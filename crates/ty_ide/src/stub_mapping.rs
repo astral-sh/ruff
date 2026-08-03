@@ -28,7 +28,7 @@ impl<'db> StubMapper<'db> {
     ///
     /// If the definition is in a stub file and a corresponding source file definition exists,
     /// returns the source file definition(s). Otherwise, returns the original definition.
-    pub(crate) fn map_definition(
+    fn map_definition(
         &self,
         def: ResolvedDefinition<'db>,
     ) -> impl Iterator<Item = ResolvedDefinition<'db>> {

@@ -59,7 +59,8 @@ impl Server {
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
 
-        let server_capabilities = Self::server_capabilities(position_encoding);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, &client_capabilities);
 
         let connection = connection.initialize_finish(
             id,
@@ -150,7 +151,41 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> types::ServerCapabilities {
+    fn supports_dynamic_formatting(client_capabilities: &ClientCapabilities) -> bool {
+        client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.formatting)
+            .and_then(|formatting| formatting.dynamic_registration)
+            .unwrap_or_default()
+    }
+
+    fn supports_dynamic_range_formatting(client_capabilities: &ClientCapabilities) -> bool {
+        client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.range_formatting)
+            .and_then(|range_formatting| range_formatting.dynamic_registration)
+            .unwrap_or_default()
+    }
+
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        client_capabilities: &ClientCapabilities,
+    ) -> types::ServerCapabilities {
+        let document_formatting_provider = if Self::supports_dynamic_formatting(client_capabilities)
+        {
+            None
+        } else {
+            Some(true.into())
+        };
+        let document_range_formatting_provider =
+            if Self::supports_dynamic_range_formatting(client_capabilities) {
+                None
+            } else {
+                Some(true.into())
+            };
+
         types::ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             code_action_provider: Some(
@@ -176,8 +211,8 @@ impl Server {
                 file_operations: None,
                 text_document_content: None,
             }),
-            document_formatting_provider: Some(true.into()),
-            document_range_formatting_provider: Some(true.into()),
+            document_formatting_provider,
+            document_range_formatting_provider,
             diagnostic_provider: Some(
                 DiagnosticOptions {
                     identifier: Some(crate::DIAGNOSTIC_NAME.into()),

@@ -806,7 +806,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 
 /// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
-pub const fn is_singleton(expr: &Expr) -> bool {
+const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)

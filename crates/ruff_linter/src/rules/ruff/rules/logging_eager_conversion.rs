@@ -64,8 +64,8 @@ use crate::rules::flake8_logging_format::rules::{LoggingCallType, find_logging_c
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.13.2")]
 pub(crate) struct LoggingEagerConversion {
-    pub(crate) format_conversion: FormatConversion,
-    pub(crate) function_name: Option<&'static str>,
+    format_conversion: FormatConversion,
+    function_name: Option<&'static str>,
 }
 
 impl Violation for LoggingEagerConversion {

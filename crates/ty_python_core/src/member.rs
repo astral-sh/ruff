@@ -80,7 +80,7 @@ impl Member {
     /// a method context, or whether the `<NAME>` actually refers to the first
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
-    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&str> {
+    fn as_instance_attribute_candidate(&self) -> Option<&str> {
         let mut segments = self.expression().segments();
         let first_segment = segments.next()?;
 
@@ -105,7 +105,7 @@ impl Member {
     }
 
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
-    pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
+    fn is_instance_attribute_named(&self, name: &str) -> bool {
         self.as_instance_attribute() == Some(name)
     }
 
@@ -164,7 +164,7 @@ pub(crate) struct MemberExpr {
 
 impl MemberExpr {
     #[cfg(test)]
-    pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
+    fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
     }
 
@@ -190,7 +190,7 @@ impl MemberExpr {
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
     ///
     /// This is the symbol on which the member access is performed.
-    pub(crate) fn symbol_name(&self) -> &str {
+    fn symbol_name(&self) -> &str {
         self.as_ref().symbol_name()
     }
 

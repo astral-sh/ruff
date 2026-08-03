@@ -25,8 +25,8 @@ import builtins
 from _typeshed import MaybeNone, SupportsWrite
 from abc import abstractmethod
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, ClassVar, Final, Literal, NoReturn, overload
-from typing_extensions import Self
+from typing import Any, ClassVar, Final, Literal, overload
+from typing_extensions import Never, Self
 
 __all__ = [
     "Option",
@@ -558,7 +558,7 @@ class OptionParser(OptionContainer):
         allow_interspersed_args.
         """
 
-    def error(self, msg: str) -> NoReturn:
+    def error(self, msg: str) -> Never:
         """error(msg : string)
 
         Print a usage message incorporating 'msg' to stderr and exit.
@@ -566,7 +566,7 @@ class OptionParser(OptionContainer):
         should either exit or raise an exception.
         """
 
-    def exit(self, status: int = 0, msg: str | None = None) -> NoReturn: ...
+    def exit(self, status: int = 0, msg: str | None = None) -> Never: ...
     def expand_prog_name(self, s: str) -> str: ...
     def format_epilog(self, formatter: HelpFormatter) -> str: ...
     def format_help(self, formatter: HelpFormatter | None = None) -> str: ...

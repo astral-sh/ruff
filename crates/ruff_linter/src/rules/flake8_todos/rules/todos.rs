@@ -351,7 +351,7 @@ fn directive_errors(context: &LintContext, directive: &TodoDirective) {
 }
 
 /// Checks for "static" errors in the comment: missing colon, missing author, etc.
-pub(crate) fn static_errors(
+fn static_errors(
     context: &LintContext,
     comment: &str,
     comment_range: TextRange,

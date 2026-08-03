@@ -3,6 +3,7 @@ use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
 use get_size2::GetSize;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -102,9 +103,10 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
+pub fn unused_bindings(db: &dyn Db, file: PythonFile<'_>) -> Box<[UnusedBinding]> {
+    let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
-    let is_stub_file = file.is_stub(db);
+    let is_stub_file = source_file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
     // A used synthetic definition counts as a use of the user-visible definitions it represents.
@@ -232,6 +234,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 mod tests {
     use super::{UnusedBinding, unused_bindings};
     use crate::db::tests::TestDbBuilder;
+    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
@@ -243,7 +246,8 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).to_vec();
+        let mut bindings =
+            unused_bindings(&db, PythonFile::new(&db, file, db.python_version())).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }

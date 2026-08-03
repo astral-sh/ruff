@@ -1,6 +1,7 @@
+use crate::ProgramEnvironment;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
-use ruff_python_ast::{self as ast, NodeIndex, name::Name};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, name::Name};
+use ruff_text_size::TextRange;
 
 use crate::{
     Db, TypeQualifiers,
@@ -9,7 +10,8 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
         SubclassOfType, Type,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
+            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicClassHeaderAnchor,
+            InstanceMemberResult, MroLookup, dynamic_class_header_range,
             typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
@@ -112,6 +114,7 @@ impl<'db> DynamicClassAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -125,7 +128,7 @@ impl<'db> DynamicClassAnchor<'db> {
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
-                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        let base = base.recursive_type_normalized_impl(db, env, div, true);
                         if nested {
                             base
                         } else {
@@ -199,7 +202,9 @@ impl<'db> DynamicClassLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let python_file = definition.python_file(db);
+            let env = ProgramEnvironment::from_file(python_file);
+            let module = parsed_module(db, python_file).load(db);
 
             let value = definition
                 .kind(db)
@@ -214,7 +219,7 @@ impl<'db> DynamicClassLiteral<'db> {
             };
 
             // Use `definition_expression_type` for deferred inference support.
-            extract_fixed_length_iterable_element_types(db, bases_arg, |expr| {
+            extract_fixed_length_iterable_element_types(db, &env, bases_arg, |expr| {
                 definition_expression_type(db, definition, expr)
             })
             .unwrap_or_else(|| Box::from([Type::unknown()]))
@@ -237,36 +242,15 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Returns the range of the `type()` call expression that created this class.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
-
-        match self.anchor(db) {
+        let anchor = match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => {
-                // For definitions, get the range from the definition's value.
-                // The `type()` call is the value of the assignment.
-                definition
-                    .kind(db)
-                    .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
-                    .range()
+                DynamicClassHeaderAnchor::Definition(*definition)
             }
             DynamicClassAnchor::ScopeOffset { offset, .. } => {
-                // For dangling `type()` calls, compute the absolute index from the offset.
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + *offset);
-
-                // Get the node and return its range.
-                let node: &ast::ExprCall = module
-                    .get_by_index(absolute_index)
-                    .try_into()
-                    .expect("scope offset should point to ExprCall");
-                node.range()
+                DynamicClassHeaderAnchor::ScopeOffset(*offset)
             }
-        }
+        };
+        dynamic_class_header_range(db, self.scope(db), anchor)
     }
 
     /// Get the metaclass of this dynamic class.
@@ -291,12 +275,13 @@ impl<'db> DynamicClassLiteral<'db> {
         db: &'db dyn Db,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
         let original_bases = self.explicit_bases(db);
+        let env = ProgramEnvironment::from_scope(self.scope(db));
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
         if original_bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return Ok(KnownClass::Type.to_class_literal(db, &env));
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
@@ -309,23 +294,23 @@ impl<'db> DynamicClassLiteral<'db> {
         // returned `Err(InvalidBases)` if any failed, causing us to return early.
         let bases: Vec<ClassBase<'db>> = original_bases
             .iter()
-            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None))
+            .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None))
             .collect();
 
         // If all bases failed to convert, return type as the metaclass.
         if bases.is_empty() {
-            return Ok(KnownClass::Type.to_class_literal(db));
+            return Ok(KnownClass::Type.to_class_literal(db, &env));
         }
 
         // Start with the first base's metaclass as the candidate.
-        let mut candidate = bases[0].metaclass(db);
+        let mut candidate = bases[0].metaclass(db, &env);
 
         // Track which base the candidate metaclass came from.
         let (mut candidate_base, rest) = bases.split_first().unwrap();
 
         // Reconcile with other bases' metaclasses.
         for base in rest {
-            let base_metaclass = base.metaclass(db);
+            let base_metaclass = base.metaclass(db, &env);
 
             // Get the ClassType for comparison.
             let Some(candidate_class) = candidate.to_class_type(db) else {
@@ -337,14 +322,14 @@ impl<'db> DynamicClassLiteral<'db> {
             };
 
             // If base's metaclass is more derived, use it.
-            if base_metaclass_class.is_subclass_of(db, candidate_class) {
+            if base_metaclass_class.is_subclass_of(db, &env, candidate_class) {
                 candidate = base_metaclass;
                 candidate_base = base;
                 continue;
             }
 
             // If candidate is already more derived, keep it.
-            if candidate_class.is_subclass_of(db, base_metaclass_class) {
+            if candidate_class.is_subclass_of(db, &env, base_metaclass_class) {
                 continue;
             }
 
@@ -373,14 +358,19 @@ impl<'db> DynamicClassLiteral<'db> {
     }
 
     /// Look up an instance member by iterating through the MRO.
-    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, self.iter_mro(db)).instance_member(name) {
+    pub(crate) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
                 KnownClass::TypedDictFallback
-                    .to_instance(db)
-                    .instance_member(db, name)
+                    .to_instance(db, env)
+                    .instance_member(db, env, name)
             }
         }
     }
@@ -393,6 +383,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
@@ -404,9 +395,10 @@ impl<'db> DynamicClassLiteral<'db> {
                 // Make this class look like a subclass of the `DataClassInstance` protocol.
                 return Place::declared(KnownClass::Dict.to_specialized_instance(
                     db,
+                    env,
                     &[
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Field.to_specialized_instance(db, &[Type::any()]),
+                        KnownClass::Str.to_instance(db, env),
+                        KnownClass::Field.to_specialized_instance(db, env, &[Type::any()]),
                     ],
                 ))
                 .with_qualifiers(TypeQualifiers::CLASS_VAR);
@@ -416,15 +408,15 @@ impl<'db> DynamicClassLiteral<'db> {
             }
         }
 
-        let result = MroLookup::new(db, self.iter_mro(db)).class_member(
+        let result = MroLookup::new(db, env, self.iter_mro(db)).class_member(
             name, policy, None,  // No inherited generic context.
             false, // Dynamic classes are never `object`.
         );
 
         match result {
-            ClassMemberResult::Done(result) => result.finalize(db),
+            ClassMemberResult::Done(result) => result.finalize(db, env),
             ClassMemberResult::TypedDict(module) => {
-                typed_dict_fallback_class_member(db, module, policy, name)
+                typed_dict_fallback_class_member(db, env, module, policy, name)
             }
         }
     }
@@ -461,7 +453,7 @@ impl<'db> DynamicClassLiteral<'db> {
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(db),
+                ClassBase::object(db, &ProgramEnvironment::from_scope(self_.scope(db))),
             ]))
         },
         heap_size=ruff_memory_usage::heap_size
@@ -484,9 +476,12 @@ impl<'db> DynamicClassLiteral<'db> {
                 // Check if the slots are non-empty
                 let is_non_empty = match ty {
                     // __slots__ = ("a", "b")
-                    Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
-                        spec.len().into_fixed_length().is_some_and(|len| len > 0)
-                    }),
+                    Type::NominalInstance(nominal) => {
+                        let env = ProgramEnvironment::from_scope(self.scope(db));
+                        nominal.tuple_spec(db, &env).is_some_and(|spec| {
+                            spec.len().into_fixed_length().is_some_and(|len| len > 0)
+                        })
+                    }
                     // __slots__ = "abc"  # Same as ("abc",)
                     Type::LiteralValue(literal) if literal.is_string() => true,
                     // Other types are considered dynamic/unknown
@@ -536,23 +531,24 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let anchor = self
             .anchor(db)
-            .recursive_type_normalized_impl(db, div, nested)?;
+            .recursive_type_normalized_impl(db, env, div, nested)?;
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
         let dataclass_params = match self.dataclass_params(db) {
-            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            Some(params) => Some(params.recursive_type_normalized_impl(db, env, div, nested)?),
             None => None,
         };
 

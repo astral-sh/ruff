@@ -13,11 +13,11 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 
-pub use grouped::GroupedEmitter;
+pub(crate) use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
-pub use sarif::SarifEmitter;
+pub(crate) use sarif::SarifEmitter;
 
 use crate::Fix;
 use crate::registry::Rule;
@@ -76,7 +76,7 @@ pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagn
 }
 
 #[expect(clippy::too_many_arguments)]
-pub fn create_lint_diagnostic<B, S>(
+pub(crate) fn create_lint_diagnostic<B, S>(
     body: B,
     suggestion: Option<S>,
     range: TextRange,
@@ -165,7 +165,7 @@ impl FileResolver for EmitterContext<'_> {
 /// Display format for [`Diagnostic`]s.
 ///
 /// The emitter serializes a slice of [`Diagnostic`]s and writes them to a [`Write`].
-pub trait Emitter {
+pub(crate) trait Emitter {
     /// Serializes the `diagnostics` and writes the output to `writer`.
     fn emit(
         &mut self,
@@ -175,7 +175,7 @@ pub trait Emitter {
     ) -> anyhow::Result<()>;
 }
 
-/// Context passed to [`Emitter`].
+/// Context used while rendering diagnostics.
 pub struct EmitterContext<'a> {
     notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
@@ -185,12 +185,7 @@ impl<'a> EmitterContext<'a> {
         Self { notebook_indexes }
     }
 
-    /// Tests if the file with `name` is a jupyter notebook.
-    pub fn is_notebook(&self, name: &str) -> bool {
-        self.notebook_indexes.contains_key(name)
-    }
-
-    pub fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
+    fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
         self.notebook_indexes.get(name)
     }
 }

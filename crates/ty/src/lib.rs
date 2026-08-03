@@ -72,7 +72,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     }
 }
 
-pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
+fn version(output_format: HelpFormat) -> Result<()> {
     let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
 
@@ -265,7 +265,7 @@ pub enum ExitStatus {
 }
 
 impl ExitStatus {
-    pub const fn is_internal_error(self) -> bool {
+    const fn is_internal_error(self) -> bool {
         matches!(self, ExitStatus::InternalError)
     }
 }
@@ -409,12 +409,17 @@ impl MainLoop {
                             }
                         }
                         MainLoopMode::Fix(mode) => {
+                            let python_version = db.python_version();
                             let result = match mode {
-                                FixMode::AddIgnore => {
-                                    suppress_all_diagnostics(db, result, &self.cancellation_token)
-                                }
+                                FixMode::AddIgnore => suppress_all_diagnostics(
+                                    db,
+                                    python_version,
+                                    result,
+                                    &self.cancellation_token,
+                                ),
                                 FixMode::ApplyFixes => fix_all_diagnostics(
                                     db,
+                                    python_version,
                                     result,
                                     Applicability::Safe,
                                     &self.cancellation_token,

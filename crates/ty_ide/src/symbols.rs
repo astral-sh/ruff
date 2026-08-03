@@ -6,8 +6,9 @@ use std::ops::Range;
 
 use regex::Regex;
 
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::{Name, UnqualifiedName};
@@ -31,7 +32,7 @@ pub struct QueryPattern {
 
 impl QueryPattern {
     /// Create a new query pattern from a literal search string given.
-    pub fn fuzzy(literal_query_string: &str) -> QueryPattern {
+    pub(crate) fn fuzzy(literal_query_string: &str) -> QueryPattern {
         let mut pattern = "(?i)".to_string();
         for ch in literal_query_string.chars() {
             pattern.push_str(&regex::escape(ch.encode_utf8(&mut [0; 4])));
@@ -50,7 +51,7 @@ impl QueryPattern {
     }
 
     /// Create a new query
-    pub fn exactly(symbol: &str) -> QueryPattern {
+    pub(crate) fn exactly(symbol: &str) -> QueryPattern {
         QueryPattern {
             re: None,
             original: symbol.to_string(),
@@ -59,7 +60,7 @@ impl QueryPattern {
     }
 
     /// Create a new query pattern that matches all symbols.
-    pub fn matches_all_symbols() -> QueryPattern {
+    pub(crate) fn matches_all_symbols() -> QueryPattern {
         QueryPattern {
             re: None,
             original: String::new(),
@@ -71,7 +72,7 @@ impl QueryPattern {
         self.is_match_symbol_name(&symbol.name)
     }
 
-    pub fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
+    pub(crate) fn is_match_symbol_name(&self, symbol_name: &str) -> bool {
         if let Some(ref re) = self.re {
             re.is_match(symbol_name)
         } else if self.original_is_exact {
@@ -91,7 +92,7 @@ impl QueryPattern {
     /// This will never return `true` incorrectly, but it may return `false`
     /// incorrectly. That is, it's possible that this query will match all
     /// inputs but this still returns `false`.
-    pub fn will_match_everything(&self) -> bool {
+    pub(crate) fn will_match_everything(&self) -> bool {
         self.re.is_none() && self.original.is_empty()
     }
 }
@@ -149,7 +150,10 @@ impl FlatSymbols {
     }
 
     /// Returns a sequence of symbols that matches the given query.
-    pub fn search(&self, query: &QueryPattern) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
+    pub(crate) fn search(
+        &self,
+        query: &QueryPattern,
+    ) -> impl Iterator<Item = (SymbolId, SymbolInfo<'_>)> {
         self.iter()
             .filter(|(_, symbol)| query.is_match_symbol(symbol))
     }
@@ -271,7 +275,7 @@ pub struct SymbolInfo<'a> {
 }
 
 impl SymbolInfo<'_> {
-    pub fn to_owned(&self) -> SymbolInfo<'static> {
+    pub(crate) fn to_owned(&self) -> SymbolInfo<'static> {
         SymbolInfo {
             name: Cow::Owned(self.name.to_string()),
             kind: self.kind,
@@ -333,7 +337,7 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
-    pub fn function_kind(name: &str, defined_in_class: bool) -> Self {
+    pub(crate) fn function_kind(name: &str, defined_in_class: bool) -> Self {
         if !defined_in_class {
             SymbolKind::Function
         } else if name == "__init__" {
@@ -362,7 +366,7 @@ impl SymbolKind {
     }
 
     /// Maps this to a "completion" kind if a sensible mapping exists.
-    pub fn to_completion_kind(self) -> Option<CompletionKind> {
+    pub(crate) fn to_completion_kind(self) -> Option<CompletionKind> {
         Some(match self {
             SymbolKind::Module => CompletionKind::Module,
             SymbolKind::Class => CompletionKind::Class,
@@ -388,7 +392,7 @@ impl SymbolKind {
 /// The flattened list includes parent/child information and can be
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
+pub(crate) fn symbols_for_file(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
@@ -407,14 +411,15 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: File) -> FlatSymbols {
     cycle_initial=|_, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
-pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbols {
+pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: PythonFile<'_>) -> FlatSymbols {
+    let source_file = file.file(db);
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
     let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
-    if file
+    if source_file
         .path(db)
         .as_system_path()
         .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
@@ -450,7 +455,7 @@ impl ImportedFrom {
 
     fn import_from(
         db: &dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'_>,
         ast: &ast::StmtImportFrom,
         kind: ImportKind,
     ) -> Option<ImportedFrom> {
@@ -591,7 +596,7 @@ impl<'db> Imports<'db> {
     fn get_module_symbols(
         &self,
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: PythonFile<'db>,
         name: &ModuleName,
     ) -> Option<&'db FlatSymbols> {
         let module_name = match self.module_names.get(name.as_str())? {
@@ -600,7 +605,7 @@ impl<'db> Imports<'db> {
             }
         };
         let module = resolve_module(db, importing_file, &module_name)?;
-        Some(symbols_for_file_global_only(db, module.file(db)?))
+        Some(symbols_for_file_global_only(db, module.python_file(db)?))
     }
 }
 
@@ -649,7 +654,11 @@ enum ImportModuleName<'db> {
 impl<'db> ImportModuleName<'db> {
     /// Converts the lazy representation of a module name into an
     /// actual `ModuleName` that can be used for module resolution.
-    fn to_module_name(self, db: &'db dyn Db, importing_file: File) -> Option<ModuleName> {
+    fn to_module_name(
+        self,
+        db: &'db dyn Db,
+        importing_file: PythonFile<'db>,
+    ) -> Option<ModuleName> {
         match self {
             ImportModuleName::Import(name) => ModuleName::new(name),
             ImportModuleName::ImportFrom { parent, child } => {
@@ -685,7 +694,7 @@ impl Ranged for AstImport<'_> {
 #[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
-    file: File,
+    file: PythonFile<'db>,
     symbols: IndexVec<SymbolId, SymbolTree>,
     symbol_stack: Vec<SymbolId>,
     /// Track if we're currently inside a function at any point.
@@ -698,6 +707,10 @@ struct SymbolVisitor<'db> {
     /// This is true even when we're inside a function definition
     /// that is inside a class.
     in_class: bool,
+    /// The statement whose expressions are currently being visited.
+    current_stmt: Option<&'db ast::Stmt>,
+    /// Whether store-context names should be excluded from the enclosing scope.
+    suppress_store_symbols: bool,
     /// When enabled, the visitor should only try to extract
     /// symbols from a module that we believed form the "exported"
     /// interface for that module. i.e., `__all__` is only respected
@@ -719,7 +732,7 @@ struct SymbolVisitor<'db> {
 }
 
 impl<'db> SymbolVisitor<'db> {
-    fn tree(db: &'db dyn Db, file: File) -> Self {
+    fn tree(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             db,
             file,
@@ -727,6 +740,8 @@ impl<'db> SymbolVisitor<'db> {
             symbol_stack: vec![],
             in_function: false,
             in_class: false,
+            current_stmt: None,
+            suppress_store_symbols: false,
             exports_only: false,
             all_origin: None,
             all_names: FxHashSet::default(),
@@ -735,7 +750,7 @@ impl<'db> SymbolVisitor<'db> {
         }
     }
 
-    fn globals(db: &'db dyn Db, file: File) -> Self {
+    fn globals(db: &'db dyn Db, file: PythonFile<'db>) -> Self {
         Self {
             exports_only: true,
             ..Self::tree(db, file)
@@ -746,7 +761,10 @@ impl<'db> SymbolVisitor<'db> {
         // If `__all__` was found but wasn't recognized,
         // then we emit a diagnostic message indicating as such.
         if self.all_invalid {
-            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
+            tracing::debug!(
+                "Invalid `__all__` in `{}`",
+                self.file.file(self.db).path(self.db)
+            );
         }
         // We want to filter out some of the symbols we collected.
         // Specifically, to respect conventions around library
@@ -818,6 +836,12 @@ impl<'db> SymbolVisitor<'db> {
         for stmt in body {
             self.visit_stmt(stmt);
         }
+    }
+
+    fn visit_nonbinding_target(&mut self, target: &'db ast::Expr) {
+        let previous = std::mem::replace(&mut self.suppress_store_symbols, true);
+        self.visit_expr(target);
+        self.suppress_store_symbols = previous;
     }
 
     /// Add a new symbol and return its ID.
@@ -1112,7 +1136,10 @@ impl<'db> SymbolVisitor<'db> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, self.file, &module_name)?;
-        Some(symbols_for_file_global_only(self.db, module.file(self.db)?))
+        Some(symbols_for_file_global_only(
+            self.db,
+            module.python_file(self.db)?,
+        ))
     }
 
     /// Add valid names from `__all__` to the set of existing `__all__`
@@ -1157,11 +1184,6 @@ impl<'db> SymbolVisitor<'db> {
             self.all_names.clear();
         }
         self.all_origin = Some(origin);
-    }
-
-    fn push_symbol(&mut self, symbol: SymbolTree) {
-        let symbol_id = self.add_symbol(symbol);
-        self.symbol_stack.push(symbol_id);
     }
 
     fn pop_symbol(&mut self) {
@@ -1239,10 +1261,8 @@ impl<'db> SymbolVisitor<'db> {
         // ... otherwise, it's exported!
         true
     }
-}
 
-impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+    fn visit_stmt_impl(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(func_def) => {
                 let kind = SymbolKind::function_kind(
@@ -1262,19 +1282,32 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     imported_from: None,
                 };
 
+                for decorator in &func_def.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+
+                let symbol_id = self.add_symbol(symbol);
+
+                if let Some(type_params) = &func_def.type_params {
+                    self.visit_type_params(type_params);
+                }
+                self.visit_parameters(&func_def.parameters);
+                if let Some(returns) = &func_def.returns {
+                    self.visit_annotation(returns);
+                }
+
                 if self.exports_only {
-                    self.add_symbol(symbol);
                     // If global_only, don't walk function bodies
                     return;
                 }
 
-                self.push_symbol(symbol);
+                self.symbol_stack.push(symbol_id);
 
                 // Mark that we're entering a function scope
                 let was_in_function = self.in_function;
                 self.in_function = true;
 
-                source_order::walk_stmt(self, stmt);
+                self.visit_body(&func_def.body);
 
                 // Restore the previous function scope state
                 self.in_function = was_in_function;
@@ -1292,8 +1325,20 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     imported_from: None,
                 };
 
+                for decorator in &class_def.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+
+                let symbol_id = self.add_symbol(symbol);
+
+                if let Some(type_params) = &class_def.type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = &class_def.arguments {
+                    self.visit_arguments(arguments);
+                }
+
                 if self.exports_only {
-                    self.add_symbol(symbol);
                     // If global_only, don't walk class bodies
                     return;
                 }
@@ -1302,8 +1347,8 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 let was_in_class = self.in_class;
                 self.in_class = true;
 
-                self.push_symbol(symbol);
-                source_order::walk_stmt(self, stmt);
+                self.symbol_stack.push(symbol_id);
+                self.visit_body(&class_def.body);
                 self.pop_symbol();
 
                 // Restore the previous class scope state
@@ -1321,28 +1366,23 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             }
             ast::Stmt::Assign(assign) => {
                 self.add_all_assignment(&assign.targets, Some(&assign.value));
-
-                for target in &assign.targets {
-                    let ast::Expr::Name(name) = target else {
-                        continue;
-                    };
-                    self.add_assignment(stmt, name);
-                }
+                source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::AnnAssign(ann_assign) => {
                 self.add_all_assignment(
                     std::slice::from_ref(&ann_assign.target),
                     ann_assign.value.as_deref(),
                 );
-
-                let ast::Expr::Name(name) = &*ann_assign.target else {
-                    return;
-                };
-                self.add_assignment(stmt, name);
+                source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
+                if !target.is_name_expr() {
+                    self.visit_expr(target);
+                }
+                self.visit_expr(value);
+
                 // We don't care about `__all__` unless we're
                 // specifically looking for exported symbols.
                 if !self.exports_only {
@@ -1367,6 +1407,8 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 }
             }
             ast::Stmt::Expr(expr) => {
+                source_order::walk_stmt(self, stmt);
+
                 // We don't care about `__all__` unless we're
                 // specifically looking for exported symbols.
                 if !self.exports_only {
@@ -1398,8 +1440,6 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 if !self.update_all_by_call_idiom(attr, arguments) {
                     self.all_invalid = true;
                 }
-
-                source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::Import(import) => {
                 // We ignore any names introduced by imports
@@ -1449,15 +1489,72 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
             // statements. We just assume that all `if` statements are
             // always `True`. This applies to symbols in general but
             // also `__all__`.
-            _ => {
-                source_order::walk_stmt(self, stmt);
+            _ => source_order::walk_stmt(self, stmt),
+        }
+    }
+}
+
+impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
+    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+        let previous_stmt = self.current_stmt.replace(stmt);
+        self.visit_stmt_impl(stmt);
+        self.current_stmt = previous_stmt;
+    }
+
+    fn visit_expr(&mut self, expr: &'db ast::Expr) {
+        if self.in_function {
+            return;
+        }
+
+        match expr {
+            ast::Expr::Name(name)
+                if name.ctx.is_store()
+                    && !self.suppress_store_symbols
+                    && let Some(stmt) = self.current_stmt =>
+            {
+                self.add_assignment(stmt, name);
+
+                if name.id != "__all__" {
+                    return;
+                }
+
+                // We don't care about `__all__` unless we're
+                // specifically looking for exported symbols.
+                if !self.exports_only {
+                    return;
+                }
+
+                // We can't update `__all__` if it doesn't already exist.
+                if self.all_origin.is_none() {
+                    return;
+                }
+
+                if !is_recognized_all_assignment(stmt, name) {
+                    self.all_invalid = true;
+                }
             }
+            ast::Expr::Lambda(lambda) => {
+                if let Some(parameters) = &lambda.parameters {
+                    self.visit_parameters(parameters);
+                }
+
+                let was_in_function = self.in_function;
+                self.in_function = true;
+                self.visit_expr(&lambda.body);
+                self.in_function = was_in_function;
+            }
+            _ => source_order::walk_expr(self, expr),
         }
     }
 
-    // TODO: We might consider handling walrus expressions
-    // here, since they can be used to introduce new names.
-    fn visit_expr(&mut self, _expr: &ast::Expr) {}
+    fn visit_comprehension(&mut self, comprehension: &'db ast::Comprehension) {
+        self.visit_nonbinding_target(&comprehension.target);
+        self.visit_expr(&comprehension.iter);
+
+        for condition in &comprehension.ifs {
+            self.visit_expr(condition);
+        }
+    }
 }
 
 /// Represents where an `__all__` has been defined.
@@ -1476,6 +1573,19 @@ fn is_dunder_all(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
 }
 
+fn is_recognized_all_assignment(stmt: &ast::Stmt, name: &ast::ExprName) -> bool {
+    match stmt {
+        ast::Stmt::Assign(assign) => assign
+            .targets
+            .first()
+            .is_some_and(|target| is_dunder_all(target) && target.range() == name.range()),
+        ast::Stmt::AnnAssign(assign) => {
+            is_dunder_all(&assign.target) && assign.target.range() == name.range()
+        }
+        _ => false,
+    }
+}
+
 /// Create and return a string representing a name from the given
 /// expression, or `None` if it is an invalid expression for a
 /// `__all__` element.
@@ -1489,6 +1599,7 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
+    use ruff_db::PythonFile;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
@@ -1549,6 +1660,121 @@ def quux():
         Foo :: Class
         quux :: Function
         ",
+        );
+    }
+
+    #[test]
+    fn exports_with_statement_targets() {
+        insta::assert_snapshot!(
+            public_test("\
+from contextlib import nullcontext
+
+with nullcontext() as module_target, nullcontext((1, 2)) as (left, right):
+    body_target = 1
+
+class C:
+    with nullcontext() as class_target:
+        body_field = 1
+
+def function():
+    with nullcontext() as local_target:
+        pass
+").exports(),
+            @"
+        module_target :: Variable
+        left :: Variable
+        right :: Variable
+        body_target :: Variable
+        C :: Class
+        function :: Function
+        ",
+        );
+    }
+
+    #[test]
+    fn exports_store_context_targets() {
+        let test = public_test(
+            "\
+first, *rest, LAST = values
+for loop_left, [loop_right, *loop_rest] in rows:
+    pass
+with manager() as [with_left, *with_rest]:
+    pass
+captured = (walrus := 1)
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "first :: Variable\n\
+rest :: Variable\n\
+LAST :: Constant\n\
+loop_left :: Variable\n\
+loop_right :: Variable\n\
+loop_rest :: Variable\n\
+with_left :: Variable\n\
+with_rest :: Variable\n\
+captured :: Variable\n\
+walrus :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_exclude_comprehension_targets() {
+        let test = public_test(
+            "\
+result = [item for item in values if (leaked := item)]
+generator = (other for other in values)
+lambda_value = lambda: (lambda_local := 1)
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "result :: Variable\n\
+leaked :: Variable\n\
+generator :: Variable\n\
+lambda_value :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_with_target() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+with manager() as __all__:
+    pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_named_expression() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+result = (__all__ := unknown)
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable\n\
+result :: Variable"
         );
     }
 
@@ -2937,7 +3163,10 @@ class C: ...
         /// The path given must have been written to this test's salsa DB.
         fn exported_symbols_for(&self, path: impl AsRef<SystemPath>) -> &super::FlatSymbols {
             let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
-            symbols_for_file_global_only(&self.db, file)
+            symbols_for_file_global_only(
+                &self.db,
+                PythonFile::new(&self.db, file, self.db.python_version()),
+            )
         }
 
         /// Returns the exports from the module at the given path.
@@ -2972,7 +3201,7 @@ class C: ...
     }
 
     impl PublicTestBuilder {
-        pub(super) fn build(&self) -> PublicTest {
+        fn build(&self) -> PublicTest {
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
@@ -3006,7 +3235,7 @@ class C: ...
             }
         }
 
-        pub(super) fn source(
+        fn source(
             &mut self,
             path: impl Into<SystemPathBuf>,
             contents: impl AsRef<str>,
@@ -3017,7 +3246,7 @@ class C: ...
             self
         }
 
-        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut PublicTestBuilder {
+        fn python_version(&mut self, version: PythonVersion) -> &mut PublicTestBuilder {
             self.python_version = Some(version);
             self
         }

@@ -169,10 +169,8 @@ class GoodWithClassInitFalse:
 
 GoodWithClassInitFalse("value")
 
-# Re-enabling `init` makes the inherited default-before-required ordering invalid at runtime.
-# TODO: error: [dataclass-field-order]
 @dataclass
-class BadWithReenabledInit(GoodWithClassInitFalse):
+class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [dataclass-field-order]
     pass
 ```
 
@@ -1870,6 +1868,256 @@ Derived(1, "a")
 Derived(True)
 ```
 
+### Required fields after inherited defaults
+
+A required positional field cannot follow a positional field with a default inherited from a
+dataclass base.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class DefaultedBase:
+    x: int = 1
+
+@dataclass
+class InvalidChild(DefaultedBase):
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    y: int
+```
+
+A default factory also makes an inherited field optional.
+
+```py
+@dataclass
+class DefaultFactoryBase:
+    x: list[int] = field(default_factory=list)
+
+@dataclass
+class InvalidDefaultFactoryChild(DefaultFactoryBase):
+    # error: [dataclass-field-order]
+    y: int
+```
+
+An ordering violation already present in an ancestor is not reported again on its descendants.
+
+```py
+@dataclass
+class InvalidAncestor:
+    optional: int = 1
+    required: int  # error: [dataclass-field-order]
+
+@dataclass
+class ChildOfInvalidAncestor(InvalidAncestor):
+    pass
+
+@dataclass
+class GrandchildOfInvalidAncestor(ChildOfInvalidAncestor):
+    pass
+```
+
+Suppressing the original diagnostic also suppresses that inherited violation throughout the
+hierarchy.
+
+```py
+@dataclass
+class IgnoredInvalidAncestor:
+    optional: int = 1
+    required: int  # ty: ignore[dataclass-field-order]
+
+@dataclass
+class ChildOfIgnoredAncestor(IgnoredInvalidAncestor):
+    pass
+
+@dataclass
+class GrandchildOfIgnoredAncestor(ChildOfIgnoredAncestor):
+    pass
+```
+
+Redeclaring fields can introduce a new violation even when the same required field had an ignored
+violation in an ancestor.
+
+```py
+@dataclass
+class IgnoredViolationsBase:
+    first: int = 1
+    second: int  # ty: ignore[dataclass-field-order]
+    third: int  # ty: ignore[dataclass-field-order]
+
+@dataclass
+class NewlyInvalidOverride(IgnoredViolationsBase):
+    first: int = field()
+    second: int = 1
+    third: int = field()  # error: [dataclass-field-order]
+```
+
+Combining independently valid bases can introduce a new ordering violation even when the child
+declares no fields.
+
+```py
+@dataclass
+class DefaultOnlyBase:
+    optional: int = 1
+
+@dataclass
+class RequiredOnlyBase:
+    required: int
+
+@dataclass
+class InvalidMergedBases(RequiredOnlyBase, DefaultOnlyBase):  # error: [dataclass-field-order]
+    pass
+
+@dataclass
+class ValidMergedBases(DefaultOnlyBase, RequiredOnlyBase):
+    pass
+```
+
+Inherited fields that are keyword-only or excluded from `__init__` do not affect positional field
+ordering, and a required child field can itself be keyword-only.
+
+```py
+@dataclass
+class KeywordOnlyBase:
+    x: int = field(default=1, kw_only=True)
+
+@dataclass
+class ValidKeywordOnlyBaseChild(KeywordOnlyBase):
+    y: int
+
+@dataclass
+class NonInitBase:
+    x: int = field(default=1, init=False)
+
+@dataclass
+class ValidNonInitBaseChild(NonInitBase):
+    y: int
+
+@dataclass
+class ValidKeywordOnlyChild(DefaultedBase):
+    y: int = field(kw_only=True)
+```
+
+Overriding a field preserves its original position in the inherited field order. Removing its
+default permits later required fields, while introducing a default before another inherited required
+field is invalid.
+
+```py
+@dataclass
+class ValidRequiredOverride(DefaultedBase):
+    x: int = field()
+    y: int
+
+@dataclass
+class RequiredBase:
+    first: int
+    second: int
+
+@dataclass
+class InvalidDefaultOverride(RequiredBase):  # error: [dataclass-field-order]
+    first: int = 1
+```
+
+### Class variables overriding inherited fields
+
+Redeclaring an inherited instance field as a class variable removes it from the generated
+constructor and positional ordering checks. The override itself remains invalid.
+
+```py
+from dataclasses import InitVar, dataclass, field
+from typing import ClassVar
+
+@dataclass
+class DefaultedFieldBase:
+    x: int = 1
+
+@dataclass
+class ClassVariableOverride(DefaultedFieldBase):
+    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    y: int
+
+reveal_type(ClassVariableOverride.__init__)  # revealed: (self: ClassVariableOverride, y: int) -> None
+
+@dataclass
+class InheritedClassVariableOverride(ClassVariableOverride):
+    z: int
+
+reveal_type(InheritedClassVariableOverride.__init__)  # revealed: (self: InheritedClassVariableOverride, y: int, z: int) -> None
+```
+
+A class variable declared by an undecorated intermediate class does not remove the inherited
+dataclass field.
+
+```py
+class OrdinaryClassVariableOverride(DefaultedFieldBase):
+    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+
+@dataclass
+class DataclassAfterOrdinaryOverride(OrdinaryClassVariableOverride):
+    y: int  # error: [dataclass-field-order]
+```
+
+An annotation-only class variable also masks the inherited instance field.
+
+```py
+@dataclass
+class AnnotationOnlyClassVariableOverride(DefaultedFieldBase):
+    x: ClassVar[int]  # error: [invalid-attribute-override]
+    y: int
+
+reveal_type(AnnotationOnlyClassVariableOverride.__init__)  # revealed: (self: AnnotationOnlyClassVariableOverride, y: int) -> None
+```
+
+Restoring an instance field in a later subclass preserves the field's original inherited position.
+
+```py
+@dataclass
+class RestoredInstanceField(ClassVariableOverride):
+    x: int = field()  # error: [invalid-attribute-override]
+
+reveal_type(RestoredInstanceField.__init__)  # revealed: (self: RestoredInstanceField, x: int, y: int) -> None
+```
+
+An initialization-only field overrides an inherited class variable and remains a constructor
+parameter.
+
+```py
+@dataclass
+class ClassVariableBase:
+    value: ClassVar[int]
+
+@dataclass
+class InitializationVariableOverride(ClassVariableBase):
+    value: InitVar[int]
+
+reveal_type(InitializationVariableOverride.__init__)  # revealed: (self: InitializationVariableOverride, value: int) -> None
+InitializationVariableOverride(1)
+```
+
+### Fields named after generated dataclass attributes
+
+Fields named after generated dataclass attributes are still ordinary constructor parameters.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class DataclassFieldsConstructorField:
+    __dataclass_fields__: int
+
+DataclassFieldsConstructorField(1)
+
+@dataclass
+class DataclassParamsConstructorField:
+    __dataclass_params__: int
+
+DataclassParamsConstructorField(1)
+```
+
 ### Overwriting attributes from base class
 
 The following example comes from the
@@ -2223,7 +2471,8 @@ asdict(Foo)
 ## `dataclasses.is_dataclass`
 
 `is_dataclass` recognizes both dataclass instances and dataclass classes. A concrete dataclass
-instance always satisfies the `DataclassInstance` protocol, so the negative branch is unreachable:
+instance always satisfies the `DataclassInstance` protocol, but we do not currently recognize that
+the negative branch is unreachable:
 
 ```py
 from dataclasses import dataclass, is_dataclass
@@ -2234,7 +2483,8 @@ class Event:
 
 def check(event: Event) -> None:
     if not is_dataclass(event):
-        reveal_type(event)  # revealed: Never
+        # TODO: This should be `Never`.
+        reveal_type(event)  # revealed: Event & ~DataclassInstance & ~type[DataclassInstance]
 ```
 
 ## `dataclasses.KW_ONLY`

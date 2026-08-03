@@ -695,7 +695,7 @@ impl Configuration {
     }
 
     #[must_use]
-    pub fn apply_fallbacks(
+    pub(crate) fn apply_fallbacks(
         mut self,
         origin: ConfigurationOrigin,
         initial_config_path: &Path,
@@ -1232,7 +1232,7 @@ impl LintConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    fn combine(self, config: Self) -> Self {
         let mut rule_selections = config.rule_selections;
         rule_selections.extend(self.rule_selections);
 
@@ -1364,7 +1364,7 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
@@ -1425,7 +1425,7 @@ impl AnalyzeConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
@@ -1458,7 +1458,7 @@ impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
 
 /// Given a list of source paths, which could include glob patterns, resolve the
 /// matching paths.
-pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
+fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
     let expansions = src
         .iter()
         .map(shellexpand::full)

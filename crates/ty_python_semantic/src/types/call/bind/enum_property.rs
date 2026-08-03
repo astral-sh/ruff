@@ -1,9 +1,8 @@
-use itertools::Itertools;
-
 use super::Bindings;
 use crate::db::Db;
 use crate::types::call::CallArguments;
 use crate::types::{KnownClass, PropertyInstanceType, Type};
+use itertools::Itertools;
 
 impl<'db> Bindings<'db> {
     /// Replaces constructed `enum.property` instances with the property type derived from their

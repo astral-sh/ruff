@@ -186,7 +186,7 @@ impl DisplayParseError {
     }
 
     /// Create a [`DisplayParseError`] from a [`ParseError`] and a [`SourceCode`].
-    pub fn from_source_code(
+    fn from_source_code(
         error: ParseError,
         path: Option<PathBuf>,
         source_code: &SourceCode,

@@ -17,8 +17,9 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, ProgramEnvironment,
+        StaticClassLiteral, SubclassOfInner, Type, TypeVarBoundOrConstraints,
+        class::CodeGeneratorKind,
     },
 };
 use ty_python_core::{
@@ -32,13 +33,16 @@ pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let env = ProgramEnvironment::from_scope(scope_id);
+
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
+    let bindings_ctx = env.clone();
 
     use_def_map
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
-            let place_result = place_from_declarations(db, declarations);
+            let place_result = place_from_declarations(db, &env, declarations);
             let first_reachable_definition = place_result.first_declaration?;
             let ty = place_result
                 .ignore_conflicting_declarations()
@@ -59,7 +63,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let PlaceWithDefinition {
                     place,
                     first_definition,
-                } = place_from_bindings(db, bindings);
+                } = place_from_bindings(db, &bindings_ctx, bindings);
 
                 let first_reachable_definition = first_definition?;
                 let ty = place.ignore_possibly_undefined()?;
@@ -83,6 +87,8 @@ pub(crate) fn all_reachable_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let env = ProgramEnvironment::from_scope(scope_id);
+
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -91,7 +97,7 @@ pub(crate) fn all_reachable_members<'db>(
         .flat_map(move |(symbol_id, declarations, bindings)| {
             let symbol = table.symbol(symbol_id);
 
-            let declaration_place_result = place_from_declarations(db, declarations);
+            let declaration_place_result = place_from_declarations(db, &env, declarations);
             let declaration =
                 declaration_place_result
                     .first_declaration
@@ -110,7 +116,7 @@ pub(crate) fn all_reachable_members<'db>(
                         })
                     });
 
-            let place_with_definition = place_from_bindings(db, bindings);
+            let place_with_definition = place_from_bindings(db, &env, bindings);
             let binding =
                 place_with_definition
                     .first_definition
@@ -153,15 +159,15 @@ struct AllMembers<'db> {
 }
 
 impl<'db> AllMembers<'db> {
-    fn of(db: &'db dyn Db, ty: Type<'db>) -> Self {
+    fn of(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
         let mut all_members = Self {
             members: FxHashSet::default(),
         };
-        all_members.extend_with_type(db, ty);
+        all_members.extend_with_type(db, env, ty);
         all_members
     }
 
-    fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+    fn extend_with_type(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         match ty {
             Type::Union(union) => {
                 fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
@@ -179,13 +185,13 @@ impl<'db> AllMembers<'db> {
 
                 let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
                     Type::Union(union) => union,
-                    ty => return self.extend_with_type(db, ty),
+                    ty => return self.extend_with_type(db, env, ty),
                 };
                 self.members.extend(
                     union
                         .elements(db)
                         .iter()
-                        .map(|ty| AllMembers::of(db, *ty).members)
+                        .map(|ty| AllMembers::of(db, env, *ty).members)
                         .reduce(|acc, members| acc.intersection(&members).cloned().collect())
                         .unwrap_or_default(),
                 );
@@ -195,84 +201,117 @@ impl<'db> AllMembers<'db> {
                 intersection
                     .positive(db)
                     .iter()
-                    .map(|ty| AllMembers::of(db, *ty).members)
+                    .map(|ty| AllMembers::of(db, env, *ty).members)
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
                     .unwrap_or_default(),
             ),
 
             Type::EnumComplement(complement) => {
-                self.extend_with_type(db, complement.to_intersection(db));
+                self.extend_with_type(db, env, complement.to_intersection(db, env));
             }
 
             Type::NominalInstance(instance) => {
-                let class = instance.class(db);
+                let class = instance.class(db, env);
                 if let Some((class_literal, _)) = class.static_class_literal(db) {
-                    self.extend_with_instance_members(db, ty, class_literal);
-                    self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
+                    self.extend_with_instance_members(db, env, ty, class_literal);
+                    self.extend_with_synthetic_members(
+                        db,
+                        env,
+                        ty,
+                        ClassLiteral::Static(class_literal),
+                    );
                 } else {
                     // For dynamic classes, we can't enumerate instance members (requires body scope),
                     // but we can still add synthetic members for dataclass-like classes.
-                    self.extend_with_synthetic_members(db, ty, class.class_literal(db));
+                    self.extend_with_synthetic_members(db, env, ty, class.class_literal(db));
                 }
             }
 
             Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, newtype.concrete_base_type(db));
+                self.extend_with_type(db, env, newtype.concrete_base_type(db));
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(
+                    db,
+                    env,
+                    KnownClass::TypedDictFallback.to_class_literal(db, env),
+                );
             }
 
             Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(
+                    db,
+                    env,
+                    KnownClass::TypedDictFallback.to_class_literal(db, env),
+                );
             }
 
-            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db, env) => {
+                self.extend_with_type(
+                    db,
+                    env,
+                    KnownClass::TypedDictFallback.to_class_literal(db, env),
+                );
             }
 
             Type::ClassLiteral(class_literal) => {
-                self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal);
-                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
+                self.extend_with_class_members(db, env, ty, class_literal);
+                self.extend_with_synthetic_members(db, env, ty, class_literal);
+                self.extend_with_metaclass_members(db, env, ty, class_literal.metaclass(db));
             }
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
-                self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
-                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
+                self.extend_with_class_members(db, env, ty, ClassLiteral::Static(class_literal));
+                self.extend_with_synthetic_members(
+                    db,
+                    env,
+                    ty,
+                    ClassLiteral::Static(class_literal),
+                );
+                self.extend_with_metaclass_members(db, env, ty, class_literal.metaclass(db));
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => {
-                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                    self.extend_with_type(db, env, KnownClass::Type.to_instance(db, env));
                 }
                 SubclassOfInner::Protocol(protocol) => {
                     if let Some((class_literal, _)) = protocol
                         .class_origin(db)
                         .and_then(|origin| origin.static_class_literal(db))
                     {
-                        self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                        self.extend_with_class_members(
+                            db,
+                            env,
+                            ty,
+                            ClassLiteral::Static(class_literal),
+                        );
                         self.extend_with_synthetic_members(
                             db,
+                            env,
                             ty,
                             ClassLiteral::Static(class_literal),
                         );
                     }
                     // A structural implementation can use any metaclass, so only members of
                     // `type` itself are guaranteed in addition to the protocol interface.
-                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
+                    self.extend_with_type(db, env, KnownClass::Type.to_instance(db, env));
                 }
                 _ => {
-                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db)
+                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db, env)
                         && let Some((class_literal, _)) = class_type.static_class_literal(db)
                     {
                         let static_class = ClassLiteral::Static(class_literal);
-                        self.extend_with_class_members(db, ty, static_class);
-                        self.extend_with_synthetic_members(db, ty, static_class);
-                        self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
+                        self.extend_with_class_members(db, env, ty, static_class);
+                        self.extend_with_synthetic_members(db, env, ty, static_class);
+                        self.extend_with_metaclass_members(
+                            db,
+                            env,
+                            ty,
+                            class_literal.metaclass(db),
+                        );
                     }
                 }
             },
@@ -283,25 +322,27 @@ impl<'db> AllMembers<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeForm(_) => {
-                self.extend_with_type(db, Type::object());
+                self.extend_with_type(db, env, Type::object());
             }
 
-            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+            Type::TypeAlias(alias) => {
+                self.extend_with_type(db, env, alias.value_type(db));
+            }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                     None => {
-                        self.extend_with_type(db, Type::object());
+                        self.extend_with_type(db, env, Type::object());
                     }
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.extend_with_type(db, bound);
+                        self.extend_with_type(db, env, bound);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         self.members.extend(
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|ty| AllMembers::of(db, *ty).members)
+                                .map(|ty| AllMembers::of(db, env, *ty).members)
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
@@ -325,65 +366,76 @@ impl<'db> AllMembers<'db> {
             | Type::KnownInstance(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
-            | Type::TypeGuard(_) => match ty.to_meta_type(db) {
+            | Type::TypeGuard(_) => match ty.to_meta_type(db, env) {
                 Type::ClassLiteral(class_literal) => {
-                    self.extend_with_class_members(db, ty, class_literal);
+                    self.extend_with_class_members(db, env, ty, class_literal);
                 }
                 Type::SubclassOf(subclass_of) => {
-                    if let Some(class) = subclass_of.subclass_of().into_class(db)
+                    if let Some(class) = subclass_of.subclass_of().into_class(db, env)
                         && let Some((class_literal, _)) = class.static_class_literal(db)
                     {
-                        self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                        self.extend_with_class_members(
+                            db,
+                            env,
+                            ty,
+                            ClassLiteral::Static(class_literal),
+                        );
                     }
                 }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                    self.extend_with_class_members(
+                        db,
+                        env,
+                        ty,
+                        ClassLiteral::Static(class_literal),
+                    );
                 }
                 _ => {}
             },
 
             Type::TypedDict(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
-                    self.extend_with_class_members(db, ty, class_literal);
+                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db, env) {
+                    self.extend_with_class_members(db, env, ty, class_literal);
                 }
 
                 if let Type::ClassLiteral(ClassLiteral::Static(class)) =
-                    KnownClass::TypedDictFallback.to_class_literal(db)
+                    KnownClass::TypedDictFallback.to_class_literal(db, env)
                 {
-                    self.extend_with_instance_members(db, ty, class);
+                    self.extend_with_instance_members(db, env, ty, class);
                 }
             }
 
             Type::ModuleLiteral(literal) => {
+                let module = literal.module(db);
                 // Looking up `__file__` on `types.ModuleType` will not give as precise a type
                 // as we infer in type inference, but it's confusing if autocomplete etc.
                 // shows a different type in the tooltip to the one inferred by the type checker.
-                let dunder_file_type = if literal.module(db).file(db).is_some() {
-                    KnownClass::Str.to_instance(db)
+                let dunder_file_type = if module.file(db).is_some() {
+                    KnownClass::Str.to_instance(db, env)
                 } else {
-                    Type::none(db)
+                    Type::none(db, env)
                 };
                 self.members.insert(Member {
                     name: Name::new_static("__file__"),
                     ty: dunder_file_type,
                 });
 
-                self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
-                let module = literal.module(db);
+                self.extend_with_type(db, env, KnownClass::ModuleType.to_instance(db, env));
 
-                let Some(file) = module.file(db) else {
+                let Some(python_file) = module.python_file(db) else {
                     return;
                 };
+                let file = python_file.file(db);
 
-                let module_scope = global_scope(db, file);
+                let module_scope = global_scope(db, python_file);
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
-                        imported_symbol(db, Some(file), symbol_name, None).place
+                        imported_symbol(db, env, Some(python_file), symbol_name, None).place
                     else {
                         continue;
                     };
@@ -464,6 +516,7 @@ impl<'db> AllMembers<'db> {
     fn extend_with_class_members(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
@@ -474,7 +527,7 @@ impl<'db> AllMembers<'db> {
         {
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
-                let result = ty.member(db, memberdef.member.name.as_str());
+                let result = ty.member(db, env, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
@@ -493,6 +546,7 @@ impl<'db> AllMembers<'db> {
     fn extend_with_metaclass_members(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         metaclass: Type<'db>,
     ) {
@@ -500,9 +554,9 @@ impl<'db> AllMembers<'db> {
             return;
         };
 
-        self.extend_with_class_members(db, ty, metaclass.class_literal(db));
+        self.extend_with_class_members(db, env, ty, metaclass.class_literal(db));
         if let Some((metaclass, _)) = metaclass.static_class_literal(db) {
-            self.extend_with_instance_members(db, ty, metaclass);
+            self.extend_with_instance_members(db, env, ty, metaclass);
         }
     }
 
@@ -510,18 +564,19 @@ impl<'db> AllMembers<'db> {
     fn extend_with_instance_members_for_class(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
-        let file = class_body_scope.file(db);
-        let index = semantic_index(db, file);
+        let python_file = class_body_scope.python_file(db);
+        let index = semantic_index(db, python_file);
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {
                     continue;
                 };
-                let result = ty.member(db, name);
+                let result = ty.member(db, env, name);
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
                 };
@@ -538,7 +593,7 @@ impl<'db> AllMembers<'db> {
         // member, e.g., `SomeClass.__delattr__` is not a bound
         // method, but `instance_of_SomeClass.__delattr__` is.
         for memberdef in all_end_of_scope_members(db, class_body_scope) {
-            let result = ty.member(db, memberdef.member.name.as_str());
+            let result = ty.member(db, env, memberdef.member.name.as_str());
             let Some(ty) = result.place.ignore_possibly_undefined() else {
                 continue;
             };
@@ -553,6 +608,7 @@ impl<'db> AllMembers<'db> {
     fn extend_with_instance_members(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
@@ -561,7 +617,7 @@ impl<'db> AllMembers<'db> {
             .filter_map(ClassBase::into_class)
         {
             if let Some((class_literal, _)) = class.static_class_literal(db) {
-                self.extend_with_instance_members_for_class(db, ty, class_literal);
+                self.extend_with_instance_members_for_class(db, env, ty, class_literal);
             }
         }
     }
@@ -569,15 +625,24 @@ impl<'db> AllMembers<'db> {
     fn extend_with_synthetic_members(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
         match CodeGeneratorKind::from_class(db, class_literal) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
+                    self.extend_with_type(
+                        db,
+                        env,
+                        KnownClass::NamedTupleFallback.to_instance(db, env),
+                    );
                 } else {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                    self.extend_with_type(
+                        db,
+                        env,
+                        KnownClass::NamedTupleFallback.to_class_literal(db, env),
+                    );
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
@@ -592,7 +657,7 @@ impl<'db> AllMembers<'db> {
                     if let Place::Defined(DefinedPlace {
                         ty: synthetic_member,
                         ..
-                    }) = ty.member(db, attr).place
+                    }) = ty.member(db, env, attr).place
                     {
                         self.members.insert(Member {
                             name: Name::from(*attr),
@@ -609,13 +674,13 @@ impl<'db> AllMembers<'db> {
 /// A member of a type or scope, with the first reachable definition of that member.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
-    pub member: Member<'db>,
-    pub first_reachable_definition: Definition<'db>,
+    pub(crate) member: Member<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A member of a type or scope.
 ///
-/// In the context of the [`all_members`] routine, this represents
+/// In the context of the `all_members` routine, this represents
 /// a single item in (ideally) the list returned by `dir(object)`.
 ///
 /// The equality, comparison and hashing traits implemented for
@@ -628,8 +693,8 @@ pub struct MemberWithDefinition<'db> {
 /// ordered comparisons.
 #[derive(Clone, Debug)]
 pub struct Member<'db> {
-    pub name: Name,
-    pub ty: Type<'db>,
+    pub(crate) name: Name,
+    pub(crate) ty: Type<'db>,
 }
 
 impl std::hash::Hash for Member<'_> {
@@ -660,6 +725,10 @@ impl<'db> PartialOrd for Member<'db> {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
-    AllMembers::of(db, ty).members
+pub(crate) fn all_members<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> FxHashSet<Member<'db>> {
+    AllMembers::of(db, env, ty).members
 }

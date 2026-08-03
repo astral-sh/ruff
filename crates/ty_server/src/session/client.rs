@@ -118,7 +118,7 @@ impl Client {
     ///
     /// This is useful for notifications that don't require any data.
     #[expect(dead_code)]
-    pub(crate) fn send_notification_no_params(&self, method: &str) {
+    fn send_notification_no_params(&self, method: &str) {
         if let Err(err) =
             self.client_sender
                 .send(lsp_server::Message::Notification(Notification::new(

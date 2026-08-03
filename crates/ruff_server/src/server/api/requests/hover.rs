@@ -43,7 +43,7 @@ impl super::BackgroundDocumentRequestHandler for Hover {
     }
 }
 
-pub(crate) fn hover(
+fn hover(
     snapshot: &DocumentSnapshot,
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {

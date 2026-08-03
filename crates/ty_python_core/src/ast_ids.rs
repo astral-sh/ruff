@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
@@ -55,7 +55,7 @@ impl AstIds {
     }
 }
 
-fn ast_ids(db: &dyn Db, file: File) -> &AstIds {
+fn ast_ids<'db>(db: &'db dyn Db, file: PythonFile<'db>) -> &'db AstIds {
     semantic_index(db, file).ast_ids()
 }
 
@@ -66,46 +66,46 @@ pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
     /// Returns the ID that uniquely identifies the use in its scope.
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId;
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId;
 }
 
 impl HasScopedUseId for ast::Identifier {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId {
         let ast_ids = ast_ids(db, file);
         ast_ids.use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprName {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::ExprAttribute {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::ExprSubscript {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::Keyword {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId {
         let ast_ids = ast_ids(db, file);
         ast_ids.use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprRef<'_> {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: PythonFile<'_>) -> ScopedUseId {
         let ast_ids = ast_ids(db, file);
         ast_ids.use_id(*self)
     }

@@ -14,6 +14,7 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
@@ -27,6 +28,7 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::lint::RuleSelection;
 
 mod db;
@@ -176,7 +178,7 @@ impl Project {
     ///
     /// Program-settings diagnostics are accepted separately so callers do not need to know how to
     /// convert and merge them into the stored project settings diagnostics.
-    pub(crate) fn from_metadata(
+    fn from_metadata(
         db: &dyn Db,
         metadata: ProjectMetadata,
         settings: Settings,
@@ -199,7 +201,7 @@ impl Project {
     /// Permanently freezes the most heavily read immutable project inputs.
     ///
     /// This is intentionally not exhaustive.
-    pub(crate) fn freeze(self, db: &mut dyn Db) {
+    fn freeze(self, db: &mut dyn Db) {
         let durability = Durability::NEVER_CHANGE;
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
@@ -234,7 +236,7 @@ impl Project {
         self.metadata(db).root()
     }
 
-    pub fn name(self, db: &dyn Db) -> &str {
+    fn name(self, db: &dyn Db) -> &str {
         self.metadata(db).name()
     }
 
@@ -259,7 +261,7 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
-    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),
@@ -325,7 +327,7 @@ impl Project {
     ///
     /// This is used when a change affects [`ty_python_core::program::ProgramSettings`] without
     /// reloading the full project.
-    pub(crate) fn update_settings_diagnostics(
+    fn update_settings_diagnostics(
         self,
         db: &mut dyn Db,
         settings_diagnostics: Vec<OptionDiagnostic>,
@@ -356,7 +358,7 @@ impl Project {
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
-    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
+    fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -392,8 +394,9 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
+                let python_file = PythonFile::new(db, file, db.python_version());
 
-                match check_file_impl(db, file) {
+                match check_file_impl(db, python_file) {
                     Ok(diagnostics) => {
                         reporter.report_checked_file(db, file, diagnostics);
 
@@ -402,7 +405,7 @@ impl Project {
                         if !open_files.contains(&file) {
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
-                            let parsed = parsed_module(db, file);
+                            let parsed = parsed_module(db, python_file);
 
                             // Drop the AST now that we are done checking this file. It is not currently open,
                             // so it is unlikely to be accessed again soon. If any queries need to access the AST
@@ -455,7 +458,7 @@ impl Project {
         }
     }
 
-    pub fn verbose(self, db: &dyn Db) -> bool {
+    fn verbose(self, db: &dyn Db) -> bool {
         self.verbose_flag(db)
     }
 
@@ -465,7 +468,7 @@ impl Project {
         }
     }
 
-    pub fn force_exclude(self, db: &dyn Db) -> bool {
+    fn force_exclude(self, db: &dyn Db) -> bool {
         self.force_exclude_flag(db)
     }
 
@@ -487,7 +490,7 @@ impl Project {
     }
 
     /// Returns the open files in the project.
-    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
 
@@ -501,7 +504,7 @@ impl Project {
 
     /// Permanently marks the project as never having open files, so reads of the
     /// open-file state record no salsa dependency. Any later write panics.
-    pub fn freeze_open_files(self, db: &mut dyn Db) {
+    fn freeze_open_files(self, db: &mut dyn Db) {
         self.set_open_fileset(db)
             .with_durability(Durability::NEVER_CHANGE)
             .to(FxHashSet::default());
@@ -535,7 +538,7 @@ impl Project {
     ///
     /// This is a no-op if the project files are still lazily indexed.
     #[tracing::instrument(level = "debug", skip(self, db, paths))]
-    pub(crate) fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
+    fn remove_files_under<P, I>(self, db: &mut dyn Db, paths: I)
     where
         I: IntoIterator<Item = P>,
         P: AsRef<SystemPath>,
@@ -584,7 +587,7 @@ impl Project {
         }
     }
 
-    pub fn add_file(self, db: &mut dyn Db, file: File) {
+    fn add_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!(
             "Adding file `{}` to project `{}`",
             file.path(db),
@@ -601,7 +604,7 @@ impl Project {
     /// Replaces the diagnostics from indexing the project files with `diagnostics`.
     ///
     /// This is a no-op if the project files haven't been indexed yet.
-    pub fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -634,7 +637,7 @@ impl Project {
         }
     }
 
-    pub fn reload_files(self, db: &mut dyn Db) {
+    fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {
@@ -652,12 +655,12 @@ impl Project {
     }
 }
 
-pub(crate) fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     if !db.should_check_file(file) {
         return Vec::new();
     }
 
-    check_file_impl(db, file)
+    check_file_impl(db, PythonFile::new(db, file, db.python_version()))
         .map(<[Diagnostic]>::to_vec)
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
 }
@@ -739,10 +742,16 @@ pub enum ProjectReloadResult {
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub(crate) fn check_file_impl(
+    db: &dyn Db,
+    file: PythonFile<'_>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let source_file = file.file(db);
     {
         let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || ty_python_semantic::check_file(*db, file)) {
+        match catch(&**db, source_file, || {
+            ty_python_semantic::check_file(*db, file)
+        }) {
             Ok(result) => result,
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
@@ -885,6 +894,7 @@ mod tests {
     use crate::db::Db as _;
     use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
+    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -907,7 +917,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, PythonFile::new(&db, file, db.python_version()))
                 .as_ref()
                 .unwrap_err()
                 .headline_message()
@@ -916,7 +926,12 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, check_types, file, &events);
+        assert_function_query_was_not_run(
+            &db,
+            check_types,
+            PythonFile::new(&db, file, db.python_version()),
+            &events,
+        );
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
@@ -924,7 +939,7 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            check_file_impl(&db, PythonFile::new(&db, file, db.python_version()))
                 .as_ref()
                 .unwrap()
                 .iter()

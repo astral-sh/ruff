@@ -107,10 +107,7 @@ mod tests {
         );
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -126,10 +123,8 @@ mod tests {
         let tested_notebook = assert_notebook_path(
             &actual,
             &expected,
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::TooManyNewlinesAtEndOfFile)
-            },
+            &settings::LinterSettings::for_rule(Rule::TooManyNewlinesAtEndOfFile)
+                .with_preview_mode(),
         )?;
 
         assert_eq!(tested_notebook.diagnostics.len(), 3);

@@ -891,10 +891,17 @@ def use_env(flag: bool, /) -> None:
     and COLUMNS are not set).
     """
 
-class error(Exception): ...
+class error(Exception):
+    """Exception raised when a curses library function returns an error."""
 
 @final
 class window:  # undocumented
+    """A curses window.
+
+    Window objects are returned by initscr() and newwin(), and by the
+    methods that create subwindows and pads.
+    """
+
     encoding: str
     """the typecode character used to create the array"""
 
