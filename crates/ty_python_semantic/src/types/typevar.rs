@@ -1629,6 +1629,17 @@ pub enum ParamSpecAttrKind {
     Kwargs,
 }
 
+impl ParamSpecAttrKind {
+    /// Returns the component represented by a `ParamSpec` attribute name.
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "args" => Some(Self::Args),
+            "kwargs" => Some(Self::Kwargs),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Display for ParamSpecAttrKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

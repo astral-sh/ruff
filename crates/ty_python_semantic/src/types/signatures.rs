@@ -37,7 +37,9 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{TypeVarSet, max_typevar_freshness_matching_generic_context};
+use crate::types::typevar::{
+    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
@@ -827,6 +829,23 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
+    }
+
+    /// Returns the binding referenced by a direct `P.args` or `P.kwargs` variadic parameter.
+    ///
+    /// Returns `None` if this signature has no `ParamSpec` component parameters, or if none of
+    /// their `ParamSpec`s has the same identity as `typevar`.
+    ///
+    /// This also exposes captured bindings that are intentionally absent from the function's own
+    /// generic context.
+    pub(super) fn paramspec_component_binding(
+        &self,
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        self.parameters
+            .paramspec_component_bindings(db)
+            .find(|bound| bound.typevar(db).identity(db) == typevar.identity(db))
     }
 
     pub(super) fn wrap_coroutine_return_type(
@@ -4739,6 +4758,25 @@ impl<'db> Parameters<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
         self.data.value.iter()
+    }
+
+    /// Iterates over the `ParamSpec` bindings referenced by direct variadic component annotations.
+    ///
+    /// The returned bindings represent `P` itself, with the `args` or `kwargs` component removed.
+    fn paramspec_component_bindings(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> + '_ {
+        self.iter()
+            .filter(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
+            .filter_map(move |parameter| match parameter.annotated_type() {
+                Type::TypeVar(typevar)
+                    if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_some() =>
+                {
+                    Some(typevar.without_paramspec_attr(db))
+                }
+                _ => None,
+            })
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.

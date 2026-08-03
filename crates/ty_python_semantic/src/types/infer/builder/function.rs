@@ -61,17 +61,13 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
 struct ExpectedReturnType<'db> {
     /// The externally-visible return type.
     public: Type<'db>,
-    /// The lexical return type, if it differs for a generic PEP 695 function.
-    lexical: Option<Type<'db>>,
+    /// The return type as seen from inside the function body.
+    lexical: Type<'db>,
 }
 
 impl<'db> ExpectedReturnType<'db> {
-    /// Creates the expected return type policy for `function_node`.
-    fn from_function(
-        db: &'db dyn Db,
-        function: FunctionType<'db>,
-        function_node: &ast::StmtFunctionDef,
-    ) -> Self {
+    /// Creates the expected return type policy for `function`.
+    fn from_function(db: &'db dyn Db, function: FunctionType<'db>) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
         fn normalize<'db>(
             db: &'db dyn Db,
@@ -91,18 +87,12 @@ impl<'db> ExpectedReturnType<'db> {
             same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
-        let lexical = function_node.type_params.is_some().then(|| {
-            normalize(
-                db,
-                &env,
-                same_module_uncached_raw_signature(
-                    db,
-                    function,
-                    ReturnCallableTypeVarScope::Lexical,
-                )
+        let lexical = normalize(
+            db,
+            &env,
+            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
                 .return_ty,
-            )
-        });
+        );
 
         Self { public, lexical }
     }
@@ -115,10 +105,7 @@ impl<'db> ExpectedReturnType<'db> {
     /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
     /// type.
     fn accepts(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
-        ty.is_assignable_to(db, env, self.public)
-            || self
-                .lexical
-                .is_some_and(|lexical| ty.is_assignable_to(db, env, lexical))
+        ty.is_assignable_to(db, env, self.public) || ty.is_assignable_to(db, env, self.lexical)
     }
 }
 
@@ -145,7 +132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(parameter);
         }
 
-        validate_paramspec_components(&self.context, &function.parameters, |expr| {
+        validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
             self.file_expression_type(expr)
         });
         self.validate_unpacked_typed_dict_kwargs(&function.parameters);
@@ -185,8 +172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
-            let expected_return =
-                ExpectedReturnType::from_function(db, enclosing_function, function);
+            let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
             let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));

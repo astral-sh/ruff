@@ -97,7 +97,7 @@ use crate::types::{
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, Program, ProgramEnvironment};
+use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -1341,10 +1341,6 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
         self.literal(db).last_definition.python_file(db)
-    }
-
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program {
-        self.literal(db).last_definition.body_scope(db).program(db)
     }
 
     /// Returns the AST node for this function.
