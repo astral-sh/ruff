@@ -11,9 +11,11 @@ use std::process::ExitCode;
 use anyhow::{Context, anyhow};
 use clap::Parser;
 
+use ruff_db::PythonFile;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::{Completion, CompletionCapabilities};
+use ty_project::Db as _;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
@@ -142,7 +144,7 @@ fn get_completions<'db>(
         db,
         &settings,
         CompletionCapabilities::default(),
-        file,
+        PythonFile::new(db, file, db.python_version()),
         offset,
     ))
 }

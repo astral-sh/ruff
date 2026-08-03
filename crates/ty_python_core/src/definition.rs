@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
@@ -19,7 +20,7 @@ use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::use_def::BindingWithConstraintsIterator;
-use crate::{Db, SemanticIndex};
+use crate::{Db, Program, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -83,6 +84,14 @@ impl<'db> Definition<'db> {
         self.scope_id(db).file(db)
     }
 
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.scope_id(db).python_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.scope_id(db).program(db)
+    }
+
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
         self.scope_id(db).file_scope_id(db)
     }
@@ -105,8 +114,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -142,8 +150,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {

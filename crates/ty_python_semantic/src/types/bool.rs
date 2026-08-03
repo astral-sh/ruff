@@ -1,14 +1,13 @@
+use crate::Db;
+use crate::ProgramEnvironment;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{
-    Db,
-    types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
-        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-        diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
-    },
+use crate::types::{
+    CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
+    call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
+    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -18,9 +17,14 @@ impl<'db> Type<'db> {
     /// This method should only be used outside type checking or when evaluating if a type
     /// is truthy or falsy in a context where Python doesn't make an implicit `bool` call.
     /// Use [`try_bool`](Self::try_bool) for type checking or implicit `bool` calls.
-    pub(crate) fn bool(&self, db: &'db dyn Db) -> Truthiness {
-        self.try_bool_impl(db, true, &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)))
-            .unwrap_or_else(|err| err.fallback_truthiness())
+    pub(crate) fn bool(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Truthiness {
+        self.try_bool_impl(
+            db,
+            env,
+            true,
+            &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
+        )
+        .unwrap_or_else(|err| err.fallback_truthiness())
     }
 
     /// Resolves the boolean value of a type.
@@ -29,8 +33,17 @@ impl<'db> Type<'db> {
     /// when `bool(x)` is called on an object `x`.
     ///
     /// Returns an error if the type doesn't implement `__bool__` correctly.
-    pub(crate) fn try_bool(&self, db: &'db dyn Db) -> Result<Truthiness, BoolError<'db>> {
-        self.try_bool_impl(db, false, &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)))
+    pub(crate) fn try_bool(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Result<Truthiness, BoolError<'db>> {
+        self.try_bool_impl(
+            db,
+            env,
+            false,
+            &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
+        )
     }
 
     /// Resolves the boolean value of a type.
@@ -48,6 +61,7 @@ impl<'db> Type<'db> {
     fn try_bool_impl(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         allow_short_circuit: bool,
         visitor: &TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
@@ -63,13 +77,15 @@ impl<'db> Type<'db> {
         let try_dunders = || {
             match self.try_call_dunder(
                 db,
+                env,
                 "__bool__",
                 CallArguments::none(),
                 TypeContext::default(),
             ) {
                 Ok(outcome) => {
-                    let return_type = outcome.return_type(db);
-                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                    let return_type = outcome.return_type(db, env);
+                    if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
+                    {
                         // The type has a `__bool__` method, but it doesn't return a
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
@@ -83,12 +99,13 @@ impl<'db> Type<'db> {
                 Err(CallDunderError::PossiblyUnbound {
                     bindings: outcome, ..
                 }) => {
-                    let return_type = outcome.return_type(db);
-                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                    let return_type = outcome.return_type(db, env);
+                    if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
+                    {
                         // The type has a `__bool__` method, but it doesn't return a
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
-                            return_type: outcome.return_type(db),
+                            return_type: outcome.return_type(db, env),
                             not_boolable_type: *self,
                         });
                     }
@@ -103,7 +120,7 @@ impl<'db> Type<'db> {
                 // handling for tuples here isn't sound.
                 Err(CallDunderError::MethodNotAvailable)
                     if let Type::NominalInstance(instance) = self
-                        && let Some(tuple_spec) = instance.tuple_spec(db) =>
+                        && let Some(tuple_spec) = instance.tuple_spec(db, env) =>
                 {
                     Ok(tuple_spec.truthiness())
                 }
@@ -113,19 +130,22 @@ impl<'db> Type<'db> {
                 // and a subclass could add a `__bool__` method.
                 Err(CallDunderError::MethodNotAvailable)
                     if let Type::NominalInstance(instance) = self
-                        && instance.class(db).is_final(db) =>
+                        && instance.class(db, env).is_final(db) =>
                 {
                     match self.try_call_dunder(
                         db,
+                        env,
                         "__len__",
                         CallArguments::none(),
                         TypeContext::default(),
                     ) {
                         Ok(outcome) => {
-                            let return_type = outcome.return_type(db);
-                            if return_type
-                                .is_assignable_to(db, KnownClass::SupportsIndex.to_instance(db))
-                            {
+                            let return_type = outcome.return_type(db, env);
+                            if return_type.is_assignable_to(
+                                db,
+                                env,
+                                KnownClass::SupportsIndex.to_instance(db, env),
+                            ) {
                                 Ok(type_to_truthiness(return_type))
                             } else {
                                 // TODO: should report a diagnostic similar to if return type of `__bool__`
@@ -145,7 +165,7 @@ impl<'db> Type<'db> {
 
                 Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                     Err(BoolError::IncorrectArguments {
-                        truthiness: type_to_truthiness(bindings.return_type(db)),
+                        truthiness: type_to_truthiness(bindings.return_type(db, env)),
                         not_boolable_type: *self,
                     })
                 }
@@ -171,7 +191,7 @@ impl<'db> Type<'db> {
 
             for element in union.elements(db) {
                 let element_truthiness =
-                    match element.try_bool_impl(db, allow_short_circuit, visitor) {
+                    match element.try_bool_impl(db, env, allow_short_circuit, visitor) {
                         Ok(truthiness) => truthiness,
                         Err(err) => {
                             has_errors = true;
@@ -228,8 +248,8 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
-                let tracked_set = constraints.load(db, tracked_set.constraints(db));
-                Truthiness::from(tracked_set.is_always_satisfied(db))
+                let tracked_set = constraints.load(db, env, tracked_set.constraints(db));
+                Truthiness::from(tracked_set.is_always_satisfied(db, env))
             }
 
             Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
@@ -251,36 +271,40 @@ impl<'db> Type<'db> {
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
-            Type::ClassLiteral(class) => {
-                class
-                    .metaclass_instance_type(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)?
-            }
+            Type::ClassLiteral(class) => class.metaclass_instance_type(db, env).try_bool_impl(
+                db,
+                env,
+                allow_short_circuit,
+                visitor,
+            )?,
             Type::GenericAlias(alias) => ClassType::from(*alias)
-                .metaclass_instance_type(db)
-                .try_bool_impl(db, allow_short_circuit, visitor)?,
+                .metaclass_instance_type(db, env)
+                .try_bool_impl(db, env, allow_short_circuit, visitor)?,
 
             Type::SubclassOf(subclass_of_ty) => {
-                match subclass_of_ty.subclass_of().with_transposed_type_var(db) {
+                match subclass_of_ty
+                    .subclass_of()
+                    .with_transposed_type_var(db, env)
+                {
                     SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
                     SubclassOfInner::Class(class) => {
-                        Type::from(class).try_bool_impl(db, allow_short_circuit, visitor)?
+                        Type::from(class).try_bool_impl(db, env, allow_short_circuit, visitor)?
                     }
                     SubclassOfInner::Protocol(_) => Truthiness::Ambiguous,
                     SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar)
-                        .try_bool_impl(db, allow_short_circuit, visitor)?,
+                        .try_bool_impl(db, env, allow_short_circuit, visitor)?,
                 }
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                     None => Truthiness::Ambiguous,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.try_bool_impl(db, allow_short_circuit, visitor)?
+                        bound.try_bool_impl(db, env, allow_short_circuit, visitor)?
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .as_type(db)
-                        .try_bool_impl(db, allow_short_circuit, visitor)?,
+                        .as_type(db, env)
+                        .try_bool_impl(db, env, allow_short_circuit, visitor)?,
                 }
             }
 
@@ -295,8 +319,8 @@ impl<'db> Type<'db> {
             Type::Union(union) => try_union(*union)?,
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternative_union(db) {
-                    alternatives.try_bool_impl(db, allow_short_circuit, visitor)?
+                if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
+                    alternatives.try_bool_impl(db, env, allow_short_circuit, visitor)?
                 } else {
                     // TODO
                     Truthiness::Ambiguous
@@ -304,14 +328,14 @@ impl<'db> Type<'db> {
             }
 
             Type::EnumComplement(complement) => complement
-                .remaining_literal_union(db)
-                .try_bool_impl(db, allow_short_circuit, visitor)?,
+                .remaining_literal_union(db, env)
+                .try_bool_impl(db, env, allow_short_circuit, visitor)?,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
                 LiteralValueTypeKind::Enum(enum_type) => enum_type
-                    .enum_class_instance(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)?,
+                    .enum_class_instance(db, env)
+                    .try_bool_impl(db, env, allow_short_circuit, visitor)?,
 
                 LiteralValueTypeKind::Int(num) => Truthiness::from(num.as_i64() != 0),
                 LiteralValueTypeKind::Bool(bool) => Truthiness::from(bool),
@@ -322,13 +346,14 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => visitor.visit(db, *self, || {
                 alias
                     .value_type(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)
+                    .try_bool_impl(db, env, allow_short_circuit, visitor)
             })?,
-            Type::NewTypeInstance(newtype) => {
-                newtype
-                    .concrete_base_type(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)?
-            }
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).try_bool_impl(
+                db,
+                env,
+                allow_short_circuit,
+                visitor,
+            )?,
         };
 
         Ok(truthiness)
@@ -403,24 +428,26 @@ impl<'db> BoolError<'db> {
     }
 
     fn report_diagnostic_impl(&self, context: &InferContext, condition: TextRange) {
+        let db = context.db();
         let Some(builder) = context.report_lint(&UNSUPPORTED_BOOL_CONVERSION, condition) else {
             return;
         };
+        let env = context.program_environment();
         match self {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{}`",
-                    not_boolable_type.display(context.db())
+                    not_boolable_type.display(db, env)
                 ));
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     "`__bool__` methods must only have a `self` parameter",
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
-                    .member(context.db(), "__bool__")
-                    .into_lookup_result(context.db())
+                    .member(db, env, "__bool__")
+                    .into_lookup_result(db, env)
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
                 {
@@ -437,18 +464,18 @@ impl<'db> BoolError<'db> {
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{not_boolable}`",
-                    not_boolable = not_boolable_type.display(context.db()),
+                    not_boolable = not_boolable_type.display(db, env),
                 ));
                 let mut sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
                         "`{return_type}` is not assignable to `bool`",
-                        return_type = return_type.display(context.db()),
+                        return_type = return_type.display(db, env),
                     ),
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
-                    .member(context.db(), "__bool__")
-                    .into_lookup_result(context.db())
+                    .member(db, env, "__bool__")
+                    .into_lookup_result(db, env)
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
                     .and_then(|spans| Some((spans.name, spans.return_type?)))
@@ -463,13 +490,13 @@ impl<'db> BoolError<'db> {
             Self::NotCallable { not_boolable_type } => {
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{}`",
-                    not_boolable_type.display(context.db())
+                    not_boolable_type.display(db, env)
                 ));
                 let sub = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(
                         "`__bool__` on `{}` must be callable",
-                        not_boolable_type.display(context.db())
+                        not_boolable_type.display(db, env)
                     ),
                 );
                 // TODO: It would be nice to create an annotation here for
@@ -481,14 +508,14 @@ impl<'db> BoolError<'db> {
                 let first_error = union
                     .elements(context.db())
                     .iter()
-                    .find_map(|element| element.try_bool(context.db()).err())
+                    .find_map(|element| element.try_bool(db, env).err())
                     .unwrap();
 
                 builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for union `{}` \
                      because `{}` doesn't implement `__bool__` correctly",
-                    Type::Union(*union).display(context.db()),
-                    first_error.not_boolable_type().display(context.db()),
+                    Type::Union(*union).display(db, env),
+                    first_error.not_boolable_type().display(db, env),
                 ));
             }
 
@@ -496,7 +523,7 @@ impl<'db> BoolError<'db> {
                 builder.into_diagnostic(format_args!(
                     "Boolean conversion is not supported for type `{}`; \
                      it incorrectly implements `__bool__`",
-                    not_boolable_type.display(context.db())
+                    not_boolable_type.display(db, env)
                 ));
             }
         }

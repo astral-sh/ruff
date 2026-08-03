@@ -1,9 +1,9 @@
 use crate::symbols::{FlatSymbols, symbols_for_file};
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ty_project::Db;
 
 /// Get all document symbols for a file with the given options.
-pub fn document_symbols(db: &dyn Db, file: File) -> &FlatSymbols {
+pub fn document_symbols<'db>(db: &'db dyn Db, file: PythonFile<'db>) -> &'db FlatSymbols {
     symbols_for_file(db, file)
 }
 
@@ -17,6 +17,7 @@ mod tests {
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
         SubDiagnosticSeverity,
     };
+    use ruff_db::files::File;
 
     #[test]
     fn test_document_symbols_simple() {
@@ -404,7 +405,7 @@ def function():
 <CURSOR>",
         );
 
-        let symbols = document_symbols(&test.db, test.cursor.file)
+        let symbols = document_symbols(&test.db, test.python_file(test.cursor.file))
             .iter()
             .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
             .collect::<Vec<_>>();
@@ -441,7 +442,7 @@ lambda_value = lambda: (lambda_local := 1)
 <CURSOR>",
         );
 
-        let names = document_symbols(&test.db, test.cursor.file)
+        let names = document_symbols(&test.db, test.python_file(test.cursor.file))
             .iter()
             .map(|(_, symbol)| symbol.name.into_owned())
             .collect::<Vec<_>>();
@@ -463,7 +464,7 @@ class Example((class_base := Base)):
 <CURSOR>",
         );
 
-        let symbols = document_symbols(&test.db, test.cursor.file)
+        let symbols = document_symbols(&test.db, test.python_file(test.cursor.file))
             .iter()
             .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
             .collect::<Vec<_>>();
@@ -485,7 +486,8 @@ class Example((class_base := Base)):
 
     impl CursorTest {
         fn document_symbols(&self) -> String {
-            let symbols = document_symbols(&self.db, self.cursor.file).to_hierarchical();
+            let symbols =
+                document_symbols(&self.db, self.python_file(self.cursor.file)).to_hierarchical();
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

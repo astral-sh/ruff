@@ -1,3 +1,4 @@
+use crate::ProgramEnvironment;
 use std::fmt::Write;
 
 use crate::{
@@ -19,8 +20,8 @@ use ty_python_core::{
 };
 
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -50,7 +51,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
+        semantic_index(db, scope.python_file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
@@ -68,14 +69,16 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let module = parsed_module(db, scope.file(db)).load(db);
+        let python_file = scope.python_file(db);
+        let module = parsed_module(db, python_file).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
@@ -110,8 +113,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let file = scope.file(db);
-        let parsed = parsed_module(db, file).load(db);
+        let python_file = scope.python_file(db);
+        let parsed = parsed_module(db, python_file).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -119,7 +122,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .type_params
             .as_ref()
             .map(|type_params| {
-                let index = semantic_index(db, scope.file(db));
+                let index = semantic_index(db, python_file);
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
@@ -173,15 +176,15 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
-        let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return Type::unknown();
         };
@@ -216,7 +219,8 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
-        let file = definition.file(db);
+        let file = definition.python_file(db);
+        let env = ProgramEnvironment::from_file(file);
         let module = parsed_module(db, file).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return None;
@@ -248,7 +252,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             variables.insert(typevar);
         }
 
-        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, variables))
+        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, &env, variables))
     }
 }
 
@@ -262,6 +266,7 @@ fn apply_type_alias_specialization<'db>(
         return ty;
     };
 
+    let env = ProgramEnvironment::from_program(generic_context.program(db));
     let specialization =
         specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
     let type_mapping = match specialization.materialization_kind(db) {
@@ -276,7 +281,7 @@ fn apply_type_alias_specialization<'db>(
         db,
         &type_mapping,
         TypeContext::default(),
-        &ApplyTypeMappingVisitor::default(),
+        &ApplyTypeMappingVisitor::new(&env),
     )
 }
 
@@ -393,16 +398,32 @@ impl<'db> TypeAliasType<'db> {
     }
 }
 
-#[salsa::tracked]
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        _: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        self.variance_of_owner(db, typevar)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> TypeAliasType<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+    fn variance_of_owner(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        let env = ProgramEnvironment::from_definition(self.definition(db));
         let Some(generic_context) = self.generic_context(db) else {
-            return self.value_type(db).variance_of(db, typevar);
+            return self.value_type(db).variance_of(db, &env, typevar);
         };
 
         // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
@@ -411,7 +432,7 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
         {
-            return self.raw_value_type(db).variance_of(db, typevar);
+            return self.raw_value_type(db).variance_of(db, &env, typevar);
         }
 
         let raw_value_type = self.raw_value_type(db);
@@ -426,8 +447,8 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
             .zip(specialization.types(db))
             .map(|(alias_typevar, argument_ty)| {
                 raw_value_type
-                    .variance_of(db, alias_typevar.identity(db))
-                    .compose_thunk(|| argument_ty.variance_of(db, typevar))
+                    .variance_of(db, &env, alias_typevar.identity(db))
+                    .compose_thunk(|| argument_ty.variance_of(db, &env, typevar))
             })
             .collect()
     }
@@ -454,7 +475,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
         let definition = self.type_alias.definition(self.db);
-        let file = definition.file(self.db);
+        let file = definition.python_file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
         // Type aliases are defined directly in their enclosing scope (no body scope like classes),

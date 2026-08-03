@@ -2,6 +2,7 @@ use crate::docstring::Docstring;
 pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
+use ty_python_semantic::Db;
 
 use std::borrow::Cow;
 
@@ -14,16 +15,16 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
     typed_dict_key_definition,
 };
+use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
-    definitions_for_imported_symbol, definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
+    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -256,11 +257,15 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
-        let ty_def = ty.definition(db)?;
+    pub(crate) fn from_ty(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        let ty_def = ty.definition(db, env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.file(db)?)
+                ResolvedDefinition::Module(module.python_file(db)?)
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -387,8 +392,8 @@ impl<'db> Definitions<'db> {
             .into_iter()
             .map(|definition| match definition {
                 ResolvedDefinition::Definition(definition) => {
-                    let file = definition.file(db);
-                    let module = ruff_db::parsed::parsed_module(db, file).load(db);
+                    let module =
+                        ruff_db::parsed::parsed_module(db, definition.python_file(db)).load(db);
 
                     let focus_range = definition.focus_range(db, &module);
                     let full_range = definition.full_range(db, &module);
@@ -400,7 +405,7 @@ impl<'db> Definitions<'db> {
                     }
                 }
                 ResolvedDefinition::Module(file) => {
-                    NavigationTarget::new(file, TextRange::default())
+                    NavigationTarget::new(file.file(db), TextRange::default())
                 }
                 ResolvedDefinition::FileWithRange(file_range) => NavigationTarget::from(file_range),
             })
@@ -412,7 +417,7 @@ impl<'db> Definitions<'db> {
     /// Typically documentation only appears on implementations and not stubs,
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
-    pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
+    pub(crate) fn docstring(self, db: &'db dyn SemanticDb) -> Option<Docstring> {
         for definition in &self {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
@@ -470,7 +475,7 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
 /// Shared by hover and signature help so both surfaces render the same
 /// docstring for a given call site.
 pub(crate) fn docstring_for_call_definition<'db>(
-    db: &'db dyn crate::Db,
+    db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<Docstring> {
     let resolved = ResolvedDefinition::Definition(definition);
@@ -1446,7 +1451,7 @@ fn definitions_for_module<'db>(
     level: u32,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
-    let file = module.file(model.db())?;
+    let file = module.python_file(model.db())?;
     Some(vec![ResolvedDefinition::Module(file)])
 }
 

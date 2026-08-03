@@ -18,15 +18,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         target: Type<'db>,
     ) -> Option<Type<'db>> {
-        let non_type_form_fallback = match target.resolve_type_alias(self.db()) {
+        let db = self.db();
+        let env = self.program_environment();
+        let non_type_form_fallback = match target.resolve_type_alias(db) {
             Type::TypeForm(_) => None,
             Type::Union(union)
-                if union.elements(self.db()).iter().any(|element| {
-                    matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
-                }) =>
+                if union
+                    .elements(self.db())
+                    .iter()
+                    .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))) =>
             {
-                Some(target.filter_union(self.db(), |element| {
-                    !matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                Some(target.filter_union(db, |element| {
+                    !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
                 }))
             }
             _ => return None,
@@ -37,10 +40,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let value_ty = self
             .speculate_without_diagnostics()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
-        if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
+        if matches!(value_ty.resolve_type_alias(db), Type::Never)
             || self.contains_type_form_value(expression, value_ty)
             || non_type_form_fallback
-                .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
+                .is_some_and(|alternative| value_ty.is_assignable_to(db, env, alternative))
         {
             return None;
         }
@@ -56,7 +59,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let contextual_ty = self
                 .speculate_without_diagnostics()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
-            if contextual_ty.is_assignable_to(self.db(), target) {
+            if contextual_ty.is_assignable_to(db, env, target) {
                 return None;
             }
         }
@@ -78,6 +81,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ty: Type<'db>,
             visitor: &ContainsTypeFormValueVisitor<'db>,
         ) -> bool {
+            let db = builder.db();
+            let env = builder.program_environment();
             match ty {
                 Type::TypeForm(_) | Type::SubclassOf(_) => true,
                 // A bare class object is valid type-expression syntax and should still be
@@ -99,18 +104,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(alias) => visitor.visit(builder.db(), ty, || {
-                    imp(builder, expression, alias.value_type(builder.db()), visitor)
+                Type::TypeAlias(alias) => visitor.visit(db, ty, || {
+                    imp(builder, expression, alias.value_type(db), visitor)
                 }),
-                Type::TypeVar(typevar) => visitor.visit(builder.db(), ty, || {
+                Type::TypeVar(typevar) => visitor.visit(db, ty, || {
                     typevar
                         .typevar(builder.db())
-                        .bound_or_constraints(builder.db())
+                        .bound_or_constraints(db, env)
                         .is_some_and(|bound_or_constraints| {
                             imp(
                                 builder,
                                 expression,
-                                bound_or_constraints.as_type(builder.db()),
+                                bound_or_constraints.as_type(db, env),
                                 visitor,
                             )
                         })
