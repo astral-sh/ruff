@@ -104,7 +104,9 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
-use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
+use crate::types::typed_dict::{
+    TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
+};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
@@ -8797,10 +8799,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => None,
         };
 
-        // Prepare `TypedDict` constructor calls before variadic argument setup so field-directed
-        // value inference becomes canonical before `**kwargs` expressions are inferred.
+        let generic_typed_dict_class =
+            class
+                .filter(|class| class.is_typed_dict(self.db()))
+                .filter(|_| {
+                    matches!(
+                        callable_type,
+                        Type::ClassLiteral(class_literal)
+                            if class_literal.generic_context(self.db()).is_some()
+                    )
+                });
+        let generic_typed_dict_constructor = generic_typed_dict_class.filter(|_| {
+            arguments.args.is_empty()
+                && !(arguments
+                    .keywords
+                    .iter()
+                    .any(|keyword| keyword.arg.is_none())
+                    && arguments
+                        .keywords
+                        .iter()
+                        .any(|keyword| keyword.arg.is_some()))
+        });
+
+        // Non-generic calls and unsupported mapping forms still need field-directed preparation
+        // before variadic arguments are inferred. Generic keyword calls obtain their context
+        // from the actual constructor signature instead.
         let has_prepared_typed_dict_constructor = class
             .filter(|class| class.is_typed_dict(self.db()))
+            .filter(|_| generic_typed_dict_constructor.is_none())
             .map(|class| {
                 let typed_dict = TypedDictType::new(class);
                 let form = TypedDictConstructorForm::from_arguments(arguments);
@@ -9109,9 +9135,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let mut bindings =
-            self.bindings_for_call(callable_type)
-                .match_parameters(db, env, &call_arguments);
+        let call_bindings =
+            if generic_typed_dict_class.is_some() && generic_typed_dict_constructor.is_none() {
+                Binding::single(
+                    callable_type,
+                    Signature::new(
+                        Parameters::gradual_form(),
+                        callable_type
+                            .to_instance_approximation(db, env)
+                            .unwrap_or_else(Type::unknown),
+                    ),
+                )
+                .into()
+            } else {
+                self.bindings_for_call(callable_type)
+            };
+        let mut bindings = call_bindings.match_parameters(db, env, &call_arguments);
+
+        // Preserve TypedDict-specific missing-key and unknown-key diagnostics when neither
+        // synthesized constructor overload matches the call shape.
+        if let Some(class) = generic_typed_dict_constructor
+            && !bindings.satisfies(|_| true)
+        {
+            self.prepare_typed_dict_constructor(
+                TypedDictType::new(class),
+                TypedDictConstructorForm::from_arguments(arguments),
+                arguments,
+                func.as_ref().into(),
+            );
+            return callable_type
+                .to_instance_approximation(db, env)
+                .unwrap_or_else(Type::unknown);
+        }
 
         report_missing_implicit_constructor_call(
             &self.context,
@@ -9141,6 +9196,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return bindings.return_type(db, env);
             }
         };
+
+        // Validate against the solved specialization so field-sensitive diagnostics use the same
+        // concrete types that the constructor returns.
+        if generic_typed_dict_constructor.is_some()
+            && let Some(typed_dict) = bindings.return_type(db, env).as_typed_dict()
+        {
+            validate_typed_dict_constructor(
+                &self.context,
+                typed_dict,
+                arguments,
+                func.as_ref().into(),
+                |expr, _| self.expression_type(expr),
+            );
+        }
 
         if let Some(class) = class {
             pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);

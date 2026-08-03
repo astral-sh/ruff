@@ -1610,19 +1610,23 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.nominal_class(db, env)?
-            .static_class_literal(db)
+        self.class_specialization(db, env)
             .filter(|(class_literal, _)| *class_literal == expected_class)
-            .and_then(|(_, specialization)| specialization)
+            .map(|(_, specialization)| specialization)
     }
 
-    /// If this type is a class instance, returns the class and its specialization.
+    /// If this type is a class instance or class-backed `TypedDict`, returns its specialization.
     fn class_specialization(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
-        self.nominal_class(db, env)?
+        let class = match self {
+            Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
+            _ => self.nominal_class(db, env)?,
+        };
+
+        class
             .static_class_literal(db)
             .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
     }
@@ -2800,11 +2804,15 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Some(
-                alias
-                    .origin(db)
-                    .typed_dict_member(db, env, None, name, policy),
-            ),
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Some(alias.origin(db).typed_dict_member(
+                    db,
+                    env,
+                    (name == "__init__").then_some(alias.specialization(db)),
+                    name,
+                    policy,
+                ))
+            }
 
             Type::GenericAlias(alias) => {
                 Some(ClassType::from(*alias).class_member(db, env, name, policy))
@@ -5698,11 +5706,12 @@ impl<'db> Type<'db> {
             .into()
         };
 
-        // Checking TypedDict construction happens in `infer_call_expression_impl`.
-        // We don't want to use the synthesized binding for type inference, so here we just
-        // return a permissive fallback binding.
-        if class_literal.is_typed_dict(db)
-            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal)
+        // Specialized and non-generic TypedDict constructors use their dedicated validation.
+        // An unspecialized generic constructor also needs its real `__init__` signature so
+        // ordinary call inference can solve the class type variables.
+        if (class_literal.is_typed_dict(db)
+            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal))
+            && (!matches!(self, Type::ClassLiteral(_)) || class_generic_context.is_none())
         {
             return fallback_bindings();
         }

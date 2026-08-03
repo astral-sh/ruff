@@ -3473,6 +3473,451 @@ static_assert(is_assignable_to(Items[Any], Items[int]))
 static_assert(not is_subtype_of(Items[Any], Items[int]))
 ```
 
+### Generic constructor signatures
+
+The constructor of an unspecialized generic `TypedDict` retains its class type parameter. An
+explicit specialization substitutes the same parameter in both the receiver and the fields.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+# revealed: Overload[[T](self: Box[T], map: Box[T], /, *, value: T = ...) -> None, [T](self: Box[T], /, *, value: T) -> None]
+reveal_type(Box.__init__)
+# revealed: Overload[(self: Box[int], map: Box[int], /, *, value: int = ...) -> None, (self: Box[int], /, *, value: int) -> None]
+reveal_type(Box[int].__init__)
+```
+
+### Constructor inference from keyword arguments
+
+Both PEP 695 and legacy generic constructors infer their type arguments from keyword values.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+reveal_type(Box(value=1))  # revealed: Box[int]
+
+T = TypeVar("T")
+
+class LegacyBox(TypedDict, Generic[T]):
+    value: T
+
+reveal_type(LegacyBox(value=1))  # revealed: LegacyBox[int]
+```
+
+### Generic constructor diagnostics
+
+Generic constructors preserve the usual diagnostics for missing and unexpected fields.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+Box()  # error: [missing-typed-dict-key]
+Box(value=1, extra=2)  # error: [invalid-key]
+```
+
+Repeated keyword values are still rejected without exposing an unresolved type parameter.
+
+```py
+# error: [parameter-already-assigned]
+reveal_type(Box(**{"value": 1}, value="two"))  # revealed: Box[Unknown]
+```
+
+### Constructor inference from multiple fields
+
+Different fields can contribute different types to the same type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Pair[T](TypedDict):
+    first: T
+    second: T
+
+reveal_type(Pair(first=1, second="x"))  # revealed: Pair[int | str]
+```
+
+### Constructor inference from inherited fields
+
+An inherited field constrains the child class's type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Base[T](TypedDict):
+    value: T
+
+class Child[T](Base[T]):
+    pass
+
+reveal_type(Child(value=1))  # revealed: Child[int]
+```
+
+### Constructor inference from dictionary literals
+
+Direct keyword and unpacked dictionary forms infer the same nested list type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class ListBox[T](TypedDict):
+    value: list[T]
+
+reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
+reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[int]
+```
+
+A positional dictionary does not yet provide its individual values to constructor inference.
+
+```py
+reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[Unknown]
+
+class Box[T](TypedDict):
+    value: T
+
+reveal_type(Box({"value": 1}, value="two"))  # revealed: Box[Unknown]
+```
+
+### Constructor inference and ambiguous dictionary unpacking
+
+An optional field in a later unpack may replace the earlier value, so its possible value remains
+gradual.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NotRequired, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+class MaybeString(TypedDict):
+    value: NotRequired[str]
+
+def optional_overwrite(maybe: MaybeString) -> None:
+    reveal_type(Box(**{"value": 1, **maybe}))  # revealed: Box[int | Unknown]
+```
+
+An ordinary dictionary may also replace the earlier value, producing a union of both possible value
+types.
+
+```py
+def mapping_overwrite(values: dict[str, str]) -> None:
+    reveal_type(Box(**{"value": 1, **values}))  # revealed: Box[int | str]
+```
+
+### Constructor inference from recursive fields
+
+An inner constructor constrains the type parameter of an outer constructor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NotRequired, TypedDict
+
+class Node[T](TypedDict):
+    value: NotRequired[T]
+    child: NotRequired["Node[T]"]
+
+reveal_type(Node(child=Node(value=1)))  # revealed: Node[int]
+```
+
+A recursive field wrapped in a union also constrains the outer constructor.
+
+```py
+class UnionNode[T](TypedDict):
+    value: NotRequired[T]
+    child: NotRequired["UnionNode[T] | None"]
+
+reveal_type(UnionNode(child=UnionNode(value=1)))  # revealed: UnionNode[int]
+```
+
+The same inference works when a type alias wraps the recursive union.
+
+```py
+class AliasNode[T](TypedDict):
+    value: NotRequired[T]
+    child: NotRequired["AliasNodeChild[T]"]
+
+type AliasNodeChild[T] = AliasNode[T] | None
+
+reveal_type(AliasNode(child=AliasNode(value=1)))  # revealed: AliasNode[int]
+```
+
+### Constructor inference from nested values
+
+A nested constructor and a sibling field can contribute different types to the same type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Inner[T](TypedDict):
+    value: T
+
+class Outer[T](TypedDict):
+    inner: Inner[T]
+    marker: T
+
+reveal_type(Outer(inner=Inner(value=1), marker=1))  # revealed: Outer[int]
+reveal_type(Outer(inner=Inner(value=1), marker="x"))  # revealed: Outer[int | str]
+```
+
+An existing mutable `TypedDict` cannot be widened to accept an incompatible sibling field.
+
+```py
+inner = Inner(value=1)
+Outer(inner=inner, marker="x")  # error: [invalid-argument-type]
+```
+
+An existing nested value with an unknown type argument keeps that uncertainty in the result.
+
+```py
+def unknown(): ...
+
+inner_unknown = Inner(value=[unknown()])
+reveal_type(Outer(inner=inner_unknown, marker=["x"]))  # revealed: Outer[list[Unknown] | list[str]]
+```
+
+### Constructor inference through type aliases
+
+A specialized alias contributes the same constraints as the underlying `TypedDict`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Inner[T](TypedDict):
+    value: T
+
+class Outer[T](TypedDict):
+    inner: Inner[T]
+    marker: T
+
+type Alias[T] = Inner[T]
+
+def specialized() -> Alias[int]:
+    raise NotImplementedError
+
+reveal_type(Outer(inner=specialized(), marker=1))  # revealed: Outer[int]
+```
+
+An unspecialized alias keeps its unknown type argument in the inferred specialization.
+
+```py
+def unspecialized() -> Alias:
+    raise NotImplementedError
+
+reveal_type(Outer(inner=unspecialized(), marker="x"))  # revealed: Outer[Unknown | str]
+```
+
+### Constructor inference with upper bounds
+
+A literal upper bound preserves its literal, while an ordinary `int` upper bound permits the usual
+promotion.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, TypedDict
+
+class LiteralBound[T: Literal[1]](TypedDict):
+    value: T
+
+reveal_type(LiteralBound(value=1))  # revealed: LiteralBound[Literal[1]]
+
+class IntBound[T: int](TypedDict):
+    value: T
+
+reveal_type(IntBound(value=1))  # revealed: IntBound[int]
+```
+
+### Constructor inference with callable parameters
+
+A callback that accepts only `Literal[1]` must not become callable with another integer.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Literal, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+    callback: Callable[[T], None]
+
+def accepts_one(value: Literal[1]) -> None: ...
+
+box = Box(value=1, callback=accepts_one)
+box["callback"](2)  # error: [invalid-argument-type]
+```
+
+### Constructor inference with an expected type
+
+The expected type can preserve a literal that inference from the value alone would promote.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+literal: Box[Literal[1]] = Box(value=1)
+```
+
+A wider expected type is also respected because a mutable `TypedDict` is invariant.
+
+```py
+class Animal: ...
+class Dog(Animal): ...
+
+animal: Box[Animal] = Box(value=Dog())
+```
+
+### Constructor inference with read-only fields
+
+A type parameter that appears only in a read-only field is covariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+from typing_extensions import ReadOnly
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Box[T](TypedDict):
+    value: ReadOnly[T]
+
+dog = Box(value=Dog())
+animal: Box[Animal] = dog
+```
+
+### Constructor inference and context-sensitive arguments
+
+After inferring the type parameter, the constructor checks a lambda with its inferred parameter
+type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+    callback: Callable[[T], int]
+
+Box(value=1, callback=lambda x: x.upper())  # error: [unresolved-attribute]
+```
+
+### Constructor inference with a contextual callable
+
+An expected specialization supplies the parameter type of a lambda stored in a field.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+direct: Box[Callable[[int], int]] = Box(value=lambda x: x.upper())  # error: [unresolved-attribute]
+optional: Box[Callable[[int], int]] | None = Box(
+    value=lambda x: x.upper(),  # error: [unresolved-attribute]
+)
+```
+
+### Constructor inference with a default type parameter
+
+A constructor argument takes precedence over the type parameter's default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypedDict
+
+class Defaulted[T = str](TypedDict):
+    value: T
+
+reveal_type(Defaulted(value=1))  # revealed: Defaulted[int]
+```
+
 ### Validation of generic `TypedDict`s
 
 ```toml

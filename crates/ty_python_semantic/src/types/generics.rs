@@ -3268,6 +3268,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        let db = self.db;
+        let formal_contains_typed_dict = match formal.resolve_type_alias(db) {
+            Type::TypedDict(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| matches!(element.resolve_type_alias(db), Type::TypedDict(_))),
+            _ => false,
+        };
+
+        if formal_contains_typed_dict {
+            // Structural TypedDict relations already encode field variance and recursive schemas.
+            // Preserve those complete constraints instead of reconstructing individual mappings.
+            let when =
+                actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
+            return self.add_constraint_set(when);
+        }
+
         self.infer_map_impl(
             formal,
             actual,

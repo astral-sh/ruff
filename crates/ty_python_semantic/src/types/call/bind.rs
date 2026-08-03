@@ -5717,6 +5717,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let lower = bounds.lower?;
             let promoted = lower.promote(db, self.env);
 
+            // A callback field may require a narrower argument than another field's literal would
+            // normally promote to, such as `Callable[[Literal[1]], None]` alongside `value=1`.
+            if self.return_ty.as_typed_dict().is_some()
+                && bounds.has_upper()
+                && bounds
+                    .upper
+                    .as_single_bound(db, self.env)
+                    .is_none_or(|upper| !promoted.is_assignable_to(db, self.env, upper))
+            {
+                return None;
+            }
+
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.
             if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
