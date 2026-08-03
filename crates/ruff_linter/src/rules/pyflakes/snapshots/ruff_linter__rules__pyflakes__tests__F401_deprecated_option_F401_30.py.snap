@@ -8,7 +8,6 @@ F401 [*] `.main.MaμToMan` imported but unused
 5 |
 6 | from .main import MaµToMan
   |                   ^^^^^^^^
-  |
 help: Remove unused import: `.main.MaμToMan`
   |
 5 |

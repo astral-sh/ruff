@@ -453,7 +453,6 @@ mod tests {
           | ^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -511,7 +510,6 @@ mod tests {
            | |    |
            | |    Cursor offset
            | source
-           |
         ");
     }
 
@@ -567,7 +565,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         ");
     }
 
@@ -617,7 +614,6 @@ mod tests {
            | |   |
            | |   Cursor offset
            | source
-           |
         "#);
     }
 
@@ -679,7 +675,6 @@ mod tests {
            | |    |
            | |    Cursor offset
            | source
-           |
         ");
     }
 
@@ -739,7 +734,6 @@ mod tests {
           |       |    |
           |       |    Cursor offset
           |       source
-          |
         ");
     }
 
@@ -793,7 +787,6 @@ mod tests {
            |     |    |
            |     |    Cursor offset
            |     source
-           |
         ");
     }
 
@@ -847,7 +840,6 @@ mod tests {
           |           |    |
           |           |    Cursor offset
           |           source
-          |
         ");
     }
 
@@ -908,7 +900,6 @@ mod tests {
            |     |    |
            |     |    Cursor offset
            |     source
-           |
         ");
     }
 
@@ -946,7 +937,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -994,7 +984,6 @@ mod tests {
            |     |    |
            |     |    Cursor offset
            |     source
-           |
         "#);
     }
 
@@ -1024,7 +1013,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1062,7 +1050,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1110,7 +1097,6 @@ mod tests {
            |     |  |
            |     |  Cursor offset
            |     source
-           |
         ");
     }
 
@@ -1156,7 +1142,6 @@ mod tests {
            |     |  |
            |     |  Cursor offset
            |     source
-           |
         "#);
     }
 
@@ -1202,11 +1187,10 @@ mod tests {
           --> main.py:12:5
            |
         12 | x = S(1)
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
-           |
         ");
     }
 
@@ -1244,11 +1228,10 @@ mod tests {
           --> main.py:12:5
            |
         12 | x = S(1)
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
-           |
         ");
     }
 
@@ -1281,7 +1264,6 @@ mod tests {
           |     |   |
           |     |   Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1314,7 +1296,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1355,7 +1336,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1401,7 +1381,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1446,7 +1425,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1487,7 +1465,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1528,7 +1505,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1600,7 +1576,6 @@ mod tests {
            |   |    |
            |   |    Cursor offset
            |   source
-           |
         ");
     }
 
@@ -1644,7 +1619,6 @@ mod tests {
            |          ||
            |          |Cursor offset
            |          source
-           |
         ");
     }
 
@@ -1685,7 +1659,6 @@ mod tests {
           |            |        |
           |            |        Cursor offset
           |            source
-          |
         "#);
 
         let literal_string = hover_test(
@@ -1725,7 +1698,6 @@ mod tests {
           |            |        |
           |            |        Cursor offset
           |            source
-          |
         "#);
     }
 
@@ -1771,7 +1743,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1811,7 +1782,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1860,7 +1830,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1917,7 +1886,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1970,7 +1938,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -2022,7 +1989,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -2075,7 +2041,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -2110,11 +2075,10 @@ mod tests {
           --> main.py:14:5
            |
         14 | foo.a
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
-           |
         ");
     }
 
@@ -2148,7 +2112,6 @@ mod tests {
           | ^^^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -2176,7 +2139,6 @@ mod tests {
           |     |       |
           |     |       Cursor offset
           |     source
-          |
         ");
     }
 
@@ -2216,7 +2178,6 @@ mod tests {
            |      ||
            |      |Cursor offset
            |      source
-           |
         ");
     }
 
@@ -2258,7 +2219,6 @@ mod tests {
            |      ^^^^^- Cursor offset
            |      |
            |      source
-           |
         ");
     }
 
@@ -2288,7 +2248,6 @@ mod tests {
           |      ||
           |      |Cursor offset
           |      source
-          |
         ");
     }
 
@@ -2328,7 +2287,6 @@ mod tests {
            |      ||
            |      |Cursor offset
            |      source
-           |
         ");
     }
 
@@ -2368,7 +2326,6 @@ mod tests {
            |      | |
            |      | Cursor offset
            |      source
-           |
         ");
     }
 
@@ -2418,7 +2375,6 @@ mod tests {
            |        |   |
            |        |   Cursor offset
            |        source
-           |
         ");
     }
 
@@ -2465,7 +2421,6 @@ mod tests {
            |        |   |
            |        |   Cursor offset
            |        source
-           |
         ");
     }
 
@@ -2502,7 +2457,6 @@ mod tests {
            |         | |
            |         | Cursor offset
            |         source
-           |
         ");
     }
 
@@ -2535,7 +2489,6 @@ mod tests {
           |          ||
           |          |Cursor offset
           |          source
-          |
         ");
     }
 
@@ -2575,7 +2528,6 @@ mod tests {
            | ^- Cursor offset
            | |
            | source
-           |
         ");
     }
 
@@ -2610,7 +2562,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -2645,7 +2596,6 @@ mod tests {
           |            |   |
           |            |   Cursor offset
           |            source
-          |
         "#);
     }
 
@@ -2693,7 +2643,6 @@ mod tests {
           |            ^^^^^^^- Cursor offset
           |            |
           |            source
-          |
         "#);
     }
 
@@ -2756,7 +2705,6 @@ mod tests {
           |     |   |
           |     |   Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -2786,7 +2734,6 @@ mod tests {
           |               ||
           |               |Cursor offset
           |               source
-          |
         "#);
     }
 
@@ -2813,7 +2760,6 @@ mod tests {
           |      ||
           |      |Cursor offset
           |      source
-          |
         "#);
     }
 
@@ -2840,7 +2786,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -2875,7 +2820,6 @@ mod tests {
           |           | |
           |           | Cursor offset
           |           source
-          |
         "#);
     }
 
@@ -2910,7 +2854,6 @@ mod tests {
           |                 | |
           |                 | Cursor offset
           |                 source
-          |
         "#);
     }
 
@@ -2945,7 +2888,6 @@ mod tests {
           |                          | |
           |                          | Cursor offset
           |                          source
-          |
         "#);
     }
 
@@ -2980,7 +2922,6 @@ mod tests {
           |                   | |
           |                   | Cursor offset
           |                   source
-          |
         "#);
     }
 
@@ -3015,7 +2956,6 @@ mod tests {
           |           | |
           |           | Cursor offset
           |           source
-          |
         "#);
     }
 
@@ -3045,7 +2985,6 @@ mod tests {
           |             |  |
           |             |  Cursor offset
           |             source
-          |
         "#);
     }
 
@@ -3080,7 +3019,6 @@ mod tests {
           |                               | |
           |                               | Cursor offset
           |                               source
-          |
         "#);
     }
 
@@ -3138,7 +3076,6 @@ def ab(a: str): ...
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3184,7 +3121,6 @@ def bar() -> None:
           | | |
           | | Cursor offset
           | source
-          |
         ");
     }
 
@@ -3242,7 +3178,6 @@ def ab(a: str):
           | ||
           | |Cursor offset
           | source
-          |
         "#);
     }
 
@@ -3306,7 +3241,6 @@ def ab(a: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3364,7 +3298,6 @@ def ab(a: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3434,7 +3367,6 @@ def ab(a: int, *, c: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3504,7 +3436,6 @@ def ab(a: int, *, c: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3566,7 +3497,6 @@ def ab(a: int, *, c: int):
            | ^^^- Cursor offset
            | |
            | source
-           |
         ");
     }
 
@@ -3616,7 +3546,6 @@ def ab(a: int, *, c: int):
            | ^^^- Cursor offset
            | |
            | source
-           |
         ");
     }
 
@@ -3667,7 +3596,6 @@ def ab(a: int, *, c: int):
           | | |
           | | Cursor offset
           | source
-          |
         ");
     }
 
@@ -3702,7 +3630,6 @@ def outer():
           |                ^- Cursor offset
           |                |
           |                source
-          |
         "#);
     }
 
@@ -3755,7 +3682,6 @@ def function():
           |            |      |
           |            |      Cursor offset
           |            source
-          |
         "#);
     }
 
@@ -3816,7 +3742,6 @@ def function():
           |                 ||
           |                 |Cursor offset
           |                 source
-          |
         ");
     }
 
@@ -3860,7 +3785,6 @@ def function():
           |                 ||
           |                 |Cursor offset
           |                 source
-          |
         ");
     }
 
@@ -3904,7 +3828,6 @@ def function():
           |                 ||
           |                 |Cursor offset
           |                 source
-          |
         "#);
     }
 
@@ -3960,7 +3883,6 @@ def function():
            |                 ||
            |                 |Cursor offset
            |                 source
-           |
         ");
     }
 
@@ -3996,7 +3918,6 @@ def function():
            |              | |
            |              | Cursor offset
            |              source
-           |
         ");
     }
 
@@ -4043,7 +3964,6 @@ def function():
           |             ||
           |             |Cursor offset
           |             source
-          |
         ");
     }
 
@@ -4070,7 +3990,6 @@ def function():
           |                                     ||
           |                                     |Cursor offset
           |                                     source
-          |
         ");
     }
 
@@ -4083,7 +4002,22 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @"
+        AB@Alias2 (contravariant)
+        ---------------------------------------------
+        ```python
+        AB@Alias2 (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^-
+          |               ||
+          |               |Cursor offset
+          |               source
+        ");
     }
 
     #[test]
@@ -4112,7 +4046,6 @@ def function():
           |                                           ||
           |                                           |Cursor offset
           |                                           source
-          |
         ");
     }
 
@@ -4150,7 +4083,6 @@ def function():
           |                                      ||
           |                                      |Cursor offset
           |                                      source
-          |
         ");
     }
 
@@ -4201,7 +4133,6 @@ def function():
           |        | |
           |        | Cursor offset
           |        source
-          |
         ");
     }
 
@@ -4258,7 +4189,6 @@ def function():
           |                                  ^- Cursor offset
           |                                  |
           |                                  source
-          |
         ");
     }
 
@@ -4272,10 +4202,10 @@ def function():
 
         // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @"
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ---------------------------------------------
         ```python
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4285,7 +4215,6 @@ def function():
           |                                         ^- Cursor offset
           |                                         |
           |                                         source
-          |
         ");
     }
 
@@ -4311,7 +4240,6 @@ def function():
           |                               ^^- Cursor offset
           |                               |
           |                               source
-          |
         ");
     }
 
@@ -4350,7 +4278,6 @@ def function():
           | ^^^^^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -4398,7 +4325,6 @@ def function():
           | ^^^^^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -4444,7 +4370,6 @@ def function():
           |   ^^^^- Cursor offset
           |   |
           |   source
-          |
         ");
     }
 
@@ -4492,7 +4417,6 @@ def function():
           |   ^^^^- Cursor offset
           |   |
           |   source
-          |
         ");
     }
 
@@ -4532,7 +4456,6 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
-          |
         ");
     }
 
@@ -4572,7 +4495,6 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
-          |
         ");
     }
 
@@ -4615,7 +4537,6 @@ def function():
            |   ^- Cursor offset
            |   |
            |   source
-           |
         ");
     }
 
@@ -4656,7 +4577,6 @@ def function():
           |              ^- Cursor offset
           |              |
           |              source
-          |
         ");
     }
 
@@ -4700,7 +4620,6 @@ def function():
            |   ^- Cursor offset
            |   |
            |   source
-           |
         ");
     }
 
@@ -4730,7 +4649,6 @@ def function():
           |              ^- Cursor offset
           |              |
           |              source
-          |
         ");
     }
 
@@ -4758,7 +4676,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -4787,7 +4704,6 @@ def function():
           |       ^- Cursor offset
           |       |
           |       source
-          |
         ");
     }
 
@@ -4819,7 +4735,6 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
-          |
         ");
     }
 
@@ -4851,7 +4766,6 @@ def function():
           |           ^- Cursor offset
           |           |
           |           source
-          |
         ");
     }
 
@@ -4885,7 +4799,6 @@ def function():
            |               ^- Cursor offset
            |               |
            |               source
-           |
         ");
     }
 
@@ -4952,7 +4865,6 @@ def function():
           |       |       |
           |       |       Cursor offset
           |       source
-          |
         ");
     }
 
@@ -5121,7 +5033,6 @@ def function():
            |        |  |
            |        |  Cursor offset
            |        source
-           |
         "#);
     }
 
@@ -5159,7 +5070,6 @@ def function():
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -5189,7 +5099,6 @@ def function():
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -5219,7 +5128,6 @@ def function():
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -5265,7 +5173,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5303,7 +5210,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -5332,7 +5238,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5367,7 +5272,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5402,7 +5306,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5438,7 +5341,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5475,7 +5377,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5513,7 +5414,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5542,7 +5442,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5570,7 +5469,6 @@ def function():
           |                 ^- Cursor offset
           |                 |
           |                 source
-          |
         ");
 
         let test = hover_test(
@@ -5595,7 +5493,6 @@ def function():
           |                      ^- Cursor offset
           |                      |
           |                      source
-          |
         ");
 
         let test = hover_test(
@@ -5620,7 +5517,6 @@ def function():
           |                     ^- Cursor offset
           |                     |
           |                     source
-          |
         ");
 
         let test = hover_test(
@@ -5645,7 +5541,6 @@ def function():
           |                      ^- Cursor offset
           |                      |
           |                      source
-          |
         ");
     }
 
@@ -5672,7 +5567,6 @@ def function():
           |               ^- Cursor offset
           |               |
           |               source
-          |
         ");
 
         let test = hover_test(
@@ -5696,7 +5590,6 @@ def function():
           |                       ^- Cursor offset
           |                       |
           |                       source
-          |
         ");
 
         let test = hover_test(
@@ -5720,7 +5613,6 @@ def function():
           |                   ^- Cursor offset
           |                   |
           |                   source
-          |
         ");
 
         let test = hover_test(
@@ -5744,7 +5636,6 @@ def function():
           |                         ^- Cursor offset
           |                         |
           |                         source
-          |
         ");
     }
 
@@ -5770,7 +5661,6 @@ def function():
           |           ^- Cursor offset
           |           |
           |           source
-          |
         ");
 
         let test = hover_test(
@@ -5793,7 +5683,6 @@ def function():
           |                     ^- Cursor offset
           |                     |
           |                     source
-          |
         ");
 
         let test = hover_test(
@@ -5816,7 +5705,6 @@ def function():
           |            ^- Cursor offset
           |            |
           |            source
-          |
         ");
 
         let test = hover_test(
@@ -5839,7 +5727,6 @@ def function():
           |                       ^- Cursor offset
           |                       |
           |                       source
-          |
         ");
     }
 
@@ -5865,7 +5752,6 @@ def function():
           |      ^^^- Cursor offset
           |      |
           |      source
-          |
         ");
     }
 
@@ -5902,7 +5788,6 @@ def function():
           |      ^^^^^^^- Cursor offset
           |      |
           |      source
-          |
         ");
 
         let test = hover_test(
@@ -5927,7 +5812,6 @@ def function():
           |    |  |
           |    |  Cursor offset
           |    source
-          |
         ");
     }
 
@@ -5958,7 +5842,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
 
         let test = hover_test(
@@ -5986,7 +5869,6 @@ def function():
           |                    ^- Cursor offset
           |                    |
           |                    source
-          |
         ");
 
         let test = hover_test(
@@ -6014,7 +5896,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
 
         let test = hover_test(
@@ -6042,7 +5923,6 @@ def function():
           |                      ^- Cursor offset
           |                      |
           |                      source
-          |
         ");
     }
 
@@ -6070,11 +5950,10 @@ def function():
          --> main.py:2:12
           |
         2 | result = 5 + 3
-          |            -
+          |            ^
           |            |
           |            source
           |            Cursor offset
-          |
         ");
     }
 
@@ -6114,11 +5993,10 @@ def function():
           --> main.py:15:8
            |
         15 | Test() + Test()
-           |        -
+           |        ^
            |        |
            |        source
            |        Cursor offset
-           |
         ");
     }
 
@@ -6155,7 +6033,6 @@ def function():
            |       ^- Cursor offset
            |       |
            |       source
-           |
         ");
     }
 
@@ -6186,7 +6063,6 @@ def function():
           |    ^^^^^- Cursor offset
           |    |
           |    source
-          |
         ");
     }
 
@@ -6250,7 +6126,6 @@ def function():
           |    ^^^^^- Cursor offset
           |    |
           |    source
-          |
         ");
 
         let test = hover_test(
@@ -6275,7 +6150,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -6301,7 +6175,6 @@ def function():
           |      ^^^- Cursor offset
           |      |
           |      source
-          |
         ");
 
         let test = hover_test(
@@ -6324,7 +6197,6 @@ def function():
           |                             ^^^- Cursor offset
           |                             |
           |                             source
-          |
         ");
     }
 
@@ -6354,7 +6226,6 @@ def function():
           |                  ^- Cursor offset
           |                  |
           |                  source
-          |
         ");
 
         let test = hover_test(
@@ -6378,7 +6249,6 @@ def function():
           |             ^- Cursor offset
           |             |
           |             source
-          |
         ");
 
         let test = hover_test(
@@ -6405,7 +6275,6 @@ def function():
           |             ^- Cursor offset
           |             |
           |             source
-          |
         ");
 
         let test = hover_test(
@@ -6429,7 +6298,6 @@ def function():
           |             ^- Cursor offset
           |             |
           |             source
-          |
         ");
     }
 
@@ -6469,7 +6337,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -6509,7 +6376,6 @@ def function():
           |       |  |
           |       |  Cursor offset
           |       source
-          |
         ");
     }
 
@@ -6549,7 +6415,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -6589,7 +6454,6 @@ def function():
           |              |  |
           |              |  Cursor offset
           |              source
-          |
         ");
     }
 
@@ -6628,7 +6492,6 @@ def function():
           |       |  |
           |       |  Cursor offset
           |       source
-          |
         ");
     }
 
@@ -6667,7 +6530,6 @@ def function():
           |                     |  |
           |                     |  Cursor offset
           |                     source
-          |
         ");
     }
 
@@ -6706,7 +6568,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -6750,7 +6611,6 @@ def function():
           |    ^- Cursor offset
           |    |
           |    source
-          |
         ");
     }
 
@@ -6778,7 +6638,6 @@ def function():
           | |    |
           | |    Cursor offset
           | source
-          |
         ");
     }
 
@@ -6832,7 +6691,6 @@ class CoolType(str):
           |        ^- Cursor offset
           |        |
           |        source
-          |
         ");
     }
 
@@ -6868,7 +6726,6 @@ type U<CURSOR> = MyType
           |      ^- Cursor offset
           |      |
           |      source
-          |
         ");
     }
 
@@ -6918,7 +6775,6 @@ type U<CURSOR> = MyType
           |    |  |
           |    |  Cursor offset
           |    source
-          |
         ");
     }
 
@@ -6967,7 +6823,6 @@ type U<CURSOR> = MyType
           |                     ^^^^^- Cursor offset
           |                     |
           |                     source
-          |
         ");
     }
 
@@ -7014,7 +6869,6 @@ type U<CURSOR> = MyType
            |    ^^^^- Cursor offset
            |    |
            |    source
-           |
         ");
     }
 

@@ -78,7 +78,7 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::inline_always)]
     #[inline(always)]
-    pub(crate) fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
+    fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
         match self {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -138,7 +138,7 @@ impl<'db> DefinitionReferenceVisitor<'db> {
         }
 
         let class = match ty {
-            Type::ProtocolInstance(protocol) => *protocol.class_origin()?,
+            Type::ProtocolInstance(protocol) => *protocol.class_origin(db)?,
             Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
             _ => return None,
         };
@@ -198,7 +198,7 @@ impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
     }
 
     fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some(class) = protocol.class_origin() {
+        if let Some(class) = protocol.class_origin(db) {
             class.walk_recursive_member_types(db, self);
         }
     }
@@ -229,12 +229,12 @@ impl<'db> TypeAliasType<'db> {
 
 impl<'db> ProtocolInstanceType<'db> {
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        let (origin, _) = self.class_origin()?.static_class_literal(db)?;
+        let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
         Some(origin.definition(db))
     }
 
     fn is_recursive(self, db: &'db dyn Db) -> bool {
-        let Some(class) = self.class_origin() else {
+        let Some(class) = self.class_origin(db) else {
             return false;
         };
         let Some((origin, _)) = class.static_class_literal(db) else {
@@ -347,7 +347,7 @@ impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R,
 where
     T: HasIdentity<'db>,
 {
-    pub fn new(fallback: R) -> Self {
+    pub(crate) fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
             cache: RefCell::new(CycleDetectorCache::new()),

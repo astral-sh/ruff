@@ -402,7 +402,7 @@ def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tu
 
 # HACK: `obj: Never` typing matches if object argument is using `Any` type.
 @overload
-def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]
+def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]
     """Returns True if obj is a dataclass or an instance of a
     dataclass.
     """
@@ -415,13 +415,17 @@ class FrozenInstanceError(AttributeError): ...
 
 class InitVar(Generic[_T]):
     __slots__ = ("type",)
-    type: Type[_T]
+    type: Type[_T]  # ty:ignore[unbound-type-variable]
     def __init__(self, type: Type[_T]) -> None: ...
 
     @overload
-    def __class_getitem__(cls, type: Type[_T]) -> InitVar[_T]: ...  # pyright: ignore[reportInvalidTypeForm]
+    def __class_getitem__(
+        cls, type: Type[_T]
+    ) -> InitVar[_T]: ...  # pyright: ignore[reportInvalidTypeForm]  # ty:ignore[invalid-type-form]
     @overload
-    def __class_getitem__(cls, type: Any) -> InitVar[Any]: ...  # pyright: ignore[reportInvalidTypeForm]
+    def __class_getitem__(
+        cls, type: Any
+    ) -> InitVar[Any]: ...  # pyright: ignore[reportInvalidTypeForm]  # ty:ignore[invalid-type-form]
 
 if sys.version_info >= (3, 14):
     def make_dataclass(

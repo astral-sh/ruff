@@ -729,11 +729,11 @@ reveal_type(add_letters(Array[B, D]()))  # revealed: Array[A, B, D, C]
 reveal_type(add_letter_a(Array[B, C]()))  # revealed: Array[A, B, C]
 
 reveal_type(del_letter_a(Array[A, B]()))  # revealed: Array[B]
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `del_letter_a` is incorrect: Expected `Array[A, C]`, found `Array[B, C]`"
 reveal_type(del_letter_a(Array[B, C]()))  # revealed: Array[C]
 
 reveal_type(del_letter_c(Array[A, B, C]()))  # revealed: Array[A, B]
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `del_letter_c` is incorrect: Expected `Array[A, C]`, found `Array[A, B]`"
 reveal_type(del_letter_c(Array[A, B]()))  # revealed: Array[A]
 
 reveal_type(generic(A(), Array[B, D]()))  # revealed: Array[A, B, D]
@@ -1026,8 +1026,7 @@ class Row[*Cells]:
 
 def f(pair: Row[int, str], triple: Row[int, str, bytes]) -> None:
     reveal_type(pair.get())  # revealed: Row[str, int]
-    # TODO: Should reveal `Row[str, bytes, int]`.
-    reveal_type(triple.get())  # revealed: Row[Unknown, Unknown]
+    reveal_type(triple.get())  # revealed: Row[str, bytes, int]
 ```
 
 ## Invalid Forms

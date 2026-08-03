@@ -147,46 +147,64 @@ pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<Module
 }
 
 /// Return whether a given expression uses a PEP 585 standard library generic.
-pub fn is_pep585_generic(
-    expr: &Expr,
-    semantic: &SemanticModel,
-    include_preview_generics: bool,
-) -> bool {
+pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| match qualified_name.segments() {
-            ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
-            | ["collections", "deque" | "defaultdict"] => true,
-            ["asyncio", "Future" | "Task"]
-            | ["collections", "ChainMap" | "Counter" | "OrderedDict"]
-            | [
-                "contextlib",
-                "AbstractAsyncContextManager" | "AbstractContextManager",
-            ]
-            | ["dataclasses", "Field"]
-            | ["functools", "cached_property" | "partialmethod"]
-            | ["os", "PathLike"]
-            | [
-                "queue",
-                "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue",
-            ]
-            | ["re", "Match" | "Pattern"]
-            | ["shelve", "BsdDbShelf" | "DbfilenameShelf" | "Shelf"]
-            | ["types", "MappingProxyType"]
-            | [
-                "weakref",
-                "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary",
-            ]
-            | [
-                "collections",
-                "abc",
-                "AsyncGenerator" | "AsyncIterable" | "AsyncIterator" | "Awaitable" | "ByteString"
-                | "Callable" | "Collection" | "Container" | "Coroutine" | "Generator" | "ItemsView"
-                | "Iterable" | "Iterator" | "KeysView" | "Mapping" | "MappingView"
-                | "MutableMapping" | "MutableSequence" | "MutableSet" | "Reversible" | "Sequence"
-                | "Set" | "ValuesView",
-            ] => include_preview_generics,
-            _ => false,
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
+                    | [
+                        "collections",
+                        "deque" | "defaultdict" | "ChainMap" | "Counter" | "OrderedDict"
+                    ]
+                    | ["asyncio", "Future" | "Task"]
+                    | [
+                        "contextlib",
+                        "AbstractAsyncContextManager" | "AbstractContextManager"
+                    ]
+                    | ["dataclasses", "Field"]
+                    | ["functools", "cached_property" | "partialmethod"]
+                    | ["os", "PathLike"]
+                    | [
+                        "queue",
+                        "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue"
+                    ]
+                    | ["re", "Match" | "Pattern"]
+                    | ["shelve", "BsdDbShelf" | "DbfilenameShelf" | "Shelf"]
+                    | ["types", "MappingProxyType"]
+                    | [
+                        "weakref",
+                        "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary"
+                    ]
+                    | [
+                        "collections",
+                        "abc",
+                        "AsyncGenerator"
+                            | "AsyncIterable"
+                            | "AsyncIterator"
+                            | "Awaitable"
+                            | "ByteString"
+                            | "Callable"
+                            | "Collection"
+                            | "Container"
+                            | "Coroutine"
+                            | "Generator"
+                            | "ItemsView"
+                            | "Iterable"
+                            | "Iterator"
+                            | "KeysView"
+                            | "Mapping"
+                            | "MappingView"
+                            | "MutableMapping"
+                            | "MutableSequence"
+                            | "MutableSet"
+                            | "Reversible"
+                            | "Sequence"
+                            | "Set"
+                            | "ValuesView"
+                    ]
+            )
         })
 }
 
@@ -843,7 +861,7 @@ impl BuiltinTypeChecker for FloatChecker {
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Float);
 }
 
-pub struct IoBaseChecker;
+struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
@@ -956,7 +974,7 @@ impl TypeChecker for PathlibPathChecker {
     }
 }
 
-pub struct FastApiRouteChecker;
+struct FastApiRouteChecker;
 
 impl FastApiRouteChecker {
     fn is_fastapi_route_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
@@ -985,7 +1003,7 @@ impl TypeChecker for FastApiRouteChecker {
     }
 }
 
-pub struct TypeVarLikeChecker;
+struct TypeVarLikeChecker;
 
 impl TypeVarLikeChecker {
     /// Returns `true` if an [`Expr`] is a `TypeVar`, `TypeVarTuple`, or `ParamSpec` call.
@@ -1128,7 +1146,7 @@ pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
 }
 
 /// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
-pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<TypeVarLikeChecker>(binding, semantic)
 }
 

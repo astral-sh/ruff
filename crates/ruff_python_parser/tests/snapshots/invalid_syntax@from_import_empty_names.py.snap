@@ -85,7 +85,6 @@ Module(
 2 | from x import ()
 3 | from x import ,,
   |               ^ Syntax Error: Expected an import name
-  |
 
 
   |
@@ -93,7 +92,6 @@ Module(
 2 | from x import ()
 3 | from x import ,,
   |                ^ Syntax Error: Expected an import name
-  |
 
 
   |
@@ -101,4 +99,3 @@ Module(
 2 | from x import ()
 3 | from x import ,,
   |                 ^ Syntax Error: Expected one or more symbol names after import
-  |

@@ -8,7 +8,9 @@ use crate::types::attribute_write::{
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
     ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
 };
-use crate::types::call::{Bindings, CallArguments, CallError};
+use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
+use crate::types::class::FrozenDataclassDispatch;
+use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, UNRESOLVED_ATTRIBUTE, report_bad_dunder_set_call,
     report_invalid_attribute_assignment, report_possibly_missing_attribute,
@@ -55,10 +57,15 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
         is_setattr_synthesized: bool,
     },
     TerminalDescriptor,
-    BadDunderSet(CallError<'db>),
+    BadDunderSet {
+        failure: CallError<'db>,
+        descriptor_ty: Type<'db>,
+        includes_descriptor_argument: bool,
+    },
     PossiblyMissing,
     BadSetAttr {
         value_ty: Type<'db>,
+        failure: CallError<'db>,
     },
     Unresolved {
         with_period: bool,
@@ -121,11 +128,17 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ast::ArgOrKeyword::Arg(self.value),
         ];
         let mut call_arguments = CallArguments::positional([name_ty, Type::unknown()]);
+        // A bound `super` must use its own MRO lookup rather than the normal instance fallback.
+        let lookup_policy = if matches!(object_ty, Type::BoundSuper(_)) {
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+        } else {
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK
+        };
         let setattr_result = self.builder.infer_and_try_call_dunder(
             db,
             object_ty,
             "__setattr__",
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            lookup_policy,
             ArgumentsIter::synthesized(&ast_arguments),
             &mut call_arguments,
             &mut |builder, (argument_index, _, tcx)| {
@@ -247,6 +260,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         TypeContext::new(Some(domain.unwrap_or_else(Type::unknown))),
                         emit_diagnostics,
                     );
+                    if let Some(domain) = domain
+                        && !self.check_type_pair(value_ty, *domain, emit_diagnostics)
+                    {
+                        return false;
+                    }
                     self.evaluate_protocol_descriptor_write(
                         *descriptor_ty,
                         *receiver_ty,
@@ -338,12 +356,29 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
+        let frozen_dataclass_dispatch = object_ty
+            .nominal_class(db)
+            .and_then(|class| class.static_class_literal(db))
+            .and_then(|(class, specialization)| {
+                class.inherited_frozen_dataclass_dispatch(
+                    db,
+                    specialization,
+                    "__setattr__",
+                    self.attribute,
+                )
+            });
+        let setattr_receiver = frozen_dataclass_dispatch
+            .map_or(object_ty, |dispatch| dispatch.receiver(db, object_ty));
+
         let (setattr_result, value_ty) = if matches!(member, InstanceAttributeWriteMember::SetAttr)
-        {
-            self.infer_and_try_call_setattr(object_ty, emit_diagnostics)
+            || matches!(
+                frozen_dataclass_dispatch,
+                Some(FrozenDataclassDispatch::Delegate(_))
+            ) {
+            self.infer_and_try_call_setattr(setattr_receiver, emit_diagnostics)
         } else {
             let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
-            let setattr_result = object_ty.try_call_dunder_with_policy(
+            let setattr_result = setattr_receiver.try_call_dunder_with_policy(
                 db,
                 "__setattr__",
                 &mut CallArguments::positional([
@@ -357,13 +392,28 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         };
 
         // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_returns_never = match &setattr_result {
+        let setattr_returns_never = matches!(
+            frozen_dataclass_dispatch,
+            Some(FrozenDataclassDispatch::FrozenField)
+        ) || match &setattr_result {
             Ok(bindings) => bindings.return_type(db).is_never(),
             Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
         };
-        if setattr_returns_never {
+
+        // We could also model this more precisely by synthesizing a `__setattr__`overload set
+        // that only disallows mutation on non-private fields, but for now, we just suppress the
+        // diagnostic here. This is much easier and faster.
+        let is_private_pydantic_attribute =
+            matches!(member, InstanceAttributeWriteMember::Explicit { .. })
+                && pydantic::is_private_attribute(self.attribute)
+                && pydantic::is_model_instance(db, object_ty);
+
+        if setattr_returns_never && !is_private_pydantic_attribute {
             if emit_diagnostics {
-                let is_setattr_synthesized = match object_ty.class_member_with_policy(
+                let is_setattr_synthesized = !matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::Delegate(_))
+                ) && match object_ty.class_member_with_policy(
                     db,
                     "__setattr__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
@@ -395,6 +445,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 {
                     return false;
                 }
+                if matches!(
+                    frozen_dataclass_dispatch,
+                    Some(FrozenDataclassDispatch::Delegate(_))
+                ) && let Err(CallDunderError::CallError(kind, bindings, _)) = setattr_result
+                {
+                    if emit_diagnostics {
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                            value_ty,
+                            failure: CallError(kind, bindings),
+                        });
+                    }
+                    return false;
+                }
                 let member_valid =
                     self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
@@ -410,11 +473,22 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             }
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
                 Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                Err(CallDunderError::CallError(..)) => {
+                Err(CallDunderError::CallError(kind, bindings, _)) => {
                     if emit_diagnostics {
-                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty });
+                        self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
+                            value_ty,
+                            failure: CallError(kind, bindings),
+                        });
                     }
                     false
+                }
+                Err(CallDunderError::MethodNotAvailable)
+                    if matches!(
+                        frozen_dataclass_dispatch,
+                        Some(FrozenDataclassDispatch::Delegate(_))
+                    ) =>
+                {
+                    true
                 }
                 Err(CallDunderError::MethodNotAvailable) => {
                     if emit_diagnostics {
@@ -484,10 +558,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
                 match setattr_result {
                     Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                    Err(CallDunderError::CallError(..)) => {
+                    Err(CallDunderError::CallError(kind, bindings, _)) => {
                         if emit_diagnostics {
                             self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
                                 value_ty,
+                                failure: CallError(kind, bindings),
                             });
                         }
                         false
@@ -581,9 +656,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             Ok(_) => true,
             Err(CallDunderError::CallError(kind, bindings, _)) => {
                 if emit_diagnostics {
-                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(CallError(
-                        kind, bindings,
-                    )));
+                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
+                        failure: CallError(kind, bindings),
+                        descriptor_ty,
+                        includes_descriptor_argument: false,
+                    });
                 }
                 false
             }
@@ -605,21 +682,35 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
-        if property_setter_returns_never(db, descriptor_ty, object_ty, value_ty) {
+        let setter_result = setter_ty.try_call(
+            db,
+            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
+        );
+        // `Never` supports arbitrary operations only because there can be no runtime value to
+        // mutate; it is not a concrete descriptor with a terminal setter.
+        let setter_returns_never = !descriptor_ty.is_never()
+            && match &setter_result {
+                Ok(bindings) => bindings.return_type(db).is_never(),
+                Err(error) => error.return_type(db).is_never(),
+            };
+        if setter_returns_never
+            || property_setter_returns_never(db, descriptor_ty, object_ty, value_ty)
+        {
             if emit_diagnostics {
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
             }
             return false;
         }
 
-        match setter_ty.try_call(
-            db,
-            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
-        ) {
+        match setter_result {
             Ok(_) => true,
             Err(error) => {
                 if emit_diagnostics {
-                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(error));
+                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
+                        failure: error,
+                        descriptor_ty,
+                        includes_descriptor_argument: true,
+                    });
                 }
                 false
             }
@@ -778,13 +869,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     ));
                 }
             }
-            AssignmentAttributeWriteDiagnostic::BadDunderSet(failure) => {
+            AssignmentAttributeWriteDiagnostic::BadDunderSet {
+                failure,
+                descriptor_ty,
+                includes_descriptor_argument,
+            } => {
                 report_bad_dunder_set_call(
                     &self.builder.context,
                     &failure,
-                    self.attribute,
                     self.object_ty,
+                    descriptor_ty,
+                    includes_descriptor_argument,
                     self.target,
+                    self.value,
                 );
             }
             AssignmentAttributeWriteDiagnostic::PossiblyMissing => {
@@ -795,19 +892,22 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.object_ty,
                 );
             }
-            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty } => {
-                if let Some(builder) = self
-                    .builder
-                    .context
-                    .report_lint(&UNRESOLVED_ATTRIBUTE, self.target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign object of type `{}` to attribute `{}` on type `{}` with custom `__setattr__` method.",
-                        value_ty.display(db),
-                        self.attribute,
-                        self.object_ty.display(db)
-                    ));
-                }
+            AssignmentAttributeWriteDiagnostic::BadSetAttr { value_ty, failure } => {
+                failure.report_diagnostics_with_override(
+                    &self.builder.context,
+                    self.target.into(),
+                    &CallDiagnosticOverride {
+                        lint: &INVALID_ASSIGNMENT,
+                        message: format!(
+                            "Cannot assign object of type `{}` to attribute `{}` on type `{}`",
+                            value_ty.display(db),
+                            self.attribute,
+                            self.object_ty.display(db)
+                        ),
+                        info: "This assignment implicitly calls a custom `__setattr__` method",
+                        argument_ranges: &[self.target.range(), self.value.range()],
+                    },
+                );
             }
             AssignmentAttributeWriteDiagnostic::Unresolved { with_period } => {
                 if let Some(builder) = self

@@ -34,7 +34,6 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |
 5 |     c: Callable[Concatenate[Concatenate[int, ...], P], None],
   |                             ^^^^^^^^^^^^^^^^^^^^^
-  |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -47,7 +46,6 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |
 7 |     d: Callable[Concatenate[Concatenate, P], int],
   |                             ^^^^^^^^^^^
-  |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -60,7 +58,6 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |
 9 |     e: Callable[Concatenate[int, Concatenate[int, ...]], None],
   |                                  ^^^^^^^^^^^^^^^^^^^^^
-  |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter

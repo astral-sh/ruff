@@ -98,7 +98,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// expression refers to the first parameter of the enclosing method and has not been shadowed
     /// in intermediate scopes. We additionally check that the nearest enclosing function has an
     /// implicit receiver, since static methods also have a first parameter.
-    pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
+    fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };
@@ -213,7 +213,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
                 object_ty.display(db)
             ));
-            diagnostic.set_primary_message(if is_dataclass_like {
+            diagnostic.set_primary_annotation_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
             } else {
                 "`Final` attributes can only be assigned in the class body or `__init__`"
@@ -238,10 +238,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db);
-        let object_instance_ty = object_ty.bind_self_typevars(db, class_instance_ty);
-        let is_current_class_instance =
-            is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
+        // Final ownership is nominal: checking structural protocol requirements can
+        // incorrectly reject the declaring class's own receiver.
+        let is_current_class_instance = is_self_parameter
+            && object_ty.nominal_class(db).is_some_and(|object_class| {
+                object_class.is_subtype_of_class_literal(db, class_ty.class_literal(db))
+            });
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -262,7 +264,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     let mut diagnostic =
                         diag_builder.into_diagnostic("Invalid assignment to final attribute");
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "`{attribute}` already has a value in the class body"
                     ));
                     if let Some(final_declaration) = final_declaration {
@@ -301,7 +303,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "Cannot delete final attribute `{attribute}` on type `{}`",
                     object_ty.display(db)
                 ));
-                diagnostic.set_primary_message("`Final` attributes cannot be deleted");
+                diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
                     self.annotate_final_declaration(&mut diagnostic, final_declaration);
                 }

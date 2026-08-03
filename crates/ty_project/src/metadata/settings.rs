@@ -38,15 +38,15 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn rules(&self) -> &RuleSelection {
+    fn rules(&self) -> &RuleSelection {
         &self.rules
     }
 
-    pub fn src(&self) -> &SrcSettings {
+    pub(crate) fn src(&self) -> &SrcSettings {
         &self.src
     }
 
-    pub fn to_rules(&self) -> Arc<RuleSelection> {
+    pub(crate) fn to_rules(&self) -> Arc<RuleSelection> {
         self.rules.clone()
     }
 
@@ -54,11 +54,11 @@ impl Settings {
         &self.terminal
     }
 
-    pub fn overrides(&self) -> &[Override] {
+    fn overrides(&self) -> &[Override] {
         &self.overrides
     }
 
-    pub fn analysis(&self) -> &AnalysisSettings {
+    pub(crate) fn analysis(&self) -> &AnalysisSettings {
         &self.analysis
     }
 }
@@ -80,13 +80,15 @@ impl Default for TerminalSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct SrcSettings {
-    pub respect_ignore_files: bool,
-    pub files: IncludeExcludeFilter,
+    pub(crate) respect_ignore_files: bool,
+    pub(crate) exclude_scripts: bool,
+    pub(crate) files: IncludeExcludeFilter,
 }
 impl SrcSettings {
     pub(crate) fn default() -> Self {
         Self {
             respect_ignore_files: true,
+            exclude_scripts: false,
             files: IncludeExcludeFilter::default(),
         }
     }
@@ -109,7 +111,7 @@ pub struct Override {
 
 impl Override {
     /// Returns whether this override applies to the given file path.
-    pub fn matches_file(&self, path: &ruff_db::system::SystemPath) -> bool {
+    fn matches_file(&self, path: &ruff_db::system::SystemPath) -> bool {
         use crate::glob::{GlobFilterCheckMode, IncludeResult};
 
         matches!(
@@ -256,14 +258,14 @@ pub enum FileSettings {
 }
 
 impl FileSettings {
-    pub fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
+    pub(crate) fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
         match self {
             FileSettings::Global => db.project().settings(db).rules(),
             FileSettings::File(override_settings) => &override_settings.rules,
         }
     }
 
-    pub fn analysis<'a>(&'a self, db: &'a dyn Db) -> &'a AnalysisSettings {
+    pub(crate) fn analysis<'a>(&'a self, db: &'a dyn Db) -> &'a AnalysisSettings {
         match self {
             FileSettings::Global => db.project().settings(db).analysis(),
             FileSettings::File(override_settings) => &override_settings.analysis,

@@ -313,17 +313,12 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
-We have to add `x: T` to the classes to ensure they're not bivariant in `T` (__new__ and __init__
-signatures don't count towards variance).
-
 ### `__new__` only
 
 ```py
 from ty_extensions._internal import generic_context, into_regular_callable
 
 class C[T]:
-    x: T
-
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
@@ -332,9 +327,9 @@ reveal_type(generic_context(C))
 # revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
-reveal_type(C(1))  # revealed: C[int]
+reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -344,8 +339,6 @@ wrong_innards: C[int] = C("five")
 from ty_extensions._internal import generic_context, into_regular_callable
 
 class C[T]:
-    x: T
-
     def __init__(self, x: T) -> None: ...
 
 # revealed: ty_extensions._internal.GenericContext[T@C]
@@ -353,9 +346,9 @@ reveal_type(generic_context(C))
 # revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
-reveal_type(C(1))  # revealed: C[int]
+reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -553,10 +546,6 @@ from typing import overload
 from ty_extensions._internal import generic_context, into_regular_callable
 
 class C[T]:
-    # we need to use the type variable or else the class is bivariant in T, and
-    # specializations become meaningless
-    x: T
-
     @overload
     def __init__(self: C[str], x: str) -> None: ...
     @overload
@@ -593,10 +582,6 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 
 class D[T, U]:
-    # we need to use the type variable or else the class is bivariant in T, and
-    # specializations become meaningless
-    x: T
-
     @overload
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
@@ -610,7 +595,7 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
 reveal_type(D(1))  # revealed: D[str, Literal[1]]
-reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
+reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses
@@ -932,6 +917,44 @@ class Impl[S, R](A[S, R]):
 reveal_type(generic_context(A.get))  # revealed: ty_extensions._internal.GenericContext[Self@get]
 reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.GenericContext[Self@merge, R2@merge]
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
+```
+
+## Subscripting non-generic classes
+
+Subscripting a non-generic class in a type expression is an error. The invalid type expression
+recovers to `Unknown`.
+
+```py
+class NonGeneric: ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
+def direct(value: NonGeneric[int]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+The same diagnostic applies when the specialization is nested inside `type[...]`.
+
+```py
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'NonGeneric'>`"
+def nested(value: type[NonGeneric[int]]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+Inheriting from a non-generic class, or from a specialization of a generic class, does not make the
+subclass generic.
+
+```py
+class Child(NonGeneric): ...
+class Generic[T, U = str]: ...
+class SpecializedChild(Generic[int]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+def child(value: Child[str]) -> None:
+    reveal_type(value)  # revealed: Unknown
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'SpecializedChild'>`"
+def specialized_child(value: SpecializedChild[bytes]) -> None:
+    reveal_type(value)  # revealed: Unknown
 ```
 
 ## Tuple as a PEP-695 generic class

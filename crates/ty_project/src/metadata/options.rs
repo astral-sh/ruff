@@ -197,6 +197,7 @@ impl Options {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
                 ValueSource::Editor => SysPrefixPathOrigin::Editor,
+                ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
             };
 
             PythonEnvironment::new(python_path.absolute(project_root, system), origin, system)
@@ -565,6 +566,7 @@ fn python_version_from_config(
                 PythonVersionFileSource::new(path.clone(), ranged_version.range()),
             ),
             ValueSource::Editor => PythonVersionSource::Editor,
+            ValueSource::UvWorkspace => PythonVersionSource::UvWorkspace,
         },
     }
 }
@@ -685,6 +687,10 @@ fn unsupported_inferred_python_version_diagnostic(
         PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
+        )),
+        PythonVersionSource::UvWorkspace => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was provided by uv workspace metadata.",
         )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -937,6 +943,18 @@ pub struct SrcOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
 
+    /// Whether to exclude files containing PEP 723 inline script metadata unless they are
+    /// explicitly passed on the command line.
+    #[option(
+        default = r#"false"#,
+        value_type = r#"bool"#,
+        example = r#"
+            exclude-scripts = true
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude_scripts: Option<bool>,
+
     /// A list of files and directories to check. The `include` option
     /// follows a similar syntax to `.gitignore` but reversed:
     /// Including a file or directory will make it so that it (and its contents)
@@ -1056,6 +1074,7 @@ impl SrcOptions {
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            exclude_scripts: self.exclude_scripts.unwrap_or(false),
             files,
         })
     }
@@ -1085,7 +1104,7 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 
 impl Rules {
     /// Convert the rules to a `RuleSelection` with diagnostics.
-    pub fn to_rule_selection(
+    pub(crate) fn to_rule_selection(
         &self,
         db: &dyn Db,
         diagnostics: &mut Vec<OptionDiagnostic>,
@@ -1101,6 +1120,7 @@ impl Rules {
                 ValueSource::File(_) => LintSource::File,
                 ValueSource::Cli => LintSource::Cli,
                 ValueSource::Editor => LintSource::Editor,
+                ValueSource::UvWorkspace => LintSource::UvWorkspace,
             };
 
             let mut set_lint_level = |lint| {
@@ -1149,7 +1169,7 @@ impl Rules {
         selection
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 }
@@ -1472,69 +1492,95 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
-    /// Whether equality-based checks should preserve broad builtin types rather than narrow them to
-    /// literal types.
+    /// Configure ty's behavior regarding type inference and narrowing of equality
+    /// checks. Defaults to `false`.
     ///
-    /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-    /// `value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
-    /// membership tests and literal match patterns, which use equality comparisons.
+    /// By default, ty makes various assumptions about equality checks that match the
+    /// intuitions of most Python programmers, but may not be fully sound in all situations.
+    /// Enabling this option makes ty more conservative about these assumptions, making it
+    /// less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+    /// equality check. This has various effects on type checking, including fewer type
+    /// narrowing opportunities and more conservative assumptions regarding control flow.
+    ///
+    /// One way in which ty will by default make unsound assumptions is by narrowing an
+    /// object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+    /// unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+    /// to `"a"`, but will not be of type `Literal["a"]`:
+    ///
+    /// ```pycon
+    /// >>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+    /// >>> # subclasses, but str subclasses compare equal by default:
+    /// >>> class StringSubclass(str): ...
+    /// ...
+    /// >>> StringSubclass("a") == "a"
+    /// True
+    /// >>>
+    /// >>> # This also applies to `StrEnum`s:
+    /// >>> from enum import StrEnum
+    /// >>> class MyEnum(StrEnum):
+    /// ...     A = "a"
+    /// ...
+    /// >>> MyEnum.A == "a"
+    /// True
+    /// ```
+    ///
+    /// Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+    /// and instead keeps it as `str`:
     ///
     /// ```python
     /// from typing import Literal
     ///
     /// def parse(value: str) -> Literal["a"] | None:
+    ///     # with `strict-equality-semantics = true`, no narrowing will occur here,
+    ///     # and an error will be emitted on the `return` statement.
     ///     if value == "a":
-    ///         return value  # Accepted by default; `value` remains `str` in strict mode.
+    ///         return value
     ///     return None
     /// ```
     ///
-    /// Broad builtin types include subclasses, but literal types distinguish values by both their
-    /// runtime type and value. This makes the narrowing unsound even for subclasses that inherit
-    /// builtin equality. For example:
+    /// Another assumption ty makes by default is that subclasses will never override `__eq__` or
+    /// `__ne__`. This allows ty to narrow the following union based on an equality check, despite
+    /// the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+    /// perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
     ///
     /// ```python
-    /// class StringSubclass(str): ...
-    ///
-    /// result = parse(StringSubclass("a"))
-    /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+    /// def narrow(x: Foo | None, other: Foo) -> None:
+    ///     if x == other:
+    ///         # with this option enabled, `x` will still have type `Foo | None` here,
+    ///         # since it is legal to subclass `Foo` and override its `__eq__` method.
+    ///         reveal_type(x)
     /// ```
     ///
-    /// The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
-    /// respectively. This means enum members can encounter the same unsoundness:
+    /// Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+    /// will also impact those operations. For example, this option will also impact narrowing from
+    /// `in` checks, and narrowing in `match` statements that use value patterns:
     ///
     /// ```python
-    /// from enum import StrEnum
+    /// def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    ///     if x in other:
+    ///         # with this option enabled, `x` will still have type `Foo | None` here,
+    ///         # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+    ///         reveal_type(x)
     ///
-    /// class Choice(StrEnum):
-    ///     A = "a"
     ///
-    /// result = parse(Choice.A)
-    /// # Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
+    /// def narrow_match(x: str) -> None:
+    ///     match x:
+    ///         case "a":
+    ///             # with this option enabled, `x` will still have type `str` here,
+    ///             # since this `case` branch will be taken by any object that compares
+    ///             # equal to `"a"`, including subclasses of `str`.
+    ///             reveal_type(x)
     /// ```
-    ///
-    /// A subclass can also override `__eq__` to compare equal to a literal with a different value:
-    ///
-    /// ```python
-    /// class MisleadingStr(str):
-    ///     def __eq__(self, other: object) -> bool:
-    ///         return True
-    ///
-    /// result = parse(MisleadingStr("b"))
-    /// # Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
-    /// ```
-    ///
-    /// Enable this option to preserve the broader builtin type instead.
-    ///
-    /// Defaults to `false`.
     #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
         # Preserve broad builtin types instead of narrowing them to literals
-        strict-literal-narrowing = true
+        strict-equality-semantics = true
         "#
     )]
-    pub strict_literal_narrowing: Option<bool>,
+    #[serde(alias = "strict-literal-narrowing")]
+    pub strict_equality_semantics: Option<bool>,
 
     /// Whether ty should respect `type: ignore` comments.
     ///
@@ -1612,14 +1658,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
-            strict_literal_narrowing,
+            strict_equality_semantics,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
-            strict_literal_narrowing: strict_literal_narrowing_default,
+            strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1648,8 +1694,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
-            strict_literal_narrowing: strict_literal_narrowing
-                .unwrap_or(strict_literal_narrowing_default),
+            strict_equality_semantics: strict_equality_semantics
+                .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
@@ -1788,7 +1834,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
     ///
@@ -1810,7 +1856,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
     ///
@@ -1829,11 +1875,11 @@ pub struct OverrideOptions {
             possibly-unresolved-reference = "ignore"
         "#
     )]
-    pub rules: Option<Rules>,
+    rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
-    pub analysis: Option<AnalysisOptions>,
+    analysis: Option<AnalysisOptions>,
 }
 
 trait ToOverride {
@@ -2049,7 +2095,7 @@ pub struct ToSettingsError {
 }
 
 impl ToSettingsError {
-    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+    pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
         let db: &dyn ruff_db::Db = db;
 
         fmt::from_fn(move |f| {
@@ -2067,7 +2113,7 @@ impl ToSettingsError {
         })
     }
 
-    pub fn into_diagnostic(self) -> OptionDiagnostic {
+    pub(crate) fn into_diagnostic(self) -> OptionDiagnostic {
         *self.diagnostic
     }
 }
@@ -2172,7 +2218,7 @@ pub struct OptionDiagnostic {
 }
 
 impl OptionDiagnostic {
-    pub fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
+    fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
         Self {
             id,
             message,
@@ -2241,6 +2287,10 @@ impl OptionDiagnostic {
             ValueSource::Editor => self.sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 "The {value_label} was specified in the editor settings.",
+            )),
+            ValueSource::UvWorkspace => self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("The {value_label} was provided by uv workspace metadata."),
             )),
         }
     }

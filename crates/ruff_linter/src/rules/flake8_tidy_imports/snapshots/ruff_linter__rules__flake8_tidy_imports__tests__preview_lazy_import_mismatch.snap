@@ -80,7 +80,6 @@ TID254 [*] `pkg` should be imported lazily
 27 |
 28 | x = 1; import pkg.submodule
    |               ^^^^^^^^^^^^^
-   |
 help: Convert to a lazy import
    |
 27 |

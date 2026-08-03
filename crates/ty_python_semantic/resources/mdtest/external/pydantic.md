@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 python-platform = "linux"
 
 [project]
@@ -467,6 +467,174 @@ class Nested(BaseModel):
 
 Nested(value=[{"a": 1}, {"b": "2", "c": 3.0}])
 Nested(value=[{"a": 1}, {"b": None}])  # error: [invalid-argument-type]
+```
+
+In lax mode, fields that refer to an ordinary Pydantic model accept either an instance of that model
+or a mapping:
+
+```py
+class Child(BaseModel):
+    value: int
+
+class Stranger(BaseModel):
+    value: int
+
+class Parent(BaseModel):
+    child: Child
+    children: list[Child]
+
+# revealed: (self: Parent, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
+reveal_type(Parent.__init__)
+
+child_input = {"value": "1"}
+
+Parent(child=Child(value=1), children=[Child(value=2), Child(value=3)])
+Parent(child={"value": "1"}, children=[{"value": "2"}, {"value": "3"}])
+
+Parent(child=Stranger(value=1), children=[])  # error: [invalid-argument-type]
+Parent(child=1, children=[])  # error: [invalid-argument-type]
+Parent(child={"value": 1}, children=[Stranger(value=2)])  # error: [invalid-argument-type]
+Parent(child={"value": 1}, children=[2])  # error: [invalid-argument-type]
+```
+
+"before" and "plain" field validators can accept input of a different type, so for now, we widen the
+input types of affected fields to `Any`:
+
+```py
+from pydantic import field_validator
+
+class BeforeValidatedParent(BaseModel):
+    child: Child
+    untouched_child: Child
+
+    @field_validator("child", mode="before")
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+# revealed: (self: BeforeValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(BeforeValidatedParent.__init__)
+
+BeforeValidatedParent(child=1, untouched_child={"value": "2"})
+BeforeValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
+```
+
+"before" field validators are inherited:
+
+```py
+class BeforeValidatorBase(BaseModel):
+    @field_validator("child", mode="before", check_fields=False)
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+class InheritedBeforeValidatedParent(BeforeValidatorBase):
+    child: Child
+
+# revealed: (self: InheritedBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+reveal_type(InheritedBeforeValidatedParent.__init__)
+```
+
+A wildcard "before" validator applies to every field:
+
+```py
+class WildcardBeforeValidatedParent(BaseModel):
+    child: Child
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def coerce_fields(cls, value: object) -> object:
+        if isinstance(value, int):
+            return {"value": value}
+        return value
+
+# revealed: (self: WildcardBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+reveal_type(WildcardBeforeValidatedParent.__init__)
+
+WildcardBeforeValidatedParent(child=1)
+```
+
+A "plain" field validator also bypasses Pydantic's validation against the field's declared type:
+
+```py
+class PlainValidatedParent(BaseModel):
+    child: Child
+    untouched_child: Child
+
+    @field_validator("child", mode="plain")
+    @classmethod
+    def accept_child(cls, value: object) -> object:
+        return value
+
+# revealed: (self: PlainValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(PlainValidatedParent.__init__)
+
+PlainValidatedParent(child=1, untouched_child={"value": "2"})
+PlainValidatedParent(child=1, untouched_child=1)  # error: [invalid-argument-type]
+```
+
+An "after" field validator does not change the raw input accepted by the field:
+
+```py
+class AfterValidatedParent(BaseModel):
+    child: Child
+
+    @field_validator("child", mode="after")
+    @classmethod
+    def validate_child(cls, value: Child) -> Child:
+        return value
+
+# revealed: (self: AfterValidatedParent, *, child: Child | Mapping[str, Any], **extra: Any) -> None
+reveal_type(AfterValidatedParent.__init__)
+
+AfterValidatedParent(child=1)  # error: [invalid-argument-type]
+```
+
+For fields that refer to generic models, we widen to a gradual specialization, since Pydantic
+revalidates same-origin generic model instances against the target specialization:
+
+```py
+class Box[T](BaseModel):
+    value: T
+
+class HasBox(BaseModel):
+    box: Box[int]
+
+# revealed: (self: HasBox, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
+reveal_type(HasBox.__init__)
+
+HasBox(box=Box(value=1))
+HasBox(box=Box(value="1"))
+HasBox(box=1)  # error: [invalid-argument-type]
+
+# This would ideally be an error, but we currently do not attempt to detect this:
+HasBox(box=Box(value=None))
+```
+
+Models configured to validate from attributes can accept arbitrary objects, so their field
+parameters remain `Any`:
+
+```py
+class AttributeChild(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    value: int
+
+class AttributeParent(BaseModel):
+    child: AttributeChild
+
+class AttributeSource:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+# revealed: (self: AttributeParent, *, child: Any, **extra: Any) -> None
+reveal_type(AttributeParent.__init__)
+
+AttributeParent(child=AttributeSource(1))
 ```
 
 For enums, we currently fall back to a very permissive `Any`, because Pydantic allows certain
@@ -963,7 +1131,7 @@ There are various ways to make a field immutable. A model can be globally frozen
 parameter:
 
 ```py
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 class PersonFrozenName1(BaseModel, frozen=True):
     name: str
@@ -1008,6 +1176,23 @@ class Derived(Base):
 
 derived = Derived(value=1)
 derived.value = 2  # error: [invalid-assignment]
+```
+
+Private attributes on models with `frozen=True` can be mutated:
+
+```py
+class FrozenPerson(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    _implicit_private: int
+    _private_with_default: int = 1
+    _explicit_private: int = PrivateAttr(default=0)
+
+person = FrozenPerson()
+
+person._implicit_private = 2
+person._private_with_default = 2
+person._explicit_private = 2
 ```
 
 ## Validation of default values
@@ -1064,6 +1249,7 @@ A model derived from `BaseSettings` can use environment variables, so we assume 
 to provide their values:
 
 ```py
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -1077,8 +1263,37 @@ Settings(port=8000)
 Settings(host="localhost", port=8000)
 Settings(host=None)  # error: [invalid-argument-type]
 
+# `BaseSettings` accepts underscore-prefixed parameters that override settings configuration.
+Settings(_secrets_dir="./secrets")
+# An unknown leading-underscore keyword is not a control argument and is still rejected.
+Settings(_not_a_control_kwarg=1)  # error: [unknown-argument]
+
+class AliasedSettings(BaseSettings):
+    env_file: int = Field(alias="_env_file")
+
+# `_env_file` binds the control argument (not the `int` field).
+AliasedSettings(_env_file=".env")
+AliasedSettings(_env_file=1)  # error: [invalid-argument-type]
+
 # `BaseSettings` defines a specialized constructor and forbids extra values by default.
 Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
+```
+
+A custom initializer continues to control the accepted arguments:
+
+```py
+from pydantic_settings import BaseSettings
+
+class CustomInit(BaseSettings):
+    def __init__(self, value: int) -> None: ...
+
+class DerivedSettings(CustomInit):
+    host: str
+
+DerivedSettings(1)
+
+# `CustomInit.__init__` overrides the constructor, so `_secrets_dir` is not accepted.
+DerivedSettings(1, _secrets_dir="./secrets")  # error: [unknown-argument]
 ```
 
 ## Root models
@@ -1111,6 +1326,21 @@ Model(int_list=[1, 2, 3])
 Model(int_list=["1", "2", "3"])
 
 Model(int_list=1)  # error: [invalid-argument-type]
+```
+
+Generic root models can accept root models with a different specialization:
+
+```py
+class GenericRoot[T](RootModel[T]): ...
+
+class HasGenericRoot(BaseModel):
+    root: GenericRoot[int]
+
+HasGenericRoot(root=GenericRoot(1))
+HasGenericRoot(root=GenericRoot("1"))
+
+# This would ideally be an error, but we currently do not attempt to detect this:
+HasGenericRoot(root=GenericRoot(None))
 ```
 
 ## Model configuration
@@ -1284,6 +1514,187 @@ class InvalidFieldQualifiers(BaseModel):
     read_only: ReadOnly[int]
     # error: [invalid-type-form] "`Required` is not allowed in Pydantic model fields"
     required: Required[int]
+```
+
+## Replacement
+
+Pydantic models support `copy.replace` and expose a synthesized `__replace__` method on Python 3.13
+and later.
+
+### Frozen models
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model(BaseModel, frozen=True):
+    value: int
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+```
+
+### Mutable models
+
+Replacement is available on mutable models and accepts only real model fields.
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model(BaseModel):
+    value: int
+    _private: int = 0
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+model.__replace__(_private=2)  # error: [unknown-argument]
+model.__replace__(missing=2)  # error: [unknown-argument]
+```
+
+### Field aliases
+
+Replacement updates model fields by name, even when initialization uses an alias.
+
+```py
+from copy import replace
+
+from pydantic import BaseModel, Field
+
+class Model(BaseModel):
+    value: int = Field(alias="external_value")
+
+model = Model(external_value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(external_value=2)  # error: [unknown-argument]
+```
+
+### Member discovery
+
+The synthesized method is available in completions for both a model class and its instances. Models
+do not expose attributes that belong only to standard-library dataclasses.
+
+```py
+from pydantic import BaseModel
+from ty_extensions import static_assert
+from ty_extensions._internal import has_member
+
+class Model(BaseModel):
+    value: int
+
+model = Model(value=1)
+
+static_assert(has_member(Model, "__replace__"))
+static_assert(has_member(model, "__replace__"))
+static_assert(not has_member(Model, "__dataclass_fields__"))
+static_assert(not has_member(Model, "__dataclass_params__"))
+static_assert(not has_member(Model, "__match_args__"))
+```
+
+### Inherited fields
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Parent(BaseModel):
+    inherited: int
+
+class Child(Parent):
+    own: str
+
+model = Child(inherited=1, own="first")
+
+# revealed: (self: Child, *, inherited: int = ..., own: str = ...) -> Child
+reveal_type(Child.__replace__)
+
+reveal_type(model.__replace__(inherited=2))  # revealed: Child
+reveal_type(model.__replace__(own="second"))  # revealed: Child
+reveal_type(replace(model, inherited=2, own="second"))  # revealed: Child
+
+model.__replace__(inherited="two")  # error: [invalid-argument-type]
+model.__replace__(own=2)  # error: [invalid-argument-type]
+```
+
+### Generic models
+
+```py
+from copy import replace
+
+from pydantic import BaseModel
+
+class Model[T](BaseModel):
+    value: T
+
+model = Model[int](value=1)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model[int]
+reveal_type(replace(model, value=2))  # revealed: Model[int]
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+```
+
+### Root models
+
+```py
+from copy import replace
+
+from pydantic import RootModel
+
+class Model(RootModel[int]): ...
+
+model = Model(1)
+
+# revealed: (self: Model, *, root: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(root=2))  # revealed: Model
+reveal_type(replace(model, root=2))  # revealed: Model
+
+model.__replace__(root="two")  # error: [invalid-argument-type]
+```
+
+### Settings models
+
+```py
+from copy import replace
+
+from pydantic_settings import BaseSettings
+
+class Model(BaseSettings):
+    value: int
+
+model = Model(value=1)
+
+# revealed: (self: Model, *, value: int = ...) -> Model
+reveal_type(Model.__replace__)
+
+reveal_type(model.__replace__(value=2))  # revealed: Model
+reveal_type(replace(model, value=2))  # revealed: Model
+
+model.__replace__(value="two")  # error: [invalid-argument-type]
+model.__replace__(_secrets_dir=".")  # error: [unknown-argument]
 ```
 
 ## Pydantic dataclasses

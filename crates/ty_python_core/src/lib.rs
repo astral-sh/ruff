@@ -141,13 +141,13 @@ pub struct LoopHeader {
 }
 
 impl LoopHeader {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             bindings: FxHashMap::default(),
         }
     }
 
-    pub fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
+    fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
         self.bindings.entry(place).or_default().push(binding);
     }
 
@@ -390,7 +390,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self) -> &AstIds {
+    fn ast_ids(&self) -> &AstIds {
         &self.ast_ids
     }
 
@@ -431,10 +431,6 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn symbol_is_global_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
         self.place_table(scope).symbol(symbol).is_global()
-    }
-
-    pub fn symbol_is_nonlocal_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
-        self.place_table(scope).symbol(symbol).is_nonlocal()
     }
 
     /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
@@ -554,7 +550,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
+    fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
     }
 
@@ -878,7 +874,7 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    pub fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
         let descendants = DescendantsIter::new(scopes, parent);
 
         Self {

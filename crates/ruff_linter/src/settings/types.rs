@@ -184,10 +184,6 @@ impl GlobPath {
         let absolute = fs::normalize_path_to(path, escaped);
         Self { path: absolute }
     }
-
-    pub fn into_inner(self) -> PathBuf {
-        self.path
-    }
 }
 
 impl Deref for GlobPath {
@@ -495,13 +491,13 @@ impl ExtensionMapping {
     }
 
     /// Return the [`Language`] for the given file.
-    pub fn get(&self, path: &Path) -> Option<Language> {
+    fn get(&self, path: &Path) -> Option<Language> {
         let ext = path.extension()?.to_str()?;
         self.0.get(ext).copied()
     }
 
     /// Return the [`Language`] for a given file extension.
-    pub fn get_extension(&self, ext: &str) -> Option<Language> {
+    fn get_extension(&self, ext: &str) -> Option<Language> {
         self.0.get(ext).copied()
     }
 
@@ -699,14 +695,14 @@ impl IdentifierPattern {
         }
     }
 
-    pub fn matches(&self, candidate: &str) -> bool {
+    pub(crate) fn matches(&self, candidate: &str) -> bool {
         match self {
             Self::Literal(literal) => literal == candidate,
             Self::Glob(pattern) => pattern.matches(candidate),
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Literal(literal) => literal,
             Self::Glob(pattern) => pattern.as_str(),
@@ -731,10 +727,10 @@ impl FromStr for IdentifierPattern {
 /// Like [`PerFile`] but with string globs compiled to [`GlobMatcher`]s for more efficient usage.
 #[derive(Debug, Clone)]
 pub struct CompiledPerFile<T> {
-    pub absolute_matcher: GlobMatcher,
-    pub basename_matcher: GlobMatcher,
-    pub negated: bool,
-    pub data: T,
+    absolute_matcher: GlobMatcher,
+    basename_matcher: GlobMatcher,
+    negated: bool,
+    data: T,
 }
 
 impl<T> CompiledPerFile<T> {

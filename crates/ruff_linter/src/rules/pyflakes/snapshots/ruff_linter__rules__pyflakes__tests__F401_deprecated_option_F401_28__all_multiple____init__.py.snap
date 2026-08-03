@@ -6,7 +6,6 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
   |               ^^^^^^
-  |
 help: Remove unused import
   |
 4 |
@@ -20,7 +19,6 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
   |
 5 | from . import unused, renamed as bees  # F401: add to __all__
   |                                  ^^^^
-  |
 help: Remove unused import
   |
 4 |

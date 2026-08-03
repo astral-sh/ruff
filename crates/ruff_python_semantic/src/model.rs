@@ -307,7 +307,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Create a new [`Binding`] for a builtin.
-    pub fn push_builtin(&mut self) -> BindingId {
+    fn push_builtin(&mut self) -> BindingId {
         self.bindings.push(Binding {
             range: TextRange::default(),
             kind: BindingKind::Builtin,
@@ -1531,7 +1531,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns a mutable reference to the global [`Scope`].
-    pub fn global_scope_mut(&mut self) -> &mut Scope<'a> {
+    fn global_scope_mut(&mut self) -> &mut Scope<'a> {
         self.scopes.global_mut()
     }
 
@@ -1556,12 +1556,12 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns the parent of the given [`Scope`], if any.
-    pub fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+    fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
     /// Returns the ID of the parent of the given [`ScopeId`], if any.
-    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+    fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
         self.scopes[scope_id].parent
     }
 
@@ -1604,7 +1604,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub(crate) fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
         self.nodes[parent_node_id].as_expression()
     }
@@ -2041,7 +2041,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
-    pub fn exceptions(&self) -> Exceptions {
+    fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
         for exception in &self.handled_exceptions {
             exceptions.insert(*exception);
@@ -2136,7 +2136,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the model is visiting a "`__future__` type definition"
     /// that was previously deferred when initially traversing the AST
-    pub const fn in_future_type_definition(&self) -> bool {
+    const fn in_future_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
@@ -2163,7 +2163,7 @@ impl<'a> SemanticModel<'a> {
     /// cast("Thread", x)  # Forward reference
     /// cast(Thread, x)  # Non-forward reference
     /// ```
-    pub const fn in_forward_reference(&self) -> bool {
+    const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
@@ -2225,7 +2225,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in a t-string.
-    pub const fn in_t_string(&self) -> bool {
+    const fn in_t_string(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::T_STRING)
     }
 
@@ -2432,7 +2432,7 @@ impl TypingOnlyBindingsStatus {
         matches!(self, TypingOnlyBindingsStatus::Allowed)
     }
 
-    pub const fn is_disallowed(self) -> bool {
+    const fn is_disallowed(self) -> bool {
         matches!(self, TypingOnlyBindingsStatus::Disallowed)
     }
 }
@@ -2918,7 +2918,7 @@ bitflags! {
 }
 
 impl SemanticModelFlags {
-    pub fn new(path: &Path) -> Self {
+    fn new(path: &Path) -> Self {
         if PySourceType::from(path).is_stub() {
             Self::STUB_FILE
         } else {

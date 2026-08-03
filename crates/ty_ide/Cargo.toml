@@ -37,7 +37,6 @@ compact_str = { workspace = true }
 get-size2 = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
-memchr = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }

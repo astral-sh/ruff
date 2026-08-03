@@ -10,7 +10,8 @@ pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
 pub(crate) use self::static_literal::{
-    ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
+    ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
+    expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::dedicated::pydantic;
@@ -26,9 +27,7 @@ use crate::types::constraints::{
 };
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
-use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_specialization,
-};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
@@ -38,6 +37,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
 use crate::types::tuple::TupleSpec;
+use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
@@ -53,10 +53,12 @@ use crate::{
 };
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast};
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, NodeIndex};
+use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
@@ -65,6 +67,45 @@ mod known;
 mod named_tuple;
 mod static_literal;
 mod typed_dict;
+
+#[derive(Clone, Copy)]
+enum DynamicClassHeaderAnchor<'db> {
+    Definition(Definition<'db>),
+    ScopeOffset(u32),
+}
+
+/// Returns the source range of a call that creates a dynamic class.
+///
+/// ```python
+/// Color = Enum("Color", "RED GREEN")
+/// #       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/// ```
+fn dynamic_class_header_range<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    anchor: DynamicClassHeaderAnchor<'db>,
+) -> TextRange {
+    let module = parsed_module(db, scope.file(db)).load(db);
+    match anchor {
+        DynamicClassHeaderAnchor::Definition(definition) => definition
+            .kind(db)
+            .value(&module)
+            .expect("dynamic class definitions should only be used for assignments")
+            .range(),
+        DynamicClassHeaderAnchor::ScopeOffset(offset) => {
+            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+            let anchor_u32 = scope_anchor
+                .as_u32()
+                .expect("anchor should not be NodeIndex::NONE");
+            let absolute_index = NodeIndex::from(anchor_u32 + offset);
+            let node: &ast::ExprCall = module
+                .get_by_index(absolute_index)
+                .try_into()
+                .expect("scope offset should point to ExprCall");
+            node.range()
+        }
+    }
+}
 
 bitflags::bitflags! {
     /// Properties that affect the representation of instances of a class.
@@ -237,7 +278,7 @@ impl<'db> CodeGeneratorKind<'db> {
         )
     }
 
-    pub(super) fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
+    fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
         match self {
             Self::DataclassLike(params) => params,
             Self::Pydantic(_) | Self::NamedTuple | Self::TypedDict => None,
@@ -283,7 +324,7 @@ impl<'db> CodeGeneratorKind<'db> {
     /// def f(c: C):
     ///     c.value  # okay, `value` will be set by `C`'s constructor
     /// ```
-    pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
+    const fn treats_fields_as_instance_attributes(self) -> bool {
         matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
     }
 
@@ -298,8 +339,16 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
-        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    fn synthesizes_constructor_signature_from_fields(
+        self,
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::DataclassLike(_) => true,
+            Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
+            Self::NamedTuple | Self::TypedDict => false,
+        }
     }
 
     pub(super) const fn pydantic_metadata(self) -> Option<pydantic::ModelMetadata<'db>> {
@@ -522,7 +571,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns whether this class has PEP 695 type parameters.
-    pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+    fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
         self.as_static()
             .is_some_and(|class| class.has_pep_695_type_params(db))
     }
@@ -533,7 +582,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the properties that affect how instances of this class are represented.
-    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+    fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         match self {
             Self::Static(literal) => literal.instance_flags(db),
             Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
@@ -625,13 +674,10 @@ impl<'db> ClassLiteral<'db> {
     /// For static classes, this applies default type arguments.
     /// For dynamic classes, this returns a non-generic class type.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.default_specialization(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_static().map_or_else(
+            || ClassType::NonGeneric(self),
+            |class| class.default_specialization(db),
+        )
     }
 
     /// Returns the unknown specialization of this class.
@@ -640,24 +686,18 @@ impl<'db> ClassLiteral<'db> {
     /// For a non-specialized generic class, we return a generic alias that maps each of the class's
     /// typevars to `Unknown`.
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.unknown_specialization(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_static().map_or_else(
+            || ClassType::NonGeneric(self),
+            |class| class.unknown_specialization(db),
+        )
     }
 
     /// Returns the identity specialization for this class (same as default for non-generic).
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::Static(class) => class.identity_specialization(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
-        }
+        self.as_static().map_or_else(
+            || ClassType::NonGeneric(self),
+            |class| class.identity_specialization(db),
+        )
     }
 
     /// Returns the generic context if this is a generic class.
@@ -681,13 +721,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// Returns whether this class is `builtins.tuple` exactly
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Static(class) => class.is_tuple(db),
-            Self::Dynamic(_)
-            | Self::DynamicNamedTuple(_)
-            | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => false,
-        }
+        self.as_static().is_some_and(|class| class.is_tuple(db))
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -756,7 +790,7 @@ impl<'db> ClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__lt__": lambda self, other: True})
     /// ```
-    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+    fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class.has_own_ordering_method(db),
             Self::Dynamic(class) => class.has_own_ordering_method(db),
@@ -842,7 +876,7 @@ impl<'db> ClassLiteral<'db> {
     ///     class Foo(int, X): ...
     /// TypeError: multiple bases have instance lay-out conflict
     /// ```
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         match self {
             Self::Static(class) => class.as_disjoint_base(db),
             Self::Dynamic(class) => class.as_disjoint_base(db),
@@ -1145,7 +1179,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `Some` if this class is known to be a [`DisjointBase`], or `None` if it is not.
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.class_literal(db).as_disjoint_base(db)
     }
 
@@ -1373,7 +1407,7 @@ impl<'db> ClassType<'db> {
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
-            InferableTypeVars::None,
+            TypeVarSet::None,
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -1410,14 +1444,14 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class could exist in the MRO of `other`.
-    pub(super) fn could_exist_in_mro_of(
+    fn could_exist_in_mro_of(
         self,
         db: &'db dyn Db,
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+            this.is_disjoint_from(db, other, constraints, TypeVarSet::None)
                 .is_always_satisfied(db)
         })
     }
@@ -1504,11 +1538,11 @@ impl<'db> ClassType<'db> {
             other,
             |this, other| this.could_exist_in_mro_of(db, other, constraints),
             |this, other| {
-                this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                this.is_disjoint_from(db, other, constraints, TypeVarSet::None)
                     .is_always_satisfied(db)
             },
             |this, other| {
-                this.when_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                this.when_disjoint_from(db, other, constraints, TypeVarSet::None)
                     .is_always_satisfied(db)
             },
         )
@@ -2043,12 +2077,25 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        self.into_callable_with_receiver(db, Type::from(self))
+    }
+
+    /// Infer this class's constructor using the actual class-object receiver.
+    ///
+    /// A materialized protocol uses its class origin for constructor lookup, but `Self` must be
+    /// bound to the materialized receiver. Keeping lookup and receiver separate preserves both
+    /// instance-returning constructors and constructors that explicitly return another type.
     #[salsa::tracked(
         returns(clone),
-        cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
+        cycle_initial=|db, _, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+    pub(super) fn into_callable_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+    ) -> CallableTypes<'db> {
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
         // then relying on the call binding machinery to Just Work™?
@@ -2058,8 +2105,12 @@ impl<'db> ClassType<'db> {
             .static_class_literal(db)
             .and_then(|(class_literal, _)| class_literal.generic_context(db));
 
-        let self_ty = Type::from(self);
-        let metaclass_dunder_call_function_symbol = self_ty
+        let lookup_type = Type::from(self);
+        let instance_type = receiver
+            .to_instance_approximation(db)
+            .unwrap_or_else(Type::unknown);
+
+        let metaclass_dunder_call_function_symbol = lookup_type
             .member_lookup_with_policy(
                 db,
                 "__call__",
@@ -2085,11 +2136,17 @@ impl<'db> ClassType<'db> {
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
             if !is_actual_enum {
-                return CallableTypes::one(metaclass_dunder_call_function.into_callable_type(db));
+                let callable = if receiver == lookup_type {
+                    metaclass_dunder_call_function.into_callable_type(db)
+                } else {
+                    metaclass_dunder_call_function
+                        .into_callable_type_with_receiver(db, receiver, receiver)
+                };
+                return CallableTypes::one(callable);
             }
         }
 
-        let dunder_new_function_symbol = self_ty.lookup_dunder_new(db);
+        let dunder_new_function_symbol = lookup_type.lookup_dunder_new(db);
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
@@ -2100,21 +2157,22 @@ impl<'db> ClassType<'db> {
             });
 
         let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
+            let bound_signature = dunder_new_signature.bind_self_with_receiver(
+                db,
+                Some(receiver),
+                Some(instance_type),
+            );
+
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
-            let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
-                !signature.return_ty.is_assignable_to(
-                    db,
-                    self_ty
-                        .to_instance_approximation(db)
-                        .expect("ClassType should be instantiable"),
-                )
-            });
+            let returns_non_subclass = bound_signature
+                .overloads
+                .iter()
+                .any(|signature| !signature.return_ty.is_assignable_to(db, instance_type));
 
-            let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = CallableType::new(
                 db,
-                dunder_new_signature.bind_self_with_receiver(db, Some(self_ty), Some(instance_ty)),
+                bound_signature,
                 CallableTypeKind::Regular,
                 CallableFunctionProvenance::None,
             );
@@ -2127,7 +2185,7 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        let dunder_init_function_symbol = self_ty
+        let dunder_init_function_symbol = lookup_type
             .member_lookup_with_policy(
                 db,
                 "__init__",
@@ -2135,10 +2193,6 @@ impl<'db> ClassType<'db> {
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .place;
-
-        let correct_return_type = self_ty
-            .to_instance_approximation(db)
-            .unwrap_or_else(Type::unknown);
 
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
@@ -2165,8 +2219,7 @@ impl<'db> ClassType<'db> {
                             ty.as_typevar()
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
                         });
-                    let return_type = self_annotation.unwrap_or(correct_return_type);
-                    let instance_ty = Type::instance(db, self);
+                    let return_type = self_annotation.unwrap_or(instance_type);
                     let generic_context = GenericContext::merge_optional(
                         db,
                         class_generic_context,
@@ -2178,10 +2231,11 @@ impl<'db> ClassType<'db> {
                         return_type,
                     )
                     .with_definition(signature.definition())
+                    .with_source_overload_index(signature.source_overload_index())
                     .bind_self_with_receiver(
                         db,
-                        Some(instance_ty),
-                        Some(instance_ty),
+                        Some(instance_type),
+                        Some(instance_type),
                     )
                 };
 
@@ -2215,7 +2269,7 @@ impl<'db> ClassType<'db> {
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
-                let new_function_symbol = self_ty
+                let new_function_symbol = lookup_type
                     .member_lookup_with_policy(
                         db,
                         "__new__",
@@ -2234,7 +2288,7 @@ impl<'db> ClassType<'db> {
                     }
                     CallableTypes::one(
                         new_function
-                            .into_bound_method_type(db, correct_return_type)
+                            .into_bound_method_type(db, instance_type)
                             .into_callable_type(db),
                     )
                 } else {
@@ -2244,7 +2298,7 @@ impl<'db> ClassType<'db> {
                         Signature::new_generic(
                             class_generic_context,
                             Parameters::empty(),
-                            correct_return_type,
+                            instance_type,
                         ),
                     ))
                 }
@@ -2543,7 +2597,7 @@ pub(super) struct MroLookup<'db, I> {
 
 impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
-    pub(super) fn new(db: &'db dyn Db, mro_iter: I) -> Self {
+    fn new(db: &'db dyn Db, mro_iter: I) -> Self {
         Self { db, mro_iter }
     }
 
@@ -2561,7 +2615,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// If we encounter a dynamic type in the MRO, we save it and after traversal:
     /// 1. Use it as the type if no other classes define the attribute, or
     /// 2. Intersect it with the type from non-dynamic MRO members.
-    pub(super) fn class_member(
+    fn class_member(
         self,
         name: &str,
         policy: MemberLookupPolicy,
@@ -2642,7 +2696,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
     /// allowing the caller to handle this case specially.
-    pub(super) fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
+    fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
@@ -2738,7 +2792,7 @@ pub(super) struct CompletedMemberLookup<'db> {
 
 impl<'db> CompletedMemberLookup<'db> {
     /// Finalize the lookup result by handling dynamic type intersection.
-    pub(super) fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+    fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
         match (
             PlaceAndQualifiers::from(self.lookup_result),
             self.dynamic_type,
@@ -2786,7 +2840,7 @@ pub(super) struct QualifiedClassName<'db> {
 }
 
 impl<'db> QualifiedClassName<'db> {
-    pub(super) fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+    fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
         Self { db, class }
     }
 

@@ -278,6 +278,17 @@ pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
+/// Summarizes whether the live control-flow paths leave a symbol bound.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum LiveBindingStatus {
+    /// No live path contains a binding.
+    Unbound,
+    /// Some live paths contain a binding and others leave the symbol unbound.
+    PossiblyBound,
+    /// Every live path contains a binding.
+    Bound,
+}
+
 /// Identifies a [`LoopHeader`] within a single scope's [`UseDefMap`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
@@ -858,10 +869,6 @@ impl<'db> UseDefMap<'db> {
         &self.constraint_tables().reachability_constraints
     }
 
-    pub fn narrowing_constraints(&self) -> &NarrowingConstraints {
-        &self.constraint_tables().narrowing_constraints
-    }
-
     pub fn predicates(&self) -> &Predicates<'db> {
         &self.constraint_tables().predicates
     }
@@ -986,7 +993,7 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn end_of_scope_member_bindings(
+    fn end_of_scope_member_bindings(
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -1102,7 +1109,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn end_of_scope_member_declarations<'map>(
+    fn end_of_scope_member_declarations<'map>(
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
@@ -1761,7 +1768,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     used_bindings: IndexVec<ScopedDefinitionId, bool>,
 
     /// Builder of predicates.
-    pub(super) predicates: PredicatesBuilder<'db>,
+    predicates: PredicatesBuilder<'db>,
 
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
@@ -2473,6 +2480,37 @@ impl<'db> UseDefMapBuilder<'db> {
             .bindings()
             .iter()
             .map(LiveBinding::binding)
+    }
+
+    /// Returns the current boundness of `symbol` after applying pending reachability constraints.
+    ///
+    /// Bindings on statically unreachable paths do not contribute to the result. This is stricter
+    /// than [`Symbol::is_bound`](crate::symbol::Symbol::is_bound), which records whether the symbol
+    /// is bound anywhere in the scope without considering control flow.
+    pub(super) fn symbol_live_binding_status(
+        &mut self,
+        symbol: ScopedSymbolId,
+    ) -> LiveBindingStatus {
+        let mut has_binding = false;
+        let mut has_unbound = false;
+
+        for binding in self.current_bindings(symbol.into()) {
+            if binding.reachability_constraint() == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+                continue;
+            }
+
+            if binding.binding().is_unbound() {
+                has_unbound = true;
+            } else {
+                has_binding = true;
+            }
+        }
+
+        match (has_binding, has_unbound) {
+            (true, true) => LiveBindingStatus::PossiblyBound,
+            (true, false) => LiveBindingStatus::Bound,
+            (false, _) => LiveBindingStatus::Unbound,
+        }
     }
 
     pub(super) fn mark_binding_definitions_used(

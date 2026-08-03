@@ -1003,7 +1003,6 @@ PYI016 [*] Duplicate union member `complex`
 134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
 135 | field49: typing.Optional[complex | complex] | complex
     |                                    ^^^^^^^
-    |
 help: Remove duplicate union member `complex`
     |
 134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
@@ -1018,7 +1017,6 @@ PYI016 [*] Duplicate union member `complex`
 134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
 135 | field49: typing.Optional[complex | complex] | complex
     |                                               ^^^^^^^
-    |
 help: Remove duplicate union member `complex`
     |
 134 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]

@@ -251,7 +251,7 @@ impl<'db> AllMembers<'db> {
                 }
                 SubclassOfInner::Protocol(protocol) => {
                     if let Some((class_literal, _)) = protocol
-                        .class_origin()
+                        .class_origin(db)
                         .and_then(|origin| origin.static_class_literal(db))
                     {
                         self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
@@ -266,20 +266,13 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_type(db, KnownClass::Type.to_instance(db));
                 }
                 _ => {
-                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        if let Some((class_literal, _)) = class_type.static_class_literal(db) {
-                            self.extend_with_class_members(
-                                db,
-                                ty,
-                                ClassLiteral::Static(class_literal),
-                            );
-                            self.extend_with_synthetic_members(
-                                db,
-                                ty,
-                                ClassLiteral::Static(class_literal),
-                            );
-                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
-                        }
+                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db)
+                        && let Some((class_literal, _)) = class_type.static_class_literal(db)
+                    {
+                        let static_class = ClassLiteral::Static(class_literal);
+                        self.extend_with_class_members(db, ty, static_class);
+                        self.extend_with_synthetic_members(db, ty, static_class);
+                        self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                     }
                 }
             },
@@ -588,8 +581,14 @@ impl<'db> AllMembers<'db> {
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
-            Some(CodeGeneratorKind::DataclassLike(_)) => {
-                for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
+            Some(kind @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_))) => {
+                let synthetic_attributes: &[&str] = if kind.is_pydantic() {
+                    &["__replace__"]
+                } else {
+                    SYNTHETIC_DATACLASS_ATTRIBUTES
+                };
+
+                for attr in synthetic_attributes {
                     if let Place::Defined(DefinedPlace {
                         ty: synthetic_member,
                         ..
@@ -602,9 +601,6 @@ impl<'db> AllMembers<'db> {
                     }
                 }
             }
-            Some(CodeGeneratorKind::Pydantic(_)) => {
-                // Pydantic's special attributes are declared on and inherited from `BaseModel`.
-            }
             None => {}
         }
     }
@@ -613,13 +609,13 @@ impl<'db> AllMembers<'db> {
 /// A member of a type or scope, with the first reachable definition of that member.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MemberWithDefinition<'db> {
-    pub member: Member<'db>,
-    pub first_reachable_definition: Definition<'db>,
+    pub(crate) member: Member<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A member of a type or scope.
 ///
-/// In the context of the [`all_members`] routine, this represents
+/// In the context of the `all_members` routine, this represents
 /// a single item in (ideally) the list returned by `dir(object)`.
 ///
 /// The equality, comparison and hashing traits implemented for
@@ -632,8 +628,8 @@ pub struct MemberWithDefinition<'db> {
 /// ordered comparisons.
 #[derive(Clone, Debug)]
 pub struct Member<'db> {
-    pub name: Name,
-    pub ty: Type<'db>,
+    pub(crate) name: Name,
+    pub(crate) ty: Type<'db>,
 }
 
 impl std::hash::Hash for Member<'_> {
@@ -664,6 +660,6 @@ impl<'db> PartialOrd for Member<'db> {
 
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
+pub(crate) fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
     AllMembers::of(db, ty).members
 }

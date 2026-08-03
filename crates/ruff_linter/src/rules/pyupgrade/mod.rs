@@ -234,7 +234,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
@@ -483,7 +482,6 @@ mod tests {
           |
         1 | from pipes import quote, Template
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
         help: Import from `shlex`
           |
           - from pipes import quote, Template

@@ -26,7 +26,6 @@ AIR302 [*] `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved into `apache
 6 | WebHDFSHook()
 7 | WebHdfsSensor()
   | ^^^^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHdfsSensor` from `airflow.providers.apache.hdfs.sensors.web_hdfs` instead.
   |
 3 | from airflow.hooks.webhdfs_hook import WebHDFSHook

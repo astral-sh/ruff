@@ -117,6 +117,11 @@ class ConstraintSet:
         `other`.
         """
 
+    def exists(self, typevars: TypeForm[tuple[object, ...]]) -> Self:
+        """
+        Existentially abstracts the given type variables from this constraint set.
+        """
+
     def for_all(self, typevars: TypeForm[tuple[object, ...]]) -> Self:
         """
         Universally abstracts the given type variables from this constraint set.
@@ -233,9 +238,6 @@ def is_disjoint_from(
 
 def is_singleton(ty: TypeForm[object]) -> bool:
     """Returns `True` if `ty` is a singleton type with exactly one inhabitant."""
-
-def is_single_valued(ty: TypeForm[object]) -> bool:
-    """Returns `True` if `ty` is non-empty and all inhabitants compare equal to each other."""
 
 # -------------------
 # Operations on types

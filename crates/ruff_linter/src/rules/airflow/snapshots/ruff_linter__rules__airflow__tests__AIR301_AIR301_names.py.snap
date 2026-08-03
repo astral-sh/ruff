@@ -95,7 +95,6 @@ AIR301 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
 43 | # airflow.contrib.*
 44 | AWSAthenaHook()
    | ^^^^^^^^^^^^^
-   |
 help: The whole `airflow.contrib` module has been removed.
 
 AIR301 `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
@@ -114,7 +113,6 @@ AIR301 `airflow.datasets.DatasetEvent` is removed in Airflow 3.0
 48 | DatasetAliasEvent()
 49 | DatasetEvent()
    | ^^^^^^^^^^^^
-   |
 help: `DatasetEvent` has been made private in Airflow 3. Use `dict[str, Any]` for the time being. An `AssetEvent` type will be added to the apache-airflow-task-sdk in a future version.
 
 AIR301 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
@@ -240,7 +238,6 @@ AIR301 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
 81 | # airflow.utils.dag_cycle_tester
 82 | test_cycle
    | ^^^^^^^^^^
-   |
 
 AIR301 `airflow.utils.db.create_session` is removed in Airflow 3.0
   --> AIR301_names.py:86:1
@@ -248,7 +245,6 @@ AIR301 `airflow.utils.db.create_session` is removed in Airflow 3.0
 85 | # airflow.utils.db
 86 | create_session
    | ^^^^^^^^^^^^^^
-   |
 
 AIR301 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
   --> AIR301_names.py:90:1
@@ -256,7 +252,6 @@ AIR301 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
 89 | # airflow.utils.file
 90 | mkdirs
    | ^^^^^^
-   |
 help: Use `pathlib.Path({path}).mkdir` instead
 
 AIR301 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
@@ -285,7 +280,6 @@ AIR301 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
 97 | #  airflow.utils.trigger_rule
 98 | TriggerRule.DUMMY
    | ^^^^^^^^^^^^^^^^^
-   |
 
 AIR301 `airflow.www.auth.has_access` is removed in Airflow 3.0
    --> AIR301_names.py:102:1
@@ -323,4 +317,3 @@ AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
 106 | get_sensitive_variables_fields
 107 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
-    |

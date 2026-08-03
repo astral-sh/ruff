@@ -347,6 +347,8 @@ pub enum KnownModule {
     PydanticConfig,
     #[strum(serialize = "pydantic.fields")]
     PydanticFields,
+    #[strum(serialize = "pydantic.functional_validators")]
+    PydanticFunctionalValidators,
     #[strum(serialize = "pydantic.main")]
     PydanticMain,
     #[strum(serialize = "pydantic.root_model")]
@@ -394,6 +396,7 @@ impl KnownModule {
             Self::Struct => "struct",
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticFields => "pydantic.fields",
+            Self::PydanticFunctionalValidators => "pydantic.functional_validators",
             Self::PydanticMain => "pydantic.main",
             Self::PydanticRootModel => "pydantic.root_model",
             Self::PydanticSettingsMain => "pydantic_settings.main",
@@ -423,6 +426,7 @@ impl KnownModule {
         match self {
             Self::PydanticConfig
             | Self::PydanticFields
+            | Self::PydanticFunctionalValidators
             | Self::PydanticMain
             | Self::PydanticRootModel
             | Self::PydanticSettingsMain

@@ -212,14 +212,8 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
-    let cli_output_format_set = args.output_format.is_some();
     let (cli, config_arguments) = args.partition(global_options)?;
     let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
-    if cli_output_format_set && !pyproject_config.settings.formatter.preview.is_enabled() {
-        warn_user_once!(
-            "The --output-format flag for the formatter is unstable and requires preview mode to use."
-        );
-    }
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
@@ -381,6 +375,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
     let preview = pyproject_config.settings.linter.preview;
+    let prefer_rule_codes = pyproject_config.settings.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.
@@ -406,7 +401,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &diagnostics, preview)?;
+        printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -433,7 +428,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 fix_mode,
                 unsafe_fixes,
             )?;
-            printer.write_continuously(&mut writer, &diagnostics, preview)?;
+            printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
         }
     } else {
         // Generate lint violations.
@@ -468,7 +463,12 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
+            printer.write_once(
+                &diagnostics,
+                &mut summary_writer,
+                preview,
+                prefer_rule_codes,
+            )?;
         }
 
         if !cli.exit_zero {

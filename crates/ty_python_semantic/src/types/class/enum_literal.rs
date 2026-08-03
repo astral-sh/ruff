@@ -1,14 +1,15 @@
 use ruff_db::diagnostic::Span;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, NodeIndex};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::Db;
 use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::Type;
 use crate::types::class::known::KnownClass;
-use crate::types::class::{ClassLiteral, ClassType, MemberLookupPolicy};
+use crate::types::class::{
+    ClassLiteral, ClassType, DynamicClassHeaderAnchor, MemberLookupPolicy,
+    dynamic_class_header_range,
+};
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
@@ -164,28 +165,15 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
-        match self.anchor(db) {
-            DynamicEnumAnchor::Definition { definition, .. } => definition
-                .kind(db)
-                .value(&module)
-                .expect("DynamicEnumAnchor::Definition should only be used for assignments")
-                .range(),
-            DynamicEnumAnchor::ScopeOffset { offset, .. } => {
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + offset);
-                let node: &ast::ExprCall = module
-                    .get_by_index(absolute_index)
-                    .try_into()
-                    .expect("scope offset should point to ExprCall");
-                node.range()
+        let anchor = match self.anchor(db) {
+            DynamicEnumAnchor::Definition { definition, .. } => {
+                DynamicClassHeaderAnchor::Definition(*definition)
             }
-        }
+            DynamicEnumAnchor::ScopeOffset { offset, .. } => {
+                DynamicClassHeaderAnchor::ScopeOffset(*offset)
+            }
+        };
+        dynamic_class_header_range(db, self.scope(db), anchor)
     }
 
     pub(super) fn header_span(self, db: &'db dyn Db) -> Span {

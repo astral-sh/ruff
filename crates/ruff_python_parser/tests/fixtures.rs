@@ -2,9 +2,9 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
 
+use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet};
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
@@ -380,14 +380,14 @@ impl std::fmt::Display for CodeFrame<'_> {
         let label = format!("Syntax Error: {error}", error = self.error);
 
         let span = usize::from(annotation_range.start())..usize::from(annotation_range.end());
-        let annotation = Level::Error.span(span).label(&label);
+        let annotation = AnnotationKind::Primary.span(span).label(&label);
         let snippet = Snippet::source(source)
             .line_start(start_index.get())
             .annotation(annotation)
             .fold(false);
-        let message = Level::None.title("").snippet(snippet);
+        let message = Group::with_level(Level::ERROR).element(snippet);
         let renderer = Renderer::plain().cut_indicator("…");
-        let rendered = renderer.render(message);
+        let rendered = renderer.render(&[message]);
         writeln!(f, "{rendered}")
     }
 }

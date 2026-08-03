@@ -226,27 +226,25 @@ impl<'db> FunctionDecoratorInference<'db> {
         self.expression_types.get(&expression.into()).copied()
     }
 
-    pub(crate) fn expression_types(
+    fn expression_types(
         &self,
     ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
         self.expression_types.iter().copied()
     }
 
-    pub(crate) fn bindings(
-        &self,
-    ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
+    fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
         self.bindings.iter().copied()
     }
 
-    pub(crate) fn called_functions(&self) -> &[FunctionType<'db>] {
+    fn called_functions(&self) -> &[FunctionType<'db>] {
         &self.called_functions
     }
 
-    pub(crate) fn known_decorators(&self) -> FunctionDecorators {
+    fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
     }
 
-    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
+    fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
     }
 }
@@ -525,7 +523,7 @@ pub(super) struct ExpressionWithContext<'db> {
 }
 
 impl<'db> InferExpression<'db> {
-    pub(super) fn new(
+    fn new(
         db: &'db dyn Db,
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
@@ -564,11 +562,7 @@ pub(super) struct ScopeWithContext<'db> {
 }
 
 impl<'db> InferScope<'db> {
-    pub(super) fn new(
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        tcx: TypeContext<'db>,
-    ) -> InferScope<'db> {
+    fn new(db: &'db dyn Db, scope: ScopeId<'db>, tcx: TypeContext<'db>) -> InferScope<'db> {
         if tcx.annotation.is_some() {
             InferScope::WithContext(ScopeWithContext::new(db, scope, tcx))
         } else {
@@ -614,19 +608,19 @@ impl<'db> TypeContext<'db> {
             .and_then(|ty| ty.known_specialization(db, known_class))
     }
 
-    pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
         }
     }
 
-    pub(crate) fn is_typealias(&self) -> bool {
+    fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
     }
 
     /// If the type annotation is a union, returns the target elements that it can be narrowed to.
-    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
+    fn narrow_targets(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
         let union = self.annotation?.as_union_like(db)?;
 
         let targets = if union.has_aliases(db) {
@@ -1371,7 +1365,7 @@ impl<'db> DefinitionInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
-    pub(crate) fn collection_use_constraints(
+    fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
@@ -1463,14 +1457,14 @@ impl<'db> DefinitionInference<'db> {
         self.types.declaration_types()
     }
 
-    pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
             Some(_) | None => None,
         }
     }
 
-    pub(crate) fn discards_dict_key_assignments(&self) -> bool {
+    fn discards_dict_key_assignments(&self) -> bool {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::DiscardsDictKeyAssignments) => true,
             Some(DefinitionInferenceExtra::Other(extra)) => extra.discards_dict_key_assignments,
@@ -1601,10 +1595,7 @@ impl<'db> ExpressionInference<'db> {
         self
     }
 
-    pub(crate) fn try_expression_type(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
@@ -1616,7 +1607,7 @@ impl<'db> ExpressionInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn collection_use_constraints(
+    fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
@@ -1643,7 +1634,7 @@ pub(crate) enum StatementInference<'db> {
 }
 
 impl<'db> StatementInference<'db> {
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         match self {
             StatementInference::Expression(inference) => inference.expression_type(expression),
             StatementInference::Definition(_, inference) => inference.expression_type(expression),
@@ -1651,7 +1642,7 @@ impl<'db> StatementInference<'db> {
         }
     }
 
-    pub(crate) fn collection_use_constraints(
+    fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
@@ -1790,22 +1781,19 @@ impl<'db> StatementInferenceInner<'db> {
         self
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn try_expression_type(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
     }
 
-    pub(crate) fn collection_use_constraints(
+    fn collection_use_constraints(
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
@@ -1825,7 +1813,7 @@ impl<'db> StatementInferenceInner<'db> {
         self.declarations.iter().copied()
     }
 
-    pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 }

@@ -309,7 +309,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
-    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+    fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
         !self.0.borrow_mut().insert(ty)
     }
 }
@@ -332,7 +332,7 @@ impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
 
 impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     #[inline]
-    pub(super) fn insert(&mut self, value: T) -> bool
+    fn insert(&mut self, value: T) -> bool
     where
         T: Hash + Eq,
     {
@@ -367,7 +367,7 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     }
 
     #[cfg(test)]
-    pub(super) const fn is_spilled(&self) -> bool {
+    const fn is_spilled(&self) -> bool {
         matches!(self, Self::Spilled(_))
     }
 }
@@ -444,7 +444,7 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             protocol: ProtocolInstanceType<'db>,
         ) {
             let protocol_ty = Type::ProtocolInstance(protocol);
-            let Some(class) = protocol.as_class_based() else {
+            let Some(class) = protocol.class_origin(db) else {
                 walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
                 return;
             };

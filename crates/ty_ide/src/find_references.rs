@@ -90,6 +90,115 @@ mod tests {
     }
 
     #[test]
+    fn references_do_not_mix_global_and_nonlocal_comprehension_walruses() {
+        let test = cursor_test(
+            "
+last = 0
+
+def outer():
+    last = 1
+
+    def write_global():
+        global last
+        [(last := global_item) for global_item in [2]]
+
+    def write_nonlocal():
+        nonlocal last
+        [(last := nonlocal_item) for nonlocal_item in [3]]
+
+    write_global()
+    write_nonlocal()
+    return la<CURSOR>st
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+          --> main.py:5:5
+           |
+         5 |     last = 1
+           |     ----
+           |
+          ::: main.py:12:18
+           |
+        12 |         nonlocal last
+           |                  ----
+        13 |         [(last := nonlocal_item) for nonlocal_item in [3]]
+           |           ----
+        14 |
+        15 |     write_global()
+        16 |     write_nonlocal()
+        17 |     return last
+           |            ----
+        ");
+    }
+
+    #[test]
+    fn comprehension_walrus_references_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [(la<CURSOR>st := item) for item in items]
+    return last
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:7
+          |
+        3 |     [(last := item) for item in items]
+          |       ----
+        4 |     return last
+          |            ----
+        ");
+    }
+
+    #[test]
+    fn nested_comprehension_walrus_references_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [[(la<CURSOR>st := item) for item in items] for _ in [1]]
+    return last
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:8
+          |
+        3 |     [[(last := item) for item in items] for _ in [1]]
+          |        ----
+        4 |     return last
+          |            ----
+        ");
+    }
+
+    #[test]
+    fn comprehension_walrus_references_across_files() {
+        let test = CursorTest::builder()
+            .source("lib.py", "[(la<CURSOR>st := item) for item in [1]]\n")
+            .source("main.py", "from lib import last\nprint(last)\n")
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> lib.py:1:3
+          |
+        1 | [(last := item) for item in [1]]
+          |   ----
+          |
+         ::: main.py:1:17
+          |
+        1 | from lib import last
+          |                 ----
+        2 | print(last)
+          |       ----
+        ");
+    }
+
+    #[test]
     fn parameter_references_in_function() {
         let test = cursor_test(
             "
@@ -119,7 +228,6 @@ result = calculate_sum(value=42)
         7 | # Call with keyword argument
         8 | result = calculate_sum(value=42)
           |                        -----
-          |
         ");
     }
 
@@ -180,7 +288,6 @@ def outer_function():
         18 |     decrement()
         19 |     final = counter
            |             -------
-           |
         ");
     }
 
@@ -238,7 +345,6 @@ final_value = global_counter
         17 | decrement_global()
         18 | final_value = global_counter
            |               --------------
-           |
         ");
     }
 
@@ -276,7 +382,6 @@ except ValueError as err:
            |                      ---
         11 |     print(f'Different error: {err}')
            |                               ---
-           |
         ");
     }
 
@@ -303,7 +408,6 @@ match x:
           |                           -------
         5 |         return pattern
           |                -------
-          |
         ");
     }
 
@@ -331,7 +435,6 @@ match data:
           |                 ----
         6 |         return rest
           |                ----
-          |
         ");
     }
 
@@ -378,7 +481,6 @@ value = my_function
            |       -----------
         14 | value = my_function
            |         -----------
-           |
         ");
     }
 
@@ -434,7 +536,6 @@ test("test")
          3 |
          4 | test("test")
            | ----
-           |
         "#);
     }
 
@@ -481,7 +582,6 @@ cls = MyClass
            |
         15 | cls = MyClass
            |       -------
-           |
         ");
     }
 
@@ -505,7 +605,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -526,7 +625,6 @@ cls = MyClass
           |
         2 | a: "MyClass" = 1
           |     -------
-          |
         "#);
     }
 
@@ -550,7 +648,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -588,7 +685,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -640,7 +736,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -672,7 +767,6 @@ cls = MyClass
           |
         2 | ab: "ab"
           | --   --
-          |
         "#);
     }
 
@@ -706,7 +800,6 @@ cls = MyClass
           |                      --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -729,7 +822,6 @@ cls = MyClass
           |                      --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -752,7 +844,6 @@ cls = MyClass
           |                       --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -775,7 +866,6 @@ cls = MyClass
           |                       --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -798,7 +888,6 @@ cls = MyClass
           |                                     --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -821,7 +910,6 @@ cls = MyClass
           |                                     --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -850,7 +938,6 @@ cls = MyClass
            |                              --
         11 |             x = ab
            |                 --
-           |
         ");
     }
 
@@ -879,7 +966,6 @@ cls = MyClass
            |                              --
         11 |             x = ab
            |                 --
-           |
         ");
     }
 
@@ -914,7 +1000,6 @@ cls = MyClass
          9 |     match event:
         10 |         case Click(x, button=ab):
            |              -----
-           |
         ");
     }
 
@@ -952,7 +1037,6 @@ cls = MyClass
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --                      --       --
-          |
         ");
     }
 
@@ -970,7 +1054,6 @@ cls = MyClass
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --                      --       --
-          |
         ");
     }
 
@@ -989,7 +1072,6 @@ cls = MyClass
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --                          --        --
-          |
         ");
     }
 
@@ -1008,7 +1090,6 @@ cls = MyClass
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --                          --        --
-          |
         ");
     }
 
@@ -1026,7 +1107,6 @@ cls = MyClass
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              --                      --          --
-          |
         ");
     }
 
@@ -1044,7 +1124,6 @@ cls = MyClass
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              --                      --          --
-          |
         ");
     }
 
@@ -1111,7 +1190,6 @@ class DataProcessor:
           |
         2 | def func(x):
           |     ----
-          |
         ");
     }
 
@@ -1161,7 +1239,6 @@ def process_model():
         5 |     def get_attribute(self):
         6 |         return MyModel.attr
           |                        ----
-          |
         ");
     }
 
@@ -1199,7 +1276,6 @@ instance = ExampleClass(old_name="test")
           |                        --------
         4 |         self.old_name = old_name
           |                         --------
-          |
         "#);
     }
 
@@ -1227,7 +1303,6 @@ TD(f=1)
         7 |
         8 | TD(f=1)
           |    -
-          |
         ");
     }
 
@@ -1255,7 +1330,6 @@ TD(f<CURSOR>=1)
         7 |
         8 | TD(f=1)
           |    -
-          |
         ");
     }
 
@@ -1283,7 +1357,6 @@ NT(f=1)
         7 |
         8 | NT(f=1)
           |    -
-          |
         ");
     }
 
@@ -1312,7 +1385,6 @@ DC(f=1)
         8 |
         9 | DC(f=1)
           |    -
-          |
         ");
     }
 
@@ -1349,7 +1421,6 @@ result = func(value=42)
           |          -----
         3 |     return value * 2
           |            -----
-          |
         ");
     }
 
@@ -1391,7 +1462,6 @@ result = func(value=1)
         4 |
         5 | result = func(value=42)
           |               -----
-          |
         ");
     }
 
@@ -1429,7 +1499,6 @@ async def main():
           |                -----
         3 |     return value * 2
           |            -----
-          |
         ");
     }
 
@@ -1460,7 +1529,6 @@ instance = ExampleClass(old_name="test")
           |
         4 |         self.old_name = old_name
           |              --------
-          |
         ");
     }
 
@@ -1498,7 +1566,6 @@ result = func(value=10)
           |               -----
         4 |         return value * 2
           |                -----
-          |
         ");
     }
 
@@ -1540,7 +1607,6 @@ result = instance.method(old_name="world")
           |                        --------
         4 |         self.old_name = old_name
           |                         --------
-          |
         "#);
     }
 
@@ -1577,7 +1643,6 @@ func<CURSOR>_alias()
         3 |
         4 | func_alias()
           | ----------
-          |
         ");
     }
 
@@ -1623,7 +1688,6 @@ func<CURSOR>_alias()
           |
         2 | class Path:
           |       ----
-          |
         "#);
     }
 
@@ -1651,7 +1715,6 @@ func<CURSOR>_alias()
         4 |
         5 | x = abc
           |     ---
-          |
         ");
     }
 
@@ -1679,7 +1742,6 @@ func<CURSOR>_alias()
         4 |
         5 | x = abc
           |     ---
-          |
         ");
     }
 
@@ -1708,7 +1770,6 @@ func<CURSOR>_alias()
         4 |
         5 | y = xyz
           |     ---
-          |
         ");
     }
 
@@ -1737,7 +1798,6 @@ func<CURSOR>_alias()
         4 |
         5 | y = xyz
           |     ---
-          |
         ");
     }
 
@@ -1768,7 +1828,6 @@ func<CURSOR>_alias()
           |
         4 | x = subpkg
           |     ------
-          |
         ");
     }
 
@@ -1901,7 +1960,6 @@ func<CURSOR>_alias()
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -1938,7 +1996,6 @@ func<CURSOR>_alias()
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -1970,7 +2027,6 @@ func<CURSOR>_alias()
         5 |
         6 | print(a)
           |       -
-          |
         "#);
     }
 
@@ -1989,7 +2045,6 @@ print(x)
           |
         3 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2011,7 +2066,6 @@ print(x<CURSOR>)
           | -
         4 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2033,7 +2087,6 @@ print(x)
           | -
         4 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2053,7 +2106,6 @@ print(x)
           |
         4 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2072,7 +2124,6 @@ value: Box
           |
         3 | value: Box
           |        ---
-          |
         ");
     }
 
@@ -2096,7 +2147,6 @@ def test(flag: bool):
           |
         8 |     print(x)
           |           -
-          |
         ");
     }
 
@@ -2120,7 +2170,6 @@ def f(flag: bool):
           |     -
         6 |     print(x)
           |           -
-          |
         ");
     }
 
@@ -2142,7 +2191,6 @@ print(x<CURSOR>)
           |
         6 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2165,7 +2213,6 @@ class C:
           |
         7 |         print(self.x)
           |                    -
-          |
         ");
     }
 
@@ -2190,7 +2237,6 @@ class C:
           |
         9 |         print(self.x)
           |                    -
-          |
         ");
     }
 }

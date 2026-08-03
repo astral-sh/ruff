@@ -11,7 +11,6 @@ SIM103 [*] Return the condition `bool(a)` directly
 5 | |     else:
 6 | |         return False
   | |____________________^
-  |
 help: Replace with `return bool(a)`
   |
 2 |     # SIM103
@@ -34,7 +33,6 @@ SIM103 [*] Return the condition `a == b` directly
 13 | |     else:
 14 | |         return False
    | |____________________^
-   |
 help: Replace with `return a == b`
    |
 10 |     # SIM103
@@ -57,7 +55,6 @@ SIM103 [*] Return the condition `bool(b)` directly
 23 | |     else:
 24 | |         return False
    | |____________________^
-   |
 help: Replace with `return bool(b)`
    |
 20 |         return 1
@@ -80,7 +77,6 @@ SIM103 [*] Return the condition `bool(b)` directly
 34 | |         else:
 35 | |             return False
    | |________________________^
-   |
 help: Replace with `return bool(b)`
    |
 31 |     else:
@@ -103,7 +99,6 @@ SIM103 [*] Return the condition `not a` directly
 59 | |     else:
 60 | |         return True
    | |___________________^
-   |
 help: Replace with `return not a`
    |
 56 |     # SIM103
@@ -126,7 +121,6 @@ SIM103 Return the condition directly
 85 | |     else:
 86 | |         return False
    | |____________________^
-   |
 help: Inline condition
 
 SIM103 [*] Return the condition `not (keys is not None and notice.key not in keys)` directly
@@ -139,7 +133,6 @@ SIM103 [*] Return the condition `not (keys is not None and notice.key not in key
 93 | |     else:
 94 | |         return True
    | |___________________^
-   |
 help: Replace with `return not (keys is not None and notice.key not in keys)`
    |
 90 |     # SIM103
@@ -161,7 +154,6 @@ SIM103 [*] Return the condition `bool(a)` directly
 105 | |         return True
 106 | |     return False
     | |________________^
-    |
 help: Replace with `return bool(a)`
     |
 103 |     # SIM103
@@ -182,7 +174,6 @@ SIM103 [*] Return the condition `not a` directly
 112 | |         return False
 113 | |     return True
     | |_______________^
-    |
 help: Replace with `return not a`
     |
 110 |     # SIM103
@@ -202,7 +193,6 @@ SIM103 [*] Return the condition `10 < a` directly
 118 | |         return False
 119 | |     return True
     | |_______________^
-    |
 help: Replace with `return 10 < a`
     |
 116 | def f():
@@ -222,7 +212,6 @@ SIM103 [*] Return the condition `not 10 < a` directly
 124 | |         return False
 125 | |     return True
     | |_______________^
-    |
 help: Replace with `return not 10 < a`
     |
 122 | def f():
@@ -242,7 +231,6 @@ SIM103 [*] Return the condition `10 not in a` directly
 130 | |         return False
 131 | |     return True
     | |_______________^
-    |
 help: Replace with `return 10 not in a`
     |
 128 | def f():
@@ -262,7 +250,6 @@ SIM103 [*] Return the condition `10 in a` directly
 136 | |         return False
 137 | |     return True
     | |_______________^
-    |
 help: Replace with `return 10 in a`
     |
 134 | def f():
@@ -282,7 +269,6 @@ SIM103 [*] Return the condition `a is not 10` directly
 142 | |         return False
 143 | |     return True
     | |_______________^
-    |
 help: Replace with `return a is not 10`
     |
 140 | def f():
@@ -302,7 +288,6 @@ SIM103 [*] Return the condition `a is 10` directly
 148 | |         return False
 149 | |     return True
     | |_______________^
-    |
 help: Replace with `return a is 10`
     |
 146 | def f():
@@ -322,7 +307,6 @@ SIM103 [*] Return the condition `a != 10` directly
 154 | |         return False
 155 | |     return True
     | |_______________^
-    |
 help: Replace with `return a != 10`
     |
 152 | def f():
@@ -342,7 +326,6 @@ SIM103 [*] Return the condition `a == 10` directly
 160 | |         return False
 161 | |     return True
     | |_______________^
-    |
 help: Replace with `return a == 10`
     |
 158 | def f():

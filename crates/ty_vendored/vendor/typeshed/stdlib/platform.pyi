@@ -41,7 +41,7 @@ def mac_ver(
     """
 
 if sys.version_info < (3, 15):
-    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
+    @deprecated("Deprecated; will be removed in Python 3.15.")
     def java_ver(
         release: str = "",
         vendor: str = "",
@@ -120,7 +120,7 @@ if sys.version_info >= (3, 12):
             """Create new instance of uname_result_base(system, node, release, version, machine)"""
 
         @property
-        def processor(self) -> str: ...
+        def processor(self) -> str: ...  # ty:ignore[invalid-named-tuple-override]
 
 else:
     @disjoint_base
@@ -137,7 +137,7 @@ else:
             """Create new instance of uname_result_base(system, node, release, version, machine)"""
 
         @property
-        def processor(self) -> str: ...
+        def processor(self) -> str: ...  # ty:ignore[invalid-named-tuple-override]
 
 def uname() -> uname_result:
     """Fairly portable uname interface. Returns a tuple

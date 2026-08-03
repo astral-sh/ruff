@@ -41,7 +41,6 @@ PIE808 [*] Unnecessary `start` argument in `range`
 18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
 19 | range((0), 42)
    |        ^
-   |
 help: Remove `start` argument
    |
 18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
@@ -55,7 +54,6 @@ PIE808 [*] Unnecessary `start` argument in `range`
    |
 27 | range(0, 3)
    |       ^
-   |
 help: Remove `start` argument
    |
 26 |

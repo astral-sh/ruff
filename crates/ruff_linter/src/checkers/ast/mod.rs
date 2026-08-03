@@ -253,7 +253,7 @@ pub(crate) struct Checker<'a> {
 
 impl<'a> Checker<'a> {
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn new(
+    fn new(
         parsed: &'a Parsed<ModModule>,
         parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
         settings: &'a LinterSettings,
@@ -605,7 +605,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
-    pub(crate) fn report_type_diagnostic<T: Violation>(&self, kind: T, range: TextRange) {
+    fn report_type_diagnostic<T: Violation>(&self, kind: T, range: TextRange) {
         if !self.semantic.in_no_type_check() {
             self.report_diagnostic(kind, range);
         }
@@ -3527,7 +3527,7 @@ impl<'a> LintContext<'a> {
     /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
     /// sub-diagnostics before the fix title. See its documentation for more details.
     #[expect(unused)]
-    pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
+    fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
@@ -3645,7 +3645,7 @@ impl DiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    pub(crate) fn set_primary_message(&mut self, message: impl IntoDiagnosticMessage) {
+    pub(crate) fn set_primary_annotation_message(&mut self, message: impl IntoDiagnosticMessage) {
         // N.B. It is normally bad juju to define `self` methods
         // on types that implement `Deref`. Instead, it's idiomatic
         // to do `fn foo(this: &mut LintDiagnosticGuard)`, which in
@@ -3697,7 +3697,7 @@ impl DiagnosticGuard<'_, '_> {
     /// diagnostic.info("This will appear first");
     /// diagnostic.before_drop(|diag| diag.info("This will appear last, after the fix title"));
     /// ```
-    pub(crate) fn before_drop<F>(&mut self, f: F)
+    fn before_drop<F>(&mut self, f: F)
     where
         F: Fn(&mut Diagnostic) + 'static,
     {

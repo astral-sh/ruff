@@ -19,19 +19,14 @@ use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
 use ty_python_core::Db as _;
 
-fn get_cargo_workspace_root() -> anyhow::Result<SystemPathBuf> {
-    Ok(SystemPathBuf::from(String::from_utf8(
-        std::process::Command::new("cargo")
-            .args(["locate-project", "--workspace", "--message-format", "plain"])
-            .output()?
-            .stdout,
-    )?)
-    .parent()
-    .unwrap()
-    .to_owned())
+fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
+    SystemPath::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(SystemPath::parent)
+        .context("Failed to determine the Cargo workspace root")
 }
 
-/// Test that all snippets in testcorpus can be checked without panic (except for [`KNOWN_FAILURES`])
+/// Test that all snippets in testcorpus can be checked without panic.
 #[test]
 fn corpus_no_panic() -> anyhow::Result<()> {
     let crate_root = String::from(env!("CARGO_MANIFEST_DIR"));
@@ -102,17 +97,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
         let relative_path = path.strip_prefix(&workspace_root)?;
 
-        let (py_expected_to_fail, pyi_expected_to_fail) = KNOWN_FAILURES
-            .iter()
-            .find_map(|(path, py_fail, pyi_fail)| {
-                if *path == relative_path.as_str().replace('\\', "/") {
-                    Some((*py_fail, *pyi_fail))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or((false, false));
-
         let source = path.as_path();
         let source_filename = source.file_name().unwrap();
 
@@ -127,25 +111,9 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             // (and some non-expressions that clearly define a single type)
             let file = system_path_to_file(&db, path).unwrap();
 
-            let result = std::panic::catch_unwind(|| pull_types(&db, file));
-
-            let expected_to_fail = if path.extension().map(|e| e == "pyi").unwrap_or(false) {
-                pyi_expected_to_fail
-            } else {
-                py_expected_to_fail
-            };
-            if let Err(err) = result {
-                if !expected_to_fail {
-                    println!(
-                        "Check failed for {relative_path:?}. Consider fixing it or adding it to KNOWN_FAILURES"
-                    );
-                    std::panic::resume_unwind(err);
-                }
-            } else {
-                assert!(
-                    !expected_to_fail,
-                    "Expected to panic, but did not. Consider removing this path from KNOWN_FAILURES"
-                );
+            if let Err(err) = std::panic::catch_unwind(|| pull_types(&db, file)) {
+                println!("Check failed for {relative_path:?}.");
+                std::panic::resume_unwind(err);
             }
 
             db.memory_file_system().remove_file(path).unwrap();
@@ -169,11 +137,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
     Ok(())
 }
-
-/// Whether or not the .py/.pyi version of this file is expected to fail
-#[rustfmt::skip]
-const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-];
 
 #[salsa::db]
 #[derive(Clone)]

@@ -7,6 +7,8 @@ semantics are the same.
 
 For a complete enumeration of the available configuration options, see [_Settings_](settings.md).
 
+For the complete list of enabled rules, see [_Default Rules_](default-rules.md).
+
 If left unspecified, Ruff's default configuration is equivalent to:
 
 === "pyproject.toml"
@@ -51,10 +53,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py310"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-    # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-    # McCabe complexity (`C901`) by default.
-    select = ["E4", "E7", "E9", "F"]
+    # select = [...]  # See the Default Rules page for the full listing.
     ignore = []
 
     # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -133,10 +132,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py310"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-    # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-    # McCabe complexity (`C901`) by default.
-    select = ["E4", "E7", "E9", "F"]
+    # select = [...]  # See the Default Rules page for the full listing.
     ignore = []
 
     # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -180,8 +176,8 @@ As an example, the following would configure Ruff to:
 
     ```toml
     [tool.ruff.lint]
-    # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-    select = ["E4", "E7", "E9", "F", "B"]
+    # 1. Enable all flake8-bugbear (`B`) rules, in addition to the defaults.
+    extend-select = ["B"]
 
     # 2. Avoid enforcing line-length violations (`E501`)
     ignore = ["E501"]
@@ -203,8 +199,8 @@ As an example, the following would configure Ruff to:
 
     ```toml
     [lint]
-    # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-    select = ["E4", "E7", "E9", "F", "B"]
+    # 1. Enable all flake8-bugbear (`B`) rules, in addition to the defaults.
+    extend-select = ["B"]
 
     # 2. Avoid enforcing line-length violations (`E501`)
     ignore = ["E501"]
@@ -229,7 +225,7 @@ Linter plugin configurations are expressed as subsections, e.g.:
     ```toml
     [tool.ruff.lint]
     # Add "Q" to the list of enabled codes.
-    select = ["E4", "E7", "E9", "F", "Q"]
+    extend-select = ["Q"]
 
     [tool.ruff.lint.flake8-quotes]
     docstring-quotes = "double"
@@ -240,7 +236,7 @@ Linter plugin configurations are expressed as subsections, e.g.:
     ```toml
     [lint]
     # Add "Q" to the list of enabled codes.
-    select = ["E4", "E7", "E9", "F", "Q"]
+    extend-select = ["Q"]
 
     [lint.flake8-quotes]
     docstring-quotes = "double"
@@ -648,9 +644,9 @@ Options:
           Enable automatic additions of `noqa` directives to failing lines.
           Optionally provide a reason to append after the codes
       --add-ignore[=<REASON>]
-          Enable automatic additions of `ruff:ignore` comments to failing
-          lines. Optionally provide a reason to append after the rule names.
-          Requires preview mode
+          Enable automatic additions of `ruff: ignore` comments to failing
+          lines. Optionally provide a reason to append after the codes. In
+          preview, add suppression comments with rule names instead
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings

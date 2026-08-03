@@ -2,9 +2,9 @@
   "name": "api",
   "version": "0.0.0",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260702.1",
+    "@cloudflare/workers-types": "^5.0.0",
     "miniflare": "^4.20260706.0",
-    "typescript": "^6.0.0",
+    "typescript": "^7.0.0",
     "wrangler": "^4.107.1"
   },
   "private": true,

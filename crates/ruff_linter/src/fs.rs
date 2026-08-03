@@ -8,7 +8,7 @@ use crate::settings::types::CompiledPerFileIgnoreList;
 /// Return the current working directory.
 ///
 /// On WASM this just returns `.`. Otherwise, defer to [`path_absolutize::path_dedot::CWD`].
-pub fn get_cwd() -> &'static Path {
+pub(crate) fn get_cwd() -> &'static Path {
     cfg_select! {
         target_arch = "wasm32" => Path::new("."),
         _ => path_absolutize::path_dedot::CWD.as_path(),
@@ -38,11 +38,9 @@ pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
 
 /// Convert any path to an absolute path (based on the specified project root).
 pub fn normalize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) -> PathBuf {
-    let path = path.as_ref();
-    if let Ok(path) = path.absolutize_from(project_root.as_ref()) {
-        return path.to_path_buf();
-    }
-    path.to_path_buf()
+    path.as_ref()
+        .absolutize_from(project_root.as_ref())
+        .into_owned()
 }
 
 /// Convert an absolute path to be relative to the current working directory.

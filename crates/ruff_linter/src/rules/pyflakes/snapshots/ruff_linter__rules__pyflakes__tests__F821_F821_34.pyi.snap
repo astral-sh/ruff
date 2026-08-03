@@ -18,4 +18,3 @@ F821 Undefined name `Undefined`
 21 | # Error: name that was never defined
 22 | def g(x: Undefined) -> None: ...  # F821
    |          ^^^^^^^^^
-   |

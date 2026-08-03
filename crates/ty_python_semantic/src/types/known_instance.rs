@@ -309,7 +309,7 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::TypeVarTuple
             }
             Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
+            Self::TypeAliasType(alias) if alias.specialization(db).is_some() => {
                 KnownClass::GenericAlias
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
@@ -463,6 +463,13 @@ impl<'db> KnownInstanceType<'db> {
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )))
             }
+            KnownInstanceType::LiteralStringAlias(ty) => {
+                Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
+                    db,
+                    ty.inner(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
 
             KnownInstanceType::SubscriptedProtocol(_)
             | KnownInstanceType::SubscriptedGeneric(_)
@@ -474,7 +481,6 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::GenericContext(_)
             | KnownInstanceType::Specialization(_)
             | KnownInstanceType::Literal(_)
-            | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
             | KnownInstanceType::NewType(_)
             | KnownInstanceType::Sentinel(_) => {
@@ -660,7 +666,7 @@ impl<'db> UnionTypeInstance<'db> {
         )))
     }
 
-    pub(super) fn apply_type_mapping_impl(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'_, 'db>,

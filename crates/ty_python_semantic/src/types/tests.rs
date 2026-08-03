@@ -357,12 +357,28 @@ fn type_alias_variance() {
         };
         type_alias
     }
+    fn get_bound_typevar_instance<'db>(
+        db: &'db TestDb,
+        type_alias: PEP695TypeAliasType<'db>,
+    ) -> BoundTypeVarInstance<'db> {
+        let generic_context = type_alias.generic_context(db).unwrap();
+        generic_context.variables(db).next().unwrap()
+    }
+
     fn get_bound_typevar<'db>(
         db: &'db TestDb,
         type_alias: PEP695TypeAliasType<'db>,
     ) -> BoundTypeVarIdentity<'db> {
-        let generic_context = type_alias.generic_context(db).unwrap();
-        generic_context.variables(db).next().unwrap().identity(db)
+        get_bound_typevar_instance(db, type_alias).identity(db)
+    }
+
+    fn assert_effective_variance<'db>(
+        db: &'db TestDb,
+        type_alias: PEP695TypeAliasType<'db>,
+        expected: TypeVarVariance,
+    ) {
+        let typevar = get_bound_typevar_instance(db, type_alias);
+        assert_eq!(typevar.variance(db), expected);
     }
 
     let mut db = setup_db();
@@ -397,6 +413,7 @@ type ContravariantAliasAlias[T] = ContravariantAlias[T]
 type InvariantAliasAlias[T] = InvariantAlias[T]
 type BivariantAliasAlias[T] = BivariantAlias[T]
 type ParamSpecContravariantAlias[**P] = Callable[P, None]
+type ParamSpecDefaultContravariantAlias[**P = [int, str]] = Callable[P, None]
 type ParamSpecConcatenateAlias[**P] = Callable[Concatenate[int, P], None]
 type ParamSpecBivariantAlias[**P] = int
 
@@ -468,6 +485,13 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
         TypeVarVariance::Contravariant
     );
 
+    let paramspec_default_contravariant = get_type_alias(&db, "ParamSpecDefaultContravariantAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_default_contravariant))
+            .variance_of(&db, get_bound_typevar(&db, paramspec_default_contravariant)),
+        TypeVarVariance::Contravariant
+    );
+
     let paramspec_concatenate = get_type_alias(&db, "ParamSpecConcatenateAlias");
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate))
@@ -495,6 +519,38 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
             .variance_of(&db, get_bound_typevar(&db, recursive2)),
         TypeVarVariance::Invariant
     );
+
+    assert_effective_variance(&db, covariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, contravariant, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, invariant, TypeVarVariance::Invariant);
+    assert_effective_variance(&db, bivariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, covariant_alias, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, contravariant_alias, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, invariant_alias, TypeVarVariance::Invariant);
+    assert_effective_variance(&db, bivariant_alias, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, paramspec_contravariant, TypeVarVariance::Contravariant);
+    assert_effective_variance(
+        &db,
+        paramspec_default_contravariant,
+        TypeVarVariance::Contravariant,
+    );
+    assert_effective_variance(&db, paramspec_concatenate, TypeVarVariance::Contravariant);
+    assert_effective_variance(&db, paramspec_bivariant, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, recursive, TypeVarVariance::Covariant);
+    assert_effective_variance(&db, recursive2, TypeVarVariance::Invariant);
+
+    let bivariant_typevar = get_bound_typevar_instance(&db, bivariant);
+    for polarity in [
+        TypeVarVariance::Covariant,
+        TypeVarVariance::Contravariant,
+        TypeVarVariance::Invariant,
+        TypeVarVariance::Bivariant,
+    ] {
+        assert_eq!(
+            bivariant_typevar.variance_with_polarity(&db, polarity),
+            polarity
+        );
+    }
 }
 
 #[test]

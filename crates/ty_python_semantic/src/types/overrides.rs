@@ -1289,7 +1289,7 @@ fn report_invalid_attribute_override<'db>(
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of attribute `{member}`"));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "{subclass_kind} cannot override {superclass_kind} `{superclass_member}`"
     ));
     diagnostic.info("This violates the Liskov Substitution Principle");
@@ -1553,7 +1553,14 @@ fn check_missing_overrides<'db>(
         "Method `{}` overrides `{superclass_member}` but is not decorated with `@override`",
         member.name
     ));
-    diagnostic.info("Decorate the method with `@typing.override` to make the override explicit");
+    let override_module = if Program::get(db).python_version(db) >= PythonVersion::PY312 {
+        "typing"
+    } else {
+        "typing_extensions"
+    };
+    diagnostic.info(format_args!(
+        "Decorate the method with `@{override_module}.override` to make the override explicit"
+    ));
 
     if let Some(superclass_definition) = superclass_definition
         && superclass_definition.file(db) == context.file()
@@ -1867,16 +1874,14 @@ fn check_enum_member_against_constructor_method<'db>(
     // The enum metaclass unpacks tuple values as positional args:
     //   MEMBER = (a, b, c)  →  __new__(cls, a, b, c) / __init__(self, a, b, c)
     //   MEMBER = x          →  __new__(cls, x) / __init__(self, x)
-    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
-        if let Some(spec) = instance.tuple_spec(db) {
-            if let Tuple::Fixed(fixed) = &*spec {
-                fixed.all_elements().to_vec()
-            } else {
-                // Variable-length tuples: can't determine exact args, skip validation.
-                return;
-            }
+    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type
+        && let Some(spec) = instance.tuple_spec(db)
+    {
+        if let Tuple::Fixed(fixed) = &*spec {
+            fixed.all_elements().to_vec()
         } else {
-            vec![member_value_type]
+            // Variable-length tuples: can't determine exact args, skip validation.
+            return;
         }
     } else {
         vec![member_value_type]

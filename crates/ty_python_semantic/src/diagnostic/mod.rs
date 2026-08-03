@@ -33,9 +33,10 @@ pub fn inferred_python_version_source_annotation(
             .as_ref()
             .and_then(|source| source.span(db))
             .map(Annotation::primary),
-        PythonVersionSource::Cli | PythonVersionSource::Editor | PythonVersionSource::Default => {
-            None
-        }
+        PythonVersionSource::Cli
+        | PythonVersionSource::Editor
+        | PythonVersionSource::UvWorkspace
+        | PythonVersionSource::Default => None,
     }
 }
 
@@ -43,7 +44,7 @@ pub fn inferred_python_version_source_annotation(
 ///
 /// ty can infer the Python version from various sources, such as command-line arguments,
 /// configuration files, or defaults.
-pub fn add_inferred_python_version_hint_to_diagnostic(
+pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
     db: &dyn Db,
     diagnostic: &mut Diagnostic,
     action: &str,
@@ -98,6 +99,11 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
             diagnostic.info(format_args!(
                 "Python {version} was assumed when {action} \
                 because it's the version of the selected Python interpreter in your editor",
+            ));
+        }
+        crate::PythonVersionSource::UvWorkspace => {
+            diagnostic.info(format_args!(
+                "Python {version} was assumed when {action} because it was provided by uv workspace metadata",
             ));
         }
         crate::PythonVersionSource::InstallationDirectoryLayout {

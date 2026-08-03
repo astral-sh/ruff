@@ -255,49 +255,29 @@ fn apply_generated_type_mixin_member_values<'db>(
         return None;
     };
 
-    match class.known(db) {
-        Some(KnownClass::Str) => Some(
-            members
-                .into_iter()
-                .map(|(name, value)| {
-                    let value = if let Some(literal) = value.as_int_literal() {
-                        Type::string_literal(db, literal.to_compact_string())
-                    } else if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                        KnownClass::Str.to_instance(db)
-                    } else {
-                        return None;
-                    };
-                    Some((name, value))
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ),
-        Some(KnownClass::Bytes) => Some(
-            members
-                .into_iter()
-                .map(|(name, value)| {
-                    let value = if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                        KnownClass::Bytes.to_instance(db)
-                    } else {
-                        return None;
-                    };
-                    Some((name, value))
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ),
-        Some(KnownClass::Float) => Some(
-            members
-                .into_iter()
-                .map(|(name, value)| {
-                    if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                        Some((name, KnownClass::Float.to_instance(db)))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ),
-        _ => None,
-    }
+    let mixin_class @ (KnownClass::Str | KnownClass::Bytes | KnownClass::Float) =
+        class.known(db)?
+    else {
+        return None;
+    };
+
+    members
+        .into_iter()
+        .map(|(name, value)| {
+            if !value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+                return None;
+            }
+
+            let value = if mixin_class == KnownClass::Str
+                && let Some(literal) = value.as_int_literal()
+            {
+                Type::string_literal(db, literal.to_compact_string())
+            } else {
+                mixin_class.to_instance(db)
+            };
+            Some((name, value))
+        })
+        .collect()
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -483,7 +463,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid argument to parameter `value` of `{base_name}()`"
                 ));
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
                     name_type.display(db)
                 ));
@@ -906,7 +886,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `names` of `{base_name}()`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
                 enum_names_type(db).display(db),
                 names_ty.display(db),

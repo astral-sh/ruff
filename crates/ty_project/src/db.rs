@@ -96,7 +96,7 @@ impl ProjectDatabase {
         self.files.freeze();
     }
 
-    /// See [`Project::freeze_open_files`].
+    /// Permanently marks the project as never having open files.
     pub fn freeze_open_files(&mut self) {
         let project = self.project();
         project.freeze_open_files(self);

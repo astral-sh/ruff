@@ -200,7 +200,6 @@ F632 [*] Use `!=` to compare constant literals
 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 34 | variable: "123 is not y"
    |            ^^^^^^^^^^^^
-   |
 help: Replace `is not` with `!=`
    |
 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736

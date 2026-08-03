@@ -1898,7 +1898,6 @@ error[unresolved-reference]: Name `x` used when not defined
   |
 5 |         y = x  # snapshot
   |             ^
-  |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -1916,7 +1915,6 @@ error[unresolved-reference]: Name `x` used when not defined
    |
 10 |         y = x  # snapshot
    |             ^
-   |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -2980,6 +2978,71 @@ instance.callback = lambda number: (
 instance.payload = {"value": 1}
 ```
 
+### Nested argument type
+
+```py
+class C:
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
+
+c = C()
+c.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `C`
+ --> src/mdtest_snippet.py:5:7
+  |
+5 | c.x = (1, b"")  # snapshot: invalid-assignment
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+info: Argument to bound method `C.__setattr__` is incorrect
+info: This assignment implicitly calls a custom `__setattr__` method
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Method defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __setattr__(self, name: str, value: tuple[int, str]): ...
+  |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
+```
+
+### Overloaded `__setattr__`
+
+```py
+from typing import overload
+
+class D:
+    @overload
+    def __setattr__(self, name: str, value: tuple[int, str]): ...
+    @overload
+    def __setattr__(self, name: str, value: int): ...
+    def __setattr__(self, name: str, value: tuple[int, str] | int): ...
+
+d = D()
+d.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Literal[b""]]` to attribute `x` on type `D`
+  --> src/mdtest_snippet.py:11:1
+   |
+11 | d.x = (1, b"")  # snapshot: invalid-assignment
+   | ^^^ No overload of bound method `D.__setattr__` matches arguments
+info: This assignment implicitly calls a custom `__setattr__` method
+info: First overload defined here
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | /     @overload
+5 | |     def __setattr__(self, name: str, value: tuple[int, str]): ...
+  | |_________________________________________________________________^ First overload defined here
+info: Possible overloads for bound method `__setattr__`:
+info:   (self, name: str, value: tuple[int, str]) -> Unknown
+info:   (self, name: str, value: int) -> Unknown
+info: Overload implementation defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |     def __setattr__(self, name: str, value: tuple[int, str] | int): ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__setattr__` method is annotated with a (union of) literal type(s),
@@ -2998,8 +3061,53 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+date.month = "May"  # snapshot: invalid-assignment
+# snapshot: invalid-assignment
+# snapshot: invalid-assignment
 date.tz = "UTC"
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign object of type `Literal["May"]` to attribute `month` on type `Date`
+  --> src/mdtest_snippet.py:13:14
+   |
+13 | date.month = "May"  # snapshot: invalid-assignment
+   |              ^^^^^ Expected `int`, found `Literal["May"]`
+info: Argument to bound method `Date.__setattr__` is incorrect
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+  |         ^^^^^^^^^^^                                              ---------- Parameter declared here
+
+
+error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
+  --> src/mdtest_snippet.py:16:1
+   |
+16 | date.tz = "UTC"
+   | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
+info: Argument to bound method `Date.__setattr__` is incorrect
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+  |         ^^^^^^^^^^^       ------------------------------------- Parameter declared here
+
+
+error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
+  --> src/mdtest_snippet.py:16:11
+   |
+16 | date.tz = "UTC"
+   |           ^^^^^ Expected `int`, found `Literal["UTC"]`
+info: Argument to bound method `Date.__setattr__` is incorrect
+info: This assignment implicitly calls a custom `__setattr__` method
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+  |         ^^^^^^^^^^^                                              ---------- Parameter declared here
 ```
 
 ### Return type of `__setattr__`
@@ -3117,7 +3225,7 @@ def use_module(m: MyModule, param: int) -> None:
 
     # But assigning to an attribute that's not explicitly defined will still
     # use `__setattr__` for validation.
-    # error: [unresolved-attribute] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule` with custom `__setattr__` method."
+    # error: [invalid-assignment] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule`"
     m.undefined_param = param
 ```
 
@@ -3158,7 +3266,7 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 Foo.whatever = 42
-Foo.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+Foo.whatever = "invalid"  # error: [invalid-assignment]
 ```
 
 If both the metaclass and class define `__setattr__`, class-object assignments use the metaclass
@@ -3169,11 +3277,11 @@ class WithSetAttr(metaclass=Meta):
     def __setattr__(self, name: str, value: str) -> None: ...
 
 WithSetAttr.class_attribute = 42
-WithSetAttr.class_attribute = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+WithSetAttr.class_attribute = "invalid"  # error: [invalid-assignment]
 
 instance = WithSetAttr()
 instance.instance_attribute = "valid"
-instance.instance_attribute = 42  # error: [unresolved-attribute] "with custom `__setattr__` method"
+instance.instance_attribute = 42  # error: [invalid-assignment]
 ```
 
 The same applies when the class object is annotated as `type[Foo]`:
@@ -3181,7 +3289,7 @@ The same applies when the class object is annotated as `type[Foo]`:
 ```py
 def set_on_subclass(cls: type[Foo]) -> None:
     cls.whatever = 42
-    cls.whatever = "invalid"  # error: [unresolved-attribute] "with custom `__setattr__` method"
+    cls.whatever = "invalid"  # error: [invalid-assignment]
 ```
 
 The setter also provides the expected type when inferring the assigned value:
@@ -3225,7 +3333,7 @@ OverloadedClass.callback = lambda number: (
     number.missing
 )
 OverloadedClass.payload = {"value": 1}
-OverloadedClass.callback = {"value": 1}  # error: [unresolved-attribute] "with custom `__setattr__` method"
+OverloadedClass.callback = {"value": 1}  # error: [invalid-assignment]
 ```
 
 A metaclass `__setattr__` method returning `Never` prevents writes to undefined attributes:
@@ -4113,7 +4221,6 @@ error[unresolved-attribute]: Module `datetime` has no member `UTC`
   |
 4 | reveal_type(datetime.UTC)  # revealed: Unknown
   |             ^^^^^^^^^^^^
-  |
 info: The member may be available on other Python versions or platforms
 info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 ```
@@ -4135,7 +4242,6 @@ error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
   |
 4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
   |             ^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Unimported submodule incorrectly accessed as attribute
@@ -4172,7 +4278,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(foo.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `foo.bar`
 ```
 
@@ -4191,7 +4296,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(baz.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `baz.bar`
 ```
 
@@ -4217,7 +4321,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__n
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^
-  |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
@@ -4233,7 +4336,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__a
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^^^^^
-  |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```

@@ -447,7 +447,7 @@ struct ApplicableFix {
     /// Gets fixed to:
     ///
     /// ```py
-    /// enumerate(0, "1")  # ty:ignore[invalid-argument-type]
+    /// enumerate(0, "1")  # ty: ignore[invalid-argument-type]
     /// ```
     ///
     /// In which case `fixed_diagnostics` is 2.
@@ -832,7 +832,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        a = b + 10  # ty:ignore[unresolved-reference]
+        a = b + 10  # ty: ignore[unresolved-reference]
         ```
         ");
     }
@@ -849,7 +849,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        a = b + 10 + c  # ty:ignore[unresolved-reference]
+        a = b + 10 + c  # ty: ignore[unresolved-reference]
         ```
         ");
     }
@@ -868,7 +868,7 @@ mod tests {
 
         ```py
         import sys
-        a = b + 10 + sys.veeersion  # ty:ignore[unresolved-attribute, unresolved-reference]
+        a = b + 10 + sys.veeersion  # ty: ignore[unresolved-attribute, unresolved-reference]
         ```
         ");
     }
@@ -898,8 +898,12 @@ mod tests {
         1 | import sys
         2 | a = 5 + 10  # ty: ignore[unresolved-reference]
           |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
         help: Remove the unused suppression comment
+          |
+        1 | import sys
+          - a = 5 + 10  # ty: ignore[unresolved-reference]
+        2 + a = 5 + 10
+          |
         ");
     }
 
@@ -929,7 +933,6 @@ mod tests {
         1 | import sys
         2 | a = x +
           |     ^
-          |
 
         error[invalid-syntax]: Expected an expression
          --> test.py:2:8
@@ -937,7 +940,6 @@ mod tests {
         1 | import sys
         2 | a = x +
           |        ^
-          |
         ");
     }
 
@@ -967,8 +969,8 @@ mod tests {
 
         test(
             a = 10,
-            c = "unknown"  # ty:ignore[unknown-argument]
-        )  # ty:ignore[missing-argument]
+            c = "unknown"  # ty: ignore[unknown-argument]
+        )  # ty: ignore[missing-argument]
         ```
         "#);
     }
@@ -1013,8 +1015,8 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
-                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
+            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
             )
         ```
         "#);
@@ -1056,8 +1058,8 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
-                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
+            diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
+                diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
             ); missing  # ty: ignore[unresolved-reference]
         ```
         "#
@@ -1094,7 +1096,7 @@ class B(A):
             def test(
                 self,
                 b: str
-            ) -> A.b:  # ty:ignore[invalid-method-override, unresolved-attribute]
+            ) -> A.b:  # ty: ignore[invalid-method-override, unresolved-attribute]
                 pass
         ```
         "#);
@@ -1130,7 +1132,7 @@ class B(A):
             def test(  # ty:ignore[unresolved-reference, invalid-method-override]
                 self,
                 b: str
-            ) -> A.b:  # ty:ignore[unresolved-attribute]
+            ) -> A.b:  # ty: ignore[unresolved-attribute]
                 pass
         ```
 
@@ -1146,6 +1148,12 @@ class B(A):
         9 |         b: str
           |
         help: Remove the unused suppression code
+          |
+        6 | class B(A):
+          -     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+        7 +     def test(  # ty:ignore[invalid-method-override]
+        8 |         self,
+          |
         "#);
     }
 
@@ -1179,7 +1187,7 @@ class B(A):
         ## Fixed source
 
         ```py
-        value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
         ```
 
         ## Diagnostics after applying fixes
@@ -1187,10 +1195,13 @@ class B(A):
         warning[unused-ignore-comment]: Unused `ty: ignore` without a code
          --> test.py:1:18
           |
-        1 | value = missing  # ty: ignore[] tracked by [123]  # ty:ignore[unresolved-reference]
+        1 | value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
           |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
         help: Remove the unused suppression comment
+          |
+          - value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
+        1 + value = missing  # ty: ignore[unresolved-reference]
+          |
         "
         );
     }
@@ -1233,6 +1244,11 @@ class B(A):
         6 | ]
           |
         help: Remove the unused suppression comment
+          |
+        3 | values = [
+          -     # ty: ignore[] tracked by [123]
+        4 |     missing,
+          |
         "
         );
     }
@@ -1269,6 +1285,12 @@ class B(A):
         3 | value = 1 / 0
           |
         help: Remove the unused suppression comment
+          |
+        1 | seen_code = True
+          - # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        2 + # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule]
+        3 | value = 1 / 0
+          |
         "
         );
     }
@@ -1321,8 +1343,12 @@ class B(A):
         2 |
         3 | result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
           |                                        ^^^^^^^^^^^^^^^^
-          |
         help: Remove the unused suppression code
+          |
+        2 |
+          - result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+        3 + result: int = f(missing)  # ty: ignore[invalid-assignment, too-many-positional-arguments, unresolved-reference]
+          |
         "#
         );
     }
@@ -1548,6 +1574,12 @@ class B(A):
         4 |     # ty: ignore[invalid-argument-type, unresolved-reference]
           |
         help: Remove the unused suppression code
+          |
+        1 | seen_code = True
+          - # ty: ignore[too-many-positional-arguments, unresolved-reference]
+        2 + # ty: ignore[unresolved-reference]
+        3 | values = [
+          |
 
         warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-argument-type'
          --> test.py:4:18
@@ -1560,6 +1592,12 @@ class B(A):
         6 |     absent,
           |
         help: Remove the unused suppression code
+          |
+        3 | values = [
+          -     # ty: ignore[invalid-argument-type, unresolved-reference]
+        4 +     # ty: ignore[unresolved-reference]
+        5 |     missing,
+          |
         "
         );
     }
@@ -1693,12 +1731,12 @@ class B(A):
 
         assert_eq!(diagnostic.id(), LINT_ID);
         assert_eq!(
-            diagnostic.primary_message(),
+            diagnostic.headline_message(),
             "Variable `a` should be named `b`."
         );
 
         assert_eq!(convergence_diagnostic.id(), DiagnosticId::InternalError);
-        assert_snapshot!(convergence_diagnostic.primary_message(), @"Fixes failed to converge after 10 iterations.");
+        assert_snapshot!(convergence_diagnostic.headline_message(), @"Fixes failed to converge after 10 iterations.");
 
         // It should keep the source text from the last allowed fix iteration.
         assert_eq!(&*source_text(&db, file), "a = 10");
@@ -1770,12 +1808,12 @@ class B(A):
 
         assert_eq!(diagnostic.id(), LINT_ID);
         assert_eq!(
-            diagnostic.primary_message(),
+            diagnostic.headline_message(),
             "Variable `b` should be named `c`."
         );
 
         assert_eq!(syntax_error.id(), DiagnosticId::InternalError);
-        assert_snapshot!(syntax_error.primary_message(), @"Applying fixes introduced a syntax error. Reverting changes.");
+        assert_snapshot!(syntax_error.headline_message(), @"Applying fixes introduced a syntax error. Reverting changes.");
 
         // It should revert the source to the last known error free version.
         assert_eq!(&*source_text(&db, file), "b = 10");
