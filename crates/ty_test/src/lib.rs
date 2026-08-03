@@ -14,6 +14,7 @@ use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_db::{Db, PythonFile};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
 use std::fmt::Write;
 use ty_module_resolver::{
@@ -188,24 +189,10 @@ fn run_test(
                 {
                     typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
-            } else if let Some(component_index) = full_path
-                .components()
-                .position(|c| c.as_str() == "<path-to-site-packages>")
+            } else if let Some(site_packages_path) =
+                expand_site_packages_placeholder(&full_path, python_version)
             {
-                // If the path contains `<path-to-site-packages>`, we need to replace it with the
-                // actual site-packages directory based on the Python platform and version.
-                let mut components = full_path.components();
-                let mut new_path: SystemPathBuf =
-                    components.by_ref().take(component_index).collect();
-                if cfg!(target_os = "windows") {
-                    new_path.extend(["Lib", "site-packages"]);
-                } else {
-                    new_path.push("lib");
-                    new_path.push(format!("python{python_version}"));
-                    new_path.push("site-packages");
-                }
-                new_path.extend(components.skip(1));
-                full_path = new_path;
+                full_path = site_packages_path;
             }
 
             let temp_string;
@@ -289,11 +276,12 @@ fn run_test(
         .unwrap_or_default()
         .iter()
         .map(|path| {
-            if path.is_absolute() {
+            let path = if path.is_absolute() {
                 path.clone()
             } else {
                 src_path.join(path)
-            }
+            };
+            expand_site_packages_placeholder(&path, python_version).unwrap_or(path)
         })
         .collect();
 
@@ -577,6 +565,28 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
         }
         Ok(())
     }
+}
+
+fn expand_site_packages_placeholder(
+    path: &SystemPath,
+    python_version: PythonVersion,
+) -> Option<SystemPathBuf> {
+    let component_index = path
+        .components()
+        .position(|component| component.as_str() == "<path-to-site-packages>")?;
+
+    let mut components = path.components();
+    let mut expanded: SystemPathBuf = components.by_ref().take(component_index).collect();
+    if cfg!(target_os = "windows") {
+        expanded.extend(["Lib", "site-packages"]);
+    } else {
+        expanded.push("lib");
+        expanded.push(format!("python{python_version}"));
+        expanded.push("site-packages");
+    }
+    expanded.extend(components.skip(1));
+
+    Some(expanded)
 }
 
 fn parse<'s>(

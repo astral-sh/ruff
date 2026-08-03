@@ -440,7 +440,7 @@ impl KnownModule {
         let known_module = Self::from_str(name.as_str()).ok()?;
 
         let is_expected_search_path = if known_module.is_third_party() {
-            search_path.is_third_party()
+            search_path.can_contain_third_party_code()
         } else {
             search_path.is_standard_library()
         };
