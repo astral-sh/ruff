@@ -3541,7 +3541,8 @@ re.<CURSOR>
             .source(
                 "package/__init__.pyi",
                 r#"\
-from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
+from types import UnionType
+from typing import TYPE_CHECKING, Literal, ParamSpec, Protocol, TypeAlias, TypeVar, TypeVarTuple, type_check_only
 
 public_name = 1
 _private_name = 1
@@ -3564,11 +3565,34 @@ _private_explicit_type_alias: TypeAlias = Literal[1]
 public_implicit_union_alias = int | str
 _private_implicit_union_alias = int | str
 
+def make_union() -> UnionType: ...
+def make_typevar() -> TypeVar: ...
+def identity[T](value: T) -> T: ...
+
+_private_runtime_union = make_union()
+_private_runtime_typevar = make_typevar()
+_private_precise_runtime_union = identity(int | str)
+
 class PublicProtocol(Protocol):
     def method(self) -> None: ...
 
 class _PrivateProtocol(Protocol):
     def method(self) -> None: ...
+
+@type_check_only
+class PublicTypeOnlyProtocol(Protocol):
+    def method(self) -> None: ...
+
+@type_check_only
+class _PrivateTypeOnlyProtocol(Protocol):
+    def method(self) -> None: ...
+
+if TYPE_CHECKING:
+    class PublicTypeCheckingProtocol(Protocol):
+        def method(self) -> None: ...
+
+    class _PrivateTypeCheckingProtocol(Protocol):
+        def method(self) -> None: ...
 "#,
             )
             .source("main.py", "import package; package.<CURSOR>")
@@ -3590,8 +3614,15 @@ class _PrivateProtocol(Protocol):
         test.not_contains("_private_explicit_type_alias");
         test.contains("public_implicit_union_alias");
         test.not_contains("_private_implicit_union_alias");
+        test.contains("_private_runtime_union");
+        test.contains("_private_runtime_typevar");
+        test.contains("_private_precise_runtime_union");
         test.contains("PublicProtocol");
-        test.not_contains("_PrivateProtocol");
+        test.contains("_PrivateProtocol");
+        test.not_contains("PublicTypeOnlyProtocol");
+        test.not_contains("_PrivateTypeOnlyProtocol");
+        test.not_contains("PublicTypeCheckingProtocol");
+        test.not_contains("_PrivateTypeCheckingProtocol");
     }
 
     /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names

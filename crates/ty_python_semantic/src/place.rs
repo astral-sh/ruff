@@ -14,7 +14,8 @@ use crate::reachability::{
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -608,12 +609,68 @@ pub(crate) fn builtins_symbol<'db>(
     env: &ProgramEnvironment<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
+        .map(|(_, symbol)| symbol)
+        .unwrap_or_default()
+}
+
+/// Looks up `symbol` for implicit builtin fallback.
+///
+/// Private type-checking-only definitions are implementation details, but private runtime
+/// definitions from either the standard or project-level builtins remain available.
+///
+/// ```python
+/// # builtins.pyi
+/// _T = TypeVar("_T")  # Not available as an implicit builtin.
+///
+/// # __builtins__.pyi
+/// _custom: int  # Available as an implicit builtin.
+/// ```
+pub(crate) fn implicit_builtins_symbol<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+) -> PlaceAndQualifiers<'db> {
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
+        .map(|(_, symbol)| symbol)
+        .unwrap_or_default()
+}
+
+/// Returns the module scope that supplies `symbol` through implicit builtin fallback.
+///
+/// Uses the same visibility rules as [`implicit_builtins_symbol`] so IDE definition lookup cannot
+/// resolve a private typing-only helper that type inference considers undefined.
+pub(crate) fn implicit_builtins_symbol_scope<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+) -> Option<ScopeId<'db>> {
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly).map(|(scope, _)| scope)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BuiltinVisibility {
+    All,
+    RuntimeOnly,
+}
+
+/// Resolves project-level builtins before standard builtins and optionally hides typing-only names.
+///
+/// Returns the supplying module's scope together with the symbol so inference and IDE lookups can
+/// share the same resolution and visibility policy.
+fn builtins_symbol_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+    visibility: BuiltinVisibility,
+) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
     let python_version = env.python_version(db);
     let resolver = |module: Module<'db>| {
         let python_file = module.python_file(db)?;
+        let scope = global_scope(db, python_file);
         let found_symbol = symbol_impl(
             db,
-            global_scope(db, python_file),
+            scope,
             symbol,
             RequiresExplicitReExport::Yes,
             ConsideredDefinitions::EndOfScope,
@@ -624,11 +681,19 @@ pub(crate) fn builtins_symbol<'db>(
             // `imported_symbol`.
             module_type_implicit_global_symbol(db, python_file, symbol)
         });
-        // If this symbol is not present in project-level builtins, search in the default ones.
-        found_symbol
-            .ignore_possibly_undefined()
-            .map(|_| found_symbol)
+        found_symbol.ignore_possibly_undefined()?;
+
+        if matches!(visibility, BuiltinVisibility::RuntimeOnly)
+            && let Place::Defined(defined) = found_symbol.place
+            && let Some(definition) = defined.provenance.definition()
+            && !exists_at_runtime(db, definition)
+        {
+            return None;
+        }
+
+        Some((scope, found_symbol))
     };
+    // If this symbol is not present in project-level builtins, search in the default ones.
     resolve_module_confident(
         db,
         python_version,
@@ -639,7 +704,6 @@ pub(crate) fn builtins_symbol<'db>(
         resolve_module_confident(db, python_version, &KnownModule::Builtins.name())
             .and_then(resolver)
     })
-    .unwrap_or_default()
 }
 
 /// Lookup the type of `symbol` in a given known module.

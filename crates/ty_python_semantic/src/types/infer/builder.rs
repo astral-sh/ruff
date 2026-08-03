@@ -35,8 +35,8 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
+    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
@@ -9637,7 +9637,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if Some(self.scope()) == builtins_module_scope(db, env) {
                     Place::Undefined.into()
                 } else {
-                    builtins_symbol(db, env, symbol_name)
+                    implicit_builtins_symbol(db, env, symbol_name)
                 }
             })
             // Still not found? It might be `reveal_type`...

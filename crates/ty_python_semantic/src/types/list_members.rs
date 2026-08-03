@@ -11,15 +11,15 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, NameKind,
+    Db,
     place::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, ProgramEnvironment,
-        StaticClassLiteral, SubclassOfInner, Type, TypeVarBoundOrConstraints,
-        class::CodeGeneratorKind,
+        ClassBase, ClassLiteral, KnownClass, KnownFunction, ProgramEnvironment, StaticClassLiteral,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        exists_at_runtime,
     },
 };
 use ty_python_core::{
@@ -426,7 +426,6 @@ impl<'db> AllMembers<'db> {
                 let Some(python_file) = module.python_file(db) else {
                     return;
                 };
-                let file = python_file.file(db);
 
                 let module_scope = global_scope(db, python_file);
                 let use_def_map = use_def_map(db, module_scope);
@@ -434,49 +433,31 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Defined(DefinedPlace { ty, .. }) =
+                    let Place::Defined(defined) =
                         imported_symbol(db, env, Some(python_file), symbol_name, None).place
                     else {
                         continue;
                     };
 
-                    // Filter private symbols from stubs if they appear to be internal types
-                    let is_stub_file = file.path(db).extension() == Some("pyi");
-                    let is_private_symbol = match NameKind::classify(symbol_name) {
-                        NameKind::Dunder | NameKind::Normal => false,
-                        NameKind::Sunder => true,
-                    };
-                    if is_private_symbol && is_stub_file {
-                        match ty {
-                            Type::NominalInstance(instance)
-                                if matches!(
-                                    instance.known_class(db),
-                                    Some(
-                                        KnownClass::TypeVar
-                                            | KnownClass::TypeVarTuple
-                                            | KnownClass::ExtensionsTypeVarTuple
-                                            | KnownClass::ParamSpec
-                                            | KnownClass::UnionType
-                                    )
-                                ) =>
-                            {
-                                continue;
-                            }
-                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
-                            Type::KnownInstance(
-                                KnownInstanceType::TypeVar(_)
-                                | KnownInstanceType::TypeAliasType(_)
-                                | KnownInstanceType::UnionType(_)
-                                | KnownInstanceType::Literal(_)
-                                | KnownInstanceType::Annotated(_),
-                            ) => continue,
-                            _ => {}
-                        }
+                    if let Some(definition) = defined.provenance.definition()
+                        && !exists_at_runtime(db, definition)
+                        // Source-module completions retain `@type_check_only` symbols and rank them
+                        // lower.
+                        && (python_file.file(db).is_stub(db) || !defined.ty.is_type_check_only(db))
+                        // The decorator itself is typing-only, but users must still be able to
+                        // import it when defining typing-only classes and functions.
+                        && !matches!(
+                            defined.ty,
+                            Type::FunctionLiteral(function)
+                                if function.known(db) == Some(KnownFunction::TypeCheckOnly)
+                        )
+                    {
+                        continue;
                     }
 
                     self.members.insert(Member {
                         name: symbol_name.clone(),
-                        ty,
+                        ty: defined.ty,
                     });
                 }
 

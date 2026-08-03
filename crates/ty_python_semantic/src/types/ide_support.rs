@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use crate::FxIndexSet;
-use crate::place::builtins_module_scope;
+use crate::place::implicit_builtins_symbol_scope;
 use crate::reachability::is_range_reachable;
 use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
@@ -172,7 +172,7 @@ pub fn definitions_for_name<'db>(
     // If we didn't find any definitions in scopes, fallback to builtins
     let env = model.program_environment();
     if resolved_definitions.is_empty()
-        && let Some(builtins_scope) = builtins_module_scope(db, &env)
+        && let Some(builtins_scope) = implicit_builtins_symbol_scope(db, &env, name_str)
     {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
