@@ -1007,10 +1007,14 @@ from collections.abc import Callable
 def call[T](callback: Callable[..., T]) -> T:
     return callback()
 
+def bounded[T: int](callback: Callable[..., T]) -> T:
+    return callback()
+
 def callback(*args: object, **kwargs: object) -> int:
     return 1
 
 reveal_type(call(callback))  # revealed: int
+reveal_type(bounded(callback))  # revealed: int
 ```
 
 ## `Callable` parameters
