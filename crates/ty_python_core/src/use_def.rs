@@ -780,14 +780,6 @@ pub struct UseDefMap<'db> {
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
     >,
 
-    /// Prior ordinary variable definitions used by eager value expressions.
-    ///
-    /// Type inference traverses this graph iteratively before inferring a requested definition.
-    name_dependencies: FrozenMap<Definition<'db>, Box<[Definition<'db>]>>,
-
-    /// Ordinary variable definitions whose eager value expressions have dependency entries.
-    name_dependency_roots: FrozenMap<Definition<'db>, ()>,
-
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
 
@@ -1081,62 +1073,6 @@ impl<'db> UseDefMap<'db> {
             |definitions| &self.interned_bindings[definitions.bindings],
         );
         self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
-    }
-
-    /// Returns prior ordinary variable definitions used by `definition`'s eager value expression.
-    pub fn name_dependencies(&self, definition: Definition<'db>) -> &[Definition<'db>] {
-        self.name_dependencies
-            .get(&definition)
-            .map(AsRef::as_ref)
-            .unwrap_or_default()
-    }
-
-    /// Returns every definition in the eager value dependency graph in dependency order.
-    pub fn all_name_dependencies_in_order(&self) -> Vec<Definition<'db>> {
-        let roots = self
-            .all_definitions
-            .iter_enumerated()
-            .filter_map(|(_, state)| state.state().definition())
-            .filter(|definition| self.name_dependency_roots.get(definition).is_some());
-        self.name_dependency_order(roots)
-    }
-
-    /// Returns `definition`'s eager value dependencies in dependency order.
-    pub fn name_dependencies_in_order(&self, definition: Definition<'db>) -> Vec<Definition<'db>> {
-        self.name_dependency_order(self.name_dependencies(definition).iter().copied())
-    }
-
-    fn name_dependency_order(
-        &self,
-        roots: impl IntoIterator<Item = Definition<'db>>,
-    ) -> Vec<Definition<'db>> {
-        let mut pending = Vec::new();
-        let mut visited = FxHashSet::default();
-        let mut ordered = Vec::new();
-
-        for root in roots {
-            pending.push((root, false));
-
-            while let Some((definition, expanded)) = pending.pop() {
-                if expanded {
-                    ordered.push(definition);
-                    continue;
-                }
-                if !visited.insert(definition) {
-                    continue;
-                }
-
-                pending.push((definition, true));
-                pending.extend(
-                    self.name_dependencies(definition)
-                        .iter()
-                        .rev()
-                        .map(|dependency| (*dependency, false)),
-                );
-            }
-        }
-
-        ordered
     }
 
     pub fn declarations_at_binding(
@@ -1866,9 +1802,6 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Ordinary variable definitions directly needed to infer a definition.
     name_dependencies: FxHashMap<Definition<'db>, Box<[Definition<'db>]>>,
 
-    /// Ordinary variable definitions that have entries in `name_dependencies`.
-    name_dependency_roots: FxHashSet<Definition<'db>>,
-
     /// Ordinary variable definitions that are safe to infer before their source-order visit.
     name_dependency_eligible: FxHashSet<Definition<'db>>,
 
@@ -1911,7 +1844,6 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: Vec::new(),
             definitions_by_definition: FxHashMap::default(),
             name_dependencies: FxHashMap::default(),
-            name_dependency_roots: FxHashSet::default(),
             name_dependency_eligible: FxHashSet::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
@@ -1954,7 +1886,6 @@ impl<'db> UseDefMapBuilder<'db> {
         if !dependencies.is_empty() {
             self.name_dependencies
                 .insert(binding, dependencies.into_boxed_slice());
-            self.name_dependency_roots.insert(binding);
         }
     }
 
@@ -2848,7 +2779,12 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
-    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+    pub(super) fn finish(
+        mut self: Box<Self>,
+    ) -> (
+        UseDefMap<'db>,
+        FxHashMap<Definition<'db>, Box<[Definition<'db>]>>,
+    ) {
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -2988,25 +2924,23 @@ impl<'db> UseDefMapBuilder<'db> {
                 narrowing_constraints,
             })
         });
+        let name_dependencies = std::mem::take(&mut self.name_dependencies);
         let all_definitions = RetainedDefinitions::new(self.all_definitions, self.used_bindings);
 
-        UseDefMap {
-            all_definitions,
-            constraint_tables,
-            interned_bindings,
-            interned_declarations,
-            range_reachability: self.range_reachability.into_boxed_slice(),
-            symbol_states,
-            definitions_by_definition,
-            name_dependencies: FrozenMap::from(self.name_dependencies),
-            name_dependency_roots: self
-                .name_dependency_roots
-                .into_iter()
-                .map(|definition| (definition, ()))
-                .collect(),
-            extra,
-            end_of_scope_reachability: self.reachability,
-        }
+        (
+            UseDefMap {
+                all_definitions,
+                constraint_tables,
+                interned_bindings,
+                interned_declarations,
+                range_reachability: self.range_reachability.into_boxed_slice(),
+                symbol_states,
+                definitions_by_definition,
+                extra,
+                end_of_scope_reachability: self.reachability,
+            },
+            name_dependencies,
+        )
     }
 
     fn zip_place_states<I: Idx, T>(

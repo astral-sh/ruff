@@ -67,7 +67,8 @@ use crate::use_def::{
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
     DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderId,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
+    NameDependencies, NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
+    VisibleAncestorsIter,
 };
 
 use super::place::PlaceExprRef;
@@ -3029,6 +3030,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .map(|(definition, uses)| (definition, uses.into_boxed_slice()))
                 .collect(),
         );
+        let mut use_def_maps = IndexVec::new();
+        let mut name_dependencies = FxHashMap::default();
+        for builder in self.use_def_maps {
+            let (use_def_map, scope_name_dependencies) = builder.finish();
+            use_def_maps.push(Arc::new(use_def_map));
+            name_dependencies.extend(scope_name_dependencies);
+        }
 
         SemanticIndex {
             place_tables: self
@@ -3045,11 +3053,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps: self
-                .use_def_maps
-                .into_iter()
-                .map(|builder| Arc::new(builder.finish()))
-                .collect(),
+            use_def_maps: use_def_maps.into(),
+            name_dependencies: NameDependencies::from_map(name_dependencies),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,

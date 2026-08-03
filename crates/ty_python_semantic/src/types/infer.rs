@@ -127,10 +127,9 @@ pub(crate) fn infer_definition_types<'db>(
 ) -> &'db DefinitionInference<'db> {
     let python_file = definition.python_file(db);
     let index = semantic_index(db, python_file);
-    let use_def_map = index.use_def_map(definition.file_scope(db));
 
-    if !use_def_map.name_dependencies(definition).is_empty() {
-        for dependency in use_def_map.name_dependencies_in_order(definition) {
+    if !index.name_dependencies(definition).is_empty() {
+        for dependency in index.name_dependencies_in_order(definition) {
             infer_definition_types_with_prepared_dependencies(db, dependency);
         }
     }
@@ -141,10 +140,7 @@ pub(crate) fn infer_definition_types<'db>(
 /// Infers every ordinary variable dependency in `scope` in dependency order.
 pub(crate) fn infer_name_dependencies_for_scope<'db>(db: &'db dyn Db, scope: ScopeId<'db>) {
     let index = semantic_index(db, scope.python_file(db));
-    for definition in index
-        .use_def_map(scope.file_scope_id(db))
-        .all_name_dependencies_in_order()
-    {
+    for definition in index.all_name_dependencies_in_order(scope.file_scope_id(db)) {
         infer_definition_types_with_prepared_dependencies(db, definition);
     }
 }

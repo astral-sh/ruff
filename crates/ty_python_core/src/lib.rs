@@ -16,6 +16,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
+use thin_vec::ThinVec;
 use ty_module_resolver::ModuleName;
 
 // FIXME: Replace this temporary alias once semantic query keys can use the environment-bearing
@@ -279,6 +280,50 @@ impl<'db> DefinitionsByNode<'db> {
     }
 }
 
+/// Prior ordinary variable definitions used by eager value expressions in one file.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct NameDependencies<'db> {
+    definitions: ThinVec<(Definition<'db>, usize)>,
+    dependencies: ThinVec<Definition<'db>>,
+}
+
+impl<'db> NameDependencies<'db> {
+    fn from_map(
+        dependencies_by_definition: FxHashMap<Definition<'db>, Box<[Definition<'db>]>>,
+    ) -> Self {
+        let dependency_count = dependencies_by_definition
+            .values()
+            .map(|dependencies| dependencies.len())
+            .sum();
+        let mut entries = dependencies_by_definition.into_iter().collect::<Vec<_>>();
+        entries.sort_unstable_by_key(|(definition, _)| *definition);
+
+        let mut definitions = ThinVec::with_capacity(entries.len());
+        let mut dependencies = ThinVec::with_capacity(dependency_count);
+        for (definition, definition_dependencies) in entries {
+            dependencies.extend(definition_dependencies);
+            definitions.push((definition, dependencies.len()));
+        }
+
+        Self {
+            definitions,
+            dependencies,
+        }
+    }
+
+    fn get(&self, definition: Definition<'db>) -> Option<&[Definition<'db>]> {
+        let index = self
+            .definitions
+            .binary_search_by_key(&definition, |(candidate, _)| *candidate)
+            .ok()?;
+        let start = index
+            .checked_sub(1)
+            .map_or(0, |previous| self.definitions[previous].1);
+        let end = self.definitions[index].1;
+        Some(&self.dependencies[start..end])
+    }
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
@@ -320,6 +365,9 @@ pub struct SemanticIndex<'db> {
 
     /// Use-def map for each scope in this file.
     use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+
+    /// Eager value dependencies for definitions that have them.
+    name_dependencies: NameDependencies<'db>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
@@ -382,6 +430,64 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
         &self.use_def_maps[scope_id]
+    }
+
+    /// Returns prior ordinary variable definitions used by `definition`'s eager value expression.
+    pub fn name_dependencies(&self, definition: Definition<'db>) -> &[Definition<'db>] {
+        self.name_dependencies.get(definition).unwrap_or_default()
+    }
+
+    /// Returns every definition in a scope's eager value dependency graph in dependency order.
+    pub fn all_name_dependencies_in_order(&self, scope_id: FileScopeId) -> Vec<Definition<'db>> {
+        let roots = self
+            .use_def_map(scope_id)
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, _)| state.definition())
+            .filter(|definition| self.name_dependencies.get(*definition).is_some());
+        Self::name_dependency_order(&self.name_dependencies, roots)
+    }
+
+    /// Returns `definition`'s eager value dependencies in dependency order.
+    pub fn name_dependencies_in_order(&self, definition: Definition<'db>) -> Vec<Definition<'db>> {
+        Self::name_dependency_order(
+            &self.name_dependencies,
+            self.name_dependencies(definition).iter().copied(),
+        )
+    }
+
+    fn name_dependency_order(
+        dependencies: &NameDependencies<'db>,
+        roots: impl IntoIterator<Item = Definition<'db>>,
+    ) -> Vec<Definition<'db>> {
+        let mut pending = Vec::new();
+        let mut visited = FxHashSet::default();
+        let mut ordered = Vec::new();
+
+        for root in roots {
+            pending.push((root, false));
+
+            while let Some((definition, expanded)) = pending.pop() {
+                if expanded {
+                    ordered.push(definition);
+                    continue;
+                }
+                if !visited.insert(definition) {
+                    continue;
+                }
+
+                pending.push((definition, true));
+                if let Some(definition_dependencies) = dependencies.get(definition) {
+                    pending.extend(
+                        definition_dependencies
+                            .iter()
+                            .rev()
+                            .map(|dependency| (*dependency, false)),
+                    );
+                }
+            }
+        }
+
+        ordered
     }
 
     /// Returns the set of modules that are imported anywhere in this file.
