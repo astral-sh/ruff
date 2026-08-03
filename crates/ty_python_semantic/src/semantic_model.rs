@@ -159,8 +159,10 @@ impl<'db> SemanticModel<'db> {
         list_modules(self.db, resolver_environment)
             .iter()
             .copied()
-            .filter(|module| {
-                is_typing_extensions_available || module.name(self.db) != &typing_extensions
+            .filter(|module| match module.known(self.db) {
+                Some(KnownModule::Typeshed | KnownModule::TyExtensions) => false,
+                Some(KnownModule::TypingExtensions) => is_typing_extensions_available,
+                _ => true,
             })
             .map(|module| {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);

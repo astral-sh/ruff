@@ -9629,6 +9629,170 @@ from .imp<CURSOR>
     }
 
     #[test]
+    fn ty_extensions_excluded_from_auto_import_without_existing_import() {
+        completion_test_builder("static_ass<CURSOR>")
+            .build()
+            .not_contains("static_assert");
+    }
+
+    #[test]
+    fn ty_extensions_excluded_from_import_without_existing_import() {
+        completion_test_builder("from ty_ex<CURSOR>")
+            .build()
+            .not_contains("ty_extensions");
+    }
+
+    #[test]
+    fn typeshed_excluded_from_import_without_existing_import() {
+        completion_test_builder("from _type<CURSOR>")
+            .build()
+            .not_contains("_typeshed");
+    }
+
+    #[test]
+    fn ty_extensions_runtime_module_included_from_auto_import_without_existing_import() {
+        let builder = CursorTest::builder()
+            .source("ty_extensions.py", "static_assert = 1")
+            .source("main.py", "static_ass<CURSOR>")
+            .completion_test_builder()
+            .module_names()
+            .filter(|completion| completion.name == "static_assert");
+        assert_snapshot!(builder.build().snapshot(), @"static_assert :: ty_extensions");
+    }
+
+    #[test]
+    fn ty_extensions_included_from_auto_import_after_module_import() {
+        let builder = completion_test_builder("import ty_extensions\nstatic_ass<CURSOR>")
+            .module_names()
+            .imports()
+            .filter(|completion| completion.name == "static_assert");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"ty_extensions.static_assert :: ty_extensions :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn ty_extensions_included_from_auto_import_after_aliased_module_import() {
+        let builder = completion_test_builder("import ty_extensions as tx\nstatic_ass<CURSOR>")
+            .module_names()
+            .imports()
+            .filter(|completion| completion.name == "static_assert");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"tx.static_assert :: ty_extensions :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn ty_extensions_included_from_auto_import_after_symbol_import() {
+        let builder =
+            completion_test_builder("from ty_extensions import Intersection\nstatic_ass<CURSOR>")
+                .module_names()
+                .imports()
+                .filter(|completion| completion.name == "static_assert");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"static_assert :: ty_extensions :: , static_assert",
+        );
+    }
+
+    #[test]
+    fn ty_extensions_included_from_auto_import_after_conditional_symbol_import() {
+        let builder = completion_test_builder(
+            "\
+if True:
+    from ty_extensions import Intersection
+
+static_ass<CURSOR>",
+        )
+        .module_names()
+        .filter(|completion| completion.name == "static_assert");
+        assert_snapshot!(builder.build().snapshot(), @"static_assert :: ty_extensions");
+    }
+
+    #[test]
+    fn ty_extensions_submodule_included_from_auto_import_after_star_import() {
+        let builder = completion_test_builder(
+            "\
+from ty_extensions import *
+LaxDa<CURSOR>",
+        )
+        .module_names()
+        .filter(|completion| completion.name == "LaxDate");
+        assert_snapshot!(builder.build().snapshot(), @"LaxDate :: ty_extensions.pydantic");
+    }
+
+    #[test]
+    fn typing_extensions_included_from_auto_import_after_symbol_import() {
+        let builder =
+            completion_test_builder("from typing_extensions import Literal\ndeprecat<CURSOR>")
+                .module_names()
+                .imports()
+                .filter(|completion| {
+                    completion.name == "deprecated"
+                        && completion.module_name.map(ModuleName::as_str)
+                            == Some("typing_extensions")
+                });
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"deprecated :: typing_extensions :: , deprecated",
+        );
+    }
+
+    #[test]
+    fn ty_extensions_internal_included_from_auto_import_after_symbol_import() {
+        let builder =
+            completion_test_builder("from ty_extensions._internal import TypeOf\nis_equiv<CURSOR>")
+                .module_names()
+                .imports()
+                .filter(|completion| completion.name == "is_equivalent_to");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"is_equivalent_to :: ty_extensions._internal :: , is_equivalent_to",
+        );
+    }
+
+    #[test]
+    fn ty_extensions_pydantic_included_from_auto_import_after_parent_symbol_import() {
+        let builder =
+            completion_test_builder("from ty_extensions import Intersection\nLaxDa<CURSOR>")
+                .module_names()
+                .imports()
+                .filter(|completion| completion.name == "LaxDate");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"LaxDate :: ty_extensions.pydantic :: from ty_extensions.pydantic import LaxDate",
+        );
+    }
+
+    #[test]
+    fn ty_extensions_pydantic_included_from_auto_import_after_submodule_import() {
+        let builder = completion_test_builder("from ty_extensions import pydantic\nLaxDa<CURSOR>")
+            .module_names()
+            .imports()
+            .filter(|completion| completion.name == "LaxDate");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"LaxDate :: ty_extensions.pydantic :: from ty_extensions.pydantic import LaxDate",
+        );
+    }
+
+    #[test]
+    fn typeshed_internal_included_from_auto_import_after_sibling_symbol_import() {
+        let builder = completion_test_builder(
+            "from _typeshed.dbapi import DBAPITypeCode\nTypedDictFall<CURSOR>",
+        )
+        .module_names()
+        .imports()
+        .filter(|completion| completion.name == "TypedDictFallback");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"TypedDictFallback :: _typeshed._type_checker_internals :: from _typeshed._type_checker_internals import TypedDictFallback",
+        );
+    }
+
+    #[test]
     fn typing_extensions_included_from_import() {
         let builder = CursorTest::builder()
             .source("typing_extensions.py", "deprecated = 1")
