@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
@@ -57,11 +57,6 @@ pub(crate) fn shebang_leading_whitespace(
     range: TextRange,
     locator: &Locator,
 ) {
-    // If the shebang is at the beginning of the file, abort.
-    if range.start() == TextSize::from(0) {
-        return;
-    }
-
     // If the entire prefix _isn't_ whitespace, abort (this is handled by EXE005).
     if !locator
         .up_to(range.start())

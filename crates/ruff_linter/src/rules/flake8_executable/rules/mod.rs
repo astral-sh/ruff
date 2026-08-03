@@ -29,7 +29,7 @@ pub(crate) fn from_tokens(
     for range in comment_ranges {
         let comment = locator.slice(range);
         if let Some(shebang) = ShebangDirective::try_extract(comment) {
-            if range.start() == TextSize::from(0) {
+            if range.start() == TextSize::ZERO {
                 has_any_shebang = true;
 
                 shebang_missing_python(range, &shebang, context);
