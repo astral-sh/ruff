@@ -677,7 +677,7 @@ static_assert(not has_member(module, "Optional"))
 
 ### Private typing-only stub members
 
-Typing-only helpers in stubs are not runtime members of their module.
+Typing-only helpers in stubs remain available as module members for autocomplete.
 
 `module.pyi`:
 
@@ -697,8 +697,8 @@ from ty_extensions import static_assert
 from ty_extensions._internal import has_member
 
 static_assert(has_member(module, "_runtime"))
-static_assert(not has_member(module, "_Alias"))
-static_assert(not has_member(module, "_T"))
+static_assert(has_member(module, "_Alias"))
+static_assert(has_member(module, "_T"))
 ```
 
 ## Conditionally available members

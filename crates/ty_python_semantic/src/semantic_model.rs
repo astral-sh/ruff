@@ -18,7 +18,7 @@ use ty_module_resolver::{
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
-use crate::types::list_members::{Member, all_members_for_completion, all_reachable_members};
+use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, inferred_declaration,
@@ -244,7 +244,7 @@ impl<'db> SemanticModel<'db> {
             name,
             ty,
             is_type_check_only,
-        } in all_members_for_completion(db, &self.program_environment(), ty)
+        } in all_members(db, &self.program_environment(), ty)
         {
             completions.push(Completion {
                 name: CompactString::new(name),
@@ -282,7 +282,7 @@ impl<'db> SemanticModel<'db> {
             return Vec::new();
         };
 
-        all_members_for_completion(db, &self.program_environment(), ty)
+        all_members(db, &self.program_environment(), ty)
             .into_iter()
             .map(|member| Completion {
                 name: CompactString::new(member.name),

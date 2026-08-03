@@ -17,7 +17,7 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownFunction, ProgramEnvironment, StaticClassLiteral,
+        ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
         exists_at_runtime,
     },
@@ -158,27 +158,14 @@ const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
     "__dataclass_params__",
 ];
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum MemberVisibility {
-    Default,
-    IncludeTypeCheckOnly,
-}
-
 struct AllMembers<'db> {
     members: FxHashSet<Member<'db>>,
-    visibility: MemberVisibility,
 }
 
 impl<'db> AllMembers<'db> {
-    fn of(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-        visibility: MemberVisibility,
-    ) -> Self {
+    fn of(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
         let mut all_members = Self {
             members: FxHashSet::default(),
-            visibility,
         };
         all_members.extend_with_type(db, env, ty);
         all_members
@@ -208,7 +195,7 @@ impl<'db> AllMembers<'db> {
                     union
                         .elements(db)
                         .iter()
-                        .map(|ty| AllMembers::of(db, env, *ty, self.visibility).members)
+                        .map(|ty| AllMembers::of(db, env, *ty).members)
                         .reduce(|acc, members| acc.intersection(&members).cloned().collect())
                         .unwrap_or_default(),
                 );
@@ -218,7 +205,7 @@ impl<'db> AllMembers<'db> {
                 intersection
                     .positive(db)
                     .iter()
-                    .map(|ty| AllMembers::of(db, env, *ty, self.visibility).members)
+                    .map(|ty| AllMembers::of(db, env, *ty).members)
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
                     .unwrap_or_default(),
             ),
@@ -359,7 +346,7 @@ impl<'db> AllMembers<'db> {
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|ty| AllMembers::of(db, env, *ty, self.visibility).members)
+                                .map(|ty| AllMembers::of(db, env, *ty).members)
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
@@ -458,30 +445,13 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
 
-                    let is_type_check_only = defined
-                        .provenance
-                        .definition()
-                        .is_some_and(|definition| !exists_at_runtime(db, definition));
-
-                    if self.visibility == MemberVisibility::Default
-                        && is_type_check_only
-                        // Source modules retain `@type_check_only` definitions.
-                        && (file.is_stub(db) || !defined.ty.is_type_check_only(db))
-                        // The decorator itself must remain available for defining typing-only
-                        // classes and functions.
-                        && !matches!(
-                            defined.ty,
-                            Type::FunctionLiteral(function)
-                                if function.known(db) == Some(KnownFunction::TypeCheckOnly)
-                        )
-                    {
-                        continue;
-                    }
-
                     self.members.insert(Member {
                         name: symbol_name.clone(),
                         ty: defined.ty,
-                        is_type_check_only,
+                        is_type_check_only: defined
+                            .provenance
+                            .definition()
+                            .is_some_and(|definition| !exists_at_runtime(db, definition)),
                     });
                 }
 
@@ -744,14 +714,5 @@ pub(crate) fn all_members<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> FxHashSet<Member<'db>> {
-    AllMembers::of(db, env, ty, MemberVisibility::Default).members
-}
-
-/// Lists completion candidates, including module definitions unavailable at runtime.
-pub(crate) fn all_members_for_completion<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> FxHashSet<Member<'db>> {
-    AllMembers::of(db, env, ty, MemberVisibility::IncludeTypeCheckOnly).members
+    AllMembers::of(db, env, ty).members
 }
