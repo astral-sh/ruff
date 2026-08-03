@@ -335,7 +335,7 @@ fn enum_literal_subject_names<'db>(
 /// Return the canonical enum-member name matched by a single value pattern.
 ///
 /// This recognizes patterns like `case Color.RED:` only when the pattern expression is
-/// single-valued and belongs to the expected enum class. Enum aliases are resolved to their
+/// an enum member belonging to the expected enum class. Enum aliases are resolved to their
 /// canonical member names before returning.
 fn enum_member_pattern_name<'db>(
     db: &'db dyn Db,
@@ -1653,7 +1653,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
     /// constraint from the primary graph is cached by dense index; all other constraints are cached
     /// by graph identity and id.
-    pub(crate) fn evaluate(
+    fn evaluate(
         &self,
         db: &'db dyn Db,
         constraints: &ReachabilityConstraints,

@@ -3,6 +3,7 @@ use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::{
     self as types, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Notification as _,
+    Request as _,
 };
 
 use crate::{
@@ -135,20 +136,27 @@ impl Server {
     }
 
     fn initialize(&mut self, client: &Client) {
-        let dynamic_registration = self
+        let supports_watched_files = self
             .client_capabilities
             .workspace
             .as_ref()
             .and_then(|workspace| workspace.did_change_watched_files)
             .and_then(|watched_files| watched_files.dynamic_registration)
             .unwrap_or_default();
+        let supports_formatting = Self::supports_dynamic_formatting(&self.client_capabilities);
+        let supports_range_formatting =
+            Self::supports_dynamic_range_formatting(&self.client_capabilities);
+        let dynamic_registration =
+            supports_watched_files || supports_formatting || supports_range_formatting;
+
         if dynamic_registration {
             // Register all dynamic capabilities here
+            let mut registrations = vec![];
 
-            // `workspace/didChangeWatchedFiles`
-            // (this registers the configuration file watcher)
-            let params = lsp_types::RegistrationParams {
-                registrations: vec![lsp_types::Registration {
+            if supports_watched_files {
+                // `workspace/didChangeWatchedFiles`
+                // (this registers the configuration file watcher)
+                registrations.push(lsp_types::Registration {
                     id: "ruff-server-watch".into(),
                     method: "workspace/didChangeWatchedFiles".into(),
                     register_options: Some(
@@ -176,11 +184,71 @@ impl Server {
                         })
                         .unwrap(),
                     ),
-                }],
-            };
+                });
+            }
 
+            if supports_formatting || supports_range_formatting {
+                let document_selector = vec![
+                    types::TextDocumentFilter::Language(types::TextDocumentFilterLanguage {
+                        language: "python".to_string(),
+                        scheme: None,
+                        pattern: None,
+                    })
+                    .into(),
+                    types::TextDocumentFilter::Language(types::TextDocumentFilterLanguage {
+                        language: "markdown".to_string(),
+                        scheme: None,
+                        pattern: None,
+                    })
+                    .into(),
+                    types::NotebookCellTextDocumentFilter {
+                        notebook: "*".into(),
+                        language: Some("python".into()),
+                    }
+                    .into(),
+                ];
+
+                let text_document_registration_options = types::TextDocumentRegistrationOptions {
+                    document_selector: Some(document_selector),
+                };
+
+                if supports_formatting {
+                    registrations.push(types::Registration {
+                        id: "ruff-server-format".into(),
+                        method: types::DocumentFormattingRequest::METHOD.to_string(),
+                        register_options: Some(
+                            serde_json::to_value(types::DocumentFormattingRegistrationOptions {
+                                text_document_registration_options:
+                                    text_document_registration_options.clone(),
+                                document_formatting_options:
+                                    types::DocumentFormattingOptions::default(),
+                            })
+                            .unwrap(),
+                        ),
+                    });
+                }
+
+                if supports_range_formatting {
+                    registrations.push(types::Registration {
+                        id: "ruff-server-format-range".into(),
+                        method: types::DocumentRangeFormattingRequest::METHOD.to_string(),
+                        register_options: Some(
+                            serde_json::to_value(
+                                types::DocumentRangeFormattingRegistrationOptions {
+                                    text_document_registration_options,
+                                    document_range_formatting_options:
+                                        types::DocumentRangeFormattingOptions::default(),
+                                },
+                            )
+                            .unwrap(),
+                        ),
+                    });
+                }
+            }
+
+            let params = types::RegistrationParams { registrations };
             let response_handler = |_: &Client, ()| {
-                tracing::info!("Configuration file watcher successfully registered");
+                tracing::info!("Dynamic capabilities successfully registered");
             };
 
             if let Err(err) = client.send_request::<lsp_types::RegistrationRequest>(
@@ -189,7 +257,7 @@ impl Server {
                 response_handler,
             ) {
                 tracing::error!(
-                    "An error occurred when trying to register the configuration file watcher: {err}"
+                    "An error occurred when trying to register dynamic capabilities: {err}"
                 );
             }
         } else {

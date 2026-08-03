@@ -567,7 +567,7 @@ impl<T, E: Into<anyhow::Error>> LSPResult<T> for core::result::Result<T, E> {
 }
 
 impl Error {
-    pub(crate) fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
+    fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
         Self { code, error: err }
     }
 }

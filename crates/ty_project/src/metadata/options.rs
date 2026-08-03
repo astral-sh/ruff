@@ -1104,7 +1104,7 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 
 impl Rules {
     /// Convert the rules to a `RuleSelection` with diagnostics.
-    pub fn to_rule_selection(
+    pub(crate) fn to_rule_selection(
         &self,
         db: &dyn Db,
         diagnostics: &mut Vec<OptionDiagnostic>,
@@ -1169,7 +1169,7 @@ impl Rules {
         selection
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 }
@@ -1834,7 +1834,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
     ///
@@ -1856,7 +1856,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
     ///
@@ -1875,11 +1875,11 @@ pub struct OverrideOptions {
             possibly-unresolved-reference = "ignore"
         "#
     )]
-    pub rules: Option<Rules>,
+    rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
-    pub analysis: Option<AnalysisOptions>,
+    analysis: Option<AnalysisOptions>,
 }
 
 trait ToOverride {
@@ -2095,7 +2095,7 @@ pub struct ToSettingsError {
 }
 
 impl ToSettingsError {
-    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+    pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
         let db: &dyn ruff_db::Db = db;
 
         fmt::from_fn(move |f| {
@@ -2113,7 +2113,7 @@ impl ToSettingsError {
         })
     }
 
-    pub fn into_diagnostic(self) -> OptionDiagnostic {
+    pub(crate) fn into_diagnostic(self) -> OptionDiagnostic {
         *self.diagnostic
     }
 }
@@ -2218,7 +2218,7 @@ pub struct OptionDiagnostic {
 }
 
 impl OptionDiagnostic {
-    pub fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
+    fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
         Self {
             id,
             message,

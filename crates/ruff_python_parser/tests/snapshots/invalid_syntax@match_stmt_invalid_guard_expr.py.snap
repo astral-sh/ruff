@@ -236,4 +236,3 @@ Module(
 5 | match x:
 6 |     case y if yield x: ...
   |               ^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |

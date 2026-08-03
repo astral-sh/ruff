@@ -222,10 +222,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
 ///
 /// The layout is only applied when the parenthesized pattern is the first or last item in the pattern.
 /// For example, the layout isn't used for `a | [b, c] | d` because that would look weird.
-pub(crate) fn can_pattern_omit_optional_parentheses(
-    pattern: &Pattern,
-    context: &PyFormatContext,
-) -> bool {
+fn can_pattern_omit_optional_parentheses(pattern: &Pattern, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::default();
     visitor.visit_pattern(pattern, context);
 

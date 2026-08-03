@@ -90,7 +90,7 @@ pub(crate) enum CallableParams {
 }
 
 impl CallableParams {
-    pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
+    fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
             CallableParams::List(params) => Parameters::from_annotation(

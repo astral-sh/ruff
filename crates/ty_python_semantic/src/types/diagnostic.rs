@@ -18,6 +18,7 @@ use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, Ov
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
+use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
@@ -26,9 +27,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
-    binding_type, protocol_class::ProtocolClass,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
+    SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
+    protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -1351,7 +1352,7 @@ impl TypeCheckDiagnostics {
         self.diagnostics.is_empty() && self.used_suppressions.is_empty()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+    fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics().iter()
     }
 
@@ -2837,10 +2838,7 @@ pub(crate) fn report_undeclared_protocol_member(
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
     fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         let class = match ty {
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(_),
-                ..
-            }) => return true,
+            Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Protocol(_) => return true,
@@ -3336,6 +3334,32 @@ pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
 
     diagnostic.set_concise_message(format_args!(
         "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
+}
+
+/// Report a `NamedTuple` field annotated with a type qualifier that `NamedTuple` does not accept.
+///
+/// The diagnostic is anchored to the annotated assignment that introduced the qualifier. It does
+/// not claim that class creation fails at runtime because deferred and wrapped annotations can
+/// preserve the qualifier without passing it directly to `typing._type_check`.
+pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
+    context: &InferContext<'db, '_>,
+    field_name: &str,
+    qualifier: TypeQualifier,
+    field_definition: Definition<'db>,
+) {
+    let db = context.db();
+    let module = context.module();
+    let qualifier = qualifier.name();
+    let diagnostic_range = field_definition.kind(db).full_range(module);
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Type qualifier `{qualifier}` is not allowed in a NamedTuple field"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Type qualifier `{qualifier}` is not allowed on NamedTuple field `{field_name}`"
     ));
 }
 

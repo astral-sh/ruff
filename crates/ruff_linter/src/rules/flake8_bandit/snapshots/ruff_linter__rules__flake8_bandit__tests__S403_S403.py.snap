@@ -81,4 +81,3 @@ S403 `pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure
 7 | import pickle
 8 | from pickle import load
   |      ^^^^^^
-  |

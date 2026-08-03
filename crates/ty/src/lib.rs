@@ -72,7 +72,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     }
 }
 
-pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
+fn version(output_format: HelpFormat) -> Result<()> {
     let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
 
@@ -265,7 +265,7 @@ pub enum ExitStatus {
 }
 
 impl ExitStatus {
-    pub const fn is_internal_error(self) -> bool {
+    const fn is_internal_error(self) -> bool {
         matches!(self, ExitStatus::InternalError)
     }
 }

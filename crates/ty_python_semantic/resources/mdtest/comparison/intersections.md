@@ -164,7 +164,6 @@ error[unsupported-operator]: Unsupported `in` operation
    |                         |    |
    |                         |    Has type `NonContainer1 & NonContainer2`
    |                         Has type `Literal[2]`
-   |
 ```
 
 Do not raise an error if at least one of the positive contributions to the intersection type support
@@ -206,7 +205,6 @@ error[unsupported-operator]: Unsupported `in` operation
    |                     |    |
    |                     |    Has type `~NonContainer1`
    |                     Has type `Literal[2]`
-   |
 ```
 
 ### Unsupported operators for negative contributions

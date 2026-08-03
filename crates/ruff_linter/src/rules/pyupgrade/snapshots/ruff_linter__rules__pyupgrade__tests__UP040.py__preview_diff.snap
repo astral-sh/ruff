@@ -56,7 +56,6 @@ UP040 [*] Type alias `DefaultList` uses `TypeAlias` annotation instead of the `t
 133 | T_default = TypeVar("T_default", default=int)
 134 | DefaultList: TypeAlias = list[T_default]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Use the `type` keyword
     |
 133 | T_default = TypeVar("T_default", default=int)

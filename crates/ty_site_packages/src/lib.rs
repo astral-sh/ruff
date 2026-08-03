@@ -17,9 +17,9 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
+use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use camino::Utf8Component;
 use indexmap::IndexSet;
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
@@ -399,14 +399,6 @@ impl PythonEnvironment {
         }
     }
 
-    /// Returns the `pyvenv.cfg` path for virtual environments.
-    pub fn pyvenv_cfg_path(&self) -> Option<SystemPathBuf> {
-        match self {
-            Self::Virtual(env) => Some(env.root_path.join("pyvenv.cfg")),
-            Self::System(_) => None,
-        }
-    }
-
     /// Returns `true` if this is a virtual environment (has a `pyvenv.cfg` file).
     pub fn is_virtual(&self) -> bool {
         matches!(self, Self::Virtual(_))
@@ -709,10 +701,7 @@ pub struct VirtualEnvironment {
 }
 
 impl VirtualEnvironment {
-    pub(crate) fn new(
-        path: &SysPrefixPath,
-        system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<Self> {
+    fn new(path: &SysPrefixPath, system: &dyn System) -> SitePackagesDiscoveryResult<Self> {
         let pyvenv_cfg_path = path.join("pyvenv.cfg");
         tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
 
@@ -828,7 +817,7 @@ impl VirtualEnvironment {
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
     /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
-    pub(crate) fn site_packages_directories(
+    fn site_packages_directories(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
@@ -898,10 +887,7 @@ System site-packages will not be used for module resolution.",
     /// Return the real stdlib path (containing actual .py files, and not some variation of typeshed).
     ///
     /// See the documentation for [`real_stdlib_directory_from_sys_prefix`] for more details.
-    pub(crate) fn real_stdlib_directory(
-        &self,
-        system: &dyn System,
-    ) -> StdlibDiscoveryResult<SystemPathBuf> {
+    fn real_stdlib_directory(&self, system: &dyn System) -> StdlibDiscoveryResult<SystemPathBuf> {
         let VirtualEnvironment {
             base_executable_home_path,
             implementation,
@@ -1002,7 +988,7 @@ impl CondaEnvironmentKind {
 }
 
 /// Read `CONDA_PREFIX` and confirm that it has the expected kind
-pub(crate) fn conda_environment_from_env(
+fn conda_environment_from_env(
     system: &dyn System,
     kind: CondaEnvironmentKind,
 ) -> Option<SystemPathBuf> {
@@ -1019,10 +1005,7 @@ pub(crate) fn conda_environment_from_env(
     Some(path)
 }
 
-pub(crate) fn environment_from_binary(
-    system: &dyn System,
-    binary: &str,
-) -> Option<PythonEnvironment> {
+fn environment_from_binary(system: &dyn System, binary: &str) -> Option<PythonEnvironment> {
     let binary = system.which(binary).ok()?;
     let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
 
@@ -1159,7 +1142,7 @@ impl SystemEnvironment {
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
     /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
-    pub(crate) fn site_packages_directories(
+    fn site_packages_directories(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
@@ -1178,10 +1161,7 @@ impl SystemEnvironment {
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
     /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
-    pub(crate) fn real_stdlib_directory(
-        &self,
-        system: &dyn System,
-    ) -> StdlibDiscoveryResult<SystemPathBuf> {
+    fn real_stdlib_directory(&self, system: &dyn System) -> StdlibDiscoveryResult<SystemPathBuf> {
         let stdlib_directory = real_stdlib_directory_from_sys_prefix(
             self.path.sys_prefix(),
             self.path.interpreter_layout().unwrap_or_default(),
@@ -1417,7 +1397,7 @@ fn display_error(
     let start_offset = source.line_start(start_index);
     let end_offset = source.line_end(end_index);
 
-    let mut annotation = Level::Error.span((setting_range - start_offset).into());
+    let mut annotation = AnnotationKind::Primary.span((setting_range - start_offset).into());
 
     if let Some(secondary_message) = secondary_message {
         annotation = annotation.label(secondary_message);
@@ -1428,7 +1408,10 @@ fn display_error(
         .line_start(start_index.get())
         .fold(false);
 
-    let message = Level::None.title(&primary_message).snippet(snippet);
+    let message = Level::ERROR
+        .no_name()
+        .primary_title(&primary_message)
+        .element(snippet);
 
     let renderer = if colored::control::SHOULD_COLORIZE.should_colorize() {
         Renderer::styled()
@@ -1437,7 +1420,7 @@ fn display_error(
     };
     let renderer = renderer.cut_indicator("…");
 
-    writeln!(f, "{}", renderer.render(message))
+    writeln!(f, "{}", renderer.render(&[message]))
 }
 
 /// The various ways in which parsing a `pyvenv.cfg` file could fail
@@ -2141,7 +2124,7 @@ pub enum SysPrefixPathOrigin {
 impl SysPrefixPathOrigin {
     /// Whether the given `sys.prefix` path must be a virtual environment (rather than a system
     /// Python environment).
-    pub(crate) const fn must_be_virtual_env(&self) -> bool {
+    const fn must_be_virtual_env(&self) -> bool {
         match self {
             Self::LocalVenv | Self::VirtualEnvVar => true,
             Self::ConfigFileSetting(..)
@@ -2159,7 +2142,7 @@ impl SysPrefixPathOrigin {
     ///
     /// Some variants can point either directly to `sys.prefix` or to a Python executable inside
     /// the `sys.prefix` directory, e.g. the `--python` CLI flag.
-    pub(crate) const fn must_point_directly_to_sys_prefix(&self) -> bool {
+    const fn must_point_directly_to_sys_prefix(&self) -> bool {
         match self {
             Self::PythonCliFlag
             | Self::ConfigFileSetting(..)

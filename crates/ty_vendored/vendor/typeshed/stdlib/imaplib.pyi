@@ -1,6 +1,6 @@
 """IMAP4 client.
 
-Based on RFC 2060.
+Based on RFC 3501.
 
 Public class:           IMAP4
 Public variable:        Debug
@@ -292,13 +292,23 @@ class IMAP4:
             Note: 'duration' requires a socket connection (not IMAP4_stream).
             """
 
-    def list(self, directory: str = '""', pattern: str = "*") -> tuple[str, _AnyResponseData]:
-        """List mailbox names in directory matching pattern.
+    if sys.version_info >= (3, 15):
+        def list(self, directory: str = "", pattern: str = "*") -> tuple[str, _AnyResponseData]:
+            """List mailbox names in directory matching pattern.
 
-        (typ, [data]) = <instance>.list(directory='""', pattern='*')
+            (typ, [data]) = <instance>.list(directory='', pattern='*')
 
-        'data' is list of LIST responses.
-        """
+            'data' is list of LIST responses.
+            """
+
+    else:
+        def list(self, directory: str = '""', pattern: str = "*") -> tuple[str, _AnyResponseData]:
+            """List mailbox names in directory matching pattern.
+
+            (typ, [data]) = <instance>.list(directory='""', pattern='*')
+
+            'data' is list of LIST responses.
+            """
 
     def login(self, user: str, password: str) -> tuple[Literal["OK"], _list[bytes]]:
         """Identify client using plaintext password.
@@ -322,13 +332,23 @@ class IMAP4:
         Returns server 'BYE' response.
         """
 
-    def lsub(self, directory: str = '""', pattern: str = "*") -> _CommandResults:
-        """List 'subscribed' mailbox names in directory matching pattern.
+    if sys.version_info >= (3, 15):
+        def lsub(self, directory: str = "", pattern: str = "*") -> _CommandResults:
+            """List 'subscribed' mailbox names in directory matching pattern.
 
-        (typ, [data, ...]) = <instance>.lsub(directory='""', pattern='*')
+            (typ, [data, ...]) = <instance>.lsub(directory='', pattern='*')
 
-        'data' are tuples of message part envelope and data.
-        """
+            'data' are tuples of message part envelope and data.
+            """
+
+    else:
+        def lsub(self, directory: str = '""', pattern: str = "*") -> _CommandResults:
+            """List 'subscribed' mailbox names in directory matching pattern.
+
+            (typ, [data, ...]) = <instance>.lsub(directory='""', pattern='*')
+
+            'data' are tuples of message part envelope and data.
+            """
 
     def myrights(self, mailbox: str) -> _CommandResults:
         """Show my ACLs for a mailbox (i.e. the rights that I have on mailbox).
@@ -399,10 +419,17 @@ class IMAP4:
         (typ, [data]) = <instance>.setacl(mailbox, who, what)
         """
 
-    def setannotation(self, *args: str) -> _CommandResults:
-        """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
-        Set ANNOTATIONs.
-        """
+    if sys.version_info >= (3, 15):
+        def setannotation(self, mailbox: str | bytes, *args: str) -> _CommandResults:
+            """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
+            Set ANNOTATIONs.
+            """
+
+    else:
+        def setannotation(self, *args: str) -> _CommandResults:
+            """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
+            Set ANNOTATIONs.
+            """
 
     def setquota(self, root: str, limits: str) -> _CommandResults:
         """Set the quota root's resource limits.

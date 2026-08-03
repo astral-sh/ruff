@@ -318,7 +318,7 @@ impl QuoteMetadata {
         }
     }
 
-    pub(crate) fn from_str(text: &str, flags: AnyStringFlags, preferred_quote: Quote) -> Self {
+    fn from_str(text: &str, flags: AnyStringFlags, preferred_quote: Quote) -> Self {
         let kind = if flags.is_raw_string() {
             QuoteMetadataKind::raw(text, preferred_quote, flags.triple_quotes())
         } else if flags.is_triple_quoted() {

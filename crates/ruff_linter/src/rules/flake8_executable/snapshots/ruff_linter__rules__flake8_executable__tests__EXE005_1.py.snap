@@ -7,4 +7,3 @@ EXE005 Shebang should be at the beginning of the file
 2 | # A python comment
 3 | #!/usr/bin/python
   | ^^^^^^^^^^^^^^^^^
-  |

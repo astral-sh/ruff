@@ -274,6 +274,7 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     diag: Option<Diagnostic>,
 
     source: LintSource,
+    message_override: Option<String>,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
@@ -362,6 +363,22 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         // is via this impl, which can only run at most
         // once.
         let mut diag = self.diag.take().unwrap();
+
+        if let Some(message_override) = self.message_override.take() {
+            let primary_annotation_has_message = diag
+                .primary_annotation()
+                .and_then(Annotation::get_message)
+                .is_some_and(|message| !message.is_empty());
+            let original_message = diag.headline_message().to_string();
+            if primary_annotation_has_message {
+                diag.prepend_info(original_message);
+            } else if let Some(annotation) = diag.primary_annotation_mut() {
+                annotation.set_message(original_message);
+            }
+
+            diag.set_headline_message(message_override);
+            diag.clear_concise_message();
+        }
 
         if self.ctx.db().verbose() {
             let rule = diag.id();
@@ -514,7 +531,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
     ///
-    /// If a message override is present, `message` is retained on the primary annotation.
+    /// If a message override is present, it is applied when the diagnostic is finalized. `message`
+    /// is retained on the primary annotation if the annotation has no message, or as an info
+    /// sub-diagnostic otherwise. Any custom concise message is discarded.
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
@@ -523,31 +542,24 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         // We add the primary annotation here (because it's required). Without a message
         // override, its optional message can be added later via `set_primary_annotation_message`.
         let primary_span = Span::from(self.ctx.file()).with_range(self.primary_range);
-        let mut diag = if let Some((message_override, info)) = self.message_override {
-            let mut diag = Diagnostic::new(
-                DiagnosticId::Lint(self.id.name()),
-                self.severity,
-                message_override,
-            );
-            diag.annotate(Annotation::primary(primary_span).message(message));
+        let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
+        diag.annotate(Annotation::primary(primary_span));
+        let message_override = self.message_override.map(|(message, info)| {
             diag.info(info);
-            diag
-        } else {
-            let mut diag =
-                Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
-            diag.annotate(Annotation::primary(primary_span));
-            diag
-        };
+            message
+        });
         diag.set_documentation_url(Some(self.id.documentation_url()));
         LintDiagnosticGuard {
             ctx: self.ctx,
             source: self.source,
             diag: Some(diag),
+            message_override,
         }
     }
 
-    /// Replace the headline message and add an info sub-diagnostic while retaining the original
-    /// message on the primary annotation.
+    /// Replace the headline message when the diagnostic is finalized and add an info
+    /// sub-diagnostic. The original message is retained on the primary annotation if it has no
+    /// message, or as an info sub-diagnostic otherwise.
     pub(super) fn with_message_override(mut self, message: String, info: &str) -> Self {
         self.message_override = Some((message, info.to_string()));
         self

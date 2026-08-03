@@ -73,7 +73,7 @@ def relational_bridge[X, U, V]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[V=object, U=object]]
-    # revealed: tuple[Solution[V=U@relational_bridge, U=Never]]
+    # revealed: tuple[Solution[U=Never, V=U@relational_bridge]]
     reveal_type(quantified.solutions(inferable=tuple[U, V]))
 
     # U ≤ V
@@ -105,7 +105,7 @@ def inverse_image[X, A, B]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object, X=object]]
-    # revealed: tuple[Solution[A=Never, B=X@inverse_image, X=Never]]
+    # revealed: tuple[Solution[A=Never, X=Never, B=X@inverse_image]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object]]
     # revealed: tuple[()]
@@ -149,7 +149,7 @@ def witness_sensitive[X, A, B]() -> None:
 
     # Each solution for A and B depends on the compatible choice of X.
     # TODO: revealed: tuple[Solution[X=object, A=object, B=Invariant[object]]]
-    # revealed: tuple[Solution[X=A@witness_sensitive, A=X@witness_sensitive, B=Invariant[X@witness_sensitive]]]
+    # revealed: tuple[Solution[A=X@witness_sensitive, X=A@witness_sensitive, B=Invariant[X@witness_sensitive]]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=object, B=Invariant[object]]]
     # revealed: tuple[()]
@@ -201,7 +201,7 @@ def correlated_outputs[X, Y, Z]() -> None:
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[X=int | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[int], Y=int], Solution[X=str | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[str], Y=str]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
-    # revealed: tuple[Solution[Z=Invariant[int], Y=int], Solution[Z=Invariant[str], Y=str]]
+    # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
 
     # (Y = int ∧ Z = Invariant[int]) ∨ (Y = str ∧ Z = Invariant[str])

@@ -666,7 +666,7 @@ impl<'db> UnionTypeInstance<'db> {
         )))
     }
 
-    pub(super) fn apply_type_mapping_impl(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'_, 'db>,

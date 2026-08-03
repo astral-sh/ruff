@@ -9,7 +9,6 @@ RUF047 [*] Empty `else` clause
 5 | / else:
 6 | |     pass
   | |________^
-  |
 help: Remove the `else` clause
   |
 4 |     condition_is_not_evaluated()
@@ -26,7 +25,6 @@ RUF047 [*] Empty `else` clause
 11 | / else:
 12 | |     ...
    | |_______^
-   |
 help: Remove the `else` clause
    |
 10 |     belongs_to()  # `if`
@@ -43,7 +41,6 @@ RUF047 [*] Empty `else` clause
 19 | / else:
 20 | |     pass
    | |________^
-   |
 help: Remove the `else` clause
    |
 18 |     as_if()
@@ -79,7 +76,6 @@ RUF047 [*] Empty `else` clause
 32 | / else:
 33 | |     pass
    | |________^
-   |
 help: Remove the `else` clause
    |
 31 |     # `if`
@@ -94,7 +90,6 @@ RUF047 [*] Empty `else` clause
 43 | if of_course: this()
 44 | else: ...
    | ^^^^^^^^^
-   |
 help: Remove the `else` clause
    |
 43 | if of_course: this()
@@ -109,7 +104,6 @@ RUF047 [*] Empty `else` clause
 48 |     this() # comment
 49 | else: ...
    | ^^^^^^^^^
-   |
 help: Remove the `else` clause
    |
 48 |     this() # comment
@@ -125,7 +119,6 @@ RUF047 [*] Empty `else` clause
 55 | /     else:
 56 | |         ...
    | |___________^
-   |
 help: Remove the `else` clause
    |
 54 |         b()

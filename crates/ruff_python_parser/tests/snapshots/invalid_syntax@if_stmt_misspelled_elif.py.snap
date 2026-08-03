@@ -127,4 +127,3 @@ Module(
 5 | else:
 6 |     pass
   | ^^^^ Syntax Error: Unexpected indentation
-  |

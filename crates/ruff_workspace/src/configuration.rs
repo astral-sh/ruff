@@ -179,6 +179,7 @@ pub struct Configuration {
     pub fix_only: Option<bool>,
     pub unsafe_fixes: Option<UnsafeFixes>,
     pub output_format: Option<OutputFormat>,
+    pub output_prefer_rule_codes: Option<bool>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<RequiredVersion>,
     pub extension: Option<ExtensionMapping>,
@@ -325,6 +326,7 @@ impl Configuration {
             fix_only: self.fix_only.unwrap_or(false),
             unsafe_fixes: self.unsafe_fixes.unwrap_or_default(),
             output_format: self.output_format.unwrap_or_default(),
+            output_prefer_rule_codes: self.output_prefer_rule_codes.unwrap_or_default(),
             show_fixes: self.show_fixes.unwrap_or(false),
 
             file_resolver: FileResolverSettings {
@@ -604,6 +606,7 @@ impl Configuration {
             fix_only: options.fix_only,
             unsafe_fixes: options.unsafe_fixes.map(UnsafeFixes::from),
             output_format: options.output_format,
+            output_prefer_rule_codes: options.output_prefer_rule_codes,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
             indent_width: options.indent_width,
@@ -667,6 +670,9 @@ impl Configuration {
             fix_only: self.fix_only.or(config.fix_only),
             unsafe_fixes: self.unsafe_fixes.or(config.unsafe_fixes),
             output_format: self.output_format.or(config.output_format),
+            output_prefer_rule_codes: self
+                .output_prefer_rule_codes
+                .or(config.output_prefer_rule_codes),
             force_exclude: self.force_exclude.or(config.force_exclude),
             line_length: self.line_length.or(config.line_length),
             indent_width: self.indent_width.or(config.indent_width),
@@ -689,7 +695,7 @@ impl Configuration {
     }
 
     #[must_use]
-    pub fn apply_fallbacks(
+    pub(crate) fn apply_fallbacks(
         mut self,
         origin: ConfigurationOrigin,
         initial_config_path: &Path,
@@ -1226,7 +1232,7 @@ impl LintConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    fn combine(self, config: Self) -> Self {
         let mut rule_selections = config.rule_selections;
         rule_selections.extend(self.rule_selections);
 
@@ -1358,7 +1364,7 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
@@ -1419,7 +1425,7 @@ impl AnalyzeConfiguration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Self) -> Self {
+    fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
@@ -1452,7 +1458,7 @@ impl<T: CombinePluginOptions> CombinePluginOptions for Option<T> {
 
 /// Given a list of source paths, which could include glob patterns, resolve the
 /// matching paths.
-pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
+fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
     let expansions = src
         .iter()
         .map(shellexpand::full)

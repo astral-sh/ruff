@@ -151,9 +151,16 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::Protocol(protocol) => protocol
-                    .class_origin()
-                    .map(|origin| (*origin).into_callable(db)),
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
+                    if protocol.materialization_kind(db).is_some() {
+                        // The origin supplies the constructor, but the actual receiver retains
+                        // `Top[P]` or `Bottom[P]`. Infer with both so instance-returning overloads
+                        // are materialized without replacing explicit non-instance returns.
+                        (*origin).into_callable_with_receiver(db, self)
+                    } else {
+                        (*origin).into_callable(db)
+                    }
+                }),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound
@@ -469,10 +476,7 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn paramspec_value(
-        db: &'db dyn Db,
-        parameters: Parameters<'db>,
-    ) -> CallableType<'db> {
+    fn paramspec_value(db: &'db dyn Db, parameters: Parameters<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
@@ -490,7 +494,7 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
-    pub(crate) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+    fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
     }
 
@@ -680,7 +684,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    pub(super) fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
         CallableTypes(callables)
     }
@@ -706,7 +710,7 @@ impl<'db> CallableTypes<'db> {
         &self.0
     }
 
-    pub(super) fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+    fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
         self.0
     }
 
@@ -735,7 +739,10 @@ impl<'db> CallableTypes<'db> {
         for callable in self.0 {
             for signature in callable.signatures(db) {
                 let signature = signature.clone();
-                let dedup_key = signature.clone().with_definition(None);
+                let dedup_key = signature
+                    .clone()
+                    .with_definition(None)
+                    .with_source_overload_index(None);
                 if seen_overloads.insert(dedup_key) {
                     overloads.push(signature);
                 }

@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::settings::LinterSettings;
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
-pub(super) fn is_allowed_func_call(name: &str) -> bool {
+fn is_allowed_func_call(name: &str) -> bool {
     matches!(
         name,
         "__setattr__"
@@ -51,10 +51,7 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
 }
 
 /// Returns `true` if a call is semantically allowed to use a boolean trap.
-pub(super) fn is_semantically_allowed_func_call(
-    call: &ast::ExprCall,
-    semantic: &SemanticModel,
-) -> bool {
+fn is_semantically_allowed_func_call(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(call.func.as_ref())
         .is_some_and(|qualified_name| {
@@ -66,7 +63,7 @@ pub(super) fn is_semantically_allowed_func_call(
 }
 
 /// Returns `true` if a call is allowed by the user to use a boolean trap.
-pub(super) fn is_user_allowed_func_call(
+fn is_user_allowed_func_call(
     call: &ast::ExprCall,
     semantic: &SemanticModel,
     settings: &LinterSettings,
@@ -88,7 +85,7 @@ pub(super) fn is_user_allowed_func_call(
 /// This only includes operators, i.e., functions that are usually not called directly.
 ///
 /// See: <https://docs.python.org/3/library/operator.html>
-pub(super) fn is_operator_method(name: &str) -> bool {
+fn is_operator_method(name: &str) -> bool {
     matches!(
         name,
         "__contains__"  // in

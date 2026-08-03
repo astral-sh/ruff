@@ -4,6 +4,7 @@ use rustc_hash::FxHashSet;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Default)]
 pub(super) struct Stack<'data> {
@@ -30,11 +31,16 @@ pub(super) struct Stack<'data> {
     pub(super) annotations: FxHashSet<&'data str>,
     /// Whether the current function is a generator.
     pub(super) is_generator: bool,
-    /// The `assignment`-to-`return` statement pairs in the current function.
+    /// The `assignment`-to-`return` statement pairs in the current function, each paired with the
+    /// ranges of any enclosing `finally` suites that run after the `return`.
     /// TODO(charlie): Remove the extra [`Stmt`] here, which is necessary to support statement
     /// removal for the `return` statement.
-    pub(super) assignment_return:
-        Vec<(&'data ast::StmtAssign, &'data ast::StmtReturn, &'data Stmt)>,
+    pub(super) assignment_return: Vec<(
+        &'data ast::StmtAssign,
+        &'data ast::StmtReturn,
+        &'data Stmt,
+        Vec<TextRange>,
+    )>,
 }
 
 pub(super) struct ReturnVisitor<'semantic, 'data> {
@@ -56,6 +62,20 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
             sibling: None,
             parents: Vec::new(),
         }
+    }
+
+    /// Return the enclosing `finally` suites that run after this `return`.
+    fn enclosing_finally(&self, stmt_return: &ast::StmtReturn) -> Vec<TextRange> {
+        self.parents
+            .iter()
+            .filter_map(|parent| parent.as_try_stmt())
+            .filter_map(|stmt_try| {
+                let first = stmt_try.finalbody.first()?;
+                let last = stmt_try.finalbody.last()?;
+                Some(TextRange::new(first.start(), last.end()))
+            })
+            .filter(|finally_range| !finally_range.contains_range(stmt_return.range()))
+            .collect()
     }
 }
 
@@ -128,9 +148,13 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                         //     return x
                         // ```
                         Stmt::Assign(stmt_assign) => {
-                            self.stack
-                                .assignment_return
-                                .push((stmt_assign, stmt_return, stmt));
+                            let enclosing_finally = self.enclosing_finally(stmt_return);
+                            self.stack.assignment_return.push((
+                                stmt_assign,
+                                stmt_return,
+                                stmt,
+                                enclosing_finally,
+                            ));
                         }
                         // Example:
                         // ```python
@@ -144,10 +168,12 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                                 with.body.last().and_then(Stmt::as_assign_stmt)
                             {
                                 if !has_conditional_body(with, self.semantic) {
+                                    let enclosing_finally = self.enclosing_finally(stmt_return);
                                     self.stack.assignment_return.push((
                                         stmt_assign,
                                         stmt_return,
                                         stmt,
+                                        enclosing_finally,
                                     ));
                                 }
                             }

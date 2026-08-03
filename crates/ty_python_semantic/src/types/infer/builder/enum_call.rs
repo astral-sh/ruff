@@ -255,49 +255,29 @@ fn apply_generated_type_mixin_member_values<'db>(
         return None;
     };
 
-    match class.known(db) {
-        Some(KnownClass::Str) => Some(
-            members
-                .into_iter()
-                .map(|(name, value)| {
-                    let value = if let Some(literal) = value.as_int_literal() {
-                        Type::string_literal(db, literal.to_compact_string())
-                    } else if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                        KnownClass::Str.to_instance(db)
-                    } else {
-                        return None;
-                    };
-                    Some((name, value))
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ),
-        Some(KnownClass::Bytes) => Some(
-            members
-                .into_iter()
-                .map(|(name, value)| {
-                    let value = if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                        KnownClass::Bytes.to_instance(db)
-                    } else {
-                        return None;
-                    };
-                    Some((name, value))
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ),
-        Some(KnownClass::Float) => Some(
-            members
-                .into_iter()
-                .map(|(name, value)| {
-                    if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
-                        Some((name, KnownClass::Float.to_instance(db)))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Option<Vec<_>>>()?,
-        ),
-        _ => None,
-    }
+    let mixin_class @ (KnownClass::Str | KnownClass::Bytes | KnownClass::Float) =
+        class.known(db)?
+    else {
+        return None;
+    };
+
+    members
+        .into_iter()
+        .map(|(name, value)| {
+            if !value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
+                return None;
+            }
+
+            let value = if mixin_class == KnownClass::Str
+                && let Some(literal) = value.as_int_literal()
+            {
+                Type::string_literal(db, literal.to_compact_string())
+            } else {
+                mixin_class.to_instance(db)
+            };
+            Some((name, value))
+        })
+        .collect()
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {

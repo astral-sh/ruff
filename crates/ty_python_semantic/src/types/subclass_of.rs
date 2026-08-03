@@ -116,7 +116,7 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a [`Type`] instance representing the type `type[object]`.
-    pub(crate) fn subclass_of_object(db: &'db dyn Db) -> Type<'db> {
+    fn subclass_of_object(db: &'db dyn Db) -> Type<'db> {
         // See the documentation of `SubclassOfType::from` for details.
         KnownClass::Type.to_instance(db)
     }
@@ -246,7 +246,7 @@ impl<'db> SubclassOfType<'db> {
         let class_like = match self.subclass_of.with_transposed_type_var(db) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin()?),
+            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin(db)?),
             SubclassOfInner::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
@@ -374,11 +374,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.is_eager_assignability(),
+                    target_class.is_object(db) || self.relation.is_assignability(),
                 )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -461,15 +461,15 @@ pub(crate) enum SubclassOfInner<'db> {
 }
 
 impl<'db> SubclassOfInner<'db> {
-    pub(crate) const fn unknown() -> Self {
+    const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) const fn is_dynamic(self) -> bool {
+    const fn is_dynamic(self) -> bool {
         matches!(self, Self::Dynamic(_))
     }
 
-    pub(crate) const fn is_type_var(self) -> bool {
+    const fn is_type_var(self) -> bool {
         matches!(self, Self::TypeVar(_))
     }
 
@@ -505,7 +505,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         Some(match ty {
             Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
             Type::TypedDict(typed_dict) => match typed_dict {
@@ -562,7 +562,7 @@ impl<'db> SubclassOfInner<'db> {
         Self::TypeVar(bound_typevar)
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         div: Type<'db>,

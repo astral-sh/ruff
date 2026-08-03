@@ -50,7 +50,6 @@ error[PLW2901]: `for` loop variable `i` overwritten by assignment target
   |
 5 |     i = [1]  # snapshot: redefined-loop-name
   |     ^
-  |
 
 
 error[PLW2901]: `for` loop variable `i` overwritten by assignment target
@@ -58,7 +57,6 @@ error[PLW2901]: `for` loop variable `i` overwritten by assignment target
    |
 11 |     i = {"b": 2}  # snapshot: redefined-loop-name
    |     ^
-   |
 
 
 error[PLW2901]: `for` loop variable `i` overwritten by assignment target
@@ -66,7 +64,6 @@ error[PLW2901]: `for` loop variable `i` overwritten by assignment target
    |
 26 |     i = {1} # snapshot: redefined-loop-name
    |     ^
-   |
 
 
 error[PLW2901]: `for` loop variable `i` overwritten by assignment target
@@ -74,7 +71,6 @@ error[PLW2901]: `for` loop variable `i` overwritten by assignment target
    |
 29 |     i += (1,)  # snapshot: redefined-loop-name
    |     ^
-   |
 
 
 error[PLW2901]: `for` loop variable `i` overwritten by assignment target
@@ -82,5 +78,4 @@ error[PLW2901]: `for` loop variable `i` overwritten by assignment target
    |
 32 |     i += "a"  # snapshot: redefined-loop-name
    |     ^
-   |
 ```

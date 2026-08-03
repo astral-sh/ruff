@@ -52,7 +52,7 @@ jobs:
       # Flag that is set to "true" when code related to the benchmarks changes.
       benchmarks: ${{ steps.check_benchmarks.outputs.changed }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -248,7 +248,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
@@ -260,10 +260,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26.5"
       - name: "Run ShellCheck"
@@ -286,7 +286,7 @@ jobs:
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -308,7 +308,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -327,7 +327,7 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -339,7 +339,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: |
             cargo-nextest
@@ -347,7 +347,7 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
@@ -394,7 +394,7 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -405,13 +405,13 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-nextest
       - name: "Install uv"
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
           enable-cache: "true"
       - name: "Run tests"
         run: cargo nextest run --cargo-profile profiling --all-features
@@ -433,7 +433,7 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -444,13 +444,13 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-nextest
       - name: "Install uv"
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
           enable-cache: "true"
       - name: "Run tests"
         run: |
@@ -464,7 +464,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -499,7 +499,7 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: SebRollen/toml-action@b1b3628f55fc3a28208d4203ada8b737e9687876 # v1.2.0
@@ -528,7 +528,7 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' || needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -555,12 +555,12 @@ jobs:
     env:
       FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           shared-key: ruff-linux-debug
@@ -594,7 +594,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -602,7 +602,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -640,7 +640,7 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           persist-credentials: false
@@ -649,7 +649,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
-          version: "0.11.32"
+          version: "0.12.0"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -667,7 +667,7 @@ jobs:
           cargo build --bin ruff
           mv target/debug/ruff target/debug/ruff-baseline
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           clean: false
@@ -755,7 +755,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 10 || 20 }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
@@ -763,7 +763,7 @@ jobs:
         run: git fetch --no-tags --filter=blob:none --unshallow origin
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -808,7 +808,7 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: cargo-bins/cargo-binstall@ead08b90bd7b2e6d81963fb9cf0b7239f66d5db4 # v1.21.0
@@ -824,12 +824,12 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -848,10 +848,10 @@ jobs:
     timeout-minutes: 20
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -877,12 +877,12 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
@@ -907,7 +907,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -920,7 +920,7 @@ jobs:
         with:
           python-version: 3.13
           activate-environment: true
-          version: "0.11.32"
+          version: "0.12.0"
       - name: "Install dependencies"
         run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
@@ -939,7 +939,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -964,7 +964,7 @@ jobs:
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: "Checkout ruff source"
         with:
           persist-credentials: false
@@ -983,14 +983,14 @@ jobs:
       - name: Build Ruff binary
         run: cargo build -p ruff --bin ruff
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: "Checkout ruff-lsp source"
         with:
           persist-credentials: false
           repository: "astral-sh/ruff-lsp"
           path: ruff-lsp
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           # installation fails on 3.13 and newer
           python-version: "3.12"
@@ -1022,7 +1022,7 @@ jobs:
       - determine_changes
     if: ${{ (needs.determine_changes.outputs.playground == 'true') }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
@@ -1068,7 +1068,7 @@ jobs:
       id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -1077,13 +1077,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-codspeed
 
@@ -1110,7 +1110,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -1122,7 +1122,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-codspeed
 
@@ -1172,15 +1172,15 @@ jobs:
             mode: simulation
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-codspeed
 
@@ -1219,7 +1219,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -1228,13 +1228,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-codspeed
 
@@ -1275,16 +1275,16 @@ jobs:
             filter: "pydantic|freqtrade|multithreaded|altair"
     steps:
       - name: "Checkout Branch"
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          version: "0.11.32"
+          version: "0.12.0"
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@43aecc8d72668fbcfe75c31400bc4f890f1c5853 # v2.83.2
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
         with:
           tool: cargo-codspeed
 

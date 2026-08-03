@@ -99,7 +99,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// Resolves a module name to a module.
-    pub(crate) fn resolve_module(&self, module_name: &ModuleName) -> Option<&'a FilePath> {
+    fn resolve_module(&self, module_name: &ModuleName) -> Option<&'a FilePath> {
         let module = if let Some(file) = self.file {
             resolve_module(self.db, file, module_name)?
         } else {

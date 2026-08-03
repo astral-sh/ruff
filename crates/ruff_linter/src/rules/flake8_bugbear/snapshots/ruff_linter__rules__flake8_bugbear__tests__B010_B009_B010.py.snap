@@ -114,7 +114,6 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
 80 | getattr(foo, "ſ")
 81 | setattr(foo, "ſ", 1)
    | ^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `setattr` with assignment
    |
 80 | getattr(foo, "ſ")

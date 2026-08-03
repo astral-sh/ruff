@@ -27,7 +27,6 @@ error[invalid-syntax]: cannot use an asynchronous comprehension inside of a sync
   |
 6 |     return {n: [x async for x in elements(n)] for n in range(3)}
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 If all of the comprehensions are `async`, on the other hand, the code was still valid:
@@ -44,7 +43,6 @@ error[not-iterable]: Object of type `range` is not async-iterable
   |
 9 |     return [[x async for x in elements(n)] async for n in range(3)]
   |                                                           ^^^^^^^^
-  |
 info: It has no `__aiter__` method
 ```
 
@@ -497,7 +495,6 @@ error[invalid-syntax]: `break` outside loop
   |
 1 | break  # snapshot: invalid-syntax
   | ^^^^^
-  |
 
 
 error[invalid-syntax]: `continue` outside loop
@@ -505,7 +502,6 @@ error[invalid-syntax]: `continue` outside loop
   |
 2 | continue  # snapshot: invalid-syntax
   | ^^^^^^^^
-  |
 
 
 error[invalid-syntax]: `break` outside loop
@@ -513,7 +509,6 @@ error[invalid-syntax]: `break` outside loop
   |
 9 |         break  # snapshot: invalid-syntax
   |         ^^^^^
-  |
 
 
 error[invalid-syntax]: `continue` outside loop
@@ -521,7 +516,6 @@ error[invalid-syntax]: `continue` outside loop
    |
 10 |         continue  # snapshot: invalid-syntax
    |         ^^^^^^^^
-   |
 
 
 error[invalid-syntax]: `break` outside loop
@@ -529,7 +523,6 @@ error[invalid-syntax]: `break` outside loop
    |
 14 |         break  # snapshot: invalid-syntax
    |         ^^^^^
-   |
 
 
 error[invalid-syntax]: `continue` outside loop
@@ -537,7 +530,6 @@ error[invalid-syntax]: `continue` outside loop
    |
 15 |         continue  # snapshot: invalid-syntax
    |         ^^^^^^^^
-   |
 ```
 
 ## name cannot refer to a parameter and a global variable
@@ -582,7 +574,6 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
   |
 4 |     global a  # snapshot: invalid-syntax
   |            ^
-  |
 
 
 error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
@@ -590,7 +581,6 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
   |
 8 |         global a  # snapshot: invalid-syntax
   |                ^
-  |
 
 
 error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
@@ -598,7 +588,6 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
    |
 16 |         global a  # snapshot: invalid-syntax
    |                ^
-   |
 
 
 error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
@@ -606,7 +595,6 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
    |
 22 |     global a  # snapshot: invalid-syntax
    |            ^
-   |
 
 
 error[invalid-syntax]: name `a` cannot refer to a parameter and a global variable
@@ -614,5 +602,4 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
    |
 27 |     global a  # snapshot: invalid-syntax
    |            ^
-   |
 ```

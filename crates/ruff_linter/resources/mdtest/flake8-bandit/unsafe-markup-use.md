@@ -22,7 +22,6 @@ error[S704]: Unsafe use of `markupsafe.Markup` detected
   |
 5 | Markup(f"unsafe {content}")  # snapshot: unsafe-markup-use
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ```py

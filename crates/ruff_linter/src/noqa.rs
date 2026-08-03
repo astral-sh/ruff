@@ -1242,10 +1242,7 @@ impl<'a> NoqaDirectives<'a> {
         Self { inner: directives }
     }
 
-    pub(crate) fn find_line_with_directive(
-        &self,
-        offset: TextSize,
-    ) -> Option<&NoqaDirectiveLine<'_>> {
+    fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine<'_>> {
         self.find_line_index(offset).map(|index| &self.inner[index])
     }
 

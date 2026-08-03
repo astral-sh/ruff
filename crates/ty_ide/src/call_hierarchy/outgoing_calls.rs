@@ -368,13 +368,11 @@ mod tests {
           |
         6 |     helper()
           |     ^^^^^^ Call site
-          |
         info: Function: `helper` (`main`)
          --> main.py:2:5
           |
         2 | def helper():
           |     ^^^^^^
-          |
         ");
     }
 
@@ -396,13 +394,11 @@ mod tests {
           |
         7 |     c.m()
           |       ^ Call site
-          |
         info: Method: `m` (`main`)
          --> main.py:3:9
           |
         3 |     def m(self):
           |         ^
-          |
         ");
     }
 
@@ -423,13 +419,11 @@ mod tests {
           |
         6 |     C()
           |     ^ Call site
-          |
         info: Class: `C` (`main`)
          --> main.py:2:7
           |
         2 | class C:
           |       ^
-          |
         ");
     }
 
@@ -453,13 +447,11 @@ mod tests {
           |     ^^^^^^ Call site
         7 |     helper()
           |     ^^^^^^ Call site
-          |
         info: Function: `helper` (`main`)
          --> main.py:2:5
           |
         2 | def helper():
           |     ^^^^^^
-          |
         ");
     }
 
@@ -521,65 +513,55 @@ mod tests {
            |
         17 | @cls_deco
            |  ^^^^^^^^ Call site
-           |
         info: Function: `cls_deco` (`main`)
          --> main.py:2:5
           |
         2 | def cls_deco(cls):
           |     ^^^^^^^^
-          |
 
         info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:18:11
            |
         18 | class Cls(base_factory()):
            |           ^^^^^^^^^^^^ Call site
-           |
         info: Function: `base_factory` (`main`)
          --> main.py:5:5
           |
         5 | def base_factory():
           |     ^^^^^^^^^^^^
-          |
 
         info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:19:12
            |
         19 |     attr = class_body_helper()
            |            ^^^^^^^^^^^^^^^^^ Call site
-           |
         info: Function: `class_body_helper` (`main`)
          --> main.py:8:5
           |
         8 | def class_body_helper():
           |     ^^^^^^^^^^^^^^^^^
-          |
 
         info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:21:6
            |
         21 |     @method_deco
            |      ^^^^^^^^^^^ Call site
-           |
         info: Function: `method_deco` (`main`)
           --> main.py:11:5
            |
         11 | def method_deco(fn):
            |     ^^^^^^^^^^^
-           |
 
         info[outgoing-calls]: Outgoing calls from `Cls`
           --> main.py:22:19
            |
         22 |     def m(self, x=default_factory()):
            |                   ^^^^^^^^^^^^^^^ Call site
-           |
         info: Function: `default_factory` (`main`)
           --> main.py:14:5
            |
         14 | def default_factory():
            |     ^^^^^^^^^^^^^^^
-           |
         ");
     }
 
@@ -605,13 +587,11 @@ mod tests {
           |
         8 |     nested()
           |     ^^^^^^ Call site
-          |
         info: Function: `nested` (`main`)
          --> main.py:6:9
           |
         6 |     def nested():
           |         ^^^^^^
-          |
         ");
     }
 
@@ -634,13 +614,11 @@ mod tests {
           |
         5 | def foo(x=default_factory()):
           |           ^^^^^^^^^^^^^^^ Call site
-          |
         info: Function: `default_factory` (`main`)
          --> main.py:2:5
           |
         2 | def default_factory():
           |     ^^^^^^^^^^^^^^^
-          |
         ");
     }
 
@@ -663,13 +641,11 @@ mod tests {
           |
         5 | class Derived(base_factory()):
           |               ^^^^^^^^^^^^ Call site
-          |
         info: Function: `base_factory` (`main`)
          --> main.py:2:5
           |
         2 | def base_factory():
           |     ^^^^^^^^^^^^
-          |
         ");
     }
 
@@ -698,13 +674,11 @@ mod tests {
           |
         9 |     f = lambda x=default_factory(): lambda_body_helper()
           |                  ^^^^^^^^^^^^^^^ Call site
-          |
         info: Function: `default_factory` (`main`)
          --> main.py:2:5
           |
         2 | def default_factory():
           |     ^^^^^^^^^^^^^^^
-          |
         ");
     }
 
@@ -723,26 +697,22 @@ mod tests {
            |
         LL |     print("hi")  # builtins resolve via stubs, so this *does* appear
            |     ^^^^^ Call site
-           |
         info: Function: `print` (`builtins`)
           --> stdlib/builtins.pyi:LL:5
            |
         LL | def print(
            |     ^^^^^
-           |
 
         info[outgoing-calls]: Outgoing calls from `foo`
           --> main.py:LL:5
            |
         LL |     print("hi")  # builtins resolve via stubs, so this *does* appear
            |     ^^^^^ Call site
-           |
         info: Function: `print` (`builtins`)
           --> stdlib/builtins.pyi:LL:5
            |
         LL | def print(
            |     ^^^^^
-           |
         "#);
     }
 
@@ -767,26 +737,22 @@ mod tests {
           |
         8 |         super().m()
           |                 ^ Call site
-          |
         info: Method: `m` (`main`)
          --> main.py:3:9
           |
         3 |     def m(self):
           |         ^
-          |
 
         info[outgoing-calls]: Outgoing calls from `m`
           --> main.py:LL:9
            |
         LL |         super().m()
            |         ^^^^^ Call site
-           |
         info: Class: `super` (`builtins`)
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class super:
            |       ^^^^^
-           |
         ");
     }
 
@@ -817,13 +783,11 @@ def f<CURSOR>oo():
           |
         5 |     helper()
           |     ^^^^^^ Call site
-          |
         info: Function: `helper` (`lib`)
          --> lib.py:2:5
           |
         2 | def helper():
           |     ^^^^^^
-          |
         ");
     }
 }

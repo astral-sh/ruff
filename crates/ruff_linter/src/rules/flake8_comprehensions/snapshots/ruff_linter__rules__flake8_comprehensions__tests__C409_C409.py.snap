@@ -255,7 +255,6 @@ C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple litera
 46 | t9 = tuple([1],)
 47 | t10 = tuple([1, 2],)
    |       ^^^^^^^^^^^^^^
-   |
 help: Rewrite as a tuple literal
    |
 46 | t9 = tuple([1],)

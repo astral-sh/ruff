@@ -44,7 +44,7 @@ pub(super) fn disable_lru(db: &mut dyn Db) {
     parsed_module::set_lru_capacity(db, 0);
 }
 
-pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
@@ -115,7 +115,7 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
-    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    fn new(file: File, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
             inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(

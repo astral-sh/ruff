@@ -111,7 +111,7 @@ impl<'db> NewType<'db> {
         Type::object()
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         // Two instances of the "same" `NewType` won't compare == if one of them has an eagerly
         // evaluated base (or a normalized base, etc.) and the other doesn't, so we only check for
         // equality of the `definition`.
@@ -121,7 +121,7 @@ impl<'db> NewType<'db> {
     /// Create a new `NewType` by mapping the underlying `ClassType`. This descends through any
     /// number of nested `NewType` layers and rebuilds the whole chain. In the rare case of cyclic
     /// `NewType`s with no underlying `ClassType`, this has no effect and does not call `f`.
-    pub(crate) fn try_map_base_class_type(
+    fn try_map_base_class_type(
         self,
         db: &'db dyn Db,
         f: impl FnOnce(ClassType<'db>) -> Option<ClassType<'db>>,

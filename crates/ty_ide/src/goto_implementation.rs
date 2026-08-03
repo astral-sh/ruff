@@ -204,7 +204,6 @@ mod tests {
            |
         12 |     animal.speak()
            |            ^^^^^ Clicking here
-           |
         info: Found 3 implementations
          --> main.py:3:9
           |
@@ -218,7 +217,6 @@ mod tests {
         8 | class Cat(Animal):
         9 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -251,7 +249,6 @@ mod tests {
            |
         17 |     animal.speak()
            |            ^^^^^ Clicking here
-           |
         info: Found 3 implementations
           --> main.py:6:9
            |
@@ -266,7 +263,6 @@ mod tests {
            |
         13 |     def speak(self) -> str:
            |         -----
-           |
         ");
     }
 
@@ -294,7 +290,6 @@ mod tests {
            |
         12 |     animal.speak()
            |            ^^^^^ Clicking here
-           |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -305,7 +300,6 @@ mod tests {
           |
         9 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -330,13 +324,11 @@ mod tests {
           |
         9 | dog.speak()
           |     ^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> main.py:3:9
           |
         3 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -364,13 +356,11 @@ mod tests {
            |
         12 |     dog.speak()
            |         ^^^^^ Clicking here
-           |
         info: Found 1 implementation
          --> main.py:6:9
           |
         6 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -395,13 +385,11 @@ mod tests {
           |
         9 | dog.speak()
           |     ^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> main.py:6:5
           |
         6 |     speak = 1
           |     -----
-          |
         ");
     }
 
@@ -445,13 +433,11 @@ mod tests {
            |
         13 |     animal.speak(1)
            |            ^^^^^ Clicking here
-           |
         info: Found 1 implementation
          --> main.py:9:9
           |
         9 |     def speak(self, volume: int | str) -> int | str:
           |         -----
-          |
         ");
     }
 
@@ -482,13 +468,11 @@ mod tests {
            |
         15 |     animal.speak(1)
            |            ^^^^^ Clicking here
-           |
         info: Found 1 implementation
           --> main.py:11:9
            |
         11 |     def speak(self, volume: int | str) -> int | str:
            |         -----
-           |
         ");
     }
 
@@ -524,7 +508,6 @@ mod tests {
           |
         7 |     def value(self, value: int) -> None: ...
           |         ^^^^^ Clicking here
-          |
         info: Found 2 implementations
           --> main.py:7:9
            |
@@ -535,7 +518,6 @@ mod tests {
            |
         17 |     def value(self, value: int) -> None: ...
            |         -----
-           |
         ");
     }
 
@@ -574,7 +556,6 @@ mod tests {
            |
         23 |     return base.value
            |                 ^^^^^ Clicking here
-           |
         info: Found 2 implementations
           --> main.py:4:9
            |
@@ -585,7 +566,6 @@ mod tests {
            |
         14 |     def value(self) -> int: ...
            |         -----
-           |
         ");
     }
 
@@ -624,7 +604,6 @@ mod tests {
            |
         23 |     base.value = value
            |          ^^^^^ Clicking here
-           |
         info: Found 2 implementations
           --> main.py:7:9
            |
@@ -635,7 +614,6 @@ mod tests {
            |
         17 |     def value(self, value: int) -> None: ...
            |         -----
-           |
         ");
     }
 
@@ -663,13 +641,11 @@ mod tests {
            |
         12 |     pet.speak()
            |         ^^^^^ Clicking here
-           |
         info: Found 1 implementation
          --> main.py:3:9
           |
         3 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -694,7 +670,6 @@ mod tests {
           |
         9 |     animal.speak()
           |            ^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -704,7 +679,6 @@ mod tests {
         5 | class Dog(Animal):
         6 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -732,7 +706,6 @@ mod tests {
           |
         8 |         cls.speak()
           |             ^^^^^ Clicking here
-          |
         info: Found 2 implementations
           --> main.py:4:9
            |
@@ -743,7 +716,6 @@ mod tests {
            |
         12 |     def speak(cls): ...
            |         -----
-           |
         ");
     }
 
@@ -770,7 +742,6 @@ mod tests {
            |
         11 |     cls.speak()
            |         ^^^^^ Clicking here
-           |
         info: Found 2 implementations
          --> main.py:4:9
           |
@@ -781,7 +752,6 @@ mod tests {
         7 |     @classmethod
         8 |     def speak(cls): ...
           |         -----
-          |
         ");
     }
 
@@ -818,7 +788,6 @@ mod tests {
           |
         3 |     def method(self): ...
           |         ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> base.py:3:9
           |
@@ -829,7 +798,6 @@ mod tests {
           |
         5 |     def method(self): ...
           |         ------
-          |
         ");
     }
 
@@ -912,13 +880,11 @@ class MyClass:
           |
         4 | x.action()
           |   ^^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> mymodule.py:5:9
           |
         5 |     def action(self):
           |         ------
-          |
         ");
     }
 
@@ -964,13 +930,11 @@ class MyClass:
           |
         4 | x.action(1)
           |   ^^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> mymodule.py:5:9
           |
         5 |     def action(self, value):
           |         ------
-          |
         ");
     }
 
@@ -1021,7 +985,6 @@ class MyClass:
           |
         3 |     def speak(self): ...
           |         ^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -1031,7 +994,6 @@ class MyClass:
         5 | class Dog(Animal):
         6 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -1071,7 +1033,6 @@ class MyClass:
           |
         4 | class Animal(ABC):
           |       ^^^^^^ Clicking here
-          |
         info: Found 3 implementations
           --> main.py:4:7
            |
@@ -1085,7 +1046,6 @@ class MyClass:
          9 |
         10 | class Cat(Animal):
            |       ---
-           |
         ");
     }
 
@@ -1115,7 +1075,6 @@ class MyClass:
           |
         2 | class Animal:
           |       ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1125,7 +1084,6 @@ class MyClass:
         4 |
         5 | class Dog(Animal):
           |       ---
-          |
         ");
     }
 
@@ -1144,13 +1102,11 @@ class MyClass:
           |
         2 | class Widget:
           |       ^^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> main.py:2:7
           |
         2 | class Widget:
           |       ------
-          |
         ");
     }
 
@@ -1175,7 +1131,6 @@ class MyClass:
           |
         5 | class Mammal(Animal):
           |       ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:5:7
           |
@@ -1185,7 +1140,6 @@ class MyClass:
         7 |
         8 | class Dog(Mammal):
           |       ---
-          |
         ");
     }
 
@@ -1213,7 +1167,6 @@ class MyClass:
           |
         2 | class Base:
           |       ^^^^ Clicking here
-          |
         info: Found 4 implementations
           --> main.py:2:7
            |
@@ -1231,7 +1184,6 @@ class MyClass:
         10 |
         11 | class Diamond(Left, Right):
            |       -------
-           |
         ");
     }
 
@@ -1253,7 +1205,6 @@ class MyClass:
           |
         2 | class Container[T]:
           |       ^^^^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1263,7 +1214,6 @@ class MyClass:
         4 |
         5 | class IntContainer(Container[int]):
           |       ------------
-          |
         ");
     }
 
@@ -1288,7 +1238,6 @@ class MyClass:
           |
         8 | def f(x: Animal):
           |          ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1298,7 +1247,6 @@ class MyClass:
         4 |
         5 | class Dog(Animal):
           |       ---
-          |
         ");
     }
 
@@ -1323,7 +1271,6 @@ class MyClass:
           |
         8 | def f(x: "Animal"):
           |           ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1333,7 +1280,6 @@ class MyClass:
         4 |
         5 | class Dog(Animal):
           |       ---
-          |
         "#);
     }
 
@@ -1364,7 +1310,6 @@ class MyClass:
           |
         4 | class Dog(animals.Animal):
           |                   ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> animals.py:2:7
           |
@@ -1375,7 +1320,6 @@ class MyClass:
           |
         4 | class Dog(animals.Animal):
           |       ---
-          |
         ");
     }
 
@@ -1408,7 +1352,6 @@ class MyClass:
           |
         7 | animals.Animal()
           |         ^^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> animals.py:2:7
           |
@@ -1419,7 +1362,6 @@ class MyClass:
           |
         4 | class Dog(animals.Animal):
           |       ---
-          |
         ");
     }
 
@@ -1446,7 +1388,6 @@ class MyClass:
            |
         11 | Base()
            | ^^^^ Clicking here
-           |
         info: Found 2 implementations
          --> main.py:5:7
           |
@@ -1456,7 +1397,6 @@ class MyClass:
         7 |
         8 | class Child(Base):
           |       -----
-          |
         ");
     }
 
@@ -1482,7 +1422,6 @@ class MyClass:
           |
         9 | def f(x: Outer.Inner):
           |                ^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:3:11
           |
@@ -1492,7 +1431,6 @@ class MyClass:
         5 |
         6 | class SubInner(Outer.Inner):
           |       --------
-          |
         ");
     }
 
@@ -1519,13 +1457,11 @@ class MyClass:
           |
         9 |     factory.dog_cls
           |             ^^^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> main.py:2:7
           |
         2 | class Dog:
           |       ---
-          |
         ");
     }
 
@@ -1559,7 +1495,6 @@ class MyClass:
            |
         18 | factory.item
            |         ^^^^ Clicking here
-           |
         info: Found 3 implementations
           --> main.py:11:5
            |
@@ -1571,7 +1506,6 @@ class MyClass:
         14 |     else:
         15 |         item = 0
            |         ----
-           |
         ");
     }
 
@@ -1659,7 +1593,6 @@ class MyClass:
           |
         2 | class Base:
           |       ^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1670,7 +1603,6 @@ class MyClass:
           |
         4 | class Derived(Base):
           |       -------
-          |
         ");
     }
 
@@ -1698,7 +1630,6 @@ class MyClass:
            |
         12 |     animal.sound
            |            ^^^^^ Clicking here
-           |
         info: Found 3 implementations
          --> main.py:3:5
           |
@@ -1712,7 +1643,6 @@ class MyClass:
         8 | class Cat(Animal):
         9 |     sound: str = "meow"
           |     -----
-          |
         "#);
     }
 
@@ -1737,7 +1667,6 @@ class MyClass:
           |
         9 |     animal.sound
           |            ^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:3:5
           |
@@ -1747,7 +1676,6 @@ class MyClass:
         5 | class Dog(Animal):
         6 |     sound = "woof"
           |     -----
-          |
         "#);
     }
 
@@ -1772,7 +1700,6 @@ class MyClass:
           |
         9 |     animal.sound
           |            ^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:3:5
           |
@@ -1782,7 +1709,6 @@ class MyClass:
         5 | class Dog(Animal):
         6 |     sound: str = "woof"
           |     -----
-          |
         "#);
     }
 
@@ -1807,7 +1733,6 @@ class MyClass:
           |
         9 |     animal.speak
           |            ^^^^^ Clicking here
-          |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -1817,7 +1742,6 @@ class MyClass:
         5 | class Dog(Animal):
         6 |     speak = 1
           |     -----
-          |
         ");
     }
 
@@ -1844,7 +1768,6 @@ class MyClass:
            |
         11 |     animal.sound
            |            ^^^^^ Clicking here
-           |
         info: Found 2 implementations
          --> main.py:4:9
           |
@@ -1855,7 +1778,6 @@ class MyClass:
         7 |     def __init__(self):
         8 |         self.sound = "woof"
           |         ----------
-          |
         "#);
     }
 
@@ -1885,13 +1807,11 @@ class MyClass:
            |
         14 |     dog.sound
            |         ^^^^^ Clicking here
-           |
         info: Found 1 implementation
          --> main.py:4:9
           |
         4 |         self.sound = "generic"
           |         ----------
-          |
         "#);
     }
 
@@ -1917,7 +1837,6 @@ class MyClass:
            |
         10 |     animal.sound
            |            ^^^^^ Clicking here
-           |
         info: Found 2 implementations
          --> main.py:3:5
           |
@@ -1928,7 +1847,6 @@ class MyClass:
         6 |     def __init__(self):
         7 |         self.sound = "woof"
           |         ----------
-          |
         "#);
     }
 
@@ -1954,13 +1872,11 @@ class MyClass:
           |
         8 |     animal.sound
           |            ^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> main.py:3:5
           |
         3 |     sound: str = "generic"
           |     -----
-          |
         "#);
     }
 
@@ -1997,13 +1913,11 @@ class MyClass:
           |
         4 |     x.sound
           |       ^^^^^ Clicking here
-          |
         info: Found 1 implementation
          --> mymodule.py:3:5
           |
         3 |     sound: str = "generic"
           |     -----
-          |
         "#);
     }
 
@@ -2037,7 +1951,6 @@ class MyClass:
            |
         14 |     speaker.speak()
            |             ^^^^^ Clicking here
-           |
         info: Found 2 implementations
           --> main.py:5:9
            |
@@ -2048,7 +1961,6 @@ class MyClass:
            |
         11 |     def speak(self) -> None: ...
            |         -----
-           |
         ");
     }
 
@@ -2082,7 +1994,6 @@ class MyClass:
            |
         16 |     animal.speak()
            |            ^^^^^ Clicking here
-           |
         info: Found 2 implementations
          --> main.py:5:9
           |
@@ -2093,7 +2004,6 @@ class MyClass:
         8 |     class Dog(Animal):
         9 |         def speak(self): ...
           |             -----
-          |
         ");
     }
 
@@ -2121,13 +2031,11 @@ class MyClass:
            |
         12 |     animal.speak()
            |            ^^^^^ Clicking here
-           |
         info: Found 1 implementation
          --> main.py:5:9
           |
         5 |     def speak(self): ...
           |         -----
-          |
         ");
     }
 
@@ -2156,13 +2064,11 @@ class MyClass:
            |
         13 |     animal.sound
            |            ^^^^^ Clicking here
-           |
         info: Found 1 implementation
          --> main.py:5:5
           |
         5 |     sound: str = "generic"
           |     -----
-          |
         "#);
     }
 

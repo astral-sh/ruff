@@ -636,9 +636,9 @@ impl<'db> BoundSuperType<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db)),
-                                Type::ProtocolInstance(protocol) => protocol
-                                    .to_nominal_instance()
-                                    .map(|instance| instance.class(db)),
+                                Type::ProtocolInstance(protocol) => {
+                                    protocol.class_origin(db).map(|class| *class)
+                                }
                                 _ => None,
                             };
                             if let Some(class) = class {
@@ -693,13 +693,13 @@ impl<'db> BoundSuperType<'db> {
             }
 
             Type::ProtocolInstance(protocol) => {
-                if let Some(nominal_instance) = protocol.to_nominal_instance() {
+                if let Some(class) = protocol.class_origin(db) {
                     SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                         db,
                         pivot_class,
                         pivot_class_type,
                         owner_type,
-                        nominal_instance.class(db),
+                        *class,
                         None,
                     )?)
                 } else {
@@ -755,9 +755,9 @@ impl<'db> BoundSuperType<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db)),
-                            Type::ProtocolInstance(protocol) => protocol
-                                .to_nominal_instance()
-                                .map(|instance| instance.class(db)),
+                            Type::ProtocolInstance(protocol) => {
+                                protocol.class_origin(db).map(|class| *class)
+                            }
                             _ => None,
                         };
                         if let Some(class) = class {

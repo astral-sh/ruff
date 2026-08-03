@@ -3,7 +3,6 @@
 use std::fmt::{self, Display};
 
 use compact_str::{CompactString, ToCompactString};
-use itertools::Itertools;
 use ruff_python_ast as ast;
 
 use crate::Db;
@@ -23,8 +22,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType, TypedDictType,
-    UnionBuilder, UnionType, todo_type,
+    ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
+    TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -36,7 +35,7 @@ pub(crate) enum SubscriptKind {
 }
 
 impl SubscriptKind {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Tuple => "tuple",
             Self::String => "string",
@@ -65,7 +64,7 @@ impl Display for DunderMethod {
 }
 
 impl DunderMethod {
-    pub(crate) const fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::GetItem => "__getitem__",
             Self::ClassGetItem => "__class_getitem__",
@@ -108,6 +107,8 @@ pub(crate) enum SubscriptErrorKind<'db> {
     SliceStepSizeZero,
     /// A non-generic PEP 695 type alias was subscripted.
     NonGenericTypeAlias { alias: TypeAliasType<'db> },
+    /// A non-generic subclass of a generic class was subscripted.
+    NonGenericClass { class: ClassLiteral<'db> },
     /// `__getitem__` or `__class_getitem__` exists but is possibly unbound.
     DunderPossiblyUnbound {
         method: DunderMethod,
@@ -244,6 +245,14 @@ impl<'db> SubscriptErrorKind<'db> {
                             ),
                         ));
                     }
+                }
+            }
+            Self::NonGenericClass { class } => {
+                if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot specialize non-generic class `{}`",
+                        class.name(db)
+                    ));
                 }
             }
             Self::DunderPossiblyUnbound { method, value_ty } => {
@@ -951,21 +960,22 @@ impl<'db> Type<'db> {
                     // expression.
                     return Ok(value_ty);
                 }
+
+                if class.iter_mro(db).any(|base| base == ClassBase::Generic) {
+                    return Err(SubscriptError::new(
+                        Type::unknown(),
+                        SubscriptErrorKind::NonGenericClass { class },
+                    ));
+                }
             }
 
-            // TODO: properly handle old-style generics; get rid of this temporary hack
-            if !value_ty
-                .as_class_literal()
-                .is_some_and(|class| class.iter_mro(db).contains(&ClassBase::Generic))
-            {
-                return Err(SubscriptError::new(
-                    Type::unknown(),
-                    SubscriptErrorKind::NotSubscriptable {
-                        value_ty,
-                        method: DunderMethod::ClassGetItem,
-                    },
-                ));
-            }
+            return Err(SubscriptError::new(
+                Type::unknown(),
+                SubscriptErrorKind::NotSubscriptable {
+                    value_ty,
+                    method: DunderMethod::ClassGetItem,
+                },
+            ));
         } else if expr_context != ast::ExprContext::Store {
             return Err(SubscriptError::new(
                 Type::unknown(),

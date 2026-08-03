@@ -4273,6 +4273,31 @@ class Foo:
     );
 }
 
+#[test]
+fn prefer_rule_codes_in_output() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args([
+                "--preview",
+                "--config",
+                "output-prefer-rule-codes = true",
+                "--select=A001",
+                "-",
+            ])
+            .pass_stdin("print = 1\n"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: A001 Variable `print` is shadowing a Python builtin
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
 #[test_case::test_case("concise")]
 #[test_case::test_case("full")]
 #[test_case::test_case("json")]
@@ -4475,7 +4500,6 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |
     1 | import math
       |        ^^^^
-      |
     help: Remove unused import: `math`
       |
       - import math
@@ -5195,7 +5219,6 @@ fn ruff_toml_is_linted() -> Result<()> {
       |
     1 | lint.select = ["F401"]
       |                 ^^^^
-      |
     help: Replace rule code with `unused-import`
       |
       - lint.select = ["F401"]

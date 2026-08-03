@@ -11,7 +11,7 @@ use rustc_hash::FxHashMap;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 
-pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
+pub(crate) fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
     TypeshedVersions::from_str(
         &vendored
             .read_to_string("stdlib/VERSIONS")

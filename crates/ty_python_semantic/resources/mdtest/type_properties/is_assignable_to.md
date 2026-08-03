@@ -1146,6 +1146,32 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+### Generic method types with gradual class return types
+
+A generic receiver makes signature comparison lazy without changing whether gradual class types are
+assignable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable
+from ty_extensions import Unknown
+
+class C:
+    def concrete[T](self: T) -> type[int]:
+        return int
+
+    def gradual[T](self: T) -> type[Any]:
+        return int
+
+accepts_any: Callable[[], type[Any]] = C().concrete
+accepts_unknown: Callable[[], type[Unknown]] = C().concrete
+accepts_concrete: Callable[[], type[int]] = C().gradual
+```
+
 ### Class literal types
 
 ```py

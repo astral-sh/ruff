@@ -141,7 +141,6 @@ PLR1730 [*] Replace `if` statement with `b = max(b, a)`
 49 | / if a > b:
 50 | |     b = a
    | |_________^
-   |
 help: Replace with `b = max(b, a)`
    |
 48 | # case 8: b = max(b, a)
@@ -253,7 +252,6 @@ PLR1730 [*] Replace `if` statement with `value = min(value, value2)`
 79 | / if value > value2:
 80 | |     value = value2
    | |__________________^
-   |
 help: Replace with `value = min(value, value2)`
    |
 78 | # base case 5: value = min(value, value2)
@@ -289,7 +287,6 @@ PLR1730 [*] Replace `if` statement with `A1.value = min(A1.value, 10)`
 95 | / if A1.value > 10:
 96 | |     A1.value = 10
    | |_________________^
-   |
 help: Replace with `A1.value = min(A1.value, 10)`
    |
 94 |
@@ -556,7 +553,6 @@ PLR1730 [*] Replace `if` statement with `self._max = min(value, self._max)`
 219 | /         if self._max >= value:
 220 | |             self._max = value
     | |_____________________________^
-    |
 help: Replace with `self._max = min(value, self._max)`
     |
 218 |             self._min = value
@@ -672,7 +668,6 @@ PLR1730 [*] Replace `if` statement with `a = min(b, a)`
 250 | / if a >= b:
 251 | |     a = b  # very important comment
     | |_________^
-    |
 help: Replace with `a = min(b, a)`
     |
 249 | # fix marked safe as preserve comments
