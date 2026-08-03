@@ -41,7 +41,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
-        let python_file = db.program_file(file);
+        let program_file = db.program_file(file);
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {
@@ -100,7 +100,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             if let Some(diagnostic_id) = diagnostic_id
                 && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
             {
-                for action in code_actions(db, python_file, range, &diagnostic_id) {
+                for action in code_actions(db, program_file, range, &diagnostic_id) {
                     actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QuickFix),

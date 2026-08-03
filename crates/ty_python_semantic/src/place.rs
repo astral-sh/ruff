@@ -765,7 +765,7 @@ fn core_module_scope<'db>(
     core_module: KnownModule,
 ) -> Option<ScopeId<'db>> {
     let program = env.program(db);
-    let module = resolve_module_confident(db, program, &core_module.name())?;
+    let module = resolve_module_confident(db, env.resolver_environment(db), &core_module.name())?;
     Some(global_scope(
         db,
         ProgramFile::new(db, module.file(db)?, program),
