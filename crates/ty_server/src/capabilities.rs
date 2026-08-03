@@ -275,9 +275,7 @@ impl ResolvedClientCapabilities {
         if client_capabilities
             .experimental
             .as_ref()
-            .and_then(|experimental| experimental.get("commands"))
-            .and_then(|commands| commands.get("commands"))
-            .and_then(|commands| commands.as_array())
+            .and_then(|experimental| experimental.get("commands")?.get("commands")?.as_array())
             .is_some_and(|commands| {
                 commands
                     .iter()

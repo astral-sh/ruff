@@ -148,7 +148,7 @@ complete_parenth
         "insertText": "complete_parentheses($0)",
         "insertTextFormat": 2,
         "command": {
-          "title": "",
+          "title": "Trigger parameter hints",
           "command": "ty.triggerParameterHints"
         }
       }
@@ -270,7 +270,7 @@ is_typedd
         "insertText": "typing.is_typeddict($0)",
         "insertTextFormat": 2,
         "command": {
-          "title": "",
+          "title": "Trigger parameter hints",
           "command": "ty.triggerParameterHints"
         }
       }

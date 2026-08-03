@@ -14,6 +14,7 @@ use ty_ide::{
 };
 use ty_project::ProjectDatabase;
 
+use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -142,12 +143,9 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
-                    command: comp.command.and_then(|command| {
-                        to_lsp(
-                            command,
-                            client_capabilities.supports_trigger_parameter_hints_command(),
-                        )
-                    }),
+                    command: comp
+                        .command
+                        .and_then(|command| to_lsp_command(command, client_capabilities)),
                     ..Default::default()
                 }
             })
@@ -179,17 +177,19 @@ impl RetriableRequestHandler for CompletionRequestHandler {
 ///
 /// Returns `None` when the client has not advertised support for the command,
 /// so that clients without a handler never receive one.
-fn to_lsp(command: CompletionCommand, supported: bool) -> Option<Command> {
-    if !supported {
-        return None;
-    }
+fn to_lsp_command(
+    command: CompletionCommand,
+    client_capabilities: ResolvedClientCapabilities,
+) -> Option<Command> {
     match command {
-        CompletionCommand::TriggerSignatureHelp => Some(Command {
-            title: String::new(),
-            tooltip: None,
-            command: "ty.triggerParameterHints".into(),
-            arguments: None,
-        }),
+        CompletionCommand::TriggerSignatureHelp => client_capabilities
+            .supports_trigger_parameter_hints_command()
+            .then(|| Command {
+                title: "Trigger parameter hints".into(),
+                tooltip: None,
+                command: "ty.triggerParameterHints".into(),
+                arguments: None,
+            }),
     }
 }
 
