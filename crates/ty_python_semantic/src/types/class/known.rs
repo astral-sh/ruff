@@ -1646,16 +1646,8 @@ impl KnownClass {
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
-            "EnumType"
-                if file.resolver_environment(db).python_version(db) >= PythonVersion::PY311 =>
-            {
-                &[Self::EnumType]
-            }
-            "StrEnum"
-                if file.resolver_environment(db).python_version(db) >= PythonVersion::PY311 =>
-            {
-                &[Self::StrEnum]
-            }
+            "EnumType" if file.python_version(db) >= PythonVersion::PY311 => &[Self::EnumType],
+            "StrEnum" if file.python_version(db) >= PythonVersion::PY311 => &[Self::StrEnum],
             "IntEnum" => &[Self::IntEnum],
             "Flag" => &[Self::Flag],
             "IntFlag" => &[Self::IntFlag],
@@ -1690,7 +1682,7 @@ impl KnownClass {
         };
 
         let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
-        let python_version = file.resolver_environment(db).python_version(db);
+        let python_version = file.python_version(db);
         candidates
             .iter()
             .copied()

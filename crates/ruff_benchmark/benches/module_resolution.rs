@@ -8,8 +8,7 @@ use divan::{Bencher, bench};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
-use salsa::plumbing::{AsId, FromId, Id};
-use ty_module_resolver::{ImportingFile, ModuleName, ResolverEnvironment, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
@@ -39,7 +38,6 @@ const STDLIB_NAMES: &[&str] = &[
 
 struct Case {
     db: ProjectDatabase,
-    resolver_environment: Id,
     importing_file: File,
     resolves: Vec<ModuleName>,
 }
@@ -75,7 +73,7 @@ fn setup_case(n: usize) -> Case {
     });
 
     let db = ProjectDatabase::fallible(metadata, system).unwrap();
-    let resolver_environment = Program::get(&db).resolver_environment(&db).as_id();
+    let _ = Program::get(&db).resolver_environment(&db);
     let importing_file = system_path_to_file(&db, &importing_path).unwrap();
 
     let resolves = SEEDED_TARGETS
@@ -87,7 +85,6 @@ fn setup_case(n: usize) -> Case {
 
     Case {
         db,
-        resolver_environment,
         importing_file,
         resolves,
     }
@@ -98,7 +95,7 @@ fn ty_module_resolver<const PATHS: usize>(bencher: Bencher) {
     bencher
         .with_inputs(|| setup_case(PATHS))
         .bench_local_refs(|case| {
-            let environment = ResolverEnvironment::from_id(case.resolver_environment);
+            let environment = Program::get(&case.db).resolver_environment(&case.db);
             for name in &case.resolves {
                 black_box(resolve_module(
                     &case.db,

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::panic::RefUnwindSafe;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use zip::CompressionMethod;
 
 use ruff_db::Db as SourceDb;
@@ -8,6 +8,7 @@ use ruff_db::files::Files;
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
+use salsa::plumbing::{AsId, FromId, Id};
 use ty_module_resolver::{FallibleStrategy, ResolverEnvironment, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
@@ -24,6 +25,8 @@ pub struct ModuleDb {
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
     search_paths: Arc<SearchPaths>,
+    /// All cloned databases share their Salsa storage, so their cached environment IDs remain valid.
+    resolver_environments: Arc<[(PythonVersion, OnceLock<Id>)]>,
 }
 
 impl ModuleDb {
@@ -31,7 +34,18 @@ impl ModuleDb {
         &self,
         python_version: PythonVersion,
     ) -> ResolverEnvironment<'_> {
-        ResolverEnvironment::new(self, python_version, self.search_paths.as_ref())
+        let Some((_, cached)) = self
+            .resolver_environments
+            .iter()
+            .find(|(version, _)| *version == python_version)
+        else {
+            return ResolverEnvironment::new(self, python_version, self.search_paths.as_ref());
+        };
+
+        let id = *cached.get_or_init(|| {
+            ResolverEnvironment::new(self, python_version, self.search_paths.as_ref()).as_id()
+        });
+        ResolverEnvironment::from_id(id)
     }
 
     /// Initialize a [`ModuleDb`] from the given source root.
@@ -62,6 +76,9 @@ impl ModuleDb {
             files: Files::default(),
             system: Arc::new(system),
             search_paths: Arc::new(search_paths),
+            resolver_environments: PythonVersion::iter()
+                .map(|version| (version, OnceLock::new()))
+                .collect(),
         };
 
         // Register the static roots for salsa durability

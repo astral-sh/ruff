@@ -5,7 +5,7 @@ use ty_module_resolver::{ResolverEnvironment, ResolverFile};
 
 use crate::{Db, Program};
 
-/// A physical file interpreted in one module-resolution environment.
+/// A physical file interpreted in one program.
 #[salsa::interned(
     debug,
     constructor = new_internal,

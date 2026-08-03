@@ -5,7 +5,7 @@ use std::ops::Deref;
 use compact_str::{CompactString, ToCompactString};
 
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::db::Db;
@@ -488,6 +488,10 @@ impl<'db> ImportingFile<'db> {
             Self::ResolverFile(file) => file.environment(db),
             Self::File(_, resolver_environment) => resolver_environment,
         }
+    }
+
+    pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {
+        self.resolver_environment(db).python_version(db)
     }
 
     pub fn resolver_file(self, db: &'db dyn Db) -> ResolverFile<'db> {
