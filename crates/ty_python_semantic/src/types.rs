@@ -223,25 +223,25 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
     inference.binding_type(definition)
 }
 
-/// Returns whether a stub definition represents a value that exists at runtime.
+/// Returns whether a definition represents a value that exists at runtime.
 ///
 /// Type-checking-only decorators and guards never represent runtime values. Private type-variable
-/// declarations and aliases are also stub-only, while public aliases and genuine runtime values
-/// remain visible.
+/// declarations, explicit aliases, and unambiguous typing aliases in stub files are also
+/// typing-only, while public aliases and genuine runtime values remain visible.
 ///
 /// ```python
 /// _T = TypeVar("_T")  # Typing-only helper.
-/// _Alias = list[int]  # Typing-only alias.
+/// _Alias: TypeAlias = list[int]  # Typing-only alias.
 /// _runtime_typevar = make_typevar()  # Runtime value.
 /// _runtime_callback = callbacks[0]  # Runtime value.
 /// ```
 #[salsa::tracked(returns(copy))]
 pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let file = definition.python_file(db);
-    let model = SemanticModel::new(db, file);
     let inference = infer_definition_types(db, definition);
     let ty = inference.binding_type(definition);
 
+    // A class or function decorated with `@type_check_only` never exists at runtime.
     if ty.is_type_check_only(db)
         || inference
             .undecorated_type()
@@ -253,11 +253,17 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
+    // Definitions inside an `if TYPE_CHECKING` block are never available at runtime.
     if semantic_index(db, file).is_in_type_checking_block(
         definition.file_scope(db),
         definition.full_range(db, &module).range(),
     ) {
         return false;
+    }
+
+    // The remaining heuristics only apply to stub definitions.
+    if !file.file(db).is_stub(db) {
+        return true;
     }
 
     let is_private = definition.place(db).as_symbol().is_some_and(|symbol| {
@@ -271,12 +277,17 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         return true;
     }
 
-    if matches!(
-        ty,
-        Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-            if typevar.definition(db) == Some(definition)
-    ) || model.is_type_alias_definition(definition)
+    // Private type variables, parameter specifications, and type-variable tuples in stubs are
+    // implementation details rather than runtime values.
+    if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+        && typevar.definition(db) == Some(definition)
     {
+        return false;
+    }
+
+    // Explicit PEP 613 and PEP 695 type aliases in stubs are also typing-only helpers.
+    let model = SemanticModel::new(db, file);
+    if model.is_type_alias_definition(definition) {
         return false;
     }
 
@@ -284,6 +295,8 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         return true;
     };
 
+    // Preserve the existing narrow heuristics for private union, `Literal`, and `Annotated`
+    // aliases without mistaking runtime calls or indexing for type-alias definitions.
     match (ty, assignment.value(&module)) {
         (
             Type::KnownInstance(KnownInstanceType::UnionType(_)),
@@ -293,15 +306,7 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
             }),
         ) => false,
         (
-            Type::KnownInstance(
-                KnownInstanceType::Literal(_)
-                | KnownInstanceType::Annotated(_)
-                | KnownInstanceType::Callable(_)
-                | KnownInstanceType::TypeGenericAlias(_),
-            )
-            | Type::GenericAlias(_)
-            | Type::Callable(_)
-            | Type::SubclassOf(_),
+            Type::KnownInstance(KnownInstanceType::Literal(_) | KnownInstanceType::Annotated(_)),
             ast::Expr::Subscript(subscript),
         ) => !matches!(
             subscript.value.inferred_type(&model),

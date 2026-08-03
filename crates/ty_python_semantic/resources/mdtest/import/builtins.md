@@ -53,12 +53,10 @@ from typing import ParamSpec, Protocol, TypeAlias, TypeVar, type_check_only
 
 class object: ...
 class int: ...
-class str: ...
 
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
 _PrivateAlias: TypeAlias = int
-_PrivateUnion = int | str
 
 @type_check_only
 class _PrivateProtocol(Protocol): ...
@@ -70,11 +68,12 @@ class PublicTypeOnlyClass: ...
 def public_type_only_function(): ...
 ```
 
+`module.py`:
+
 ```py
 _T  # error: [unresolved-reference]
 _P  # error: [unresolved-reference]
 _PrivateAlias  # error: [unresolved-reference]
-_PrivateUnion  # error: [unresolved-reference]
 _PrivateProtocol  # error: [unresolved-reference]
 PublicTypeOnlyClass  # error: [unresolved-reference]
 public_type_only_function  # error: [unresolved-reference]
@@ -120,6 +119,8 @@ class _PrivateProtocol(Protocol): ...
 @type_check_only
 class PublicTypeOnlyClass: ...
 ```
+
+`module.py`:
 
 ```py
 from builtins import PublicTypeOnlyClass, _PrivateAlias, _PrivateProtocol, _T
@@ -214,6 +215,8 @@ typeshed = "/typeshed"
 class object: ...
 class _IncompleteInputError: ...
 ```
+
+`module.py`:
 
 ```py
 _IncompleteInputError

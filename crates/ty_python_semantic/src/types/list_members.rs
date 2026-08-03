@@ -426,7 +426,6 @@ impl<'db> AllMembers<'db> {
                 let Some(python_file) = module.python_file(db) else {
                     return;
                 };
-                let file = python_file.file(db);
 
                 let module_scope = global_scope(db, python_file);
                 let use_def_map = use_def_map(db, module_scope);
@@ -440,9 +439,11 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
 
-                    if file.is_stub(db)
-                        && let Some(definition) = defined.provenance.definition()
+                    if let Some(definition) = defined.provenance.definition()
                         && !exists_at_runtime(db, definition)
+                        // Source-module completions retain `@type_check_only` symbols and rank them
+                        // lower.
+                        && (python_file.file(db).is_stub(db) || !defined.ty.is_type_check_only(db))
                         // The decorator itself is typing-only, but users must still be able to
                         // import it when defining typing-only classes and functions.
                         && !matches!(
