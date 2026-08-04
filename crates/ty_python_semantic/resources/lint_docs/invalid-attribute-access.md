@@ -1,10 +1,7 @@
 ## What it does
 
-Checks for invalid attribute reads and writes.
-
-This includes assignments to class variables from instances, assignments to
-instance-only attributes from their class, and reads of descriptors with an
-invalid `__get__` method.
+Checks for assignments to class variables from instances
+and assignments to instance-only attributes from their class.
 
 An "instance-only" variable is one which is only ever assigned to or declared
 when accessed via `self` in an instance method.
@@ -45,24 +42,3 @@ C().class_var = 3  # error
 # Cannot assign to instance-only variable from class
 C.instance_only_var = 56  # error
 ```
-
-A descriptor's `__get__` method receives the descriptor, the instance (or
-`None` for class access), and the owner class. An attribute read is invalid if
-the method cannot accept those arguments:
-
-```python
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-
-class C:
-    value = Descriptor()
-
-
-C().value  # error: [invalid-attribute-access]
-```
-
-As with other operations on unions, every possible descriptor implementation
-must accept the implicit call. A descriptor error is suppressed only when a
-higher-priority lookup path prevents the descriptor from being called.
