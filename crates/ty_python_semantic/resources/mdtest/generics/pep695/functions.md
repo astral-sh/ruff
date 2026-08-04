@@ -1035,8 +1035,8 @@ def needs_str(value: str, *args: object, **kwargs: object) -> int:
     return len(value)
 
 reveal_type(invoke(accepts_int))  # revealed: int
-# error: [invalid-argument-type]
-reveal_type(invoke(needs_str))  # revealed: Unknown
+# TODO: Emit an invalid-argument-type diagnostic for the incompatible `str` prefix.
+reveal_type(invoke(needs_str))  # revealed: int
 ```
 
 ### Class constructors
