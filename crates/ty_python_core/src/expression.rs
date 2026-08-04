@@ -36,6 +36,7 @@ pub struct Expression<'db> {
     ///
     /// Storing the interned scope avoids retaining the file and file-local scope separately, at
     /// the cost of database lookups when either of those values is needed.
+    #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
     /// The expression node.
@@ -53,9 +54,11 @@ pub struct Expression<'db> {
     /// to the target, and so have `None` for this field.)
     #[no_eq]
     #[tracked]
+    #[returns(clone)]
     pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
     /// Should this expression be inferred as a normal expression or a type expression?
+    #[returns(copy)]
     pub kind: ExpressionKind,
 }
 

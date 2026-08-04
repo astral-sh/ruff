@@ -56,7 +56,7 @@ is not assignable to either subclass.
 
 ```py
 from typing import Any
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class SubclassOfAny(Any): ...
 class IndirectSubclass(SubclassOfAny): ...
@@ -92,7 +92,7 @@ This behavior is preserved through dynamically created subclasses:
 
 ```py
 from typing import Any, final
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Any): ...
 
@@ -114,7 +114,7 @@ c: FinalClass = C()
 
 ```py
 from typing import Annotated, Any, Literal, final
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Any): ...
 class B(Annotated[A, "metadata"]): ...
@@ -244,13 +244,12 @@ def check_callable_union(value1: CallableSubclassOfAny | IncompatibleCallable):
 
 ```snapshot
 error[invalid-assignment]: Object of type `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
-   --> src/mdtest_snippet.py:141:14
+   --> src/mdtest_snippet.py:141:37
     |
 141 |     target1: Callable[[int], int] = value1  # snapshot
     |              --------------------   ^^^^^^ Incompatible value of type `CallableSubclassOfAny | IncompatibleCallable`
     |              |
     |              Declared type
-    |
 info: element `IncompatibleCallable` of union `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
 info: └── type `IncompatibleCallable` has inferred callable type `(x: int) -> bytes`
 info:     └── incompatible return types: `bytes` is not assignable to `int`
@@ -286,7 +285,8 @@ on all versions of Python:
 
 ```py
 from typing import Any
-from ty_extensions import TypeOf, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
 
 reveal_type(Any.__base__)  # revealed: type | None
 reveal_type(Any.__bases__)  # revealed: tuple[type, ...]

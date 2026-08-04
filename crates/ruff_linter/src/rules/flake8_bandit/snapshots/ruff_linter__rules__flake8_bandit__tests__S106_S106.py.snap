@@ -7,4 +7,3 @@ S106 Possible hardcoded password assigned to argument: "password"
 13 | # Error
 14 | func(1, password="s3cr3t")
    |         ^^^^^^^^^^^^^^^^^
-   |

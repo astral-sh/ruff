@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use super::TypeInferenceBuilder;
@@ -22,7 +23,7 @@ enum BinaryExpressionOperandTypes<'db> {
 }
 
 type BinaryExpressionVisitor<'db> =
-    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -342,7 +343,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -353,7 +354,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -525,26 +526,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 })
             }
 
-            (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-                _,
-            )
-            | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
-                ),
-                _,
-            ) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
 
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
@@ -680,14 +663,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::String(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let lhs_value = lhs.value(db).to_string();
+                        let lhs_value = lhs.value(db);
                         let rhs_value = rhs.value(db);
-                        let ty =
-                            if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                                Type::string_literal(db, &(lhs_value + rhs_value))
-                            } else {
-                                Type::literal_string()
-                            };
+                        let new_length = lhs_value.len() + rhs_value.len();
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            let mut value = CompactString::with_capacity(new_length);
+                            value.push_str(lhs_value);
+                            value.push_str(rhs_value);
+                            Type::string_literal(db, value)
+                        } else {
+                            Type::literal_string()
+                        };
                         Some(ty)
                     }
 
@@ -710,12 +696,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let ty = if n.as_i64() < 1 {
                             Type::string_literal(db, "")
                         } else if let Ok(n) = usize::try_from(n.as_i64())
-                            && n.checked_mul(s.value(db).len()).is_some_and(|new_length| {
+                            && let value = s.value(db)
+                            && n.checked_mul(value.len()).is_some_and(|new_length| {
                                 new_length <= Self::MAX_STRING_LITERAL_SIZE
                             })
                         {
-                            let new_literal = s.value(db).repeat(n);
-                            Type::string_literal(db, &new_literal)
+                            let new_literal = value.repeat(n);
+                            Type::string_literal(db, &*new_literal)
                         } else {
                             Type::literal_string()
                         };

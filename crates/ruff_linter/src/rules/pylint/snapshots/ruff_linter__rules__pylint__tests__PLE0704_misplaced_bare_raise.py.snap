@@ -94,4 +94,3 @@ PLE0704 Bare `raise` statement is not inside an exception handler
 70 | finally:
 71 |     raise # [misplaced-bare-raise]
    |     ^^^^^
-   |

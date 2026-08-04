@@ -60,6 +60,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &Checker, range: TextR
     if checker
         .semantic()
         .lookup_symbol(name)
+        .binding_id()
         .is_some_and(|id| checker.semantic().binding(id).is_global())
     {
         return;

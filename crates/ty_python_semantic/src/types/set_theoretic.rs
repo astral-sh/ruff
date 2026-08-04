@@ -7,7 +7,7 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{Type, TypeQualifiers};
+use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
@@ -22,6 +22,7 @@ pub struct UnionType<'db> {
     pub elements: Box<[Type<'db>]>,
     /// Whether the value pointed to by this type is recursively defined.
     /// If `Yes`, union literal widening is performed early.
+    #[returns(copy)]
     pub(crate) recursively_defined: RecursivelyDefined,
 }
 
@@ -54,10 +55,13 @@ impl<'db> UnionType<'db> {
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
-                let builder = UnionBuilder::new(db).add(first.into()).add(second.into());
-                iter_elements
-                    .fold(builder, |builder, element| builder.add(element.into()))
-                    .build()
+                let mut builder = UnionBuilder::new(db);
+                builder.add_in_place(first.into());
+                builder.add_in_place(second.into());
+                for element in iter_elements {
+                    builder.add_in_place(element.into());
+                }
+                builder.build()
             } else {
                 first.into()
             }
@@ -67,15 +71,23 @@ impl<'db> UnionType<'db> {
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
-    #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
-        UnionBuilder::new(db).add(a).add(b).build()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+                result.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            UnionBuilder::new(db)
+                .add(types.first(db))
+                .add(types.second(db))
+                .build()
+        }
+
+        union_from_two_elements(db, TypePair::new(db, a, b))
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
@@ -84,13 +96,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
+        let mut builder = UnionBuilder::new(db).unpack_aliases(false);
+        for element in elements {
+            builder.add_in_place(element.into());
+        }
+        builder.build()
     }
 
     /// Returns `true` if any direct element of this union is a type alias.
@@ -113,13 +123,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
+        let mut builder = UnionBuilder::new(db).cycle_recovery(true);
+        for element in elements {
+            builder.add_in_place(element.into());
+        }
+        builder.build()
     }
 
     /// A fallible version of [`UnionType::from_elements`].
@@ -134,7 +142,7 @@ impl<'db> UnionType<'db> {
     {
         let mut builder = UnionBuilder::new(db);
         for element in elements {
-            builder = builder.add(element?.into());
+            builder.add_in_place(element?.into());
         }
         Some(builder.build())
     }
@@ -164,11 +172,11 @@ impl<'db> UnionType<'db> {
             if &new_ty != ty {
                 let mut builder = UnionBuilder::new(db).unpack_aliases(false);
                 for prev in &elements[..i] {
-                    builder = builder.add(*prev);
+                    builder.add_in_place(*prev);
                 }
-                builder = builder.add(new_ty);
+                builder.add_in_place(new_ty);
                 for (_, element) in iter {
-                    builder = builder.add(transform_fn(element));
+                    builder.add_in_place(transform_fn(element));
                 }
                 return builder
                     .recursively_defined(self.recursively_defined(db))
@@ -205,13 +213,13 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
-                let mut builder = elements[..i]
-                    .iter()
-                    .copied()
-                    .fold(UnionBuilder::new(db), UnionBuilder::add);
-                builder = builder.add(new_ty);
+                let mut builder = UnionBuilder::new(db);
+                for prev in &elements[..i] {
+                    builder.add_in_place(*prev);
+                }
+                builder.add_in_place(new_ty);
                 for (_, element) in iter {
-                    builder = builder.add(transform_fn(element)?);
+                    builder.add_in_place(transform_fn(element)?);
                 }
                 return Ok(builder
                     .recursively_defined(self.recursively_defined(db))
@@ -222,8 +230,14 @@ impl<'db> UnionType<'db> {
         Ok(Type::Union(self))
     }
 
-    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.try_map(db, |element| element.to_instance(db))
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
+        let mut is_exact = true;
+        let instance = self.try_map(db, |element| {
+            let projection = element.to_instance(db)?;
+            is_exact &= projection.is_exact();
+            Some(projection.into_inner())
+        })?;
+        Some(InstanceProjection::new(instance, is_exact))
     }
 
     /// Returns a shared fully static supertype for a union of literal-value types.
@@ -292,7 +306,7 @@ impl<'db> UnionType<'db> {
                     provenance = provenance.or(member_provenance);
 
                     all_unbound = false;
-                    builder = builder.add(ty_member);
+                    builder.add_in_place(ty_member);
                 }
             }
         }
@@ -352,7 +366,7 @@ impl<'db> UnionType<'db> {
                     provenance = provenance.or(member_provenance);
 
                     all_unbound = false;
-                    builder = builder.add(ty_member);
+                    builder.add_in_place(ty_member);
                 }
             }
         }
@@ -396,7 +410,7 @@ impl<'db> UnionType<'db> {
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
-                builder = builder.add(ty);
+                builder.add_in_place(ty);
                 empty = false;
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
@@ -405,7 +419,7 @@ impl<'db> UnionType<'db> {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
-                builder = builder.add(
+                builder.add_in_place(
                     ty.recursive_type_normalized_impl(db, div, nested)
                         .unwrap_or(div),
                 );
@@ -413,7 +427,7 @@ impl<'db> UnionType<'db> {
             }
         }
         if empty {
-            builder = builder.add(div);
+            builder.add_in_place(div);
         }
         Some(builder.build())
     }
@@ -496,7 +510,7 @@ pub struct IntersectionType<'db> {
 /// and `Self::Single` would add overhead to methods like `Self::swap_remove`,
 /// and would have little value. At the point when you're calling that method, a
 /// heap allocation has already taken place.
-#[derive(Debug, Clone, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Debug, Clone, get_size2::GetSize, Default, salsa::SalsaValue)]
 pub enum NegativeIntersectionElements<'db> {
     #[default]
     Empty,
@@ -513,7 +527,7 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
-    pub(crate) fn len(&self) -> usize {
+    fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
             Self::Single(_) => 1,
@@ -558,7 +572,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     }
 
     /// Shrink the capacity of the collection as much as possible.
-    pub(crate) fn shrink_to_fit(&mut self) {
+    fn shrink_to_fit(&mut self) {
         match self {
             Self::Empty | Self::Single(_) => {}
             Self::Multiple(set) => set.shrink_to_fit(),
@@ -574,7 +588,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     /// the last element in the collection is popped off the end of the collection
     /// and placed at the index where `ty` was previously, allowing this method to complete
     /// in O(1) time (average).
-    pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
+    fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
         match self {
             Self::Empty => false,
             Self::Single(existing) => {
@@ -596,7 +610,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     /// The element is removed by swapping it with the last element
     /// of the collection and popping it off, allowing this method to complete
     /// in O(1) time (average).
-    pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
+    fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
         match self {
             Self::Empty => None,
             Self::Single(existing) => {
@@ -753,13 +767,12 @@ impl<'db> IntersectionType<'db> {
 
         if let Some(first) = elements_iter.next() {
             if let Some(second) = elements_iter.next() {
-                let builder =
+                let mut builder =
                     IntersectionBuilder::new(db).positive_elements([first.into(), second.into()]);
-                elements_iter
-                    .fold(builder, |builder, element| {
-                        builder.add_positive(element.into())
-                    })
-                    .build()
+                for element in elements_iter {
+                    builder.add_positive_in_place(element.into());
+                }
+                builder.build()
             } else {
                 first.into()
             }
@@ -846,17 +859,22 @@ impl<'db> IntersectionType<'db> {
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
-    #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub(crate) fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
-        IntersectionBuilder::new(db)
-            .positive_elements([a, b])
-            .build()
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+                result.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            IntersectionBuilder::new(db)
+                .positive_elements([types.first(db), types.second(db)])
+                .build()
+        }
+
+        intersection_from_two_elements(db, TypePair::new(db, a, b))
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -899,10 +917,11 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = Type<'db>> {
-        if self.positive(db).is_empty() {
+        let positive = self.positive(db);
+        if positive.is_empty() {
             Either::Left(std::iter::once(Type::object()))
         } else {
-            Either::Right(self.positive(db).iter().copied())
+            Either::Right(positive.iter().copied())
         }
     }
 
@@ -915,12 +934,34 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         let mut builder = IntersectionBuilder::new(db);
         for ty in self.positive(db) {
-            builder = builder.add_positive(transform_fn(ty));
+            builder.add_positive_in_place(transform_fn(ty));
         }
         for ty in self.negative(db) {
-            builder = builder.add_negative(*ty);
+            builder.add_negative_in_place(*ty);
         }
         builder.build()
+    }
+
+    /// Compute the `__class__` type when this intersection contains a positive class-backed
+    /// protocol constraint.
+    ///
+    /// Negative instance constraints are not transferred: an object not satisfying `P` does not
+    /// imply that other instances of its class cannot satisfy `P`.
+    pub(crate) fn try_dunder_class(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if !self.iter_positive(db).any(|positive| {
+            matches!(
+                positive,
+                Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some()
+            )
+        }) {
+            return None;
+        }
+
+        let mut builder = IntersectionBuilder::new(db);
+        for positive in self.iter_positive(db) {
+            builder.add_positive_in_place(positive.dunder_class(db));
+        }
+        Some(builder.build())
     }
 
     pub(crate) fn map_with_boundness(
@@ -952,7 +993,7 @@ impl<'db> IntersectionType<'db> {
                     }
                     provenance = provenance.or(member_provenance);
 
-                    builder = builder.add_positive(ty_member);
+                    builder.add_positive_in_place(ty_member);
                 }
             }
         }
@@ -1008,7 +1049,7 @@ impl<'db> IntersectionType<'db> {
                     }
                     provenance = provenance.or(member_provenance);
 
-                    builder = builder.add_positive(ty_member);
+                    builder.add_positive_in_place(ty_member);
                 }
             }
         }
@@ -1044,8 +1085,54 @@ impl<'db> IntersectionType<'db> {
         self.positive(db).iter().copied()
     }
 
-    pub fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+    pub(crate) fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.negative(db).iter().copied()
+    }
+
+    /// Project an intersection containing class-object types into the corresponding instance types.
+    ///
+    /// A projected positive element supplies a sound instance-space over-approximation for the
+    /// whole intersection. Other positive elements can constrain class objects in a domain with no
+    /// instance-space projection, so omitting them is also a sound over-approximation. Negative
+    /// elements cannot be projected: a class object excluded by an exact-class negative can still
+    /// have subclasses whose instances inhabit the excluded class's instance type. Without a
+    /// projected positive element, we cannot tell whether the intersection contains class objects
+    /// at all. The result is exact only when every positive element projects exactly and there are
+    /// no negative elements.
+    ///
+    /// For example, Python narrowing can produce `type[Base] & ~TypeOf[Base]`:
+    ///
+    /// ```py
+    /// class Base: ...
+    /// class Child(Base): ...
+    ///
+    /// def make(cls: type[Base]) -> Base:
+    ///     if cls is not Base:
+    ///         return cls()  # `cls` can be `Child`, so this can return a `Child` instance.
+    ///     return Base()
+    /// ```
+    ///
+    /// Projecting only the positive `type[Base]` is an over-approximation, since we have no
+    /// representation of an exact instance type excluding subclasses, and projecting the negative
+    /// `~TypeOf[Base]` to `~Base` would incorrectly exclude `Child` instances too.
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<InstanceProjection<Type<'db>>> {
+        let mut builder = IntersectionBuilder::new(db);
+        let mut has_projected_positive = false;
+        let mut is_exact = self.negative(db).is_empty();
+        for positive in self.iter_positive(db) {
+            if let Some(projection) = positive.to_instance(db) {
+                has_projected_positive = true;
+                is_exact &= projection.is_exact();
+                builder.add_positive_in_place(projection.into_inner());
+            } else {
+                is_exact = false;
+            }
+        }
+        if !has_projected_positive {
+            return None;
+        }
+
+        Some(InstanceProjection::new(builder.build(), is_exact))
     }
 
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {
@@ -1068,10 +1155,10 @@ fn expand_intersection_typevars_and_newtypes<'db>(
             Type::TypeVar(tvar) => {
                 match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        builder = builder.add_positive(bound);
+                        builder.add_positive_in_place(bound);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        builder = builder.add_positive(constraints.as_type(db));
+                        builder.add_positive_in_place(constraints.as_type(db));
                     }
                     // Type variables without bounds or constraints implicitly have `object`
                     // as their upper bound, and adding `object` to an intersection is always a no-op
@@ -1079,14 +1166,14 @@ fn expand_intersection_typevars_and_newtypes<'db>(
                 }
             }
             Type::NewTypeInstance(newtype) => {
-                builder = builder.add_positive(newtype.concrete_base_type(db));
+                builder.add_positive_in_place(newtype.concrete_base_type(db));
             }
-            _ => builder = builder.add_positive(element),
+            _ => builder.add_positive_in_place(element),
         }
     }
 
     for &element in negative {
-        builder = builder.add_negative(element);
+        builder.add_negative_in_place(element);
     }
 
     builder.build()

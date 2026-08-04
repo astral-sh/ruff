@@ -13,7 +13,7 @@ use salsa;
 /// Many statements can be treated directly as definitions or expressions,
 /// and so do not require a separate Salsa allocation.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum Statement<'db> {
     Expression(Expression<'db>),
@@ -37,9 +37,11 @@ pub enum Statement<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StatementInner<'db> {
     /// The file in which the statement occurs.
+    #[returns(copy)]
     pub file: File,
 
     /// The scope in which the statement occurs.
+    #[returns(copy)]
     pub file_scope: FileScopeId,
 
     /// The statement node.
@@ -58,7 +60,7 @@ impl<'db> StatementInner<'db> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct StatementNodeKey(NodeKey);
 
 impl From<&ast::Stmt> for StatementNodeKey {

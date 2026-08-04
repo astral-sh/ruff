@@ -120,8 +120,10 @@ fn stdin_error() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -145,8 +147,10 @@ fn stdin_filename() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -181,16 +185,22 @@ import bar   # unused import
       |
     2 | import bar   # unused import
       |        ^^^
-      |
     help: Remove unused import: `bar`
+      |
+    1 |
+      - import bar   # unused import
+      |
 
     F401 [*] `foo` imported but unused
      --> foo.py:2:8
       |
     2 | import foo   # unused import
       |        ^^^
-      |
     help: Remove unused import: `foo`
+      |
+    1 |
+      - import foo   # unused import
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -217,8 +227,10 @@ fn check_warn_stdin_filename_with_files() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -244,8 +256,10 @@ fn stdin_source_type_py() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -482,7 +496,6 @@ fn stdin_fix_jupyter() {
       |
     1 | print(x)
       |       ^
-      |
 
     Found 3 errors (2 fixed, 1 remaining).
     "#);
@@ -581,16 +594,22 @@ fn stdin_override_parser_ipynb() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+     ::: cell 1
+      |
+      - import os
+      |
 
     F401 [*] `sys` imported but unused
      --> Jupyter.py:cell 3:1:8
       |
     1 | import sys
       |        ^^^
-      |
     help: Remove unused import: `sys`
+     ::: cell 3
+      |
+      - import sys
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -619,8 +638,10 @@ fn stdin_override_parser_py() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -654,8 +675,10 @@ extension = {ipynb="python"}
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -850,7 +873,6 @@ fn stdin_parse_error() {
       |
     1 | from foo import
       |                ^
-      |
 
     Found 1 error.
 
@@ -880,7 +902,6 @@ fn stdin_multiple_parse_error() {
     1 | from foo import
     2 | bar =
       |      ^
-      |
 
     Found 2 errors.
 
@@ -902,7 +923,6 @@ fn parse_error_not_included() {
       |
     1 | foo =
       |      ^
-      |
 
     Found 1 error.
 
@@ -925,7 +945,6 @@ fn full_output_preview() {
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -954,7 +973,6 @@ preview = true
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -965,7 +983,10 @@ preview = true
 
 #[test]
 fn full_output_format() {
-    let mut cmd = RuffCheck::default().output_format("full").build();
+    let mut cmd = RuffCheck::default()
+        .output_format("full")
+        .args(["--select=E741"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @"
     success: false
@@ -976,7 +997,6 @@ fn full_output_format() {
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -1818,7 +1838,7 @@ fn check_input_from_argfile() -> Result<()> {
     )?;
 
     // Generate the args with the argfile notation
-    let argfile = format!("@{}", &input_file_path.display());
+    let argfile = format!("@{}", input_file_path.display());
     let mut cmd = RuffCheck::default().filename(argfile.as_ref()).build();
     insta::with_settings!({filters => vec![
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
@@ -1833,8 +1853,10 @@ fn check_input_from_argfile() -> Result<()> {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
+          |
+          - import os
+          |
 
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
@@ -1878,6 +1900,9 @@ fn check_hints_hidden_unsafe_fixes() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -1920,6 +1945,9 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -1963,9 +1991,16 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+      |
+    note: This is an unsafe fix and may change runtime behavior
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -2241,9 +2276,15 @@ extend-safe-fixes = ["RUF902"]
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -2279,6 +2320,9 @@ extend-safe-fixes = ["RUF902"]
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -2325,6 +2369,10 @@ extend-safe-fixes = ["RUF9"]
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+    2 | x = {'a': 1, 'a': 1}
+      |
 
     RUF903 Hey this is a stable test rule with a display only fix.
     --> -:1:1
@@ -2436,7 +2484,6 @@ select = ["RUF017"]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
-      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2477,7 +2524,6 @@ unfixable = ["RUF"]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
-      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2505,7 +2551,6 @@ fn pyproject_toml_stdin_syntax_error() {
       |
     1 | [project
       |         ^
-      |
 
     Found 1 error.
 
@@ -2532,7 +2577,6 @@ fn pyproject_toml_stdin_schema_error() {
     1 | [project]
     2 | name = 1
       |        ^
-      |
 
     Found 1 error.
 
@@ -2544,7 +2588,7 @@ fn pyproject_toml_stdin_schema_error() {
 #[test]
 fn pyproject_toml_stdin_no_applicable_rules_selected() {
     let mut cmd = RuffCheck::default()
-        .args(["--stdin-filename", "pyproject.toml"])
+        .args(["--stdin-filename", "pyproject.toml", "--ignore=RUF200"])
         .build();
 
     assert_cmd_snapshot!(
@@ -2586,7 +2630,7 @@ fn pyproject_toml_stdin_no_errors() {
         .build();
 
     assert_cmd_snapshot!(
-        cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
+        cmd.pass_stdin("[project]\nname = 'ruff'\nversion = '0.0.0'"),
         @"
     success: true
     exit_code: 0
@@ -2625,7 +2669,6 @@ fn pyproject_toml_stdin_schema_error_fix() {
     1 | [project]
     2 | name = 1
       |        ^
-      |
 
     Found 1 error.
     "

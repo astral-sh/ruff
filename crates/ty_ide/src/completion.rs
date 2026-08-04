@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
+use compact_str::{CompactString, CompactStringExt};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
@@ -284,18 +285,20 @@ impl<'db> Extend<CompletionBuilder<'db>> for Completions<'db> {
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The name used when matching the query and ranking this suggestion.
-    pub name: Name,
+    pub name: CompactString,
     /// The label shown to the user for this suggestion.
-    pub label: Name,
+    ///
+    /// This is only set when the label differs from the insert text.
+    label: Option<CompactString>,
     /// The fully qualified name, when available.
     ///
     /// This is only set when `module_name` is available.
-    pub qualified: Option<Name>,
+    pub qualified: Option<CompactString>,
     /// The text that should be inserted at the cursor
     /// when the completion is selected.
     ///
     /// When this is not set, [`Self::label`] is used.
-    pub insert: Option<Name>,
+    pub insert: Option<CompactString>,
     /// The format of [`Self::insert`].
     pub insert_text_format: CompletionInsertTextFormat,
     /// The type of this completion, if available.
@@ -351,7 +354,14 @@ pub struct Completion<'db> {
 }
 
 impl<'db> Completion<'db> {
-    fn builder(name: impl Into<Name>) -> CompletionBuilder<'db> {
+    pub fn label(&self) -> &str {
+        self.label
+            .as_deref()
+            .or(self.insert.as_deref())
+            .unwrap_or(self.name.as_str())
+    }
+
+    fn builder(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder::new(name)
     }
 }
@@ -361,9 +371,9 @@ impl<'db> Completion<'db> {
 #[expect(clippy::struct_excessive_bools)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
-    name: Name,
-    qualified: Option<Name>,
-    insert: Option<Name>,
+    name: CompactString,
+    qualified: Option<CompactString>,
+    insert: Option<CompactString>,
     ty: Option<Type<'db>>,
     kind: Option<CompletionKind>,
     module_name: Option<&'db ModuleName>,
@@ -382,7 +392,7 @@ impl<'db> CompletionBuilder<'db> {
     /// All other values given to the completion by default are
     /// valid, but callers will generally want to fill in as much
     /// as is appropriate.
-    fn new(name: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn new(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder {
             name: name.into(),
             qualified: None,
@@ -416,7 +426,7 @@ impl<'db> CompletionBuilder<'db> {
     ///
     /// This is just like `CompletionBuilder::new`, but sets the kind
     /// to "keyword."
-    fn keyword(name: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn keyword(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         Completion::builder(name).kind(CompletionKind::Keyword)
     }
 
@@ -426,7 +436,7 @@ impl<'db> CompletionBuilder<'db> {
     fn argument(name: impl Into<Name>) -> CompletionBuilder<'db> {
         let name = name.into();
         let insert = compact_str::format_compact!("{name}=");
-        Completion::builder(name)
+        Completion::builder(CompactString::new(name))
             .kind(CompletionKind::Variable)
             .insert(insert)
             .context_specific(true)
@@ -477,17 +487,26 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
-        let label = self.insert.as_ref().unwrap_or(&self.name).clone();
-        let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
+        let (label, insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind)
+        {
+            let label = self.insert.unwrap_or_else(|| self.name.clone());
             if ctx.capabilities.snippets {
-                let insert = Name::new(format!("{label}($0)"));
-                (Some(insert), CompletionInsertTextFormat::Snippet)
+                let insert = compact_str::format_compact!("{label}($0)");
+                (
+                    Some(label),
+                    Some(insert),
+                    CompletionInsertTextFormat::Snippet,
+                )
             } else {
-                let insert = Name::new(format!("{label}()"));
-                (Some(insert), CompletionInsertTextFormat::PlainText)
+                let insert = compact_str::format_compact!("{label}()");
+                (
+                    Some(label),
+                    Some(insert),
+                    CompletionInsertTextFormat::PlainText,
+                )
             }
         } else {
-            (self.insert, CompletionInsertTextFormat::PlainText)
+            (None, self.insert, CompletionInsertTextFormat::PlainText)
         };
         Completion {
             name: self.name,
@@ -508,12 +527,12 @@ impl<'db> CompletionBuilder<'db> {
         }
     }
 
-    fn qualified(mut self, qualified: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn qualified(mut self, qualified: impl Into<CompactString>) -> CompletionBuilder<'db> {
         self.qualified = Some(qualified.into());
         self
     }
 
-    fn insert(mut self, insert: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn insert(mut self, insert: impl Into<CompactString>) -> CompletionBuilder<'db> {
         self.insert = Some(insert.into());
         self
     }
@@ -755,7 +774,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(class_def.name.id.clone());
+                        bases.insert(CompactString::new(&class_def.name.id));
                     }
                     bases
                 });
@@ -1541,7 +1560,7 @@ struct CollectionContext<'db> {
     /// including the class being defined (unless its name was previously bound).
     /// Used to filter out duplicate and self-referential base class suggestions.
     /// This is only `Some` when we're in a class definition context.
-    existing_class_bases: Option<FxHashSet<Name>>,
+    existing_class_bases: Option<FxHashSet<CompactString>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1615,11 +1634,12 @@ impl<'db> CollectionContext<'db> {
 ///
 /// For simple name references (e.g., `Foo`), returns the name as-is.
 /// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
-fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<Name> {
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactString> {
     class_def
         .bases()
         .iter()
-        .filter_map(|expr| UnqualifiedName::from_expr(expr).map(|name| Name::new(name.to_string())))
+        .filter_map(UnqualifiedName::from_expr)
+        .map(|name| name.segments().join_compact("."))
         .collect()
 }
 
@@ -3083,7 +3103,7 @@ fn is_name_like_token(token: &Token) -> bool {
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
+        CycleDetector<'db, CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
         db: &'db dyn Db,
@@ -3130,7 +3150,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
             Type::TypeAlias(alias) => {
-                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
             }
         })
     }
@@ -7536,6 +7556,31 @@ func("<CURSOR>")
     }
 
     #[test]
+    fn string_literal_completions_overloaded_generic_function_argument() {
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal, overload
+
+@overload
+def func[T](value: T, mode: Literal["r"]) -> T: ...
+@overload
+def func[T](value: T, mode: Literal["w"]) -> T: ...
+def func(value: object, mode: str) -> object: ...
+
+func(1, "<CURSOR>")
+"#,
+        );
+
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().type_signatures().build().snapshot(),
+            @r#"
+        r :: Literal["r"]
+        w :: Literal["w"]
+        "#,
+        );
+    }
+
+    #[test]
     fn string_literal_completions_annotated_assignment() {
         let builder = completion_test_builder(
             r#"
@@ -7901,7 +7946,7 @@ x: Literal["can't", "won't"] = '<CURSOR>'
                 completion
                     .insert
                     .as_deref()
-                    .unwrap_or(completion.label.as_str())
+                    .unwrap_or(completion.label())
                     .to_string()
             })
             .collect::<Vec<_>>();
@@ -7925,7 +7970,7 @@ x: Literal['say "hi"', 'say "bye"'] = "<CURSOR>"
                 completion
                     .insert
                     .as_deref()
-                    .unwrap_or(completion.label.as_str())
+                    .unwrap_or(completion.label())
                     .to_string()
             })
             .collect::<Vec<_>>();
@@ -10895,7 +10940,7 @@ raise <CURSOR>
             self.filtered
                 .iter()
                 .map(|c| {
-                    let mut snapshot = c.insert.as_deref().unwrap_or(c.label.as_str()).to_string();
+                    let mut snapshot = c.insert.as_deref().unwrap_or(c.label()).to_string();
                     if self.type_signatures {
                         let ty =
                             c.ty.map(|ty| ty.display(self.db).to_string())

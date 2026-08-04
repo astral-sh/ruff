@@ -172,14 +172,14 @@ pub(super) enum NestedIf<'a> {
 }
 
 impl<'a> NestedIf<'a> {
-    pub(super) fn body(self) -> &'a [Stmt] {
+    fn body(self) -> &'a [Stmt] {
         match self {
             NestedIf::If(stmt_if) => &stmt_if.body,
             NestedIf::Elif(clause) => &clause.body,
         }
     }
 
-    pub(super) fn is_elif(self) -> bool {
+    fn is_elif(self) -> bool {
         matches!(self, NestedIf::Elif(..))
     }
 }
@@ -316,11 +316,7 @@ fn parenthesize_and_operand(expr: libcst_native::Expression) -> libcst_native::E
 }
 
 /// Convert `if a: if b:` to `if a and b:`.
-pub(super) fn collapse_nested_if(
-    locator: &Locator,
-    stylist: &Stylist,
-    nested_if: NestedIf,
-) -> Result<Edit> {
+fn collapse_nested_if(locator: &Locator, stylist: &Stylist, nested_if: NestedIf) -> Result<Edit> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator.contents(), &nested_if) else {
         bail!("Unable to fix multiline statement");

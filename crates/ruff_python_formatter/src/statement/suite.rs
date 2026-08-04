@@ -740,7 +740,7 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
-pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
+fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     as_only_an_ellipsis(body, comments).is_some()
 }
 

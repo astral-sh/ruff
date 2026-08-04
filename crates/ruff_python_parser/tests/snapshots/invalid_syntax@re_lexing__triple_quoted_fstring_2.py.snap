@@ -81,4 +81,3 @@ Module(
 5 | f'''{foo:.3f
 6 | '''
   | ^^^ Syntax Error: f-string: expecting `}`
-  |

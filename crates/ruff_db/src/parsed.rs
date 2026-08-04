@@ -8,7 +8,8 @@ use ruff_python_ast::{
     StringLiteral,
 };
 use ruff_python_parser::{
-    ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+    ParseError, ParseErrorType, ParseOptions, Parsed, parse_cells_unchecked,
+    parse_string_annotation, parse_unchecked,
 };
 
 use crate::Db;
@@ -43,15 +44,23 @@ pub(super) fn disable_lru(db: &mut dyn Db) {
     parsed_module::set_lru_capacity(db, 0);
 }
 
-pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
     let target_version = db.python_version();
     let options = ParseOptions::from(ty).with_target_version(target_version);
-    parse_unchecked(&source, options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+
+    // Notebooks parse each cell as an independent module so a syntax error confined to one cell is
+    // surfaced instead of being masked by a later cell's content. Regular files take the existing
+    // single-parse path.
+    if let Some(notebook) = source.as_notebook() {
+        parse_cells_unchecked(&source, notebook.cell_offsets().content_ranges(), &options)
+    } else {
+        parse_unchecked(&source, options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module")
+    }
 }
 
 pub fn parsed_string_annotation(
@@ -106,7 +115,7 @@ pub struct ParsedModule {
 }
 
 impl ParsedModule {
-    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    fn new(file: File, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
             inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(

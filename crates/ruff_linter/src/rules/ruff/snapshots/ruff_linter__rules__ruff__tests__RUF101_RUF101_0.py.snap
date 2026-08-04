@@ -94,7 +94,6 @@ RUF101 [*] `RUF940` is a redirect to `RUF950`
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |               ^^^^^^
-  |
 help: Replace with `RUF950`
   |
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
@@ -109,7 +108,6 @@ RUF101 [*] `RUF940` is a redirect to `RUF950`
 5 | x = 2 # noqa: RUF940, RUF950, RUF940
 6 | x = 2 # noqa: RUF940, RUF950, RUF940, RUF950
   |                               ^^^^^^
-  |
 help: Replace with `RUF950`
   |
 5 | x = 2 # noqa: RUF940, RUF950, RUF940

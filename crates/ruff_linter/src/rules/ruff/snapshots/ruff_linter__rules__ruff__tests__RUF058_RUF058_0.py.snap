@@ -24,7 +24,6 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 7 | starmap(func, zip())
 8 | starmap(func, zip([]))
   | ^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Use `map` instead
   |
 7 | starmap(func, zip())
@@ -38,7 +37,6 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
    |
 11 | starmap(func, zip(a, b, c,),)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `map` instead
    |
 10 |
@@ -183,7 +181,6 @@ RUF058 [*] `itertools.starmap` called on `zip` iterable
 59 | |         )
 60 | | )
    | |_^
-   |
 help: Use `map` instead
    |
 50 |

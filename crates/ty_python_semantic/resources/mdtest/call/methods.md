@@ -191,6 +191,39 @@ def f(a_or_b: A | B, any_or_a: Any | A):
     reveal_type(any_or_a.f())  # revealed: Any | int
 ```
 
+## Stored protocol-bound methods
+
+A protocol-bound method stored alongside another callable must not re-check its already-bound
+receiver when the callable union is invoked.
+
+```py
+from collections.abc import Iterator
+from typing import Any
+
+class PeekIterator(Iterator[Any]):
+    def __init__(self, iterator: Iterator[Any]) -> None:
+        self._next = iterator.__next__
+
+    def __next__(self) -> Any:
+        return self._next()
+
+    def use_fallback(self) -> None:
+        self._next = lambda: None
+```
+
+Only a genuine implicit positional receiver can be consumed before call inference. Other parameter
+shapes must continue through the ordinary bound-method call path.
+
+```py
+from typing import Protocol
+
+class Variadic(Protocol):
+    def method(*args: int) -> int: ...
+
+def check_variadic(value: Variadic) -> None:
+    value.method()  # error: [invalid-argument-type]
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml
@@ -583,13 +616,11 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 18 | class MissingArg(RequiresArg): ...
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-   |
 ```
 
 ```py
@@ -604,13 +635,11 @@ error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass_
    |
 20 | class InvalidType(RequiresArg, arg="foo"): ...
    |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
-   |
 ```
 
 ```py
@@ -635,13 +664,11 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-   |
 
 
 error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
@@ -649,13 +676,11 @@ error[unknown-argument]: Argument `not_arg` does not match any known parameter o
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    |                                 ^^^^^^^^^^^^^
-   |
 info: Function signature here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 ```
 
 ```py
@@ -671,7 +696,7 @@ class Bad(NotCallableInitSubclass):
 
 ```snapshot
 error[non-callable-init-subclass]: Invalid definition of class `Bad`
-  --> src/mdtest_snippet.py:36:5
+  --> src/mdtest_snippet.py:39:7
    |
 36 |     __init_subclass__ = None
    |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
@@ -679,7 +704,6 @@ error[non-callable-init-subclass]: Invalid definition of class `Bad`
 38 | # snapshot: non-callable-init-subclass
 39 | class Bad(NotCallableInitSubclass):
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
-   |
 info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
 info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 ```
@@ -986,6 +1010,48 @@ class X:
         return self.__new__(type(self))
 ```
 
+Calling `object.__new__` from an overriding `__new__` method preserves `Self`, so an invalid
+attribute access on the result is reported:
+
+```py
+class Item:
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
+Explicitly marking `__new__` as a static method does not change the inferred result:
+
+```py
+class StaticItem:
+    @staticmethod
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+`Self` is also preserved through a chain of inherited `__new__` calls:
+
+```py
+class Foo: ...
+
+class Bar(Foo):
+    def __new__(cls) -> Self:
+        return Foo.__new__(cls)
+
+class Baz(Bar):
+    def __new__(cls) -> Self:
+        result = Bar.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
 ## Bound-method attribute fallback
 
 Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying
@@ -1018,7 +1084,8 @@ properties are understood correctly for these functions and methods.
 ```py
 import types
 from typing import Any, Callable
-from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def f(obj: type) -> None: ...
 

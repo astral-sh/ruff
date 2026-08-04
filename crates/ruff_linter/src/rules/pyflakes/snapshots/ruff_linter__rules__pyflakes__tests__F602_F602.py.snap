@@ -237,7 +237,6 @@ F602 [*] Dictionary key `a` repeated
 44 | x = {a: 1, a: 1}
 45 | x = {a: 1, b: 2, a: 1}
    |                  ^
-   |
 help: Remove repeated key `a`
    |
 44 | x = {a: 1, a: 1}

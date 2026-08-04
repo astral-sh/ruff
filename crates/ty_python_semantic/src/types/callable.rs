@@ -1,4 +1,3 @@
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -114,7 +113,7 @@ impl<'db> Type<'db> {
                 let call_symbol = self
                     .member_lookup_with_policy(
                         db,
-                        Name::new_static("__call__"),
+                        "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
                     .place;
@@ -152,6 +151,16 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
+                    if protocol.materialization_kind(db).is_some() {
+                        // The origin supplies the constructor, but the actual receiver retains
+                        // `Top[P]` or `Bottom[P]`. Infer with both so instance-returning overloads
+                        // are materialized without replacing explicit non-instance returns.
+                        (*origin).into_callable_with_receiver(db, self)
+                    } else {
+                        (*origin).into_callable(db)
+                    }
+                }),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound
@@ -251,11 +260,8 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_only(None)
-                                .with_annotated_type(newtype.base(db).instance_type(db))],
-                        ),
+                        Parameters::standard([Parameter::positional_only(None)
+                            .with_annotated_type(newtype.base(db).instance_type(db))]),
                         Type::NewTypeInstance(newtype),
                     ),
                 )))
@@ -270,9 +276,10 @@ impl<'db> Type<'db> {
             | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                Some(CallableTypes::one(partial.partial(db)))
-            }
+            Type::KnownInstance(
+                KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial),
+            ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::Intersection(intersection) => {
                 intersection
@@ -319,6 +326,12 @@ pub enum CallableTypeKind {
     /// `NamedTuples`. These callables act like real functions when accessed as attributes on
     /// instances, i.e. they bind `self`.
     FunctionLike,
+
+    /// Represents a `Callable[P, R]`-typed dunder attribute.
+    ///
+    /// This is distinct from [`Self::Regular`] so that the dunder descriptor heuristic does not
+    /// turn the callable into a function-like object after `P` is specialized.
+    DunderParamSpec,
 
     /// A callable type that represents a staticmethod. These callables do not bind `self`
     /// when accessed as attributes on instances - they return the underlying function as-is.
@@ -412,6 +425,7 @@ pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
+    #[returns(copy)]
     pub(super) kind: CallableTypeKind,
 
     /// Source-function return-annotation provenance retained by this callable.
@@ -426,6 +440,7 @@ pub struct CallableType<'db> {
     /// ```python
     /// def decorator_factory() -> Callable[[type[object]], object]: ...
     /// ```
+    #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
 }
 
@@ -461,10 +476,7 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn paramspec_value(
-        db: &'db dyn Db,
-        parameters: Parameters<'db>,
-    ) -> CallableType<'db> {
+    fn paramspec_value(db: &'db dyn Db, parameters: Parameters<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
@@ -480,6 +492,14 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
+    }
+
+    fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::DunderParamSpec)
+    }
+
+    pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::Regular)
     }
 
     pub(crate) fn is_classmethod_like(self, db: &'db dyn Db) -> bool {
@@ -544,6 +564,10 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         self_type: Option<Type<'db>>,
     ) -> CallableType<'db> {
+        if self.is_dunder_paramspec(db) {
+            return self.into_regular(db);
+        }
+
         CallableType::new(
             db,
             self.signatures(db).bind_self(db, self_type),
@@ -552,10 +576,38 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
+    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
             db,
-            self.signatures(db).apply_self(db, self_type),
+            self.signatures(db),
+            CallableTypeKind::FunctionLike,
+            self.provenance(db),
+        )
+    }
+
+    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db),
+            CallableTypeKind::DunderParamSpec,
+            self.provenance(db),
+        )
+    }
+
+    pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
+        self.apply_self_with_receiver(db, self_type, self_type)
+    }
+
+    pub(crate) fn apply_self_with_receiver(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db)
+                .apply_self_with_receiver(db, receiver_type, self_type),
             self.kind(db),
             self.provenance(db),
         )
@@ -628,11 +680,11 @@ impl<'db> CallableType<'db> {
 ///
 /// Note that this type is guaranteed to contain at least one callable. If you need to support "no
 /// callables" as a possibility, use `Option<CallableTypes>`.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {
-    pub(super) fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
+    fn new(callables: SmallVec<[CallableType<'db>; 1]>) -> Self {
         assert!(!callables.is_empty(), "CallableTypes should not be empty");
         CallableTypes(callables)
     }
@@ -658,7 +710,7 @@ impl<'db> CallableTypes<'db> {
         &self.0
     }
 
-    pub(super) fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
+    fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {
         self.0
     }
 
@@ -687,7 +739,10 @@ impl<'db> CallableTypes<'db> {
         for callable in self.0 {
             for signature in callable.signatures(db) {
                 let signature = signature.clone();
-                let dedup_key = signature.clone().with_definition(None);
+                let dedup_key = signature
+                    .clone()
+                    .with_definition(None)
+                    .with_source_overload_index(None);
                 if seen_overloads.insert(dedup_key) {
                     overloads.push(signature);
                 }

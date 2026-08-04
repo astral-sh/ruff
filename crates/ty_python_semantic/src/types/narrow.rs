@@ -7,7 +7,7 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -38,32 +38,21 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
+use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use super::equality::{
-    equality_exclusion_constraint, equality_truthiness, evaluate_type_equality,
-    evaluate_type_inequality,
+    ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
+    evaluate_type_equality, evaluate_type_inequality,
 };
+use super::variance::TypeVarVariance;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
-/// Return whether `ty` includes a value with bytes-like containment semantics.
-///
-/// `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, so their
-/// iteration element type does not describe every value that can satisfy a membership test.
-fn has_bytes_like_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|element| has_bytes_like_containment(db, *element)),
-        ty => {
-            ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
-                || ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
-        }
-    }
-}
+mod containment;
+
+use self::containment::{elements_of, narrow_string_membership};
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
@@ -181,7 +170,7 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 /// This positive structural analysis infers the type of each supported name bound by a successful
 /// pattern. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
 /// intentionally remains separate.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PatternSuccessTypes<'db> {
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
     missing_binding_ty: Type<'db>,
@@ -370,8 +359,9 @@ enum PatternValueSource {
 
 /// Computes the subject and binding types produced by successful match patterns.
 ///
-/// Structural patterns pass the type of each extracted value to their child patterns. Results from
-/// a subject union are combined only after each complete union arm has been checked.
+/// Subject narrowing and binding inference use separate recursive entry points. Structural
+/// patterns share the lower-level operations that filter subject arms, extract child values, and
+/// preserve type variables.
 struct PatternSuccessAnalyzer<'db> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -474,6 +464,17 @@ impl ClassInfoConstraintFunction {
                     // e.g. `isinstance(x, list[int])` fails at runtime.
                     SubclassOfInner::Class(ClassType::Generic(_)) => None,
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+                    // TODO: This narrowing is not fully sound:
+                    // - `type[protocol]` currently admits non-concrete classes, some of which are
+                    //   not valid runtime class-info arguments.
+                    // - A class can inhabit `type[protocol]` because its metaclass constructs
+                    //   protocol-conforming objects even if its nominal instances do not conform.
+                    SubclassOfInner::Protocol(protocol) => match self {
+                        ClassInfoConstraintFunction::IsInstance => {
+                            Some(Type::ProtocolInstance(protocol))
+                        }
+                        ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
+                    },
                     SubclassOfInner::TypeVar(bound_typevar) => match self {
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                         ClassInfoConstraintFunction::IsInstance => {
@@ -486,14 +487,23 @@ impl ClassInfoConstraintFunction {
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
+                    let mut any_member = false;
                     for element in intersection.positive(db) {
-                        builder = builder.add_positive(self.generate_constraint(
-                            db,
-                            *element,
-                            is_positive,
-                        )?);
+                        // A member that yields no constraint (e.g. a parametrized
+                        // generic alias, which is not a valid runtime isinstance
+                        // target) should be SKIPPED, not abort narrowing on the
+                        // whole intersection. Narrowing on the remaining members
+                        // is still sound.
+                        if let Some(c) = self.generate_constraint(db, *element, is_positive) {
+                            builder = builder.add_positive(c);
+                            any_member = true;
+                        }
                     }
-                    Some(builder.build())
+                    if any_member {
+                        Some(builder.build())
+                    } else {
+                        None
+                    }
                 } else {
                     // TODO: can we do better here?
                     None
@@ -517,14 +527,14 @@ impl ClassInfoConstraintFunction {
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
 
-            Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
+            Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db) => {
                 UnionType::try_from_elements(
                     db,
                     tuple
-                        .iter_all_elements()
+                        .iter_element_types(db)
                         .map(|element| self.generate_constraint(db, element, is_positive)),
                 )
-            }),
+            }
 
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 UnionType::try_from_elements(
@@ -597,12 +607,13 @@ impl ClassInfoConstraintFunction {
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)
+            | Type::NominalInstance(_)
             | Type::NewTypeInstance(_) => None,
         }
     }
 }
 
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
     conjuncts: SmallVec<[Type<'db>; 2]>,
 }
@@ -632,11 +643,12 @@ impl<'db> Conjunctions<'db> {
             return self.conjuncts[0];
         }
 
-        let mut intersection = IntersectionBuilder::new(db);
-        for conjunct in self.conjuncts {
-            intersection = intersection.add_positive(conjunct);
-        }
-        intersection.build()
+        // Collapse shared union arms before distributing the next constraint over them.
+        self.conjuncts
+            .into_iter()
+            .fold(Type::object(), |accumulated, conjunct| {
+                IntersectionType::from_two_elements(db, accumulated, conjunct)
+            })
     }
 }
 
@@ -660,7 +672,7 @@ impl<'db> Conjunctions<'db> {
 ///   ===> `NarrowingConstraint { intersection_disjuncts: [], replacement_disjuncts: [B] }`
 ///   => `NarrowingConstraint { intersection_disjuncts: [A], replacement_disjuncts: [B] }`
 ///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct NarrowingConstraint<'db> {
     /// Intersection constraint (from `isinstance()` narrowing comparisons, `TypeIs`, and
     /// similar). We keep these as a disjunction of conjunctions to avoid constructing
@@ -747,6 +759,14 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Merge two constraints with OR semantics (union/disjunction).
+    fn merge_constraint_or(&mut self, other: Self) {
+        self.intersection_disjuncts
+            .extend(other.intersection_disjuncts);
+        self.replacement_disjuncts
+            .extend(other.replacement_disjuncts);
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
@@ -808,7 +828,7 @@ impl<'db> PatternNarrowingResult<'db> {
     }
 }
 
-#[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpressionNarrowingConstraints<'db> {
     positive: Option<FrozenNarrowingConstraints<'db>>,
     negative: Option<FrozenNarrowingConstraints<'db>>,
@@ -890,15 +910,7 @@ fn merge_constraints_or<'db>(
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
                 let into_constraint = entry.get_mut();
-                // Union the intersection constraints by concatenating disjunct lists.
-                into_constraint
-                    .intersection_disjuncts
-                    .extend(from_constraint.intersection_disjuncts);
-
-                // Concatenate replacement disjuncts
-                into_constraint
-                    .replacement_disjuncts
-                    .extend(from_constraint.replacement_disjuncts);
+                into_constraint.merge_constraint_or(from_constraint);
             }
             Entry::Vacant(_) => {
                 // Place only appears in `from`, not in `into`. No constraint needed.
@@ -929,6 +941,40 @@ fn positive_class_pattern_type<'db>(
         }
         _ => None,
     }
+}
+
+/// Refine an exact tuple with the element types established by an exact sequence pattern.
+///
+/// As elsewhere in tuple-pattern narrowing, this assumes that values represented by a `tuple[...]`
+/// annotation preserve the builtin relationship between iteration and indexing. Statically known
+/// tuple subclasses are not refined here.
+///
+/// Gradual tuple elements retain their uncertainty through intersection with the observed pattern
+/// type. For example, matching `tuple[Any]` against `[str()]` produces `tuple[Any & str]`.
+///
+/// In the example below, `subject_ty` is `tuple[int | str]`, `pattern_element_types` is `[str]`,
+/// and the refined type returned is `tuple[str]`.
+///
+/// ```python
+/// def f(value: tuple[int | str]) -> None:
+///     match value:
+///         case [str()]:
+///             reveal_type(value)  # tuple[str]
+/// ```
+fn refine_exact_tuple_for_sequence_pattern<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    pattern_element_types: &[Type<'db>],
+) -> Option<Type<'db>> {
+    let tuple = subject_ty.exact_tuple_instance_spec(db)?;
+    let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
+    Some(
+        TupleSpecBuilder::from(tuple.as_ref())
+            .intersect(db, &pattern_tuple)
+            .map_or(Type::Never, |refined| {
+                Type::tuple(TupleType::new(db, &refined.build()))
+            }),
+    )
 }
 
 /// Return a type that contains every value that can match `pattern`.
@@ -996,6 +1042,12 @@ fn necessary_sequence_pattern_type<'db>(
             .map(|pattern| necessary_match_pattern_type(db, pattern));
         exact_sequence_pattern_type(db, element_types)
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum NominalAttributeComparison {
+    Equality,
+    Identity,
 }
 
 struct NarrowingConstraintsBuilder<'db, 'ast> {
@@ -1071,8 +1123,37 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     constraints
                 }
             }
-            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.evaluate_simple_expr(expression_node, is_positive)
+            ast::Expr::Attribute(attribute) => {
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                let inference = infer_expression_types(self.db, expression, TypeContext::default());
+                let nominal_constraints = self
+                    .narrow_nominal_attribute_by_truthiness(
+                        inference.expression_type(&*attribute.value),
+                        &attribute.value,
+                        attribute.attr.id(),
+                        is_positive,
+                    )
+                    .map(|(place, constraint)| {
+                        NarrowingConstraints::from_iter([(place, constraint)])
+                    });
+
+                Self::merge_optional_constraints_and(constraints, nominal_constraints)
+            }
+            ast::Expr::Subscript(subscript) => {
+                let constraints = self.evaluate_simple_expr(expression_node, is_positive);
+                let inference = infer_expression_types(self.db, expression, TypeContext::default());
+                let typeddict_constraints = self
+                    .narrow_typeddict_subscript_by_truthiness(
+                        inference.expression_type(&*subscript.value),
+                        &subscript.value,
+                        inference.expression_type(&*subscript.slice),
+                        is_positive,
+                    )
+                    .map(|(place, constraint)| {
+                        NarrowingConstraints::from_iter([(place, constraint)])
+                    });
+
+                Self::merge_optional_constraints_and(constraints, typeddict_constraints)
             }
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
@@ -1085,7 +1166,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
             ast::Expr::If(expr_if) => self.evaluate_expr_if(expr_if, expression, is_positive),
-            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
+            ast::Expr::Named(expr_named) => {
+                self.evaluate_expr_named(expr_named, expression, is_positive)
+            }
             _ => None,
         }
     }
@@ -1155,38 +1238,34 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_pattern_predicate_kind(
+    fn evaluate_negative_pattern_predicate_kind(
         &mut self,
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
-        is_positive: bool,
     ) -> PatternNarrowingResult<'db> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_singleton(subject, *singleton, is_positive),
+                self.evaluate_negative_match_pattern_singleton(subject, *singleton),
             ),
-            PatternPredicateKind::Class(kind) => {
-                PatternNarrowingResult::Possible(self.evaluate_match_pattern_class(
-                    subject,
-                    kind.class,
-                    pattern_predicate_kind,
-                    is_positive,
-                ))
+            PatternPredicateKind::Class(_) | PatternPredicateKind::Mapping(_) => {
+                PatternNarrowingResult::Possible(
+                    self.evaluate_negative_match_pattern(subject, pattern_predicate_kind),
+                )
             }
-            PatternPredicateKind::Mapping(_) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_mapping(subject, pattern_predicate_kind, is_positive),
-            ),
             PatternPredicateKind::Sequence(kind) => {
-                self.evaluate_match_pattern_sequence(subject, kind, is_positive)
+                self.evaluate_negative_match_pattern_sequence(subject, kind, pattern_predicate_kind)
             }
             PatternPredicateKind::Value(expr) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_value(subject, *expr, is_positive),
+                self.evaluate_match_pattern_value(subject, *expr, false),
             ),
-            PatternPredicateKind::Or(predicates) => {
-                self.evaluate_match_pattern_or(subject, predicates, is_positive)
-            }
+            PatternPredicateKind::Or(predicates) => PatternNarrowingResult::merge_alternatives(
+                predicates.iter().map(|predicate| {
+                    self.evaluate_negative_pattern_predicate_kind(predicate, subject)
+                }),
+                Self::merge_optional_constraints_and,
+            ),
             PatternPredicateKind::As(Some(pattern), _) => {
-                self.evaluate_pattern_predicate_kind(pattern, subject, is_positive)
+                self.evaluate_negative_pattern_predicate_kind(pattern, subject)
             }
             PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => {
                 PatternNarrowingResult::Possible(None)
@@ -1201,14 +1280,127 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
-        self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
-            .into_constraints()
+        if !is_positive {
+            return self
+                .evaluate_negative_pattern_predicate_kind(kind, subject)
+                .into_constraints();
+        }
+
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        let expression_constraints = self
+            .evaluate_positive_pattern_related_expressions(kind, subject, subject_node)
+            .into_constraints();
+
+        let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
+            return expression_constraints;
+        };
+        let place = self.expect_place(&subject_place);
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let mut constraints = expression_constraints.unwrap_or_default();
+        constraints.remove(&place);
+        if let Some(subject_constraint) = self.positive_subject_constraint(kind, subject_ty) {
+            constraints.insert(place, subject_constraint);
+        }
+        (!constraints.is_empty()).then_some(constraints)
+    }
+
+    fn evaluate_positive_pattern_related_expressions(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
+        subject_node: &ast::Expr,
+    ) -> PatternNarrowingResult<'db> {
+        if Self::sequence_expression_elements(subject_node).is_some() {
+            return self.evaluate_match_pattern_for_subject_element(
+                subject,
+                subject_node,
+                pattern,
+                None,
+            );
+        }
+
+        match pattern {
+            PatternPredicateKind::Value(value)
+                if matches!(
+                    subject_node,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                ) =>
+            {
+                PatternNarrowingResult::Possible(
+                    self.evaluate_match_pattern_value(subject, *value, true),
+                )
+            }
+            PatternPredicateKind::Or(patterns) => PatternNarrowingResult::merge_alternatives(
+                patterns.iter().map(|pattern| {
+                    self.evaluate_positive_pattern_related_expressions(
+                        pattern,
+                        subject,
+                        subject_node,
+                    )
+                }),
+                Self::merge_optional_constraints_or,
+            ),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.evaluate_positive_pattern_related_expressions(pattern, subject, subject_node)
+            }
+            _ => PatternNarrowingResult::Possible(None),
+        }
+    }
+
+    /// Return the positive constraint produced when `pattern` matches `subject_ty`.
+    ///
+    /// Leaf patterns return their direct runtime-test constraint; the caller applies that constraint
+    /// to the current subject type. Structural patterns use the type established by successful
+    /// pattern analysis.
+    fn positive_subject_constraint(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<NarrowingConstraint<'db>> {
+        match pattern {
+            PatternPredicateKind::Value(value) => {
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *value, TypeContext::default());
+                self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
+                    .map(NarrowingConstraint::intersection)
+            }
+            PatternPredicateKind::Singleton(singleton) => Some(NarrowingConstraint::intersection(
+                singleton_pattern_type(self.db, *singleton),
+            )),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.positive_subject_constraint(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => None,
+            PatternPredicateKind::Or(patterns) => {
+                let mut patterns = patterns.iter();
+                let mut constraint =
+                    self.positive_subject_constraint(patterns.next()?, subject_ty)?;
+                for pattern in patterns {
+                    constraint.merge_constraint_or(
+                        self.positive_subject_constraint(pattern, subject_ty)?,
+                    );
+                }
+                Some(constraint)
+            }
+            _ => {
+                let matched_subject_ty = PatternSuccessAnalyzer::new(self.db, self.scope())
+                    .matched_subject_type(pattern, subject_ty);
+                (!matched_subject_ty.is_equivalent_to(self.db, subject_ty))
+                    .then(|| NarrowingConstraint::intersection(matched_subject_ty))
+            }
+        }
     }
 }
 
 impl<'db> PatternSuccessAnalyzer<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
         Self { db, scope }
+    }
+
+    fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
+        ComparisonSoundnessPolicy::from_analysis_settings(
+            self.db.analysis_settings(self.scope.file(self.db)),
+        )
     }
 
     fn merge_binding(
@@ -1330,6 +1522,61 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
     }
 
+    /// Return the type established when `pattern` matches `subject_ty`.
+    ///
+    /// This analysis is independent of binding inference. In particular, every `or`-pattern
+    /// alternative is checked against the original subject, and sequence patterns retain the
+    /// structural facts established by their child patterns.
+    fn matched_subject_type(
+        &self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            PatternPredicateKind::Class(kind) => {
+                self.matched_class_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Mapping(kind) => {
+                self.matched_mapping_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Sequence(kind) => {
+                self.matched_sequence_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Or(patterns) => {
+                self.matched_or_pattern_subject_type(patterns, subject_ty)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.matched_subject_type(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
+            PatternPredicateKind::Value(value) => {
+                self.match_value_pattern_subject_type(*value, subject_ty)
+            }
+            PatternPredicateKind::Singleton(_) => {
+                self.intersect_types(subject_ty, necessary_match_pattern_type(self.db, pattern))
+            }
+        }
+    }
+
+    fn matched_or_pattern_subject_type(
+        &self,
+        patterns: &[PatternPredicateKind<'db>],
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::TypeVariablesOnly,
+            |analyzer, _, subject_ty| {
+                Some(UnionType::from_elements(
+                    analyzer.db,
+                    patterns
+                        .iter()
+                        .map(|pattern| analyzer.matched_subject_type(pattern, subject_ty)),
+                ))
+            },
+        )
+    }
+
     /// Return the type of the subject when a value pattern succeeds.
     ///
     /// A value pattern uses Python equality, so a successful match does not always narrow to the
@@ -1349,9 +1596,15 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
-        evaluate_type_equality(self.db, subject_ty, value_ty, true)
-            .map(|constraint| self.intersect_types(subject_ty, constraint))
-            .unwrap_or(subject_ty)
+        evaluate_type_equality(
+            self.db,
+            subject_ty,
+            value_ty,
+            true,
+            self.comparison_soundness_policy(),
+        )
+        .map(|constraint| self.intersect_types(subject_ty, constraint))
+        .unwrap_or(subject_ty)
     }
 
     fn analyze_successful_or_pattern(
@@ -1396,9 +1649,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             remaining_subject_ty =
                 pattern_binding_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
-            matched_subject_types.add_in_place(alternative.matched_subject_ty);
             binding_subject_types.add_in_place(alternative.binding_subject_ty);
             Self::merge_bindings(&mut bindings, alternative.bindings);
+
+            matched_subject_types.add_in_place(self.matched_subject_type(pattern, subject_ty));
             previous_pattern = pattern;
         }
 
@@ -1471,11 +1725,23 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         original_subject_ty: Type<'db>,
+        filtering_subject_ty: Type<'db>,
         subject_ty: Type<'db>,
     ) -> Option<Vec<ClassPatternArgument<'db>>> {
         let subject_is_final = subject_ty
             .nominal_class(self.db)
             .is_some_and(|class| class.is_final(self.db));
+        let specialized_pattern_class =
+            if context.positional_sources.is_empty() && kind.keywords.is_empty() {
+                None
+            } else {
+                context
+                    .class
+                    .zip(filtering_subject_ty.nominal_class(self.db))
+                    .and_then(|(pattern_class, subject_class)| {
+                        self.specialize_pattern_class_for_subject(pattern_class, subject_class)
+                    })
+            };
         let member_type = |name: &Name| {
             let original_member_ty = original_subject_ty
                 .member(self.db, name.as_str())
@@ -1483,27 +1749,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .ignore_possibly_undefined();
             let place = subject_ty.member(self.db, name.as_str()).place;
             let mut member_ty = place.ignore_possibly_undefined();
-            if original_subject_ty.nominal_class(self.db).is_some()
-                && let Type::Intersection(intersection) = subject_ty
-            {
-                let overlapping_member_ty = UnionType::from_elements(
-                    self.db,
-                    intersection
-                        .positive(self.db)
-                        .iter()
-                        .filter_map(|positive| {
-                            positive
-                                .member(self.db, name.as_str())
-                                .place
-                                .ignore_possibly_undefined()
-                        }),
-                );
-                if !overlapping_member_ty.is_never() {
-                    member_ty = Some(overlapping_member_ty);
-                }
-            }
 
-            if let Some(pattern_class) = context.class
+            if let Some(specialized_pattern_class) = specialized_pattern_class {
+                member_ty = Type::instance(self.db, specialized_pattern_class)
+                    .member(self.db, name.as_str())
+                    .place
+                    .ignore_possibly_undefined();
+            } else if let Some(pattern_class) = context.class
                 && pattern_class
                     .generic_context(self.db)
                     .and_then(|generic_context| {
@@ -1524,8 +1776,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     .place
                     .ignore_possibly_undefined();
                 // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
-                // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
-                // a `Base[int]` subject.
+                // pattern can reuse `int` from the subject. This is also the conservative fallback
+                // when the subject does not determine one exact specialization of the pattern
+                // subclass.
                 if original_subject_ty
                     .nominal_class(self.db)
                     .is_some_and(|original_class| {
@@ -1586,6 +1839,84 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             .collect()
     }
 
+    /// Infer an exact specialization of a generic pattern subclass from a specialized base-class
+    /// subject.
+    ///
+    /// This intentionally handles only the case where every pattern-class type variable has one
+    /// exact solution. Variant base classes and pattern classes with unconstrained parameters keep
+    /// the existing conservative member type.
+    ///
+    /// ```python
+    /// class Base[T]: ...
+    ///
+    /// class Child[T](Base[T]):
+    ///     item: T
+    ///
+    /// def f(value: Base[int]) -> None:
+    ///     match value:
+    ///         case Child(item=item):
+    ///             reveal_type(item)  # int
+    /// ```
+    fn specialize_pattern_class_for_subject(
+        &self,
+        pattern_class: ClassLiteral<'db>,
+        subject_class: ClassType<'db>,
+    ) -> Option<ClassType<'db>> {
+        let generic_context = pattern_class.generic_context(self.db)?;
+        let pattern_base = pattern_class
+            .identity_specialization(self.db)
+            .iter_mro(self.db)
+            .filter_map(ClassBase::into_class)
+            .find(|base| base.class_literal(self.db) == subject_class.class_literal(self.db))?;
+
+        let constraints = ConstraintSetBuilder::new();
+        let solutions = Type::instance(self.db, pattern_base)
+            .assignable_solutions_with_inferable(
+                self.db,
+                Type::instance(self.db, subject_class),
+                generic_context.inferable_typevars(self.db),
+            )
+            .solve_with(|variance, path_bound| {
+                let Some(lower) = path_bound.lower else {
+                    return Ok(None);
+                };
+                if variance != TypeVarVariance::Invariant
+                    || path_bound.upper.materialize_exact(self.db) != lower
+                {
+                    return Ok(None);
+                }
+                PathBounds::default_solve(self.db, &constraints, path_bound)
+            });
+        let Solutions::Constrained(solutions) = solutions else {
+            return None;
+        };
+        let [solution] = solutions.as_slice() else {
+            return None;
+        };
+
+        let typevars = generic_context.variables(self.db);
+        let types = typevars
+            .clone()
+            .map(|typevar| {
+                solution
+                    .iter()
+                    .find(|binding| binding.bound_typevar == typevar)
+                    .map(|binding| binding.solution)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        if types.iter().any(|ty| {
+            typevars.clone().any(|typevar| {
+                ty.references_typevar(self.db, typevar.typevar(self.db).identity(self.db))
+            })
+        }) {
+            return None;
+        }
+        Some(
+            pattern_class
+                .apply_specialization(self.db, |_| generic_context.specialize(self.db, types)),
+        )
+    }
+
     fn class_pattern_contexts(
         &self,
         kind: &ClassPatternPredicateKind<'db>,
@@ -1632,9 +1963,55 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             kind,
             context,
             original_subject_ty,
+            subject_ty,
             narrowed_subject_ty,
         )?;
         Some((narrowed_subject_ty, arguments))
+    }
+
+    fn matched_class_pattern_subject_type(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        UnionType::from_elements(
+            self.db,
+            self.class_pattern_contexts(kind).iter().map(|context| {
+                self.matched_class_pattern_subject_type_for_context(kind, context, subject_ty)
+            }),
+        )
+    }
+
+    fn matched_class_pattern_subject_type_for_context(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        context: &ClassPatternContext<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::EquivalentTypes,
+            |analyzer, original_subject_ty, subject_ty| {
+                let (narrowed_subject_ty, arguments) =
+                    analyzer.class_pattern_arm(kind, context, original_subject_ty, subject_ty)?;
+                let mut matched_subject_ty = narrowed_subject_ty;
+                for (pattern, argument) in kind
+                    .positional
+                    .iter()
+                    .chain(kind.keywords.iter().map(|keyword| &keyword.pattern))
+                    .zip(arguments)
+                {
+                    let child_ty = analyzer.matched_subject_type(pattern, argument.ty);
+                    if child_ty.is_never() {
+                        return None;
+                    }
+                    if argument.source == PatternValueSource::Subject {
+                        matched_subject_ty = child_ty;
+                    }
+                }
+                Some(matched_subject_ty)
+            },
+        )
     }
 
     fn analyze_successful_class_pattern(
@@ -1710,8 +2087,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         if let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(self.db) {
             let key_ty = key_ty.resolve_type_alias(self.db);
             let typed_dict_key_ty = typed_dict.key_type(self.db);
+            let policy = self.comparison_soundness_policy();
             if typed_dict_key_ty.is_never()
-                || equality_truthiness(self.db, typed_dict_key_ty, key_ty)
+                || equality_truthiness(self.db, typed_dict_key_ty, key_ty, policy)
                     == Truthiness::AlwaysFalse
             {
                 return None;
@@ -1807,6 +2185,31 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         Some((narrowed_subject_ty, value_types))
     }
 
+    fn matched_mapping_pattern_subject_type(
+        &self,
+        kind: &MappingPatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        let key_types = self.mapping_pattern_key_types(kind);
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::EquivalentTypes,
+            |analyzer, _, subject_ty| {
+                let (narrowed_subject_ty, value_types) =
+                    analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
+                for (entry, value_ty) in kind.entries.iter().zip(value_types) {
+                    if analyzer
+                        .matched_subject_type(&entry.pattern, value_ty)
+                        .is_never()
+                    {
+                        return None;
+                    }
+                }
+                Some(narrowed_subject_ty)
+            },
+        )
+    }
+
     fn analyze_successful_mapping_pattern(
         &self,
         kind: &MappingPatternPredicateKind<'db>,
@@ -1862,6 +2265,39 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         KnownClass::Dict.to_specialized_instance(self.db, &[key_ty, value_ty])
     }
 
+    fn matched_sequence_pattern_subject_type(
+        &self,
+        kind: &SequencePatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        let target_len = Self::sequence_pattern_target_len(kind);
+        let sequence_ty = sequence_pattern_type_builder(self.db).build();
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::TypeVariablesOnly,
+            |analyzer, _, subject_ty| {
+                let (narrowed_subject_ty, element_types) =
+                    analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
+                let mut persistent_element_types = Vec::with_capacity(kind.patterns.len());
+                for (pattern, element_ty) in kind.patterns.iter().zip(element_types) {
+                    let child = analyzer.analyze_successful_pattern(pattern, element_ty);
+                    if child.matched_subject_ty.is_never() {
+                        return None;
+                    }
+                    // Use the mutation-safe type so an exact tuple does not retain stale facts
+                    // about a mutable sequence stored in one of its elements.
+                    persistent_element_types.push(child.binding_subject_ty);
+                }
+                Some(analyzer.successful_sequence_subject_type(
+                    kind,
+                    subject_ty,
+                    narrowed_subject_ty,
+                    &persistent_element_types,
+                ))
+            },
+        )
+    }
+
     /// Return the subject and binding types of a successful sequence pattern.
     ///
     /// Each union member is checked against the complete pattern before element types are combined.
@@ -1881,12 +2317,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
+        let sequence_ty = sequence_pattern_type_builder(self.db).build();
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::TypeVariablesOnly,
             |analyzer, _, subject_ty| {
                 let (narrowed_subject_ty, element_types) =
-                    analyzer.sequence_pattern_arm(subject_ty, target_len)?;
+                    analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
                 let mut bindings = BTreeMap::new();
                 let mut matched_element_types = Vec::with_capacity(kind.patterns.len());
                 let mut binding_element_types = Vec::with_capacity(kind.patterns.len());
@@ -1923,8 +2360,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// Return the type established while a sequence pattern is being evaluated.
     ///
     /// Exact tuples can refine their tuple element types with the facts established by successful
-    /// child patterns. Other sequences retain the structural constraints already present in
-    /// `narrowed_subject_ty`.
+    /// child patterns. For other sequences, retain the observed length and indexed-element facts
+    /// while type-checking the successful case branch.
     fn successful_sequence_subject_type(
         &self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -1932,14 +2369,17 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         narrowed_subject_ty: Type<'db>,
         matched_element_types: &[Type<'db>],
     ) -> Type<'db> {
-        if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
-            self.intersect_types(
-                narrowed_subject_ty,
-                self.successful_sequence_pattern_type(kind, matched_element_types),
-            )
-        } else {
-            narrowed_subject_ty
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, matched_element_types)
+        {
+            return refined;
         }
+
+        self.intersect_types(
+            narrowed_subject_ty,
+            self.successful_sequence_pattern_type(kind, matched_element_types),
+        )
     }
 
     /// Return the sequence type safe to assign to a binding created by the pattern.
@@ -1954,6 +2394,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
         binding_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, binding_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 subject_ty,
@@ -1990,24 +2437,55 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         &self,
         subject_ty: Type<'db>,
         target_len: TupleLength,
+        sequence_ty: Type<'db>,
     ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
-        let narrowed_subject_ty =
-            self.intersect_types(subject_ty, sequence_pattern_type_builder(self.db).build());
+        let narrowed_subject_ty = self.intersect_types(subject_ty, sequence_ty);
         if narrowed_subject_ty.is_never() {
             return None;
         }
 
         let tuple = subject_ty.try_iterate(self.db).unwrap_or_else(|error| {
             let fallback_element_ty = error.fallback_element_type(self.db);
-            Cow::Owned(Tuple::homogeneous(if fallback_element_ty.is_unknown() {
-                Type::object()
-            } else {
-                fallback_element_ty
-            }))
+            Cow::Owned(TupleSpec::homogeneous(
+                if fallback_element_ty.is_unknown() {
+                    Type::object()
+                } else {
+                    fallback_element_ty
+                },
+            ))
         });
         let mut unpacker = TupleUnpacker::new(self.db, target_len);
         unpacker.unpack_tuple(tuple.as_ref()).ok()?;
         Some((narrowed_subject_ty, unpacker.into_types().collect()))
+    }
+
+    fn analyze_matched_subject_arms(
+        &self,
+        subject_ty: Type<'db>,
+        preservation: OriginalSubjectPreservation,
+        analyze_arm: impl Fn(&Self, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> Type<'db> {
+        let subject_arms = self.match_pattern_subject_arms(subject_ty);
+        let grouped_arms = subject_arms
+            .into_iter()
+            .chunk_by(|(original_subject_ty, _)| *original_subject_ty);
+        let mut matched_subject_types = UnionBuilder::new(self.db);
+
+        for (original_subject_ty, arms) in &grouped_arms {
+            let matched_types = UnionType::from_elements(
+                self.db,
+                arms.filter_map(|(_, filtering_subject_ty)| {
+                    analyze_arm(self, original_subject_ty, filtering_subject_ty)
+                }),
+            );
+            matched_subject_types.add_in_place(self.preserve_original_subject_type(
+                original_subject_ty,
+                matched_types,
+                preservation,
+            ));
+        }
+
+        matched_subject_types.build()
     }
 
     fn analyze_pattern_subject_arms(
@@ -2061,8 +2539,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             ));
         }
 
+        let matched_subject_ty = matched_subject_types.build();
         PatternSuccessResult {
-            matched_subject_ty: matched_subject_types.build(),
+            matched_subject_ty,
             binding_subject_ty: binding_subject_types.build(),
             bindings,
         }
@@ -2160,8 +2639,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         subject_element: SubjectElementPatternPredicate<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
         let pattern = subject_element.pattern;
-        let subject = pattern.subject(self.db).node_ref(self.db).node(self.module);
+        let subject_expression = pattern.subject(self.db);
+        let subject = subject_expression.node_ref(self.db).node(self.module);
         self.evaluate_match_pattern_for_subject_element(
+            subject_expression,
             subject,
             pattern.kind(self.db),
             Some(subject_element.target),
@@ -2186,6 +2667,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::IsNonEmptyIterable(expression) => expression.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
+    }
+
+    fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
+        ComparisonSoundnessPolicy::from_analysis_settings(
+            self.db.analysis_settings(self.scope().file(self.db)),
+        )
     }
 
     #[track_caller]
@@ -2291,39 +2778,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Narrow a successful sequence-pattern subject without retaining observed length or indexed
-    /// element types for mutable or stateful sequences.
-    fn narrow_type_by_sequence_pattern(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        kind: &SequencePatternPredicateKind<'db>,
-    ) -> Type<'db> {
-        let resolved = ty.resolve_type_alias(db);
-        let narrowed = match resolved {
-            Type::Union(union) => union.map(db, |element| {
-                Self::narrow_type_by_sequence_pattern(db, *element, kind)
-            }),
-            Type::Intersection(intersection) if !intersection.positive(db).is_empty() => {
-                intersection.map_positive(db, |element| {
-                    Self::narrow_type_by_sequence_pattern(db, *element, kind)
-                })
-            }
-            _ => {
-                let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
-                    necessary_sequence_pattern_type(db, kind)
-                } else {
-                    sequence_pattern_type_builder(db).build()
-                };
-                IntersectionBuilder::new(db)
-                    .add_positive(resolved)
-                    .add_positive(sequence_ty)
-                    .build()
-            }
-        };
-
-        if narrowed == resolved { ty } else { narrowed }
-    }
-
     /// Filter a type based on an equality or inequality comparison against an exact length.
     ///
     /// Exact tuple types are specialized to the observed length. Other types that encode their
@@ -2344,6 +2798,33 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             Type::Intersection(intersection) => intersection.map_positive(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
             }),
+            Type::TypeVar(typevar) => {
+                let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db)
+                else {
+                    return ty;
+                };
+
+                let upper_bound = bound_or_constraints.as_type(db);
+                let narrowed_upper_bound = match bound_or_constraints {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        Self::narrow_type_by_exact_len(db, bound, length, is_equality)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        UnionType::from_elements(
+                            db,
+                            constraints.elements(db).iter().map(|constraint| {
+                                Self::narrow_type_by_exact_len(db, *constraint, length, is_equality)
+                            }),
+                        )
+                    }
+                };
+
+                if narrowed_upper_bound == upper_bound {
+                    resolved
+                } else {
+                    IntersectionType::from_two_elements(db, resolved, narrowed_upper_bound)
+                }
+            }
             _ => {
                 if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
                     match tuple.resize(db, TupleLength::Fixed(length)) {
@@ -2351,10 +2832,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         Err(_) => Type::Never,
                     }
                 } else {
-                    let tuple_length = resolved
-                        .as_nominal_instance()
-                        .and_then(|instance| instance.tuple_spec(db))
-                        .map(|spec| spec.len());
+                    let tuple_length = resolved.tuple_instance_spec(db).map(|spec| spec.len());
                     let satisfies_comparison = |length_type: Type<'db>| {
                         length_type
                             .as_int_literal()
@@ -2416,10 +2894,28 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_expr_named(
         &mut self,
         expr_named: &ast::ExprNamed,
+        expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let target_constraints = self.evaluate_simple_expr(&expr_named.target, is_positive);
-        let value_constraints = self.evaluate_simple_expr(&expr_named.value, is_positive);
+        let mut value_constraints =
+            self.evaluate_expression_node_predicate(&expr_named.value, expression, is_positive);
+
+        if let Some(value_constraints) = value_constraints.as_mut()
+            && let Some(target) = PlaceExpr::try_from_expr(&expr_named.target)
+            && let Some(target_place) = self.places().place_id(&target)
+        {
+            let places = self.places();
+            // The target is rebound after the value is evaluated, invalidating constraints on the
+            // target and any member places rooted at it.
+            value_constraints.retain(|place, _| {
+                *place != target_place
+                    && !places
+                        .parents(places.place(*place))
+                        .any(|parent| parent == target_place)
+            });
+        }
+
         match (target_constraints, value_constraints) {
             (Some(mut target), Some(value)) => {
                 merge_constraints_and(&mut target, value);
@@ -2431,105 +2927,53 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if has_bytes_like_containment(self.db, rhs_ty) {
-            return None;
+        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+
+        // The supported containers compare against their iterated elements, so union arms can be
+        // combined. String membership also accepts multi-character substrings, so evaluate literal
+        // haystacks separately, including when they occur in a union.
+        if let Some(haystack) = rhs_ty.as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
         }
+        if let Type::Union(union) = rhs_ty
+            && union.elements(self.db).iter().any(|element| {
+                element
+                    .resolve_type_alias(self.db)
+                    .as_string_literal()
+                    .is_some()
+            })
+        {
+            let mut builder = UnionBuilder::new(self.db);
+            for element in union.elements(self.db) {
+                builder = builder.add(self.evaluate_expr_in(lhs_ty, *element)?);
+            }
+            let narrowed = builder.build();
+            return (narrowed != lhs_ty).then_some(narrowed);
+        }
+        let membership_type = elements_of(self.db, rhs_ty)?;
+        let iterable = membership_type.try_iterate(self.db).ok()?;
 
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
-
-        // A fixed-length iteration spec with no elements does not imply that membership is always
-        // false: `"" in ""` is true. Exact tuples are the fixed-length containers here whose
-        // membership is known to test their elements individually.
-        if matches!(
-            rhs_ty.resolve_type_alias(self.db),
-            Type::NominalInstance(instance)
-                if instance.has_known_class(self.db, KnownClass::Tuple)
-        ) && iterable
+        if iterable
             .as_fixed_length()
             .is_some_and(|fixed| fixed.all_elements().is_empty())
         {
             return Some(Type::Never);
         }
-        let rhs_values = iterable
-            .homogeneous_element_type(self.db)
-            .resolve_type_alias(self.db);
-
-        if let Type::Union(union) = rhs_values {
-            let mut builder = UnionBuilder::new(self.db);
-            for rhs_value in union.elements(self.db) {
-                builder = builder.add(self.evaluate_membership_equality(lhs_ty, *rhs_value)?);
-            }
-            Some(builder.build())
-        } else {
-            self.evaluate_membership_equality(lhs_ty, rhs_values)
-        }
+        evaluate_type_equality(
+            self.db,
+            lhs_ty,
+            iterable.homogeneous_element_type(self.db),
+            true,
+            self.comparison_soundness_policy(),
+        )
     }
 
-    /// Apply equality compatibility without losing the container's declared element domain.
-    ///
-    /// Generic equality retains disjoint single-valued arms when an element subclass could define
-    /// custom equality. Membership narrowing instead removes those arms unless the equality
-    /// evaluator can establish a more specific compatibility, while retaining broader arms whose
-    /// runtime values may still match an element.
-    fn evaluate_membership_equality(
-        &self,
-        lhs_ty: Type<'db>,
-        rhs_ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
-        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
-
-        // Preserve the shared specialization of a constrained TypeVar. Expanding the TypeVar
-        // before comparing it with `lhs_ty` would lose the correlation between this occurrence
-        // and other occurrences in the same function.
-        if let Type::TypeVar(typevar) = rhs_ty
-            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.typevar(self.db).bound_or_constraints(self.db)
-            && constraints.elements(self.db).iter().all(|constraint| {
-                evaluate_type_equality(self.db, lhs_ty, *constraint, true)
-                    .is_some_and(|narrowed| narrowed.is_equivalent_to(self.db, *constraint))
-            })
-        {
-            return Some(rhs_ty);
+    fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), false);
         }
-
-        let has_single_valued_component = match lhs_ty {
-            Type::Union(union) => union
-                .elements(self.db)
-                .iter()
-                .any(|element| element.is_single_valued(self.db)),
-            _ => lhs_ty.is_single_valued(self.db),
-        };
-        if !has_single_valued_component {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true);
-        }
-
-        let mut builder = UnionBuilder::new(self.db);
-        let add_lhs_element = |builder: UnionBuilder<'db>, element: Type<'db>| {
-            let element = element.resolve_type_alias(self.db);
-            match evaluate_type_equality(self.db, element, rhs_ty, true) {
-                Some(Type::Never) => builder,
-                Some(constraint) => builder.add(constraint),
-                None if !element.is_single_valued(self.db) => builder.add(element),
-                None => builder,
-            }
-        };
-
-        if let Type::Union(union) = lhs_ty {
-            for element in union.elements(self.db).iter().copied() {
-                builder = add_lhs_element(builder, element);
-            }
-        } else {
-            builder = add_lhs_element(builder, lhs_ty);
-        }
-
-        builder = builder.add(rhs_ty);
-        let narrowed = builder.build();
-        (narrowed != lhs_ty).then_some(narrowed)
-    }
-
-    fn evaluate_expr_not_in(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+        let membership_type = elements_of(self.db, rhs_ty)?;
+        let iterable = membership_type.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
         let mut builder = IntersectionBuilder::new(self.db);
         let mut constrained = false;
@@ -2537,13 +2981,44 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // `not in` negates equality with every element; it does not use `__ne__`. Only add an
         // exclusion when every value represented by a slot is known to compare equal.
         for element_ty in fixed_length.all_elements().iter().copied() {
-            if let Some(constraint) = equality_exclusion_constraint(self.db, element_ty) {
+            if let Some(constraint) = equality_exclusion_constraint(
+                self.db,
+                element_ty,
+                self.comparison_soundness_policy(),
+            ) {
                 builder = builder.add_positive(constraint);
                 constrained = true;
             }
         }
 
         constrained.then(|| builder.build())
+    }
+
+    /// Preserve the precise element types of an immediately consumed list or set literal.
+    ///
+    /// These expressions cannot be mutated before membership is evaluated. Representing them as
+    /// fixed-length tuples also lets negative narrowing exclude values that are guaranteed present.
+    fn inline_membership_rhs_type(
+        &self,
+        rhs: &ast::Expr,
+        inference: &ExpressionInference<'db>,
+    ) -> Option<Type<'db>> {
+        let elements = match rhs.expression_value() {
+            ast::Expr::List(list) => &list.elts,
+            ast::Expr::Set(set) => &set.elts,
+            _ => return None,
+        };
+
+        if elements.iter().any(ast::Expr::is_starred_expr) {
+            return None;
+        }
+
+        Some(Type::heterogeneous_tuple(
+            self.db,
+            elements
+                .iter()
+                .map(|element| inference.expression_type(element)),
+        ))
     }
 
     fn evaluate_expr_compare_op(
@@ -2554,26 +3029,122 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<Type<'db>> {
         if op == ast::CmpOp::Eq {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, is_positive);
+            return evaluate_type_equality(
+                self.db,
+                lhs_ty,
+                rhs_ty,
+                is_positive,
+                self.comparison_soundness_policy(),
+            );
         }
         if op == ast::CmpOp::NotEq {
-            return evaluate_type_inequality(self.db, lhs_ty, rhs_ty, is_positive);
+            return evaluate_type_inequality(
+                self.db,
+                lhs_ty,
+                rhs_ty,
+                is_positive,
+                self.comparison_soundness_policy(),
+            );
         }
 
         let op = if is_positive { op } else { op.negate() };
 
         match op {
             ast::CmpOp::IsNot => {
-                if rhs_ty.is_singleton(self.db) {
-                    Some(rhs_ty.negate(self.db))
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
+                // An `is not` check can narrow the LHS only when the RHS identifies a single
+                // runtime object. There are two ways this can happen:
+                //
+                // 1. The RHS's runtime identity type is itself a singleton. This includes ordinary
+                //    singleton types, such as `None`, and distinct `NewType`s that all wrap the
+                //    same singleton object. Narrow against the runtime identity type so that every
+                //    static type representing that object is excluded.
+                //
+                // 2. The RHS is a constrained `TypeVar` whose constraints are all singletons. For
+                //    example, `T = TypeVar("T", None, EllipsisType)` can be specialized to either
+                //    `None` or `EllipsisType` across different calls. Within one specialization,
+                //    however, every occurrence of `T` resolves to the same constraint, so all
+                //    values of type `T` are either `None` or all are `...`. Keep `T` symbolic so
+                //    that excluding it preserves its relationship with subsequent occurrences of
+                //    the same specialization.
+                //
+                // In every other case, the RHS might identify multiple objects even within a
+                // single specialization, so excluding its entire type would be unsound.
+                let rhs_constraint = if rhs_identity_ty.is_singleton(self.db) {
+                    rhs_identity_ty
+                } else if matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
+                    && rhs_ty.is_singleton(self.db)
+                {
+                    rhs_ty
                 } else {
-                    // Non-singletons cannot be safely narrowed using `is not`
-                    None
-                }
+                    return None;
+                };
+                Some(rhs_constraint.negate(self.db))
             }
-            ast::CmpOp::Is => Some(rhs_ty),
+            ast::CmpOp::Is => {
+                // Preserve the nominal RHS constraint for ordinary overlaps. If a `NewType`
+                // creates additional runtime-only overlap, retain the corresponding part of the
+                // LHS as well so that applying the constraint does not erase that possibility.
+                let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
+                let rhs_resolved = rhs_ty.resolve_type_alias(self.db);
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
+                let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
+                    let overlaps_only_at_runtime = |rhs_element| {
+                        element.is_disjoint_from(self.db, rhs_element)
+                            && element
+                                .identity_comparison_truthiness(self.db, rhs_element)
+                                .may_be_true()
+                    };
+                    let has_runtime_only_overlap = match rhs_resolved {
+                        Type::Union(union) => union
+                            .elements(self.db)
+                            .iter()
+                            .copied()
+                            .any(overlaps_only_at_runtime),
+                        Type::TypeVar(typevar) => {
+                            match typevar.typevar(self.db).bound_or_constraints(self.db) {
+                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                    overlaps_only_at_runtime(bound)
+                                }
+                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                    constraints
+                                        .elements(self.db)
+                                        .iter()
+                                        .copied()
+                                        .any(overlaps_only_at_runtime)
+                                }
+                                None => overlaps_only_at_runtime(rhs_ty),
+                            }
+                        }
+                        rhs_ty => overlaps_only_at_runtime(rhs_ty),
+                    };
+                    if !has_runtime_only_overlap {
+                        return builder;
+                    }
+
+                    let runtime_overlap =
+                        IntersectionType::from_two_elements(self.db, element, rhs_identity_ty);
+                    builder.add(if runtime_overlap.is_never() {
+                        element
+                    } else {
+                        runtime_overlap
+                    })
+                };
+
+                if let Type::Union(union) = lhs_ty.resolve_type_alias(self.db) {
+                    builder = union
+                        .elements(self.db)
+                        .iter()
+                        .copied()
+                        .fold(builder, add_runtime_overlap);
+                } else {
+                    builder = add_runtime_overlap(builder, lhs_ty);
+                }
+
+                Some(builder.build())
+            }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in(rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }
@@ -2619,7 +3190,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     match subclass_of.subclass_of().with_transposed_type_var(db) {
                         SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(class),
                         SubclassOfInner::Class(ClassType::Generic(_))
-                        | SubclassOfInner::Dynamic(_) => None,
+                        | SubclassOfInner::Dynamic(_)
+                        | SubclassOfInner::Protocol(_) => None,
                         SubclassOfInner::TypeVar(tvar) => {
                             find_underlying_class(db, tvar.typevar(db).upper_bound(db)?)
                         }
@@ -2703,6 +3275,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //         if t[0] is not None:
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
+            && let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is)
             && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
                 .expression_type(&*subscript.value)
@@ -2713,21 +3286,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
-            && rhs_ty.is_singleton(self.db)
         {
-            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered = union.filter(self.db, |elem| {
-                elem.as_nominal_instance()
-                    .and_then(|inst| inst.tuple_spec(self.db))
+                elem.tuple_instance_spec(self.db)
                     .and_then(|spec| spec.py_index(self.db, index).ok())
                     .is_none_or(|el_ty| {
-                        if is_positive_check {
-                            // `is X` context: keep tuples where element could be X
-                            !el_ty.is_disjoint_from(self.db, rhs_ty)
-                        } else {
-                            // `is not X` context: keep tuples where element is not always X
-                            !el_ty.is_subtype_of(self.db, rhs_ty)
-                        }
+                        el_ty
+                            .identity_comparison_truthiness(self.db, rhs_ty)
+                            .negate_if(!is_positive_check)
+                            .may_be_true()
                     })
             });
             if filtered != Type::Union(union) {
@@ -2831,6 +3398,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             if let ast::Expr::Subscript(subscript) = comparators[0].expression_value() {
                 narrow_subscript(subscript, inference.expression_type(&**left));
             }
+        }
+
+        if let [
+            operator @ (ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot),
+        ] = &**ops
+        {
+            let comparison = if matches!(operator, ast::CmpOp::Is | ast::CmpOp::IsNot) {
+                NominalAttributeComparison::Identity
+            } else {
+                NominalAttributeComparison::Equality
+            };
+            let is_positive_comparison =
+                is_positive == matches!(operator, ast::CmpOp::Eq | ast::CmpOp::Is);
 
             let mut narrow_attribute = |attribute: &ast::ExprAttribute, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*attribute.value);
@@ -2840,13 +3420,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     &attribute.value,
                     attribute.attr.id(),
                     other_type,
-                    is_equality,
+                    comparison,
+                    is_positive_comparison,
                 ) {
                     insert_narrowing_constraint(&mut constraints, place, constraint);
                 }
             };
 
-            if let ast::Expr::Attribute(attribute) = &**left {
+            if let ast::Expr::Attribute(attribute) = &**left
+                && comparators[0].as_named_expr().is_none_or(|named| {
+                    PlaceExpr::try_from_expr(&named.target)
+                        != PlaceExpr::try_from_expr(&attribute.value)
+                })
+            {
                 narrow_attribute(attribute, inference.expression_type(&comparators[0]));
             }
 
@@ -2954,6 +3540,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
+            let lhs_narrowing_rhs_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {
+                self.inline_membership_rhs_type(right, inference)
+                    .unwrap_or(rhs_ty)
+            } else {
+                rhs_ty
+            };
 
             // Narrowing for:
             // - `if type(x) is Y`
@@ -3016,7 +3608,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
+                && let Some(ty) =
+                    self.evaluate_expr_compare_op(lhs_ty, lhs_narrowing_rhs_ty, *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -3197,66 +3790,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         Some(NarrowingConstraints::from_iter([place_and_constraint]))
     }
 
-    fn evaluate_match_pattern_singleton(
+    fn evaluate_negative_match_pattern_singleton(
         &mut self,
         subject: Expression<'db>,
         singleton: ast::Singleton,
-        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = singleton_pattern_type(self.db, singleton);
-        let ty = ty.negate_if(self.db, !is_positive);
+        let ty = singleton_pattern_type(self.db, singleton).negate(self.db);
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(ty),
-        )]))
-    }
-
-    fn evaluate_match_pattern_class(
-        &mut self,
-        subject: Expression<'db>,
-        cls: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        if !is_positive {
-            return self.evaluate_negative_match_pattern(subject, pattern);
-        }
-
-        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject_place);
-        let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
-        let narrowed_type = positive_class_pattern_type(self.db, class_type)?;
-
-        Some(NarrowingConstraints::from_iter([(
-            place,
-            NarrowingConstraint::intersection(narrowed_type),
-        )]))
-    }
-
-    fn evaluate_match_pattern_mapping(
-        &mut self,
-        subject: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        if !is_positive {
-            return self.evaluate_negative_match_pattern(subject, pattern);
-        }
-
-        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject_place);
-        let mapping_type = ClassInfoConstraintFunction::IsInstance.generate_constraint(
-            self.db,
-            KnownClass::Mapping.to_class_literal(self.db),
-            true,
-        )?;
-
-        Some(NarrowingConstraints::from_iter([(
-            place,
-            NarrowingConstraint::intersection(mapping_type),
         )]))
     }
 
@@ -3280,11 +3825,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         )]))
     }
 
-    fn evaluate_match_pattern_sequence(
+    fn evaluate_negative_match_pattern_sequence(
         &mut self,
         subject: Expression<'db>,
         kind: &SequencePatternPredicateKind<'db>,
-        is_positive: bool,
+        pattern: &PatternPredicateKind<'db>,
     ) -> PatternNarrowingResult<'db> {
         let subject_node = subject.node_ref(self.db).node(self.module);
 
@@ -3296,27 +3841,16 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // Apply the element constraints to the narrowable elements of the subject expression.
         if let Some(elements) = Self::sequence_expression_elements(subject_node) {
             return self.evaluate_match_pattern_sequence_for_subject_element(
-                elements,
-                kind,
-                is_positive,
-                None,
+                subject, elements, kind, false, None,
             );
         }
 
-        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
         let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
             return PatternNarrowingResult::Possible(None);
         };
 
-        let narrowed_ty = if is_positive {
-            Self::narrow_type_by_sequence_pattern(self.db, subject_ty, kind)
-        } else {
-            pattern_binding_fallthrough_type(
-                self.db,
-                &PatternPredicateKind::Sequence(kind.clone()),
-                subject_ty,
-            )
-        };
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let narrowed_ty = pattern_binding_fallthrough_type(self.db, pattern, subject_ty);
         if narrowed_ty == subject_ty {
             return PatternNarrowingResult::Possible(None);
         }
@@ -3325,7 +3859,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::replacement(narrowed_ty),
+            NarrowingConstraint::intersection(narrowed_ty),
         )])))
     }
 
@@ -3339,6 +3873,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     fn evaluate_match_pattern_sequence_for_subject_element(
         &mut self,
+        subject_expression: Expression<'db>,
         elements: &[ast::Expr],
         kind: &SequencePatternPredicateKind<'db>,
         is_positive: bool,
@@ -3373,7 +3908,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             .chain(elements.iter().rev().zip(suffix_patterns.iter().rev()));
         let mut constraints = None;
         for (element, pattern) in element_patterns {
-            match self.evaluate_match_pattern_for_subject_element(element, pattern, target) {
+            match self.evaluate_match_pattern_for_subject_element(
+                subject_expression,
+                element,
+                pattern,
+                target,
+            ) {
                 PatternNarrowingResult::Impossible => return PatternNarrowingResult::Impossible,
                 PatternNarrowingResult::Possible(element_constraints) => {
                     constraints =
@@ -3387,6 +3927,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     fn evaluate_match_pattern_for_subject_element(
         &mut self,
+        subject_expression: Expression<'db>,
         subject: &ast::Expr,
         pattern: &PatternPredicateKind<'db>,
         target: Option<ExpressionNodeKey>,
@@ -3395,14 +3936,27 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return match pattern {
                 PatternPredicateKind::Sequence(kind) => self
                     .evaluate_match_pattern_sequence_for_subject_element(
-                        elements, kind, true, target,
+                        subject_expression,
+                        elements,
+                        kind,
+                        true,
+                        target,
                     ),
-                PatternPredicateKind::As(Some(pattern), _) => {
-                    self.evaluate_match_pattern_for_subject_element(subject, pattern, target)
-                }
+                PatternPredicateKind::As(Some(pattern), _) => self
+                    .evaluate_match_pattern_for_subject_element(
+                        subject_expression,
+                        subject,
+                        pattern,
+                        target,
+                    ),
                 PatternPredicateKind::Or(patterns) => PatternNarrowingResult::merge_alternatives(
                     patterns.iter().map(|pattern| {
-                        self.evaluate_match_pattern_for_subject_element(subject, pattern, target)
+                        self.evaluate_match_pattern_for_subject_element(
+                            subject_expression,
+                            subject,
+                            pattern,
+                            target,
+                        )
                     }),
                     Self::merge_optional_constraints_or,
                 ),
@@ -3414,6 +3968,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let Some(subject) = PlaceExpr::try_from_expr(subject_expr) else {
             return PatternNarrowingResult::Possible(None);
         };
+        let subject_ty =
+            infer_expression_types(self.db, subject_expression, TypeContext::default())
+                .expression_type(subject_expr);
+        let Some(constraint) = self.positive_subject_constraint(pattern, subject_ty) else {
+            return PatternNarrowingResult::Possible(None);
+        };
+        if NarrowingConstraint::intersection(subject_ty)
+            .merge_constraint_and(constraint.clone())
+            .evaluate_constraint_type(self.db)
+            .is_never()
+        {
+            return PatternNarrowingResult::Impossible;
+        }
         if let Some(target) = target
             && ExpressionNodeKey::from(subject_expr) != target
         {
@@ -3421,7 +3988,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             self.expect_place(&subject),
-            NarrowingConstraint::intersection(necessary_match_pattern_type(self.db, pattern)),
+            constraint,
         )])))
     }
 
@@ -3486,6 +4053,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 &attribute.value,
                 attribute.attr.id(),
                 value_ty,
+                NominalAttributeComparison::Equality,
                 is_positive,
             ) {
                 constraints.insert(place, constraint);
@@ -3493,26 +4061,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
 
         Some(constraints)
-    }
-
-    fn evaluate_match_pattern_or(
-        &mut self,
-        subject: Expression<'db>,
-        predicates: &[PatternPredicateKind<'db>],
-        is_positive: bool,
-    ) -> PatternNarrowingResult<'db> {
-        let merge_constraints = if is_positive {
-            Self::merge_optional_constraints_or
-        } else {
-            Self::merge_optional_constraints_and
-        };
-
-        PatternNarrowingResult::merge_alternatives(
-            predicates.iter().map(|predicate| {
-                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
-            }),
-            merge_constraints,
-        )
     }
 
     fn evaluate_bool_op(
@@ -3557,11 +4105,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 if let Some(ref mut first) = first {
                     for rest_constraint in rest {
-                        if let Some(rest_constraint) = rest_constraint {
-                            merge_constraints_or(first, rest_constraint);
-                        } else {
-                            return None;
-                        }
+                        merge_constraints_or(first, rest_constraint?);
                     }
                 }
                 first
@@ -3628,6 +4172,36 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let schema = TypedDictSchema::from_iter([(field_name, field)]);
         let synthesized_typeddict = TypedDictType::from_schema_items(self.db, schema);
         // As mentioned above, the synthesized `TypedDict` is always negated.
+        let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
+        let place = self.expect_place(&subscript_place_expr);
+        Some((place, NarrowingConstraint::intersection(intersection)))
+    }
+
+    /// Narrow tagged unions of `TypedDict`s based on the truthiness of a `Literal` key.
+    fn narrow_typeddict_subscript_by_truthiness(
+        &self,
+        subscript_value_type: Type<'db>,
+        subscript_value_expr: &ast::Expr,
+        subscript_key_type: Type<'db>,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        if !is_or_contains_typeddict(self.db, subscript_value_type) {
+            return None;
+        }
+        let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
+        let key_literal = subscript_key_type.as_string_literal()?;
+
+        let excluded_field_type = if is_positive {
+            Type::AlwaysFalsy
+        } else {
+            Type::AlwaysTruthy
+        };
+        let field = TypedDictFieldBuilder::new(excluded_field_type)
+            .required(false)
+            .read_only(true)
+            .build();
+        let schema = TypedDictSchema::from_iter([(Name::from(key_literal.value(self.db)), field)]);
+        let synthesized_typeddict = TypedDictType::from_schema_items(self.db, schema);
         let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
         let place = self.expect_place(&subscript_place_expr);
         Some((place, NarrowingConstraint::intersection(intersection)))
@@ -3709,8 +4283,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
         let filtered = union.filter(self.db, |elem| {
-            elem.as_nominal_instance()
-                .and_then(|inst| inst.tuple_spec(self.db))
+            elem.tuple_instance_spec(self.db)
                 .and_then(|spec| spec.py_index(self.db, index).ok())
                 .is_none_or(|el_ty| {
                     if is_equality {
@@ -3738,24 +4311,73 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         attribute_value_expr: &ast::Expr,
         attribute_name: &str,
         rhs_type: Type<'db>,
-        is_equality: bool,
+        comparison: NominalAttributeComparison,
+        is_positive: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
             return None;
         };
-        if !is_supported_tag_literal(rhs_type) {
+
+        if comparison == NominalAttributeComparison::Equality && !is_supported_tag_literal(rhs_type)
+        {
             return None;
         }
 
         let narrowed = union.filter(self.db, |element| {
-            nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
-                if is_equality {
-                    !is_supported_tag_literal(attribute_type)
-                        || !attribute_type.is_disjoint_from(self.db, rhs_type)
-                } else {
-                    !attribute_type.is_subtype_of(self.db, rhs_type)
-                }
-            })
+            element
+                .resolve_type_alias(self.db)
+                .member(self.db, attribute_name)
+                .place
+                .ignore_possibly_undefined()
+                .is_none_or(|attribute_type| match (comparison, is_positive) {
+                    (NominalAttributeComparison::Equality, true) => {
+                        !is_supported_tag_literal(attribute_type)
+                            || !attribute_type.is_disjoint_from(self.db, rhs_type)
+                    }
+                    (NominalAttributeComparison::Equality, false) => {
+                        !attribute_type.is_subtype_of(self.db, rhs_type)
+                    }
+                    (NominalAttributeComparison::Identity, is_positive) => attribute_type
+                        .identity_comparison_truthiness(self.db, rhs_type)
+                        .negate_if(!is_positive)
+                        .may_be_true(),
+                })
+        });
+
+        if narrowed == Type::Union(union) {
+            return None;
+        }
+
+        let attribute_value_place_expr = PlaceExpr::try_from_expr(attribute_value_expr)?;
+        let place = self.expect_place(&attribute_value_place_expr);
+        Some((place, NarrowingConstraint::replacement(narrowed)))
+    }
+
+    fn narrow_nominal_attribute_by_truthiness(
+        &self,
+        attribute_value_type: Type<'db>,
+        attribute_value_expr: &ast::Expr,
+        attribute_name: &str,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
+            return None;
+        };
+
+        let narrowed = union.filter(self.db, |element| {
+            element
+                .resolve_type_alias(self.db)
+                .member(self.db, attribute_name)
+                .place
+                .ignore_possibly_undefined()
+                .is_none_or(|attribute_type| {
+                    let truthiness = attribute_type.bool(self.db);
+                    if is_positive {
+                        !truthiness.is_always_false()
+                    } else {
+                        !truthiness.is_always_true()
+                    }
+                })
         });
 
         if narrowed == Type::Union(union) {
@@ -3878,14 +4500,11 @@ fn required_typeddict_key<'db>(
 /// synthesized `TypedDict` used for `TypedDict` arms.
 fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
     let signature = Signature::new(
-        Parameters::new(
-            db,
-            [
-                Parameter::positional_only(Some(Name::new_static("self"))),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(Type::string_literal(db, key)),
-            ],
-        ),
+        Parameters::standard([
+            Parameter::positional_only(Some(Name::new_static("self"))),
+            Parameter::positional_only(Some(Name::new_static("key")))
+                .with_annotated_type(Type::string_literal(db, key)),
+        ]),
         Type::bool_literal(true),
     );
 
@@ -3905,22 +4524,6 @@ fn is_supported_tag_literal(ty: Type) -> bool {
                 | LiteralValueTypeKind::Enum(_)
         )
     )
-}
-
-fn nominal_attribute_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    attribute_name: &str,
-) -> Option<Type<'db>> {
-    let resolved_ty = ty.resolve_type_alias(db);
-    if resolved_ty.is_nominal_instance() {
-        resolved_ty
-            .member(db, attribute_name)
-            .place
-            .ignore_possibly_undefined()
-    } else {
-        None
-    }
 }
 
 // Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag literal
@@ -4016,8 +4619,7 @@ fn any_tuple_has_out_of_bounds_index<'db>(
     index: i32,
 ) -> bool {
     union.elements(db).iter().any(|elem| {
-        elem.as_nominal_instance()
-            .and_then(|inst| inst.tuple_spec(db))
+        elem.tuple_instance_spec(db)
             .is_some_and(|spec| spec.py_index(db, index).is_err())
     })
 }
@@ -4034,8 +4636,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
     index: i32,
 ) -> bool {
     union.elements(db).iter().all(|elem| {
-        elem.as_nominal_instance()
-            .and_then(|inst| inst.tuple_spec(db))
+        elem.tuple_instance_spec(db)
             .and_then(|spec| spec.py_index(db, index).ok())
             .is_none_or(is_supported_tag_literal)
     })

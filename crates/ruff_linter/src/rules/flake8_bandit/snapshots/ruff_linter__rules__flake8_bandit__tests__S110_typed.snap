@@ -33,4 +33,3 @@ S110 `try`-`except`-`pass` detected, consider logging the exception
 13 | / except ValueError:
 14 | |     pass
    | |________^
-   |

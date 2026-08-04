@@ -15,6 +15,9 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// Use the `UserDict`, `UserList`, and `UserString` objects from the `collections` module
 /// instead.
 ///
+/// This rule does not apply to stub files, which should faithfully represent the runtime
+/// implementation and may be out of the author's control.
+///
 /// ## Example
 ///
 /// ```python
@@ -83,6 +86,10 @@ impl AlwaysFixableViolation for SubclassBuiltin {
 
 /// FURB189
 pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };

@@ -44,7 +44,6 @@ RUF059 [*] Unpacked variable `x` is never used
 25 |
 26 |     (x, y) = baz = bar
    |      ^
-   |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
 25 |
@@ -61,7 +60,6 @@ RUF059 [*] Unpacked variable `y` is never used
 25 |
 26 |     (x, y) = baz = bar
    |         ^
-   |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
 25 |

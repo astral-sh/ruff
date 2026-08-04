@@ -29,6 +29,7 @@ pub struct NewType<'db> {
     pub name: ast::name::Name,
 
     /// The binding where this NewType is first created.
+    #[returns(copy)]
     pub definition: Definition<'db>,
 
     // The base type of this NewType, if it's eagerly specified. This is typically `None` when a
@@ -36,6 +37,7 @@ pub struct NewType<'db> {
     // the recursive case. This becomes `Some` when a `NewType` is modified by methods like
     // `.normalize()`. Callers should use the `base` method instead of accessing this field
     // directly.
+    #[returns(copy)]
     eager_base: Option<NewTypeBase<'db>>,
 }
 
@@ -51,6 +53,7 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
+        returns(copy),
         cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -108,7 +111,7 @@ impl<'db> NewType<'db> {
         Type::object()
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         // Two instances of the "same" `NewType` won't compare == if one of them has an eagerly
         // evaluated base (or a normalized base, etc.) and the other doesn't, so we only check for
         // equality of the `definition`.
@@ -118,7 +121,7 @@ impl<'db> NewType<'db> {
     /// Create a new `NewType` by mapping the underlying `ClassType`. This descends through any
     /// number of nested `NewType` layers and rebuilds the whole chain. In the rare case of cyclic
     /// `NewType`s with no underlying `ClassType`, this has no effect and does not call `f`.
-    pub(crate) fn try_map_base_class_type(
+    fn try_map_base_class_type(
         self,
         db: &'db dyn Db,
         f: impl FnOnce(ClassType<'db>) -> Option<ClassType<'db>>,
@@ -256,7 +259,7 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
 }
 
 /// `typing.NewType` typically wraps a class type, but it can also wrap another newtype.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum NewTypeBase<'db> {
     ClassType(ClassType<'db>),
     NewType(NewType<'db>),

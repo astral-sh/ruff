@@ -25,6 +25,8 @@ scripts/collect_ty_ecosystem_run_metadata.py \
 
 The manifest contains the analyzed Ruff revisions, Actions `EXCLUDE_NEWER`, ecosystem-analyzer and mypy-primer revisions, and each project's CI Python version. Stop if the helper cannot determine a unique value; never substitute a comment timestamp or local default.
 
+The current workflow splits compilation into `Build ty (base)` and `Build ty (pr)`. The helper reads the base job, which records both the merge base and PR merge revision, and still supports historical runs with a single `Build ty` job.
+
 ## Prepare ty
 
 If a primary agent supplied freshly copied base and PR binaries plus the PR ecosystem config, verify the paths exist and reuse them. Do not rebuild, switch Ruff refs, or overwrite the shared artifacts.

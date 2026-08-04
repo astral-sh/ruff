@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 ## mdtest_snippet.py
 
 ```
- 1 | from ty_extensions import reveal_mro
+ 1 | from ty_extensions._internal import reveal_mro
  2 | 
  3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
  4 | 
@@ -91,7 +91,6 @@ error[duplicate-base]: Duplicate base class `str`
   |       ^^^ ---  ^^^ Class `str` later repeated here
   |           |
   |           Class `str` first included in bases list here
-  |
 info: Definition of class `Foo` will raise `TypeError` at runtime
 
 ```
@@ -110,7 +109,6 @@ error[duplicate-base]: Duplicate base class `Eggs`
 21 |     Spam,
 22 |     Eggs,
    |     ^^^^ Class `Eggs` later repeated here
-   |
 info: Definition of class `Ham` will raise `TypeError` at runtime
 
 ```
@@ -128,7 +126,6 @@ error[duplicate-base]: Duplicate base class `Spam`
 20 |     Baz,
 21 |     Spam,
    |     ^^^^ Class `Spam` later repeated here
-   |
 info: Definition of class `Ham` will raise `TypeError` at runtime
 
 ```
@@ -141,7 +138,6 @@ error[duplicate-base]: Duplicate base class `Mushrooms`
    |       ^^^^^^^^             ---------  ^^^^^^^^^ Class `Mushrooms` later repeated here
    |                            |
    |                            Class `Mushrooms` first included in bases list here
-   |
 info: Definition of class `Omelette` will raise `TypeError` at runtime
 
 ```
@@ -165,7 +161,6 @@ error[duplicate-base]: Duplicate base class `Eggs`
 45 |     Baz,
 46 |     Eggs,
    |     ^^^^ Class `Eggs` later repeated here
-   |
 info: Definition of class `VeryEggyOmelette` will raise `TypeError` at runtime
 
 ```
@@ -180,7 +175,6 @@ error[duplicate-base]: Duplicate base class `A`
    |     - Class `A` first included in bases list here
 61 |     A
    |     ^ Class `A` later repeated here
-   |
 info: Definition of class `C` will raise `TypeError` at runtime
 
 ```
@@ -191,7 +185,6 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive
    |
 63 | ):  # type: ignore[ty:duplicate-base]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove the unused suppression comment
    |
 62 | # error: [unused-type-ignore-comment]

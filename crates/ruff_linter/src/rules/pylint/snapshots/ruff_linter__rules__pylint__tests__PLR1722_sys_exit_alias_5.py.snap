@@ -27,7 +27,6 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
 3 | exit(0)
 4 | quit(0)
   | ^^^^
-  |
 help: Replace `quit` with `sys.exit()`
   |
 1 | from sys import *
@@ -68,7 +67,6 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
 8 |     exit(1)
 9 |     quit(1)
   |     ^^^^
-  |
 help: Replace `quit` with `sys.exit()`
    |
 1  | from sys import *

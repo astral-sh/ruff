@@ -13,7 +13,7 @@ instance to the first argument. The bound-method object therefore has a differen
 the first argument:
 
 ```py
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 from typing import Any, Callable
 
 class C1:
@@ -174,27 +174,34 @@ class C3:
 reveal_type(C3().method_decorated(1))  # revealed: int | str
 ```
 
-Note that we currently only apply this heuristic when calling a function such as `memoize` via the
-decorator syntax. This is inconsistent, because the above *should* be equivalent to the following,
-but here we emit errors:
+Transparent decorators are also treated consistently when spelled as an equivalent assignment:
 
 ```py
-def memoize3(f: Callable[[C4, int], str]) -> Callable[[C4, int], str]:
-    raise NotImplementedError
-
 class C4:
     def method(self, x: int) -> str:
         return str(x)
-    method_decorated = memoize3(method)
+    method_decorated = memoize(method)
 
-# error: [missing-argument]
-# error: [invalid-argument-type]
 C4().method_decorated(1)
 ```
 
-The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
-return type of `memoize` is actually related to the method that we pass in. But when `memoize` is
-applied as a decorator, it is reasonable to assume so.
+For non-transparent decorators, avoid resolving the decorated function's signature before the
+decorator itself has been rejected. Doing so can introduce a cycle when the signature refers back to
+the decorated name:
+
+```py
+decorated = lambda: decorated
+try:
+    pass
+except* Exception:
+    pass
+
+unknown_decorator: Any
+
+@unknown_decorator  # error: [unresolved-reference]
+def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
+    pass
+```
 
 In general, a function call might however return a `Callable` that is unrelated to the argument
 passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
@@ -282,6 +289,44 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
+The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
+accept a receiver:
+
+```py
+class Thunk:
+    __value_thunk__: Callable[[], int]
+
+    def replace(self, other: "Thunk") -> None:
+        self.__value_thunk__ = other.__value_thunk__
+
+reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+For other concrete signatures, the heuristic does not check whether the first parameter can accept
+the instance:
+
+```py
+def descriptor_candidate(value: str) -> int:
+    return len(value)
+
+class DescriptorCandidate:
+    __value__: Callable[[str], int] = descriptor_candidate
+
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+```
+
+A gradual callable signature might accept the receiver, so we preserve the function-descriptor
+heuristic. This also preserves function attributes on class access:
+
+```py
+from typing import Any
+
+class Method:
+    __call__: Callable[..., Any]
+
+Method.__call__.__code__
+```
+
 ## `self`-binding behaviour of function-like `Callable`s
 
 Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also
@@ -348,7 +393,7 @@ The callable type of a type object is not function-like.
 
 ```py
 from typing import ClassVar
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:

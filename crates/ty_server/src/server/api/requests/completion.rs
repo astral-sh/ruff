@@ -88,7 +88,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     })
                 });
 
-                let label = comp.label.to_string();
+                let label = comp.label().to_string();
                 let import_suffix = comp
                     .module_name
                     .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));

@@ -15,7 +15,7 @@ use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::TriviaRanges;
 use {
     ruff_formatter::{FormatOptions, IndentStyle, LineWidth, Printed, write},
-    ruff_python_trivia::{PythonWhitespace, is_python_whitespace},
+    ruff_python_trivia::{PythonWhitespace, is_python_whitespace, tab_offset},
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
@@ -1693,7 +1693,7 @@ impl Indentation {
         for char in iter {
             if char == '\t' {
                 // Pad to the next multiple of tab_width
-                width += Self::TAB_INDENT_WIDTH - (width.rem_euclid(Self::TAB_INDENT_WIDTH));
+                width += tab_offset(width, Self::TAB_INDENT_WIDTH);
                 len += '\t'.text_len();
             } else if char.is_whitespace() {
                 width += char.len_utf8();
@@ -1720,7 +1720,7 @@ impl Indentation {
             Self::TabSpaces { tabs, spaces } => tabs * Self::TAB_INDENT_WIDTH + spaces,
             Self::SpacesTabs { spaces, tabs } => {
                 let mut indent = spaces;
-                indent += Self::TAB_INDENT_WIDTH - indent.rem_euclid(Self::TAB_INDENT_WIDTH);
+                indent += tab_offset(indent, Self::TAB_INDENT_WIDTH);
                 indent + (tabs - 1) * Self::TAB_INDENT_WIDTH
             }
             Self::Mixed { width, .. } => width,
@@ -1827,8 +1827,7 @@ impl Indentation {
             }
             if char == '\t' {
                 // Pad to the next multiple of tab_width
-                seen_indent_len +=
-                    Self::TAB_INDENT_WIDTH - (seen_indent_len.rem_euclid(Self::TAB_INDENT_WIDTH));
+                seen_indent_len += tab_offset(seen_indent_len, Self::TAB_INDENT_WIDTH);
                 trimmed = &trimmed[1..];
             } else if char.is_whitespace() {
                 seen_indent_len += char.len_utf8();

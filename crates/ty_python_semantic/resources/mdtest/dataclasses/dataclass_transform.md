@@ -1418,6 +1418,10 @@ class InvalidModel:
     x: int = 1
     y: str  # error: [dataclass-field-order]
 
+@create_model
+class InvalidInheritedModel(ValidModel):
+    z: bytes  # error: [dataclass-field-order]
+
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
     ...
@@ -1562,6 +1566,28 @@ class TemperatureSensor(Sensor):
 t = TemperatureSensor(key=1, name="Temperature Sensor")
 reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
+```
+
+Dataclass-transform defaults remain attached to inherited fields even when a subclass is explicitly
+decorated with `@dataclass`.
+
+```py
+@dataclass_transform(kw_only_default=True)
+class KeywordOnlyModelMeta(type):
+    pass
+
+class RequiredModel(metaclass=KeywordOnlyModelMeta):
+    required: int
+
+class OptionalModel(metaclass=KeywordOnlyModelMeta):
+    optional: int = 1
+
+@dataclass(kw_only=True)
+class Child(RequiredModel, OptionalModel):
+    pass
+
+reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = 1, required: int) -> None
+Child(required=1)
 ```
 
 ## `__dataclass_fields__` and `DataclassInstance` protocol
@@ -1943,6 +1969,24 @@ def _(obj: BasicAlias):
     reveal_type(obj.a)  # revealed: int
     obj.a = "2"
     obj.a = 3  # error: [invalid-assignment]
+```
+
+A converted field satisfies a writable property protocol using the converter input type as its write
+type:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class HasConvertedField(Protocol):
+    @property
+    def a(self) -> int: ...
+    @a.setter
+    def a(self, value: str) -> None: ...
+
+static_assert(is_subtype_of(Basic, HasConvertedField))
+static_assert(is_assignable_to(Basic, HasConvertedField))
 ```
 
 The default parameter for a converter field should also be verified against the converter's input

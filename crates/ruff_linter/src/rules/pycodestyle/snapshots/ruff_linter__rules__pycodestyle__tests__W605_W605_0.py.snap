@@ -76,7 +76,6 @@ W605 [*] Invalid escape sequence: `\_`
 22 | #: W605:1:38
 23 | value = 'new line\nand invalid escape \_ here'
    |                                       ^^
-   |
 help: Add backslash to escape sequence
    |
 22 | #: W605:1:38
@@ -178,7 +177,6 @@ W605 [*] Invalid escape sequence: `\.`
 59 | #: W605:1:13
 60 | "foo \t bar \."
    |             ^^
-   |
 help: Add backslash to escape sequence
    |
 59 | #: W605:1:13

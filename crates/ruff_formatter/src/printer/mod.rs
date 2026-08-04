@@ -39,7 +39,7 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
+    pub(crate) fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
         Self {
             source_code,
             options,
@@ -48,14 +48,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Prints the passed in element as well as all its content
-    pub fn print(self, document: &'a Document) -> PrintResult<Printed> {
+    pub(crate) fn print(self, document: &'a Document) -> PrintResult<Printed> {
         self.print_with_indent(document, 0)
     }
 
     /// Prints the passed in element as well as all its content,
     /// starting at the specified indentation level
     #[tracing::instrument(level = "debug", name = "Printer::print", skip_all)]
-    pub fn print_with_indent(
+    pub(crate) fn print_with_indent(
         mut self,
         document: &'a Document,
         indent: u16,
@@ -88,6 +88,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Prints a single element and push the following elements to queue
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // element visited by the printing loop.
+    #[inline(always)]
     fn print_element(
         &mut self,
         stack: &mut PrintCallStack,
@@ -438,6 +441,10 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // text element visited by the printing loop.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
             let indent = std::mem::take(&mut self.state.pending_indent);

@@ -1,3 +1,4 @@
+use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -28,7 +29,7 @@ use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, us
 /// Standard-library methods and user-defined methods are both callable functions, but callers need
 /// to distinguish them: standard-library methods have modeled behavior, while user-defined or
 /// opaque methods may replace the member value arbitrarily.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) enum ResolvedEnumMethod<'db> {
     #[default]
     Absent,
@@ -49,7 +50,7 @@ pub(super) enum ResolvedEnumMethod<'db> {
 ///
 /// User-defined data types are excluded because their construction, attribute access, equality, and
 /// hashing semantics can differ from the built-in scalar later in their MRO.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum KnownEnumDataTypeMixin {
     Int,
     Str,
@@ -72,7 +73,7 @@ impl KnownEnumDataTypeMixin {
                 Type::int_literal(i64::from(value))
             }
             (Self::Str, Some(LiteralValueTypeKind::Int(value))) => {
-                Type::string_literal(db, &value.to_string())
+                Type::string_literal(db, value.to_compact_string())
             }
             (Self::Str, Some(LiteralValueTypeKind::Bool(value))) => {
                 Type::string_literal(db, if value { "True" } else { "False" })
@@ -109,7 +110,7 @@ impl<'db> ResolvedEnumMethod<'db> {
 /// Different consumers require different levels of conservatism. Value inference trusts known
 /// standard-library data types but treats user-defined data types and constructors as possible
 /// transformations, while alias detection follows the value captured before `__init__`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
     pub(super) new: ResolvedEnumMethod<'db>,
@@ -204,7 +205,7 @@ impl<'db> EnumValueConstruction<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::SalsaValue)]
 enum EnumValueAnnotation<'db> {
     /// An annotation declared on this enum or a user-defined parent enum.
     UserDefined(Type<'db>),
@@ -220,10 +221,10 @@ impl<'db> EnumValueAnnotation<'db> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::SalsaValue)]
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
-    pub(crate) aliases: FxHashMap<Name, Name>,
+    aliases: FxHashMap<Name, Name>,
 
     /// Whether alias detection was precise for every member declaration.
     pub(super) aliases_are_known: bool,
@@ -279,18 +280,21 @@ pub(super) fn class_defines_property<'db>(
 /// the underlying class literal.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumClassLiteral<'db> {
+    #[returns(copy)]
     pub(crate) class_literal: ClassLiteral<'db>,
     #[returns(ref)]
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
     /// Whether the canonical member and alias sets are known exactly.
+    #[returns(copy)]
     pub(super) aliases_are_known: bool,
     /// Whether the canonical members exhaust the runtime values of this enum class.
     ///
     /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
     /// create runtime members beyond those declared in the class body, so their declared members
     /// are not a closed value set.
+    #[returns(copy)]
     pub(crate) members_are_exhaustive: bool,
 }
 
@@ -303,7 +307,7 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
-#[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -378,14 +382,12 @@ impl<'db> EnumClassLiteral<'db> {
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
     ///
-    /// This is the canonical member name when alias detection is precise, or `str` when the
-    /// declaration may be an alias of another member.
+    /// This is the canonical member name when alias detection is precise. When alias detection is
+    /// inconclusive, we intentionally favor useful literal inference and assume the declaration is
+    /// canonical, even though custom enum construction could make it an alias of another member.
     pub(crate) fn name_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
-        if !self.aliases_are_known(db) {
-            return Some(KnownClass::Str.to_instance(db));
-        }
         self.resolve_member(db, name)
-            .map(|name| Type::string_literal(db, name.as_str()))
+            .map(|name| Type::string_literal(db, name))
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
@@ -427,7 +429,7 @@ pub(super) fn member_lookup_for_enum_complement<'db>(
     } else {
         complement
             .remaining_literal_union(db)
-            .member_lookup_with_policy(db, name.into(), policy)
+            .member_lookup_with_policy(db, name, policy)
     }
 }
 
@@ -514,7 +516,7 @@ impl<'db> EnumMetadata<'db> {
     /// data types normalize the value directly. A literal is preserved when its runtime class
     /// matches an inherited `_value_` annotation; otherwise, the annotation describes the
     /// normalized value.
-    pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
+    fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
             return None;
         }
@@ -613,7 +615,7 @@ impl<'db> EnumMetadata<'db> {
         let union = self
             .members
             .keys()
-            .map(|name| Type::string_literal(db, name.as_str()))
+            .map(|name| Type::string_literal(db, name))
             .fold(UnionBuilder::new(db), UnionBuilder::add)
             .build();
         Some(union)
@@ -640,6 +642,7 @@ impl<'db> EnumMetadata<'db> {
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumComplementType<'db> {
+    #[returns(copy)]
     pub(crate) enum_class_literal: EnumClassLiteral<'db>,
     /// Canonical enum-member names excluded by this complement.
     #[returns(ref)]
@@ -731,18 +734,6 @@ impl<'db> EnumComplementType<'db> {
         self.rest(db).is_empty() && self.remaining_member_count(db) == 1
     }
 
-    /// Return `true` when this complement is a single value under equality narrowing.
-    ///
-    /// Enums that override equality are excluded because one remaining enum literal can still
-    /// compare equal to non-identical values.
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.is_singleton(db)
-            && !self
-                .enum_class(db)
-                .to_non_generic_instance(db)
-                .overrides_equality(db)
-    }
-
     /// Expand this complement to the enum literals that remain possible.
     pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
@@ -777,7 +768,7 @@ impl<'db> EnumComplementType<'db> {
 
         let mut builder = IntersectionBuilder::new(db).add_positive(literal);
         for rest in self.rest(db) {
-            builder = builder.add_positive(*rest);
+            builder.add_positive_in_place(*rest);
         }
         builder.build()
     }
@@ -807,7 +798,7 @@ impl<'db> EnumComplementType<'db> {
     ///
     /// This handles `.name`, `.value`, `._name_`, and `._value_` by unioning the corresponding
     /// attribute type from each remaining canonical enum member.
-    pub(crate) fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
+    fn member_type(self, db: &'db dyn Db, member_name: &str) -> Option<Type<'db>> {
         let enum_class_literal = self.enum_class_literal(db);
         let is_enum_subclass = Type::ClassLiteral(self.enum_class(db))
             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
@@ -1093,7 +1084,7 @@ pub(crate) fn enum_metadata<'db>(
                                     if Type::ClassLiteral(ClassLiteral::Static(class))
                                         .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                     {
-                                        Type::string_literal(db, &name.to_lowercase())
+                                        Type::string_literal(db, &*name.to_lowercase())
                                     } else {
                                         let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
                                             class
@@ -1149,7 +1140,7 @@ pub(crate) fn enum_metadata<'db>(
                         let dunder_get = ty
                             .member_lookup_with_policy(
                                 db,
-                                "__get__".into(),
+                                "__get__",
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                             )
                             .place;
@@ -1322,7 +1313,7 @@ fn inherited_user_defined_value_annotation<'db>(
         .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum InheritedEnumDataType {
     #[default]
     None,

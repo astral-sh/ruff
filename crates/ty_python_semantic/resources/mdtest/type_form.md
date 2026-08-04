@@ -340,7 +340,10 @@ bad_literal_var: TypeForm = Literal[var]  # error: [invalid-type-form]
 bad_literal_f_string: TypeForm = Literal[f""]  # error: [invalid-type-form]
 bad_qualifier: TypeForm = ClassVar[int]  # error: [invalid-type-form]
 bad_final: TypeForm = Final[int]  # error: [invalid-type-form]
-bad_unpack: TypeForm = Unpack[Ts]  # error: [invalid-type-form]
+# error: [invalid-type-form] "`Unpack` is not allowed in type expressions"
+bad_unpack: TypeForm = Unpack[Ts]
+# error: [invalid-type-form] "`Unpack` is not allowed in type expressions"
+bad_concrete_unpack: TypeForm = Unpack[tuple[int, ...]]
 bad_optional: TypeForm = Optional  # error: [invalid-type-form]
 bad_quoted_operator: TypeForm = "int + str"  # error: [invalid-type-form]
 ```
@@ -436,10 +439,28 @@ argument.
 ```py
 from typing import Any
 from typing_extensions import TypeForm, TypeIs
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_disjoint_from, is_equivalent_to, is_subtype_of
 
 def as_type[T](form: TypeForm[T]) -> type[T] | None:
     if isinstance(form, type):
         reveal_type(form)  # revealed: type[T@as_type]
+        return form
+    return None
+
+def is_runtime_type[T](form: TypeForm[T]) -> TypeIs[type[T]]:
+    return isinstance(form, type)
+
+def narrow_runtime_type[T](form: TypeForm[T]) -> type[T] | None:
+    static_assert(is_subtype_of(type[T], TypeForm[T]))
+    static_assert(not is_disjoint_from(type[T], TypeForm[T]))
+    static_assert(is_equivalent_to(Intersection[type[T], TypeForm[T]], type[T]))
+    static_assert(is_equivalent_to(Intersection[TypeForm[T], type[T]], type[T]))
+    static_assert(not is_disjoint_from(type[bool], TypeForm[int]))
+    static_assert(is_disjoint_from(type[int], TypeForm[str]))
+
+    if is_runtime_type(form):
+        reveal_type(form)  # revealed: type[T@narrow_runtime_type]
         return form
     return None
 

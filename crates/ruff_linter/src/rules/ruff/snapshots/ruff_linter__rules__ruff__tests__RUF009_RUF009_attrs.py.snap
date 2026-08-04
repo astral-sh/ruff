@@ -51,7 +51,6 @@ RUF009 Do not perform function call `G` in dataclass defaults
 108 |     f: F = F()
 109 |     g: G = G()
     |            ^^^
-    |
 
 RUF009 Do not perform function call `F` in dataclass defaults
    --> RUF009_attrs.py:114:12
@@ -70,7 +69,6 @@ RUF009 Do not perform function call `G` in dataclass defaults
 114 |     f: F = F()
 115 |     g: G = G()
     |            ^^^
-    |
 
 RUF009 Do not perform function call `F` in dataclass defaults
    --> RUF009_attrs.py:120:12
@@ -89,7 +87,6 @@ RUF009 Do not perform function call `G` in dataclass defaults
 120 |     f: F = F()
 121 |     g: G = G()
     |            ^^^
-    |
 
 RUF009 Do not perform function call `F` in dataclass defaults
    --> RUF009_attrs.py:126:12
@@ -108,7 +105,6 @@ RUF009 Do not perform function call `G` in dataclass defaults
 126 |     f: F = F()
 127 |     g: G = G()
     |            ^^^
-    |
 
 RUF009 Do not perform function call `list` in dataclass defaults
    --> RUF009_attrs.py:144:20
@@ -117,4 +113,3 @@ RUF009 Do not perform function call `list` in dataclass defaults
 143 | class TestAttrAttributes:
 144 |     x: list[int] = list()  # RUF009
     |                    ^^^^^^
-    |

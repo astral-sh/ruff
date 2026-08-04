@@ -2,7 +2,7 @@
 
 ## Basic narrowing
 
-The `callable()` builtin returns `TypeIs[Callable[..., object]]`, which narrows the type to the
+The `callable()` builtin returns `TypeIs[Top[Callable[..., object]]]`, which narrows the type to the
 intersection with `Top[Callable[..., object]]`. The `Top[...]` wrapper indicates this is a fully
 static type representing the top materialization of a gradual callable.
 
@@ -112,7 +112,8 @@ functions expecting gradual callables.
 
 ```py
 from typing import Any, Callable, TypeVar
-from ty_extensions import static_assert, Top, is_assignable_to
+from ty_extensions import static_assert, Top
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(Top[Callable[..., bool]], Callable[..., int]))
 

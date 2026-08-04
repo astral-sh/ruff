@@ -135,7 +135,6 @@ NPY201 [*] `np.format_parser` will be removed in NumPy 2.0. Use `numpy.rec.forma
 15 |
 16 |     np.format_parser
    |     ^^^^^^^^^^^^^^^^
-   |
 help: Replace with `numpy.rec.format_parser`
    |
 1  + from numpy.rec import format_parser

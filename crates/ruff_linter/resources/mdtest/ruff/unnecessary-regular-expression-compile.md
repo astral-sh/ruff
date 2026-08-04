@@ -22,7 +22,6 @@ error[RUF077]: Compiled regular expression is used only once
   |
 3 | re.compile(r"hello").match("world")  # snapshot: unnecessary-regular-expression-compile
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `re.match()` or store the compiled pattern
 ```
 

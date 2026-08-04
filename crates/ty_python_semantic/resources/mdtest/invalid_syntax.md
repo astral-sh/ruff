@@ -41,7 +41,6 @@ type pass = 1
 # error: [invalid-syntax]
 def True(for):
     # error: [invalid-syntax]
-    # error: [invalid-syntax]
     pass
 ```
 
@@ -76,7 +75,6 @@ match while:
     # error: [invalid-syntax]
     # error: [unresolved-reference] "Name `case` used when not defined"
     case in:
-        # error: [invalid-syntax]
         # error: [invalid-syntax]
         pass
 ```

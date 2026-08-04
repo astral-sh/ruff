@@ -398,7 +398,7 @@ python-version = "3.12"
 
 ```py
 from typing import ClassVar, TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # error: [invalid-type-form] "`ClassVar` is only allowed in class bodies"
 x: ClassVar[int] = 1

@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{CycleDetector, DynamicType, KnownClass, Type, TypeContext, TypeFormType};
+use crate::types::{CycleDetector, KnownClass, Type, TypeContext, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -56,11 +56,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let contextual_ty = self
                 .speculate_without_diagnostics()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
-            // TODO: Remove this exception once `Unpack` produces a precise type instead of a
-            // dynamic placeholder in ordinary expression inference.
-            if contextual_ty.is_assignable_to(self.db(), target)
-                && contextual_ty != Type::Dynamic(DynamicType::TodoUnpack)
-            {
+            if contextual_ty.is_assignable_to(self.db(), target) {
                 return None;
             }
         }
@@ -74,7 +70,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
         struct ContainsTypeFormValue;
         type ContainsTypeFormValueVisitor<'db> =
-            CycleDetector<ContainsTypeFormValue, Type<'db>, bool, 3>;
+            CycleDetector<'db, ContainsTypeFormValue, Type<'db>, bool, 3>;
 
         fn imp<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,
@@ -103,10 +99,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(alias) => visitor.visit(ty, || {
+                Type::TypeAlias(alias) => visitor.visit(builder.db(), ty, || {
                     imp(builder, expression, alias.value_type(builder.db()), visitor)
                 }),
-                Type::TypeVar(typevar) => visitor.visit(ty, || {
+                Type::TypeVar(typevar) => visitor.visit(builder.db(), ty, || {
                     typevar
                         .typevar(builder.db())
                         .bound_or_constraints(builder.db())

@@ -26,7 +26,7 @@ pub enum HintKind {
 }
 
 impl HintKind {
-    pub fn message(&self) -> String {
+    fn message(&self) -> String {
         match self {
             Self::UnusedBinding(name) => format!("`{name}` is unused"),
             Self::UnreachableCode(UnreachableKind::Unconditional) => {
@@ -41,7 +41,7 @@ impl HintKind {
 }
 
 pub fn hints(db: &dyn Db, file: File) -> Vec<Hint> {
-    if !db.project().should_check_file(db, file) {
+    if !db.should_check_file(file) {
         return Vec::new();
     }
 

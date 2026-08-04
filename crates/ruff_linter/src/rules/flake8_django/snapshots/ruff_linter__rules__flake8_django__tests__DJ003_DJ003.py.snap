@@ -7,7 +7,6 @@ DJ003 Avoid passing `locals()` as context to a `render` function
 4 | def test_view1(request):
 5 |     return render(request, "index.html", locals())
   |                                          ^^^^^^^^
-  |
 
 DJ003 Avoid passing `locals()` as context to a `render` function
  --> DJ003.py:9:50
@@ -15,4 +14,3 @@ DJ003 Avoid passing `locals()` as context to a `render` function
 8 | def test_view2(request):
 9 |     return render(request, "index.html", context=locals())
   |                                                  ^^^^^^^^
-  |

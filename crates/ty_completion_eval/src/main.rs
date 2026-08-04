@@ -1,8 +1,6 @@
-/*!
-A simple command line tool for running a completion evaluation.
-
-See `crates/ty_completion_eval/README.md` for examples and more docs.
-*/
+//! A simple command line tool for running a completion evaluation.
+//!
+//! See `crates/ty_completion_eval/README.md` for examples and more docs.
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -282,14 +280,13 @@ impl Task {
         let system = OsSystem::new(project_path);
         let mut project_metadata = ProjectMetadata::discover(project_path, &system)?;
         // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
-        project_metadata.apply_options(Options {
+        project_metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python: Some(RelativePathBuf::cli(".venv")),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
         });
-        project_metadata.apply_configuration_files(&system)?;
         let db = ProjectDatabase::fallible(project_metadata, system)?;
         Ok(Task {
             db,

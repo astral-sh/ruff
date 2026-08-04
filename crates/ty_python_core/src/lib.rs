@@ -13,7 +13,6 @@ use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
@@ -136,19 +135,19 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// header are only known after walking all loop-back edges. The builder reserves a [`LoopHeaderId`]
 /// before the walk, fills the corresponding header afterward, and publishes the completed headers
 /// in the scope's [`UseDefMap`].
-#[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
 }
 
 impl LoopHeader {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             bindings: FxHashMap::default(),
         }
     }
 
-    pub fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
+    fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
         self.bindings.entry(place).or_default().push(binding);
     }
 
@@ -221,7 +220,7 @@ pub fn attribute_scopes<'db>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
@@ -235,7 +234,7 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
-#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DefinitionsByNode<'db> {
     single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
     non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
@@ -277,7 +276,7 @@ impl<'db> DefinitionsByNode<'db> {
 }
 
 /// The place tables and use-def maps for all scopes in a file.
-#[derive(Debug, Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
     place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
@@ -339,13 +338,16 @@ pub struct SemanticIndex<'db> {
     /// Set of all generator functions in this file.
     generator_functions: FrozenSet<FileScopeId>,
 
+    /// Set of all asynchronous comprehensions in this file.
+    async_comprehensions: FrozenSet<FileScopeId>,
+
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
     narrowing_alias_predicates: FrozenMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct NarrowingAliasPredicate<'db> {
     /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
     pub expression: Expression<'db>,
@@ -388,7 +390,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self) -> &AstIds {
+    fn ast_ids(&self) -> &AstIds {
         &self.ast_ids
     }
 
@@ -429,10 +431,6 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn symbol_is_global_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
         self.place_table(scope).symbol(symbol).is_global()
-    }
-
-    pub fn symbol_is_nonlocal_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
-        self.place_table(scope).symbol(symbol).is_nonlocal()
     }
 
     /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
@@ -552,7 +550,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
+    fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
     }
 
@@ -876,7 +874,7 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    pub fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
         let descendants = DescendantsIter::new(scopes, parent);
 
         Self {
@@ -1005,7 +1003,7 @@ impl From<bool> for Truthiness {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum EvaluationMode {
     Sync,
     Async,
@@ -1026,7 +1024,7 @@ impl EvaluationMode {
 }
 
 /// Specifies how the boundness of a place should be determined.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BoundnessAnalysis {
     /// The place is always considered bound.
     AssumeBound,

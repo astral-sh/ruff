@@ -62,7 +62,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
                 formal_parameter_type.display(db),
                 bases_type.display(db)
@@ -112,8 +112,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid base for class created via `{fn_name}`"
                         ));
-                        diagnostic
-                            .set_primary_message(format_args!("Has type `{}`", base.display(db)));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Has type `{}`",
+                            base.display(db)
+                        ));
                         match class_base {
                             ClassBase::Generic => {
                                 diagnostic.info(format_args!(
@@ -143,8 +145,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Unsupported base for class created via `{fn_name}`"
                         ));
-                        diagnostic
-                            .set_primary_message(format_args!("Has type `{}`", base.display(db)));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Has type `{}`",
+                            base.display(db)
+                        ));
                         diagnostic.info(format_args!(
                             "Classes created via `{fn_name}` cannot be protocols",
                         ));
@@ -179,7 +183,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         {
                             let mut diagnostic = builder
                                 .into_diagnostic("Invalid base for class created via `type()`");
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Has type `{}`",
                                 base.display(db)
                             ));
@@ -301,7 +305,7 @@ pub(super) fn report_mro_error_kind<'db>(
                         context.report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_range)
                     {
                         let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Has type `{}`",
                             base_type.display(db)
                         ));

@@ -1232,6 +1232,21 @@ mod tests {
     }
 
     #[test]
+    fn builtin_after_exception_target_cleanup() {
+        flakes(
+            r"
+            try:
+                pass
+            except Exception as len:
+                pass
+
+            print(len)
+            ",
+            &[Rule::UnusedVariable],
+        );
+    }
+
+    #[test]
     fn magic_globals_name() {
         // Use of the C{__name__} magic global should not emit an undefined name
         // warning.

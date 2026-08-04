@@ -1,6 +1,6 @@
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
-use ruff_python_ast::{self as ast, NodeIndex, name::Name};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, name::Name};
+use ruff_text_size::TextRange;
 
 use crate::{
     Db, TypeQualifiers,
@@ -9,7 +9,8 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
         SubclassOfType, Type,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
+            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicClassHeaderAnchor,
+            InstanceMemberResult, MroLookup, dynamic_class_header_range,
             typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
@@ -72,10 +73,12 @@ pub struct DynamicClassLiteral<'db> {
     /// Whether the namespace is dynamic (not a literal dict, or contains
     /// non-string-literal keys). When true, attribute lookups on this class
     /// and its instances return `Unknown` instead of failing.
+    #[returns(copy)]
     pub has_dynamic_namespace: bool,
 
     /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
     /// or passed to `dataclass()` as a function.
+    #[returns(copy)]
     pub dataclass_params: Option<DataclassParams<'db>>,
 }
 
@@ -84,7 +87,7 @@ pub struct DynamicClassLiteral<'db> {
 /// This enum provides stable identity for `DynamicClassLiteral`:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a relative offset provides stable identity.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicClassAnchor<'db> {
     /// The call is assigned to a variable.
     ///
@@ -235,36 +238,15 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Returns the range of the `type()` call expression that created this class.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
-        let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
-
-        match self.anchor(db) {
+        let anchor = match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => {
-                // For definitions, get the range from the definition's value.
-                // The `type()` call is the value of the assignment.
-                definition
-                    .kind(db)
-                    .value(&module)
-                    .expect("DynamicClassAnchor::Definition should only be used for assignments")
-                    .range()
+                DynamicClassHeaderAnchor::Definition(*definition)
             }
             DynamicClassAnchor::ScopeOffset { offset, .. } => {
-                // For dangling `type()` calls, compute the absolute index from the offset.
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + *offset);
-
-                // Get the node and return its range.
-                let node: &ast::ExprCall = module
-                    .get_by_index(absolute_index)
-                    .try_into()
-                    .expect("scope offset should point to ExprCall");
-                node.range()
+                DynamicClassHeaderAnchor::ScopeOffset(*offset)
             }
-        }
+        };
+        dynamic_class_header_range(db, self.scope(db), anchor)
     }
 
     /// Get the metaclass of this dynamic class.
@@ -395,10 +377,9 @@ impl<'db> DynamicClassLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
-        if matches!(
-            CodeGeneratorKind::from_class(db, self.into()),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        ) {
+        if CodeGeneratorKind::from_class(db, self.into())
+            .is_some_and(CodeGeneratorKind::is_dataclass_like)
+        {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol.
                 return Place::declared(KnownClass::Dict.to_specialized_instance(

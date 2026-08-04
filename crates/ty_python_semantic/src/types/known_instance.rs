@@ -4,12 +4,13 @@ use ruff_python_ast::name::Name;
 use crate::{
     Db, DisplaySettings,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
-        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
-        TypeVarVariance, UnionBuilder,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
+        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
-        constraints::OwnedConstraintSet,
+        constraints::{OwnedConstraintSet, TypeVarSolution},
+        dedicated::pydantic::ConfigBoolean,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
         typevar::TypeVarInstance,
@@ -30,6 +31,7 @@ pub struct InternedConstraintSet<'db> {
     #[returns(ref)]
     pub(super) constraints: OwnedConstraintSet<'db>,
 
+    #[returns(copy)]
     pub(super) detailed_display: bool,
 }
 
@@ -46,10 +48,22 @@ impl<'db> InternedConstraintSet<'db> {
     }
 }
 
+/// A Salsa-interned solution path exposed to mdtests as `ConstraintSetSolution`.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct InternedConstraintSetSolution<'db> {
+    #[returns(ref)]
+    pub(super) bindings: Box<[TypeVarSolution<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InternedConstraintSetSolution<'_> {}
+
 /// A salsa-interned payload for `functools.partial(...)` instances.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctoolsPartialInstance<'db> {
+    #[returns(copy)]
     pub wrapped: InternedType<'db>,
+    #[returns(copy)]
     pub partial: CallableType<'db>,
 }
 
@@ -67,7 +81,7 @@ impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
 /// are generally created by operations at runtime in some way, such as a type alias
 /// statement, a typevar definition, or an instance of `Generic[T]` in a class's
 /// bases list.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
@@ -92,15 +106,19 @@ pub enum KnownInstanceType<'db> {
     Field(FieldInstance<'db>),
 
     /// A constraint set, which is exposed in mdtests as an instance of
-    /// `ty_extensions.ConstraintSet`.
+    /// `ty_extensions._internal.ConstraintSet`.
     ConstraintSet(InternedConstraintSet<'db>),
 
+    /// A solution path, which is exposed in mdtests as an instance of
+    /// `ty_extensions._internal.ConstraintSetSolution`.
+    ConstraintSetSolution(InternedConstraintSetSolution<'db>),
+
     /// A generic context, which is exposed in mdtests as an instance of
-    /// `ty_extensions.GenericContext`.
+    /// `ty_extensions._internal.GenericContext`.
     GenericContext(GenericContext<'db>),
 
     /// A specialization, which is exposed in mdtests as an instance of
-    /// `ty_extensions.Specialization`.
+    /// `ty_extensions._internal.Specialization`.
     Specialization(Specialization<'db>),
 
     /// A single instance of `types.UnionType`, which stores the elements of
@@ -138,6 +156,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A `range(...)` call result where we could determine whether it is non-empty.
     Range { is_non_empty: bool },
+
+    /// The bound `__call__` attribute of a precise `functools.partial(...)` result.
+    FunctoolsPartialCall(FunctoolsPartialInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -162,6 +183,11 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownInstanceType::GenericContext(_)
         | KnownInstanceType::Specialization(_) => {
             // Nothing to visit
+        }
+        KnownInstanceType::ConstraintSetSolution(solution) => {
+            for binding in solution.bindings(db) {
+                visitor.visit_type(db, binding.solution);
+            }
         }
         KnownInstanceType::Field(field) => {
             if let Some(default_ty) = field.default_type(db) {
@@ -197,14 +223,15 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, field.ty);
             }
         }
-        KnownInstanceType::FunctoolsPartial(partial) => {
+        KnownInstanceType::FunctoolsPartial(partial)
+        | KnownInstanceType::FunctoolsPartialCall(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
         }
     }
 }
 
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, typevar)
@@ -228,6 +255,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
             Self::Range { is_non_empty } => Some(Self::Range { is_non_empty }),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
+            Self::ConstraintSetSolution(solution) => Some(Self::ConstraintSetSolution(solution)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
@@ -265,6 +293,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(partial) => partial
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::FunctoolsPartial),
+            Self::FunctoolsPartialCall(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartialCall),
         }
     }
 
@@ -274,14 +305,18 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar_instance) if typevar_instance.is_paramspec(db) => {
                 KnownClass::ParamSpec
             }
+            Self::TypeVar(typevar_instance) if typevar_instance.is_typevartuple(db) => {
+                KnownClass::TypeVarTuple
+            }
             Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::TypeAliasType(TypeAliasType::PEP695(alias)) if alias.is_specialized(db) => {
+            Self::TypeAliasType(alias) if alias.specialization(db).is_some() => {
                 KnownClass::GenericAlias
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
+            Self::ConstraintSetSolution(_) => KnownClass::ConstraintSetSolution,
             Self::GenericContext(_) => KnownClass::GenericContext,
             Self::Specialization(_) => KnownClass::Specialization,
             Self::UnionType(_) => KnownClass::UnionType,
@@ -295,6 +330,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
             Self::Range { .. } => KnownClass::Range,
+            Self::FunctoolsPartialCall(_) => KnownClass::MethodWrapperType,
         }
     }
 
@@ -415,8 +451,20 @@ impl<'db> KnownInstanceType<'db> {
                 }
                 _ => Type::KnownInstance(self),
             },
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
+                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
+                    db,
+                    ty.inner(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
+            KnownInstanceType::LiteralStringAlias(ty) => {
+                Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
                     db,
                     ty.inner(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -429,10 +477,10 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::Deprecated(_)
             | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
+            | KnownInstanceType::ConstraintSetSolution(_)
             | KnownInstanceType::GenericContext(_)
             | KnownInstanceType::Specialization(_)
             | KnownInstanceType::Literal(_)
-            | KnownInstanceType::LiteralStringAlias(_)
             | KnownInstanceType::NamedTupleSpec(_)
             | KnownInstanceType::NewType(_)
             | KnownInstanceType::Sentinel(_) => {
@@ -448,6 +496,7 @@ impl<'db> KnownInstanceType<'db> {
 pub struct SentinelInstance<'db> {
     #[returns(ref)]
     pub name: Name,
+    #[returns(copy)]
     pub definition: Definition<'db>,
 }
 
@@ -465,7 +514,7 @@ impl<'db> SentinelInstance<'db> {
 }
 
 /// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
     pub(crate) message: Option<StringLiteralType<'db>>,
@@ -477,12 +526,15 @@ pub struct DeprecatedInstance<'db> {
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
+    #[returns(copy)]
     pub default_type: Option<Type<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
+    #[returns(copy)]
     pub init: bool,
 
     /// Whether or not this field can only be passed as a keyword argument to `__init__`.
+    #[returns(copy)]
     pub kw_only: Option<bool>,
 
     /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
@@ -492,7 +544,12 @@ pub struct FieldInstance<'db> {
     /// The converter types for this field, if a `converter` argument was provided.
     /// The first element is the input type (first positional parameter), the second is the
     /// output type (return type of the converter callable).
+    #[returns(copy)]
     pub converter: Option<(Type<'db>, Type<'db>)>,
+
+    /// The mode selected by Pydantic's `strict` argument.
+    #[returns(copy)]
+    pub strict: ConfigBoolean,
 }
 
 // The Salsa heap is tracked separately.
@@ -536,6 +593,7 @@ impl<'db> FieldInstance<'db> {
             self.kw_only(db),
             self.alias(db),
             converter,
+            self.strict(db),
         ))
     }
 }
@@ -608,7 +666,7 @@ impl<'db> UnionTypeInstance<'db> {
         )))
     }
 
-    pub(super) fn apply_type_mapping_impl(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'_, 'db>,
@@ -742,6 +800,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
 /// A salsa-interned `Type`
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedType<'db> {
+    #[returns(copy)]
     pub(super) inner: Type<'db>,
 }
 

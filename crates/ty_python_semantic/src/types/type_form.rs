@@ -1,12 +1,13 @@
 use super::variance::VarianceInferable;
 use super::{
-    BoundTypeVarInstance, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
+    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
     visitor,
 };
 use crate::Db;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
+    #[returns(copy)]
     pub(crate) type_argument: Type<'db>,
 }
 
@@ -38,7 +39,7 @@ impl<'db> Type<'db> {
     pub(crate) fn project_type_form(self, db: &'db dyn Db) -> Type<'db> {
         struct TypeFormArgument;
         type TypeFormArgumentVisitor<'db> =
-            CycleDetector<TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
+            CycleDetector<'db, TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
 
         fn project<'db>(
             db: &'db dyn Db,
@@ -48,7 +49,7 @@ impl<'db> Type<'db> {
             match ty {
                 Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || project(db, alias.value_type(db), visitor))
+                    visitor.visit(db, ty, || project(db, alias.value_type(db), visitor))
                 }
                 Type::Union(union) => {
                     let mut elements = union
@@ -67,7 +68,7 @@ impl<'db> Type<'db> {
                     elements.peek()?;
                     Some(IntersectionType::from_elements(db, elements))
                 }
-                Type::TypeVar(typevar) => visitor.visit(ty, || {
+                Type::TypeVar(typevar) => visitor.visit(db, ty, || {
                     typevar
                         .typevar(db)
                         .bound_or_constraints(db)
@@ -80,7 +81,7 @@ impl<'db> Type<'db> {
                     instance.type_form_argument(db)
                 }
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    ty.to_instance(db)
+                    ty.to_instance_approximation(db)
                 }
                 _ => None,
             }
@@ -92,7 +93,7 @@ impl<'db> Type<'db> {
 
 impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
     // `TypeForm` is covariant in its type argument.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.type_argument(db).variance_of(db, typevar)
     }
 }

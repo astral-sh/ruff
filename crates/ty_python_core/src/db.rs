@@ -43,7 +43,7 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        pub(crate) fn new() -> Self {
+        fn new() -> Self {
             let events = Events::default();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({

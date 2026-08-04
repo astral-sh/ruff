@@ -23,10 +23,9 @@ use get_size2::GetSize;
 ///
 /// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
 /// bits of overhead on 32-bit platforms.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize)]
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
-    #[update(fallback)]
     bits: RankBitBoxStorage,
     chunk_ranks: Box<[u32]>,
 }

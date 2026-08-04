@@ -41,7 +41,6 @@ error[invalid-type-form]: Module `datetime` is not valid in a parameter annotati
 3 | def f(x: datetime): ...  # error: [invalid-type-form]
   |          ^^^^^^^^ Did you mean to use the module's member `datetime.datetime`?
   |
-  |
 2 |
   - def f(x: datetime): ...  # error: [invalid-type-form]
 3 + def f(x: datetime.datetime): ...  # error: [invalid-type-form]
@@ -56,7 +55,6 @@ error[invalid-type-form]: Module `PIL.Image` is not valid in a parameter annotat
   |
 3 | def g(x: Image): ...  # error: [invalid-type-form]
   |          ^^^^^ Did you mean to use the module's member `Image.Image`?
-  |
   |
 2 |
   - def g(x: Image): ...  # error: [invalid-type-form]

@@ -9,7 +9,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
-use crate::Db;
 use crate::LoopHeaderId;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
@@ -19,6 +18,8 @@ use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
+use crate::use_def::BindingWithConstraintsIterator;
+use crate::{Db, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -40,9 +41,11 @@ pub struct Definition<'db> {
     ///
     /// Storing the interned scope avoids retaining the file and file-local scope separately, at
     /// the cost of database lookups when either of those values is needed.
+    #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
     /// The place ID and re-export state of the definition.
+    #[returns(copy)]
     place_info: DefinitionPlace,
 
     /// WARNING: Only access this field when doing type inference for the same
@@ -174,7 +177,7 @@ impl<'db> Definition<'db> {
 /// Keeping the re-export state in the enum lets it share the place ID's otherwise-unused
 /// representation space. Storing it as a separate field on [`Definition`] would add padding to
 /// every tracked definition.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DefinitionPlace {
     Symbol {
         id: ScopedSymbolId,
@@ -262,19 +265,13 @@ fn attribute_docstring<'a>(
 }
 
 /// One or more [`Definition`]s.
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct Definitions<'db> {
     definitions: smallvec::SmallVec<[Definition<'db>; 1]>,
 }
 
 impl<'db> Definitions<'db> {
-    pub fn single(definition: Definition<'db>) -> Self {
-        Self {
-            definitions: smallvec::smallvec_inline![definition],
-        }
-    }
-
-    pub fn push(&mut self, definition: Definition<'db>) {
+    pub(crate) fn push(&mut self, definition: Definition<'db>) {
         self.definitions.push(definition);
     }
 
@@ -300,7 +297,7 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub enum DefinitionState<'db> {
     Defined(Definition<'db>),
     /// Represents the implicit "unbound"/"undeclared" definition of every place.
@@ -583,7 +580,7 @@ pub(crate) enum ParameterDefinitionNodeRef<'ast> {
 }
 
 impl ParameterDefinitionNodeRef<'_> {
-    pub(super) fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
+    fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
         match self {
             Self::VariadicPositionalParameter(parameter) => {
                 ParameterDefinitionNodeKind::VariadicPositionalParameter(AstNodeRef::new(
@@ -601,7 +598,7 @@ impl ParameterDefinitionNodeRef<'_> {
         }
     }
 
-    pub(super) fn key(self) -> DefinitionNodeKey {
+    fn key(self) -> DefinitionNodeKey {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
@@ -910,7 +907,7 @@ impl DefinitionCategory {
 /// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
 /// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
 /// for an in-depth explanation of why this is necessary.
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
@@ -940,7 +937,7 @@ pub enum DefinitionKind<'db> {
 }
 
 impl<'db> DefinitionKind<'db> {
-    pub fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
@@ -977,7 +974,7 @@ impl<'db> DefinitionKind<'db> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+    pub(crate) fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
         match self {
             DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
             _ => None,
@@ -1214,7 +1211,7 @@ impl StarImportDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MatchPatternDefinitionKind<'db> {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,
@@ -1236,7 +1233,7 @@ impl<'db> MatchPatternDefinitionKind<'db> {
 /// But if the target is an attribute or subscript, its definition is not in the comprehension's scope;
 /// it is in the scope in which the root variable is bound.
 /// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ComprehensionDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     node: AstNodeRef<ast::Comprehension>,
@@ -1276,7 +1273,7 @@ pub enum ParameterDefinitionNodeKind {
 }
 
 impl ParameterDefinitionNodeKind {
-    pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).name.range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).name.range(),
@@ -1284,7 +1281,7 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
@@ -1292,7 +1289,7 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub(crate) fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
+    fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
             // a parameter always binds a value, but is only a declaration if annotated
             Self::VariadicPositionalParameter(parameter)
@@ -1343,7 +1340,7 @@ impl ImportDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1364,7 +1361,7 @@ impl ImportFromDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1379,14 +1376,14 @@ impl ImportFromSubmoduleDefinitionKind {
         self.node.node(module)
     }
 
-    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+    fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
         self.import(module)
             .module
             .as_ref()
             .expect("import-from submodule definitions should always have a module identifier")
     }
 
-    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         let module_ident = self.module(module);
         let module_str = module_ident.as_str();
 
@@ -1412,7 +1409,7 @@ impl ImportFromSubmoduleDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct AssignmentDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
@@ -1456,11 +1453,11 @@ impl AnnotatedAssignmentDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DictKeyAssignmentKind<'db> {
-    pub(crate) key: AstNodeRef<ast::Expr>,
-    pub(crate) value: AstNodeRef<ast::Expr>,
-    pub(crate) assignment: Definition<'db>,
+    key: AstNodeRef<ast::Expr>,
+    value: AstNodeRef<ast::Expr>,
+    assignment: Definition<'db>,
 }
 
 impl<'db> DictKeyAssignmentKind<'db> {
@@ -1477,7 +1474,7 @@ impl<'db> DictKeyAssignmentKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct WithItemDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     item: AstNodeRef<ast::WithItem>,
@@ -1504,7 +1501,7 @@ impl<'db> WithItemDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ForStmtDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     node: AstNodeRef<ast::StmtFor>,
@@ -1581,7 +1578,7 @@ impl LoopHeaderDefinitionKind {
         self.place
     }
 
-    pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn range(&self, module: &ParsedModuleRef) -> TextRange {
         match &self.loop_stmt {
             LoopStmtKind::While(stmt) => stmt.node(module).range(),
             LoopStmtKind::For(stmt) => stmt.node(module).range(),
@@ -1592,14 +1589,94 @@ impl LoopHeaderDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct NestedBindingsDefinitionKind {
     pub name: Name,
+    pub execution: NestedBindingExecution,
     // Note that in general this can include both `global` and `nonlocal` declarations from
     // different nested scopes, because we don't necessarily know at synthesis time which of those
     // kind will be visible in the current scope.
     pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
 }
 
+impl NestedBindingsDefinitionKind {
+    /// Returns every nested binding source and whether it was declared `global`.
+    ///
+    /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
+    fn binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+    ) -> impl Iterator<Item = (bool, BindingWithConstraintsIterator<'index, 'db>)> + 'index {
+        self.nested_declarations.iter().filter_map(|declaration| {
+            debug_assert!(declaration.is_bound);
+            let symbol = index
+                .place_table(declaration.file_scope_id)
+                .symbol_id(&self.name)?;
+            let use_def = index.use_def_map(declaration.file_scope_id);
+            let bindings = match self.execution {
+                NestedBindingExecution::Lazy => use_def.reachable_bindings(symbol.into()),
+                NestedBindingExecution::Eager => use_def.end_of_scope_bindings(symbol.into()),
+            };
+            Some((declaration.is_global(), bindings))
+        })
+    }
+
+    /// Returns nested binding sources that can update the same variable as `scope`.
+    ///
+    /// A synthetic binding can collect both `global` and `nonlocal` writes to one name:
+    ///
+    /// ```python
+    /// x = 0
+    ///
+    /// def outer():
+    ///     x = 1
+    ///
+    ///     def change_global():
+    ///         global x
+    ///         x = 2
+    ///
+    ///     def change_nonlocal():
+    ///         nonlocal x
+    ///         x = 3
+    /// ```
+    ///
+    /// Only `change_nonlocal` can update `outer`'s local `x`. Nested functions also cannot
+    /// capture a class-local variable, so class scopes do not see nonlocal writes to their
+    /// own bindings.
+    pub fn visible_binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+        scope: FileScopeId,
+    ) -> impl Iterator<Item = BindingWithConstraintsIterator<'index, 'db>> + 'index {
+        let symbol_id = index.place_table(scope).symbol_id(&self.name);
+        let sees_global = symbol_id
+            .is_some_and(|symbol_id| index.symbol_resolves_to_global_scope(symbol_id, scope));
+        let sees_nonlocal = !sees_global
+            && symbol_id.is_some_and(|symbol_id| {
+                !(index.scope(scope).kind().is_class()
+                    && index.place_table(scope).symbol(symbol_id).is_local())
+            });
+
+        self.binding_sources(index)
+            .filter_map(move |(is_global, bindings)| {
+                (if is_global {
+                    sees_global
+                } else {
+                    sees_nonlocal
+                })
+                .then_some(bindings)
+            })
+    }
+}
+
+/// Describes when writes from a nested scope can affect its containing scope.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum NestedBindingExecution {
+    /// The nested scope can run later or repeatedly, as with a function body.
+    Lazy,
+    /// The nested scope is modeled as running while evaluating the containing expression.
+    Eager,
+}
+
 #[derive(
-    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub struct DefinitionNodeKey(NodeKey);
 

@@ -246,7 +246,6 @@ mod tests {
           |
         2 | def foo():
           |     ^^^
-          |
         ");
     }
 
@@ -264,7 +263,6 @@ mod tests {
           |
         2 | class MyClass:
           |       ^^^^^^^
-          |
         ");
     }
 
@@ -283,7 +281,6 @@ mod tests {
           |
         3 |     def method(self):
           |         ^^^^^^
-          |
         ");
     }
 
@@ -303,7 +300,6 @@ mod tests {
           |
         2 | def foo():
           |     ^^^
-          |
         ");
     }
 
@@ -340,21 +336,18 @@ mod tests {
           |
         5 | def foo(x: int) -> int: ...
           |     ^^^
-          |
 
         info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:7:5
           |
         7 | def foo(x: str) -> str: ...
           |     ^^^
-          |
 
         info[prepare-call-hierarchy]: Function: `foo` (`main`)
          --> main.py:8:5
           |
         8 | def foo(x):
           |     ^^^
-          |
         ");
     }
 
@@ -374,7 +367,6 @@ mod tests {
           |
         2 | async def foo():
           |           ^^^
-          |
         ");
     }
 
@@ -394,7 +386,6 @@ mod tests {
           |
         4 |     def method():
           |         ^^^^^^
-          |
         ");
     }
 
@@ -414,7 +405,6 @@ mod tests {
           |
         4 |     def method(cls):
           |         ^^^^^^
-          |
         ");
     }
 }

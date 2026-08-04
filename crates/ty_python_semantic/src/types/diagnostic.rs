@@ -10,7 +10,7 @@ use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
-use crate::types::call::CallError;
+use crate::types::call::{CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
@@ -18,6 +18,7 @@ use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, Ov
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
+use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
@@ -26,9 +27,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
-    binding_type, protocol_class::ProtocolClass,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
+    SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
+    protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -134,6 +135,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_ON_NON_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
+    registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
@@ -142,6 +144,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
+    registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
@@ -685,10 +688,13 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../../resources/lint_docs/invalid-type-guard-call.md")]
+    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
-        summary: "detects type guard function calls that has no narrowing effect",
-        status: LintStatus::stable("0.0.1-alpha.11"),
+        summary: "detects type guard function calls that have no narrowing effect",
+        status: LintStatus::removed(
+            "0.0.60",
+            "Type guard calls without a narrowing target are valid and have no narrowing effect.",
+        ),
         default_level: Level::Error,
     }
 }
@@ -956,6 +962,15 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/abstract-and-final-method.md")]
+    pub(crate) static ABSTRACT_AND_FINAL_METHOD = {
+        summary: "detects methods that are both abstract and final",
+        status: LintStatus::stable("0.0.64"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/abstract-method-in-final-class.md")]
     pub(crate) static ABSTRACT_METHOD_IN_FINAL_CLASS = {
         summary: "detects `@final` classes with unimplemented abstract methods",
@@ -1051,6 +1066,19 @@ declare_lint! {
         summary: "detects unknown keyword arguments in calls",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/pydantic-discarded-extra-argument.md")]
+    pub(crate) static PYDANTIC_DISCARDED_EXTRA_ARGUMENT = {
+        summary: "detects extra constructor arguments that Pydantic silently discards",
+        status: LintStatus::stable("0.0.60"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1273,11 +1301,11 @@ pub(crate) fn report_mismatched_type_name<'db>(
             "The name passed to `{constructor}` must match the variable it is assigned to"
         ));
         if let Some(actual_name) = actual_name {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected \"{expected_name}\", got \"{actual_name}\""
             ));
         } else {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected \"{expected_name}\", got variable of type `{}`",
                 actual_name_ty.display(context.db())
             ));
@@ -1324,7 +1352,7 @@ impl TypeCheckDiagnostics {
         self.diagnostics.is_empty() && self.used_suppressions.is_empty()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+    fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics().iter()
     }
 
@@ -1646,7 +1674,7 @@ pub(super) fn report_invalid_assignment<'db>(
             }
         }
 
-        diag.set_primary_message(format_args!(
+        diag.set_primary_annotation_message(format_args!(
             "Incompatible value of type `{}`",
             value_ty.display(context.db()),
         ));
@@ -1655,7 +1683,7 @@ pub(super) fn report_invalid_assignment<'db>(
         error_context.attach_to(context.db(), &mut diag);
 
         // Overwrite the concise message to avoid showing the value type twice
-        let message = diag.primary_message().to_string();
+        let message = diag.headline_message().to_string();
         diag.set_concise_message(message);
     }
 
@@ -1695,15 +1723,18 @@ pub(super) fn report_invalid_attribute_assignment(
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
-    attribute: &str,
     object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    includes_descriptor_argument: bool,
     target: &ast::ExprAttribute,
+    value: &ast::Expr,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
-        return;
-    };
     let db = context.db();
+    let attribute = target.attr.as_str();
     if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
+        let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+            return;
+        };
         let object_type = object_type.display(db);
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
@@ -1716,18 +1747,32 @@ pub(super) fn report_bad_dunder_set_call<'db>(
             diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
                 format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Attempted assignment to `{object_type}.{attribute}` here"
             ));
         }
     } else {
-        // TODO: Here, it would be nice to emit an additional diagnostic
-        // that explains why the call failed
-        builder.into_diagnostic(format_args!(
-            "Invalid assignment to data descriptor attribute \
-            `{attribute}` on type `{}` with custom `__set__` method",
-            object_type.display(db)
-        ));
+        let argument_ranges = if includes_descriptor_argument {
+            &[target.range(), target.value.range(), value.range()][..]
+        } else {
+            &[target.value.range(), value.range()][..]
+        };
+        dunder_set_failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ASSIGNMENT,
+                message: format!(
+                    "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db)
+                ),
+                info: &format!(
+                    "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
+                    descriptor_type.display(db)
+                ),
+                argument_ranges,
+            },
+        );
     }
 }
 
@@ -1756,7 +1801,7 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
             diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
                 format_args!("Property `{object_type}.{attribute}` defined here with no deleter"),
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Attempted deletion of `{object_type}.{attribute}` here"
             ));
         }
@@ -1812,7 +1857,7 @@ pub(super) fn report_invalid_return_type(
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
-    diag.set_primary_message(format_args!(
+    diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
         expected_ty = expected_ty.display_with(context.db(), settings.clone()),
         actual_ty = actual_ty.display_with(context.db(), settings.clone()),
@@ -1840,7 +1885,7 @@ pub(super) fn report_invalid_generator_function_return_type(
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
     let inferred_ty = inferred_return.display(context.db());
-    diag.set_primary_message(format_args!(
+    diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{inferred_ty}`",
         expected_ty = expected_ty.display(context.db()),
     ));
@@ -1913,7 +1958,7 @@ pub(super) fn report_invalid_generator_yield_type(
             format!("generator with send type `{actual_display}`, expected `{expected_display}`")
         }
     };
-    diag.set_primary_message(primary);
+    diag.set_primary_annotation_message(primary);
 
     if let Some(return_type_span) = return_type_span {
         diag.annotate(Annotation::secondary(return_type_span).message(format!(
@@ -2089,7 +2134,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
     let mut diagnostic = if ty.is_notimplemented(context.db()) {
         let mut diag =
             builder.into_diagnostic("Cannot catch `NotImplemented` in an exception handler");
-        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diag
     } else {
         let mut diag = builder.into_diagnostic(format_args!(
@@ -2100,7 +2145,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
                 "object"
             },
         ));
-        diag.set_primary_message(format_args!(
+        diag.set_primary_annotation_message(format_args!(
             "Object has type `{}`",
             ty.display(context.db())
         ));
@@ -2122,14 +2167,14 @@ pub(crate) fn report_invalid_exception_raised(
     };
     if raise_type.is_notimplemented(context.db()) {
         let mut diagnostic = builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
-        diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
+        diagnostic.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diagnostic.info("Can only raise an instance or subclass of `BaseException`");
     } else {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot raise object of type `{}`",
             raise_type.display(context.db())
         ));
-        diagnostic.set_primary_message("Not an instance or subclass of `BaseException`");
+        diagnostic.set_primary_annotation_message("Not an instance or subclass of `BaseException`");
     }
 }
 
@@ -2141,7 +2186,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
         let mut diag = builder.into_diagnostic(format_args!(
             "Cannot use `NotImplemented` as an exception cause",
         ));
-        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diag
     } else {
         builder.into_diagnostic(format_args!(
@@ -2172,7 +2217,7 @@ pub(crate) fn report_instance_layout_conflict(
     let mut diagnostic = builder
         .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
 
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Bases {} cannot be combined in multiple inheritance",
         disjoint_bases.describe_problematic_class_bases(db)
     ));
@@ -2402,7 +2447,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     };
     let db = context.db();
     let mut diagnostic = builder.into_diagnostic("Invalid argument to `get_protocol_members`");
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
@@ -2437,8 +2482,9 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
     };
     let db = context.db();
     let mut diagnostic = builder.into_diagnostic("Invalid argument to `reveal_protocol_interface`");
-    diagnostic
-        .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
+    diagnostic.set_primary_annotation_message(
+        "Only protocol classes can be passed to `reveal_protocol_interface`",
+    );
 
     if let Some(class) = param_type.to_class_type(context.db()) {
         let mut class_def_diagnostic = SubDiagnostic::new(
@@ -2487,7 +2533,7 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "`{class_display}` cannot be used in a class pattern because it is not a type"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
 }
 
 pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
@@ -2547,7 +2593,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
     ));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(format_args!(
         "A protocol class can only be used in `{function_name}` checks if it is decorated \
@@ -2574,7 +2620,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
         "`{class_name}` cannot be used as the second argument to `issubclass` \
         as it is a protocol with non-method members"
     ));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     if let [single_member] = non_method_members {
         let mut sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -2633,7 +2679,7 @@ pub(crate) fn report_runtime_check_against_typed_dict(
         "`TypedDict` class `{class_name}` cannot be used as the second argument to `{function_name}`",
         function_name = function.name()
     ));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
 }
 
 pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ranged>(
@@ -2649,7 +2695,7 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Class `{class_name}` cannot be used in a class pattern",
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(
         "A protocol class can only be used in a match class pattern if it is decorated \
@@ -2671,7 +2717,7 @@ pub(crate) fn report_match_pattern_against_typed_dict<T: Ranged>(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "`TypedDict` class `{class_name}` cannot be used in a class pattern",
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
 }
 
 fn add_non_runtime_checkable_protocol_context<'db>(
@@ -2706,7 +2752,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     let class_name = protocol.name(db);
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`"));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
         SubDiagnosticSeverity::Info,
@@ -2731,7 +2777,7 @@ pub(crate) fn report_call_to_abstract_method(
     let db = context.db();
     let name = function.name(db);
     let mut diag = builder.into_diagnostic(format_args!("Cannot call `{name}` on class object"));
-    diag.set_primary_message(format_args!(
+    diag.set_primary_annotation_message(format_args!(
         "`{name}` is an abstract {method_kind} with a trivial body"
     ));
     let span = abstract_method_span(
@@ -2792,12 +2838,10 @@ pub(crate) fn report_undeclared_protocol_member(
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
     fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         let class = match ty {
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(_),
-                ..
-            }) => return true,
+            Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Protocol(_) => return true,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
@@ -2841,17 +2885,17 @@ pub(crate) fn report_undeclared_protocol_member(
         let suggestion = binding_type.promote(db);
 
         if should_give_hint(db, suggestion) {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
                 suggestion.display(db)
             ));
         } else {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Consider adding an annotation for `{symbol_name}`"
             ));
         }
     } else {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "`{symbol_name}` is not declared as a protocol member"
         ));
     }
@@ -2878,7 +2922,7 @@ pub(crate) fn report_undeclared_protocol_attribute(
     let symbol_name = target.attr.as_str();
     let mut diagnostic =
         builder.into_diagnostic("Cannot assign to an undeclared attribute in a protocol method");
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{symbol_name}` is not declared as a protocol member"
     ));
 
@@ -3085,7 +3129,7 @@ pub(crate) fn report_unsupported_base(
     };
     let db = context.db();
     let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
+    diagnostic.set_primary_annotation_message(format_args!("Has type `{}`", base_type.display(db)));
     diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
         base_type.display(db)
@@ -3161,14 +3205,15 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                             "{quote}{suggestion}{quote}",
                             quote = literal.value.first_literal_flags().quote_str()
                         );
-                        diagnostic
-                            .set_primary_message(format_args!("Did you mean {quoted_suggestion}?"));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Did you mean {quoted_suggestion}?"
+                        ));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             quoted_suggestion,
                             key_node.range(),
                         )));
                     } else {
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
                         ));
                     }
@@ -3176,7 +3221,8 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
                     ));
                 } else {
-                    diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                    diagnostic
+                        .set_primary_annotation_message(format_args!("Unknown key \"{key}\""));
                     if let Some(full_ty) = full_object_ty {
                         diagnostic.set_concise_message(format_args!(
                             "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
@@ -3228,7 +3274,7 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
         "NamedTuple field without default value cannot follow field(s) with default value(s)",
     );
 
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Field `{field}` defined here without a default value",
     ));
 
@@ -3277,17 +3323,43 @@ pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
         builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
 
     if field_definition.is_some() {
-        diagnostic.set_primary_message(
+        diagnostic.set_primary_annotation_message(
             "Class definition will raise `TypeError` at runtime due to this field",
         );
     } else {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Class definition will raise `TypeError` at runtime due to field `{field_name}`",
         ));
     }
 
     diagnostic.set_concise_message(format_args!(
         "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
+}
+
+/// Report a `NamedTuple` field annotated with a type qualifier that `NamedTuple` does not accept.
+///
+/// The diagnostic is anchored to the annotated assignment that introduced the qualifier. It does
+/// not claim that class creation fails at runtime because deferred and wrapped annotations can
+/// preserve the qualifier without passing it directly to `typing._type_check`.
+pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
+    context: &InferContext<'db, '_>,
+    field_name: &str,
+    qualifier: TypeQualifier,
+    field_definition: Definition<'db>,
+) {
+    let db = context.db();
+    let module = context.module();
+    let qualifier = qualifier.name();
+    let diagnostic_range = field_definition.kind(db).full_range(module);
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Type qualifier `{qualifier}` is not allowed in a NamedTuple field"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Type qualifier `{qualifier}` is not allowed on NamedTuple field `{field_name}`"
     ));
 }
 
@@ -3449,14 +3521,14 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     ));
 
     if let [single_typevar] = invalid_later_typevars {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variable `{}` does not have a default",
             single_typevar.name(db),
         ));
     } else {
         let later_typevars =
             format_enumeration(invalid_later_typevars.iter().map(|tv| tv.name(db)));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variables {later_typevars} do not have defaults",
         ));
     }
@@ -3541,12 +3613,15 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
 /// class Parent(Grandparent[T1, T2]): ...
 /// class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
 /// ```
+///
+/// Returns `true` if an inconsistency was found, even when it is inherited or the diagnostic is
+/// disabled.
 pub(crate) fn report_inconsistent_generic_bases<'db>(
     context: &InferContext<'db, '_>,
     header_range: TextRange,
     explicit_bases: &[Type<'db>],
     base_nodes: Option<&[ast::Expr]>,
-) {
+) -> bool {
     let db = context.db();
     // Maps each generic ancestor's class literal to the first
     // specialization seen and the index of the explicit base it
@@ -3554,7 +3629,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     let mut ancestor_specs =
         FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
 
-    'outer: for (i, base) in explicit_bases.iter().enumerate() {
+    for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
             Type::GenericAlias(alias) => ClassType::Generic(*alias),
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
@@ -3570,17 +3645,19 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             let origin = supercls_alias.origin(db);
 
             if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                if earlier_idx != i
-                    && earlier_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .zip(supercls_alias.specialization(db).types(db))
-                        .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
+                if earlier_alias
+                    .specialization(db)
+                    .types(db)
+                    .iter()
+                    .zip(supercls_alias.specialization(db).types(db))
+                    .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
                 {
+                    if earlier_idx == i {
+                        return true;
+                    }
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
                     else {
-                        break 'outer;
+                        return true;
                     };
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Inconsistent type arguments for `{}` among class bases",
@@ -3633,7 +3710,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                         supercls_alias.display(db),
                         earlier_alias.display(db)
                     ));
-                    break 'outer;
+                    return true;
                 }
             } else if !supercls_alias
                 .specialization(db)
@@ -3645,6 +3722,8 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             }
         }
     }
+
+    false
 }
 
 pub(crate) fn report_shadowed_type_variable<'db>(
@@ -3666,6 +3745,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         | TypeVarKind::TypingSelf
         | TypeVarKind::Pep613Alias => "type variable",
         TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
+        TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
@@ -3673,7 +3753,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     diagnostic.set_concise_message(format_args!(
         "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
     ));
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
@@ -3684,15 +3764,16 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    if other_typevar.is_paramspec(db) {
-        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-            "ParamSpec `{typevar_name}` is bound in this enclosing scope"
-        )));
+    let other_typevar_kind = if other_typevar.is_paramspec(db) {
+        "ParamSpec"
+    } else if other_typevar.is_typevartuple(db) {
+        "TypeVarTuple"
     } else {
-        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-            "Type variable `{typevar_name}` is bound in this enclosing scope"
-        )));
-    }
+        "Type variable"
+    };
+    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+        "{other_typevar_kind} `{typevar_name}` is bound in this enclosing scope"
+    )));
 }
 
 // I tried refactoring this function to placate Clippy,
@@ -3748,7 +3829,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
 
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Definition is incompatible with `{overridden_method}`"
     ));
 
@@ -3849,6 +3930,10 @@ pub(super) fn report_invalid_method_override<'db>(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a dataclass"
                 )),
+                CodeGeneratorKind::Pydantic(_) => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a Pydantic model"
+                )),
                 CodeGeneratorKind::NamedTuple => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` inherits from `typing.NamedTuple`"
@@ -3884,6 +3969,63 @@ pub(super) fn report_invalid_method_override<'db>(
         for subdiag in eq_subdiagnostics {
             diagnostic.help(subdiag);
         }
+    }
+}
+
+/// Reports an incompatible pair of source-defined methods in a resolved MRO.
+pub(super) fn report_incompatible_base_method<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    member: &str,
+    selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    contract: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    error_context: impl FnOnce() -> ErrorContextTree<'db>,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, class.header_range(db))
+    else {
+        return;
+    };
+
+    let (selected_owner, selected_definition, selected_decorator) = selected;
+    let (contract_owner, contract_definition, contract_decorator) = contract;
+    let (selected_name, contract_name) = if selected_owner.name(db) == contract_owner.name(db) {
+        (
+            selected_owner.qualified_name(db).to_string(),
+            contract_owner.qualified_name(db).to_string(),
+        )
+    } else {
+        (
+            selected_owner.name(db).to_string(),
+            contract_owner.name(db).to_string(),
+        )
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Base classes for class `{}` define method `{member}` incompatibly",
+        class.name(db)
+    ));
+    diagnostic.set_primary_annotation_message(format_args!(
+        "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
+    ));
+    if selected_decorator != contract_decorator {
+        diagnostic.info(format_args!(
+            "`{selected_name}.{member}` is {} but `{contract_name}.{member}` is {}",
+            selected_decorator.description(),
+            contract_decorator.description(),
+        ));
+    }
+    error_context().attach_to(db, &mut diagnostic);
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    for (definition, owner_name) in [
+        (selected_definition, selected_name),
+        (contract_definition, contract_name),
+    ] {
+        let module = parsed_module(db, definition.file(db)).load(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(definition.focus_range(db, &module)))
+                .message(format_args!("`{owner_name}.{member}` defined here")),
+        );
     }
 }
 
@@ -3931,7 +4073,7 @@ pub(super) fn report_overridden_final_method<'db>(
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Overrides a definition from superclass `{superclass_name}`"
     ));
     diagnostic.set_concise_message(format_args!(
@@ -4099,7 +4241,7 @@ pub(super) fn report_overridden_final_variable<'db>(
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Overrides a final variable from superclass `{superclass_name}`"
     ));
     diagnostic.set_concise_message(format_args!(
@@ -4152,7 +4294,7 @@ pub(super) fn report_unsupported_comparison<'db>(
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
 
     if left_ty.is_equivalent_to(db, right_ty) {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Both operands have type `{}`",
             left_ty.display_with(db, display_settings.clone())
         ));
@@ -4309,7 +4451,7 @@ fn report_unsupported_binary_operation_impl<'a>(
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
 
     if left_ty.is_equivalent_to(db, right_ty) {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Both operands have type `{}`",
             left_ty.display_with(db, display_settings.clone())
         ));
@@ -4360,7 +4502,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             class.name(db),
             base_class.name(db)
         ));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Subclass `{}` is not frozen but base class `{}` is",
             class.name(db),
             base_class.name(db)
@@ -4374,7 +4516,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             class.name(db),
             base_class.name(db)
         ));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Subclass `{}` is frozen but base class `{}` is not",
             class.name(db),
             base_class.name(db)
@@ -4438,7 +4580,7 @@ pub(super) fn report_invalid_total_ordering(
     let mut diagnostic = builder.into_diagnostic(
         "Class decorated with `@total_ordering` must define at least one ordering method",
     );
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
         class.name(db)
     ));
@@ -4462,7 +4604,7 @@ pub(super) fn report_invalid_total_ordering_call(
     let mut diagnostic = builder.into_diagnostic(
         "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
     );
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
         class.name(db)
     ));
@@ -4581,7 +4723,7 @@ pub(super) fn report_invalid_concatenate_last_arg<'db>(
             "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` \
                 type variable",
         );
-        diag.set_primary_message(format_args!(
+        diag.set_primary_annotation_message(format_args!(
             "Got `{}`",
             last_arg_type.display(context.db())
         ));
@@ -4626,7 +4768,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
 
             if let Some((superclass, definition)) = class_and_def {
                 let superclass_name = superclass.name(db);
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Superclass `{superclass_name}` cannot be subclassed",
                 ));
                 let definition_module = parsed_module(db, definition.file(db));
@@ -4656,7 +4798,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                 }
                 diagnostic.annotate(annotation);
             } else if err_kind == CallErrorKind::NotCallable {
-                diagnostic.set_primary_message(
+                diagnostic.set_primary_annotation_message(
                     "`class` statement will fail because `__init_subclass__` \
                     on a superclass is not callable",
                 );
@@ -4665,7 +4807,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     `__init_subclass__` definition on a superclass",
                 ));
             } else {
-                diagnostic.set_primary_message(
+                diagnostic.set_primary_annotation_message(
                     "`class` statement may fail because `__init_subclass__` \
                     on a superclass may not be callable",
                 );

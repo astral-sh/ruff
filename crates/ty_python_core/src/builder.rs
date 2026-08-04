@@ -32,8 +32,8 @@ use crate::definition::{
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
-    MatchPatternDefinitionNodeRef, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, NestedBindingExecution, NestedBindingsDefinitionKind,
+    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -61,8 +61,8 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, PreviousDefinitions,
-    ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, LiveBindingStatus,
+    PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -81,16 +81,6 @@ struct Loop {
     break_states: Vec<FlowSnapshot>,
     /// Flow states at each `continue` in the current loop.
     continue_states: Vec<FlowSnapshot>,
-}
-
-impl Loop {
-    fn push_break(&mut self, state: FlowSnapshot) {
-        self.break_states.push(state);
-    }
-
-    fn push_continue(&mut self, state: FlowSnapshot) {
-        self.continue_states.push(state);
-    }
 }
 
 /// A narrowing alias: a variable whose RHS is a narrowing expression
@@ -206,6 +196,15 @@ struct ConditionFlowSnapshots {
     falsy: FlowSnapshot,
 }
 
+impl ConditionFlowSnapshots {
+    fn into_short_circuit_and_continuation(self, op: ast::BoolOp) -> (FlowSnapshot, FlowSnapshot) {
+        match op {
+            ast::BoolOp::And => (self.falsy, self.truthy),
+            ast::BoolOp::Or => (self.truthy, self.falsy),
+        }
+    }
+}
+
 enum ConditionFlowSnapshot {
     Fallback,
     Branches(ConditionFlowSnapshots),
@@ -285,6 +284,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
+    /// Hashset of all [`FileScopeId`]s that correspond to asynchronous comprehensions.
+    async_comprehensions: FxHashSet<FileScopeId>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
@@ -335,6 +336,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
+            async_comprehensions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
 
@@ -371,7 +373,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope[self.current_scope()]
     }
 
-    pub(crate) fn expect_single_definition(
+    fn mark_current_comprehension_async(&mut self) {
+        let scope = self.current_scope();
+        if self.scopes[scope].kind() == ScopeKind::Comprehension {
+            self.async_comprehensions.insert(scope);
+        }
+    }
+
+    fn expect_single_definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
@@ -1243,6 +1252,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 Self::walk_narrowing_alias_predicate(&expr_if.body, f);
                 Self::walk_narrowing_alias_predicate(&expr_if.orelse, f);
             }
+            ast::Expr::Named(expr_named) => {
+                Self::walk_narrowing_alias_predicate(&expr_named.value, f);
+            }
             _ => {}
         }
     }
@@ -1416,9 +1428,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
             Some(CurrentAssignment::Named(named)) => {
-                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                // named expression is implicitly nonlocal. This is yet to be
-                // implemented.
+                self.mark_comprehension_named_target(place_id, named.target.range());
                 self.add_definition(place_id, named);
             }
             Some(CurrentAssignment::Comprehension {
@@ -1518,8 +1528,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
         let is_loop_header = kind.is_loop_header();
-
-        let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
         let definition: Definition<'db> =
@@ -1534,6 +1542,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.push(definition);
             definitions.len()
         };
+
+        self.record_definition(place, definition, None);
+
+        (definition, num_definitions)
+    }
+
+    /// Records an already-created definition in the current scope.
+    ///
+    /// `previous_definitions` controls whether a new binding replaces earlier bindings. By
+    /// default, ordinary assignments replace them and loop headers keep them. Comprehension
+    /// bindings choose explicitly because an assignment that only runs on some paths must keep
+    /// the earlier binding.
+    fn record_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        previous_definitions: Option<PreviousDefinitions>,
+    ) {
+        let kind = definition.kind(self.db);
+        let is_loop_header = kind.is_loop_header();
+        let category = kind.category(self.source_type.is_stub(), self.module);
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1560,16 +1589,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                // Loop-header bindings don't shadow prior bindings.
-                let previous_definitions = if is_loop_header {
+                let previous = previous_definitions.unwrap_or(if is_loop_header {
                     PreviousDefinitions::AreKept
                 } else {
                     PreviousDefinitions::AreShadowed
-                };
+                });
                 use_def.record_binding(
                     place,
                     definition,
-                    previous_definitions,
+                    previous,
                     FutureDefinitions::ShadowThisOne,
                 );
                 if !is_loop_header {
@@ -1588,8 +1616,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
-
-        (definition, num_definitions)
     }
 
     // Creates a definition for each key-value assignment in the dictionary.
@@ -1635,7 +1661,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .enumerate()
             {
                 if let Some(target) = MemberExprBuilder::visit_subscript_expr(
-                    target.clone(),
+                    target,
                     &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: ast::Number::Int(ast::Int::from(i as u64)),
                         range: TextRange::default(),
@@ -1653,8 +1679,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target.clone(), key)
-            else {
+            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target, key) else {
                 continue;
             };
 
@@ -1778,6 +1803,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 place,
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
+                    execution: NestedBindingExecution::Lazy,
                     nested_declarations: declarations,
                 })),
                 false,
@@ -1817,6 +1843,209 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 FutureDefinitions::DontShadowThisOne,
             );
         }
+    }
+
+    /// Records assignment-expression bindings from a comprehension in its containing scope.
+    ///
+    /// The value expression still belongs to the comprehension scope, so the real definition
+    /// stays there. The synthetic definition lets the containing scope observe that binding while
+    /// retaining the comprehension's scope for type inference.
+    ///
+    /// ```python
+    /// [(last := item) for item in items]
+    /// print(last)  # `last` is owned by this containing scope.
+    /// ```
+    fn synthesize_comprehension_binding_definitions(
+        &mut self,
+        nested_bindings: NestedGlobalOrNonlocalDeclarations,
+    ) {
+        let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
+        nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+
+        for (name, mut declarations) in nested_bindings {
+            // Ignore declarations used only to validate `nonlocal` syntax.
+            declarations.retain(|d| d.is_bound);
+            declarations.shrink_to_fit();
+            let Some(first_declaration) = declarations.first().copied() else {
+                continue;
+            };
+
+            let binding_status = self.comprehension_binding_status(&name, &declarations);
+
+            let symbol = self.add_symbol(name.clone());
+            debug_assert!(
+                declarations
+                    .iter()
+                    .all(|declaration| declaration.is_global() == first_declaration.is_global())
+            );
+            self.forward_comprehension_binding(&name, first_declaration, symbol);
+
+            let place: ScopedPlaceId = symbol.into();
+            if binding_status == LiveBindingStatus::Unbound {
+                self.mark_place_bound(place);
+                continue;
+            }
+
+            let definition = Definition::new(
+                self.db,
+                self.current_scope_id(),
+                place,
+                DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
+                    name,
+                    execution: NestedBindingExecution::Eager,
+                    nested_declarations: declarations,
+                })),
+                false,
+            );
+            let previous = if binding_status == LiveBindingStatus::Bound {
+                PreviousDefinitions::AreShadowed
+            } else {
+                PreviousDefinitions::AreKept
+            };
+            self.record_definition(place, definition, Some(previous));
+        }
+    }
+
+    /// Summarizes whether the comprehension's live exit paths bind `name`.
+    ///
+    /// For example, `value` is only possibly bound after this comprehension because the walrus is
+    /// skipped when `flag` is false:
+    ///
+    /// ```python
+    /// [(value := item) if flag else None for item in items]
+    /// ```
+    fn comprehension_binding_status(
+        &mut self,
+        name: &str,
+        declarations: &[NestedDeclaration],
+    ) -> LiveBindingStatus {
+        let mut status = LiveBindingStatus::Unbound;
+        for declaration in declarations {
+            let scope_id = declaration.file_scope_id;
+            let Some(symbol) = self.place_tables[scope_id].symbol_id(name) else {
+                continue;
+            };
+            match self.use_def_maps[scope_id].symbol_live_binding_status(symbol) {
+                LiveBindingStatus::Bound => return LiveBindingStatus::Bound,
+                LiveBindingStatus::PossiblyBound => status = LiveBindingStatus::PossiblyBound,
+                LiveBindingStatus::Unbound => {}
+            }
+        }
+        status
+    }
+
+    /// Passes a walrus binding out through nested comprehensions.
+    ///
+    /// ```python
+    /// [[(last := item) for item in row] for row in rows]
+    /// print(last)  # `last` belongs to the scope outside both comprehensions.
+    /// ```
+    ///
+    /// Each comprehension passes the binding out one level. This preserves the order and
+    /// conditions under which the assignment is evaluated.
+    fn forward_comprehension_binding(
+        &mut self,
+        name: &Name,
+        first_declaration: NestedDeclaration,
+        symbol: ScopedSymbolId,
+    ) {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return;
+        }
+
+        self.current_scope_info_mut()
+            .nested_global_or_nonlocal_declarations
+            .remove(name);
+
+        if first_declaration.is_global() {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_global();
+        } else {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_nonlocal();
+        }
+        self.current_scope_info_mut()
+            .this_scope_global_or_nonlocal_declarations
+            .entry(name.clone())
+            .or_insert(first_declaration.range);
+    }
+
+    /// Marks a comprehension walrus target as a write to the containing Python scope.
+    ///
+    /// The iteration variable remains local to the comprehension, while the walrus target does
+    /// not:
+    ///
+    /// ```python
+    /// [(result := item) for item in items]
+    /// print(result)  # valid
+    /// print(item)    # `item` is not defined here
+    /// ```
+    fn mark_comprehension_named_target(&mut self, place: ScopedPlaceId, range: TextRange) {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return;
+        }
+        if self.semantic_syntax_errors.borrow().iter().any(|error| {
+            matches!(
+                error.kind,
+                SemanticSyntaxErrorKind::ReboundComprehensionVariable
+                    | SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable
+            ) && error.range.contains_range(range)
+        }) {
+            return;
+        }
+
+        let Some(symbol) = place.as_symbol() else {
+            return;
+        };
+        let name = self.current_place_table().symbol(symbol).name().clone();
+        let Some(containing_scope) = self.scope_stack.iter().rev().find(|scope_info| {
+            self.scopes[scope_info.file_scope_id].kind() != ScopeKind::Comprehension
+        }) else {
+            return;
+        };
+
+        let containing_scope_id = containing_scope.file_scope_id;
+        let is_global = match self.scopes[containing_scope_id].kind() {
+            ScopeKind::Module => true,
+            ScopeKind::Function | ScopeKind::Lambda => self.place_tables[containing_scope_id]
+                .symbol_id(&name)
+                .is_some_and(|symbol| {
+                    self.place_tables[containing_scope_id]
+                        .symbol(symbol)
+                        .is_global()
+                }),
+            // Assignment expressions are invalid in comprehensions directly contained by these
+            // scopes. Leave the recovered target local to the comprehension.
+            ScopeKind::Class | ScopeKind::TypeAlias | ScopeKind::TypeParams => return,
+            ScopeKind::Comprehension => return,
+        };
+
+        if is_global {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_global();
+        } else {
+            let (containing_symbol, added) =
+                self.place_tables[containing_scope_id].add_symbol(Symbol::new(name.clone()));
+            if added {
+                self.use_def_maps[containing_scope_id].add_place(containing_symbol.into());
+            }
+
+            let containing_symbol =
+                self.place_tables[containing_scope_id].symbol_mut(containing_symbol);
+            if !containing_symbol.is_nonlocal() && !containing_symbol.is_bound() {
+                containing_symbol.mark_bound();
+            }
+
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_nonlocal();
+        }
+        self.current_scope_info_mut()
+            .this_scope_global_or_nonlocal_declarations
+            .insert(name, range);
     }
 
     fn record_expression_narrowing_constraint(
@@ -2372,7 +2601,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         scope: NodeWithScopeRef,
         generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
-    ) {
+    ) -> FileScopeId {
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -2391,6 +2620,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
+        let comprehension_scope = self.current_scope();
+
+        if generators.iter().any(|generator| generator.is_async) {
+            self.async_comprehensions.insert(comprehension_scope);
+        }
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -2401,8 +2635,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             value,
         );
 
+        let mut filtered_out_paths = Vec::new();
         for if_expr in &generator.ifs {
-            self.visit_comprehension_filter(if_expr);
+            filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
         }
 
         for generator in generators_iter {
@@ -2419,23 +2654,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
 
             for if_expr in &generator.ifs {
-                self.visit_comprehension_filter(if_expr);
+                filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
             }
         }
 
         visit_outer_elt(self);
-        self.pop_scope();
+        for filtered_out_path in filtered_out_paths {
+            self.flow_merge(filtered_out_path);
+        }
+        let nested_bindings = self.pop_scope();
+        self.synthesize_comprehension_binding_definitions(nested_bindings);
 
         self.current_assignments = saved_assignments;
+
+        comprehension_scope
     }
 
-    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) {
+    /// Visits a comprehension filter on its truthy path and returns the filtered-out path.
+    ///
+    /// A false filter skips the rest of the current iteration, but assignments performed while
+    /// evaluating the filter remain observable:
+    ///
+    /// ```python
+    /// [item for item in items if (last := item)]
+    /// print(last)
+    /// ```
+    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
         self.visit_expr(if_expr);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
-        if let Some(truthy) = condition_flow_snapshot.into_truthy() {
-            self.flow_restore(truthy);
-        }
-        let _ = self.record_expression_narrowing_constraint(if_expr);
+        let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
+            self.flow_restore(snapshots.truthy);
+            snapshots.falsy
+        } else {
+            self.flow_snapshot()
+        };
+
+        let (predicate, narrowing_id) = self.record_expression_narrowing_constraint(if_expr);
+        let reachability_constraint = self.record_reachability_constraint(predicate);
+        let included_path = self.flow_snapshot();
+
+        self.flow_restore(filtered_out);
+        self.record_negated_narrowing_constraint(predicate, narrowing_id);
+        self.record_negated_reachability_constraint(reachability_constraint);
+        let filtered_out = self.flow_snapshot();
+
+        self.flow_restore(included_path);
+        filtered_out
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
@@ -2660,6 +2924,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
+            async_comprehensions: FrozenSet::from(self.async_comprehensions),
             narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
     }
@@ -3212,7 +3477,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     *node.target,
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::AnnAssign(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
 
@@ -3245,12 +3510,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
                         }
 
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
@@ -3928,20 +4193,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_unreachable();
             }
 
-            ast::Stmt::Continue(_) => {
+            ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
                 let snapshot = self.flow_snapshot();
                 if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_continue(snapshot);
-                }
-                self.record_terminal_finally_entry();
-                // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
-            }
-
-            ast::Stmt::Break(_) => {
-                let snapshot = self.flow_snapshot();
-                if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_break(snapshot);
+                    if stmt.is_continue_stmt() {
+                        current_loop.continue_states.push(snapshot);
+                    } else {
+                        current_loop.break_states.push(snapshot);
+                    }
                 }
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
@@ -4163,15 +4422,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .add_atom(predicate_id);
 
                         if self.in_function_scope() {
-                            self.record_reachability_constraint_id(predicate_id);
-
-                            // Also gate narrowing by this constraint: if the call returns
-                            // `Never`, any narrowing in the current branch should be
-                            // invalidated (since this path is unreachable). This enables
-                            // narrowing to be preserved after if-statements where one branch
-                            // calls a `NoReturn` function like `sys.exit()`.
+                            let reachability_constraint = self
+                                .current_reachability_constraints_mut()
+                                .add_atom(predicate_id);
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
+                                .record_non_terminal_call_constraints(
+                                    reachability_constraint,
+                                    narrowing_constraint,
+                                );
                         } else {
                             // In non-function scopes, we only record a narrowing constraint
                             // (not a reachability constraint). Recording reachability for
@@ -4409,12 +4667,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::Named(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
                 } else {
@@ -4481,22 +4738,28 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     elt, generators, ..
                 },
             ) => {
-                self.with_generators_scope(
+                let scope = self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
             }
             ast::Expr::SetComp(
                 set_comprehension @ ast::ExprSetComp {
                     elt, generators, ..
                 },
             ) => {
-                self.with_generators_scope(
+                let scope = self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
             }
             ast::Expr::Generator(
                 generator @ ast::ExprGenerator {
@@ -4517,7 +4780,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     ..
                 },
             ) => {
-                self.with_generators_scope(
+                let scope = self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
                     |builder| {
@@ -4527,6 +4790,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.visit_expr(value);
                     },
                 );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
             }
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
@@ -4536,6 +4802,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 let mut snapshots = vec![];
                 let mut reachability_constraints = vec![];
+                let mut last_condition_flow_snapshots = None;
 
                 for (index, value) in values.iter().enumerate() {
                     for id in &reachability_constraints {
@@ -4548,9 +4815,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .record_range_reachability(value.range(), in_type_checking_block);
                     self.visit_expr(value);
 
-                    // For the last value, we don't need to model control flow. There is no short-circuiting
-                    // anymore.
+                    // Only non-final values can short-circuit this boolean operation. The final
+                    // value can still have its own outcome-specific flow if it is nested.
                     if index < values.len() - 1 {
+                        let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
                         let predicate = self.build_predicate(value);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         let predicate_id = match op {
@@ -4561,7 +4829,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             .current_reachability_constraints_mut()
                             .add_atom(predicate_id);
 
-                        let after_expr = self.flow_snapshot();
+                        let continuation =
+                            if let Some(condition_flow_snapshots) = condition_flow_snapshots {
+                                let (short_circuit, continuation) = condition_flow_snapshots
+                                    .into_short_circuit_and_continuation(*op);
+                                self.flow_restore(short_circuit);
+                                continuation
+                            } else {
+                                self.flow_snapshot()
+                            };
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
@@ -4574,17 +4850,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
-                        self.flow_restore(after_expr);
+                        self.flow_restore(continuation);
                         self.record_narrowing_constraint_id_for_places(
                             predicate_id,
                             &possibly_narrowed,
                         );
                         reachability_constraints.push(reachability_constraint);
+                    } else {
+                        last_condition_flow_snapshots = self.take_condition_flow_snapshots(value);
                     }
                 }
 
-                let no_short_circuit =
-                    any_over_expr(expr, &ast::Expr::is_named_expr).then(|| self.flow_snapshot());
+                let has_specialized_last = last_condition_flow_snapshots.is_some();
+                let (last_short_circuit, no_short_circuit) =
+                    if let Some(condition_flow_snapshots) = last_condition_flow_snapshots {
+                        let (short_circuit, no_short_circuit) =
+                            condition_flow_snapshots.into_short_circuit_and_continuation(*op);
+                        (Some(short_circuit), Some(no_short_circuit))
+                    } else {
+                        (
+                            None,
+                            any_over_expr(expr, &ast::Expr::is_named_expr)
+                                .then(|| self.flow_snapshot()),
+                        )
+                    };
+
+                if let Some(last_short_circuit) = last_short_circuit {
+                    self.flow_restore(last_short_circuit);
+                }
 
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
@@ -4593,10 +4886,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(no_short_circuit) = no_short_circuit {
                     let bool_op_key = ExpressionNodeKey::from(expr);
                     let maybe_short_circuit = self.flow_snapshot();
+
+                    if has_specialized_last {
+                        // Restore the merged post-expression flow after constructing the two
+                        // outcome-specific snapshots.
+                        self.flow_merge(no_short_circuit.clone());
+                    }
+
                     let (truthy, falsy) = match op {
                         ast::BoolOp::And => (no_short_circuit, maybe_short_circuit),
                         ast::BoolOp::Or => (maybe_short_circuit, no_short_circuit),
                     };
+
                     self.condition_flow_snapshots_by_node
                         .insert(bool_op_key, ConditionFlowSnapshots { truthy, falsy });
                 }
@@ -4609,6 +4910,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if self.scopes[scope].kind() == ScopeKind::Function {
                     self.generator_functions.insert(scope);
                 }
+                walk_expr(self, expr);
+            }
+            ast::Expr::Await(_) => {
+                self.mark_current_comprehension_async();
                 walk_expr(self, expr);
             }
             _ => {
@@ -4884,24 +5189,6 @@ impl CurrentAssignment<'_, '_> {
     }
 }
 
-impl<'ast> From<&'ast ast::StmtAnnAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAnnAssign) -> Self {
-        Self::AnnAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAugAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAugAssign) -> Self {
-        Self::AugAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::ExprNamed) -> Self {
-        Self::Named(value)
-    }
-}
-
 #[derive(Default)]
 struct CurrentStatement<'ast, 'db> {
     /// A list of lambda expressions contained in this statement.
@@ -5150,6 +5437,6 @@ fn is_collection_initializer(expr: &ast::Expr) -> bool {
     is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
 }
 
-pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {
+fn is_collection_literal(expr: &ast::Expr) -> bool {
     expr.is_list_expr() || expr.is_set_expr() || expr.is_dict_expr()
 }

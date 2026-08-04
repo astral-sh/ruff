@@ -60,7 +60,7 @@ impl ModuleImports {
     }
 
     /// Insert a file path into the module imports.
-    pub fn insert(&mut self, path: SystemPathBuf) {
+    fn insert(&mut self, path: SystemPathBuf) {
         self.0.insert(path);
     }
 

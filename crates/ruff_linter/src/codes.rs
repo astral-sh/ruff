@@ -590,6 +590,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "047") => rules::pyupgrade::rules::NonPEP695GenericFunction,
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
+        (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
 
         // pydocstyle
         (Pydocstyle, "100") => rules::pydocstyle::rules::UndocumentedPublicModule,
@@ -1089,8 +1090,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
         (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
         (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
+        (Ruff, "105") => rules::ruff::rules::NoqaComments,
+        (Ruff, "106") => rules::ruff::rules::RuleCodesInSuppressionComments,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
+        (Ruff, "201") => rules::ruff::rules::RuleCodesInSelectors,
+
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,
         #[cfg(any(feature = "test-rules", test))]

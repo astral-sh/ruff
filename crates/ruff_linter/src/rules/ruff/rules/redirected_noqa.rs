@@ -67,7 +67,7 @@ pub(crate) fn redirected_file_noqa(context: &LintContext, noqa_directives: &File
 }
 
 /// Convert a sequence of [Codes] into [Diagnostic]s and append them to `diagnostics`.
-pub(crate) fn build_diagnostics(context: &LintContext, codes: &Codes<'_>) {
+fn build_diagnostics(context: &LintContext, codes: &Codes<'_>) {
     for code in codes.iter() {
         if let Some(redirected) = get_redirect_target(code.as_str()) {
             let mut diagnostic = context.report_diagnostic(
