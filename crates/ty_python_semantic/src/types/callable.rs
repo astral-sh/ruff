@@ -174,10 +174,14 @@ impl<'db> Type<'db> {
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
-                    match tvar.typevar(db).bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            let upcast_callables = bound
-                                .to_meta_type(db, env)
+                    match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            let constructor = if bound.is_object() {
+                                KnownClass::Object.to_class_literal(db, env)
+                            } else {
+                                bound.to_meta_type(db, env)
+                            };
+                            let upcast_callables = constructor
                                 .try_upcast_to_callable_with_policy_and_context(
                                     db, env, policy, context,
                                 )?;
@@ -194,7 +198,7 @@ impl<'db> Type<'db> {
                                 )
                             }))
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             let mut callables = SmallVec::new();
                             for constraint in constraints.elements(db) {
                                 let element_upcast = constraint
@@ -217,10 +221,6 @@ impl<'db> Type<'db> {
                             }
                             Some(CallableTypes::new(callables))
                         }
-                        None => Some(CallableTypes::one(CallableType::single(
-                            db,
-                            Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
-                        ))),
                     }
                 }
                 SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(

@@ -685,11 +685,12 @@ expects_type_c_default_of_int_str(C[str, int])
 
 ## Upcasting a `type[]` type to a `Callable` type
 
-`type[T]` accepts the same parameters as `object.__init__` if `T` does not have an upper bound. If
-`T` is bound to a nominal-instance type, `type[T]` accepts the same parameters as the constructor of
-the class that the instance-type refers to.
+`type[T]` accepts the same parameters as `object.__init__` if `T` has an implicit or explicit
+`object` upper bound. If `T` has a more specific upper bound, `type[T]` accepts the same parameters
+as that bound's constructor. Bare `type` retains its permissive constructor signature.
 
 ```py
+from collections.abc import Callable
 from ty_extensions._internal import RegularCallableTypeOf
 
 class TakesStrInConstructor:
@@ -728,9 +729,17 @@ def f[
     # error: [too-many-positional-arguments]
     reveal_type(type_t_unbound(""))  # revealed: T@f
 
+    zero_argument_unbound: Callable[[], T] = type_t_unbound
+    # error: [invalid-assignment]
+    one_argument_unbound: Callable[[int], T] = type_t_unbound
+
     reveal_type(type_t_object_bound())  # revealed: T1@f
     # error: [too-many-positional-arguments]
     reveal_type(type_t_object_bound(""))  # revealed: T1@f
+
+    zero_argument_object_bound: Callable[[], T1] = type_t_object_bound
+    # error: [invalid-assignment]
+    one_argument_object_bound: Callable[[int], T1] = type_t_object_bound
 
     reveal_type(type_int())  # revealed: int
     reveal_type(type_int("1"))  # revealed: int
@@ -773,10 +782,8 @@ def f[
         reveal_type(bare_type_upcast)  # revealed: (...) -> Any
         reveal_type(type_object_upcast)  # revealed: (...) -> Any
 
-        # TODO: if we did decide to override typeshed's `type.__call__` annotations (see above),
-        # we should also turn these two into `() -> T@f` / `() -> T1@f`
-        reveal_type(type_t_unbound_upcast)  # revealed: (...) -> T@f
-        reveal_type(type_t_object_bound_upcast)  # revealed: (...) -> T1@f
+        reveal_type(type_t_unbound_upcast)  # revealed: () -> T@f
+        reveal_type(type_t_object_bound_upcast)  # revealed: () -> T1@f
 
         # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
         reveal_type(type_int_upcast)
