@@ -457,6 +457,7 @@ impl<'a> SourceMap<'a> {
         };
 
         let lines = self.span_to_lines(lo..hi);
+        let (bounding_lo, bounding_hi) = self.span_to_locations(lo..hi);
 
         let mut highlights = vec![];
         // To build up the result, we do this for each span:
@@ -468,7 +469,7 @@ impl<'a> SourceMap<'a> {
         // - splice in the span substitution
         //
         // Finally push the trailing line segment of the last span
-        let (mut prev_hi, _) = self.span_to_locations(lo..hi);
+        let mut prev_hi = bounding_lo;
         prev_hi.char = 0;
         let mut prev_line = lines.first().map(|line| line.line);
         let mut buf = String::new();
@@ -565,7 +566,6 @@ impl<'a> SourceMap<'a> {
             buf.pop();
         }
 
-        let (bounding_lo, bounding_hi) = self.span_to_locations(lo..hi);
         let line_count = bounding_hi.line.saturating_sub(bounding_lo.line) + 1;
         let mut replaced_highlights: Vec<Vec<SubstitutionHighlight>> = vec![Vec::new(); line_count];
         for part in &trimmed_patches {
