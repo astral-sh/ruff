@@ -894,7 +894,7 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     fn add_pattern_binding(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
-        if self.in_function || name.id == "_" {
+        if self.in_function || !name.is_valid() || name.id == "_" {
             return;
         }
 

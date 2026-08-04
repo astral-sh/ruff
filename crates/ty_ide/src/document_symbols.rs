@@ -482,6 +482,19 @@ match other:
     }
 
     #[test]
+    fn document_symbols_ignore_invalid_pattern_bindings() {
+        let test = cursor_test(
+            "
+match subject:
+    case [*]:
+        pass
+<CURSOR>",
+        );
+
+        assert!(document_symbols(&test.db, test.program_file(test.cursor.file)).is_empty());
+    }
+
+    #[test]
     fn document_symbols_match_pattern_scopes() {
         let test = cursor_test(
             "
