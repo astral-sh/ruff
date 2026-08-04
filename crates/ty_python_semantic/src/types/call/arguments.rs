@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::ProgramEnvironment;
@@ -44,6 +45,7 @@ pub(crate) struct CallArguments<'a, 'db> {
 struct CallArgument<'a, 'db> {
     argument: Argument<'a>,
     types: CallArgumentTypes<'db>,
+    exact_keyword_items: Option<Box<[(Name, Type<'db>)]>>,
 }
 
 /// Inferred types for a given argument.
@@ -140,6 +142,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             call_arguments.items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
+                exact_keyword_items: None,
             });
         }
 
@@ -206,6 +209,22 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index).map(|item| &item.types)
     }
 
+    /// Records the known keys and individual value types of an unpacked dictionary literal.
+    pub(crate) fn set_exact_keyword_items(
+        &mut self,
+        index: usize,
+        items: Box<[(Name, Type<'db>)]>,
+    ) {
+        if let Some(argument) = self.items.get_mut(index) {
+            argument.exact_keyword_items = Some(items);
+        }
+    }
+
+    /// Returns the exact fields of a `**{...}` argument when every key is a string literal.
+    pub(crate) fn exact_keyword_items(&self, index: usize) -> Option<&[(Name, Type<'db>)]> {
+        self.items.get(index)?.exact_keyword_items.as_deref()
+    }
+
     pub(crate) fn insert_type(
         &mut self,
         index: usize,
@@ -247,6 +266,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             items.push(CallArgument {
                 argument: Argument::Synthetic,
                 types: CallArgumentTypes::new(bound_self),
+                exact_keyword_items: None,
             });
             items.extend(self.items.iter().cloned());
             Cow::Owned(CallArguments { items })
@@ -570,6 +590,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
+                exact_keyword_items: None,
             });
         }
 

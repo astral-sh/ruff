@@ -1385,6 +1385,29 @@ f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
 ```
 
+### Dictionary literals preserve individual value types
+
+An unpacked dictionary literal keeps the value type associated with each key when inferring a
+generic function call.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def value_and_label[T](*, value: T, label: str) -> T:
+    return value
+
+reveal_type(value_and_label(**{"value": 1, "label": "x"}))  # revealed: Literal[1]
+```
+
+Separate unpacked dictionary literals also retain their own keys and value types.
+
+```py
+reveal_type(value_and_label(**{"value": 1}, **{"label": "x"}))  # revealed: Literal[1]
+```
+
 ### Keyword-only parameters
 
 ```py

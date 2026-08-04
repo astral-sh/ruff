@@ -5049,6 +5049,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
+        if let Some(items) = self.arguments.exact_keyword_items(argument_index) {
+            for (name, value_ty) in items.iter().cloned() {
+                let _ = self.match_keyword(
+                    argument_index,
+                    Argument::Keywords,
+                    Some(value_ty),
+                    name.as_str(),
+                );
+            }
+            return;
+        }
+
         if let Some(unpacked) =
             argument_type.and_then(|ty| extract_unpacked_typed_dict_from_value_type(db, env, ty))
         {
@@ -6344,7 +6356,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec_component_start: Option<usize>,
     ) {
         let db = self.db;
-        if extract_unpacked_typed_dict_from_value_type(db, self.env, argument_type).is_some() {
+        if self.arguments.exact_keyword_items(argument_index).is_some()
+            || extract_unpacked_typed_dict_from_value_type(db, self.env, argument_type).is_some()
+        {
             self.check_variadic_argument_type(
                 constraints,
                 argument_index,

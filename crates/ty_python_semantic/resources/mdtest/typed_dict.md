@@ -3616,7 +3616,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import TypedDict
+from typing import Callable, Literal, TypedDict
 
 class ListBox[T](TypedDict):
     value: list[T]
@@ -3624,25 +3624,54 @@ class ListBox[T](TypedDict):
 reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
 ```
 
-Positional and unpacked dictionary literals are validated but do not yet infer type arguments.
+Positional dictionary literals are validated but do not yet infer type arguments.
 
 ```py
 # TODO: Infer `ListBox[int]`.
 reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[Unknown]
-# TODO: Infer `ListBox[int]`.
-reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[Unknown]
 ```
 
-A dictionary containing different field types, or multiple unpacked dictionaries, must not cause
-spurious argument errors.
+An unpacked dictionary literal contributes the value type associated with each individual key.
+
+```py
+unpacked_list_box = ListBox(**{"value": [1]})
+reveal_type(unpacked_list_box)  # revealed: ListBox[int]
+```
+
+Different field types remain distinct within one dictionary or across multiple unpacked
+dictionaries.
 
 ```py
 class Pair[T](TypedDict):
     first: T
     second: str
 
-reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[Unknown]
-reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[Unknown]
+reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[int]
+reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[int]
+```
+
+Later entries in the same dictionary literal replace earlier values for the same key.
+
+```py
+reveal_type(Pair(**{"first": "overwritten", "first": 1, "second": "x"}))  # revealed: Pair[int]
+```
+
+The expected specialization still supplies context to mutable container fields.
+
+```py
+literal_box: ListBox[Literal[1]] = ListBox(**{"value": [1]})
+```
+
+A context-sensitive callback remains gradual until unpacked values can receive field-specific
+inference context.
+
+```py
+class CallbackBox[T](TypedDict):
+    value: T
+    callback: Callable[[T], int]
+
+# TODO: Infer `CallbackBox[int]` and report the invalid attribute access.
+reveal_type(CallbackBox(**{"value": 1, "callback": lambda value: value.upper()}))  # revealed: CallbackBox[Unknown]
 ```
 
 ### Constructor inference from unpacked TypedDicts
