@@ -1400,7 +1400,13 @@ the generic callable.)
 ```py
 from typing import Callable, Self
 from ty_extensions import static_assert
-from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
+from ty_extensions._internal import (
+    ConstraintSet,
+    RegularCallableTypeOf,
+    TypeOf,
+    is_assignable_to,
+    is_constraint_set_assignable_to,
+)
 
 def identity[T](t: T) -> T:
     return t
@@ -1490,6 +1496,20 @@ static_assert(
         Callable[[SelfCarrier[int], str], tuple[int, str]],
     )
 )
+```
+
+A constraint-producing comparison must keep an enclosing class variable symbolic while solving the
+surrounding callable's return variable:
+
+```py
+class OuterCarrier[A_outer]:
+    def method(self) -> A_outer:
+        raise NotImplementedError
+
+    def check[R](self) -> None:
+        actual = is_constraint_set_assignable_to(RegularCallableTypeOf[OuterCarrier[A_outer].method], Callable[..., R])
+        expected = ConstraintSet.range(A_outer, R, object)
+        static_assert(actual == expected)
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any

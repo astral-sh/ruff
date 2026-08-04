@@ -2292,8 +2292,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        let source_inferable = source.inferable_typevars(db);
-        let target_inferable = target.inferable_typevars(db);
+        // An implicit `Self` can reach type variables bound by an enclosing class. A standalone,
+        // eager comparison must infer those variables from a concrete receiver, but an outer or
+        // lazy solve must keep them symbolic. Otherwise, quantifying `T@C` out of `T@C <= R`
+        // leaves a decorator's return variable `R` unconstrained.
+        let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager
+            && matches!(self.inferable, TypeVarSet::None);
+        let signature_typevars = |signature: &Signature<'db>| {
+            signature
+                .generic_context
+                .map_or(TypeVarSet::None, |context| {
+                    if include_bound_dependencies {
+                        context.inferable_typevars(db)
+                    } else {
+                        TypeVarSet::from_typevars(db, context.variables(db))
+                    }
+                })
+        };
+        let source_inferable = signature_typevars(source);
+        let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, signature_inferable);
 
