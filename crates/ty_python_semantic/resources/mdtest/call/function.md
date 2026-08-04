@@ -1385,10 +1385,9 @@ f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
 ```
 
-### Dictionary literals preserve individual value types
+### Generic functions with unpacked dictionary literals
 
-An unpacked dictionary literal keeps the value type associated with each key when inferring a
-generic function call.
+Each value in an unpacked dictionary is matched with the parameter named by its key.
 
 ```toml
 [environment]
@@ -1402,13 +1401,20 @@ def value_and_label[T](*, value: T, label: str) -> T:
 reveal_type(value_and_label(**{"value": 1, "label": "x"}))  # revealed: Literal[1]
 ```
 
-Separate unpacked dictionary literals also retain their own keys and value types.
+Values from separate unpacked dictionaries are matched independently.
 
 ```py
 reveal_type(value_and_label(**{"value": 1}, **{"label": "x"}))  # revealed: Literal[1]
 ```
 
-The same key information is preserved when a method receives its implicit `self` argument.
+### Generic methods with unpacked dictionary literals
+
+An unpacked dictionary preserves its key-value pairs when a method supplies `self`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class Reader:
@@ -1418,9 +1424,9 @@ class Reader:
 reveal_type(Reader().value_and_label(**{"value": 1, "label": "x"}))  # revealed: Literal[1]
 ```
 
-### Dictionary literals forwarded through a ParamSpec
+### Forwarded unpacked dictionary literals
 
-Forwarding an unpacked dictionary literal preserves the wrapped callable's distinct parameter types.
+Forwarding an unpacked dictionary through a `ParamSpec` preserves each parameter's type.
 
 ```toml
 [environment]
@@ -1435,6 +1441,11 @@ def forward[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs)
     callback(*args, **kwargs)
 
 forward(target, **{"value": 1, "other": "x"})
+```
+
+An argument with the wrong type still produces an error after forwarding.
+
+```py
 forward(target, **{"value": "invalid", "other": "x"})  # error: [invalid-argument-type]
 ```
 

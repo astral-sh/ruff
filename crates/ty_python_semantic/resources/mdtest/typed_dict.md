@@ -3616,7 +3616,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable, Literal, TypedDict
+from typing import TypedDict
 
 class ListBox[T](TypedDict):
     value: list[T]
@@ -3631,15 +3631,25 @@ Positional dictionary literals are validated but do not yet infer type arguments
 reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[Unknown]
 ```
 
-An unpacked dictionary literal contributes the value type associated with each individual key.
+### Constructor inference from unpacked dictionary literals
 
-```py
-unpacked_list_box = ListBox(**{"value": [1]})
-reveal_type(unpacked_list_box)  # revealed: ListBox[int]
+An unpacked dictionary literal preserves the type of each value.
+
+```toml
+[environment]
+python-version = "3.12"
 ```
 
-Different field types remain distinct within one dictionary or across multiple unpacked
-dictionaries.
+```py
+from typing import TypedDict
+
+class ListBox[T](TypedDict):
+    value: list[T]
+
+reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[int]
+```
+
+The values of other fields do not affect the field that determines the type argument.
 
 ```py
 class Pair[T](TypedDict):
@@ -3647,75 +3657,115 @@ class Pair[T](TypedDict):
     second: str
 
 reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[int]
+```
+
+Separate unpacked dictionaries contribute their values to the same constructor.
+
+```py
 reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[int]
 ```
 
-Later entries in the same dictionary literal replace earlier values for the same key.
+### Constructor inference from overwritten dictionary values
 
-```py
-reveal_type(Pair(**{"first": "overwritten", "first": 1, "second": "x"}))  # revealed: Pair[int]
+The last value for a repeated key determines the inferred type argument.
+
+```toml
+[environment]
+python-version = "3.12"
 ```
 
-An overwritten callback cannot affect the final field value or its inferred type.
-
 ```py
-reveal_type(Pair(**{"first": lambda value: value.upper(), "first": 1, "second": "x"}))  # revealed: Pair[int]
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+reveal_type(Box(**{"value": "overwritten", "value": 1}))  # revealed: Box[int]
 ```
 
-The expected specialization still supplies context to mutable container fields.
+An overwritten callback is ignored because it is not part of the final dictionary.
 
 ```py
-literal_box: ListBox[Literal[1]] = ListBox(**{"value": [1]})
+reveal_type(Box(**{"value": lambda value: value.upper(), "value": 1}))  # revealed: Box[int]
 ```
 
-An expected specialization wrapped in a union also preserves the field's context.
+### Constructor inference from unpacked dictionaries with an expected type
+
+An expected literal type is preserved when the value is unpacked from a dictionary.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-optional_literal_box: ListBox[Literal[1]] | None = ListBox(**{"value": [1]})
+from typing import Literal, TypedDict
 
-type OptionalListBox[T] = ListBox[T] | None
+class Box[T](TypedDict):
+    value: list[T]
 
-aliased_literal_box: OptionalListBox[Literal[1]] = ListBox(**{"value": [1]})
+literal: Box[Literal[1]] = Box(**{"value": [1]})
 ```
 
-Multiple possible specializations do not discard the contextual literal type.
+A union containing the expected `TypedDict` provides the same context.
 
 ```py
-literal_choices: ListBox[Literal[1]] | ListBox[Literal[2]] = ListBox(**{"value": [1]})
+optional: Box[Literal[1]] | None = Box(**{"value": [1]})
 ```
 
-A wider expected specialization remains valid when the dictionary value is mutable.
+A type alias to that union also preserves the expected literal type.
+
+```py
+type OptionalBox[T] = Box[T] | None
+
+aliased: OptionalBox[Literal[1]] = Box(**{"value": [1]})
+```
+
+Multiple matching `TypedDict` types do not determine which type argument should be used.
+
+```py
+choices: Box[Literal[1]] | Box[Literal[2]] = Box(**{"value": [1]})
+```
+
+A wider expected type is not replaced by the narrower dictionary value.
 
 ```py
 class Animal: ...
 class Dog(Animal): ...
-class Cat(Animal): ...
 
-optional_animal_box: ListBox[Animal] | None = ListBox(**{"value": [Dog()]})
-animal_choices: ListBox[Animal] | ListBox[Cat] = ListBox(**{"value": [Dog()]})
+animal: Box[Animal] | None = Box(**{"value": [Dog()]})
 ```
 
-A context-sensitive callback remains gradual until unpacked values can receive field-specific
-inference context.
+### Constructor inference from unpacked callbacks
+
+A callback needs its parameter type before its body can be checked. Until an unpacked value receives
+that information, the constructor cannot safely infer its type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-class CallbackBox[T](TypedDict):
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
     value: T
     callback: Callable[[T], int]
 
-# TODO: Infer `CallbackBox[int]` and report the invalid attribute access.
-reveal_type(CallbackBox(**{"value": 1, "callback": lambda value: value.upper()}))  # revealed: CallbackBox[Unknown]
+# TODO: Infer `Box[int]` and report the invalid attribute access.
+reveal_type(Box(**{"value": 1, "callback": lambda value: value.upper()}))  # revealed: Box[Unknown]
 ```
 
-Wrapping a callback in another expression does not make it safe to infer without context.
+The same limitation applies when a callback is inside another expression.
 
 ```py
-def unpack_conditional_callback(flag: bool):
-    callback = CallbackBox(**{
+def conditional_callback(flag: bool):
+    callback = Box(**{
         "value": 1,
         "callback": (lambda value: value.upper()) if flag else (lambda value: 0),
     })
-    reveal_type(callback)  # revealed: CallbackBox[Unknown]
+    reveal_type(callback)  # revealed: Box[Unknown]
 ```
 
 ### Constructor inference from unpacked TypedDicts
