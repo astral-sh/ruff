@@ -890,8 +890,7 @@ type Identity[X] = X
 
 class NormalizedAnnotations:
     # snapshot: invalid-type-form
-    def union_return(self: T) -> Self | object:
-        raise NotImplementedError
+    def union_return(self: T) -> Self | object: ...
 
     # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
     def union_parameter(self: T, other: Self | object) -> None: ...
@@ -900,7 +899,7 @@ class NormalizedAnnotations:
     def alias_return(self: T) -> Identity[Self]:
         raise NotImplementedError
 
-    # snapshot: invalid-type-form
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
     def alias_parameter(self: T, other: Identity[Self]) -> None: ...
 
     # snapshot: invalid-type-form
@@ -912,28 +911,21 @@ class NormalizedAnnotations:
 error[invalid-type-form]: `Self` is incompatible with this receiver annotation
   --> src/mdtest_snippet.py:56:34
    |
-56 |     def union_return(self: T) -> Self | object:
+56 |     def union_return(self: T) -> Self | object: ...
    |                                  ^^^^
 
 
 error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:67:50
+  --> src/mdtest_snippet.py:70:46
    |
-67 |     def alias_parameter(self: T, other: Identity[Self]) -> None: ...
-   |                                                  ^^^^
-
-
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:71:46
-   |
-71 |     def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
+70 |     def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
    |                                              ^^^^
 
 
 error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:71:52
+  --> src/mdtest_snippet.py:70:52
    |
-71 |     def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
+70 |     def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
    |                                                    ^^^^
 ```
 
@@ -1029,8 +1021,7 @@ class QuotedAnnotations:
         raise NotImplementedError
 
     # snapshot: invalid-type-form
-    def union_return(self: T) -> "Self | object":
-        raise NotImplementedError
+    def union_return(self: T) -> "Self | object": ...
 
     # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
     def union_parameter(self: T, other: "Self | object") -> None: ...
@@ -1042,8 +1033,8 @@ class QuotedAnnotations:
     # snapshot: invalid-type-form
     def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
 
-    # snapshot: invalid-type-form
-    # snapshot: invalid-type-form
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
     def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
 ```
 
@@ -1051,29 +1042,15 @@ class QuotedAnnotations:
 error[invalid-type-form]: `Self` is incompatible with this receiver annotation
   --> src/mdtest_snippet.py:23:35
    |
-23 |     def union_return(self: T) -> "Self | object":
+23 |     def union_return(self: T) -> "Self | object": ...
    |                                   ^^^^
 
 
 error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:34:51
+  --> src/mdtest_snippet.py:33:51
    |
-34 |     def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
+33 |     def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
    |                                                   ^^^^
-
-
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:38:47
-   |
-38 |     def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
-   |                                               ^^^^
-
-
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:38:53
-   |
-38 |     def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
-   |                                                     ^^^^
 ```
 
 ## Self usage in static methods

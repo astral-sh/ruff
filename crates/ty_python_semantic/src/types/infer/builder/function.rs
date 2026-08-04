@@ -56,6 +56,7 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
             .is_some_and(|param| param.annotation.is_some())
 }
 
+/// Whether a non-static method receives an instance or the class itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MethodReceiverKind {
     Instance,
@@ -63,6 +64,18 @@ enum MethodReceiverKind {
 }
 
 impl MethodReceiverKind {
+    /// Classifies methods by their decorators and implicit class-receiver rules.
+    ///
+    /// Free functions and ordinary static methods have no receiver; `__new__` receives the class.
+    ///
+    /// ```python
+    /// class Example:
+    ///     def instance(self): ...
+    ///     @classmethod
+    ///     def class_method(cls): ...
+    ///     @staticmethod
+    ///     def static_method(): ...
+    /// ```
     fn from_function<'db>(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -87,6 +100,7 @@ impl MethodReceiverKind {
         }
     }
 
+    /// Accepts only `Self` for an instance receiver and `type[Self]` for a class receiver.
     fn accepts_annotation(self, db: &dyn Db, annotation: Type<'_>) -> bool {
         match (self, annotation) {
             (Self::Instance, Type::TypeVar(typevar)) => typevar.typevar(db).is_self(db),
@@ -630,7 +644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
         if !has_type_params {
-            self.infer_function_signature_annotations(function, definition, None);
+            self.infer_function_signature_annotations(function, definition);
         }
 
         if has_defaults {
@@ -700,25 +714,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
-        let type_params = function
-            .type_params
-            .as_deref()
-            .expect("function type params scope without type params");
-
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
-        self.infer_function_signature_annotations(function, binding_context, Some(type_params));
+        self.infer_function_signature_annotations(function, binding_context);
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     /// Infer an annotated method receiver before the rest of its signature so `Self` can be
     /// validated where it occurs, including inside parsed string annotations.
+    ///
+    /// ```python
+    /// class Example:
+    ///     def method(self: object) -> "Self | object": ...
+    /// ```
     fn infer_function_signature_annotations(
         &mut self,
         function: &ast::StmtFunctionDef,
         definition: Definition<'db>,
-        type_params: Option<&ast::TypeParams>,
     ) {
         let receiver_is_incompatible = self.infer_method_receiver_annotation(function, definition);
         let previous_incompatible_receiver = self.context.inference_flags.replace(
@@ -727,7 +740,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         self.infer_return_type_annotation(function.returns.as_deref());
-        if let Some(type_params) = type_params {
+        if let Some(type_params) = function.type_params.as_deref() {
             self.infer_type_parameters(type_params);
         }
         self.infer_parameters(&function.parameters, receiver_is_incompatible.is_some());
@@ -738,8 +751,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
-    /// Returns whether the explicitly annotated receiver is incompatible with `Self`, or `None`
-    /// when this function has no such receiver annotation.
+    /// Infers an explicitly annotated method receiver before the rest of its signature.
+    ///
+    /// Returns whether the annotation is incompatible with `Self`, or `None` for functions without
+    /// an annotated instance or class receiver.
     fn infer_method_receiver_annotation(
         &mut self,
         function: &ast::StmtFunctionDef,
@@ -785,10 +800,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = parameters;
 
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
-        for (index, param_with_default) in parameters.iter_non_variadic_params().enumerate() {
-            if index == 0 && first_annotation_already_inferred {
-                continue;
-            }
+        for param_with_default in parameters
+            .iter_non_variadic_params()
+            .skip(usize::from(first_annotation_already_inferred))
+        {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
