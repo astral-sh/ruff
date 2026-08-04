@@ -381,6 +381,26 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
+### Failed constructor inference
+
+A failed constructor call reports its argument error without exposing an unsolved class type
+parameter or producing an additional assignment error.
+
+```py
+from collections.abc import Callable
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Consumer[T]:
+    def __init__(self, callback: Callable[[T], None]) -> None:
+        self.callback = callback
+
+def accepts_dog(value: Dog) -> None: ...
+
+consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
