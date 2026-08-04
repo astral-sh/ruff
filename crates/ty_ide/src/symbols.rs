@@ -868,7 +868,7 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Adds a symbol for a name definition.
-    fn add_named_symbol(
+    fn add_name_symbol(
         &mut self,
         stmt: &ast::Stmt,
         name: &Name,
@@ -887,28 +887,20 @@ impl<'db> SymbolVisitor<'db> {
         self.add_symbol(symbol);
     }
 
-    fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
-        self.add_named_symbol(stmt, &name.id, name.range(), kind);
-    }
-
-    /// Adds a symbol introduced via an assignment.
-    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
-        self.add_assignment_name(stmt, &name.id, name.range());
-    }
-
     fn add_pattern_binding(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
         if self.in_function || !name.is_valid() || name.id == "_" {
             return;
         }
 
-        self.add_assignment_name(stmt, &name.id, name.range());
+        self.add_assignment(stmt, &name.id, name.range());
 
         if self.exports_only && self.all_origin.is_some() && name.id == "__all__" {
             self.all_invalid = true;
         }
     }
 
-    fn add_assignment_name(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
+    /// Adds a symbol introduced via an assignment.
+    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
@@ -924,7 +916,7 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-        self.add_named_symbol(stmt, name, name_range, kind);
+        self.add_name_symbol(stmt, name, name_range, kind);
     }
 
     /// Adds a symbol introduced via an import `stmt`.
@@ -1411,7 +1403,7 @@ impl<'db> SymbolVisitor<'db> {
                 let ast::Expr::Name(name) = &*type_alias.name else {
                     return;
                 };
-                self.add_name_symbol(stmt, name, SymbolKind::Variable);
+                self.add_name_symbol(stmt, &name.id, name.range(), SymbolKind::Variable);
             }
             ast::Stmt::Assign(assign) => {
                 self.add_all_assignment(&assign.targets, Some(&assign.value));
@@ -1561,7 +1553,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     && !self.suppress_store_symbols
                     && let Some(stmt) = self.current_stmt =>
             {
-                self.add_assignment(stmt, name);
+                self.add_assignment(stmt, &name.id, name.range());
 
                 if name.id != "__all__" {
                     return;
