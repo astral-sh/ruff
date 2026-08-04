@@ -964,6 +964,17 @@ class MultipleAnnotations:
     ) -> None: ...
 ```
 
+Reporting an incompatible receiver does not prevent `Self` from describing the method's return type.
+
+```py
+class Preserved:
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def method(self: object) -> Self:
+        raise NotImplementedError
+
+reveal_type(Preserved().method)  # revealed: bound method Preserved.method() -> Preserved
+```
+
 ## Generic methods with explicit receiver annotations
 
 The receiver restriction also applies to methods with their own type parameters, whose annotations

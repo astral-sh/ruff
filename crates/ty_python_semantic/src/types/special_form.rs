@@ -929,6 +929,17 @@ impl SpecialFormType {
                     return Err(InvalidTypeExpression::TypingSelfInMetaclass);
                 }
 
+                if inference_flags.contains(InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER)
+                    && inference_flags.intersects(
+                        InferenceFlags::IN_RETURN_TYPE | InferenceFlags::IN_PARAMETER_ANNOTATION,
+                    )
+                    && let Some(typing_self) = typing_self
+                {
+                    return Err(InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(
+                        typing_self,
+                    ));
+                }
+
                 Ok(typing_self
                     .map(Type::TypeVar)
                     .unwrap_or(Type::SpecialForm(self)))

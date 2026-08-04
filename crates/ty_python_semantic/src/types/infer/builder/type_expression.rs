@@ -4,7 +4,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
-use super::{DeferredExpressionState, TypeAndRange, TypeInferenceBuilder};
+use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
     self, EXPERIMENTAL_SYNTAX, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
@@ -66,19 +66,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let ty = self.infer_type_expression_no_store(expression);
-        if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-            && self.inference_flags().intersects(
-                InferenceFlags::IN_RETURN_TYPE | InferenceFlags::IN_PARAMETER_ANNOTATION,
-            )
-            && let Type::TypeVar(typevar) = ty
-            && typevar.typevar(self.db()).is_self(self.db())
-        {
-            self.self_annotations.push(TypeAndRange {
-                ty,
-                range: expression.range(),
-            });
-        }
-
         self.deferred_state = previous_deferred_state;
         self.context.inference_flags.set(
             InferenceFlags::IN_NESTED_TYPE_EXPRESSION,
