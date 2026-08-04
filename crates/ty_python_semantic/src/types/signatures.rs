@@ -2292,12 +2292,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        // An implicit `Self` can reach type variables bound by an enclosing class. A standalone,
-        // eager comparison must infer those variables from a concrete receiver, but an outer or
-        // lazy solve must keep them symbolic. Otherwise, quantifying `T@C` out of `T@C <= R`
-        // leaves a decorator's return variable `R` unconstrained.
-        let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager
-            && matches!(self.inferable, TypeVarSet::None);
+        // An implicit `Self` can reach type variables bound by an enclosing class. An eager
+        // comparison must infer those variables from a concrete receiver, even when an outer
+        // callable has its own inferable type variables. A lazy solve must keep them symbolic:
+        // quantifying `T@C` out of `T@C <= R` leaves a decorator's return variable `R`
+        // unconstrained.
+        let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager;
         let signature_typevars = |signature: &Signature<'db>| {
             signature
                 .generic_context
