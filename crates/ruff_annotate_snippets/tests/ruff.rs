@@ -511,7 +511,6 @@ help: Replace three lines
 }
 
 #[test]
-#[should_panic = "index out of bounds: the len is 11 but the index is 11"]
 fn multiple_insertions() {
     let source = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\n";
     let input = &[
@@ -531,12 +530,48 @@ fn multiple_insertions() {
         ),
     ];
     let expected_ascii = str![[r#"
+error[test-diagnostic]: main diagnostic message
+  --> example.py:2:1
+   |
+ 2 | line 2
+   | ^^^^^^
+   |
+help: Replace three lines
+   |
+ 2 ~ fixed line 2
+ 3 | line 3
+...
+ 6 | line 6
+ 7 ~ fixed line 7
+ 8 | line 8
+...
+12 | line 12
+13 ~ fixed line 13
+   |
 "#]];
 
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
 
     let expected_unicode = str![[r#"
+error[test-diagnostic]: main diagnostic message
+   ╭▸ example.py:2:1
+   │
+ 2 │ line 2
+   │ ━━━━━━
+   ╰╴
+help: Replace three lines
+   ╭╴
+ 2 ± fixed line 2
+ 3 │ line 3
+ …
+ 6 │ line 6
+ 7 ± fixed line 7
+ 8 │ line 8
+ …
+12 │ line 12
+13 ± fixed line 13
+   ╰╴
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
