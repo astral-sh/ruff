@@ -1177,14 +1177,14 @@ def quantifier_order[S, T]() -> None:
 
 ## Gradual constraints
 
-Constraint-set assignability preserves gradual types. Constraints on their materializations are
-represented by hidden type variables, while constraints against inferable type variables are
-preserved. The hidden variables participate in the decision diagram but are existentially quantified
+Constraint-set assignability preserves gradual types. Opaque decision nodes represent dependence on
+a gradual materialization, while useful constraints are recorded directly on inferable type
+variables. The opaque nodes participate in the decision diagram but are existentially quantified
 when the constraint set is converted to a Boolean result.
 
 ```py
-from typing import Any
-from ty_extensions import static_assert
+from typing import Any, Never
+from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import (
     ConstraintSet,
     is_assignable_to,
@@ -1196,7 +1196,7 @@ gradual = is_constraint_set_assignable_to(Any, int)
 # revealed: ConstraintSet[bool]
 reveal_type(gradual)
 
-# revealed: ConstraintSet[(gradual@0 ≤ int)]
+# revealed: ConstraintSet[(gradual@0)]
 reveal_type(gradual.with_detailed_display())
 
 static_assert(gradual == gradual)
@@ -1209,6 +1209,10 @@ static_assert((gradual & ConstraintSet.always()) == gradual)
 static_assert((ConstraintSet.always() & gradual) == gradual)
 static_assert(gradual)
 static_assert(is_assignable_to(Any, int))
+static_assert(is_constraint_set_assignable_to(Any, object) == ConstraintSet.always())
+static_assert(is_constraint_set_assignable_to(Never, Any) == ConstraintSet.always())
+static_assert(is_constraint_set_assignable_to(Intersection[Any, bool], int) == ConstraintSet.always())
+static_assert(is_constraint_set_assignable_to(bool, Any | int) == ConstraintSet.always())
 
 def _[T]() -> None:
     other = ConstraintSet.range(int, T, object)
@@ -1220,9 +1224,9 @@ def _[T]() -> None:
     static_assert((gradual | (other & ~other)) == gradual)
 ```
 
-A target without type variables is preserved as one gradual constraint. Distributing over a union
-that contains a type variable reuses the same hidden gradual variable; separate gradual occurrences
-use distinct hidden variables instead.
+A target without type variables is preserved as one gradual decision. Each union arm that requires a
+different materialization receives its own decision, preventing distinct materialization conditions
+from being conflated.
 
 ```py
 from typing import Any
@@ -1230,19 +1234,44 @@ from ty_extensions._internal import is_constraint_set_assignable_to
 
 union_constraint = is_constraint_set_assignable_to(Any, int | str)
 
-# revealed: ConstraintSet[(gradual@0 ≤ int | str)]
+# revealed: ConstraintSet[(gradual@0)]
 reveal_type(union_constraint.with_detailed_display())
 
 def _[T]() -> None:
     distributed = is_constraint_set_assignable_to(Any, T | int)
-    # revealed: ConstraintSet[((Any ≤ T@_) ∧ ?(gradual@0 ≤ int)) ∨ (gradual@0 ≤ int)]
+    # revealed: ConstraintSet[((Any ≤ T@_) ∧ ?(gradual@0)) ∨ (gradual@0)]
     reveal_type(distributed.with_detailed_display())
+
+    nested = is_constraint_set_assignable_to(Any, tuple[T] | None)
+    # revealed: ConstraintSet[((Any ≤ T@_) ∧ (gradual@0) ∧ ?(gradual@1)) ∨ (gradual@1)]
+    reveal_type(nested.with_detailed_display())
 
 first = is_constraint_set_assignable_to(Any, int)
 second = is_constraint_set_assignable_to(Any, str)
 
-# revealed: ConstraintSet[((gradual@0 ≤ int) ∧ (gradual@1 ≤ str))]
+# revealed: ConstraintSet[((gradual@0) ∧ (gradual@1))]
 reveal_type((first & second).with_detailed_display())
+```
+
+A recursive structural projection might not infer a useful bound. It must still retain its gradual
+decision so that it does not erase informative alternatives in a surrounding disjunction.
+
+```py
+from typing import Any, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class Recursive[T](Protocol):
+    def item(self) -> T | "Recursive[T]": ...
+
+def _[T]() -> None:
+    gradual = is_constraint_set_assignable_to(Any, Recursive[T])
+    informative = ConstraintSet.range(Any, T, object)
+
+    # revealed: ConstraintSet[(gradual@0)]
+    reveal_type(gradual.with_detailed_display())
+    static_assert(gradual != ConstraintSet.always())
+    static_assert((gradual | informative) != ConstraintSet.always())
 ```
 
 Constraint-set implication uses subtyping instead of assignability, and so does not make assumptions

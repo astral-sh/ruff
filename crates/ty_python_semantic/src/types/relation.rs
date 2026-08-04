@@ -228,10 +228,9 @@ pub(crate) enum GradualEvaluation {
     /// collapsing the result to `true`.
     Eager,
 
-    /// Produce constraints based on the possible materializations of the gradual type.
+    /// Preserve gradual materialization conditions as opaque decisions in the constraint set.
     ///
-    /// Constraints on each gradual occurrence are kept on a hidden type variable whose solution is
-    /// not exposed to inference. This mode is only useful with [`TypeVarEvaluation::Lazy`].
+    /// This mode is only useful with [`TypeVarEvaluation::Lazy`].
     Lazy,
 }
 
@@ -944,9 +943,9 @@ impl<'db> HasIdentity<'db> for GradualProjectionKey<'db> {
     type Id = (TypeIdentity<'db>, GradualRangePosition, TypeIdentity<'db>);
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        // `variable` remains part of the exact cache key, preventing completed results for
-        // distinct gradual occurrences from sharing a hidden subject. It is omitted only from the
-        // recursive identity so allocating that subject cannot evade cycle detection.
+        // `variable` remains part of the exact cache key, preventing distinct materialization
+        // conditions from sharing an opaque decision. It is omitted only from the recursive
+        // identity so allocating that decision cannot evade cycle detection.
         self.source.may_share_type_identity(db, other.source)
             && self.position == other.position
             && self.target.may_share_type_identity(db, other.target)
@@ -1315,7 +1314,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let env = self.env;
         // Distributing across a type without type variables cannot improve inference.
         if !target.has_typevar(db, env) {
-            return Some(self.constrain_gradual_source(db, variable, range, target));
+            return Some(if range.top.is_subtype_of(db, env, target) {
+                self.always()
+            } else if range.bottom.is_assignable_to(db, env, target) {
+                self.gradual(db, variable)
+            } else {
+                self.never()
+            });
         }
 
         // Expand unions and intersections in the target type before choosing a materialization for
@@ -1329,6 +1334,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         union,
                         target,
                         |element| {
+                            let variable = self.constraints.new_gradual_variable();
                             self.check_gradual_source(db, source, range, element, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, source, element))
                         },
@@ -1341,6 +1347,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         intersection,
                         target,
                         |positive| {
+                            let variable = self.constraints.new_gradual_variable();
                             self.check_gradual_source(db, source, range, positive, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, source, positive))
                         },
@@ -1359,7 +1366,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // A disjoint upper bound can only satisfy the relation through an inconsequential
         // materialization such as `Never`.
         if range.top.is_disjoint_from(db, env, target) {
-            return Some(self.constrain_gradual_source(db, variable, range, target));
+            return Some(self.gradual(db, variable));
         }
 
         let top = match Self::infer_gradual_bounds(db, env, range.top, target)? {
@@ -1376,9 +1383,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         Some(
             self.check_type_pair(db, projected_source, target)
-                .and(db, self.constraints, || {
-                    self.constrain_gradual_source(db, variable, range, target)
-                }),
+                .and(db, self.constraints, || self.gradual(db, variable)),
         )
     }
 
@@ -1393,7 +1398,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let env = self.env;
         // Distributing across a type without type variables cannot improve inference.
         if !source.has_typevar(db, env) {
-            return Some(self.constrain_gradual_target(db, source, range, variable));
+            return Some(if source.is_subtype_of(db, env, range.bottom) {
+                self.always()
+            } else if source.is_assignable_to(db, env, range.top) {
+                self.gradual(db, variable)
+            } else {
+                self.never()
+            });
         }
 
         // Expand unions and intersections in the source type before choosing a materialization for
@@ -1407,6 +1418,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         union,
                         target,
                         |element| {
+                            let variable = self.constraints.new_gradual_variable();
                             self.check_gradual_target(db, element, target, range, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, element, target))
                         },
@@ -1419,6 +1431,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         intersection,
                         target,
                         |element| {
+                            let variable = self.constraints.new_gradual_variable();
                             self.check_gradual_target(db, element, target, range, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, element, target))
                         },
@@ -1448,9 +1461,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         Some(
             self.check_type_pair(db, source, projected_target)
-                .and(db, self.constraints, || {
-                    self.constrain_gradual_target(db, source, range, variable)
-                }),
+                .and(db, self.constraints, || self.gradual(db, variable)),
         )
     }
 
@@ -1776,78 +1787,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    fn constrain_gradual_range(
-        &self,
-        db: &'db dyn Db,
-        variable: GradualVariableId,
-        range: Materialization<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let mut constraints = self.always();
-        if !range.bottom.is_never() {
-            constraints.intersect(
-                db,
-                self.constraints,
-                ConstraintSet::constrain_gradual_lower_bound(
-                    db,
-                    self.env,
-                    self.constraints,
-                    variable,
-                    range.bottom,
-                ),
-            );
-        }
-        if !range.top.is_object() {
-            constraints.intersect(
-                db,
-                self.constraints,
-                ConstraintSet::constrain_gradual_upper_bound(
-                    db,
-                    self.env,
-                    self.constraints,
-                    variable,
-                    range.top,
-                ),
-            );
-        }
-        constraints
-    }
-
-    fn constrain_gradual_source(
-        &self,
-        db: &'db dyn Db,
-        variable: GradualVariableId,
-        range: Materialization<'db>,
-        target: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        self.constrain_gradual_range(db, variable, range)
-            .and(db, self.constraints, || {
-                ConstraintSet::constrain_gradual_upper_bound(
-                    db,
-                    self.env,
-                    self.constraints,
-                    variable,
-                    target,
-                )
-            })
-    }
-
-    fn constrain_gradual_target(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        range: Materialization<'db>,
-        variable: GradualVariableId,
-    ) -> ConstraintSet<'db, 'c> {
-        self.constrain_gradual_range(db, variable, range)
-            .and(db, self.constraints, || {
-                ConstraintSet::constrain_gradual_lower_bound(
-                    db,
-                    self.env,
-                    self.constraints,
-                    variable,
-                    source,
-                )
-            })
+    fn gradual(&self, db: &'db dyn Db, variable: GradualVariableId) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::constrain_gradual(db, self.env, self.constraints, variable)
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
@@ -2462,7 +2403,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     },
                 )
             }
-            (_, Type::Dynamic(_)) => self.always(),
+            (_, Type::Dynamic(_)) => self.gradual(db, self.constraints.new_gradual_variable()),
 
             // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -2667,9 +2608,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_target_intersection(db, source, intersection, target)
             }
 
-            // A lazy gradual projection normally handles this case above. If projection was
-            // ambiguous or recursive, retain the optimistic assignability fallback.
-            (Type::Dynamic(_), _) => self.always(),
+            // If projection was ambiguous or recursive, preserve its gradual decision.
+            (Type::Dynamic(_), _) => self.gradual(db, self.constraints.new_gradual_variable()),
 
             (Type::Intersection(intersection), _) => {
                 self.check_source_intersection(db, source, intersection, target)

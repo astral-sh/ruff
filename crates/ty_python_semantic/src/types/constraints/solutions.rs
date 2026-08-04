@@ -1,9 +1,9 @@
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use crate::types::constraints::support::Support;
 use crate::types::constraints::{
     ALWAYS_FALSE, ConstraintAssignment, ConstraintBoundsBuilder, ConstraintId,
-    ConstraintSetStorage, GradualVariableId, Node, NodeId, PathAssignments, PathBounds,
+    ConstraintSetStorage, Node, NodeId, PathAssignments, PathBounds,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{BoundTypeVarInstance, Type};
@@ -14,7 +14,6 @@ pub(super) struct SolutionWalker<'db> {
     inferable_support: Support,
     source_orders: FxIndexSet<ConstraintId>,
     explored_nodes: FxHashSet<(NodeId, Vec<(ConstraintAssignment, ConstraintId)>)>,
-    remaining_gradual_subjects: FxHashMap<(NodeId, GradualVariableId), bool>,
     sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
 }
 
@@ -31,7 +30,6 @@ impl<'db> SolutionWalker<'db> {
             inferable_support,
             source_orders,
             explored_nodes: FxHashSet::default(),
-            remaining_gradual_subjects: FxHashMap::default(),
             sorted_paths: Vec::default(),
         }
     }
@@ -63,34 +61,6 @@ impl<'db> SolutionWalker<'db> {
             })
     }
 
-    /// Returns whether a later decision can still depend on this gradual materialization.
-    fn node_mentions_gradual_subject(
-        &mut self,
-        storage: &ConstraintSetStorage<'db>,
-        node: NodeId,
-        variable: GradualVariableId,
-    ) -> bool {
-        if node.is_terminal() {
-            return false;
-        }
-
-        let key = (node, variable);
-        if let Some(mentions) = self.remaining_gradual_subjects.get(&key) {
-            return *mentions;
-        }
-
-        let interior = storage.interior_node_data(node);
-        let mentions = storage
-            .constraint_data(interior.constraint)
-            .as_gradual()
-            .is_some_and(|constraint| constraint.variable == variable)
-            || self.node_mentions_gradual_subject(storage, interior.if_true, variable)
-            || self.node_mentions_gradual_subject(storage, interior.if_uncertain, variable)
-            || self.node_mentions_gradual_subject(storage, interior.if_false, variable);
-        self.remaining_gradual_subjects.insert(key, mentions);
-        mentions
-    }
-
     pub(super) fn visit_node(
         &mut self,
         db: &'db dyn Db,
@@ -113,20 +83,7 @@ impl<'db> SolutionWalker<'db> {
         }
         relevant_typevars.close_over_constraints(storage, &Self::constrained_assignments(path));
         let mut relevant_path: Vec<_> =
-            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars)
-                .filter(|(assignment, _)| {
-                    let Some(constraint) = storage
-                        .constraint_data(assignment.constraint())
-                        .as_gradual()
-                    else {
-                        return true;
-                    };
-
-                    // A hidden gradual assignment matters only while another decision can
-                    // constrain the same materialization.
-                    self.node_mentions_gradual_subject(storage, node, constraint.variable)
-                })
-                .collect();
+            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
         relevant_path.sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
         let key = (node, relevant_path);
         if !self.explored_nodes.insert(key) {
@@ -267,13 +224,7 @@ impl<'db> SolutionWalker<'db> {
     ) {
         let mut path: Vec<_> =
             Self::constrained_assignments_mentioning(storage, path, visible_typevars)
-                .filter(|(assignment, _)| {
-                    assignment.is_positive()
-                        && storage
-                            .constraint_data(assignment.constraint())
-                            .as_typevar()
-                            .is_some()
-                })
+                .filter(|(assignment, _)| assignment.is_positive())
                 .map(|(assignment, source_constraint)| {
                     let source_order = self
                         .source_orders

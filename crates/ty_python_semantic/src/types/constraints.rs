@@ -44,9 +44,8 @@
 //! When `if_uncertain` is `ALWAYS_FALSE` everywhere, the TDD degenerates to a standard BDD, and
 //! all operations have zero overhead compared to the binary case.
 //!
-//! Gradual materializations are represented by hidden constraint subjects. They participate in
-//! the decision diagram like ordinary type variables, but their solutions are not exposed to
-//! inference.
+//! Gradual materializations are represented by opaque decision nodes. They participate in the
+//! decision diagram but do not carry bounds or produce solutions.
 //!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
 //! representation, and updated all of our property checks to build up a constraint set and then
@@ -327,16 +326,15 @@ impl<'db> OwnedConstraintSet<'db> {
 
     pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.inner.iter().flat_map(|inner| {
-            inner.constraints.iter().flat_map(|constraint| {
-                let subject = match constraint {
-                    ConstraintData::TypeVar(constraint) => Some(Type::TypeVar(constraint.typevar)),
-                    ConstraintData::Gradual(_) => None,
-                };
-                subject
-                    .into_iter()
-                    .chain(constraint.bounds().lower)
-                    .chain(constraint.bounds().upper)
-            })
+            inner
+                .constraints
+                .iter()
+                .filter_map(|constraint| constraint.as_typevar())
+                .flat_map(|constraint| {
+                    iter::once(Type::TypeVar(constraint.typevar))
+                        .chain(constraint.bounds.lower)
+                        .chain(constraint.bounds.upper)
+                })
         })
     }
 }
@@ -478,41 +476,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::constrain_typevar_with_bounds(db, env, builder, typevar, None, Some(upper))
     }
 
-    pub(super) fn constrain_gradual_lower_bound(
+    pub(super) fn constrain_gradual(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         variable: GradualVariableId,
-        lower: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        let (node, source_order) = GradualConstraint::new_node_with_bounds(
-            db,
-            env,
-            &mut storage,
-            variable,
-            Some(lower),
-            None,
-        );
-        Self::from_node(builder, node, source_order)
-    }
-
-    pub(super) fn constrain_gradual_upper_bound(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &'c ConstraintSetBuilder<'db>,
-        variable: GradualVariableId,
-        upper: Type<'db>,
-    ) -> Self {
-        let mut storage = builder.storage.borrow_mut();
-        let (node, source_order) = GradualConstraint::new_node_with_bounds(
-            db,
-            env,
-            &mut storage,
-            variable,
-            None,
-            Some(upper),
-        );
+        let (node, source_order) = variable.new_node(db, env, &mut storage);
         Self::from_node(builder, node, source_order)
     }
 
@@ -814,26 +785,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 continue;
             }
 
-            if let Some(gradual) = constraint.as_gradual() {
-                let lower = gradual
-                    .bounds
-                    .lower
-                    .map(|lower| lower.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-                let upper = gradual
-                    .bounds
-                    .upper
-                    .map(|upper| upper.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            if constraint.as_gradual().is_some() {
                 let mut storage = self.builder.storage.borrow_mut();
                 mapped_constraints.insert(
                     constraint_id,
-                    GradualConstraint::new_node_with_bounds(
-                        db,
-                        visitor.env,
-                        &mut storage,
-                        gradual.variable,
-                        lower,
-                        upper,
-                    ),
+                    Node::new_constraint(&mut storage, constraint_id),
                 );
                 continue;
             }
@@ -910,11 +866,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    /// Replaces each hidden gradual subject with a fresh builder-local identity.
+    /// Replaces each opaque gradual decision with a fresh builder-local identity.
     ///
-    /// Cached relation results can be reused for distinct gradual occurrences. Freshening preserves
-    /// the relationships between decisions for one occurrence without relating it to another use
-    /// of the cached result.
+    /// Cached relation results can be reused for distinct gradual occurrences. Freshening prevents
+    /// their materialization decisions from being incorrectly shared.
     pub(super) fn freshen_gradual_variables(
         self,
         db: &'db dyn Db,
@@ -974,23 +929,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let mut storage = builder.storage.borrow_mut();
         self.node
             .for_each_unique_constraint_mut(&mut storage, &mut |storage, constraint_id| {
-                let Some(constraint) = storage.constraint_data(constraint_id).as_gradual() else {
+                let Some(gradual) = storage.constraint_data(constraint_id).as_gradual() else {
                     return;
                 };
                 let variable = *variables
-                    .entry(constraint.variable)
+                    .entry(gradual)
                     .or_insert_with(|| storage.new_gradual_variable());
-                mapped_constraints.insert(
-                    constraint_id,
-                    GradualConstraint::new_node_with_bounds(
-                        db,
-                        env,
-                        storage,
-                        variable,
-                        constraint.bounds.lower,
-                        constraint.bounds.upper,
-                    ),
-                );
+                mapped_constraints.insert(constraint_id, variable.new_node(db, env, storage));
             });
 
         if mapped_constraints.is_empty() {
@@ -1231,7 +1176,7 @@ struct ConstraintSetStorage<'db> {
     /// bounds of another (e.g., whether we encode `T ≤ U` as `Never ≤ T ≤ U` or `T ≤ U ≤ object`).
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
 
-    /// The number of hidden gradual variables allocated in this builder.
+    /// The number of opaque gradual decisions allocated in this builder.
     gradual_variable_count: usize,
 
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
@@ -1460,16 +1405,13 @@ impl<'db> ConstraintSetBuilder<'db> {
             .zip(&used_constraints)
             .filter_map(|(constraint, used)| {
                 used.then(|| match constraint {
-                    ConstraintData::Gradual(mut constraint) => {
-                        constraint.variable = *gradual_variables
-                            .entry(constraint.variable)
-                            .or_insert_with(|| {
-                                let variable =
-                                    GradualVariableId::from_usize(gradual_variable_count);
-                                gradual_variable_count += 1;
-                                variable
-                            });
-                        ConstraintData::Gradual(constraint)
+                    ConstraintData::Gradual(variable) => {
+                        let variable = *gradual_variables.entry(variable).or_insert_with(|| {
+                            let variable = GradualVariableId::from_usize(gradual_variable_count);
+                            gradual_variable_count += 1;
+                            variable
+                        });
+                        ConstraintData::Gradual(variable)
                     }
                     ConstraintData::TypeVar(_) => constraint,
                 })
@@ -1523,9 +1465,8 @@ impl<'db> ConstraintSetBuilder<'db> {
     /// `OwnedConstraintSet::query` when you only need to query a single owned set, since that
     /// avoids remapping and preserves the original TDD structure.
     ///
-    /// Each load also gives the owned set's hidden gradual subjects fresh builder-local
-    /// identities. Constraints on the same subject retain their relationship within one load,
-    /// while separate loads cannot assume that their gradual occurrences materialize identically.
+    /// Each load also gives the owned set's opaque gradual decisions fresh builder-local
+    /// identities, preventing distinct loads from sharing materialization conditions.
     pub(crate) fn load<'c>(
         &'c self,
         db: &'db dyn Db,
@@ -1614,14 +1555,15 @@ impl<'db> ConstraintSetStorage<'db> {
         data: ConstraintData<'db>,
     ) -> Support {
         let mut support = Support::default();
-        if let ConstraintData::TypeVar(constraint) = data {
-            support.insert(self.intern_typevar(db, constraint.typevar));
-        }
-        let bounds = data.bounds();
-        if let Some(lower) = bounds.lower {
+        let Some(constraint) = data.as_typevar() else {
+            return support;
+        };
+
+        support.insert(self.intern_typevar(db, constraint.typevar));
+        if let Some(lower) = constraint.bounds.lower {
             self.intern_mentioned_typevars_in_type(db, env, lower, &mut support);
         }
-        if let Some(upper) = bounds.upper {
+        if let Some(upper) = constraint.bounds.upper {
             self.intern_mentioned_typevars_in_type(db, env, upper, &mut support);
         }
         support
@@ -1990,14 +1932,9 @@ impl<'db> ConstraintSetStorage<'db> {
                     old_constraint.bounds.lower,
                     old_constraint.bounds.upper,
                 ),
-                ConstraintData::Gradual(old_constraint) => GradualConstraint::new_node_with_bounds(
-                    db,
-                    env,
-                    self,
-                    gradual_variables[old_constraint.variable],
-                    old_constraint.bounds.lower,
-                    old_constraint.bounds.upper,
-                ),
+                ConstraintData::Gradual(variable) => {
+                    gradual_variables[*variable].new_node(db, env, self)
+                }
             })
             .collect();
 
@@ -2104,7 +2041,7 @@ impl IntersectionResult<'_> {
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct TypeVarId;
 
-/// The builder-local identity of one gradual type occurrence.
+/// The builder-local identity of one gradual materialization decision.
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub(super) struct GradualVariableId;
@@ -2133,31 +2070,15 @@ pub(crate) struct Constraint<'db> {
     bounds: ConstraintBounds<'db>,
 }
 
-/// A range constraint on the materialization of one gradual type occurrence.
-///
-/// These constraints participate in the decision diagram like ordinary type-variable
-/// constraints, but their solutions are not exposed to inference.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct GradualConstraint<'db> {
-    variable: GradualVariableId,
-    bounds: ConstraintBounds<'db>,
-}
-
 /// The kind of decision represented by a constraint-set variable.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum ConstraintData<'db> {
     TypeVar(Constraint<'db>),
-    Gradual(GradualConstraint<'db>),
+    /// An opaque decision node for one gradual materialization condition.
+    Gradual(GradualVariableId),
 }
 
 impl<'db> ConstraintData<'db> {
-    fn bounds(self) -> ConstraintBounds<'db> {
-        match self {
-            Self::TypeVar(constraint) => constraint.bounds,
-            Self::Gradual(constraint) => constraint.bounds,
-        }
-    }
-
     fn as_typevar(self) -> Option<Constraint<'db>> {
         match self {
             Self::TypeVar(constraint) => Some(constraint),
@@ -2165,10 +2086,10 @@ impl<'db> ConstraintData<'db> {
         }
     }
 
-    fn as_gradual(self) -> Option<GradualConstraint<'db>> {
+    fn as_gradual(self) -> Option<GradualVariableId> {
         match self {
             Self::TypeVar(_) => None,
-            Self::Gradual(constraint) => Some(constraint),
+            Self::Gradual(variable) => Some(variable),
         }
     }
 
@@ -2177,26 +2098,16 @@ impl<'db> ConstraintData<'db> {
             (Self::TypeVar(left), Self::TypeVar(right)) => {
                 left.typevar.is_same_typevar_as(db, right.typevar)
             }
-            (Self::Gradual(left), Self::Gradual(right)) => left.variable == right.variable,
             _ => false,
         }
     }
 
-    fn with_bounds(self, bounds: ConstraintBounds<'db>) -> Self {
-        match self {
-            Self::TypeVar(constraint) => Self::TypeVar(Constraint {
-                typevar: constraint.typevar,
-                bounds,
-            }),
-            Self::Gradual(constraint) => Self::Gradual(GradualConstraint {
-                variable: constraint.variable,
-                bounds,
-            }),
-        }
-    }
-
     fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
-        let both_bounds = iter::chain(self.bounds().lower, self.bounds().upper);
+        let Some(constraint) = self.as_typevar() else {
+            return (0, 0);
+        };
+
+        let both_bounds = iter::chain(constraint.bounds.lower, constraint.bounds.upper);
         both_bounds.fold((0, 0), |(constructor_depth, typevar_depth), bound| {
             let (bound_constructor_depth, bound_typevar_depth) =
                 max_constructor_and_typevar_depth(db, env, bound);
@@ -2208,18 +2119,27 @@ impl<'db> ConstraintData<'db> {
     }
 
     fn is_bound_projection_of(self, db: &'db dyn Db, antecedent: Self) -> bool {
-        self.same_subject(db, antecedent) && {
-            let bounds = self.bounds();
-            let antecedent_bounds = antecedent.bounds();
-            (bounds.lower.is_some()
-                && bounds.lower == antecedent_bounds.lower
-                && bounds.upper.is_none()
-                && antecedent_bounds.upper.is_some())
-                || (bounds.upper.is_some()
-                    && bounds.upper == antecedent_bounds.upper
-                    && bounds.lower.is_none()
-                    && antecedent_bounds.lower.is_some())
+        let (Some(constraint), Some(antecedent)) = (self.as_typevar(), antecedent.as_typevar())
+        else {
+            return false;
+        };
+        if !constraint
+            .typevar
+            .is_same_typevar_as(db, antecedent.typevar)
+        {
+            return false;
         }
+
+        let bounds = constraint.bounds;
+        let antecedent_bounds = antecedent.bounds;
+        (bounds.lower.is_some()
+            && bounds.lower == antecedent_bounds.lower
+            && bounds.upper.is_none()
+            && antecedent_bounds.upper.is_some())
+            || (bounds.upper.is_some()
+                && bounds.upper == antecedent_bounds.upper
+                && bounds.lower.is_none()
+                && antecedent_bounds.lower.is_some())
     }
 }
 
@@ -2764,83 +2684,14 @@ impl<'db> Constraint<'db> {
     }
 }
 
-impl<'db> GradualConstraint<'db> {
-    fn new_node_with_bounds(
+impl GradualVariableId {
+    fn new_node<'db>(
+        self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        variable: GradualVariableId,
-        lower: Option<Type<'db>>,
-        upper: Option<Type<'db>>,
     ) -> (NodeId, Option<SourceOrderId>) {
-        if lower.is_none() && upper.is_none() {
-            return (ALWAYS_TRUE, None);
-        }
-
-        // Use the same decomposed bound form as ordinary type-variable constraints so the
-        // sequent map can relate each bound to constraints on inferable type variables.
-        if let Some(Type::Union(lower_union)) = lower {
-            let mut result = ALWAYS_TRUE;
-            let mut source_order = None;
-            for lower_element in lower_union.elements(db) {
-                let (element_node, element_source_order) = Self::new_node_with_bounds(
-                    db,
-                    env,
-                    storage,
-                    variable,
-                    Some(*lower_element),
-                    upper,
-                );
-                result = result.and(storage, element_node);
-                source_order = storage.ordered_source_order(source_order, element_source_order);
-            }
-            return (result, source_order);
-        }
-        if let Some(Type::Intersection(upper_intersection)) = upper
-            && !upper_intersection.is_simple_negation(db)
-        {
-            let mut result = ALWAYS_TRUE;
-            let mut source_order = None;
-            for upper_element in upper_intersection.iter_positive(db) {
-                let (element_node, element_source_order) = Self::new_node_with_bounds(
-                    db,
-                    env,
-                    storage,
-                    variable,
-                    lower,
-                    Some(upper_element),
-                );
-                result = result.and(storage, element_node);
-                source_order = storage.ordered_source_order(source_order, element_source_order);
-            }
-            for upper_element in upper_intersection.iter_negative(db) {
-                let (element_node, element_source_order) = Self::new_node_with_bounds(
-                    db,
-                    env,
-                    storage,
-                    variable,
-                    lower,
-                    Some(upper_element.negate(db, env)),
-                );
-                result = result.and(storage, element_node);
-                source_order = storage.ordered_source_order(source_order, element_source_order);
-            }
-            return (result, source_order);
-        }
-
-        let data = ConstraintData::Gradual(Self {
-            variable,
-            bounds: ConstraintBounds::new(lower, upper),
-        });
-
-        if let (Some(lower), Some(upper)) = (lower, upper) {
-            let when = lower.when_constraint_set_assignable_to_owned(db, env, upper);
-            if when.query(|_builder, when| when.is_never_satisfied(db, env)) {
-                return (ALWAYS_FALSE, None);
-            }
-        }
-
-        let constraint = storage.intern_constraint(db, env, data);
+        let constraint = storage.intern_constraint(db, env, ConstraintData::Gradual(self));
         Node::new_constraint(storage, constraint)
     }
 }
@@ -2902,7 +2753,15 @@ impl ConstraintId {
         }
         let self_constraint = storage.constraint_data(self);
         let other_constraint = storage.constraint_data(other);
-        if !self_constraint.same_subject(db, other_constraint) {
+        let (Some(self_constraint), Some(other_constraint)) =
+            (self_constraint.as_typevar(), other_constraint.as_typevar())
+        else {
+            return false;
+        };
+        if !self_constraint
+            .typevar
+            .is_same_typevar_as(db, other_constraint.typevar)
+        {
             return false;
         }
         // Implication cannot make assumptions about the materialization of gradual types,
@@ -2910,13 +2769,13 @@ impl ConstraintId {
         storage.cached_is_constraint_set_subtype_of(
             db,
             env,
-            other_constraint.bounds().materialized_lower(),
-            self_constraint.bounds().materialized_lower(),
+            other_constraint.bounds.materialized_lower(),
+            self_constraint.bounds.materialized_lower(),
         ) && storage.cached_is_constraint_set_subtype_of(
             db,
             env,
-            self_constraint.bounds().materialized_upper(),
-            other_constraint.bounds().materialized_upper(),
+            self_constraint.bounds.materialized_upper(),
+            other_constraint.bounds.materialized_upper(),
         )
     }
 
@@ -2930,11 +2789,19 @@ impl ConstraintId {
     ) -> IntersectionResult<'db> {
         let self_constraint = storage.constraint_data(self);
         let other_constraint = storage.constraint_data(other);
-        if !self_constraint.same_subject(db, other_constraint) {
+        let (Some(self_constraint), Some(other_constraint)) =
+            (self_constraint.as_typevar(), other_constraint.as_typevar())
+        else {
+            return IntersectionResult::CannotSimplify;
+        };
+        if !self_constraint
+            .typevar
+            .is_same_typevar_as(db, other_constraint.typevar)
+        {
             return IntersectionResult::CannotSimplify;
         }
-        let self_bounds = self_constraint.bounds();
-        let other_bounds = other_constraint.bounds();
+        let self_bounds = self_constraint.bounds;
+        let other_bounds = other_constraint.bounds;
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = match (self_bounds.lower, other_bounds.lower) {
@@ -2977,9 +2844,10 @@ impl ConstraintId {
             return IntersectionResult::CannotSimplify;
         }
 
-        IntersectionResult::Simplified(
-            self_constraint.with_bounds(ConstraintBounds::new(lower, upper)),
-        )
+        IntersectionResult::Simplified(ConstraintData::TypeVar(Constraint {
+            typevar: self_constraint.typevar,
+            bounds: ConstraintBounds::new(lower, upper),
+        }))
     }
 
     fn display<'db, 'a>(
@@ -3261,7 +3129,7 @@ impl NodeId {
         let Node::Interior(interior) = self.node() else {
             return self == ALWAYS_TRUE;
         };
-        // Abstract hidden gradual subjects before checking the Boolean result.
+        // Abstract opaque gradual decisions before checking the Boolean result.
         let (node, derived_source_order) =
             interior.abstract_inner(db, env, storage, source_order, |storage, constraint| {
                 matches!(
@@ -3306,9 +3174,12 @@ impl NodeId {
                             return false;
                         }
 
-                        let constraint = storage.constraint_data(interior.constraint);
-                        found_lower |= constraint.bounds().lower.is_some();
-                        found_upper |= constraint.bounds().upper.is_some();
+                        if let Some(constraint) =
+                            storage.constraint_data(interior.constraint).as_typevar()
+                        {
+                            found_lower |= constraint.bounds.lower.is_some();
+                            found_upper |= constraint.bounds.upper.is_some();
+                        }
                         if found_lower && found_upper {
                             // Might be a single conjunction, but doesn't contain _only_
                             // lower-bound-only or upper-bound-only constraints
@@ -4474,8 +4345,14 @@ impl<'db> PathBounds<'db> {
                         return None;
                     }
 
-                    let constraint = storage.constraint_data(interior.constraint);
-                    let constraint = constraint.as_typevar()?;
+                    let Some(constraint) =
+                        storage.constraint_data(interior.constraint).as_typevar()
+                    else {
+                        // Opaque gradual decisions are independently satisfiable and do not
+                        // constrain any inferred type variables.
+                        current = interior.if_true;
+                        continue;
+                    };
                     if !constraint.typevar.is_inferable(db, inferable) {
                         return None;
                     }
@@ -4496,6 +4373,10 @@ impl<'db> PathBounds<'db> {
                     ));
                 }
             }
+        }
+
+        if constraints.is_empty() {
+            return Some(PathBounds::Unconstrained);
         }
 
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
@@ -5452,12 +5333,15 @@ impl InteriorNode {
             // to other inferable typevars, producing constraints on that typevar that have concrete
             // lower/upper bounds. That means we can skip the simplifications below if any bound is
             // another typevar.
-            let left_bounds = left_constraint_data.bounds();
-            let right_bounds = right_constraint_data.bounds();
-            if left_constraint_data
-                .bounds()
-                .lower
-                .is_some_and(Type::is_type_var)
+            let (Some(left_constraint_data), Some(right_constraint_data)) = (
+                left_constraint_data.as_typevar(),
+                right_constraint_data.as_typevar(),
+            ) else {
+                continue;
+            };
+            let left_bounds = left_constraint_data.bounds;
+            let right_bounds = right_constraint_data.bounds;
+            if left_bounds.lower.is_some_and(Type::is_type_var)
                 || left_bounds.upper.is_some_and(Type::is_type_var)
                 || right_bounds.lower.is_some_and(Type::is_type_var)
                 || right_bounds.upper.is_some_and(Type::is_type_var)
@@ -5849,24 +5733,14 @@ impl ConstraintAssignment {
                 let db = self.db;
 
                 let constraint_data = self.storage.constraint_data(self.assignment.constraint());
-                let bounds = constraint_data.bounds();
-                let lower = bounds.materialized_lower();
-                let upper = bounds.materialized_upper();
                 if let Some(gradual) = constraint_data.as_gradual() {
-                    f.write_str(self.range_prefix())?;
-                    f.write_str("(")?;
-                    if !lower.is_never() {
-                        write!(f, "{} ≤ ", lower.display(db, self.env))?;
-                    }
-                    write!(f, "gradual@{}", gradual.variable.index())?;
-                    if !upper.is_object() {
-                        write!(f, " ≤ {}", upper.display(db, self.env))?;
-                    }
-                    return f.write_str(")");
+                    return write!(f, "{}(gradual@{})", self.range_prefix(), gradual.index());
                 }
                 let Some(constraint) = constraint_data.as_typevar() else {
                     return Err(std::fmt::Error);
                 };
+                let lower = constraint.bounds.materialized_lower();
+                let upper = constraint.bounds.materialized_upper();
                 let typevar = constraint.typevar;
                 if lower.is_equivalent_to(db, self.env, upper) {
                     // If this typevar is equivalent to another, output the constraint in a
@@ -6054,9 +5928,13 @@ impl SequentMap {
         // single constraint; we always break that apart into the two smaller constraints that we
         // started with.
 
-        let left = storage.constraint_data(left);
-        let right = storage.constraint_data(right);
-        if !left.same_subject(db, right) {
+        let (Some(left), Some(right)) = (
+            storage.constraint_data(left).as_typevar(),
+            storage.constraint_data(right).as_typevar(),
+        ) else {
+            return true;
+        };
+        if !left.typevar.is_same_typevar_as(db, right.typevar) {
             return false;
         }
 
@@ -6069,7 +5947,7 @@ impl SequentMap {
                 lower: Some(right_lower),
                 upper: None,
             },
-        ) = (left.bounds(), right.bounds())
+        ) = (left.bounds, right.bounds)
         else {
             return false;
         };
@@ -6102,7 +5980,10 @@ impl SequentMap {
     ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = storage.constraint_data(post);
-        let post_bounds = post_data.bounds();
+        let Some(post_data) = post_data.as_typevar() else {
+            return;
+        };
+        let post_bounds = post_data.bounds;
         let (when, source_order) = storage.load(
             db,
             env,
@@ -6143,7 +6024,10 @@ impl SequentMap {
         // If this constraint binds its typevar to `Never ≤ T ≤ object`, then the typevar can take
         // on any type, and the constraint is always satisfied.
         let constraint_data = storage.constraint_data(constraint);
-        let bounds = constraint_data.bounds();
+        let Some(constraint_data) = constraint_data.as_typevar() else {
+            return;
+        };
+        let bounds = constraint_data.bounds;
         let lower = bounds.materialized_lower();
         let upper = bounds.materialized_upper();
         if lower.is_never() && upper.is_object() {
@@ -6319,17 +6203,11 @@ impl SequentMap {
                     right_constraint,
                 );
             }
-            (Some(left), Some(_))
+            (Some(left), Some(right))
                 if left.bounds.lower.is_some_and(Type::is_type_var)
                     || left.bounds.upper.is_some_and(Type::is_type_var)
-                    || right_constraint_data
-                        .bounds()
-                        .lower
-                        .is_some_and(Type::is_type_var)
-                    || right_constraint_data
-                        .bounds()
-                        .upper
-                        .is_some_and(Type::is_type_var) =>
+                    || right.bounds.lower.is_some_and(Type::is_type_var)
+                    || right.bounds.upper.is_some_and(Type::is_type_var) =>
             {
                 self.add_mutual_sequents_for_same_typevars(
                     db,
@@ -7871,6 +7749,10 @@ impl PathAssignments {
         storage: &mut ConstraintSetStorage<'db>,
         constraint: ConstraintId,
     ) {
+        if storage.constraint_data(constraint).as_gradual().is_some() {
+            return;
+        }
+
         // If we've already processed this constraint, we can skip it.
         let (constraint_index, existing) = self.discovered.insert_full(constraint, true);
         let already_processed = existing.is_some_and(|existing| existing);
