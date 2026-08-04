@@ -206,7 +206,7 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
         let mut error = Diagnostic::invalid_syntax(source_file, error, error);
         add_inferred_python_version_hint_to_diagnostic(
             db,
-            &ProgramEnvironment::from_file(file),
+            source_file,
             &mut error,
             "parsing syntax",
         );

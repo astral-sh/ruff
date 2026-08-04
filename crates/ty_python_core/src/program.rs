@@ -14,11 +14,6 @@ pub use ty_module_resolver::{FallibleStrategy, MisconfigurationStrategy, UseDefa
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program<'db> {
-    // FIXME: Move the source out of `Program`. Different source locations prevent otherwise
-    // equivalent programs from being reused across scripts.
-    #[returns(ref)]
-    pub python_version_with_source: PythonVersionWithSource,
-
     #[returns(ref)]
     pub python_platform: PythonPlatform,
 
@@ -39,7 +34,7 @@ impl<'db> Program<'db> {
 
         let resolver_environment =
             ResolverEnvironment::new(db, python_version.version, &search_paths);
-        Program::new(db, python_version, python_platform, resolver_environment)
+        Program::new(db, python_platform, resolver_environment)
     }
 
     pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {

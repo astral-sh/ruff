@@ -202,7 +202,7 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
     let equivalent_program = Program::from_settings(
         &db,
         ProgramSettings {
-            python_version: program.python_version_with_source(&db).clone(),
+            python_version: db.program_settings().python_version.clone(),
             python_platform: program.python_platform(&db).clone(),
             search_paths: program.search_paths(&db).clone(),
         },

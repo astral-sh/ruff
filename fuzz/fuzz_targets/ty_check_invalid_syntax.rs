@@ -127,6 +127,10 @@ impl SemanticDb for TestDb {
         self.program().program_file(self, file)
     }
 
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.program_settings.python_version
+    }
+
     fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }

@@ -68,11 +68,7 @@ fn debug_information(session: &Session) -> crate::Result<String> {
         writeln!(buffer, "Project at {}", db.project().root(db))?;
         let program = db.project().program(db);
         writeln!(buffer, "Program:")?;
-        writeln!(
-            buffer,
-            "  python-version: {}",
-            program.python_version_with_source(db).version
-        )?;
+        writeln!(buffer, "  python-version: {}", program.python_version(db))?;
         writeln!(buffer, "  python-platform: {}", program.python_platform(db))?;
         let mut writer = IndentingWriter {
             inner: &mut buffer,

@@ -10163,7 +10163,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
             add_inferred_python_version_hint_to_diagnostic(
                 db,
-                self.program_environment(),
+                self.file(),
                 &mut diagnostic,
                 "resolving types",
             );
@@ -10509,7 +10509,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         hint_if_stdlib_attribute_exists_on_other_versions(
                             db,
-                            env,
+                            self.program_file(),
                             diagnostic,
                             value_type,
                             attr_name,
