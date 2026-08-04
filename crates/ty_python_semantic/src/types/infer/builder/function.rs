@@ -39,8 +39,9 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, visitor, visitor::Visitor};
+use ruff_text_size::{Ranged, TextRange};
+use smallvec::SmallVec;
 
 fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
     parameters
@@ -109,6 +110,28 @@ impl<'db> ExpectedReturnType<'db> {
     }
 }
 
+/// Finds `Self` before unions or lazy type aliases can erase it from an annotation's type.
+struct SelfAnnotationVisitor<'builder, 'db, 'ast> {
+    builder: &'builder TypeInferenceBuilder<'db, 'ast>,
+    self_ranges: SmallVec<[TextRange; 1]>,
+}
+
+impl<'expr> Visitor<'expr> for SelfAnnotationVisitor<'_, '_, '_> {
+    fn visit_expr(&mut self, expression: &'expr ast::Expr) {
+        if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && let Type::TypeVar(typevar) = self.builder.file_expression_type(expression)
+            && typevar
+                .typevar(self.builder.db())
+                .is_self(self.builder.db())
+        {
+            self.self_ranges.push(expression.range());
+            return;
+        }
+
+        visitor::walk_expr(self, expression);
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
@@ -132,6 +155,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(parameter);
         }
 
+        self.validate_self_receiver_annotation(function);
         validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
             self.file_expression_type(expr)
         });
@@ -702,6 +726,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context
             .inference_flags
             .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
+    }
+
+    /// Reject `Self` in method signatures whose receiver has an incompatible explicit annotation.
+    fn validate_self_receiver_annotation(&mut self, function: &ast::StmtFunctionDef) {
+        let db = self.db();
+        let parameters = function.parameters.as_ref();
+        let Some(receiver) = parameters
+            .posonlyargs
+            .first()
+            .or_else(|| parameters.args.first())
+        else {
+            return;
+        };
+        let Some(receiver_annotation) = receiver.parameter.annotation.as_deref() else {
+            return;
+        };
+        let Some(expected_receiver_type) =
+            self.special_first_method_parameter_type(&receiver.parameter)
+        else {
+            return;
+        };
+
+        if self.file_expression_type(receiver_annotation) == expected_receiver_type {
+            return;
+        }
+
+        let signature_annotations = function.returns.as_deref().into_iter().chain(
+            parameters
+                .iter()
+                .skip(1)
+                .filter_map(ast::AnyParameterRef::annotation),
+        );
+
+        for annotation in signature_annotations {
+            let mut visitor = SelfAnnotationVisitor {
+                builder: self,
+                self_ranges: SmallVec::new(),
+            };
+            visitor.visit_expr(annotation);
+
+            let mut self_ranges = visitor.self_ranges;
+            if self_ranges.is_empty()
+                && self
+                    .file_expression_type(annotation)
+                    .contains_self(db, self.program_environment())
+            {
+                self_ranges.push(annotation.range());
+            }
+
+            for self_range in self_ranges {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, self_range) {
+                    builder.into_diagnostic("`Self` is incompatible with this receiver annotation");
+                }
+            }
+        }
     }
 
     fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
