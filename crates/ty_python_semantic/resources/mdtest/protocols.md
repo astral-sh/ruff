@@ -2015,7 +2015,7 @@ read/write property, a `Final` attribute, or a `ClassVar` attribute:
 ```py
 from typing import ClassVar, Final, Protocol, final
 from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of, is_assignable_to, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_subtype_of, is_assignable_to, is_disjoint_from
 
 class HasXProperty(Protocol):
     @property
@@ -2071,14 +2071,6 @@ static_assert(is_subtype_of(XImplicitFinal, HasXProperty))
 static_assert(is_assignable_to(XImplicitFinal, HasXProperty))
 ```
 
-Accessing an instance property on the class object exposes the property descriptor, not the value
-returned by its getter. A class object with only an instance property therefore does not satisfy the
-protocol:
-
-```py
-x_class: HasXProperty = XReadProperty  # error: [invalid-assignment]
-```
-
 But only if it has the correct type:
 
 ```py
@@ -2092,6 +2084,18 @@ class HasStrXProperty(Protocol):
 static_assert(not is_assignable_to(XAttrBad, HasXProperty))
 static_assert(not is_assignable_to(HasStrXProperty, HasXProperty))
 static_assert(not is_assignable_to(HasXProperty, HasStrXProperty))
+```
+
+Accessing an instance property on the class object exposes the property descriptor, not the value
+returned by its getter. A class object with only an instance property is therefore disjoint from the
+protocol:
+
+```py
+static_assert(not is_subtype_of(TypeOf[XReadProperty], HasXProperty))
+static_assert(not is_assignable_to(TypeOf[XReadProperty], HasXProperty))
+static_assert(is_disjoint_from(TypeOf[XReadProperty], HasXProperty))
+
+x_class: HasXProperty = XReadProperty  # error: [invalid-assignment]
 ```
 
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below

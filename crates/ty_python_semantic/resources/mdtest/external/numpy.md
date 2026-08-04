@@ -29,7 +29,10 @@ regression test for <https://github.com/astral-sh/ty/issues/3199>:
 def takes_float16(values: np.ndarray[tuple[int, ...], np.dtype[np.float16]]) -> None: ...
 
 float32_values = np.array([1, 2, 3], dtype=np.float32)
+reveal_type(float32_values)  # revealed: ndarray[tuple[Any, ...], dtype[floating[_32Bit]]]
+
 float16_values = np.array([1, 2, 3], dtype=np.float16)
+reveal_type(float16_values)  # revealed: ndarray[tuple[Any, ...], dtype[floating[_16Bit]]]
 
 takes_float16(float32_values)  # error: [invalid-argument-type]
 takes_float16(float16_values)

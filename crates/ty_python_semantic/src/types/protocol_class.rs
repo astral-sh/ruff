@@ -3319,11 +3319,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // An unbound property descriptor does not establish that the value returned by its
-        // getter is disjoint from the required property type.
-        if member.is_property() && matches!(ty, Type::PropertyInstance(_)) {
-            return self.never();
-        }
         let env = self.env;
         let access = member.access(db, env, ProtocolMemberAccessMode::Instance);
         if !member.is_method() {
