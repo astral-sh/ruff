@@ -5149,12 +5149,16 @@ impl<'db> Type<'db> {
                 ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
-                    let bindings = match tvar.typevar(db).bound_or_constraints(db, env) {
-                        None => KnownClass::Type.to_instance(db, env).bindings(db, env),
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    let bindings = match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) if bound.is_object() => {
+                            KnownClass::Object
+                                .to_class_literal(db, env)
+                                .bindings(db, env)
+                        }
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
                             bound.to_meta_type(db, env).bindings(db, env)
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             Bindings::from_union(
                                 self,
                                 constraints
@@ -5164,17 +5168,11 @@ impl<'db> Type<'db> {
                             )
                         }
                     };
-                    // TODO We would ideally be able to just do `into_constructor_bindings` in the
-                    // no-bounds/constraints case above (where we get back the bindings for
-                    // `Type.__call__`), and just do `with_constructed_instance_type` in the
-                    // bound/constrained cases, where we should get back constructor bindings (or
-                    // if we don't, we probably shouldn't return `T` from the call?). But currently
-                    // we can't because we special-case some built-in types to return regular
-                    // (not constructor) bindings from `constructor_bindings()`.
+                    // Some built-in constructors, including `object`, are special-cased as regular
+                    // callable bindings. Wrap them so that every bound or constrained call has
+                    // constructor context and constructs `T`; existing constructor bindings keep
+                    // their original kind.
                     bindings
-                        // `into_constructor_bindings` is a no-op for already-constructor bindings,
-                        // so we are just setting the `MetaclassCall` type for `Type.__call__`, or
-                        // the special-cased builtin classes that return regular bindings.
                         .into_constructor_bindings(
                             constructor_instance_type,
                             ConstructorCallableKind::MetaclassCall,

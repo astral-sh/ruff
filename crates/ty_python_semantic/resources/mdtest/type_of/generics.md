@@ -16,7 +16,8 @@ def _[T](x: T):
     reveal_type(type(x))  # revealed: type[T@_]
 ```
 
-`type[T]` with an unbounded type variable represents any subclass of `object`.
+`type[T]` with an unbounded type variable represents any subclass of `object`. Constructor calls are
+checked against `object.__init__`.
 
 ```py
 def unbounded[T](x: type[T]) -> T:
@@ -25,7 +26,27 @@ def unbounded[T](x: type[T]) -> T:
     reveal_type(x.__init__)  # revealed: def __init__(self) -> None
     reveal_type(x.__qualname__)  # revealed: str
     reveal_type(x())  # revealed: T@unbounded
+    x(1)  # error: [too-many-positional-arguments]
 
+    return x()
+```
+
+An explicit `object` upper bound has the same constructor signature as an implicit `object` bound,
+including for legacy type variables:
+
+```py
+from typing import TypeVar
+
+LegacyObjectT = TypeVar("LegacyObjectT", bound=object)
+
+def explicit_object_bound[T: object](x: type[T]) -> T:
+    reveal_type(x())  # revealed: T@explicit_object_bound
+    x(1)  # error: [too-many-positional-arguments]
+    return x()
+
+def legacy_object_bound(x: type[LegacyObjectT]) -> LegacyObjectT:
+    reveal_type(x())  # revealed: LegacyObjectT@legacy_object_bound
+    x(1)  # error: [too-many-positional-arguments]
     return x()
 ```
 
@@ -160,6 +181,32 @@ class Holder(Generic[T]):
     def narrow(self) -> None:
         if isinstance(self.value, type):
             reveal_type(self.value)  # revealed: type[T@Holder] | ((() -> type[T@Holder]) & type)
+```
+
+## Narrowing constructor calls
+
+Narrowing a class object with `issubclass` uses the narrowed class's constructor without losing its
+original type variable:
+
+```py
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def narrowed_subclass[T](cls: type[T]) -> T:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls(1))  # revealed: T@narrowed_subclass & IntConstructor
+        return cls(1)
+    return cls()
+```
+
+Checking a class object's identity preserves the original type variable in the same way:
+
+```py
+def narrowed_identity[T](cls: type[T]) -> T:
+    if cls is IntConstructor:
+        reveal_type(cls(1))  # revealed: T@narrowed_identity & IntConstructor
+        return cls(1)
+    return cls()
 ```
 
 ## `__class__`
@@ -678,11 +725,11 @@ def f[
     reveal_type(type_object(""))  # revealed: Any
 
     reveal_type(type_t_unbound())  # revealed: T@f
-    # TODO: we could consider emitting an error here as well
+    # error: [too-many-positional-arguments]
     reveal_type(type_t_unbound(""))  # revealed: T@f
 
     reveal_type(type_t_object_bound())  # revealed: T1@f
-    # TODO: we could consider emitting an error here as well
+    # error: [too-many-positional-arguments]
     reveal_type(type_t_object_bound(""))  # revealed: T1@f
 
     reveal_type(type_int())  # revealed: int
