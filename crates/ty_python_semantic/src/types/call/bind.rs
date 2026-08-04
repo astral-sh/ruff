@@ -354,9 +354,9 @@ impl<'db> CallableItem<'db> {
             CallableItem::Regular(binding) => {
                 binding.freshen_generic_contexts_in_place(db, env, nonce_generator);
             }
-            // TODO: Constructor freshening also has to keep constructor instance context in sync
-            // with `__new__`/`__init__` signatures.
-            CallableItem::Constructor(_) => {}
+            CallableItem::Constructor(binding) => {
+                binding.freshen_generic_contexts_in_place(db, env, nonce_generator);
+            }
         }
     }
 
