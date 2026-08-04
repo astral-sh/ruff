@@ -10319,8 +10319,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let fallback = value_type.member_with_diagnostics(db, env, &attr.id);
         if !matches!(attribute.ctx, ExprContext::Del)
-            && assigned_type.is_none()
             && let Some(context) = fallback.descriptor_error
+            && (assigned_type.is_none() || context.descriptor_type(db).is_data_descriptor(db, env))
             && let Some(failure) = context.into_error(db, env)
         {
             report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);

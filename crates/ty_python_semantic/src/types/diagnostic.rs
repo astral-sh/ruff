@@ -1748,23 +1748,50 @@ pub(super) fn report_bad_dunder_get_call<'db>(
 ) {
     let db = context.db();
     let env = &context.program_environment();
-    failure.error.report_diagnostics_with_override(
-        context,
-        target.into(),
-        &CallDiagnosticOverride {
-            lint: &INVALID_ATTRIBUTE_ACCESS,
-            message: format!(
-                "Invalid access to descriptor attribute `{}` on type `{}`",
-                target.attr,
-                object_type.display(db, env),
-            ),
-            info: &format!(
-                "This access implicitly calls `__get__` on a descriptor of type `{}`",
-                failure.descriptor_type.display(db, env),
-            ),
-            argument_ranges: &[target.range(), target.value.range(), target.value.range()],
-        },
-    );
+    let attribute = target.attr.as_str();
+    if let Some(property) = failure.error.as_attempt_to_get_property_with_no_getter() {
+        let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
+            return;
+        };
+        let object_type = object_type.display(db, env);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot read property `{attribute}` on object of type `{object_type}` because it has no getter",
+        ));
+        if let Some(file_range) = property
+            .setter(db)
+            .and_then(|setter| setter.definition(db, env))
+            .or_else(|| {
+                property
+                    .deleter(db)
+                    .and_then(|deleter| deleter.definition(db, env))
+            })
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no getter"),
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Attempted access to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        failure.error.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ATTRIBUTE_ACCESS,
+                message: format!(
+                    "Invalid access to descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db, env),
+                ),
+                info: &format!(
+                    "This access implicitly calls `__get__` on a descriptor of type `{}`",
+                    failure.descriptor_type.display(db, env),
+                ),
+                argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+            },
+        );
+    }
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(

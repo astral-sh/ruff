@@ -3827,9 +3827,7 @@ impl<'db> Type<'db> {
                     } else {
                         UnionType::from_two_elements(db, env, error.return_type(db, env), ty)
                     };
-                    let error = (!matches!(ty, Type::TypeVar(_))
-                        && descr_get.definedness == Definedness::AlwaysDefined)
-                        .then(|| DescriptorGetCallContext::new(db, ty, instance, owner));
+                    let error = Some(DescriptorGetCallContext::new(db, ty, instance, owner));
                     (return_type, error)
                 }
             };
@@ -4006,17 +4004,17 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers,
             } => {
+                let mut error = None;
                 let place = if intersection.positive(db).is_empty() {
                     attribute
                 } else {
-                    // Every positive element describes the same runtime descriptor value. We
-                    // decompose that value to infer its return type, but validating each element
-                    // as the complete synthetic `self` can reject a method whose annotation is
-                    // satisfied by another element of the intersection.
                     intersection
                         .map_with_boundness(db, env, |elem| {
                             let result =
                                 elem.try_call_dunder_get_with_error(db, env, instance, owner);
+                            if let Some(result) = result {
+                                error = error.or(result.error);
+                            }
                             Place::Defined(DefinedPlace {
                                 ty: result.map_or(*elem, |result| result.return_type),
                                 origin,
@@ -4032,7 +4030,7 @@ impl<'db> Type<'db> {
                     // TODO: Discover data descriptors in intersections without decomposing the
                     // descriptor return type into an unsound intersection.
                     AttributeKind::NormalOrNonDataDescriptor,
-                    None,
+                    error,
                 )
             }
 
@@ -4549,19 +4547,17 @@ impl<'db> Type<'db> {
                         )
                         .into()
                     } else {
-                        // Member lookup delegates to the positive elements, but the descriptor's
-                        // synthetic owner is the runtime class satisfying the full intersection.
-                        // Until intersection meta-types preserve that relationship, retaining an
-                        // element-local call error could turn an imprecise owner into a diagnostic.
                         let receiver = Some(receiver.unwrap_or(this));
+                        let mut error = None;
                         let member =
                             intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
-                                elem.member_lookup_with_policy_and_receiver(
+                                let result = elem.member_lookup_with_policy_and_receiver(
                                     db, env, name_str, policy, receiver,
-                                )
-                                .member
+                                );
+                                error = error.or(result.descriptor_error);
+                                result.member
                             });
-                        member.into()
+                        MemberLookupResult::new(member, error)
                     }
                 }
 
@@ -4894,18 +4890,16 @@ impl<'db> Type<'db> {
                     {
                         // A TypeVar can be bounded by a class-object type such as `type[A]`, which
                         // requires the full lookup path rather than instance-member lookup.
-                        let result = bound.member_lookup_with_policy_and_receiver(
+                        return bound.member_lookup_with_policy_and_receiver(
                             db,
                             env,
                             name_str,
                             policy,
                             Some(receiver),
                         );
-                        return MemberLookupResult::new(result.member, None);
                     }
 
-                    let result = instance_like_member_lookup(db, env, key, receiver);
-                    MemberLookupResult::new(result.member, None)
+                    instance_like_member_lookup(db, env, key, receiver)
                 }
 
                 Type::NominalInstance(instance)
@@ -5065,7 +5059,7 @@ impl<'db> Type<'db> {
                     // (which is at least `type`). Attributes resolved via `type`'s descriptors
                     // are intersected with the dynamic type to reflect uncertainty about
                     // whether the unknown metaclass overrides them.
-                    let result = if let Type::SubclassOf(subclass_of) = this
+                    if let Type::SubclassOf(subclass_of) = this
                         && let SubclassOfInner::Dynamic(dynamic) = subclass_of.subclass_of()
                     {
                         result.map_type(|ty| {
@@ -5082,17 +5076,6 @@ impl<'db> Type<'db> {
                         })
                     } else {
                         result
-                    };
-
-                    if let Type::SubclassOf(subclass_of) = this
-                        && matches!(
-                            subclass_of.subclass_of().with_transposed_type_var(db, env),
-                            SubclassOfInner::TypeVar(_)
-                        )
-                    {
-                        MemberLookupResult::new(result.member, None)
-                    } else {
-                        result
                     }
                 }
 
@@ -5107,8 +5090,7 @@ impl<'db> Type<'db> {
 
                     bound_super
                         .try_call_dunder_get_on_attribute(db, env, owner_attr)
-                        .unwrap_or(owner_attr)
-                        .into()
+                        .unwrap_or_else(|| owner_attr.into())
                 }
             }
         }
@@ -6535,11 +6517,23 @@ impl<'db> Type<'db> {
             })
         };
 
-        // A custom `__getattribute__` runs before normal descriptor lookup. Preserve the normal
-        // member type, but do not report its descriptor failure as definite when an override
-        // intercepts the access. This includes an invalid override that fails before Python can
-        // invoke the descriptor.
-        let result = if result.descriptor_error.is_some() && custom_getattribute().1 {
+        // An override returning a type disjoint from the descriptor result must bypass that
+        // descriptor. An invalid override also fails before the descriptor can run.
+        let result = if result.descriptor_error.is_some()
+            && let (override_result, true) = custom_getattribute()
+            && override_result
+                .member
+                .place
+                .ignore_possibly_undefined()
+                .is_none_or(|override_type| {
+                    result
+                        .member
+                        .place
+                        .ignore_possibly_undefined()
+                        .is_some_and(|member_type| {
+                            override_type.is_disjoint_from(db, env, member_type)
+                        })
+                }) {
             MemberLookupResult::new(result.member, None)
         } else {
             result
