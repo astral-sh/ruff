@@ -3691,9 +3691,12 @@ impl<'db> StaticClassLiteral<'db> {
                 place_and_qual.ignore_possibly_undefined().map(|ty| {
                     let variance = if place_and_qual
                         .qualifiers
-                        // `CLASS_VAR || FINAL` is really `all()`, but
-                        // we want to be robust against new qualifiers
-                        .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::FINAL)
+                        // None of these fields can be mutated through an instance.
+                        .intersects(
+                            TypeQualifiers::CLASS_VAR
+                                | TypeQualifiers::FINAL
+                                | TypeQualifiers::READ_ONLY,
+                        )
                         // We don't allow mutation of methods or properties
                         || ty.is_function_literal()
                         || ty.is_property_instance()
@@ -3704,7 +3707,7 @@ impl<'db> StaticClassLiteral<'db> {
                         // type variable, but they could if it's a
                         // callable type. They can't be mutated on instances.
                         //
-                        // FINAL: final attributes are immutable, and thus covariant
+                        // FINAL and READ_ONLY: immutable fields are covariant.
                         TypeVarVariance::Covariant
                     } else {
                         default_attribute_variance

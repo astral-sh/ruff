@@ -133,8 +133,8 @@ impl<'db> TypedDictFields<'db> {
 /// 1. `__init__(self, __map: TD, /, *, field1: T1 = ..., field2: T2 = ...) -> None`
 ///    Allows passing another instance of the `TypedDict` when creating a new instance.
 ///    Technically, `__map` could accept a subset of the `TypedDict` if the remaining
-///    fields are provided as keyword arguments, but we don't model that in the
-///    synthesized `__init__`, since this signature is primarily used for IDE support.
+///    fields are provided as keyword arguments. Such mixed calls use dedicated constructor
+///    validation instead because this overload cannot describe the overwritten mapping entries.
 ///    Fields that are not valid Python identifiers are collapsed into `**kwargs`.
 /// 2. `__init__(self, *, field1: T1, field2: T2 = ...) -> None`
 ///    Keyword-only. Fields that are not valid Python identifiers are collapsed into `**kwargs`.
@@ -145,6 +145,14 @@ fn synthesize_typed_dict_init<'db>(
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
+    // Only a bare generic class exposes a generic method. Explicit aliases already substitute
+    // their arguments into both the receiver and the fields.
+    let generic_context = typed_dict.defining_class().and_then(|class| {
+        let alias = class.into_generic_alias()?;
+        let specialization = alias.specialization(db);
+        let generic_context = specialization.generic_context(db);
+        (specialization == generic_context.identity_specialization(db)).then_some(generic_context)
+    });
     let keyword_fields: Vec<_> = fields
         .iter()
         .filter(|(name, _)| is_identifier(name))
@@ -174,7 +182,8 @@ fn synthesize_typed_dict_init<'db>(
             .with_definition(field.first_declaration())
     });
 
-    let map_overload = Signature::new(
+    let map_overload = Signature::new_generic(
+        generic_context,
         Parameters::standard(
             [self_param.clone(), map_param]
                 .into_iter()
@@ -195,7 +204,8 @@ fn synthesize_typed_dict_init<'db>(
         }
     });
 
-    let keyword_overload = Signature::new(
+    let keyword_overload = Signature::new_generic(
+        generic_context,
         Parameters::standard(
             std::iter::once(self_param)
                 .chain(keyword_field_params)

@@ -87,7 +87,6 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
@@ -116,8 +115,8 @@ use crate::types::{
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
     Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder,
-    UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
@@ -8797,21 +8796,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => None,
         };
 
-        // Prepare `TypedDict` constructor calls before variadic argument setup so field-directed
-        // value inference becomes canonical before `**kwargs` expressions are inferred.
-        let has_prepared_typed_dict_constructor = class
-            .filter(|class| class.is_typed_dict(self.db()))
-            .map(|class| {
-                let typed_dict = TypedDictType::new(class);
-                let form = TypedDictConstructorForm::from_arguments(arguments);
-                self.prepare_typed_dict_constructor(
-                    typed_dict,
-                    form,
-                    arguments,
-                    func.as_ref().into(),
-                );
-            })
-            .is_some();
+        if let Some(class) = class
+            && class.is_typed_dict(db)
+        {
+            return self.infer_typed_dict_constructor(
+                callable_type,
+                class,
+                call_expression,
+                call_expression_tcx,
+            );
+        }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
@@ -9123,13 +9117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| {
-                if has_prepared_typed_dict_constructor {
-                    builder.get_or_infer_expression(expr, tcx)
-                } else {
-                    builder.infer_expression(expr, tcx)
-                }
-            },
+            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
             &mut bindings,
             call_expression_tcx,
         );
