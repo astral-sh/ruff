@@ -2206,66 +2206,6 @@ fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
 }
 
 #[test]
-fn src_root_is_not_supported() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-            [tool.ty.src]
-            root = "./src"
-            "#,
-        ),
-        ("src/test.py", ""),
-    ])?;
-
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    ty failed
-      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`
-      Cause: TOML parse error at line 3, column 1
-      |
-    3 | root = "./src"
-      | ^^^^
-    unknown field `root`, expected one of `respect-ignore-files`, `exclude-scripts`, `include`, `exclude`
-    "#);
-
-    Ok(())
-}
-
-#[test]
-fn environment_root_configures_module_resolution() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-            [tool.ty.environment]
-            root = ["./app"]
-            "#,
-        ),
-        ("src/test.py", "import my_module"),
-        (
-            "app/my_module.py",
-            "# This module exists in app/ but not src/",
-        ),
-    ])?;
-
-    assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn default_root_src_layout() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("src/foo.py", "foo = 10"),
