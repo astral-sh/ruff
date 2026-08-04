@@ -4708,8 +4708,6 @@ from pathlib import Missing as Alias
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-            db.init_program().unwrap();
-
             let path = SystemPath::new("src/main.py");
             db.write_file(path, ruff_python_trivia::textwrap::dedent(source))
                 .expect("Write to memory file system to always succeed");

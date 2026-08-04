@@ -3229,8 +3229,7 @@ class C: ...
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
-            db.init_program_with_python_version(self.python_version.unwrap_or_default())
-                .unwrap();
+            db.set_python_version(self.python_version.unwrap_or_default());
 
             for Source { path, contents } in &self.sources {
                 db.write_file(path, contents)

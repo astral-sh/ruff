@@ -2058,21 +2058,19 @@ impl<'db> KnownClassLookupError<'db> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tests::setup_db;
+    use crate::db::tests::{TestDbBuilder, setup_db};
     use crate::{PythonVersionSource, PythonVersionWithSource};
-    use salsa::Setter;
     use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
+    use ty_python_core::TestProgramDb as _;
+    use ty_python_core::program::{Program, ProgramSettings};
 
     #[test]
     fn known_class_roundtrip_from_str() {
-        let mut db = setup_db();
-        ty_python_core::program::Program::get(&db)
-            .set_python_version_with_source(&mut db)
-            .to(PythonVersionWithSource {
-                version: PythonVersion::latest_preview(),
-                source: PythonVersionSource::default(),
-            });
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::latest_preview())
+            .build()
+            .expect("valid TestDb setup");
         let python_version = db.python_version();
         let resolver_environment = db.program_environment().resolver_environment(&db);
         for class in KnownClass::iter() {
@@ -2101,14 +2099,10 @@ mod tests {
 
     #[test]
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_latest_version() {
-        let mut db = setup_db();
-
-        ty_python_core::program::Program::get(&db)
-            .set_python_version_with_source(&mut db)
-            .to(PythonVersionWithSource {
-                version: PythonVersion::latest_ty(),
-                source: PythonVersionSource::default(),
-            });
+        let db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::latest_ty())
+            .build()
+            .expect("valid TestDb setup");
 
         let python_version = db.python_version();
         let env = db.program_environment();
@@ -2134,7 +2128,7 @@ mod tests {
 
     #[test]
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
-        let mut db = setup_db();
+        let db = setup_db();
 
         // First, collect the `KnownClass` variants
         // and sort them according to the version they were added in.
@@ -2164,22 +2158,27 @@ mod tests {
 
         classes.sort_unstable_by_key(|(_, version)| *version);
 
-        let program = ty_python_core::program::Program::get(&db);
+        let mut program = db.program();
         let mut current_version = program.python_version(&db);
+        let python_platform = program.python_platform(&db).clone();
+        let search_paths = program.search_paths(&db).clone();
 
         for (class, version_added) in classes {
             if version_added != current_version {
-                program
-                    .set_python_version_with_source(&mut db)
-                    .to(PythonVersionWithSource {
+                let settings = ProgramSettings {
+                    python_version: PythonVersionWithSource {
                         version: version_added,
                         source: PythonVersionSource::default(),
-                    });
+                    },
+                    python_platform: python_platform.clone(),
+                    search_paths: search_paths.clone(),
+                };
+                program = Program::from_settings(&db, settings);
                 current_version = version_added;
             }
 
             // Check the class can be looked up successfully
-            let env = db.program_environment();
+            let env = ProgramEnvironment::from_program(program);
             class.try_to_class_literal(&db, &env).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;

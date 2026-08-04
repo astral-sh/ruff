@@ -74,7 +74,7 @@ impl<'db> ProgramEnvironment<'db> {
     #[inline]
     pub fn program(&self, db: &'db dyn Db) -> Program<'db> {
         let program = match self.environment.get() {
-            ProgramSource::Program(id) => return ResolverEnvironment::from_id(id),
+            ProgramSource::Program(id) => return Program::from_id(id),
             ProgramSource::File(file) => {
                 cold_path();
                 // The source handle and database share `'db`; re-wrapping the stored ingredient
@@ -109,7 +109,7 @@ impl<'db> ProgramEnvironment<'db> {
     /// Returns the resolver environment used by this operation.
     #[inline]
     pub fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
-        self.program(db)
+        self.program(db).resolver_environment(db)
     }
 }
 

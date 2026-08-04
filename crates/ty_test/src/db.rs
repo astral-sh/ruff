@@ -15,8 +15,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
-use ty_python_core::program::Program;
-use ty_python_core::{Db as _, ProgramFile};
+use ty_python_core::program::ProgramSettings;
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
@@ -34,6 +34,8 @@ pub(crate) struct Db {
 
 impl Db {
     pub(crate) fn setup() -> Self {
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -41,17 +43,25 @@ impl Db {
                     tracing::trace!("event: {:?}", event);
                 }
             }))),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             files: Files::default(),
             settings: None,
         };
 
-        db.settings = Some(Settings::new(&db));
+        db.settings = Some(Settings::new(&db, program_settings));
         db
     }
 
     fn settings(&self) -> Settings {
         self.settings.unwrap()
+    }
+
+    pub(crate) fn update_program(&mut self, settings: ProgramSettings) {
+        let db_settings = self.settings();
+        if db_settings.program(self) != &settings {
+            settings.search_paths.try_register_static_roots(self);
+            db_settings.set_program(self).to(settings);
+        }
     }
 
     pub(crate) fn set_verbosity(&mut self, verbose: bool) {
@@ -133,7 +143,7 @@ impl SemanticDb for Db {
     }
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
-        Program::get(self).program_file(self, file)
+        self.program().program_file(self, file)
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -158,6 +168,13 @@ impl SemanticDb for Db {
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
+    }
+}
+
+#[salsa::db]
+impl TestProgramDb for Db {
+    fn program_settings(&self) -> &ProgramSettings {
+        self.settings().program(self)
     }
 }
 
@@ -214,6 +231,8 @@ impl FileSettings {
 
 #[salsa::input(debug)]
 struct Settings {
+    #[returns(ref)]
+    program: ProgramSettings,
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,

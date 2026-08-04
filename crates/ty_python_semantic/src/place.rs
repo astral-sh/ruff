@@ -664,6 +664,7 @@ fn builtins_symbol_impl<'db>(
     visibility: BuiltinVisibility,
 ) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
     let program = env.program(db);
+    let resolver_environment = program.resolver_environment(db);
     let resolver = |module: Module<'db>| {
         let file = ProgramFile::new(db, module.file(db)?, program);
         let scope = global_scope(db, file);
@@ -695,12 +696,13 @@ fn builtins_symbol_impl<'db>(
     // If this symbol is not present in project-level builtins, search in the default ones.
     resolve_module_confident(
         db,
-        program,
+        resolver_environment,
         &ModuleName::new_static("__builtins__").unwrap(),
     )
     .and_then(&resolver)
     .or_else(|| {
-        resolve_module_confident(db, program, &KnownModule::Builtins.name()).and_then(resolver)
+        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
+            .and_then(resolver)
     })
 }
 
@@ -1424,7 +1426,7 @@ fn symbol_impl<'db>(
             "version_info" => {
                 return Place::bound(Type::sys_version_info()).into();
             }
-            "platform" => match ty_python_core::program::Program::get(db).python_platform(db) {
+            "platform" => match scope.program(db).python_platform(db) {
                 crate::PythonPlatform::Identifier(platform) => {
                     return Place::bound(Type::string_literal(db, platform.as_str())).into();
                 }
@@ -1437,7 +1439,7 @@ fn symbol_impl<'db>(
     }
 
     if name == "name" && is_known_module(KnownModule::Os) {
-        match ty_python_core::program::Program::get(db).python_platform(db) {
+        match scope.program(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
                 let os_name = if platform == "win32" { "nt" } else { "posix" };

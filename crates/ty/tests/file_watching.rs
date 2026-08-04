@@ -19,7 +19,6 @@ use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::Program;
 use ty_static::EnvVars;
 
 struct TestCase {
@@ -39,7 +38,7 @@ fn resolve_module_confident<'db>(
 ) -> Option<Module<'db>> {
     ty_module_resolver::resolve_module_confident(
         db,
-        Program::get(db).resolver_environment(db),
+        db.project().program(db).resolver_environment(db),
         module_name,
     )
 }

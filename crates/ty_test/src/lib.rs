@@ -20,8 +20,9 @@ use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
+use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
@@ -304,7 +305,7 @@ fn run_test(
         .expect("Failed to resolve search path settings"),
     };
 
-    Program::init_or_update(db, settings);
+    db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
@@ -493,7 +494,7 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    let environment = Program::get(db).resolver_environment(db);
+    let environment = db.program().resolver_environment(db);
     for from_list in list_modules(db, environment).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.

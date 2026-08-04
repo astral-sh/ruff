@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use lsp_types::{ExecuteCommandParams, ExecuteCommandRequest, WorkDoneProgressParams};
 use ruff_db::system::SystemPath;
 
@@ -48,6 +48,21 @@ python-platform = \"linux\"
     let response = response
         .as_str()
         .expect("debug command to return a string response");
+
+    let (before_structs, salsa_structs) = response
+        .split_once("=======SALSA STRUCTS=======\n")
+        .context("debug response missing Salsa structs section")?;
+    let (salsa_structs, after_structs) = salsa_structs
+        .split_once("=======SALSA QUERIES=======\n")
+        .context("debug response missing Salsa queries section")?;
+
+    // The production report orders structs by memory usage, which varies between platforms.
+    let mut salsa_structs = salsa_structs.lines().collect::<Vec<_>>();
+    salsa_structs.sort_unstable();
+    let response = format!(
+        "{before_structs}=======SALSA STRUCTS=======\n{}\n=======SALSA QUERIES=======\n{after_structs}",
+        salsa_structs.join("\n")
+    );
 
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(r"\b[0-9]+.[0-9]+MB\b", "[X.XXMB]");

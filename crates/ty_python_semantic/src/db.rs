@@ -48,7 +48,8 @@ pub(crate) mod tests {
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_python_core::TestProgramDb;
+    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -64,11 +65,14 @@ pub(crate) mod tests {
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
         open_files: rustc_hash::FxHashSet<File>,
+        program_settings: ProgramSettings,
     }
 
     impl TestDb {
         fn new() -> Self {
             let events = Events::default();
+            let vendored = ty_vendored::file_system().clone();
+            let program_settings = ProgramSettings::empty(&vendored);
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -79,21 +83,22 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                vendored,
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
+                program_settings,
             }
         }
 
         pub(crate) fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
+            self.program().python_version(self)
         }
 
         pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
-            ProgramEnvironment::from_program(Program::get(self).resolver_environment(self))
+            ProgramEnvironment::from_program(self.program())
         }
 
         /// Marks `file` as open in the editor.
@@ -152,6 +157,13 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
+    impl TestProgramDb for TestDb {
+        fn program_settings(&self) -> &ProgramSettings {
+            &self.program_settings
+        }
+    }
+
+    #[salsa::db]
     impl Db for TestDb {
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             if !self.should_check_file(file) {
@@ -162,7 +174,7 @@ pub(crate) mod tests {
         }
 
         fn program_file(&self, file: File) -> ProgramFile<'_> {
-            Program::get(self).program_file(self, file)
+            self.program().program_file(self, file)
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -242,19 +254,18 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: self.python_version,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                        .context("Invalid search path settings")?,
+            let program_settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: self.python_version,
+                    source: PythonVersionSource::default(),
                 },
-            );
+                python_platform: self.python_platform,
+                search_paths: SearchPathSettings::new(vec![src_root])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .context("Invalid search path settings")?,
+            };
+            program_settings.search_paths.try_register_static_roots(&db);
+            db.program_settings = program_settings;
 
             Ok(db)
         }

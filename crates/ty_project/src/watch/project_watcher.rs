@@ -6,7 +6,6 @@ use tracing::info;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_module_resolver::system_module_search_paths;
-use ty_python_core::program::Program;
 
 use crate::db::{Db, ProjectDatabase};
 use crate::watch::Watcher;
@@ -41,7 +40,7 @@ impl ProjectWatcher {
     }
 
     pub fn update(&mut self, db: &ProjectDatabase) {
-        let environment = Program::get(db).resolver_environment(db);
+        let environment = db.project().program(db).resolver_environment(db);
         let search_paths: Vec<_> = system_module_search_paths(db, environment).collect();
         let project_path = db.project().root(db);
 

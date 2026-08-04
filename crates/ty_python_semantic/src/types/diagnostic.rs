@@ -4689,6 +4689,7 @@ pub(super) fn report_invalid_total_ordering_call(
 /// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
     diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,
@@ -4701,7 +4702,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         return false;
     }
 
-    let program = ty_python_core::program::Program::get(db);
+    let program = env.program(db);
     let typeshed_versions = program.search_paths(db).typeshed_versions();
 
     let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
@@ -4721,7 +4722,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, env, diagnostic, "resolving modules");
 
     true
 }
@@ -4778,7 +4779,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
+    add_inferred_python_version_hint_to_diagnostic(db, env, &mut diagnostic, action);
 }
 
 pub(super) fn report_invalid_concatenate_last_arg<'db>(
