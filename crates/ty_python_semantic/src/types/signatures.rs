@@ -2511,9 +2511,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
-        // **kwargs: object).
-        if target.parameters.is_gradual()
+        // A fully gradual parameter list is a supertype of the "bottom" parameter list
+        // (*args: object, **kwargs: object).
+        if matches!(target.parameters.kind(), ParametersKind::Gradual)
             && !source.parameters.is_top()
             && source
                 .parameters
