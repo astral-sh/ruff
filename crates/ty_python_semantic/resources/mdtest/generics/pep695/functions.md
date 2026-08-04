@@ -1060,6 +1060,51 @@ reveal_type(call(callback))  # revealed: int
 reveal_type(bounded(callback))  # revealed: int
 ```
 
+### Return type inference from top callables
+
+Top callable parameters accept any parameter list but must preserve return-type constraints.
+
+```py
+from collections.abc import Callable
+from ty_extensions import Top
+
+def accept_top[T](callback: Top[Callable[..., T]]) -> T:
+    raise NotImplementedError
+
+def accept_bounded[T: int](callback: Top[Callable[..., T]]) -> T:
+    raise NotImplementedError
+
+def accept_int(callback: Top[Callable[..., int]]) -> None: ...
+def ordinary() -> int:
+    return 1
+
+def positional(value: str) -> str:
+    return value
+
+def keyword_only(*, value: bool) -> bool:
+    return value
+
+def object_variadic(*args: object, **kwargs: object) -> tuple[int, str]:
+    return 1, "example"
+
+class Example:
+    def method(self) -> bytes:
+        return b"example"
+
+class Constructed: ...
+
+reveal_type(accept_top(ordinary))  # revealed: int
+reveal_type(accept_top(positional))  # revealed: str
+reveal_type(accept_top(keyword_only))  # revealed: bool
+reveal_type(accept_top(object_variadic))  # revealed: tuple[int, str]
+reveal_type(accept_top(Example().method))  # revealed: bytes
+reveal_type(accept_top(Constructed))  # revealed: Constructed
+reveal_type(accept_bounded(ordinary))  # revealed: int
+
+accept_int(ordinary)
+accept_int(positional)  # error: [invalid-argument-type]
+```
+
 ### Gradual callable parameters with a required prefix
 
 ```py
