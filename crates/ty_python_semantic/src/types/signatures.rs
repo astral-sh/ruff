@@ -3209,7 +3209,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // The top signature is supertype of (and assignable from) all other signatures. It is a
         // subtype of no signature except itself, and assignable only to the gradual signature.
         if target.parameters.is_top() {
-            return self.always();
+            return result;
         } else if source.parameters.is_top() && !target.parameters.is_gradual() {
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::TopCallableAssignedToNonTop {

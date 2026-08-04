@@ -1060,6 +1060,23 @@ reveal_type(call(callback))  # revealed: int
 reveal_type(bounded(callback))  # revealed: int
 ```
 
+### Return type inference from top callables
+
+Top callable parameters must preserve return-type constraints.
+
+```py
+from collections.abc import Callable
+from ty_extensions import Top
+
+def accept_top[T](callback: Top[Callable[..., T]]) -> T:
+    raise NotImplementedError
+
+def ordinary() -> int:
+    return 1
+
+reveal_type(accept_top(ordinary))  # revealed: int
+```
+
 ### Gradual callable parameters with a required prefix
 
 ```py
