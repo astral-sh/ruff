@@ -1642,8 +1642,8 @@ class C3(A3):
 class D3(A3):
     def method(self: Self) -> Self: ...  # fine
 
-# These receivers would otherwise produce valid overrides, but an explicit receiver other than
-# `Self` cannot be paired with a `Self` return annotation.
+# These overrides would otherwise be valid, but a method returning `Self` must leave `self`
+# unannotated or annotate it as `Self`.
 class E3(A3):
     def method(self: E3) -> Self: ...  # error: [invalid-type-form]
 

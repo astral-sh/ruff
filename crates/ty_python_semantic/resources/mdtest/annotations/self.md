@@ -816,241 +816,242 @@ class Bar(Generic[T]): ...
 class Baz(Bar[Self]): ...
 ```
 
-## Explicit receiver annotations with `Self`
+## Explicit instance-method receivers with `Self`
 
-When `Self` appears in a method signature, an explicitly annotated instance receiver must have type
-`Self`, and an explicitly annotated class receiver must have type `type[Self]`. Unannotated
-receivers are also valid.
+An instance method can use `Self` when its first parameter is unannotated or annotated as `Self`:
 
 ```py
 from __future__ import annotations
 
-from typing import Self, TypeVar, Union
+from typing import Self, TypeVar
 
 T = TypeVar("T")
 
-class ValidReceivers:
-    def implicit(self, other: Self) -> Self:
+class Valid:
+    def implicit(self) -> Self:
         return self
 
-    def explicit(self: Self, other: Self) -> Self:
+    def explicit(self: Self) -> Self:
         return self
+```
 
+Any other annotation for the first parameter is incompatible with `Self`, even an annotation that
+names the class itself:
+
+```py
+class Invalid:
+    def type_variable(self: T) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def concrete(self: Invalid) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def union(self: T | None) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def class_object(self: type[Self]) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+```
+
+The invalid receiver does not change the inferred return type of the bound method:
+
+```py
+reveal_type(Invalid().concrete)  # revealed: bound method Invalid.concrete() -> Invalid
+```
+
+## Explicit classmethod receivers with `Self`
+
+A class method receives the class as its first argument. When the method uses `Self`, that argument
+can be unannotated or annotated as `type[Self]`:
+
+```py
+from __future__ import annotations
+
+from typing import Self, TypeVar
+
+T = TypeVar("T")
+
+class Valid:
     @classmethod
-    def implicit_classmethod(cls) -> Self:
+    def implicit(cls) -> Self:
         return cls()
 
     @classmethod
-    def explicit_classmethod(cls: type[Self]) -> Self:
+    def explicit(cls: type[Self]) -> Self:
         return cls()
 ```
 
-A different type variable, concrete class, union, or incorrect receiver kind is incompatible with
-`Self` elsewhere in the signature.
+Other annotations are incompatible with `Self`, including `Self` without the enclosing `type`:
 
 ```py
-class InvalidReceivers:
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def type_variable(self: T) -> Self:
-        raise NotImplementedError
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def concrete(self: InvalidReceivers) -> Self:
-        raise NotImplementedError
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def union(self: T | None) -> Self:
-        raise NotImplementedError
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def class_object_receiver(self: type[Self]) -> Self:
+class Invalid:
+    @classmethod
+    def type_variable(cls: type[T]) -> Self:  # error: [invalid-type-form]
         raise NotImplementedError
 
     @classmethod
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def class_type_variable(cls: type[T]) -> Self:
+    def concrete(cls: type[Invalid]) -> Self:  # error: [invalid-type-form]
         raise NotImplementedError
 
     @classmethod
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def concrete_class(cls: type[InvalidReceivers]) -> Self:
-        raise NotImplementedError
-
-    @classmethod
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def instance_receiver(cls: Self) -> Self:
+    def instance(cls: Self) -> Self:  # error: [invalid-type-form]
         raise NotImplementedError
 ```
 
-The restriction also applies when a union simplifies away `Self`, or when `Self` is passed through a
-generic type alias, in either return or parameter annotations.
+## `Self` in unions with explicit receivers
 
-```py
-type Identity[X] = X
-
-class NormalizedAnnotations:
-    # snapshot: invalid-type-form
-    def union_return(self: T) -> Self | object: ...
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def union_parameter(self: T, other: Self | object) -> None: ...
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def alias_return(self: T) -> Identity[Self]:
-        raise NotImplementedError
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def alias_parameter(self: T, other: Identity[Self]) -> None: ...
-
-    # snapshot: invalid-type-form
-    # snapshot: invalid-type-form
-    def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
-```
-
-```snapshot
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:56:34
-   |
-56 |     def union_return(self: T) -> Self | object: ...
-   |                                  ^^^^
-
-
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:70:46
-   |
-70 |     def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
-   |                                              ^^^^
-
-
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:70:52
-   |
-70 |     def repeated_union(self: T, other: Union[Self, Self]) -> None: ...
-   |                                                    ^^^^
-```
-
-Each invalid `Self` occurrence is reported separately, including repeated occurrences in the same
-annotation. Suppressing one occurrence does not suppress another occurrence or an independently
-invalid parameter annotation.
-
-```py
-class MultipleAnnotations:
-    def multiple(
-        self: T,
-        other: Self,  # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    ) -> Self:  # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-        raise NotImplementedError
-
-    def suppressed_return(
-        self: T,
-        other: Self,  # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    ) -> Self:  # ty: ignore[invalid-type-form]
-        raise NotImplementedError
-
-    def partially_suppressed_union(
-        self: T,
-        other: Union[
-            Self,  # ty: ignore[invalid-type-form]
-            Self,  # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-        ],
-    ) -> None: ...
-```
-
-Reporting an incompatible receiver does not prevent `Self` from describing the method's return type.
-
-```py
-class Preserved:
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def method(self: object) -> Self:
-        raise NotImplementedError
-
-reveal_type(Preserved().method)  # revealed: bound method Preserved.method() -> Preserved
-```
-
-## Generic methods with explicit receiver annotations
-
-The receiver restriction also applies to methods with their own type parameters, whose annotations
-are inferred in a separate type-parameter scope.
+An incompatible receiver makes `Self` invalid even when the surrounding union simplifies to
+`object`. This applies to both return and parameter annotations:
 
 ```py
 from typing import Self
 
-class GenericMethods:
-    def valid[U](self: Self, value: U) -> Self:
+class Example:
+    def return_type(self: object) -> Self | object: ...  # error: [invalid-type-form]
+    def parameter(self: object, value: Self | object) -> None: ...  # error: [invalid-type-form]
+```
+
+## `Self` in type aliases with explicit receivers
+
+An incompatible receiver also makes `Self` invalid when it appears as an argument to a generic type
+alias, whether the alias is used in a return or parameter annotation:
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Example:
+    def return_type(self: object) -> Identity[Self]:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def parameter(self: object, value: Identity[Self]) -> None: ...  # error: [invalid-type-form]
+```
+
+## Multiple `Self` annotations with explicit receivers
+
+An incompatible receiver produces a separate error for each `Self` annotation:
+
+```py
+from typing import Self, Union
+
+class Multiple:
+    def method(
+        self: object,
+        other: Self,  # error: [invalid-type-form]
+    ) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+```
+
+Two occurrences in the same annotation also produce separate errors, each pointing at its own
+`Self`:
+
+```py
+class Repeated:
+    # snapshot: invalid-type-form
+    # snapshot: invalid-type-form
+    def method(self: object, other: Union[Self, Self]) -> None: ...
+```
+
+```snapshot
+error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+  --> src/mdtest_snippet.py:12:43
+   |
+12 |     def method(self: object, other: Union[Self, Self]) -> None: ...
+   |                                           ^^^^
+
+
+error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+  --> src/mdtest_snippet.py:12:49
+   |
+12 |     def method(self: object, other: Union[Self, Self]) -> None: ...
+   |                                                 ^^^^
+```
+
+Suppressing the error on the return annotation does not suppress the error on a parameter
+annotation:
+
+```py
+class SuppressedReturn:
+    def method(
+        self: object,
+        other: Self,  # error: [invalid-type-form]
+    ) -> Self:  # ty: ignore[invalid-type-form]
+        raise NotImplementedError
+```
+
+## Generic methods with explicit receiver annotations
+
+Methods with their own type parameters follow the same rules for `Self` in both instance methods and
+class methods:
+
+```py
+from typing import Self
+
+class Valid:
+    def instance[T](self: Self, value: T) -> Self:
         return self
 
     @classmethod
-    def valid_classmethod[U](cls: type[Self], value: U) -> Self:
+    def class_method[T](cls: type[Self], value: T) -> Self:
         return cls()
+```
 
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def invalid[U](self: U, value: U) -> Self:
+A method's own type parameter cannot replace `Self` in its receiver annotation:
+
+```py
+class Invalid:
+    def instance[T](self: T) -> Self:  # error: [invalid-type-form]
         raise NotImplementedError
 
     @classmethod
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def invalid_classmethod[U](cls: type[U], value: U) -> Self:
+    def class_method[T](cls: type[T]) -> Self:  # error: [invalid-type-form]
         raise NotImplementedError
 ```
 
 ## Quoted `Self` with explicit receiver annotations
 
-Quoted annotations follow the same receiver restriction, even when `Self` is nested in a generic,
-removed by union normalization, or wrapped in a type alias.
+A receiver annotation and a `Self` return annotation can both be quoted:
 
 ```py
-from typing import Self, TypeVar, Union
+from typing import Self
 
-T = TypeVar("T")
-type Identity[X] = X
-
-class QuotedAnnotations:
-    def valid(self: "Self") -> "Self":
+class Valid:
+    def instance(self: "Self") -> "Self":
         return self
 
     @classmethod
-    def valid_classmethod(cls: "type[Self]") -> "Self":
+    def class_method(cls: "type[Self]") -> "Self":
         return cls()
+```
 
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def simple_return(self: T) -> "Self":
-        raise NotImplementedError
+An incompatible receiver makes a quoted `Self` invalid, including when the quoted union simplifies
+to `object`:
 
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def nested_return(self: T) -> "list[Self]":
-        raise NotImplementedError
-
-    # snapshot: invalid-type-form
-    def union_return(self: T) -> "Self | object": ...
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def union_parameter(self: T, other: "Self | object") -> None: ...
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def alias_return(self: T) -> "Identity[Self]":
+```py
+class InvalidReturn:
+    def simple(self: object) -> "Self":  # error: [invalid-type-form]
         raise NotImplementedError
 
     # snapshot: invalid-type-form
-    def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
-
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
-    def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
+    def union(self: object) -> "Self | object": ...
 ```
 
 ```snapshot
 error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:23:35
+  --> src/mdtest_snippet.py:15:33
    |
-23 |     def union_return(self: T) -> "Self | object": ...
-   |                                   ^^^^
+15 |     def union(self: object) -> "Self | object": ...
+   |                                 ^^^^
+```
 
+A quoted parameter annotation is also invalid when it passes `Self` to a type alias:
 
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
-  --> src/mdtest_snippet.py:33:51
-   |
-33 |     def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
-   |                                                   ^^^^
+```py
+type Identity[T] = T
+
+class InvalidParameter:
+    def method(self: object, value: "Identity[Self]") -> None: ...  # error: [invalid-type-form]
 ```
 
 ## Self usage in static methods
