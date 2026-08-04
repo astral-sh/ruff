@@ -116,15 +116,6 @@ class Number:
     def __truediv__(self, other: int) -> int:
         raise NotImplementedError
 
-    def __getitem__(self, key: int) -> "Number":
-        return self
-
-    def __setitem__(self, key: int, value: "Number") -> None:
-        pass
-
-    def __add__(self, other: int) -> "Number":
-        return self
-
 def protocol_operations(c: C, number: Number, values: list[int]) -> None:
     state: C | int = 0
     try:
@@ -150,11 +141,11 @@ def protocol_operations(c: C, number: Number, values: list[int]) -> None:
     except:
         reveal_type(state)  # revealed: Literal[1]
 
-def augmented_assignment(number: Number) -> None:
+def augmented_assignment(values: list[int]) -> None:
     target_state = 0
     rhs_state = 0
     try:
-        number[target_state := 1] += (rhs_state := 1)
+        values[target_state := 1] += (rhs_state := 1)
     except:
         reveal_type(target_state)  # revealed: Literal[1]
         reveal_type(rhs_state)  # revealed: Literal[0, 1]

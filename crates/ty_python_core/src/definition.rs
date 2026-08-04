@@ -1612,6 +1612,8 @@ impl NestedBindingsDefinitionKind {
     /// Returns every nested binding source and whether it was declared `global`.
     ///
     /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
+    /// Exception checkpoints use reachable bindings rather than end-of-scope bindings because the
+    /// comprehension has not yet finished; inference selects the checkpoint's exact source.
     fn binding_sources<'index, 'db>(
         &'index self,
         index: &'index SemanticIndex<'db>,
@@ -1688,6 +1690,8 @@ pub enum NestedBindingExecution {
     /// The nested scope is modeled as running while evaluating the containing expression.
     Eager,
     /// An exception escaped after this specific comprehension binding was evaluated.
+    ///
+    /// Unlike [`Self::Eager`], this excludes assignments that appear later in the comprehension.
     EagerAtException {
         source_definition: ScopedDefinitionId,
     },
