@@ -653,28 +653,24 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(
-            returns(ref),
-            cycle_initial=|_, _, _| OwnedRelationConstraintSet::default(),
-            heap_size=ruff_memory_usage::heap_size,
-        )]
-        fn is_redundant_with_impl<'db>(
-            db: &'db dyn Db,
-            types: TypePair<'db>,
-        ) -> OwnedRelationConstraintSet<'db> {
+        // This query only caches the positive-proof projection consumed below. Its `false` cycle
+        // value means "not proven redundant", not negative relation evidence.
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false)]
+        fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);
             let constraints = ConstraintSetBuilder::new();
-            constraints.into_owned_relation(|constraints| {
-                types.first(db).has_relation_to(
+            types
+                .first(db)
+                .has_relation_to(
                     db,
                     &env,
                     types.second(db),
-                    constraints,
+                    &constraints,
                     TypeVarSet::None,
                     TypeRelation::Redundancy { pure: false },
                 )
-            })
+                .is_always_true(db, &env)
         }
 
         if self == other {
@@ -685,7 +681,6 @@ impl<'db> Type<'db> {
         // Union simplification only needs proof of redundancy. False, indeterminate, and
         // inconsistent results all correctly preserve the existing union arm.
         is_redundant_with_impl(db, TypePair::new(db, program, self, other))
-            .query(|_, relation| relation.is_always_true(db, env))
     }
 
     fn has_relation_to<'c>(
