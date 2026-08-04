@@ -534,13 +534,6 @@ impl AttributeKind {
     }
 }
 
-/// The raw `__get__` member selected for a descriptor value.
-#[derive(Clone, Debug, Copy)]
-struct DescriptorGetLookup<'db> {
-    callable_type: Type<'db>,
-    definedness: Definedness,
-}
-
 /// An interned description of an invalid implicit `__get__` call.
 ///
 /// Member lookup carries this compact context through unions and fallbacks. Expression inference
@@ -551,6 +544,8 @@ struct DescriptorGetCallContext<'db> {
     #[returns(copy)]
     descriptor_type: Type<'db>,
     #[returns(copy)]
+    callable_type: Type<'db>,
+    #[returns(copy)]
     instance: Option<Type<'db>>,
     #[returns(copy)]
     owner: Type<'db>,
@@ -560,27 +555,17 @@ impl get_size2::GetSize for DescriptorGetCallContext<'_> {}
 
 impl<'db> DescriptorGetCallContext<'db> {
     /// Reconstructs the implicit call and returns its error if the call is still invalid.
-    fn into_error(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<DescriptorGetCallError<'db>> {
+    fn into_error(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<CallError<'db>> {
         let descriptor_type = self.descriptor_type(db);
-        let descr_get = descriptor_type.try_lookup_dunder_get(db, env)?;
         let instance = self.instance(db).unwrap_or_else(|| Type::none(db, env));
         let owner = self.owner(db);
-        let error = descr_get
-            .callable_type
+        self.callable_type(db)
             .try_call(
                 db,
                 env,
                 &CallArguments::positional([descriptor_type, instance, owner]),
             )
-            .err()?;
-        Some(DescriptorGetCallError {
-            descriptor_type,
-            error,
-        })
+            .err()
     }
 }
 
@@ -590,12 +575,6 @@ struct DescriptorGetResult<'db> {
     return_type: Type<'db>,
     kind: AttributeKind,
     error: Option<DescriptorGetCallContext<'db>>,
-}
-
-/// A failed implicit descriptor call ready to be reported at an attribute expression.
-struct DescriptorGetCallError<'db> {
-    descriptor_type: Type<'db>,
-    error: CallError<'db>,
 }
 
 /// A member lookup result together with a deferred invalid descriptor call.
@@ -632,23 +611,23 @@ impl<'db> MemberLookupResult<'db> {
         env: &ProgramEnvironment<'db>,
         fallback_fn: impl FnOnce() -> Self,
     ) -> Self {
-        let primary_definedness = match self.member.place {
-            Place::Undefined => None,
-            Place::Defined(DefinedPlace { definedness, .. }) => Some(definedness),
-        };
-        let primary_error = self.descriptor_error;
-        let mut fallback_error = None;
-        let member = self.member.or_fall_back_to(db, env, || {
-            let fallback = fallback_fn();
-            fallback_error = fallback.descriptor_error;
-            fallback.member
-        });
-        let descriptor_error = match primary_definedness {
-            None => fallback_error,
-            Some(Definedness::AlwaysDefined) => primary_error,
-            Some(Definedness::PossiblyUndefined) => primary_error.or(fallback_error),
-        };
-        Self::new(member, descriptor_error)
+        match self.member.place {
+            Place::Undefined => fallback_fn(),
+            Place::Defined(DefinedPlace {
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => self,
+            Place::Defined(DefinedPlace {
+                definedness: Definedness::PossiblyUndefined,
+                ..
+            }) => {
+                let fallback = fallback_fn();
+                Self::new(
+                    self.member.or_fall_back_to(db, env, || fallback.member),
+                    self.descriptor_error.or(fallback.descriptor_error),
+                )
+            }
+        }
     }
 
     fn cycle_normalized(
@@ -3622,48 +3601,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Looks up the raw `__get__` slot on the descriptor's class without applying the descriptor
-    /// protocol to the slot itself.
-    fn try_lookup_dunder_get(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<DescriptorGetLookup<'db>> {
-        let Place::Defined(DefinedPlace {
-            ty: concrete_descr_get,
-            ..
-        }) = self
-            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-            .place
-        else {
-            return None;
-        };
-
-        // A recursive member lookup can yield the internal cycle marker. It does not represent a
-        // concrete descriptor method and must not escape through the access.
-        if concrete_descr_get.is_divergent() {
-            return None;
-        }
-
-        // Descriptor special-method lookup checks the descriptor's type, so instance storage
-        // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
-        let Place::Defined(DefinedPlace {
-            ty: descr_get,
-            definedness,
-            ..
-        }) = self
-            .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::NO_INSTANCE_FALLBACK)
-            .place
-        else {
-            return None;
-        };
-
-        Some(DescriptorGetLookup {
-            callable_type: descr_get,
-            definedness,
-        })
-    }
-
     /// Applies `__get__` and retains an invalid call for expression inference.
     ///
     /// For example, accessing `C().value` below implicitly supplies the descriptor value, the
@@ -3685,46 +3622,6 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<DescriptorGetResult<'db>> {
-        fn try_call_dunder_get_on_alternatives<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            alternatives: &[Type<'db>],
-            instance: Option<Type<'db>>,
-            owner: Type<'db>,
-        ) -> Option<DescriptorGetResult<'db>> {
-            let mut return_types = UnionBuilder::new(db, env);
-            let mut error = None;
-            let mut any_descriptor = false;
-            let mut all_data_descriptors = true;
-
-            for alternative in alternatives {
-                if let Some(result) =
-                    alternative.try_call_dunder_get_with_error(db, env, instance, owner)
-                {
-                    any_descriptor = true;
-                    all_data_descriptors &= result.kind.is_data();
-                    return_types = return_types.add(result.return_type);
-                    error = error.or(result.error);
-                } else {
-                    all_data_descriptors = false;
-                    return_types = return_types.add(*alternative);
-                }
-            }
-
-            any_descriptor.then(|| {
-                let kind = if all_data_descriptors {
-                    AttributeKind::DataDescriptor
-                } else {
-                    AttributeKind::NormalOrNonDataDescriptor
-                };
-                DescriptorGetResult {
-                    return_type: return_types.build(),
-                    kind,
-                    error,
-                }
-            })
-        }
-
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
@@ -3747,13 +3644,34 @@ impl<'db> Type<'db> {
             }
 
             if let Some(union) = ty.as_union_like(db) {
-                return try_call_dunder_get_on_alternatives(
-                    db,
-                    env,
-                    union.elements(db),
-                    instance,
-                    owner,
-                );
+                let mut return_types = UnionBuilder::new(db, env);
+                let mut error = None;
+                let mut any_descriptor = false;
+                let mut all_data_descriptors = true;
+
+                for alternative in union.elements(db) {
+                    if let Some(result) =
+                        alternative.try_call_dunder_get_with_error(db, env, instance, owner)
+                    {
+                        any_descriptor = true;
+                        all_data_descriptors &= result.kind.is_data();
+                        return_types = return_types.add(result.return_type);
+                        error = error.or(result.error);
+                    } else {
+                        all_data_descriptors = false;
+                        return_types = return_types.add(*alternative);
+                    }
+                }
+
+                return any_descriptor.then(|| DescriptorGetResult {
+                    return_type: return_types.build(),
+                    kind: if all_data_descriptors {
+                        AttributeKind::DataDescriptor
+                    } else {
+                        AttributeKind::NormalOrNonDataDescriptor
+                    },
+                    error,
+                });
             }
 
             match ty {
@@ -3800,7 +3718,39 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = ty.try_lookup_dunder_get(db, env)?;
+            let Place::Defined(DefinedPlace {
+                ty: concrete_descr_get,
+                ..
+            }) = ty
+                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                .place
+            else {
+                return None;
+            };
+
+            // A recursive member lookup can yield the internal cycle marker. It does not
+            // represent a concrete descriptor method and must not escape through the access.
+            if concrete_descr_get.is_divergent() {
+                return None;
+            }
+
+            // Descriptor special-method lookup checks the descriptor's type, so instance storage
+            // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
+            let Place::Defined(DefinedPlace {
+                ty: descr_get,
+                definedness: descr_get_boundness,
+                ..
+            }) = ty
+                .class_member_with_policy(
+                    db,
+                    env,
+                    "__get__",
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+            else {
+                return None;
+            };
 
             let instance_ty = instance.unwrap_or_else(|| Type::none(db, env));
             let kind = if ty.is_data_descriptor(db, env) {
@@ -3808,28 +3758,23 @@ impl<'db> Type<'db> {
             } else {
                 AttributeKind::NormalOrNonDataDescriptor
             };
-            let (return_type, error) = match descr_get.callable_type.try_call(
+            let (return_type, error) = match descr_get.try_call(
                 db,
                 env,
                 &CallArguments::positional([ty, instance_ty, owner]),
             ) {
-                Ok(bindings) => {
-                    let return_type = if descr_get.definedness == Definedness::AlwaysDefined {
-                        bindings.return_type(db, env)
-                    } else {
-                        UnionType::from_two_elements(db, env, bindings.return_type(db, env), ty)
-                    };
-                    (return_type, None)
-                }
-                Err(error) => {
-                    let return_type = if descr_get.definedness == Definedness::AlwaysDefined {
-                        error.return_type(db, env)
-                    } else {
-                        UnionType::from_two_elements(db, env, error.return_type(db, env), ty)
-                    };
-                    let error = Some(DescriptorGetCallContext::new(db, ty, instance, owner));
-                    (return_type, error)
-                }
+                Ok(bindings) => (bindings.return_type(db, env), None),
+                Err(error) => (
+                    error.return_type(db, env),
+                    Some(DescriptorGetCallContext::new(
+                        db, ty, descr_get, instance, owner,
+                    )),
+                ),
+            };
+            let return_type = if descr_get_boundness == Definedness::AlwaysDefined {
+                return_type
+            } else {
+                UnionType::from_two_elements(db, env, return_type, ty)
             };
 
             Some(DescriptorGetResult {

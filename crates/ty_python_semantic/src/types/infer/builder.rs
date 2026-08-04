@@ -10260,7 +10260,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
-    /// Infers an attribute load using a previously inferred receiver type.
+    /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load_impl(
         &mut self,
         attribute: &ast::ExprAttribute,
@@ -10323,7 +10323,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && (assigned_type.is_none() || context.descriptor_type(db).is_data_descriptor(db, env))
             && let Some(failure) = context.into_error(db, env)
         {
-            report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);
+            report_bad_dunder_get_call(
+                &self.context,
+                &failure,
+                value_type,
+                context.descriptor_type(db),
+                attribute,
+            );
         }
         let fallback_place = fallback.member.map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)

@@ -2,8 +2,8 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArguments, CallDunderError, ClassBase, ClassLiteral, DescriptorGetCallError, GenericAlias,
-    KnownClass, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
+    StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -1742,14 +1742,15 @@ pub(super) fn report_invalid_attribute_assignment(
 /// Reports an invalid implicit call to a descriptor's `__get__` method.
 pub(super) fn report_bad_dunder_get_call<'db>(
     context: &InferContext<'db, '_>,
-    failure: &DescriptorGetCallError<'db>,
+    failure: &CallError<'db>,
     object_type: Type<'db>,
+    descriptor_type: Type<'db>,
     target: &ast::ExprAttribute,
 ) {
     let db = context.db();
     let env = &context.program_environment();
     let attribute = target.attr.as_str();
-    if let Some(property) = failure.error.as_attempt_to_get_property_with_no_getter() {
+    if let Some(property) = failure.as_attempt_to_get_property_with_no_getter() {
         let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
             return;
         };
@@ -1775,7 +1776,7 @@ pub(super) fn report_bad_dunder_get_call<'db>(
             ));
         }
     } else {
-        failure.error.report_diagnostics_with_override(
+        failure.report_diagnostics_with_override(
             context,
             target.into(),
             &CallDiagnosticOverride {
@@ -1786,7 +1787,7 @@ pub(super) fn report_bad_dunder_get_call<'db>(
                 ),
                 info: &format!(
                     "This access implicitly calls `__get__` on a descriptor of type `{}`",
-                    failure.descriptor_type.display(db, env),
+                    descriptor_type.display(db, env),
                 ),
                 argument_ranges: &[target.range(), target.value.range(), target.value.range()],
             },
