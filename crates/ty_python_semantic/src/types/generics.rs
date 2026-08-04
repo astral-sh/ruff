@@ -2384,6 +2384,15 @@ impl<'db> TypeVarInference<'db> {
             returns(copy),
             cycle_initial=|db, _, inference: TypeVarInference<'db>| {
                 inference.generic_context(db).unknown_specialization(db, None)
+            },
+            cycle_fn=|db, cycle: &salsa::Cycle, previous: &Specialization<'db>, current: Specialization<'db>, inference: TypeVarInference<'db>| {
+                if cycle.iteration() <= crate::TAINTED_CYCLES {
+                    current
+                } else {
+                    current
+                        .merge_cycle_recovery(db, *previous)
+                        .unwrap_or_else(|| inference.generic_context(db).unknown_specialization(db, None))
+                }
             }
         )]
         fn specialization_inner<'db>(
