@@ -150,7 +150,8 @@ function RunOutput({
       className={classNames(
         "m-2",
         "text-sm",
-        "whitespace-pre",
+        "whitespace-pre-wrap",
+        "break-all",
         theme === "dark" ? "text-white" : null,
       )}
     >
