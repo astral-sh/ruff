@@ -15,9 +15,8 @@ use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictOpenness, TypedDictSchema, collect_guaranteed_keyword_keys,
-    extract_unpacked_typed_dict_from_value_type, functional_typed_dict_field,
-    infer_unpacked_keyword_types, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
-    validate_typed_dict_dict_literal,
+    functional_typed_dict_field, infer_unpacked_keyword_types, typed_dict_with_relaxed_keys,
+    validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
     ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
@@ -593,10 +592,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 self.try_expression_type(&keyword.value)
-                    .and_then(|ty| extract_unpacked_typed_dict_from_value_type(db, env, ty))
+                    .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
                     .is_some_and(|unpacked| {
-                        unpacked.keys.iter().all(|(name, field)| {
-                            field.is_required && permits_field_inference(name.as_str())
+                        unpacked.items(db).iter().all(|(name, field)| {
+                            field.is_required() && permits_field_inference(name.as_str())
                         })
                     })
             })
