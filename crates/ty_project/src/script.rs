@@ -180,10 +180,10 @@ pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<Scrip
         return None;
     }
 
-    let tag = ScriptTag::parse(source.as_bytes())?;
-    let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), false);
+    let (content, source_map) = ScriptTag::parse(source.as_bytes())?.into_metadata_and_source_map();
+    let _guard = ValueSourceGuard::with_source_map(ValueSource::ScriptMetadata(file), source_map);
     // FIXME: Report invalid TOML in script metadata instead of silently ignoring it.
-    let mut metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+    let mut metadata: ScriptMetadata = toml::from_str(&content).ok()?;
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
         options.prioritize_all_selectors();
