@@ -1313,6 +1313,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         variable: GradualVariableId,
     ) -> Option<ConstraintSet<'db, 'c>> {
         let env = self.env;
+        // Distributing across a type without type variables cannot improve inference.
+        if !target.has_typevar(db, env) {
+            return Some(self.constrain_gradual_source(db, variable, range, target));
+        }
+
         // Expand unions and intersections in the target type before choosing a materialization for
         // the gradual type.
         if target.materialize_once(db, env).is_none() {
@@ -1386,6 +1391,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         variable: GradualVariableId,
     ) -> Option<ConstraintSet<'db, 'c>> {
         let env = self.env;
+        // Distributing across a type without type variables cannot improve inference.
+        if !source.has_typevar(db, env) {
+            return Some(self.constrain_gradual_target(db, source, range, variable));
+        }
+
         // Expand unions and intersections in the source type before choosing a materialization for
         // the gradual type.
         if source.materialize_once(db, env).is_none() {
@@ -1904,6 +1914,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        let mut was_computed = false;
         let constraints = self
             .relation_visitor
             .try_visit(
@@ -1915,10 +1926,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.typevar_evaluation,
                     self.gradual_evaluation,
                 ),
-                work,
+                || {
+                    was_computed = true;
+                    work()
+                },
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1));
-        if self.is_lazy_gradual_assignability() {
+        // Newly computed constraints already have fresh gradual identities.
+        if !was_computed && self.is_lazy_gradual_assignability() {
             constraints.freshen_gradual_variables(db, self.env, self.constraints)
         } else {
             constraints

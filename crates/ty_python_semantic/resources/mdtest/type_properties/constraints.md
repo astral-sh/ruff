@@ -1220,18 +1220,23 @@ def _[T]() -> None:
     static_assert((gradual | (other & ~other)) == gradual)
 ```
 
-Distributing one gradual occurrence reuses its hidden variable. Separate occurrences use distinct
-variables, so the constraint set cannot derive transitive facts by assuming that they materialize to
-the same type.
+A target without type variables is preserved as one gradual constraint. Distributing over a union
+that contains a type variable reuses the same hidden gradual variable; separate gradual occurrences
+use distinct hidden variables instead.
 
 ```py
 from typing import Any
 from ty_extensions._internal import is_constraint_set_assignable_to
 
-distributed = is_constraint_set_assignable_to(Any, int | str)
+union_constraint = is_constraint_set_assignable_to(Any, int | str)
 
-# revealed: ConstraintSet[((gradual@0 ≤ int) ∧ ¬(gradual@0 ≤ str)) ∨ (gradual@0 ≤ Never) ∨ (gradual@0 ≤ str)]
-reveal_type(distributed.with_detailed_display())
+# revealed: ConstraintSet[(gradual@0 ≤ int | str)]
+reveal_type(union_constraint.with_detailed_display())
+
+def _[T]() -> None:
+    distributed = is_constraint_set_assignable_to(Any, T | int)
+    # revealed: ConstraintSet[((Any ≤ T@_) ∧ ?(gradual@0 ≤ int)) ∨ (gradual@0 ≤ int)]
+    reveal_type(distributed.with_detailed_display())
 
 first = is_constraint_set_assignable_to(Any, int)
 second = is_constraint_set_assignable_to(Any, str)
