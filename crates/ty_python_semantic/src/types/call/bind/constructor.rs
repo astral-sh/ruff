@@ -372,7 +372,7 @@ impl<'db> ConstructorBinding<'db> {
         let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
             let Some(overload) = binding
                 .first_matching_overload()
-                .or_else(|| binding.callable().best_failing_overload())
+                .or_else(|| binding.callable().unambiguous_failing_overload())
             else {
                 return;
             };

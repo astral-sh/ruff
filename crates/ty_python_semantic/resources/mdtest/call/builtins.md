@@ -495,3 +495,61 @@ def _(xs: Unknown | list[str]):
     tokens: list[Unknown | str] = []
     tokens.extend(escaped)
 ```
+
+## Failed `map` calls retain their result type
+
+When the argument count identifies a single `map` overload, an incompatible callback still produces
+its usual error. The mapped values retain the callback's return type and do not produce an
+additional error when called.
+
+```py
+class Function:
+    def __init__(self, value: str) -> None: ...
+    def __call__(self) -> None: ...
+
+# error: [invalid-argument-type]
+for function in map(Function, [object()]):
+    function()
+```
+
+## Failed `dict` calls do not expose internal type variables
+
+Several `dict` overloads accept one positional argument. When none matches, an arbitrarily selected
+overload must not make an otherwise compatible return type fail.
+
+```py
+from collections.abc import Mapping
+
+def copy(value: object) -> dict[str, str]:
+    if isinstance(value, Mapping):
+        return dict(value)  # error: [no-matching-overload]
+    return {}
+```
+
+## Failed `dict` calls preserve narrowed mapping types
+
+An invalid `dict` call must not invalidate an assignment inside a branch where the original value
+has already been narrowed to a mapping.
+
+```py
+from collections.abc import Mapping
+
+def clean(value: dict[str, int] | str | None) -> None:
+    if isinstance(value, Mapping):
+        value = dict(value)  # error: [no-matching-overload]
+        for key, item in value.items():
+            value[key] = item
+```
+
+## Failed inner `OrderedDict` calls do not invalidate outer constructors
+
+Constructing an `OrderedDict` from a list containing both strings and floats is already rejected.
+That failure must not cause a second error when the resulting value is passed to another
+`OrderedDict` constructor.
+
+```py
+from collections import OrderedDict
+
+items = [OrderedDict([["key", 1.0]])]  # error: [no-matching-overload]
+OrderedDict(zip(["name"], items))
+```
