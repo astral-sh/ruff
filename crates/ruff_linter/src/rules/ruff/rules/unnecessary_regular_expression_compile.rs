@@ -231,7 +231,10 @@ pub(crate) fn unnecessary_regular_expression_compile_binding(checker: &Checker, 
     let Expr::Attribute(ExprAttribute { attr, .. }) = attribute else {
         return;
     };
-    let Some(Expr::Call(call)) = semantic.parent_expression(attribute_id) else {
+    let Some(call_id) = semantic.parent_expression_id(attribute_id) else {
+        return;
+    };
+    let Some(Expr::Call(call)) = semantic.expression(call_id) else {
         return;
     };
     // Guard against the attribute being an argument rather than the callee, e.g. `f(pattern.match)`.
