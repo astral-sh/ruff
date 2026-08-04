@@ -1203,6 +1203,8 @@ static_assert(gradual == gradual)
 static_assert(gradual != ConstraintSet.always())
 static_assert(gradual != ConstraintSet.never())
 static_assert(gradual.satisfies(gradual))
+static_assert(not gradual.satisfies(ConstraintSet.never()))
+static_assert(not ConstraintSet.always().satisfies(gradual))
 static_assert((gradual | ConstraintSet.never()) == gradual)
 static_assert((ConstraintSet.never() | gradual) == gradual)
 static_assert((gradual & ConstraintSet.always()) == gradual)
@@ -1216,6 +1218,7 @@ static_assert(is_constraint_set_assignable_to(bool, Any | int) == ConstraintSet.
 
 def _[T]() -> None:
     other = ConstraintSet.range(int, T, object)
+    static_assert(gradual.satisfies(other) == other)
     static_assert((gradual | other) != other)
     static_assert((other | gradual) != other)
     static_assert((gradual & other) != other)

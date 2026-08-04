@@ -541,6 +541,22 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .is_gradually_satisfied(db, env, &mut storage, self.source_order)
     }
 
+    pub(super) fn for_all_gradual(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        let negated = self.negate(db, builder);
+        let mut storage = builder.storage.borrow_mut();
+        let (node, source_order) =
+            negated
+                .node
+                .abstract_gradual(db, env, &mut storage, negated.source_order);
+        let node = node.negate(&mut storage);
+        Self::from_node(builder, node, source_order)
+    }
+
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
@@ -3118,18 +3134,16 @@ impl NodeId {
         }
     }
 
-    /// Returns whether this constraint set holds under some materialization of its gradual types.
-    fn is_gradually_satisfied<'db>(
+    fn abstract_gradual<'db>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> bool {
+    ) -> (Self, Option<SourceOrderId>) {
         let Node::Interior(interior) = self.node() else {
-            return self == ALWAYS_TRUE;
+            return (self, source_order);
         };
-        // Abstract opaque gradual decisions before checking the Boolean result.
         let (node, derived_source_order) =
             interior.abstract_inner(db, env, storage, source_order, |storage, constraint| {
                 matches!(
@@ -3138,6 +3152,18 @@ impl NodeId {
                 )
             });
         let source_order = storage.ordered_source_order(source_order, derived_source_order);
+        (node, source_order)
+    }
+
+    /// Returns whether this constraint set holds under some materialization of its gradual types.
+    fn is_gradually_satisfied<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+    ) -> bool {
+        let (node, source_order) = self.abstract_gradual(db, env, storage, source_order);
         node.is_always_satisfied(db, env, storage, source_order)
     }
 

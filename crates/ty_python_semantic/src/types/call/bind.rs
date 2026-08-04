@@ -2900,8 +2900,13 @@ impl<'db> Bindings<'db> {
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
                             let lhs = constraints.load(db, env, tracked.constraints(db));
-                            let rhs = constraints.load(db, env, other.constraints(db));
+                            let rhs = if tracked == *other {
+                                lhs
+                            } else {
+                                constraints.load(db, env, other.constraints(db))
+                            };
                             lhs.implies(db, constraints, rhs)
+                                .for_all_gradual(db, env, constraints)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
