@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
@@ -35,17 +36,20 @@ pub(crate) enum Argument<'a> {
     Keywords,
 }
 
+/// Known fields from unpacked dictionary literals, indexed by their call argument.
+type ExactKeywordItems<'db> = FxHashMap<usize, Box<[(Name, Type<'db>)]>>;
+
 /// Arguments for a single call, in source order, along with inferred types for each argument.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     items: Vec<CallArgument<'a, 'db>>,
+    exact_keyword_items: Option<Box<ExactKeywordItems<'db>>>,
 }
 
 #[derive(Clone, Debug)]
 struct CallArgument<'a, 'db> {
     argument: Argument<'a>,
     types: CallArgumentTypes<'db>,
-    exact_keyword_items: Option<Box<[(Name, Type<'db>)]>>,
 }
 
 /// Inferred types for a given argument.
@@ -119,6 +123,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
+            exact_keyword_items: None,
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
@@ -142,7 +147,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             call_arguments.items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
-                exact_keyword_items: None,
             });
         }
 
@@ -157,7 +161,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
     ) -> Self {
-        arguments
+        let mut call_arguments: Self = arguments
             .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
@@ -179,7 +183,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             })
-            .collect()
+            .collect();
+        call_arguments.infer_exact_keyword_items(arguments, infer_argument_type);
+        call_arguments
     }
 
     /// Create a [`CallArguments`] with no arguments.
@@ -209,20 +215,58 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index).map(|item| &item.types)
     }
 
-    /// Records the known keys and individual value types of an unpacked dictionary literal.
-    pub(crate) fn set_exact_keyword_items(
+    /// Records known fields from dictionary literals unpacked into this call.
+    ///
+    /// Both type checking and IDE queries use these fields to resolve calls such as
+    /// `function(**{"value": 1, "label": "x"})` without merging the value types.
+    pub(crate) fn infer_exact_keyword_items(
         &mut self,
-        index: usize,
-        items: Box<[(Name, Type<'db>)]>,
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
     ) {
-        if let Some(argument) = self.items.get_mut(index) {
-            argument.exact_keyword_items = Some(items);
+        for (index, argument) in arguments.iter_source_order().enumerate() {
+            let Some(keyword) = argument.as_variadic() else {
+                continue;
+            };
+            let Some(dict) = keyword.value.as_dict_expr() else {
+                continue;
+            };
+            let Some(items) = dict
+                .items
+                .iter()
+                .rev()
+                .map(|item| {
+                    let key = item.key.as_ref()?.as_string_literal_expr()?;
+                    Some((Name::new(key.value.to_str()), &item.value))
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let Some(mut items) = items
+                .into_iter()
+                .unique_by(|(name, _)| name.clone())
+                .map(|(name, value)| {
+                    (!any_over_expr(value, ast::Expr::is_lambda_expr))
+                        .then(|| (name, infer_argument_type(value)))
+                })
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            items.reverse();
+            self.exact_keyword_items
+                .get_or_insert_default()
+                .insert(index, items.into_boxed_slice());
         }
     }
 
     /// Returns the exact fields of a `**{...}` argument when every key is a string literal.
     pub(crate) fn exact_keyword_items(&self, index: usize) -> Option<&[(Name, Type<'db>)]> {
-        self.items.get(index)?.exact_keyword_items.as_deref()
+        self.exact_keyword_items
+            .as_ref()?
+            .get(&index)
+            .map(Box::as_ref)
     }
 
     pub(crate) fn insert_type(
@@ -266,10 +310,20 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             items.push(CallArgument {
                 argument: Argument::Synthetic,
                 types: CallArgumentTypes::new(bound_self),
-                exact_keyword_items: None,
             });
             items.extend(self.items.iter().cloned());
-            Cow::Owned(CallArguments { items })
+            let exact_keyword_items = self.exact_keyword_items.as_ref().map(|exact_items| {
+                Box::new(
+                    exact_items
+                        .iter()
+                        .map(|(index, items)| (index + 1, items.clone()))
+                        .collect(),
+                )
+            });
+            Cow::Owned(CallArguments {
+                items,
+                exact_keyword_items,
+            })
         } else {
             Cow::Borrowed(self)
         }
@@ -283,8 +337,20 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Create a new [`CallArguments`] starting from the specified index.
     fn start_from(&self, index: usize) -> Self {
+        let exact_keyword_items = self.exact_keyword_items.as_ref().and_then(|exact_items| {
+            let items = exact_items
+                .iter()
+                .filter_map(|(argument_index, items)| {
+                    argument_index
+                        .checked_sub(index)
+                        .map(|argument_index| (argument_index, items.clone()))
+                })
+                .collect::<FxHashMap<_, _>>();
+            (!items.is_empty()).then_some(Box::new(items))
+        });
         Self {
             items: self.items[index..].to_vec(),
+            exact_keyword_items,
         }
     }
 
@@ -299,11 +365,24 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
     /// ```
     pub(crate) fn select(&self, indices: &[usize]) -> Self {
+        let exact_keyword_items = self.exact_keyword_items.as_ref().and_then(|exact_items| {
+            let items = indices
+                .iter()
+                .enumerate()
+                .filter_map(|(selected_index, argument_index)| {
+                    exact_items
+                        .get(argument_index)
+                        .map(|items| (selected_index, items.clone()))
+                })
+                .collect::<FxHashMap<_, _>>();
+            (!items.is_empty()).then_some(Box::new(items))
+        });
         Self {
             items: indices
                 .iter()
                 .map(|index| self.items[*index].clone())
                 .collect(),
+            exact_keyword_items,
         }
     }
 
@@ -590,11 +669,13 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
-                exact_keyword_items: None,
             });
         }
 
-        Self { items }
+        Self {
+            items,
+            exact_keyword_items: None,
+        }
     }
 }
 

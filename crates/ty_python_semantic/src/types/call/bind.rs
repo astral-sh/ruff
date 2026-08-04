@@ -5049,7 +5049,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_index: usize,
         argument_type: Option<Type<'db>>,
     ) {
-        if let Some(items) = self.arguments.exact_keyword_items(argument_index) {
+        if self.parameters.as_paramspec_with_prefix().is_none()
+            && let Some(items) = self.arguments.exact_keyword_items(argument_index)
+        {
             for (name, value_ty) in items.iter().cloned() {
                 let _ = self.match_keyword(
                     argument_index,

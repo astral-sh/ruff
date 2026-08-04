@@ -8497,39 +8497,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty
             });
 
-        for (argument_index, argument) in arguments.iter_source_order().enumerate() {
-            let Some(keyword) = argument.as_variadic() else {
-                continue;
-            };
-            let Some(dict) = keyword.value.as_dict_expr() else {
-                continue;
-            };
-            let Some(mut items) = dict
-                .items
-                .iter()
-                .map(|item| {
-                    if matches!(&item.value, ast::Expr::Lambda(_)) {
-                        return None;
-                    }
-                    let key = item.key.as_ref()?.as_string_literal_expr()?;
-                    Some((
-                        Name::new(key.value.to_str()),
-                        self.expression_type(&item.value),
-                    ))
-                })
-                .collect::<Option<Vec<_>>>()
-            else {
-                continue;
-            };
-
-            items.reverse();
-            let mut items = items
-                .into_iter()
-                .unique_by(|(name, _)| name.clone())
-                .collect_vec();
-            items.reverse();
-            call_arguments.set_exact_keyword_items(argument_index, items.into_boxed_slice());
-        }
+        call_arguments.infer_exact_keyword_items(arguments, |value| self.expression_type(value));
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {

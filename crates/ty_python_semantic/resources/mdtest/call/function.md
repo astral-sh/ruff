@@ -1408,6 +1408,36 @@ Separate unpacked dictionary literals also retain their own keys and value types
 reveal_type(value_and_label(**{"value": 1}, **{"label": "x"}))  # revealed: Literal[1]
 ```
 
+The same key information is preserved when a method receives its implicit `self` argument.
+
+```py
+class Reader:
+    def value_and_label[T](self, *, value: T, label: str) -> T:
+        return value
+
+reveal_type(Reader().value_and_label(**{"value": 1, "label": "x"}))  # revealed: Literal[1]
+```
+
+### Dictionary literals forwarded through a ParamSpec
+
+Forwarding an unpacked dictionary literal preserves the wrapped callable's distinct parameter types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+def target(value: int, *, other: str) -> None: ...
+def forward[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    callback(*args, **kwargs)
+
+forward(target, **{"value": 1, "other": "x"})
+forward(target, **{"value": "invalid", "other": "x"})  # error: [invalid-argument-type]
+```
+
 ### Keyword-only parameters
 
 ```py

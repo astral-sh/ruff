@@ -3656,10 +3656,43 @@ Later entries in the same dictionary literal replace earlier values for the same
 reveal_type(Pair(**{"first": "overwritten", "first": 1, "second": "x"}))  # revealed: Pair[int]
 ```
 
+An overwritten callback cannot affect the final field value or its inferred type.
+
+```py
+reveal_type(Pair(**{"first": lambda value: value.upper(), "first": 1, "second": "x"}))  # revealed: Pair[int]
+```
+
 The expected specialization still supplies context to mutable container fields.
 
 ```py
 literal_box: ListBox[Literal[1]] = ListBox(**{"value": [1]})
+```
+
+An expected specialization wrapped in a union also preserves the field's context.
+
+```py
+optional_literal_box: ListBox[Literal[1]] | None = ListBox(**{"value": [1]})
+
+type OptionalListBox[T] = ListBox[T] | None
+
+aliased_literal_box: OptionalListBox[Literal[1]] = ListBox(**{"value": [1]})
+```
+
+Multiple possible specializations do not discard the contextual literal type.
+
+```py
+literal_choices: ListBox[Literal[1]] | ListBox[Literal[2]] = ListBox(**{"value": [1]})
+```
+
+A wider expected specialization remains valid when the dictionary value is mutable.
+
+```py
+class Animal: ...
+class Dog(Animal): ...
+class Cat(Animal): ...
+
+optional_animal_box: ListBox[Animal] | None = ListBox(**{"value": [Dog()]})
+animal_choices: ListBox[Animal] | ListBox[Cat] = ListBox(**{"value": [Dog()]})
 ```
 
 A context-sensitive callback remains gradual until unpacked values can receive field-specific
@@ -3672,6 +3705,17 @@ class CallbackBox[T](TypedDict):
 
 # TODO: Infer `CallbackBox[int]` and report the invalid attribute access.
 reveal_type(CallbackBox(**{"value": 1, "callback": lambda value: value.upper()}))  # revealed: CallbackBox[Unknown]
+```
+
+Wrapping a callback in another expression does not make it safe to infer without context.
+
+```py
+def unpack_conditional_callback(flag: bool):
+    callback = CallbackBox(**{
+        "value": 1,
+        "callback": (lambda value: value.upper()) if flag else (lambda value: 0),
+    })
+    reveal_type(callback)  # revealed: CallbackBox[Unknown]
 ```
 
 ### Constructor inference from unpacked TypedDicts
