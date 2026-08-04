@@ -382,7 +382,7 @@ Summary.
     }
 
     #[test]
-    fn preserve_inline_roles_in_prose() {
+    fn renders_inline_roles_in_prose() {
         let _snap = bind_markdown_snapshot_filters();
         let docstring = "\
 This is a function description.
@@ -394,7 +394,7 @@ This is a function description.
 
         assert_snapshot!(rendered, @"
         This is a function description.<HB>
-        :class:`Foo` instances can be passed here.
+        `Foo` instances can be passed here.
 
         ## Parameters
         **value**<HB>

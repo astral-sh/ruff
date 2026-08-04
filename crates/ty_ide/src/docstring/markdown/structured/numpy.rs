@@ -211,6 +211,23 @@ beta : float
     }
 
     #[test]
+    fn renders_sphinx_cross_reference_in_parameter_description() {
+        let _snap = bind_markdown_snapshot_filters();
+        let docstring = "\
+Parameters
+----------
+widget : object
+    Wrap with :class:`~package.module.Widget`, if needed.
+";
+
+        assert_snapshot!(render_numpy(docstring), @"
+        ## Parameters
+        **widget**: `object`<HB>
+        Wrap with `Widget`, if needed.
+        ");
+    }
+
+    #[test]
     fn renders_shifted_top_level_sections() {
         let _snap = bind_markdown_snapshot_filters();
         let docstring = "\

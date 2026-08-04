@@ -4,10 +4,12 @@
 //! The following forms are unsupported and are passed through this rendered
 //! without modification:
 //!
-//! - Sphinx roles such as `:ref:`, because they depend on Sphinx context
 //! - Relative targets, because a standalone docstring has no document base
 //! - Named references, because they require collecting and resolving target
 //!   definitions across the entire docstring
+//!
+//! Explicit Sphinx roles are rendered as inline code using their display label,
+//! but are not resolved as hyperlinks because that requires Sphinx context.
 //!
 //! The set of links we've chosen to support was informed by a point-in-time
 //! review of 475 direct links that appeared in a sample of popular public
@@ -51,7 +53,9 @@ use std::borrow::Cow;
 
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::docstring::document::syntax::BacktickScanner;
+use crate::docstring::document::syntax::{BacktickScanner, InlineMarkupScanner, InlineMarkupToken};
+
+use super::super::rest_role_display_label;
 
 /// Exposes an interface for rendering a line of prose that may contain a hyperlink.
 #[derive(Default)]
@@ -535,6 +539,33 @@ fn render_markdown_link(output: &mut String, label: Option<&str>, uri: &str) {
 ///
 /// Inline code is assumed not to span lines.
 fn render_inline_text(output: &mut String, text: &str) {
+    let mut source_offset = 0;
+    let mut rendered_end = 0;
+
+    for token in InlineMarkupScanner::new(text) {
+        match token {
+            InlineMarkupToken::Text(text) => {
+                source_offset += text.len();
+            }
+            InlineMarkupToken::Code(span) => {
+                source_offset = span.end().to_usize();
+            }
+            InlineMarkupToken::RestPrefixRole { name, span } => {
+                render_inline_text_without_roles(output, &text[rendered_end..source_offset]);
+                output.push('`');
+                output.push_str(rest_role_display_label(name, span.content()));
+                output.push('`');
+
+                source_offset = span.end().to_usize();
+                rendered_end = source_offset;
+            }
+        }
+    }
+
+    render_inline_text_without_roles(output, &text[rendered_end..]);
+}
+
+fn render_inline_text_without_roles(output: &mut String, text: &str) {
     let mut in_inline_code = false;
     let mut first_chunk = true;
     let mut opening_tick_count = 0;
@@ -867,6 +898,32 @@ localization
             ("``C:\\`` and __dunder__", r"``C:\`` and \_\_dunder\_\_"),
             ("This is `unclosed", "This is `unclosed"),
             (r"\` literal `__dunder__", r"\` literal `\_\_dunder\_\_"),
+        ]);
+    }
+
+    #[test]
+    fn renders_sphinx_cross_references() {
+        assert_rendered(&[
+            (
+                "Remove the last item using :py:meth:`~list.pop`.",
+                "Remove the last item using `pop`.",
+            ),
+            (
+                "Wrap with :class:`~package.module.Widget`, if needed.",
+                "Wrap with `Widget`, if needed.",
+            ),
+            (
+                "Use :py:func:`~package.prepare`, then :py:meth:`~list.pop`.",
+                "Use `prepare`, then `pop`.",
+            ),
+            (
+                "Accept files ending in `.py`; `~value` is treated literally.",
+                "Accept files ending in `.py`; `~value` is treated literally.",
+            ),
+            (
+                "See :py:class:`package.Widget` and :py:class:`Widget <package.Widget>`.",
+                "See `package.Widget` and `Widget`.",
+            ),
         ]);
     }
 
