@@ -2978,6 +2978,97 @@ def _(p: Person) -> None:
     type(p).name  # error: [unresolved-attribute] "Class `dict[str, object]` has no attribute `name`"
 ```
 
+## Copying a `TypedDict` union after key membership narrowing
+
+A key membership check may add a synthesized, required-key `TypedDict` to each member of an open
+`TypedDict` union. Copying the resulting intersections must remain efficient and preserve the
+ordinary dictionary value type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from _typeshed import SupportsKeysAndGetItem
+from typing import Any, Literal, NotRequired, TypedDict
+
+T0 = TypedDict("T0", {"kind": Literal[0], "field0": NotRequired[int]})
+T1 = TypedDict("T1", {"kind": Literal[1], "field1": NotRequired[int]})
+T2 = TypedDict("T2", {"kind": Literal[2], "field2": NotRequired[int]})
+T3 = TypedDict("T3", {"kind": Literal[3], "field3": NotRequired[int]})
+T4 = TypedDict("T4", {"kind": Literal[4], "field4": NotRequired[int]})
+T5 = TypedDict("T5", {"kind": Literal[5], "field5": NotRequired[int]})
+T6 = TypedDict("T6", {"kind": Literal[6], "field6": NotRequired[int]})
+T7 = TypedDict("T7", {"kind": Literal[7], "field7": NotRequired[int]})
+T8 = TypedDict("T8", {"kind": Literal[8], "field8": NotRequired[int]})
+T9 = TypedDict("T9", {"kind": Literal[9], "field9": NotRequired[int]})
+T10 = TypedDict("T10", {"kind": Literal[10], "field10": NotRequired[int]})
+T11 = TypedDict("T11", {"kind": Literal[11], "field11": NotRequired[int]})
+
+Item = T0 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11
+```
+
+Copying after the membership test preserves the mapping's ordinary key and value types:
+
+```py
+def copy_after_key_membership(item: Item) -> None:
+    if "missing" in item:
+        reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+An `isinstance` check before the membership test must preserve the same result:
+
+```py
+def copy_after_isinstance_and_key_membership(item: Item | str) -> None:
+    if isinstance(item, dict) and "missing" in item:
+        reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+A regular string-keyed dictionary can appear alongside the `TypedDict` union:
+
+```py
+def copy_mixed_union_after_key_membership(item: Item | dict[str, Any]) -> None:
+    if "missing" in item:
+        reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+The same behavior holds when both narrowing operations apply to the mixed union:
+
+```py
+def copy_mixed_union_after_isinstance_and_key_membership(item: Item | dict[str, Any] | str) -> None:
+    if isinstance(item, dict) and "missing" in item:
+        reveal_type(dict(item))  # revealed: dict[str, object]
+```
+
+User-defined functions accepting the same mapping protocol infer precise key and value types:
+
+```py
+def infer_mapping[Key, Value](value: SupportsKeysAndGetItem[Key, Value]) -> tuple[Key, Value]:
+    raise NotImplementedError
+
+def infer_mapping_after_key_membership(item: Item) -> None:
+    if "missing" in item:
+        reveal_type(infer_mapping(item))  # revealed: tuple[str, object]
+```
+
+Explicitly typed extra items must retain their value type even after a key membership check:
+
+```py
+from typing_extensions import TypedDict as ExtensionsTypedDict
+
+class FirstWithAnyExtraItems(ExtensionsTypedDict, extra_items=Any):
+    missing: NotRequired[Any]
+
+class SecondWithAnyExtraItems(ExtensionsTypedDict, extra_items=Any):
+    missing: NotRequired[Any]
+
+def preserve_any_extra_items(value: FirstWithAnyExtraItems | SecondWithAnyExtraItems) -> None:
+    reveal_type(dict(value))  # revealed: dict[str, Any]
+    if "missing" in value:
+        reveal_type(dict(value))  # revealed: dict[str, Any]
+```
+
 ## Special properties
 
 ### Python 3.12

@@ -3051,6 +3051,23 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 })
         }
 
+        // A successful key-membership test adds a synthesized protocol to non-`TypedDict`
+        // union members. Its sole `__contains__` requirement does not change the key or value
+        // constraints of a mapping in the same intersection.
+        fn is_key_membership_protocol<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            let Type::ProtocolInstance(protocol) = ty.resolve_type_alias(db) else {
+                return false;
+            };
+            if protocol.class_origin(db).is_some() {
+                return false;
+            }
+            let mut members = protocol.interface(db).members(db);
+            members
+                .next()
+                .is_some_and(|member| member.name() == "__contains__")
+                && members.next().is_none()
+        }
+
         fn collect_typed_dicts<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -3116,6 +3133,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         && intersection.iter_positive(db).all(|element| {
                             let element = element.resolve_type_alias(db);
                             is_string_keyed_mapping(db, env, element)
+                                || is_key_membership_protocol(db, element)
                                 || element
                                     == KnownClass::Dict
                                         .to_instance_unknown(db, env)
@@ -3144,6 +3162,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut typed_dicts = FxHashSet::default();
         let mut other_types = FxOrderSet::default();
         let env = self.env;
+        let is_keys_and_get_item_protocol = matches!(formal, Type::ProtocolInstance(protocol)
+        if protocol.class_origin(db).is_some_and(|class| {
+            class.is_known(db, KnownClass::SupportsKeysAndGetItem)
+        }));
 
         if !actual.elements(db).iter().all(|element| {
             collect_typed_dicts(
@@ -3163,12 +3185,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
         // Other protocols can observe key-specific or gradual evidence that the shared mapping
         // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
-        if !other_types.is_empty()
-            && !matches!(formal, Type::ProtocolInstance(protocol)
-            if protocol.class_origin(db).is_some_and(|class| {
-                class.is_known(db, KnownClass::SupportsKeysAndGetItem)
-            }))
-        {
+        if !other_types.is_empty() && !is_keys_and_get_item_protocol {
             return None;
         }
 
@@ -3179,22 +3196,54 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mapping = KnownClass::Mapping.to_specialized_instance(db, env, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(db, env, formal);
         let mapping_when = self.constraints.load(db, env, &mapping_when);
-        // Logically equivalent constraints can still infer different solutions, such as `Any`
-        // instead of `object`; preserve the original constraints when gradual evidence differs.
-        let mapping_solutions = mapping_when.solutions(db, env, self.constraints, self.inferable);
-        if !typed_dicts.into_iter().all(|element| {
-            let element_when = self.constraints.load(
-                db,
-                env,
-                &element.when_constraint_set_assignable_to_owned(db, env, formal),
-            );
-            element_when
-                .iff(db, self.constraints, mapping_when)
-                .is_always_satisfied(db, env)
-                && element_when.solutions(db, env, self.constraints, self.inferable)
-                    == mapping_solutions
-        }) {
-            return None;
+
+        // An implicitly open `TypedDict` can contain arbitrary hidden values, so its mapping value
+        // type is always `object`, even when membership narrowing adds a required-key schema.
+        // `SupportsKeysAndGetItem` only observes those mapping constraints; other protocols and
+        // `TypedDict`s with closed or explicitly typed extra items still need the full comparison.
+        let share_open_typed_dict_constraints = is_keys_and_get_item_protocol
+            && typed_dicts
+                .iter()
+                .all(|element| match element.resolve_type_alias(db) {
+                    Type::TypedDict(typed_dict) => typed_dict.openness(db).is_implicitly_open(),
+                    Type::Intersection(intersection) => {
+                        intersection.iter_positive(db).all(|positive| {
+                            let positive = positive.resolve_type_alias(db);
+                            match positive {
+                                Type::TypedDict(typed_dict) => {
+                                    typed_dict.openness(db).is_implicitly_open()
+                                }
+                                _ => {
+                                    positive
+                                        == KnownClass::Dict
+                                            .to_instance_unknown(db, env)
+                                            .top_materialization(db, env)
+                                }
+                            }
+                        })
+                    }
+                    _ => false,
+                });
+
+        if !share_open_typed_dict_constraints {
+            // Logically equivalent constraints can still infer different solutions, such as `Any`
+            // instead of `object`; preserve the original constraints when gradual evidence differs.
+            let mapping_solutions =
+                mapping_when.solutions(db, env, self.constraints, self.inferable);
+            if !typed_dicts.into_iter().all(|element| {
+                let element_when = self.constraints.load(
+                    db,
+                    env,
+                    &element.when_constraint_set_assignable_to_owned(db, env, formal),
+                );
+                element_when
+                    .iff(db, self.constraints, mapping_when)
+                    .is_always_satisfied(db, env)
+                    && element_when.solutions(db, env, self.constraints, self.inferable)
+                        == mapping_solutions
+            }) {
+                return None;
+            }
         }
 
         // Reuse one constraint for all equivalent TypedDicts, but retain each mapping arm's
