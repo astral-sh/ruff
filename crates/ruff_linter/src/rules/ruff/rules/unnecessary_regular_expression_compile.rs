@@ -136,6 +136,13 @@ pub(crate) fn unnecessary_regular_expression_compile_binding(checker: &Checker, 
         return;
     }
 
+    // `a = b = re.compile(...)` binds the pattern to other names too, so it is reused.
+    if let Some(Stmt::Assign(assign)) = binding.statement(semantic)
+        && assign.targets.len() != 1
+    {
+        return;
+    }
+
     let Some(Expr::Call(compile)) = find_binding_value(binding, semantic) else {
         return;
     };
@@ -172,24 +179,40 @@ pub(crate) fn unnecessary_regular_expression_compile_binding(checker: &Checker, 
 
     // The assignment must dominate the use; otherwise a conditional binding may be unbound at the
     // use site, e.g. `if cond: pattern = re.compile(...)` then `pattern.match(...)`.
-    let dominates = binding.range().start() < use_range.start()
-        && binding
-            .source
-            .and_then(|source| semantic.parent_statement(source))
-            .is_some_and(|block| block.range().contains_range(use_range));
-    if !dominates {
+    let Some(source) = binding.source else {
+        return;
+    };
+    if binding.range().start() >= use_range.start() || !semantic.dominates(source, node_id) {
         return;
     }
 
-    // A single textual read inside a loop that excludes the assignment still reuses the pattern.
-    // The loop's `else` branch runs at most once, so it does not count (mirrors `in_loop_context`).
-    let mut statements = semantic.statements(node_id);
-    let mut child = statements.next();
-    for parent in statements {
+    // Loop bodies are not branches, so dominance misses an assignment inside a loop that excludes
+    // the use: with zero iterations the name would be unbound at the use site.
+    for parent in semantic.statements(source) {
         match parent {
-            Stmt::For(StmtFor { orelse, .. }) | Stmt::While(StmtWhile { orelse, .. })
+            Stmt::For(_) | Stmt::While(_) if !parent.range().contains_range(use_range) => {
+                return;
+            }
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => break,
+            _ => {}
+        }
+    }
+
+    // A single textual read inside a loop that excludes the assignment still reuses the pattern.
+    // A `while` test runs once per iteration, but a `for` iterable and a loop's `else` branch are
+    // evaluated only once, so they do not count.
+    let mut child: Option<&Stmt> = None;
+    for parent in semantic.statements(node_id) {
+        match parent {
+            Stmt::While(StmtWhile { orelse, .. })
                 if !parent.range().contains_range(binding.range())
                     && child.is_none_or(|child| !orelse.contains(child)) =>
+            {
+                return;
+            }
+            Stmt::For(StmtFor { body, .. })
+                if !parent.range().contains_range(binding.range())
+                    && child.is_some_and(|child| body.contains(child)) =>
             {
                 return;
             }
@@ -231,8 +254,17 @@ pub(crate) fn unnecessary_regular_expression_compile_binding(checker: &Checker, 
 /// `search`, `match`, `fullmatch`, `findall`, and `finditer` accept optional `pos`/`endpos`
 /// arguments that the top-level functions do not (their trailing argument is `flags`), so they only
 /// reduce when called with the single `string` argument. The parameters of `sub`, `subn`, and
-/// `split` are a positional prefix of the top-level functions', so any argument shape reduces.
+/// `split` are a positional prefix of the top-level functions', so any explicit argument shape
+/// reduces; unpacked (`*`/`**`) arguments have an unknown shape and never reduce.
 fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str> {
+    if arguments.args.iter().any(Expr::is_starred_expr)
+        || arguments
+            .keywords
+            .iter()
+            .any(|keyword| keyword.arg.is_none())
+    {
+        return None;
+    }
     let only_string_argument = arguments.args.len() == 1 && arguments.keywords.is_empty();
     Some(match attr {
         "search" if only_string_argument => "search",

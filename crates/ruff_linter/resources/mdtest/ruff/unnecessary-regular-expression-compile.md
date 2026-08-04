@@ -79,6 +79,21 @@ re.compile(r"a").sub("b", "world", 1)  # error: [unnecessary-regular-expression-
 re.compile(r"\s").split("world", 1)  # error: [unnecessary-regular-expression-compile]
 ```
 
+An unpacked (`*`/`**`) argument can expand into any number of real arguments, including ones the
+top-level functions reject, so it is never flagged:
+
+```py
+import re
+
+
+def starred(args):
+    re.compile(r"a").search(*args)
+
+
+def double_starred(kwargs):
+    re.compile(r"a").sub(**kwargs)
+```
+
 ## Bound form
 
 A compiled pattern stored in a local variable that is assigned once and read exactly once is also
@@ -119,6 +134,17 @@ def reused(s, t):
     pattern = re.compile("a")
     pattern.match(s)
     return pattern.match(t)
+```
+
+An assignment with multiple targets binds the pattern to other names too, so it counts as reuse:
+
+```py
+import re
+
+
+def multiple_targets(s):
+    a = b = re.compile("a")
+    return a.match(s)
 ```
 
 The single use must be a `re.Pattern` method call. Returning the pattern, or passing the bound
@@ -171,6 +197,30 @@ def used_in_while(s):
         s = s[1:]
 ```
 
+A `while` test is also evaluated once per iteration:
+
+```py
+import re
+
+
+def used_in_while_test(s):
+    pattern = re.compile("a")
+    while pattern.match(s):
+        s = s[1:]
+```
+
+A `for` iterable, by contrast, is evaluated only once, so it is still a single use:
+
+```py
+import re
+
+
+def used_in_for_iter(s):
+    pattern = re.compile("a")
+    for match in pattern.finditer(s):  # error: [unnecessary-regular-expression-compile]
+        print(match)
+```
+
 When the assignment shares the loop with its use, the pattern is compiled and used once per
 iteration, so it is still flagged. A use in the loop's `else` branch also runs at most once:
 
@@ -216,6 +266,38 @@ def maybe_unbound(condition, value):
     if condition:
         pattern = re.compile("a")
     return pattern.match(value)
+```
+
+The same applies when the use sits in a branch that the assignment does not dominate, or after a
+loop that may run zero times:
+
+```py
+import re
+
+
+def use_in_else_branch(condition, value):
+    if condition:
+        pattern = re.compile("a")
+    else:
+        return pattern.match(value)
+
+
+def assigned_in_loop_used_after(strings, value):
+    for s in strings:
+        pattern = re.compile(s)
+    return pattern.match(value)
+```
+
+An assignment that dominates a use deeper in the same branch is still flagged:
+
+```py
+import re
+
+
+def use_in_nested_branch(condition, value):
+    pattern = re.compile("a")
+    if condition:
+        return pattern.match(value)  # error: [unnecessary-regular-expression-compile]
 ```
 
 A `re.compile()` whose arguments have side effects is not flagged, since the top-level `re`
