@@ -3947,6 +3947,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            (formal @ Type::TypedDict(_), actual @ Type::TypedDict(_)) => {
+                let when = actual.when_constraint_set_assignable_to(
+                    db,
+                    self.env,
+                    formal,
+                    self.constraints,
+                );
+                self.infer_from_constraint_set(when)?;
+                return Ok(());
+            }
+
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.

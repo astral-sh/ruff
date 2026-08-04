@@ -3624,11 +3624,10 @@ class ListBox[T](TypedDict):
 reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
 ```
 
-Positional dictionary literals are validated but do not yet infer type arguments.
+An exact positional dictionary literal contributes its individual field values to inference.
 
 ```py
-# TODO: Infer `ListBox[int]`.
-reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[Unknown]
+reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[int]
 ```
 
 ### Constructor inference from unpacked dictionary literals
@@ -3855,6 +3854,87 @@ def unpack(source: IntSource | StrSource):
     reveal_type(Box(**source))  # revealed: Box[Unknown]
 ```
 
+### Constructor inference from positional dictionary literals
+
+Different values in a positional dictionary literal can constrain the same type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Pair[T](TypedDict):
+    first: T
+    second: T
+
+reveal_type(Pair({"first": 1, "second": "x"}))  # revealed: Pair[int | str]
+```
+
+A missing required field retains its existing constructor diagnostic.
+
+```py
+Pair({"first": 1})  # error: [missing-typed-dict-key]
+```
+
+### Generic function inference from TypedDict literals
+
+A dictionary literal passed to a generic `TypedDict` parameter constrains the function's type
+argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+def get_value[T](box: Box[T]) -> T:
+    return box["value"]
+
+reveal_type(get_value({"value": 1}))  # revealed: int
+```
+
+A partially specialized parameter keeps its existing concrete type argument.
+
+```py
+class PartiallySpecialized[A, B](TypedDict):
+    fixed: A
+    inferred: B
+
+def get_inferred[T](value: PartiallySpecialized[object, T]) -> T:
+    return value["inferred"]
+
+reveal_type(get_inferred({"fixed": 1, "inferred": "x"}))  # revealed: str
+```
+
+### Constructor inference from positional callable signatures
+
+A callable field can infer a `ParamSpec` from a positional dictionary literal.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class CallbackBox[**P](TypedDict):
+    callback: Callable[P, None]
+
+def accepts_int(value: int) -> None: ...
+
+callback_box = CallbackBox({"callback": accepts_int})
+callback_box["callback"]("invalid")  # error: [invalid-argument-type]
+```
+
 ### Constructor inference from recursive fields
 
 Recursive construction remains valid even though the outer constructor cannot yet infer its type
@@ -3989,11 +4069,20 @@ class LiteralBound[T: Literal[1]](TypedDict):
     value: T
 
 reveal_type(LiteralBound(value=1))  # revealed: LiteralBound[Literal[1]]
+reveal_type(LiteralBound({"value": 1}))  # revealed: LiteralBound[Literal[1]]
 
 class IntBound[T: int](TypedDict):
     value: T
 
 reveal_type(IntBound(value=1))  # revealed: IntBound[int]
+reveal_type(IntBound({"value": 1}))  # revealed: IntBound[int]
+
+IntBound({"value": "invalid"})  # error: [invalid-argument-type]
+
+class Constrained[T: (int, str)](TypedDict):
+    value: T
+
+reveal_type(Constrained({"value": True}))  # revealed: Constrained[int]
 ```
 
 ### Constructor inference with callable parameters
@@ -4034,6 +4123,7 @@ class Box[T](TypedDict):
     value: T
 
 literal: Box[Literal[1]] = Box(value=1)
+positional_literal: Box[Literal[1]] = Box({"value": 1})
 ```
 
 A wider expected type is also respected because a mutable `TypedDict` is invariant.
@@ -4043,6 +4133,7 @@ class Animal: ...
 class Dog(Animal): ...
 
 animal: Box[Animal] = Box(value=Dog())
+positional_animal: Box[Animal] = Box({"value": Dog()})
 ```
 
 ### Constructor inference with read-only fields
@@ -4073,6 +4164,15 @@ A read-only field also preserves a literal when the inferred value is used with 
 ```py
 literal_box = Box(value=1)
 literal: Box[Literal[1]] = literal_box
+```
+
+Read-only positional fields remain gradual until positional inference can preserve covariance.
+
+```py
+positional_literal_box = Box({"value": 1})
+# TODO: Infer `Box[Literal[1]]`.
+reveal_type(positional_literal_box)  # revealed: Box[Unknown]
+positional_literal: Box[Literal[1]] = positional_literal_box
 ```
 
 A legacy type variable is invariant by default, so assigning `LegacyBox[Dog]` to `LegacyBox[Animal]`
@@ -4141,6 +4241,10 @@ class Box[T](TypedDict, extra_items=T): ...
 box = Box(value=1)
 reveal_type(box)  # revealed: Box[int]
 box["value"] = "invalid"  # error: [invalid-assignment]
+
+positional = Box({"value": 1})
+reveal_type(positional)  # revealed: Box[int]
+positional["value"] = "invalid"  # error: [invalid-assignment]
 ```
 
 A nested generic extra item should constrain its enclosing `TypedDict` without rejecting the inner
@@ -4174,6 +4278,7 @@ class Box[T](TypedDict):
     callback: Callable[[T], int]
 
 Box(value=1, callback=lambda x: x.upper())  # error: [unresolved-attribute]
+Box({"value": 1, "callback": lambda x: x.upper()})  # error: [unresolved-attribute]
 ```
 
 ### Constructor inference with a contextual callable
