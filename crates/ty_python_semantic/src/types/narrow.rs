@@ -47,12 +47,115 @@ use super::variance::TypeVarVariance;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
-use rustc_hash::FxHashMap;
+use ruff_text_size::TextRange;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 mod containment;
 
 use self::containment::{elements_of, narrow_string_membership};
+
+/// A call to the builtin `hasattr` function that can be used for narrowing.
+pub(crate) struct HasAttrCall {
+    pub(crate) target: PlaceExpr,
+    pub(crate) attribute: Name,
+}
+
+impl HasAttrCall {
+    fn try_from_call_with_inference<'db>(
+        db: &'db dyn Db,
+        expr_call: &ast::ExprCall,
+        inference: &ExpressionInference<'db>,
+    ) -> Option<Self> {
+        if !expr_call.arguments.keywords.is_empty() {
+            return None;
+        }
+
+        let [target, attribute] = &*expr_call.arguments.args else {
+            return None;
+        };
+        let target = PlaceExpr::try_from_expr(target)?;
+        let Type::FunctionLiteral(function) = inference.expression_type(&*expr_call.func) else {
+            return None;
+        };
+        if function.known(db) != Some(KnownFunction::HasAttr) {
+            return None;
+        }
+
+        let attribute = inference
+            .expression_type(attribute)
+            .as_string_literal()?
+            .value(db);
+        is_identifier(attribute).then(|| Self {
+            target,
+            attribute: Name::new(attribute),
+        })
+    }
+
+    pub(crate) fn find_range_in_boolean_predicate<'db>(
+        db: &'db dyn Db,
+        expression: Expression<'db>,
+        expression_node: &ast::Expr,
+        is_positive: bool,
+        target: &PlaceExpr,
+        attribute: &Name,
+    ) -> Option<TextRange> {
+        let inference = infer_expression_types(db, expression, TypeContext::default());
+        Self::find_range_in_boolean_predicate_with_inference(
+            db,
+            expression_node,
+            is_positive,
+            target,
+            attribute,
+            inference,
+        )
+    }
+
+    fn find_range_in_boolean_predicate_with_inference<'db>(
+        db: &'db dyn Db,
+        expression_node: &ast::Expr,
+        is_positive: bool,
+        target: &PlaceExpr,
+        attribute: &Name,
+        inference: &ExpressionInference<'db>,
+    ) -> Option<TextRange> {
+        match expression_node {
+            ast::Expr::Call(call) if is_positive => {
+                let hasattr = Self::try_from_call_with_inference(db, call, inference)?;
+                (hasattr.target == *target && hasattr.attribute == *attribute).then_some(call.range)
+            }
+            ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not => {
+                Self::find_range_in_boolean_predicate_with_inference(
+                    db,
+                    &unary.operand,
+                    !is_positive,
+                    target,
+                    attribute,
+                    inference,
+                )
+            }
+            ast::Expr::BoolOp(boolean) => boolean.values.iter().find_map(|value| {
+                Self::find_range_in_boolean_predicate_with_inference(
+                    db,
+                    value,
+                    is_positive,
+                    target,
+                    attribute,
+                    inference,
+                )
+            }),
+            ast::Expr::Named(named) => Self::find_range_in_boolean_predicate_with_inference(
+                db,
+                &named.value,
+                is_positive,
+                target,
+                attribute,
+                inference,
+            ),
+            _ => None,
+        }
+    }
+}
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
@@ -3843,26 +3946,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(db)?;
-                let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
-                    let attr = inference
-                        .expression_type(second_arg)
-                        .as_string_literal()?
-                        .value(db);
-
-                    if !is_identifier(attr) {
-                        return None;
-                    }
+                    let call = HasAttrCall::try_from_call_with_inference(db, expr_call, inference)?;
+                    let place = self.expect_place(&call.target);
 
                     // Since `hasattr` only checks if an attribute is readable,
                     // the type of the protocol member should be a read-only property that returns `object`.
                     let constraint = Type::protocol_with_readonly_members(
                         db,
                         &self.env,
-                        [(attr, Type::object())],
+                        [(call.attribute.as_str(), Type::object())],
                     );
 
                     return Some(NarrowingConstraints::from_iter([(
@@ -3875,6 +3970,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     )]));
                 }
 
+                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let place = self.expect_place(&first_arg);
                 let function = function.into_classinfo_constraint_function()?;
 
                 let class_info_ty = inference.expression_type(second_arg);
@@ -4830,6 +4927,14 @@ pub(crate) trait NarrowingEvaluatorExtension<'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db>;
+
+    /// Finds an atomic predicate referenced by this evaluator's constraint graph.
+    ///
+    /// The returned predicate is not necessarily required on every path through the graph.
+    fn find_atomic_predicate(
+        &self,
+        predicate: impl FnMut(Predicate<'db>) -> bool,
+    ) -> Option<Predicate<'db>>;
 }
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
@@ -4849,5 +4954,29 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
             base_type,
             place,
         )
+    }
+
+    fn find_atomic_predicate(
+        &self,
+        mut predicate: impl FnMut(Predicate<'db>) -> bool,
+    ) -> Option<Predicate<'db>> {
+        let mut pending = vec![self.constraint()];
+        let mut visited = FxHashSet::default();
+
+        while let Some(constraint) = pending.pop() {
+            if constraint.is_terminal() || !visited.insert(constraint) {
+                continue;
+            }
+
+            let node = self.narrowing_constraints().get_interior_node(constraint);
+            let candidate = self.predicates()[node.atom];
+            if predicate(candidate) {
+                return Some(candidate);
+            }
+
+            pending.extend([node.if_true, node.if_uncertain, node.if_false]);
+        }
+
+        None
     }
 }

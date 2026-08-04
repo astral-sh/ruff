@@ -1,5 +1,7 @@
 # Narrowing using `hasattr()`
 
+## Basic narrowing
+
 The builtin function `hasattr()` can be used to narrow nominal and structural types. This is
 accomplished using an intersection with a synthesized protocol:
 
@@ -97,4 +99,129 @@ def f(x: object):
 
         # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
+```
+
+## Attribute types introduced by subclasses
+
+An attribute check cannot eliminate a non-final union member because a subclass could define the
+checked attribute with an unrelated type. The diagnostic explains why the checked attribute's type
+is less precise than the type declared on the other union member:
+
+```py
+class Note: ...
+
+class Editor:
+    note: Note | None
+
+class WebView: ...
+
+class EditorWebView:
+    editor: Editor | None
+
+def f(webview: WebView | EditorWebView) -> None:
+    if hasattr(webview, "editor") and webview.editor:
+        webview.editor.note  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `~AlwaysFalsy` has no attribute `note`
+  --> src/mdtest_snippet.py:13:9
+   |
+12 |     if hasattr(webview, "editor") and webview.editor:
+   |        -------------------------- This check also matches subclasses of `WebView` that define `editor` with an unrelated type
+13 |         webview.editor.note  # snapshot: unresolved-attribute
+   |         ^^^^^^^^^^^^^^^^^^^
+help: If `WebView` should not be subclassed, decorate it with `@final`
+```
+
+## The diagnostic is independent of names and condition shape
+
+The same explanation is emitted for unrelated classes and attributes when the attribute check and
+the truthiness check occur in nested conditions:
+
+```py
+class Payload:
+    identifier: str
+
+class Extensible: ...
+
+class WithPayload:
+    payload: Payload | None
+
+def f(value: Extensible | WithPayload) -> None:
+    if hasattr(value, "payload"):
+        if value.payload:
+            value.payload.identifier  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `~AlwaysFalsy` has no attribute `identifier`
+  --> src/mdtest_snippet.py:12:13
+   |
+10 |     if hasattr(value, "payload"):
+   |        ------------------------- This check also matches subclasses of `Extensible` that define `payload` with an unrelated type
+11 |         if value.payload:
+12 |             value.payload.identifier  # snapshot: unresolved-attribute
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+help: If `Extensible` should not be subclassed, decorate it with `@final`
+```
+
+When more than one union member could acquire the checked attribute in a subclass, the diagnostic
+lists every class that contributes to the imprecise attribute type:
+
+```py
+class AlsoExtensible: ...
+
+def g(value: Extensible | AlsoExtensible | WithPayload) -> None:
+    if hasattr(value, "payload"):
+        if value.payload:
+            value.payload.identifier  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `~AlwaysFalsy` has no attribute `identifier`
+  --> src/mdtest_snippet.py:18:13
+   |
+16 |     if hasattr(value, "payload"):
+   |        ------------------------- This check also matches subclasses of `Extensible` and `AlsoExtensible` that define `payload` with an unrelated type
+17 |         if value.payload:
+18 |             value.payload.identifier  # snapshot: unresolved-attribute
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+help: If `Extensible` and `AlsoExtensible` should not be subclassed, decorate all of them with `@final`
+```
+
+## A nested `hasattr` call that does not control the branch
+
+A `hasattr` call that is merely an argument to another predicate is not the source of narrowing and
+does not receive an explanatory annotation:
+
+```py
+from typing import Protocol
+from typing_extensions import TypeIs
+
+class Payload:
+    identifier: str
+
+class Extensible: ...
+
+class WithPayload:
+    payload: Payload | None
+
+class HasPayload(Protocol):
+    payload: object
+
+def is_payload(value: object, ignored: bool) -> TypeIs[HasPayload]:
+    return True
+
+def f(value: Extensible | WithPayload) -> None:
+    if is_payload(value, hasattr(value, "payload")) and value.payload:
+        value.payload.identifier  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Object of type `~AlwaysFalsy` has no attribute `identifier`
+  --> src/mdtest_snippet.py:20:9
+   |
+20 |         value.payload.identifier  # snapshot: unresolved-attribute
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^
 ```

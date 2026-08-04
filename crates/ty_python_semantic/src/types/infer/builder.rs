@@ -95,8 +95,7 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
-use crate::types::narrow::NarrowingEvaluatorExtension;
-use crate::types::narrow::pattern_success_types;
+use crate::types::narrow::{HasAttrCall, NarrowingEvaluatorExtension, pattern_success_types};
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
@@ -134,12 +133,12 @@ use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
-use ty_python_core::predicate::PatternPredicate;
+use ty_python_core::predicate::{PatternPredicate, PredicateNode};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
-    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
-    unpack::UnpackPosition,
+    ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, NarrowingEvaluator,
+    SemanticIndex, Truthiness, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -367,6 +366,13 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
+}
+
+/// Why a synthesized `hasattr` member made a downstream attribute less precise.
+struct HasAttrNarrowingCause<'db> {
+    predicate_range: TextRange,
+    extensible_classes: SmallVec<[ClassLiteral<'db>; 2]>,
+    attribute: Name,
 }
 
 fn transparent_callable_decorator_result<'db>(
@@ -10247,6 +10253,189 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn positive_hasattr_predicate_in_constraint(
+        &self,
+        evaluator: &NarrowingEvaluator<'_, 'db>,
+        target: &PlaceExpr,
+        attribute: &Name,
+    ) -> Option<TextRange> {
+        let mut predicate_range = None;
+        evaluator.find_atomic_predicate(|predicate| {
+            if let PredicateNode::Expression(expression) = predicate.node {
+                let expression_node = expression.node_ref(self.db()).node(self.module());
+                predicate_range = HasAttrCall::find_range_in_boolean_predicate(
+                    self.db(),
+                    expression,
+                    expression_node,
+                    predicate.is_positive,
+                    target,
+                    attribute,
+                );
+                predicate_range.is_some()
+            } else {
+                false
+            }
+        });
+        predicate_range
+    }
+
+    fn positive_hasattr_predicate(
+        &self,
+        target: &PlaceExpr,
+        attribute: &Name,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Option<TextRange> {
+        for (enclosing_scope_file_id, constraint_key) in constraint_keys {
+            let use_def = self.index.use_def_map(*enclosing_scope_file_id);
+            match use_def.applicable_constraints(
+                *constraint_key,
+                *enclosing_scope_file_id,
+                PlaceExprRef::from(target),
+                self.index,
+            ) {
+                ApplicableConstraints::UnboundBinding(evaluator) => {
+                    if let Some(predicate_range) =
+                        self.positive_hasattr_predicate_in_constraint(&evaluator, target, attribute)
+                    {
+                        return Some(predicate_range);
+                    }
+                }
+                ApplicableConstraints::ConstrainedBindings(bindings) => {
+                    for binding in bindings {
+                        if let Some(predicate_range) = self
+                            .positive_hasattr_predicate_in_constraint(
+                                &binding.narrowing_constraint,
+                                target,
+                                attribute,
+                            )
+                        {
+                            return Some(predicate_range);
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn non_final_class_missing_attribute(
+        &self,
+        ty: Type<'db>,
+        attribute: &Name,
+    ) -> Option<ClassLiteral<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let nominal = match ty {
+            Type::NominalInstance(nominal) => nominal,
+            Type::Intersection(intersection) => {
+                return intersection.iter_positive(db).find_map(|positive| {
+                    self.non_final_class_missing_attribute(positive, attribute)
+                });
+            }
+            _ => return None,
+        };
+        let class = nominal.class(db, env).class_literal(db);
+
+        (!class.is_final(db)
+            && Type::NominalInstance(nominal)
+                .member(db, env, attribute)
+                .place
+                .is_undefined())
+        .then_some(class)
+    }
+
+    fn narrowed_member_type(
+        &self,
+        owner: Type<'db>,
+        attribute: &Name,
+        place: &PlaceExpr,
+        constraint_keys: &[(FileScopeId, ConstraintKey)],
+    ) -> Option<Type<'db>> {
+        let member = owner
+            .member(self.db(), self.program_environment(), attribute)
+            .place
+            .raw_type()?;
+        Some(self.narrow_place_with_applicable_constraints(
+            PlaceExprRef::from(place),
+            member,
+            constraint_keys,
+        ))
+    }
+
+    fn hasattr_narrowing_cause(
+        &self,
+        receiver: &ast::Expr,
+        missing_attribute: &Name,
+    ) -> Option<HasAttrNarrowingCause<'db>> {
+        let ast::Expr::Attribute(checked_attribute) = receiver else {
+            return None;
+        };
+
+        let target = PlaceExpr::try_from_expr(&*checked_attribute.value)?;
+        let (target_place, target_constraint_keys) = self.infer_place_load(
+            PlaceExprRef::from(&target),
+            ast::ExprRef::from(&*checked_attribute.value),
+        );
+        let target_type = target_place.place.raw_type()?;
+
+        let checked_place = PlaceExpr::try_from_expr(receiver)?;
+        let (_, checked_constraint_keys) = self.infer_place_load(
+            PlaceExprRef::from(&checked_place),
+            ast::ExprRef::Attribute(checked_attribute),
+        );
+
+        let db = self.db();
+        let env = self.program_environment();
+        let checked_name = &checked_attribute.attr.id;
+        let union = target_type.as_union_like(db)?;
+        let protocol = Type::protocol_with_readonly_members(
+            db,
+            env,
+            [(checked_name.as_str(), Type::object())],
+        );
+        if !target_type.is_subtype_of(db, env, protocol) {
+            return None;
+        }
+
+        let mut extensible_classes = SmallVec::new();
+        let mut has_compatible_member = false;
+        for element in union.elements(db) {
+            let Some(member_type) = self.narrowed_member_type(
+                *element,
+                checked_name,
+                &checked_place,
+                &checked_constraint_keys,
+            ) else {
+                continue;
+            };
+            let downstream_member_exists = !member_type
+                .member(db, env, missing_attribute)
+                .place
+                .is_undefined();
+
+            if let Some(class) = self.non_final_class_missing_attribute(*element, checked_name) {
+                if !downstream_member_exists && !extensible_classes.contains(&class) {
+                    extensible_classes.push(class);
+                }
+            } else if downstream_member_exists {
+                has_compatible_member = true;
+            }
+        }
+
+        if extensible_classes.is_empty() || !has_compatible_member {
+            return None;
+        }
+        let predicate_range =
+            self.positive_hasattr_predicate(&target, checked_name, &target_constraint_keys)?;
+
+        Some(HasAttrNarrowingCause {
+            predicate_range,
+            extensible_classes,
+            attribute: checked_name.clone(),
+        })
+    }
+
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let value_type =
@@ -10455,6 +10644,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             value_type.display(db, env),
                         )),
                     };
+
+                    if let Some(cause) = self.hasattr_narrowing_cause(value, attr_name) {
+                        let class_names = if let [class] = &*cause.extensible_classes {
+                            format!("`{}`", class.name(db))
+                        } else {
+                            format_enumeration(
+                                cause
+                                    .extensible_classes
+                                    .iter()
+                                    .map(|class| class.name(db)),
+                            )
+                        };
+                        diagnostic.annotate(self.context.secondary(cause.predicate_range).message(
+                            format_args!(
+                                "This check also matches subclasses of {class_names} that define \
+                                `{attribute}` with an unrelated type",
+                                attribute = cause.attribute,
+                            ),
+                        ));
+                        if cause.extensible_classes.iter().all(|class| {
+                            matches!(class, ClassLiteral::Static(_)) && class.known(db).is_none()
+                        })
+                        {
+                            diagnostic.help(format_args!(
+                                "If {class_names} should not be subclassed, decorate {pronoun} with \
+                                `@final`",
+                                pronoun = if cause.extensible_classes.len() == 1 {
+                                    "it"
+                                } else {
+                                    "all of them"
+                                }
+                            ));
+                        }
+                    }
 
                     if value_type.is_callable_type()
                         && KnownClass::FunctionType
