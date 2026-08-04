@@ -1,3 +1,5 @@
+use crate::Program;
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -29,10 +31,13 @@ use crate::scope::{FileScopeId, ScopeId};
 /// * an argument of a cross-module query
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Unpack<'db> {
-    pub file: File,
+    #[returns(copy)]
+    pub python_file: PythonFile<'db>,
 
+    #[returns(copy)]
     pub(crate) value_file_scope: FileScopeId,
 
+    #[returns(copy)]
     pub(crate) target_file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
@@ -44,6 +49,7 @@ pub struct Unpack<'db> {
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
+    #[returns(copy)]
     pub value: UnpackValue<'db>,
 }
 
@@ -51,13 +57,22 @@ pub struct Unpack<'db> {
 impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.python_file(db).file(db)
+    }
+
     pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self._target(db).node(parsed)
     }
 
     /// Returns the scope where the unpack target expression belongs to.
     pub fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.target_file_scope(db).to_scope_id(db, self.file(db))
+        self.target_file_scope(db)
+            .to_scope_id(db, self.python_file(db))
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program {
+        self.target_scope(db).program(db)
     }
 
     /// Returns the range of the unpack target expression.
@@ -67,7 +82,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct UnpackValue<'db> {
     /// The kind of unpack expression
     kind: UnpackKind,
@@ -76,7 +91,7 @@ pub struct UnpackValue<'db> {
 }
 
 impl<'db> UnpackValue<'db> {
-    pub fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
+    pub(crate) fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
         Self { kind, expression }
     }
 
@@ -99,7 +114,7 @@ impl<'db> UnpackValue<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable { mode: EvaluationMode },
@@ -110,7 +125,7 @@ pub enum UnpackKind {
 }
 
 /// The position of the target element in an unpacking.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum UnpackPosition {
     /// The target element is in the first position of the unpacking.
     First,

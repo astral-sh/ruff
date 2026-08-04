@@ -12,7 +12,9 @@
 
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
-use ruff_db::files::File;
+use rayon::prelude::*;
+use ruff_db::PythonFile;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -20,9 +22,19 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
-use ty_python_core::definition::{Definition, DefinitionState};
-use ty_python_core::scope::ScopeKind;
-use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
+use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
+use ty_python_semantic::{
+    ImportAliasResolution, ResolvedDefinition, SemanticModel, contains_identifier,
+};
+
+/// Salsa snapshots coordinate clone and drop through shared state. For cached files that don't
+/// contain the target, that coordination can cost more than the file scan and scales poorly when
+/// many short-lived jobs finish concurrently. A 64-file minimum on large projects amortizes the
+/// task and snapshot overhead. Smaller projects lower the minimum to retain enough work for
+/// stealing.
+const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 64;
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,10 +87,11 @@ impl ReferencesMode {
 /// Search for references across all files in the project.
 pub(crate) fn references(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
+    let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target.definitions(&model, mode.to_import_alias_resolution())?;
     let is_externally_visible_symbol =
@@ -105,53 +118,41 @@ pub(crate) fn references(
     let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
 
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
-        let result = std::sync::Mutex::new(Vec::new());
         let files = db.project().files(db);
-
-        {
-            let db = Db::dyn_clone(db);
-            let target_definitions = &target_definitions;
-            let files = &files;
-            let result = &result;
-            let needle = target_text.as_ref();
-
-            rayon::scope(move |s| {
-                for other_file in files {
-                    // Skip the current file as we already processed it
-                    if other_file == file {
-                        continue;
-                    }
-
-                    let db = Db::dyn_clone(&*db);
-
-                    s.spawn(move |_| {
-                        let db = &*db;
-
-                        // First do a simple text search to see if there is a potential match in the file
-                        let source = ruff_db::source::source_text(db, other_file);
-                        if !contains_identifier(&source, needle) {
-                            return;
-                        }
-
-                        // If the target text is found, do the more expensive semantic analysis
-                        let references = if is_externally_visible_symbol {
-                            references_for_file(db, other_file, target_definitions, needle, mode)
-                        } else {
-                            references_for_keyword_arguments_in_file(
-                                db,
-                                other_file,
-                                target_definitions,
-                                needle,
-                                mode,
-                            )
-                        };
-
-                        result.lock().unwrap().extend(references);
-                    });
+        let python_version = file.python_version(db);
+        let files: Vec<_> = files
+            .iter()
+            .copied()
+            .filter(|other| *other != source_file)
+            .collect();
+        let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
+        let other_references = files
+            .into_par_iter()
+            .with_min_len(minimum_job_len)
+            .map_with_db(db, |db, other_file| {
+                let source = ruff_db::source::source_text(db, other_file);
+                if !contains_identifier(&source, &target_text) {
+                    return Vec::new();
                 }
-            });
-        }
-        references.extend(result.into_inner().unwrap());
+
+                let other_file = PythonFile::new(db, other_file, python_version);
+
+                if is_externally_visible_symbol {
+                    references_for_file(db, other_file, &target_definitions, &target_text, mode)
+                } else {
+                    references_for_keyword_arguments_in_file(
+                        db,
+                        other_file,
+                        &target_definitions,
+                        &target_text,
+                        mode,
+                    )
+                }
+            })
+            .flat_map_iter(|references| references)
+            .collect::<Vec<_>>();
+
+        references.extend(other_references);
     }
 
     if references.is_empty() {
@@ -163,7 +164,7 @@ pub(crate) fn references(
 
 fn references_for_keyword_arguments_in_file(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
@@ -175,7 +176,7 @@ fn references_for_keyword_arguments_in_file(
         "keyword-label cross-file scan should not run in DocumentHighlights mode"
     );
 
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, file);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
@@ -195,46 +196,41 @@ fn references_for_keyword_arguments_in_file(
     references
 }
 
-/// Cheap text prefilter for identifier references before AST/semantic validation.
-///
-/// Heuristically matches an ASCII approximation of `\b{name}\b`.
-pub(crate) fn contains_identifier(source: &str, name: &str) -> bool {
-    if name.is_empty() {
-        return false;
+/// Returns whether `node` assigns `value` to the sole target `__slots__`, e.g.
+/// `__slots__ = (...)` or `__slots__: tuple = (...)`.
+fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
+    match node {
+        AnyNodeRef::StmtAssign(assign) => {
+            assign.value.range() == value.range()
+                && matches!(
+                    assign.targets.as_slice(),
+                    [ast::Expr::Name(name)] if name.id.as_str() == "__slots__"
+                )
+        }
+        AnyNodeRef::StmtAnnAssign(assign) => {
+            assign
+                .value
+                .as_deref()
+                .is_some_and(|assigned| assigned.range() == value.range())
+                && matches!(
+                    assign.target.as_ref(),
+                    ast::Expr::Name(name) if name.id.as_str() == "__slots__"
+                )
+        }
+        _ => false,
     }
-
-    let bytes = source.as_bytes();
-    let needle = name.as_bytes();
-
-    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
-        let after = pos + needle.len();
-
-        // Skip this entry if it is within an identifier. E.g. skip
-        // this entry when searching for `x` and this is a match
-        // within `exclude = 10`
-        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
-        let boundary_after = bytes
-            .get(after)
-            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
-
-        boundary_before && boundary_after
-    })
-}
-
-fn is_ascii_identifier_continue(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 /// Find all references to a local symbol within the current file.
 /// The behavior depends on the provided mode.
 fn references_for_file(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, file);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
@@ -262,10 +258,16 @@ pub(crate) fn has_any_external_visible_definitions(
     definitions.iter().any(|definition| match definition {
         ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
             ScopeKind::Module | ScopeKind::Class => true,
+            ScopeKind::Comprehension => {
+                matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
+                    && definition.place(db).as_symbol().is_some_and(|symbol_id| {
+                        ty_python_core::semantic_index(db, definition.python_file(db))
+                            .symbol_resolves_to_global_scope(symbol_id, definition.file_scope(db))
+                    })
+            }
             ScopeKind::TypeParams
             | ScopeKind::Function
             | ScopeKind::Lambda
-            | ScopeKind::Comprehension
             | ScopeKind::TypeAlias => false,
         },
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
@@ -287,11 +289,13 @@ fn parameter_owner_is_externally_visible(
 
 fn parameter_owner_is_externally_visible_for_target(
     db: &dyn Db,
-    definition: &ResolvedDefinition,
+    resolved: &ResolvedDefinition,
 ) -> bool {
-    let target = definition.focus_range(db);
-    let file = target.file();
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let Some(definition) = resolved.definition() else {
+        return false;
+    };
+    let parsed = parsed_module(db, definition.python_file(db));
+    let target = definition.focus_range(db, &parsed.load(db));
     let module = parsed.load(db);
 
     let covering = covering_node(module.syntax().into(), target.range());
@@ -452,6 +456,11 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 self.check_declaration_identifier(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) => {
+                // A string literal listed in a class's `__slots__` names an
+                // instance attribute, so renaming that attribute should rename
+                // the matching slot string too.
+                self.check_slots_string_literal(string_expr);
+
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
@@ -589,6 +598,164 @@ impl<'a> LocalReferencesFinder<'a> {
         self.references.push(target);
     }
 
+    /// Checks a string literal that may be an entry in a class's `__slots__`.
+    ///
+    /// `__slots__` entries are plain strings, but they name instance
+    /// attributes of the enclosing class. When the rename target is one of
+    /// those attributes, the matching slot string should be renamed as well.
+    /// We only do this when the attribute belongs to the same class that
+    /// declares the `__slots__`, so unrelated classes that happen to use the
+    /// same slot name are left untouched.
+    fn check_slots_string_literal(&mut self, string_expr: &'a ast::ExprStringLiteral) {
+        // Quick text-based check first. We only handle single-part string
+        // literals; implicitly concatenated strings ("a" "b") can't name a
+        // single attribute, so they never match an identifier here.
+        if string_expr.value.is_implicit_concatenated() {
+            return;
+        }
+        let [part] = string_expr.value.as_slice() else {
+            return;
+        };
+        if part.value.as_ref() != self.target_text {
+            return;
+        }
+
+        // The literal must sit directly inside a tuple/list/set container, or
+        // be a key in a dict, that is the value of a `__slots__` assignment in
+        // a class body.
+        let Some(class) = self.enclosing_slots_class() else {
+            return;
+        };
+
+        // Only rename the slot if the target attribute belongs to this class.
+        if !self.target_belongs_to_class(class) {
+            return;
+        }
+
+        // Rename the inner content of the string, leaving the quotes intact.
+        let content_range = ast::StringLikePart::String(part).content_range();
+        let target = ReferenceTarget::new(self.model.file(), content_range, ReferenceKind::Other);
+        self.references.push(target);
+    }
+
+    /// Returns the class definition whose `__slots__` assignment contains the
+    /// string literal currently being visited, if the ancestor chain matches
+    /// one of the supported `__slots__` shapes.
+    ///
+    /// Supported shapes (v1):
+    /// - `__slots__ = ("a", "b")` / `["a", "b"]` / `{"a", "b"}`
+    /// - `__slots__ = {"a": ..., "b": ...}` (dict keys only)
+    fn enclosing_slots_class(&self) -> Option<&'a ast::StmtClassDef> {
+        // `self.ancestors` ends with the string literal itself. Walk outward.
+        let mut ancestors = self.ancestors.iter().rev();
+
+        // The string is either a direct element of a tuple/list/set, or a key
+        // of a dict. Skip the immediate container node.
+        match ancestors.next()? {
+            AnyNodeRef::ExprStringLiteral(_) => {}
+            _ => return None,
+        }
+        let container = *ancestors.next()?;
+        match container {
+            AnyNodeRef::ExprTuple(_) | AnyNodeRef::ExprList(_) | AnyNodeRef::ExprSet(_) => {}
+            // For a dict, both keys and values have the `ExprDict` as their
+            // direct parent, so `is_dict_key` checks that this string is one of
+            // the keys before we treat it as a slot name.
+            AnyNodeRef::ExprDict(dict) => {
+                if !self.is_dict_key(dict) {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+
+        // The container must be the value of an assignment to `__slots__`.
+        let assignment = ancestors.next()?;
+        if !is_slots_assignment(*assignment, container) {
+            return None;
+        }
+
+        // That assignment must live directly in a class body.
+        match ancestors.next()? {
+            AnyNodeRef::StmtClassDef(class) => Some(class),
+            _ => None,
+        }
+    }
+
+    /// Returns whether the string literal currently being visited is a *key*
+    /// of `dict`, as opposed to one of its values.
+    fn is_dict_key(&self, dict: &'a ast::ExprDict) -> bool {
+        let Some(AnyNodeRef::ExprStringLiteral(string_expr)) = self.ancestors.last() else {
+            return false;
+        };
+        dict.items.iter().any(|item| {
+            item.key
+                .as_ref()
+                .is_some_and(|key| key.range() == string_expr.range())
+        })
+    }
+
+    /// Returns whether any of the rename target's definitions is an instance attribute of `class`.
+    ///
+    /// The target must name an actual instance attribute of `class`, either a member access like
+    /// `self.value = ...` or a class-body declaration like `value: int` (optionally using `...` as
+    /// the value in a stub), and its nearest enclosing class must be `class` itself. A parameter or
+    /// local that merely shares the name, or an attribute of a nested class, is not treated as the
+    /// slot.
+    fn target_belongs_to_class(&self, class: &'a ast::StmtClassDef) -> bool {
+        let db = self.model.db();
+        let file = self.model.file();
+        let class_range = class.range();
+        let module = ruff_db::parsed::parsed_module(db, self.model.python_file()).load(db);
+        let index = ty_python_core::semantic_index(db, self.model.python_file());
+
+        // The nearest class scope lexically enclosing `scope`, if any. `ancestor_scopes` skips
+        // class scopes for name resolution, so we walk the lexical parents directly to stop at the
+        // innermost enclosing class rather than an outer one.
+        let nearest_enclosing_class_scope = |mut scope: FileScopeId| loop {
+            let node = index.scope(scope);
+            if node.kind() == ScopeKind::Class {
+                return Some(scope);
+            }
+            scope = node.parent()?;
+        };
+
+        self.target_definitions.iter().any(|resolved| {
+            let Some(definition) = resolved.definition() else {
+                return false;
+            };
+            if definition.file(db) != file {
+                return false;
+            }
+
+            // The target's nearest enclosing class must be the one declaring the `__slots__`, so an
+            // attribute of a nested class doesn't rename an outer class's slot.
+            let definition_scope = definition.file_scope(db);
+            let Some(owning_class_scope) = nearest_enclosing_class_scope(definition_scope) else {
+                return false;
+            };
+            match index.scope(owning_class_scope).node() {
+                NodeWithScopeKind::Class(node) if node.node(&module).range() == class_range => {}
+                _ => return false,
+            }
+
+            // Accept only a member access (`self.value = ...`) or a class-body attribute declaration
+            // (`value: int` or `value: int = ...` in a stub), so a parameter or local sharing the
+            // name is not treated as the slot.
+            let place = definition.place(db);
+            let is_class_attribute_declaration = definition_scope == owning_class_scope
+                && place.is_symbol()
+                && matches!(
+                    definition.kind(db),
+                    DefinitionKind::AnnotatedAssignment(assignment)
+                        if assignment.value(&module).is_none_or(|value| {
+                            file.is_stub(db) && value.is_ellipsis_literal_expr()
+                        })
+                );
+            place.is_member() || is_class_attribute_declaration
+        })
+    }
+
     fn is_declaration(&self, covering_node: &CoveringNode<'_>) -> bool {
         let db = self.model.db();
 
@@ -597,7 +764,7 @@ impl<'a> LocalReferencesFinder<'a> {
         };
 
         let file = local_definition.file(db);
-        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let module = ruff_db::parsed::parsed_module(db, local_definition.python_file(db)).load(db);
         let kind = local_definition.kind(db);
         let category = kind.category(file.is_stub(db), &module);
 
@@ -641,7 +808,7 @@ mod tests {
     use crate::tests::{CursorTest, cursor_test};
 
     fn cursor_target_is_externally_visible(test: &CursorTest) -> bool {
-        let model = SemanticModel::new(&test.db, test.cursor.file);
+        let model = SemanticModel::new(&test.db, test.python_file(test.cursor.file));
         let goto_target =
             find_goto_target(&model, &test.cursor.parsed, test.cursor.offset).unwrap();
         let definitions = goto_target
@@ -658,6 +825,23 @@ mod tests {
     fn externally_visible_definitions_can_have_cross_file_references() {
         for (case, source) in [
             ("module-global", "x<CURSOR> = 1"),
+            (
+                "module comprehension walrus",
+                "[(x<CURSOR> := item) for item in [1]]",
+            ),
+            (
+                "nested module comprehension walrus",
+                "[[(x<CURSOR> := item) for item in [1]] for _ in [1]]",
+            ),
+            (
+                "explicit global comprehension walrus",
+                "
+x = 0
+def f():
+    global x
+    [(x<CURSOR> := item) for item in [1]]
+",
+            ),
             (
                 "class",
                 "
@@ -684,17 +868,42 @@ def f():
             ),
             ("lambda", "f = lambda x<CURSOR>: x"),
             ("comprehension", "xs = [x for x<CURSOR> in range(3)]"),
+            (
+                "function comprehension walrus",
+                "
+def f():
+    [(x<CURSOR> := item) for item in [1]]
+    return x
+",
+            ),
+            (
+                "nested function comprehension walrus",
+                "
+def f():
+    [[(x<CURSOR> := item) for item in [1]] for _ in [1]]
+    return x
+",
+            ),
+            (
+                "lambda comprehension walrus",
+                "f = lambda: [(x<CURSOR> := item) for item in [1]]",
+            ),
+            (
+                "explicit nonlocal comprehension walrus",
+                "
+def outer():
+    x = 0
+    def inner():
+        nonlocal x
+        [(x<CURSOR> := item) for item in [1]]
+    inner()
+    return x
+",
+            ),
             ("type parameters", "type Alias[T<CURSOR>] = list[T]"),
         ] {
             let test = cursor_test(source);
             assert!(!cursor_target_is_externally_visible(&test), "{case}");
-        }
-    }
-
-    #[test]
-    fn source_candidate_prefilters_use_identifier_boundaries() {
-        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
-            assert!(contains_identifier(source, name));
         }
     }
 }

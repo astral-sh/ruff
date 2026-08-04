@@ -1,7 +1,7 @@
 use std::fmt::Debug;
-use std::fs::{self, File};
+use std::fs;
 use std::hash::Hasher;
-use std::io::{self, BufReader, Write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -91,14 +91,14 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings. It also defines the directory where to store the cache.
-    pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Self {
+    fn open(package_root: PathBuf, settings: &Settings) -> Self {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let key = format!("{}", cache_key(&package_root, settings));
         let path = PathBuf::from_iter([&settings.cache_dir, Path::new(VERSION), Path::new(&key)]);
 
-        let file = match File::open(&path) {
-            Ok(file) => file,
+        let serialized = match fs::read(&path) {
+            Ok(serialized) => serialized,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // No cache exist yet, return an empty cache.
                 return Cache::empty(path, package_root);
@@ -109,8 +109,10 @@ impl Cache {
             }
         };
 
-        let mut package: PackageCache =
-            match bincode::decode_from_reader(BufReader::new(file), bincode::config::standard()) {
+        let mut package =
+            match rkyv::access::<ArchivedPackageCache, rkyv::rancor::Error>(&serialized)
+                .and_then(rkyv::deserialize::<PackageCache, rkyv::rancor::Error>)
+            {
                 Ok(package) => package,
                 Err(err) => {
                     warn_user!("Failed parse cache file `{}`: {err}", path.display());
@@ -152,7 +154,7 @@ impl Cache {
     }
 
     /// Applies the pending changes and persists the cache to disk, if it has been changed.
-    pub(crate) fn persist(mut self) -> Result<()> {
+    fn persist(mut self) -> Result<()> {
         if !self.save() {
             // No changes made, no need to write the same cache file back to
             // disk.
@@ -167,7 +169,7 @@ impl Cache {
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
-        let serialized = bincode::encode_to_vec(&self.package, bincode::config::standard())
+        let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&self.package)
             .context("Failed to serialize cache data")?;
         temp_file
             .write_all(&serialized)
@@ -197,7 +199,7 @@ impl Cache {
 
     /// Applies the pending changes without storing the cache to disk.
     #[expect(clippy::cast_possible_truncation)]
-    pub(crate) fn save(&mut self) -> bool {
+    fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
         const MAX_LAST_SEEN: Duration = Duration::from_hours(720); // 30 days.
 
@@ -317,19 +319,21 @@ fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
 }
 
 /// On disk representation of a cache of a package.
-#[derive(bincode::Encode, Debug, bincode::Decode)]
+#[derive(rkyv::Archive, Debug, rkyv::Deserialize, rkyv::Serialize)]
 struct PackageCache {
     /// Path to the root of the package.
     ///
     /// Usually this is a directory, but it can also be a single file in case of
     /// single file "packages", e.g. scripts.
+    #[rkyv(with = rkyv::with::AsString)]
     package_root: PathBuf,
     /// Mapping of source file path to it's cached data.
+    #[rkyv(with = rkyv::with::MapKV<rkyv::with::AsString, rkyv::with::Identity>)]
     files: FxHashMap<RelativePathBuf, FileCache>,
 }
 
 /// On disk representation of the cache per source file.
-#[derive(bincode::Decode, Debug, bincode::Encode)]
+#[derive(rkyv::Deserialize, rkyv::Serialize, Debug, rkyv::Archive)]
 pub(crate) struct FileCache {
     /// Key that determines if the cached item is still valid.
     key: u64,
@@ -337,6 +341,7 @@ pub(crate) struct FileCache {
     ///
     /// Represented as the number of milliseconds since Unix epoch. This will
     /// break in 1970 + ~584 years (~2554).
+    #[rkyv(with = rkyv::with::AtomicLoad<rkyv::with::Relaxed>)]
     last_seen: AtomicU64,
 
     data: FileCacheData,
@@ -349,7 +354,7 @@ impl FileCache {
     }
 }
 
-#[derive(Debug, Default, bincode::Decode, bincode::Encode)]
+#[derive(Debug, Default, rkyv::Deserialize, rkyv::Serialize, rkyv::Archive)]
 struct FileCacheData {
     linted: bool,
     formatted: bool,
@@ -366,7 +371,7 @@ fn cache_key(package_root: &Path, settings: &Settings) -> u64 {
 }
 
 /// Initialize the cache at the specified `Path`.
-pub(crate) fn init(path: &Path) -> Result<()> {
+fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     fs::create_dir_all(path.join(VERSION))?;
 
@@ -509,10 +514,11 @@ mod tests {
 
     use ruff_cache::CACHE_DIR_NAME;
     use ruff_linter::package::PackageRoot;
+    use ruff_linter::registry::Rule;
     use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_python_ast::{PySourceType, PythonVersion};
+    use ruff_python_ast::PySourceType;
     use ruff_workspace::Settings;
 
     use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
@@ -530,10 +536,7 @@ mod tests {
 
         let settings = Settings {
             cache_dir,
-            linter: LinterSettings {
-                unresolved_target_version: PythonVersion::latest().into(),
-                ..Default::default()
-            },
+            linter: LinterSettings::for_rule(Rule::UnusedVariable),
             ..Settings::default()
         };
 
@@ -1026,6 +1029,7 @@ mod tests {
 
             let settings = Settings {
                 cache_dir,
+                linter: LinterSettings::for_rule(Rule::UndefinedExport),
                 ..Settings::default()
             };
 

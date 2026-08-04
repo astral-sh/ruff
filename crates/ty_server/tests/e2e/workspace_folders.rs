@@ -759,7 +759,7 @@ fn condensed_full_document_diagnostic_report(report: FullDocumentDiagnosticRepor
                 Some(DiagnosticSeverity::Warning) => "WARNING",
                 Some(DiagnosticSeverity::Information) => "INFORMATION",
                 Some(DiagnosticSeverity::Hint) => "HINT",
-                None => "unknown",
+                Some(DiagnosticSeverity::Custom(_)) | None => "unknown",
             };
             let Message::String(message) = d.message else {
                 panic!(

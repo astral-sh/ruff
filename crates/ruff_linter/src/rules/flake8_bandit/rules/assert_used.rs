@@ -18,6 +18,9 @@ use crate::checkers::ast::Checker;
 ///
 /// Consider raising a meaningful error instead of using `assert`.
 ///
+/// The rule exempts assertions within a `TYPE_CHECKING` block, assuming these are needed to satisfy
+/// a type checker.
+///
 /// ## Example
 /// ```python
 /// assert x > 0, "Expected positive value."

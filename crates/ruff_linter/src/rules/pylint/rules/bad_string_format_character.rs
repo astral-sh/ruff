@@ -50,16 +50,8 @@ pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
             };
 
             match FormatSpec::parse(format_spec) {
-                Err(FormatSpecError::InvalidFormatType) => {
-                    checker.report_diagnostic(
-                        BadStringFormatCharacter {
-                            // The format type character is always the last one.
-                            // More info in the official spec:
-                            // https://docs.python.org/3/library/string.html#format-specification-mini-language
-                            format_char: format_spec.chars().last().unwrap(),
-                        },
-                        range,
-                    );
+                Err(FormatSpecError::InvalidFormatType(format_char)) => {
+                    checker.report_diagnostic(BadStringFormatCharacter { format_char }, range);
                 }
                 Err(_) => {}
                 Ok(FormatSpec::Static(_)) => {}
@@ -68,18 +60,11 @@ pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
                         let FormatPart::Field { format_spec, .. } = placeholder else {
                             continue;
                         };
-                        if let Err(FormatSpecError::InvalidFormatType) =
+                        if let Err(FormatSpecError::InvalidFormatType(format_char)) =
                             FormatSpec::parse(&format_spec)
                         {
-                            checker.report_diagnostic(
-                                BadStringFormatCharacter {
-                                    // The format type character is always the last one.
-                                    // More info in the official spec:
-                                    // https://docs.python.org/3/library/string.html#format-specification-mini-language
-                                    format_char: format_spec.chars().last().unwrap(),
-                                },
-                                range,
-                            );
+                            checker
+                                .report_diagnostic(BadStringFormatCharacter { format_char }, range);
                         }
                     }
                 }

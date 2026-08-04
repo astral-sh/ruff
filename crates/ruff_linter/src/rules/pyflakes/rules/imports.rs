@@ -36,8 +36,8 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.44")]
 pub(crate) struct ImportShadowedByLoopVar {
-    pub(crate) name: String,
-    pub(crate) row: SourceRow,
+    name: String,
+    row: SourceRow,
 }
 
 impl Violation for ImportShadowedByLoopVar {

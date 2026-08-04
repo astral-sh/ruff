@@ -105,10 +105,10 @@ class Lock(_ContextManagerMixin, _LoopBoundMixin):
 class Event(_LoopBoundMixin):
     """Asynchronous equivalent to threading.Event.
 
-    Class implementing event objects. An event manages a flag that can be set
-    to true with the set() method and reset to false with the clear() method.
-    The wait() method blocks until the flag is true. The flag is initially
-    false.
+    Class implementing event objects.  An event manages a flag that can be
+    set to true with the set() method and reset to false with the clear()
+    method.  The wait() method blocks until the flag is true.  The flag is
+    initially false.
     """
 
     _waiters: deque[Future[Any]]
@@ -200,9 +200,9 @@ class Semaphore(_ContextManagerMixin, _LoopBoundMixin):
     """A Semaphore implementation.
 
     A semaphore manages an internal counter which is decremented by each
-    acquire() call and incremented by each release() call. The counter
-    can never go below zero; when acquire() finds that it is zero, it blocks,
-    waiting until some other thread calls release().
+    acquire() call and incremented by each release() call.  The counter
+    can never go below zero; when acquire() finds that it is zero, it
+    blocks, waiting until some other thread calls release().
 
     Semaphores also support the context management protocol.
 
@@ -268,8 +268,8 @@ if sys.version_info >= (3, 11):
         async def wait(self) -> int:
             """Wait for the barrier.
 
-            When the specified number of tasks have started waiting, they are all
-            simultaneously awoken.
+            When the specified number of tasks have started waiting, they are
+            all simultaneously awoken.
             Returns an unique and individual index number from 0 to 'parties-1'.
             """
 

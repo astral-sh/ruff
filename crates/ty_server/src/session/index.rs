@@ -56,7 +56,7 @@ impl Index {
     }
 
     #[expect(dead_code)]
-    pub(super) fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
+    fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
@@ -230,11 +230,11 @@ pub(crate) enum Document {
 }
 
 impl Document {
-    pub(super) fn new_text(document: TextDocument) -> Self {
+    fn new_text(document: TextDocument) -> Self {
         Self::Text(Arc::new(document))
     }
 
-    pub(super) fn new_notebook(document: NotebookDocument) -> Self {
+    fn new_notebook(document: NotebookDocument) -> Self {
         Self::Notebook(Arc::new(document))
     }
 
@@ -252,7 +252,7 @@ impl Document {
         }
     }
 
-    pub(crate) fn as_notebook_mut(&mut self) -> Option<&mut NotebookDocument> {
+    fn as_notebook_mut(&mut self) -> Option<&mut NotebookDocument> {
         Some(match self {
             Self::Notebook(notebook) => Arc::make_mut(notebook),
             Self::Text(_) => return None,

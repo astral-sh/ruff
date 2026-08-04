@@ -25,7 +25,8 @@ See the [typing documentation] for more information.
     as `int | float` and `int | float | complex`, respectively.
 
 ```py
-from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
+from ty_extensions import static_assert, JustFloat, JustComplex
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(bool, bool))
 static_assert(is_subtype_of(bool, int))
@@ -50,7 +51,8 @@ static_assert(is_subtype_of(FloatingPointError, Exception))
 ## Class hierarchies
 
 ```py
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import Never
 
 class A: ...
@@ -89,7 +91,8 @@ static_assert(is_subtype_of(C, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from ty_extensions import is_subtype_of, static_assert, TypeOf, JustFloat
+from ty_extensions import static_assert, JustFloat
+from ty_extensions._internal import TypeOf, is_subtype_of
 from enum import Enum
 
 class Answer(Enum):
@@ -136,10 +139,26 @@ static_assert(is_subtype_of(Literal[Single.VALUE], Single))
 static_assert(is_subtype_of(Single, Literal[Single.VALUE]))
 ```
 
+## Statically empty and non-empty ranges
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+type EmptyRange = TypeOf[range(0)]
+type NonEmptyRange = TypeOf[range(1)]
+
+static_assert(not is_subtype_of(EmptyRange, NonEmptyRange))
+static_assert(not is_subtype_of(NonEmptyRange, EmptyRange))
+static_assert(is_subtype_of(EmptyRange, range))
+static_assert(is_subtype_of(NonEmptyRange, range))
+```
+
 ## Heterogeneous tuple types
 
 ```py
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class A1: ...
 class B1(A1): ...
@@ -179,7 +198,8 @@ of `Sequence`:
 
 ```pyi
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_subtype_of, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
 static_assert(is_subtype_of(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[Literal[2], ...]]))
@@ -209,7 +229,8 @@ static_assert(not is_subtype_of(tuple[Any, ...], Sequence[int]))
 
 ```py
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_subtype_of, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of
 
 static_assert(
     is_subtype_of(
@@ -346,7 +367,8 @@ Its subtyping follows the general rule for subtyping of gradual types.
 
 ```py
 from typing import Any, Never
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any, ...]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[Any]))
@@ -432,7 +454,8 @@ static_assert(not is_subtype_of(tuple[int, *tuple[int, ...], int], tuple[int, in
 ## Union types
 
 ```py
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 from typing import Literal
 
 class A: ...
@@ -473,7 +496,8 @@ static_assert(not is_subtype_of(Literal[1, "two", 3], int))
 
 ```pyi
 from typing_extensions import Literal, LiteralString
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class A: ...
 class B1(A): ...
@@ -542,7 +566,8 @@ the _bottom_ materialization of the negated elements.
 
 ```pyi
 from typing_extensions import Any, Never, Sequence
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 # The top materialization of `tuple[Any]` is `tuple[object]`,
 # which is disjoint from `tuple[()]` but not `tuple[int]`,
@@ -580,7 +605,8 @@ static_assert(not is_subtype_of(list[int], ~Sequence[Any]))
 
 ```py
 from typing_extensions import Literal, Never
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(Never, Never))
 static_assert(is_subtype_of(Never, Literal[True]))
@@ -600,7 +626,8 @@ python-version = "3.11"
 ```
 
 ```pyi
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import Literal, LiteralString
 
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
@@ -667,7 +694,8 @@ static_assert(is_subtype_of(Invalid, AlwaysFalsy))
 Fully-static `TypeGuard[...]` and `TypeIs[...]` are subtypes of `bool`.
 
 ```py
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import TypeGuard, TypeIs
 
 static_assert(is_subtype_of(TypeGuard[str], bool))
@@ -679,7 +707,8 @@ static_assert(is_subtype_of(TypeIs[str], int))
 `TypeIs` is invariant. `TypeGuard` is covariant.
 
 ```py
-from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 from typing_extensions import TypeGuard, TypeIs
 
 static_assert(is_subtype_of(TypeGuard[int], TypeGuard[int]))
@@ -697,7 +726,8 @@ static_assert(not is_subtype_of(TypeIs[int], TypeIs[bool]))
 
 ```py
 from types import ModuleType
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 from typing_extensions import assert_type
 import typing
 
@@ -711,7 +741,8 @@ static_assert(is_subtype_of(TypeOf[typing], ModuleType))
 The type of a slice literal is currently inferred as a specialization of `slice`.
 
 ```py
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 # slice's default specialization is slice[Any, Any, Any], which does not participate in subtyping.
 static_assert(not is_subtype_of(TypeOf[1:2:3], slice))
@@ -722,7 +753,8 @@ static_assert(is_subtype_of(TypeOf[1:2:3], slice[int]))
 
 ```py
 from typing import _SpecialForm, Literal
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 static_assert(is_subtype_of(TypeOf[Literal], _SpecialForm))
 static_assert(is_subtype_of(TypeOf[Literal], object))
@@ -737,7 +769,8 @@ static_assert(not is_subtype_of(_SpecialForm, TypeOf[Literal]))
 ```py
 from typing import _SpecialForm, Any
 from typing_extensions import Literal, assert_type
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class Meta(type): ...
 class HasCustomMetaclass(metaclass=Meta): ...
@@ -821,7 +854,8 @@ static_assert(not is_subtype_of(LiteralListOfInt, type[Any]))
 
 ```py
 from typing_extensions import assert_type
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class Base: ...
 class Derived(Base): ...
@@ -856,7 +890,8 @@ of the first type represent sets of values that are a subset of every possible s
 represented by a materialization of the second type.
 
 ```pyi
-from ty_extensions import Unknown, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
 from typing_extensions import Any
 
 static_assert(not is_subtype_of(Any, Any))
@@ -896,14 +931,6 @@ static_assert(not is_subtype_of(Invariant[Any], Invariant[int]))
 static_assert(not is_subtype_of(Invariant[int], Invariant[Any]))
 static_assert(not is_subtype_of(Invariant[Any], Invariant[object]))
 static_assert(not is_subtype_of(Invariant[object], Invariant[Any]))
-
-class Bivariant[T]: ...
-
-static_assert(is_subtype_of(Bivariant[Any], Bivariant[Any]))
-static_assert(is_subtype_of(Bivariant[Any], Bivariant[int]))
-static_assert(is_subtype_of(Bivariant[int], Bivariant[Any]))
-static_assert(is_subtype_of(Bivariant[Any], Bivariant[object]))
-static_assert(is_subtype_of(Bivariant[object], Bivariant[Any]))
 ```
 
 The same for `Unknown`:
@@ -966,7 +993,8 @@ Return types are covariant.
 
 ```py
 from typing import Callable
-from ty_extensions import is_subtype_of, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 static_assert(is_subtype_of(Callable[[], int], Callable[[], float]))
 static_assert(not is_subtype_of(Callable[[], float], Callable[[], int]))
@@ -976,7 +1004,8 @@ static_assert(not is_subtype_of(Callable[[], float], Callable[[], int]))
 
 ```py
 from typing import Callable
-from ty_extensions import is_subtype_of, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 flag: bool = True
 
@@ -1002,7 +1031,8 @@ Parameter types are contravariant.
 
 ```py
 from typing import Callable
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_subtype_of
 
 def float_param(a: float, /) -> None: ...
 def int_param(a: int, /) -> None: ...
@@ -1047,7 +1077,8 @@ corresponding position in the supertype does not need to have a default value.
 
 ```py
 from typing import Callable
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_subtype_of
 
 def float_with_default(a: float = 1, /) -> None: ...
 def int_with_default(a: int = 1, /) -> None: ...
@@ -1093,7 +1124,8 @@ If a parameter is declared as positional-only, then the corresponding parameter 
 cannot be any other parameter kind.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def positional_only(a: int, /) -> None: ...
 def standard(a: int) -> None: ...
@@ -1114,7 +1146,8 @@ A standard parameter is either a positional or a keyword parameter.
 Unlike positional-only parameters, standard parameters should have the same name in the subtype.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def int_param_a(a: int) -> None: ...
 def int_param_b(b: int) -> None: ...
@@ -1176,7 +1209,8 @@ parameter in the subtype with the same name. This is because a standard paramete
 than a keyword-only parameter.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def standard_a(a: int) -> None: ...
 def keyword_b(*, b: int) -> None: ...
@@ -1214,7 +1248,8 @@ parameter in the subtype at the same position. This is because a standard parame
 than a positional-only parameter.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def standard_a(a: int) -> None: ...
 def positional_b(b: int, /) -> None: ...
@@ -1254,7 +1289,8 @@ A variadic or keyword-variadic parameter in the supertype cannot be substituted 
 parameter in the subtype.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def standard(a: int) -> None: ...
 def variadic(*a: int) -> None: ...
@@ -1269,7 +1305,8 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[standard], RegularCallable
 The name of the variadic parameter does not need to be the same in the subtype.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def variadic_float(*args2: float) -> None: ...
 def variadic_int(*args1: int) -> None: ...
@@ -1293,7 +1330,8 @@ If the subtype has a variadic parameter then any unmatched positional-only param
 supertype should be checked against the variadic parameter.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def variadic(a: int, /, *args: float) -> None: ...
 
@@ -1313,7 +1351,8 @@ Variadic parameter in a subtype can only be used to match against an unmatched p
 parameters from the supertype, not any other parameter kind.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of, is_assignable_to
 
 def variadic(*args: int) -> None: ...
 
@@ -1391,7 +1430,8 @@ static_assert(not is_assignable_to(RegularCallableTypeOf[only_variadic], Regular
 For keyword-only parameters, the name should be the same:
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def keyword_int(*, a: int) -> None: ...
 def keyword_float(*, a: float) -> None: ...
@@ -1415,7 +1455,8 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[keyword_ba], RegularCallab
 #### Keyword-only with default
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def float_with_default(*, a: float = 1) -> None: ...
 def int_with_default(*, a: int = 1) -> None: ...
@@ -1446,7 +1487,8 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[int_keyword], RegularCalla
 #### Keyword-only with standard
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def keywords1(*, a: int, b: int) -> None: ...
 def standard(b: float, a: float) -> None: ...
@@ -1496,7 +1538,8 @@ static_assert(is_subtype_of(RegularCallableTypeOf[mixed_variadic], RegularCallab
 The name of the keyword-variadic parameter does not need to be the same in the subtype.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def kwargs_float(**kwargs2: float) -> None: ...
 def kwargs_int(**kwargs1: int) -> None: ...
@@ -1547,7 +1590,8 @@ If the subtype has a keyword-variadic parameter then any unmatched keyword-only 
 supertype should be checked against the keyword-variadic parameter.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def kwargs(**kwargs: float) -> None: ...
 def keyword_only(*, a: int, b: float, c: bool) -> None: ...
@@ -1575,7 +1619,8 @@ When the supertype has an empty list of parameters, then the subtype can have an
 as long as they contain the default values for non-variadic parameters.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def empty() -> None: ...
 def mixed(a: int = 1, /, b: int = 2, *args: int, c: int = 3, **kwargs: int) -> None: ...
@@ -1587,7 +1632,8 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[empty], RegularCallableTyp
 #### Object
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_subtype_of
 from typing import Callable
 
 def f1(a: int, b: str, /, *c: float, d: int = 1, **e: float) -> None: ...
@@ -1615,7 +1661,8 @@ any arguments of any type, but otherwise is not a subtype or supertype of any ca
 
 ```py
 from typing import Callable, Never
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def bottom(*args: object, **kwargs: object) -> Never:
     raise Exception()
@@ -1636,7 +1683,8 @@ would not pass if we didn't handle this special case.
 
 ```py
 from typing import Callable, Any
-from ty_extensions import is_subtype_of, static_assert, RegularCallableTypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 def f(*args: Any, **kwargs: Any) -> Any: ...
 
@@ -1647,7 +1695,8 @@ static_assert(not is_subtype_of(RegularCallableTypeOf[f], Callable[[], object]))
 
 ```py
 from typing import Callable, Any
-from ty_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of, is_assignable_to
 
 class A:
     def __call__(self, a: int) -> int:
@@ -1675,7 +1724,8 @@ callable `__call__` attribute.
 from __future__ import annotations
 
 from typing import Callable
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 def call_impl(a: A, x: int) -> str:
     return ""
@@ -1704,7 +1754,8 @@ python-version = "3.12"
 ```py
 from typing import Callable, Protocol, overload
 from typing_extensions import Self
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class MetaWithReturn(type):
     def __call__(cls) -> "A":
@@ -1754,7 +1805,8 @@ static_assert(is_subtype_of(TypeOf[C], Returns[str]))
 
 ```py
 from typing import Callable, overload, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class A:
     def __new__(cls, a: int) -> int:
@@ -1812,7 +1864,8 @@ If `__call__` and `__new__` are both present, `__call__` takes precedence.
 
 ```py
 from typing import Callable, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class MetaWithIntReturn(type):
     def __call__(cls) -> int:
@@ -1820,7 +1873,7 @@ class MetaWithIntReturn(type):
 
 class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
-        return super().__new__(cls)
+        return ""
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1835,7 +1888,8 @@ static_assert(not is_subtype_of(TypeOf[F], Returns[str]))
 
 ```py
 from typing import Callable, overload, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1876,7 +1930,8 @@ static_assert(not is_subtype_of(TypeOf[D[int]], ReturnsWithArgument[str, D[int]]
 
 ```py
 from typing import Callable, overload, Self, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1897,7 +1952,7 @@ static_assert(not is_subtype_of(TypeOf[A], Returns[A]))
 
 class B:
     def __new__(cls, a: int) -> int:
-        return super().__new__(cls)
+        return 0
 
     def __init__(self, a: str) -> None: ...
 
@@ -1953,7 +2008,8 @@ If `__call__`, `__new__` and `__init__` are all present, `__call__` takes preced
 
 ```py
 from typing import Callable, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1967,7 +2023,7 @@ class MetaWithIntReturn(type):
 
 class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
-        return super().__new__(cls)
+        return ""
 
     def __init__(self, x: int) -> None: ...
 
@@ -1983,7 +2039,8 @@ static_assert(not is_subtype_of(TypeOf[F], ReturnsWithArgument[int, F]))
 
 ```py
 from typing import Callable, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1998,7 +2055,8 @@ static_assert(is_subtype_of(TypeOf[A], Returns[A]))
 
 ```py
 from typing import Callable
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class A:
     def f(self, a: int) -> int:
@@ -2043,7 +2101,8 @@ def overloaded(x: B) -> None: ...
 ```
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 from overloaded import A, B, C, overloaded
 
 def accepts_a(x: A) -> None: ...
@@ -2078,7 +2137,8 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 from overloaded import Grandparent, Parent, Child, overloaded
 
 # This is a subtype of only the first overload
@@ -2144,7 +2204,8 @@ def empty_cp(a: Parent) -> None: ...
 ```
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 from overloaded import pg, po, go, cpg, empty_go, empty_cp
 
 static_assert(is_subtype_of(RegularCallableTypeOf[pg], RegularCallableTypeOf[cpg]))
@@ -2190,7 +2251,8 @@ def overload_ba(x: A) -> None: ...
 
 ```py
 from overloaded import overload_ab, overload_ba
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 
 static_assert(is_subtype_of(RegularCallableTypeOf[overload_ab], RegularCallableTypeOf[overload_ba]))
 static_assert(is_subtype_of(RegularCallableTypeOf[overload_ba], RegularCallableTypeOf[overload_ab]))
@@ -2220,7 +2282,8 @@ def many(a: int, b: int, c: int, d: int, e: int) -> int: ...
 ```
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 from many_overloads import many
 
 def two_args(a: int, b: int) -> int:
@@ -2250,7 +2313,8 @@ the generic callable.)
 
 ```py
 from typing import Callable
-from ty_extensions import RegularCallableTypeOf, TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_subtype_of
 
 def identity[T](t: T) -> T:
     return t
@@ -2296,7 +2360,8 @@ characters.
 
 ```py
 from typing import Literal, Sequence, Iterable, Collection, Reversible
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(Literal["abba"], Sequence[Literal["a", "b"]]))
 static_assert(is_subtype_of(Literal["abb"], Iterable[Literal["a", "b"]]))
@@ -2318,7 +2383,8 @@ Bytes literals are sequences of integers.
 
 ```py
 from typing import Literal, Sequence, Iterable, Collection, Reversible
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(Literal[b"abba"], Sequence[int]))
 static_assert(is_subtype_of(Literal[b"abba"], Sequence[Literal[97, 98]]))

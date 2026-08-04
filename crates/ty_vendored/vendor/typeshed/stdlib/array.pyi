@@ -263,6 +263,6 @@ class array(MutableSequence[_T]):
 
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """See PEP 585"""
+            """Arrays are generic over the type of their elements"""
 
 ArrayType = array

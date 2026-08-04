@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// def find_phrase(x):
-///     phrases = {1: "Hello", 2: "Goodye", 3: "Good morning"}
+///     phrases = {1: "Hello", 2: "Goodbye", 3: "Good morning"}
 ///     return phrases.get(x, "Goodnight")
 /// ```
 #[derive(ViolationMetadata)]

@@ -7,7 +7,6 @@ ASYNC221 Async functions should not run processes with blocking methods
 7 | async def func():
 8 |     subprocess.run("foo")  # ASYNC221
   |     ^^^^^^^^^^^^^^
-  |
 
 ASYNC221 Async functions should not run processes with blocking methods
   --> ASYNC22x.py:12:5
@@ -15,7 +14,6 @@ ASYNC221 Async functions should not run processes with blocking methods
 11 | async def func():
 12 |     subprocess.call("foo")  # ASYNC221
    |     ^^^^^^^^^^^^^^^
-   |
 
 ASYNC221 Async functions should not run processes with blocking methods
   --> ASYNC22x.py:29:9

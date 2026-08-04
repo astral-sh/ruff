@@ -7536,7 +7536,7 @@
 <CWD>/homeassistant/components/elv/switch.py
   <CWD>/homeassistant/components/elv/switch.py:42:52 - error: Argument of type "() -> Unknown" cannot be assigned to parameter "listener" of type "(Event[_DataT@listen_once]) -> (Coroutine[Any, Any, None] | None)" in function "listen_once"
     Type "() -> Unknown" is not assignable to type "(Event[NoEventData]) -> (Coroutine[Any, Any, None] | None)"
-      Function accepts too many positional parameters; expected 0 but received 1 (reportArgumentType)
+      Function accepts too few positional parameters; expected 1 but received 0 (reportArgumentType)
 <CWD>/homeassistant/components/elvia/importer.py
   <CWD>/homeassistant/components/elvia/importer.py:99:25 - error: Could not access item in TypedDict
     "end" is not a required key in "StatisticsRow", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
@@ -24941,10 +24941,10 @@
 <CWD>/homeassistant/components/nws/__init__.py
   <CWD>/homeassistant/components/nws/__init__.py:74:21 - error: Argument of type "(*, raise_no_data: bool = False) -> CoroutineType[Any, Any, None]" cannot be assigned to parameter "func" of type "(Any, Any) -> Awaitable[Any]" in function "call_with_retry"
     Type "(*, raise_no_data: bool = False) -> CoroutineType[Any, Any, None]" is not assignable to type "(Any, Any) -> Awaitable[Any]"
-      Function accepts too many positional parameters; expected 0 but received 2 (reportArgumentType)
+      Function accepts too few positional parameters; expected 2 but received 0 (reportArgumentType)
   <CWD>/homeassistant/components/nws/__init__.py:92:21 - error: Argument of type "(*, raise_no_data: bool = False) -> CoroutineType[Any, Any, None]" cannot be assigned to parameter "func" of type "(Any, Any) -> Awaitable[Any]" in function "call_with_retry"
     Type "(*, raise_no_data: bool = False) -> CoroutineType[Any, Any, None]" is not assignable to type "(Any, Any) -> Awaitable[Any]"
-      Function accepts too many positional parameters; expected 0 but received 2 (reportArgumentType)
+      Function accepts too few positional parameters; expected 2 but received 0 (reportArgumentType)
 <CWD>/homeassistant/components/nws/config_flow.py
   <CWD>/homeassistant/components/nws/config_flow.py:43:22 - error: Type "dict[str, str | None]" is not assignable to return type "dict[str, str]"
     Type "str | None" is not assignable to type "str"
@@ -33742,9 +33742,6 @@
 <CWD>/homeassistant/components/stream/core.py
   <CWD>/homeassistant/components/stream/core.py:527:49 - error: Cannot access attribute "encode" for class "Literal[True]"
     Attribute "encode" is unknown (reportAttributeAccessIssue)
-<CWD>/homeassistant/components/stream/fmp4utils.py
-  <CWD>/homeassistant/components/stream/fmp4utils.py:147:42 - error: Function with declared return type "int" must return value on all code paths
-    "None" is not assignable to "int" (reportReturnType)
 <CWD>/homeassistant/components/stream/hls.py
   <CWD>/homeassistant/components/stream/hls.py:183:44 - error: Cannot access attribute "target_duration" for class "StreamOutput"
     Attribute "target_duration" is unknown (reportAttributeAccessIssue)
@@ -41533,9 +41530,6 @@
   <CWD>/homeassistant/components/wilight/support.py:30:29 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
   <CWD>/homeassistant/components/wilight/support.py:31:29 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
   <CWD>/homeassistant/components/wilight/support.py:32:28 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
-  <CWD>/homeassistant/components/wilight/support.py:62:22 - error: Argument of type "_localized_day" cannot be assigned to parameter "iterable" of type "Iterable[_T@list]" in function "__init__"
-    "_localized_day" is incompatible with protocol "Iterable[_T@list]"
-      "__iter__" is not present (reportArgumentType)
 <CWD>/homeassistant/components/wilight/switch.py
   <CWD>/homeassistant/components/wilight/switch.py:144:7 - error: Base classes for class "WiLightValveSwitch" define variable "available" in incompatible way (reportIncompatibleVariableOverride)
   <CWD>/homeassistant/components/wilight/switch.py:150:9 - error: "is_on" overrides symbol of same name in class "ToggleEntity"
@@ -45238,4 +45232,4 @@
   <CWD>/homeassistant/util/loop.py:162:16 - error: "integration_frame" is possibly unbound (reportPossiblyUnboundVariable)
   <CWD>/homeassistant/util/loop.py:163:16 - error: "integration_frame" is possibly unbound (reportPossiblyUnboundVariable)
   <CWD>/homeassistant/util/loop.py:164:17 - error: "integration_frame" is possibly unbound (reportPossiblyUnboundVariable)
-21179 errors, 7 warnings, 0 informations
+21177 errors, 7 warnings, 0 informations

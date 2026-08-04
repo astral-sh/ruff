@@ -224,7 +224,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.
     // This is necessary to avoid introducing a change in the behavior of the program.
     for name in names {
-        if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()) {
+        if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()).binding_id() {
             let binding = checker.semantic().binding(binding_id);
             if checker
                 .semantic()

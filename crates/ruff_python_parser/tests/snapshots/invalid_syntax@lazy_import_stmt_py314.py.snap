@@ -75,4 +75,3 @@ Module(
 2 | lazy import foo
 3 | lazy from bar import baz
   | ^^^^ Syntax Error: Cannot use `lazy` import statement on Python 3.14 (syntax was added in Python 3.15)
-  |

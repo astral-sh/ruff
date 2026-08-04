@@ -38,6 +38,69 @@ for x in IntIterable():
 reveal_type(x)  # revealed: Literal["foo"] | int
 ```
 
+## With statically non-empty builtin `range`
+
+```py
+for x in range(42):
+    pass
+
+reveal_type(x)  # revealed: int
+
+previous = "foo"
+
+for previous in range(1, 3):
+    pass
+
+reveal_type(previous)  # revealed: int
+
+for descending in range(3, 0, -1):
+    pass
+
+reveal_type(descending)  # revealed: int
+
+count = 42
+
+for from_count in range(count):
+    pass
+
+reveal_type(from_count)  # revealed: int
+```
+
+The emptiness refinement is independent of the order in which range values are assigned:
+
+```py
+def empty_first(flag: bool) -> None:
+    value = range(0)
+    if flag:
+        value = range(1)
+
+    if value:
+        reveal_type(value)  # revealed: range
+
+def non_empty_first(flag: bool) -> None:
+    value = range(1)
+    if flag:
+        value = range(0)
+
+    if value:
+        reveal_type(value)  # revealed: range
+```
+
+## With shadowed `range`
+
+```py
+def shadowed_range():
+    def range(n: int) -> list[int]:
+        return []
+
+    for x in range(42):
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
+```
+
 ## With `else` (no break)
 
 ```py
@@ -128,9 +191,120 @@ def _(color: Color):
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1, "a", b"foo"]
-# error: [possibly-unresolved-reference]
-reveal_type(x)
+reveal_type(x)  # revealed: Literal[1, "a", b"foo"]
+```
+
+## With statically non-empty literals
+
+```py
+for x in [1]:
+    pass
+
+reveal_type(x)  # revealed: Literal[1]
+
+for x in {1}:
+    pass
+
+reveal_type(x)  # revealed: int
+
+for x in {"foo": 1}:
+    pass
+
+reveal_type(x)  # revealed: str
+
+for x in "a":
+    pass
+
+reveal_type(x)  # revealed: Literal["a"]
+
+for x in b"a":
+    pass
+
+reveal_type(x)  # revealed: Literal[97]
+```
+
+## With statically empty literals
+
+```py
+value = 1
+
+for _ in ():
+    value = "tuple"
+
+for _ in []:
+    value = "list"
+
+for _ in {}:
+    value = "dict"
+
+for _ in "":
+    value = "str"
+
+for _ in b"":
+    value = "bytes"
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+## With `else` clauses and statically known literal emptiness
+
+```py
+def empty() -> None:
+    value = "before"
+
+    for _ in []:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["before"]
+
+def non_empty() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["body"]
+
+def non_empty_break() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+        break
+    else:
+        value = "else"
+
+    reveal_type(value)  # revealed: Literal["body"]
+```
+
+Starred elements and dictionary unpacking make emptiness ambiguous unless the literal also contains
+a required element:
+
+```py
+def _(items: list[int], mapping: dict[str, int]):
+    for item in [*items]:
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(item)
+
+    for key in {**mapping}:
+        pass
+
+    # revealed: str
+    # error: [possibly-unresolved-reference]
+    reveal_type(key)
+
+    for item in [*items, 1]:
+        pass
+
+    reveal_type(item)  # revealed: int
+
+    for key in {**mapping, "c": 2}:
+        pass
+
+    reveal_type(key)  # revealed: str
 ```
 
 ## With literal list
@@ -143,6 +317,10 @@ async def _():
     # error: [not-iterable]
     async for x in ["a", "b"]:
         reveal_type(x)  # revealed: Unknown
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ## With non-callable iterator
@@ -170,7 +348,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |
 9 |     for x in NotIterable():
   |              ^^^^^^^^^^^^^
-  |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
 ```
 
@@ -188,7 +365,6 @@ error[not-iterable]: Object of type `Literal[123]` is not iterable
   |
 2 | for x in nonsense:  # snapshot: not-iterable
   |          ^^^^^^^^
-  |
 info: It doesn't have an `__iter__` method or a `__getitem__` method
 ```
 
@@ -210,7 +386,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |
 6 | for x in NotIterable():  # snapshot: not-iterable
   |          ^^^^^^^^^^^^^
-  |
 info: Its `__iter__` attribute has type `None`, which is not callable
 ```
 
@@ -399,7 +574,6 @@ error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
    |
 13 |     for x in iterable:
    |              ^^^^^^^^
-   |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
 info: `Literal[42]` does not implement `__iter__`
 ```
@@ -432,7 +606,6 @@ error[not-iterable]: Object of type `Test | Test2` may not be iterable
    |
 16 |     for x in iterable:
    |              ^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
 info: element `Test2` of union `Test | Test2` is not assignable to `Iterable[Unknown]`
 info: └── type `Test2` is not assignable to protocol `Iterable[Unknown]`
@@ -473,7 +646,6 @@ error[not-iterable]: Object of type `Test | NotIter` may not be iterable
    |
 15 |     for x in iterable:
    |              ^^^^^^^^
-   |
 info: Its `__iter__` attribute (with type `(bound method Test.__iter__() -> TestIter) | int`) may not be callable
 ```
 
@@ -716,11 +888,11 @@ error[not-iterable]: Object of type `Iterable` is not iterable
    |
 10 | for x in Iterable():
    |          ^^^^^^^^^^
-   |
 info: Its `__iter__` method has an invalid signature
 info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -742,7 +914,6 @@ error[not-iterable]: Object of type `Bad` is not iterable
   |
 6 | for x in Bad():
   |          ^^^^^
-  |
 info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
 ```
 
@@ -793,7 +964,6 @@ error[not-iterable]: Object of type `Iterable1` is not iterable
    |
 17 | for x in Iterable1():
    |          ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -801,6 +971,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -816,7 +987,6 @@ error[not-iterable]: Object of type `Iterable2` is not iterable
    |
 20 | for y in Iterable2():
    |          ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
 ```
 
@@ -848,7 +1018,6 @@ error[not-iterable]: Object of type `Iterable` may not be iterable
    |
 16 |     for x in Iterable():
    |              ^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -908,7 +1077,6 @@ error[not-iterable]: Object of type `Iterable` may not be iterable
    |
 15 |     for x in Iterable():
    |              ^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method or a `__getitem__` method
 ```
 
@@ -929,7 +1097,6 @@ error[not-iterable]: Object of type `Bad` is not iterable
   |
 5 | for x in Bad():
   |          ^^^^^
-  |
 info: It has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
 ```
 
@@ -968,7 +1135,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 22 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `CustomCallable`, which is not callable
 ```
@@ -986,7 +1152,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 26 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable
 ```
@@ -1011,7 +1176,6 @@ error[not-iterable]: Object of type `Iterable` is not iterable
   |
 8 | for x in Iterable():
   |          ^^^^^^^^^^
-  |
 info: It has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1067,11 +1231,11 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 16 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` method may have an invalid signature
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1097,7 +1261,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 27 |     for x in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
 ```
 
@@ -1141,7 +1304,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 28 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -1149,6 +1311,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1165,7 +1328,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 31 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
 info: type `Iterable2` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -1207,7 +1369,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 20 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable1.__getitem__(item: int) -> str) | None`, which is not callable
 ```
@@ -1224,7 +1385,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 24 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1273,7 +1433,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 31 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
 ```
 
@@ -1289,7 +1448,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 35 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1332,7 +1490,8 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to, reveal_mro
 
 class Foo(SomethingUnknown): ...
 
@@ -1464,10 +1623,13 @@ reveal_type(loop_only)  # revealed: int
 def random() -> bool:
     return False
 
+def iterable() -> list[int]:
+    return []
+
 x = "A"
-for _ in range(1_000_000):
+for _ in iterable():
     reveal_type(x)  # revealed: Literal["A", "D"]
-    for _ in range(1_000_000):
+    for _ in iterable():
         # The "C" binding isn't visible here. It breaks this inner loop, and it always gets
         # overwritten before the end of the outer loop.
         reveal_type(x)  # revealed: Literal["A", "D", "B"]
@@ -1539,8 +1701,11 @@ On the other hand, if `x` is defined before the loop, the `del` makes it a
 `[possibly-unresolved-reference]`:
 
 ```py
+def iterable() -> list[int]:
+    return []
+
 x = 0
-for _ in range(1_000_000):
+for _ in iterable():
     x  # error: [possibly-unresolved-reference]
     x = 42
     del x
@@ -1549,8 +1714,11 @@ for _ in range(1_000_000):
 ### `del` in a loop makes a variable possibly-unbound after the loop
 
 ```py
+def iterable() -> list[int]:
+    return []
+
 x = 0
-for _ in range(1_000_000):
+for _ in iterable():
     # error: [possibly-unresolved-reference]
     del x
 # error: [possibly-unresolved-reference]
@@ -1560,7 +1728,10 @@ x
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
-for _ in range(1_000_000):
+def iterable() -> list[int]:
+    return []
+
+for _ in iterable():
     x = 42
 # error: [possibly-unresolved-reference]
 x

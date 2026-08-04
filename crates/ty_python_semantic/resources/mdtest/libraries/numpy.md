@@ -49,9 +49,13 @@ _DTypeLike: TypeAlias = type[_ScalarT] | dtype[_ScalarT] | _SupportsDType[dtype[
 DTypeLike: TypeAlias = _DTypeLike[Any] | str | None
 ```
 
-Now we can make sure that a function which accepts `DTypeLike | None` works as expected:
+Now we can make sure that a function which accepts `DTypeLike | None` works as expected. A generic
+function accepting `_DTypeLike[_ScalarT]` should also infer the scalar type from a scalar class. The
+protocol union element describes instances with a `dtype` property, not the class object whose class
+access exposes that property descriptor:
 
 ```py
+from typing import TypeVar
 import mini_numpy as np
 
 def accepts_dtype(dtype: np.DTypeLike | None) -> None: ...
@@ -61,4 +65,11 @@ accepts_dtype(dtype=np.dtype[np.bool])
 accepts_dtype(dtype=object)
 accepts_dtype(dtype=np.object_)
 accepts_dtype(dtype="U")
+
+_ScalarT = TypeVar("_ScalarT", bound=np.generic)
+
+def from_dtype_like(value: np._DTypeLike[_ScalarT]) -> np.dtype[_ScalarT]:
+    raise NotImplementedError
+
+reveal_type(from_dtype_like(np.bool))  # revealed: dtype[bool[bool]]
 ```

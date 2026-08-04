@@ -21,4 +21,3 @@ TC010 Invalid string member in `X | Y`-style union type
    |  _________________________^
 24 | |                         " | str" | None))
    | |________________________________^
-   |

@@ -69,12 +69,7 @@ impl ProjectWatcher {
 
         self.has_errored_paths = false;
 
-        let config_paths = db
-            .project()
-            .metadata(db)
-            .extra_configuration_paths()
-            .iter()
-            .map(SystemPathBuf::as_path);
+        let config_paths = db.project().metadata(db).extra_configuration_paths();
 
         // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
         // This is necessary to observe changes to files that are outside the project root.

@@ -6,9 +6,10 @@ use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 
 use ruff_db::testing::setup_logging_with_filter;
+use ruff_ranged_value::RangedValue;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 
 struct Benchmark<'a> {
@@ -42,7 +43,7 @@ impl<'a> Benchmark<'a> {
 
         let mut metadata = ProjectMetadata::discover(&root, &system).unwrap();
 
-        metadata.apply_options(Options {
+        metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(installed_project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
@@ -109,7 +110,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    3,
+    5,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
@@ -197,7 +198,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    16500,
+    16700,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -210,7 +211,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    110,
+    124,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(
@@ -226,7 +227,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    1950,
+    2000,
 );
 
 #[track_caller]

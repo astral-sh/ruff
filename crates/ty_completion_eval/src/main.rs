@@ -1,8 +1,6 @@
-/*!
-A simple command line tool for running a completion evaluation.
-
-See `crates/ty_completion_eval/README.md` for examples and more docs.
-*/
+//! A simple command line tool for running a completion evaluation.
+//!
+//! See `crates/ty_completion_eval/README.md` for examples and more docs.
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -12,10 +10,12 @@ use anyhow::{Context, anyhow};
 use clap::Parser;
 use regex::bytes::Regex;
 
+use ruff_db::PythonFile;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::{Completion, CompletionCapabilities};
 use ty_module_resolver::ModuleName;
+use ty_project::Db as _;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
@@ -282,14 +282,13 @@ impl Task {
         let system = OsSystem::new(project_path);
         let mut project_metadata = ProjectMetadata::discover(project_path, &system)?;
         // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
-        project_metadata.apply_options(Options {
+        project_metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python: Some(RelativePathBuf::cli(".venv")),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
         });
-        project_metadata.apply_configuration_files(&system)?;
         let db = ProjectDatabase::fallible(project_metadata, system)?;
         Ok(Task {
             db,
@@ -333,7 +332,7 @@ impl Task {
             &self.db,
             &self.settings,
             CompletionCapabilities::default(),
-            file,
+            PythonFile::new(&self.db, file, self.db.python_version()),
             offset,
         );
         Ok(completions)

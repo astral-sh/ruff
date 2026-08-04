@@ -16,7 +16,6 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -33,7 +32,6 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -66,7 +64,6 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -83,7 +80,6 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -105,7 +101,6 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -164,7 +159,6 @@ fn config_file_override() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -181,11 +175,33 @@ fn config_file_override() -> anyhow::Result<()> {
       |
     1 | print(x)  # [unresolved-reference]
       |       ^
-      |
 
     Found 1 diagnostic
 
     ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_configuration_file() -> anyhow::Result<()> {
+    let case = CliTest::with_files([("ty.toml", "x"), ("test.py", "")])?;
+
+    assert_cmd_snapshot!(case.command().arg("--config-file").arg("ty.toml"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Error loading configuration file at <temp_dir>/ty.toml
+      Cause: <temp_dir>/ty.toml is not a valid `ty.toml`
+      Cause: TOML parse error at line 1, column 2
+      |
+    1 | x
+      |  ^
+    key with no value, expected `=`
     ");
 
     Ok(())

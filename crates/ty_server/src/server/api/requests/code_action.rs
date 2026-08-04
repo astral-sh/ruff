@@ -2,10 +2,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use lsp_types::{self as types, Code, CodeActionRequest, CodeActionResponse, TextEdit, Uri};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
 use types::CodeActionKind;
 
@@ -41,12 +43,18 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
+        let python_file = PythonFile::new(db, file, db.python_version());
         let mut actions = Vec::new();
 
         for mut diagnostic in diagnostics.into_iter().filter(|diagnostic| {
             diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
                 && range_intersect(&diagnostic.range, &params.range)
         }) {
+            let mut diagnostic_id = match &diagnostic.code {
+                Some(Code::String(diagnostic_id)) => Some(Cow::Borrowed(diagnostic_id)),
+                _ => None,
+            };
+
             // If the diagnostic includes fixes, offer those up as options.
             if let Some(data) = diagnostic.data.take() {
                 let data: DiagnosticData = match serde_json::from_value(data) {
@@ -57,21 +65,31 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     }
                 };
 
-                actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
-                    title: data.fix_title,
-                    kind: Some(CodeActionKind::QuickFix),
-                    diagnostics: Some(vec![diagnostic.clone()]),
-                    edit: Some(lsp_types::WorkspaceEdit {
-                        changes: Some(data.edits),
-                        document_changes: None,
-                        change_annotations: None,
-                    }),
-                    is_preferred: Some(true),
-                    command: None,
-                    disabled: None,
-                    data: None,
-                    tags: None,
-                }));
+                let fix = match data {
+                    DiagnosticData::Full(full_diagnostic) => {
+                        diagnostic_id = Some(Cow::Owned(full_diagnostic.diagnostic_id));
+                        full_diagnostic.fix
+                    }
+                    DiagnosticData::Fix(fix) => Some(fix),
+                };
+
+                if let Some(fix) = fix {
+                    actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
+                        title: fix.fix_title,
+                        kind: Some(CodeActionKind::QuickFix),
+                        diagnostics: Some(vec![diagnostic.clone()]),
+                        edit: Some(lsp_types::WorkspaceEdit {
+                            changes: Some(fix.edits),
+                            document_changes: None,
+                            change_annotations: None,
+                        }),
+                        is_preferred: Some(true),
+                        command: None,
+                        disabled: None,
+                        data: None,
+                        tags: None,
+                    }));
+                }
             }
 
             // Try to find other applicable actions.
@@ -81,10 +99,10 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // which is dubious when you're in the middle of resolving symbols.
             let uri = snapshot.uri();
             let encoding = snapshot.encoding();
-            if let Some(Code::String(diagnostic_id)) = &diagnostic.code
+            if let Some(diagnostic_id) = diagnostic_id
                 && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
             {
-                for action in code_actions(db, file, range, diagnostic_id) {
+                for action in code_actions(db, python_file, range, &diagnostic_id) {
                     actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QuickFix),

@@ -6,7 +6,11 @@
 
 ## <Distinct behavior change>
 
-**Report entries:** [<project file.py:line>](<permalink>)
+**Report entries:**
+
+- [<project1 file1.py:line>](<permalink>)
+- [<project1 file2.py:line>](<permalink>)
+- [<project2 file1.py:line>](<permalink>)
 
 <Explain the exact behavior on the merge base and PR. Group additional entries here only when the same explanation and minimized reproducer account for all of them.>
 

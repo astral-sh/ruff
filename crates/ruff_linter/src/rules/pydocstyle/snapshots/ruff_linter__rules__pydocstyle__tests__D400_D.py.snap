@@ -8,7 +8,6 @@ D400 [*] First line should end with a period
 354 | def lwnlkjl():
 355 |     """Summary"""
     |     ^^^^^^^^^^^^^
-    |
 help: Add period
     |
 354 | def lwnlkjl():
@@ -25,7 +24,6 @@ D400 [*] First line should end with a period
 405 |         " or exclamation point (not 'r')")
 406 | def oneliner_withdoc(): """One liner"""
     |                         ^^^^^^^^^^^^^^^
-    |
 help: Add period
     |
 405 |         " or exclamation point (not 'r')")
@@ -77,7 +75,6 @@ D400 [*] First line should end with a period
 421 | @ignored_decorator
 422 | def oneliner_ignored_decorator(): """One liner"""
     |                                   ^^^^^^^^^^^^^^^
-    |
 help: Add period
     |
 421 | @ignored_decorator
@@ -94,7 +91,6 @@ D400 [*] First line should end with a period
 428 |         " or exclamation point (not 'r')")
 429 | def oneliner_with_decorator_expecting_errors(): """One liner"""
     |                                                 ^^^^^^^^^^^^^^^
-    |
 help: Add period
     |
 428 |         " or exclamation point (not 'r')")
@@ -180,7 +176,6 @@ D400 First line should end with a period
 513 | def valid_google_string():  # noqa: D400
 514 |     """Test a valid something!"""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add period
 
 D400 [*] First line should end with a period
@@ -190,7 +185,6 @@ D400 [*] First line should end with a period
 519 | def bad_google_string():  # noqa: D400
 520 |     """Test a valid something"""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add period
     |
 519 | def bad_google_string():  # noqa: D400
@@ -207,7 +201,6 @@ D400 [*] First line should end with a period
 580 | def endswith_quote():
 581 |     """Whitespace at the end, but also a quote" """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add period
     |
 580 | def endswith_quote():
@@ -226,7 +219,6 @@ D400 [*] First line should end with a period
 616 | |
 617 | |     """
     | |_______^
-    |
 help: Add period
     |
 614 | def one_liner():
@@ -260,7 +252,6 @@ D400 [*] First line should end with a period
 640 |
 641 | def same_line(): """This is a docstring on the same line"""
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add period
     |
 640 |
@@ -277,7 +268,6 @@ D400 [*] First line should end with a period
 664 | /     "We enforce a newline after the closing quote for a multi-line docstring \
 665 | |     but continuations shouldn't be considered multi-line"
     | |_________________________________________________________^
-    |
 help: Add period
     |
 664 |     "We enforce a newline after the closing quote for a multi-line docstring \

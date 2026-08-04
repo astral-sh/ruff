@@ -22,7 +22,6 @@ TC010 [*] Invalid string member in `X | Y`-style union type
  9 | x: "Foo" | str  # TC010
 10 | x: ("int" | str) | "Foo"  # TC010
    |     ^^^^^
-   |
 help: Remove quotes
    |
 9  | x: "Foo" | str  # TC010
@@ -37,7 +36,6 @@ TC010 [*] Invalid string member in `X | Y`-style union type
  9 | x: "Foo" | str  # TC010
 10 | x: ("int" | str) | "Foo"  # TC010
    |                    ^^^^^
-   |
 help: Extend quotes
    |
 9  | x: "Foo" | str  # TC010
@@ -111,7 +109,6 @@ TC010 [*] Invalid string member in `X | Y`-style union type
    |  _________________________^
 27 | |                         " | str" | None))
    | |________________________________^
-   |
 help: Extend quotes
    |
 25 |

@@ -78,6 +78,24 @@ impl Program {
         }
     }
 
+    /// Permanently freezes all program inputs.
+    pub fn freeze(self, db: &mut dyn Db) {
+        let durability = Durability::NEVER_CHANGE;
+        let python_version = self.python_version_with_source(db).clone();
+        let python_platform = self.python_platform(db).clone();
+        let search_paths = self.search_paths(db).clone();
+
+        self.set_python_version_with_source(db)
+            .with_durability(durability)
+            .to(python_version);
+        self.set_python_platform(db)
+            .with_durability(durability)
+            .to(python_platform);
+        self.set_search_paths(db)
+            .with_durability(durability)
+            .to(search_paths);
+    }
+
     pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
         self.search_paths(db).custom_stdlib()
     }

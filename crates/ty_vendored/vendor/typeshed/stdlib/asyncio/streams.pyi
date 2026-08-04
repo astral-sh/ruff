@@ -193,21 +193,20 @@ class StreamReader:
 
     def feed_data(self, data: Iterable[SupportsIndex]) -> None: ...
     async def readline(self) -> bytes:
-        """Read chunk of data from the stream until newline (b'
-        ') is found.
+        """Read chunk of data from the stream until newline (b'\\n') is found.
 
-                On success, return chunk that ends with newline. If only partial
-                line can be read due to EOF, return incomplete line without
-                terminating newline. When EOF was reached while no bytes read, empty
-                bytes object is returned.
+        On success, return chunk that ends with newline.  If only partial
+        line can be read due to EOF, return incomplete line without
+        terminating newline.  When EOF was reached while no bytes read,
+        empty bytes object is returned.
 
-                If limit is reached, ValueError will be raised. In that case, if
-                newline was found, complete line including newline will be removed
-                from internal buffer. Else, internal buffer will be cleared. Limit is
-                compared against part of the line without newline.
+        If limit is reached, ValueError will be raised.  In that case, if
+        newline was found, complete line including newline will be removed
+        from internal buffer.  Else, internal buffer will be cleared.
+        Limit is compared against part of the line without newline.
 
-                If stream was paused, this function will automatically resume it if
-                needed.
+        If stream was paused, this function will automatically resume it if
+        needed.
         """
 
     if sys.version_info >= (3, 13):

@@ -254,7 +254,8 @@ def _(flag: bool):
 
 ```py
 from typing import Literal
-from ty_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import Not, AlwaysFalsy, static_assert
+from ty_extensions._internal import is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(Literal["a", ""], Literal["a", ""] | Not[AlwaysFalsy]))
 static_assert(is_subtype_of(Not[AlwaysFalsy], Literal["", "a"] | Not[AlwaysFalsy]))
@@ -291,7 +292,7 @@ def _(
 ## A `TypeForm` parameter is a value parameter
 
 ```py
-from ty_extensions import is_singleton
+from ty_extensions._internal import is_singleton
 
 def _(flag: bool):
     if flag:
@@ -965,13 +966,11 @@ error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is
    |
 21 |     f(None)
    |       ^^^^ Expected `bytes`, found `None`
-   |
 info: Method defined here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __call__(self, x: bytes) -> bytes:
    |         ^^^^^^^^       -------- Parameter declared here
-   |
 info: Union variant `BytesCaller` is incompatible with this call site
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 
@@ -981,13 +980,11 @@ error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is i
    |
 21 |     f(None)
    |       ^^^^ Expected `int`, found `None`
-   |
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __call__(self, x: int) -> int:
   |         ^^^^^^^^       ------ Parameter declared here
-  |
 info: Intersection element `IntCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
@@ -998,13 +995,11 @@ error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is i
    |
 21 |     f(None)
    |       ^^^^ Expected `str`, found `None`
-   |
 info: Method defined here
  --> src/mdtest_snippet.py:9:9
   |
 9 |     def __call__(self, x: str) -> str:
   |         ^^^^^^^^       ------ Parameter declared here
-  |
 info: Intersection element `StrCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`

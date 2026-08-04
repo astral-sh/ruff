@@ -18,7 +18,6 @@ I001 [*] Import block is un-sorted or un-formatted
 12 | | from .my.nested import fn2
 13 | | from ...grandparent import fn3
    | |______________________________^
-   |
 help: Organize imports
    |
    - from a import a1  # import_from

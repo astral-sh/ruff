@@ -544,6 +544,68 @@ def foo() -> str:
 }
 
 #[test]
+fn document_diagnostic_caching_rendered_source_changed() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content_v1 = "\
+def foo() -> str:
+    return 42  # before
+";
+    let foo_content_v2 = "\
+def foo() -> str:
+    return 42  # after!
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content_v1)?
+        .with_full_diagnostic_output()
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content_v1, 1);
+
+    let first_response = server.document_diagnostic_request(foo, None);
+    let result_id = match &first_response {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
+            .full_document_diagnostic_report
+            .result_id
+            .clone()
+            .expect("First response should have a result ID"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("First response should be a full report")
+        }
+    };
+    assert_debug_snapshot!(
+        "document_diagnostic_caching_rendered_source_before",
+        first_response
+    );
+
+    server.change_text_document(
+        foo,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: foo_content_v2.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let second_response = server.document_diagnostic_request(foo, Some(result_id));
+    assert_debug_snapshot!(
+        "document_diagnostic_caching_rendered_source_after",
+        second_response
+    );
+
+    Ok(())
+}
+
+#[test]
 fn workspace_diagnostic_caching() -> Result<()> {
     let _filter = filter_result_id();
 

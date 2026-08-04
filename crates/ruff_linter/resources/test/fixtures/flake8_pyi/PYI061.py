@@ -86,3 +86,7 @@ print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
 print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
 print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
 print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+
+# Regression test for https://github.com/astral-sh/ruff/issues/20729.
+# Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
+options = Literal["foo", "bar", None]

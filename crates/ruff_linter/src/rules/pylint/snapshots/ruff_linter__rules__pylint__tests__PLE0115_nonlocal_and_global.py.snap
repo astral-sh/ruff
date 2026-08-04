@@ -28,7 +28,6 @@ PLE0115 Name `counter` is both `nonlocal` and `global`
 30 |             counter += 1
 31 |         global counter
    |                ^^^^^^^
-   |
 
 PLE0115 Name `counter` is both `nonlocal` and `global`
   --> nonlocal_and_global.py:36:12

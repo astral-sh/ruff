@@ -116,8 +116,8 @@ elif sys.version_info >= (3, 14):
           allow_code
             Allow to write code objects.
 
-        Raise a ValueError exception if value has (or contains an object that has) an
-        unsupported type.
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
         """
 
 elif sys.version_info >= (3, 13):
@@ -148,8 +148,8 @@ elif sys.version_info >= (3, 13):
           allow_code
             Allow to write code objects.
 
-        Raise a ValueError exception if value has (or contains an object that has) an
-        unsupported type.
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
         """
 
 else:

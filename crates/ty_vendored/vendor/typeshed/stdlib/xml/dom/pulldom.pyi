@@ -1,8 +1,8 @@
 import sys
 from _typeshed import Incomplete, Unused
 from collections.abc import MutableSequence, Sequence
-from typing import Final, Literal, NoReturn, TypeAlias
-from typing_extensions import Self
+from typing import Final, Literal, TypeAlias
+from typing_extensions import Never, Self
 from xml.dom.minidom import Comment, Document, DOMImplementation, Element, ProcessingInstruction, Text
 from xml.sax import _SupportsReadClose
 from xml.sax.handler import ContentHandler
@@ -74,8 +74,8 @@ class PullDOM(ContentHandler):
 
 class ErrorHandler:
     def warning(self, exception: BaseException) -> None: ...
-    def error(self, exception: BaseException) -> NoReturn: ...
-    def fatalError(self, exception: BaseException) -> NoReturn: ...
+    def error(self, exception: BaseException) -> Never: ...
+    def fatalError(self, exception: BaseException) -> Never: ...
 
 class DOMEventStream:
     stream: _SupportsReadClose[bytes] | _SupportsReadClose[str]

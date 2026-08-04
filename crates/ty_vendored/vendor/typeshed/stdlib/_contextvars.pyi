@@ -56,7 +56,7 @@ class ContextVar(Generic[_T]):
         """
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """ContextVars are generic over the type of their contained values"""
 
 @final
 class Token(Generic[_T]):
@@ -67,7 +67,7 @@ class Token(Generic[_T]):
     MISSING: ClassVar[object]
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Tokens are generic over the same type as the ContextVar which created them."""
 
     if sys.version_info >= (3, 14):
         def __enter__(self) -> Self:

@@ -15,4 +15,3 @@ S410 `lxml` is vulnerable to XML attacks
 1 | import lxml  # S410
 2 | from lxml import etree  # S410
   |      ^^^^
-  |

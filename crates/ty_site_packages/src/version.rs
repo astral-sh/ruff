@@ -39,6 +39,9 @@ pub enum PythonVersionSource {
     /// (e.g., the Python environment)
     Editor,
 
+    /// The value was provided by `uv workspace metadata`.
+    UvWorkspace,
+
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
     Default,
@@ -55,16 +58,6 @@ pub struct PythonVersionFileSource {
 impl PythonVersionFileSource {
     pub fn new(path: Arc<SystemPathBuf>, range: Option<TextRange>) -> Self {
         Self { path, range }
-    }
-
-    /// Returns the path to the configuration file.
-    pub fn path(&self) -> &SystemPathBuf {
-        &self.path
-    }
-
-    /// Returns the range of the configuration setting.
-    pub fn range(&self) -> Option<TextRange> {
-        self.range
     }
 
     /// Attempt to resolve a [`Span`] that corresponds to the location of

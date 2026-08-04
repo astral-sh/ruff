@@ -2,11 +2,14 @@ use std::borrow::Cow;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 use super::general;
+use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
+use crate::docstring::document::syntax::{is_markdown_code_span, starts_with_markdown_list_item};
 
+mod google;
+mod numpy;
 mod rst;
 
 /// Renders a docstring as Markdown.
@@ -14,7 +17,10 @@ mod rst;
 /// `source` must have already undergone PEP-257 trimming and universal newline
 /// normalization (typically via `docstring::documentation_trim`).
 pub(super) fn render_into(output: &mut String, source: &str) {
-    render_sections_into(output, source, rst::structured_sections(source));
+    let mut sections = rst::structured_sections(source);
+    sections.extend(google::structured_sections(source));
+    sections.extend(numpy::structured_sections(source));
+    render_sections_into(output, source, sections);
 }
 
 /// Renders a docstring from non-overlapping structured sections and general source fragments.
@@ -115,6 +121,21 @@ fn ensure_blank_line(output: &mut String) {
     output.push('\n');
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParameterHeading {
+    Parameters,
+    Arguments,
+}
+
+impl ParameterHeading {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Parameters => "Parameters",
+            Self::Arguments => "Arguments",
+        }
+    }
+}
+
 /// A parsed section ready for Markdown rendering.
 ///
 /// Parser modules create one of these for each supported source section or
@@ -126,16 +147,29 @@ struct Section {
     range: TextRange,
     /// The list of semantically-meaningful items to render to Markdown.
     items: Vec<SectionItem>,
+    parameter_heading: ParameterHeading,
 }
 
 impl Section {
     /// Creates a structured replacement from the items parsed out of one source section.
     fn new(range: TextRange, items: Vec<SectionItem>) -> Option<Self> {
+        Self::new_with_parameter_heading(range, items, ParameterHeading::Parameters)
+    }
+
+    fn new_with_parameter_heading(
+        range: TextRange,
+        items: Vec<SectionItem>,
+        parameter_heading: ParameterHeading,
+    ) -> Option<Self> {
         if range.is_empty() || items.iter().any(SectionItem::is_empty) {
             return None;
         }
 
-        Some(Self { range, items })
+        Some(Self {
+            range,
+            items,
+            parameter_heading,
+        })
     }
 
     fn is_empty(&self) -> bool {
@@ -146,9 +180,13 @@ impl Section {
     fn render_markdown(&self, output: &mut String) {
         let mut rendered_section = false;
         for kind in SectionKind::iter() {
+            let heading = match kind {
+                SectionKind::Parameters => self.parameter_heading.as_str(),
+                _ => kind.heading(),
+            };
             if render_markdown_section(
                 output,
-                kind.heading(),
+                heading,
                 self.items.iter().filter(move |item| item.kind == kind),
                 rendered_section,
             ) {
@@ -189,6 +227,20 @@ impl SectionItem {
         }
     }
 
+    fn from_owned_parts(
+        kind: SectionKind,
+        display_name: Option<String>,
+        ty: Option<String>,
+        description_source: String,
+    ) -> Self {
+        Self {
+            kind,
+            display_name,
+            ty: ty.filter(|ty| !ty.is_empty()),
+            description_source,
+        }
+    }
+
     /// Returns whether the item would render no user-visible Markdown.
     fn is_empty(&self) -> bool {
         self.display_name.is_none() && self.ty.is_none() && self.description_source.is_empty()
@@ -199,7 +251,7 @@ impl SectionItem {
 
         if let Some(name) = self.display_name.as_deref() {
             if matches!(self.kind, SectionKind::Raises) {
-                render_code_span_into(output, name);
+                render_type_code_span_into(output, name);
             } else {
                 render_bold_text_into(output, name);
             }
@@ -252,32 +304,6 @@ impl SectionItem {
     }
 }
 
-/// Canonical docstring sections shared by supported formats.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
-enum SectionKind {
-    Parameters,
-    KeywordArguments,
-    OtherParameters,
-    Attributes,
-    Returns,
-    Yields,
-    Raises,
-}
-
-impl SectionKind {
-    const fn heading(self) -> &'static str {
-        match self {
-            SectionKind::Parameters => "Parameters",
-            SectionKind::KeywordArguments => "Keyword Arguments",
-            SectionKind::OtherParameters => "Other Parameters",
-            SectionKind::Attributes => "Attributes",
-            SectionKind::Returns => "Returns",
-            SectionKind::Yields => "Yields",
-            SectionKind::Raises => "Raises",
-        }
-    }
-}
-
 fn render_markdown_section<'a>(
     output: &mut String,
     heading: &str,
@@ -306,45 +332,9 @@ fn render_markdown_section<'a>(
     rendered_field
 }
 
-fn starts_with_markdown_list_item(line: &str) -> bool {
-    starts_with_unordered_markdown_list_item(line) || starts_with_ordered_markdown_list_item(line)
-}
-
 fn line_starts_markdown_block_content(line: &str, at_description_start: bool) -> bool {
     MarkdownFence::find(line).is_some()
         || (at_description_start && starts_with_markdown_list_item(line))
-}
-
-/// Returns whether `line` begins with `-`, `+`, or `*` followed by whitespace.
-fn starts_with_unordered_markdown_list_item(line: &str) -> bool {
-    matches!(line.as_bytes(), [b'-' | b'+' | b'*', b' ' | b'\t', ..])
-}
-
-/// Returns whether `line` begins with one to nine ASCII digits followed by
-/// `.` or `)`, then whitespace.
-///
-/// `CommonMark` limits ordered-list markers to nine digits to avoid integer
-/// overflow in browsers: <https://spec.commonmark.org/0.31.2/#list-items>.
-fn starts_with_ordered_markdown_list_item(line: &str) -> bool {
-    let bytes = line.as_bytes();
-    let mut digit_count = 0;
-
-    for byte in bytes {
-        if digit_count < 9 && byte.is_ascii_digit() {
-            digit_count += 1;
-            continue;
-        }
-
-        if digit_count > 0 && matches!(*byte, b'.' | b')') {
-            return bytes
-                .get(digit_count + 1)
-                .is_some_and(|byte| matches!(*byte, b' ' | b'\t'));
-        }
-
-        return false;
-    }
-
-    false
 }
 
 /// Returns the byte offset where `description` first needs block-style rendering.
@@ -381,6 +371,12 @@ fn description_block_start(description: &str) -> Option<usize> {
 
 fn render_type_code_span_into(output: &mut String, ty: &str) {
     let normalized = normalize_type_for_code_span(ty);
+
+    if is_markdown_code_span(&normalized) {
+        output.push_str(&normalized);
+        return;
+    }
+
     render_code_span_into(output, normalized.as_ref());
 }
 
@@ -470,6 +466,7 @@ mod tests {
 
     #[test]
     fn sections_render_in_canonical_order() {
+        let _snap = bind_markdown_snapshot_filters();
         let section = section_block(vec![
             SectionItem::new(
                 SectionKind::Raises,
@@ -517,31 +514,31 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
-        **value**: `str`  
+        **value**: `str`<HB>
         The value.
 
         ## Keyword Arguments
-        **limit**: `int`  
+        **limit**: `int`<HB>
         Maximum result count.
 
         ## Other Parameters
-        **kw\_only**: `str`  
+        **kw\_only**: `str`<HB>
         Less common option.
 
         ## Attributes
-        **cache**: `dict[str, object]`  
+        **cache**: `dict[str, object]`<HB>
         Cached data.
 
         ## Returns
-        `bool`  
+        `bool`<HB>
         Whether validation passed.
 
         ## Yields
-        **item**: `Iterator[int]`  
+        **item**: `Iterator[int]`<HB>
         Generated values.
 
         ## Raises
-        `ValueError`  
+        `ValueError`<HB>
         Invalid value.
         ");
     }
@@ -571,6 +568,7 @@ mod tests {
 
     #[test]
     fn section_items_escape_bold_names() {
+        let _snap = bind_markdown_snapshot_filters();
         let section = section_block(vec![
             SectionItem::new(
                 SectionKind::Parameters,
@@ -594,13 +592,13 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
-        **\*args**  
+        **\*args**<HB>
         Escaped name.
 
-        **\_\_value\_\_**  
+        **\_\_value\_\_**<HB>
         Escaped name.
 
-        **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**  
+        **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**<HB>
         Escaped name.
         ");
     }
@@ -623,13 +621,23 @@ mod tests {
             ),
             SectionItem::new(
                 SectionKind::Parameters,
+                Some("link syntax"),
+                None,
+                "\
+Rendered as code:
+
+    `not a link <https://example.com>`_
+",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
                 Some("nested"),
                 None,
                 "- parent\n  - child",
             ),
         ]);
 
-        assert_snapshot!(render_markdown(&section), @"
+        assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
         **paragraphs**<HB>
         First paragraph.
@@ -641,6 +649,11 @@ mod tests {
             code<HB>
         <HB>
         trailing
+
+        **link syntax**<HB>
+        Rendered as code:
+
+            `not a link <https://example.com>`\_
 
         **nested**
 
@@ -693,11 +706,12 @@ mod tests {
 
     #[test]
     fn following_prose_does_not_continue_a_rendered_parameter_paragraph() {
+        let _snap = bind_markdown_snapshot_filters();
         let rendered = render_parameter_docstring("Value.", "After.");
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**  
+        **value**<HB>
         Value.
 
         After.
@@ -770,6 +784,7 @@ mod tests {
 
     #[test]
     fn adjacent_sections_are_separated() {
+        let _snap = bind_markdown_snapshot_filters();
         let raw = "ab";
         let rendered = render_sections(
             raw,
@@ -797,11 +812,11 @@ mod tests {
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**  
+        **value**<HB>
         The value.
 
         ## Returns
-        `bool`  
+        `bool`<HB>
         The result.
         ");
     }

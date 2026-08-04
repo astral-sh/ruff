@@ -68,7 +68,6 @@ discord/appinfo.py:643:91: warning[unused-type-ignore-comment] Unused blanket `t
 discord/asset.py:462:31: error[invalid-argument-type] Argument to `Asset.__init__` is incorrect: Expected `ConnectionState[Client] | _WebhookState`, found `Any | None | ConnectionState[Client] | _WebhookState`
 discord/asset.py:490:31: error[invalid-argument-type] Argument to `Asset.__init__` is incorrect: Expected `ConnectionState[Client] | _WebhookState`, found `Any | None | ConnectionState[Client] | _WebhookState`
 discord/asset.py:525:31: error[invalid-argument-type] Argument to `Asset.__init__` is incorrect: Expected `ConnectionState[Client] | _WebhookState`, found `Any | None | ConnectionState[Client] | _WebhookState`
-discord/audit_logs.py:210:12: error[invalid-return-type] Return type does not match returned value: expected `list[tuple[Object, PermissionOverwrite]]`, found `list[tuple[Role | Member | User | Object, PermissionOverwrite]]`
 discord/backoff.py:63:42: error[invalid-parameter-default] Default value of type `Literal[False]` is not assignable to annotated parameter type `T@ExponentialBackoff`
 discord/channel.py:255:97: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 discord/channel.py:373:9: error[invalid-method-override] Invalid override of method `_update`: Definition is incompatible with `GuildChannel._update`
@@ -129,10 +128,14 @@ discord/emoji.py:292:54: error[invalid-argument-type] Argument to `Emoji.__init_
 discord/emoji.py:294:22: error[unresolved-attribute] Attribute `http` is not defined on `None` in union `Any | None | ConnectionState[Client]`
 discord/enums.py:97:5: error[invalid-assignment] Object of type `(self) -> str` is not assignable to attribute `__repr__` of type `def __repr__(self) -> str`
 discord/enums.py:98:5: error[invalid-assignment] Object of type `(self) -> str` is not assignable to attribute `__str__` of type `def __str__(self) -> str`
-discord/enums.py:100:9: error[invalid-assignment] Object of type `(self, other) -> Literal[False] | Unknown` is not assignable to attribute `__le__` of type `def __le__(self, value: tuple[Unknown, ...], /) -> bool`
-discord/enums.py:101:9: error[invalid-assignment] Object of type `(self, other) -> Literal[False] | Unknown` is not assignable to attribute `__ge__` of type `def __ge__(self, value: tuple[Unknown, ...], /) -> bool`
-discord/enums.py:102:9: error[invalid-assignment] Object of type `(self, other) -> Literal[False] | Unknown` is not assignable to attribute `__lt__` of type `def __lt__(self, value: tuple[Unknown, ...], /) -> bool`
-discord/enums.py:103:9: error[invalid-assignment] Object of type `(self, other) -> Literal[False] | Unknown` is not assignable to attribute `__gt__` of type `def __gt__(self, value: tuple[Unknown, ...], /) -> bool`
+discord/enums.py:100:80: error[unresolved-attribute] Object of type `Self@__le__` has no attribute `value`
+discord/enums.py:100:94: error[unresolved-attribute] Object of type `Self@__le__` has no attribute `value`
+discord/enums.py:101:80: error[unresolved-attribute] Object of type `Self@__ge__` has no attribute `value`
+discord/enums.py:101:94: error[unresolved-attribute] Object of type `Self@__ge__` has no attribute `value`
+discord/enums.py:102:80: error[unresolved-attribute] Object of type `Self@__lt__` has no attribute `value`
+discord/enums.py:102:93: error[unresolved-attribute] Object of type `Self@__lt__` has no attribute `value`
+discord/enums.py:103:80: error[unresolved-attribute] Object of type `Self@__gt__` has no attribute `value`
+discord/enums.py:103:93: error[unresolved-attribute] Object of type `Self@__gt__` has no attribute `value`
 discord/enums.py:113:9: error[invalid-attribute-override] Invalid override of attribute `__name__`: class variable cannot override instance variable `type.__name__`
 discord/enums.py:160:51: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 discord/errors.py:30:10: error[unresolved-import] Cannot resolve imported module `requests`
@@ -516,6 +519,7 @@ discord/ui/view.py:273:30: error[unresolved-attribute] Object of type `((Any, In
 discord/ui/view.py:273:62: error[unresolved-attribute] Object of type `((Any, Interaction[Any], Any, /) -> Coroutine[Any, Any, Any]) & ~Item[object]` has no attribute `__discord_ui_model_kwargs__`
 discord/ui/view.py:278:31: error[unresolved-attribute] Object of type `((Any, Interaction[Any], Any, /) -> Coroutine[Any, Any, Any]) & ~Item[object]` has no attribute `__name__`
 discord/ui/view.py:603:62: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+discord/ui/view.py:986:64: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 discord/user.py:428:9: error[invalid-method-override] Invalid override of method `_update`: Definition is incompatible with `BaseUser._update`
 discord/utils.py:245:54: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 discord/utils.py:492:42: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
@@ -543,4 +547,4 @@ discord/webhook/sync.py:713:16: error[unresolved-import] Cannot resolve imported
 discord/webhook/sync.py:719:33: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 discord/webhook/sync.py:875:77: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
 discord/welcome_screen.py:104:33: error[unresolved-attribute] Attribute `name` is not defined on `str & _EmojiTag` in union `PartialEmoji | Emoji | (str & _EmojiTag)`
-Found 545 diagnostics
+Found 549 diagnostics

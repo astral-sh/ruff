@@ -42,6 +42,7 @@ mimalloc = { workspace = true, optional = true }
 [dev-dependencies]
 rayon = { workspace = true }
 ruff_python_ast = { workspace = true }
+ruff_ranged_value = { workspace = true }
 rustc-hash = { workspace = true }
 
 [features]

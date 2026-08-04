@@ -149,13 +149,13 @@ The class typevar in the method signature does not bind a _new_ instance of the 
 already solved and specialized when the class was specialized:
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
-# revealed: ty_extensions.GenericContext[T@Legacy]
+# revealed: ty_extensions._internal.GenericContext[T@Legacy]
 reveal_type(generic_context(Legacy))
-# revealed: ty_extensions.GenericContext[Self@m, S@m]
+# revealed: ty_extensions._internal.GenericContext[Self@m, S@m]
 reveal_type(generic_context(legacy.m))
 ```
 
@@ -230,7 +230,7 @@ error on the following snippet, but we may change this in the future.
 
 ```py
 from typing import TypeVar, Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 T = TypeVar("T")
 
@@ -287,6 +287,29 @@ def f[T](x: T, y: T) -> None:
 
     # error: [shadowed-type-variable]
     def bad[T](a: T, b: T) -> None: ...
+```
+
+### Generic TypeVarTuple within generic function
+
+```py
+def outer[*Ts](*args: *Ts) -> None:
+    def ok[*Us](*ok_args: *Us) -> None: ...
+
+    # snapshot: shadowed-type-variable
+    def bad[*Ts](*bad_args: *Ts) -> None: ...
+```
+
+```snapshot
+error[shadowed-type-variable]: Generic function `bad` uses TypeVarTuple `Ts` already bound by an enclosing scope
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def bad[*Ts](*bad_args: *Ts) -> None: ...
+  |         ^^^ `Ts` used in function definition here
+  |
+ ::: src/mdtest_snippet.py:1:5
+  |
+1 | def outer[*Ts](*args: *Ts) -> None:
+  |     ------------------------------ TypeVarTuple `Ts` is bound in this enclosing scope
 ```
 
 ### Generic method within generic class
@@ -546,7 +569,7 @@ parameters from the enclosing class.
 ```py
 from typing import Generic, TypeVar
 
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 T = TypeVar("T")
 S = TypeVar("S")

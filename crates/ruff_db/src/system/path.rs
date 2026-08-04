@@ -524,6 +524,13 @@ impl SystemPathBuf {
         Utf8PathBuf::from_path_buf(path).map(Self)
     }
 
+    /// Try to convert from `path` directly, falling back to the lossy string representation on
+    /// error.
+    pub fn from_path_buf_lossy(path: std::path::PathBuf) -> Self {
+        Self::from_path_buf(path)
+            .unwrap_or_else(|path| Self::from(path.to_string_lossy().to_string()))
+    }
+
     /// Extends `self` with `path`.
     ///
     /// If `path` is absolute, it replaces the current path.

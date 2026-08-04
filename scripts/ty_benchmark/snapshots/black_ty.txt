@@ -1,17 +1,8 @@
 src/black/__init__.py:1018:13: error[unresolved-attribute] Attribute `detach` is not defined on `AnsiToWin32` in union `TextIOWrapper[_WrappedBuffer] | AnsiToWin32`
 src/black/__init__.py:1072:9: error[unresolved-attribute] Attribute `detach` is not defined on `AnsiToWin32` in union `TextIOWrapper[BinaryIO | Any] | TextIOWrapper[_WrappedBuffer] | AnsiToWin32`
-src/black/files.py:104:12: warning[possibly-unresolved-reference] Name `directory` used when possibly not defined
 src/black/handle_ipynb_magics.py:108:10: error[unresolved-import] Cannot resolve imported module `tokenize_rt`
 src/black/handle_ipynb_magics.py:132:10: error[unresolved-import] Cannot resolve imported module `tokenize_rt`
 src/black/handle_ipynb_magics.py:173:10: error[unresolved-import] Cannot resolve imported module `IPython.core.inputtransformer2`
-src/black/linegen.py:930:12: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
-src/black/linegen.py:930:36: warning[possibly-unresolved-reference] Name `tail_leaves` used when possibly not defined
-src/black/linegen.py:934:9: warning[possibly-unresolved-reference] Name `head_leaves` used when possibly not defined
-src/black/linegen.py:934:28: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
-src/black/linegen.py:937:9: warning[possibly-unresolved-reference] Name `body_leaves` used when possibly not defined
-src/black/linegen.py:937:28: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
-src/black/linegen.py:940:9: warning[possibly-unresolved-reference] Name `tail_leaves` used when possibly not defined
-src/black/linegen.py:940:28: warning[possibly-unresolved-reference] Name `matching_bracket` used when possibly not defined
 src/black/ranges.py:404:28: error[invalid-argument-type] Argument to function `first_leaf` is incorrect: Expected `Leaf | Node`, found `object`
 src/black/ranges.py:405:26: error[invalid-argument-type] Argument to function `last_leaf` is incorrect: Expected `Leaf | Node`, found `object`
 src/black/trans.py:301:20: error[invalid-raise] Cannot use object of type `object` as an exception cause
@@ -34,4 +25,4 @@ src/blib2to3/pytree.py:364:18: warning[possibly-unresolved-reference] Name `curr
 src/blib2to3/pytree.py:669:24: warning[possibly-unresolved-reference] Name `newcontent` used when possibly not defined
 src/blib2to3/pytree.py:755:24: warning[possibly-unresolved-reference] Name `wrapped_content` used when possibly not defined
 src/blib2to3/pytree.py:846:34: warning[possibly-unresolved-reference] Name `save_stderr` used when possibly not defined
-Found 36 diagnostics
+Found 27 diagnostics

@@ -34,7 +34,6 @@ error[invalid-await]: `InvalidAwaitReturn` is not awaitable
   |
 2 |     def __await__(self) -> int:
   |         ---------------------- method defined here
-  |
 info: `__await__` returns `int`, which is not a valid iterator
 
 ```

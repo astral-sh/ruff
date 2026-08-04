@@ -441,7 +441,6 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
 41 |
 42 | index = index * (index + 10)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with augmented assignment
    |
 41 |
@@ -458,7 +457,6 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 46 |     def t(self):
 47 |         self.a = self.a + 1
    |         ^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with augmented assignment
    |
 46 |     def t(self):
@@ -474,7 +472,6 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 50 | obj = T()
 51 | obj.a = obj.a + 1
    | ^^^^^^^^^^^^^^^^^
-   |
 help: Replace with augmented assignment
    |
 50 | obj = T()
@@ -660,7 +657,6 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 93 | |  \
 94 | |     test8
    | |_________^
-   |
 help: Replace with augmented assignment
    |
 89 |

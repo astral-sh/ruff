@@ -6,17 +6,21 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+
+use ruff_db::PythonFile;
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
-use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
+
+// FIXME: Replace this temporary alias once semantic query keys can use the environment-bearing
+// `Program` Salsa ingredient directly.
+pub type Program = ast::PythonVersion;
 
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
@@ -34,7 +38,7 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
     ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
@@ -67,7 +71,7 @@ pub mod program;
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
-pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
+pub fn semantic_index<'db>(db: &'db dyn Db, file: PythonFile<'db>) -> SemanticIndex<'db> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
     let module = parsed_module(db, file).load(db);
@@ -82,9 +86,9 @@ pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
-    let file = scope.file(db);
-    let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
-    let index = semantic_index(db, file);
+    let python_file = scope.python_file(db);
+    let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?python_file).entered();
+    let index = semantic_index(db, python_file);
     Arc::clone(&index.place_tables[scope.file_scope_id(db)])
 }
 
@@ -95,9 +99,9 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
-    let file = scope.file(db);
-    let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
-    let index = semantic_index(db, file);
+    let python_file = scope.python_file(db);
+    let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?python_file).entered();
+    let index = semantic_index(db, python_file);
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
 }
 
@@ -132,22 +136,23 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// literals (`Literal[0, 1, 2, ...]`) until we eventually reach the threshold for widening to
 /// `int` and stop iterating. (See `should_widen` and `widen_literal_types`.)
 ///
-/// There's a chicken-and-egg problem with synthesizing the `DefinitionKind::LoopHeader`
-/// definitions at the top of the loop, and assembling all the bindings in the `LoopHeader` struct
-/// that they refer to. See `LoopToken` below for how we work around that.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
+/// Loop header definitions are synthesized before walking the loop body, but the bindings in the
+/// header are only known after walking all loop-back edges. The builder reserves a [`LoopHeaderId`]
+/// before the walk, fills the corresponding header afterward, and publishes the completed headers
+/// in the scope's [`UseDefMap`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
 }
 
 impl LoopHeader {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             bindings: FxHashMap::default(),
         }
     }
 
-    pub fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
+    fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
         self.bindings.entry(place).or_default().push(binding);
     }
 
@@ -163,33 +168,6 @@ impl LoopHeader {
     }
 }
 
-/// A Salsa token for retrieving a `LoopHeader`. See `get_loop_header` below.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct LoopToken<'db> {}
-
-impl get_size2::GetSize for LoopToken<'_> {}
-
-/// Look up a `LoopHeader` given a `LoopToken`.
-///
-/// Loop header definitions are the very first things we encounter (synthesize) when we walk a
-/// loop, and they need to refer to the corresponding the `LoopHeader` struct that records their
-/// bindings, but that struct isn't available until we've finished walking the loop. To make this
-/// work in the largely immutable world of Salsa, we add a layer of indirection using a Salsa
-/// feature called "specify":
-/// <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
-///
-/// When we first encounter a loop, we generate a `LoopToken` that uniquely identifies the loop but
-/// doesn't contain any data. We do a lightweight pre-walk to collect bound places (see
-/// `LoopBindingsVisitor`), and for each bound place we create a loop header definition that stores
-/// the `LoopToken`. Then after we've finished visiting the loop, we call
-/// `get_loop_header::specify` to associate the token with the completed `LoopHeader`. All of this
-/// happens while we're building the semantic index, and nothing needs to call `get_loop_header`
-/// until we get to type inference later, so the order of operations always works out.
-#[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
-pub fn get_loop_header<'db>(_db: &'db dyn Db, _loop_token: LoopToken<'db>) -> LoopHeader {
-    panic!("should always be set by specify()");
-}
-
 /// Returns all attribute assignments as scope IDs for a specific class body scope.
 ///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
@@ -198,8 +176,7 @@ pub fn attribute_scopes<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + 'db {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, class_body_scope.python_file(db));
     let class_scope_id = class_body_scope.file_scope_id(db);
     ChildrenIter::new(&index.scopes, class_scope_id)
         .filter_map(move |(child_scope_id, scope)| {
@@ -247,8 +224,8 @@ pub fn attribute_scopes<'db>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-pub fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub fn global_scope<'db>(db: &'db dyn Db, file: PythonFile<'db>) -> ScopeId<'db> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
     FileScopeId::global().to_scope_id(db, file)
@@ -261,7 +238,7 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
-#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DefinitionsByNode<'db> {
     single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
     non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
@@ -303,7 +280,7 @@ impl<'db> DefinitionsByNode<'db> {
 }
 
 /// The place tables and use-def maps for all scopes in a file.
-#[derive(Debug, Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
     place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
@@ -332,10 +309,10 @@ pub struct SemanticIndex<'db> {
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
-    // Map from a constraining use of a collection literal to its definition.
+    // Map from a constraining use of a collection initializer to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
-    // Map from a collection literal definition to statements containing a constraining use.
+    // Map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
@@ -365,13 +342,16 @@ pub struct SemanticIndex<'db> {
     /// Set of all generator functions in this file.
     generator_functions: FrozenSet<FileScopeId>,
 
+    /// Set of all asynchronous comprehensions in this file.
+    async_comprehensions: FrozenSet<FileScopeId>,
+
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
     narrowing_alias_predicates: FrozenMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct NarrowingAliasPredicate<'db> {
     /// Aliased expression, e.g., `x is None` in `is_none = x is None`.
     pub expression: Expression<'db>,
@@ -414,7 +394,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self) -> &AstIds {
+    fn ast_ids(&self) -> &AstIds {
         &self.ast_ids
     }
 
@@ -455,10 +435,6 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn symbol_is_global_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
         self.place_table(scope).symbol(symbol).is_global()
-    }
-
-    pub fn symbol_is_nonlocal_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
-        self.place_table(scope).symbol(symbol).is_nonlocal()
     }
 
     /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
@@ -550,16 +526,16 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
-    /// If this is a potentially constraining use of an unannotated collection literal, returns
+    /// If this is a potentially constraining use of an unannotated collection initializer, returns
     /// its definition.
-    pub fn unannotated_collection_literal(
+    pub fn unannotated_collection_initializer(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
 
-    /// Returns all potentially constraining uses of the given unnannotated collection literal.
+    /// Returns all potentially constraining uses of the given unannotated collection initializer.
     pub fn constraining_collection_uses(
         &self,
         collection_def: Definition<'db>,
@@ -578,7 +554,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
+    fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
     }
 
@@ -902,7 +878,7 @@ pub struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    pub fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
         let descendants = DescendantsIter::new(scopes, parent);
 
         Self {
@@ -1031,7 +1007,7 @@ impl From<bool> for Truthiness {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, get_size2::GetSize)]
 pub enum EvaluationMode {
     Sync,
     Async,
@@ -1052,7 +1028,7 @@ impl EvaluationMode {
 }
 
 /// Specifies how the boundness of a place should be determined.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BoundnessAnalysis {
     /// The place is always considered bound.
     AssumeBound,
@@ -1093,7 +1069,10 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::{files::system_path_to_file, parsed::ParsedModuleRef};
+    use ruff_db::{
+        files::{File, system_path_to_file},
+        parsed::ParsedModuleRef,
+    };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -1105,6 +1084,7 @@ mod tests {
         definition::{
             DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
         },
+        program::Program,
     };
 
     impl UseDefMap<'_> {
@@ -1144,6 +1124,10 @@ mod tests {
         TestCase { db, file }
     }
 
+    fn python_file(db: &TestDb, file: File) -> PythonFile<'_> {
+        PythonFile::new(db, file, Program::get(db).python_version(db))
+    }
+
     fn names(table: &PlaceTable) -> Vec<String> {
         table
             .symbols()
@@ -1154,7 +1138,7 @@ mod tests {
     #[test]
     fn empty() {
         let TestCase { db, file } = test_case("");
-        let global_table = place_table(&db, global_scope(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         let global_names = names(global_table);
 
@@ -1164,7 +1148,7 @@ mod tests {
     #[test]
     fn simple() {
         let TestCase { db, file } = test_case("x");
-        let global_table = place_table(&db, global_scope(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         assert_eq!(names(global_table), vec!["x"]);
     }
@@ -1172,7 +1156,7 @@ mod tests {
     #[test]
     fn annotation_only() {
         let TestCase { db, file } = test_case("x: int");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["int", "x"]);
@@ -1190,7 +1174,7 @@ mod tests {
     #[test]
     fn import() {
         let TestCase { db, file } = test_case("import foo");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["foo"]);
@@ -1204,7 +1188,7 @@ mod tests {
     #[test]
     fn import_sub() {
         let TestCase { db, file } = test_case("import foo.bar");
-        let global_table = place_table(&db, global_scope(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         assert_eq!(names(global_table), vec!["foo"]);
     }
@@ -1212,7 +1196,7 @@ mod tests {
     #[test]
     fn import_as() {
         let TestCase { db, file } = test_case("import foo.bar as baz");
-        let global_table = place_table(&db, global_scope(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         assert_eq!(names(global_table), vec!["baz"]);
     }
@@ -1220,7 +1204,7 @@ mod tests {
     #[test]
     fn import_from() {
         let TestCase { db, file } = test_case("from bar import foo");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["foo"]);
@@ -1241,7 +1225,7 @@ mod tests {
     #[test]
     fn assign() {
         let TestCase { db, file } = test_case("x = foo");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["foo", "x"]);
@@ -1261,7 +1245,7 @@ mod tests {
     #[test]
     fn augmented_assignment() {
         let TestCase { db, file } = test_case("x += 1");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["x"]);
@@ -1286,12 +1270,12 @@ class C:
 y = 2
 ",
         );
-        let global_table = place_table(&db, global_scope(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         assert_eq!(names(global_table), vec!["C", "y"]);
 
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
 
         let [(class_scope_id, class_scope)] = index
             .child_scopes(FileScopeId::global())
@@ -1301,7 +1285,9 @@ y = 2
         };
         assert_eq!(class_scope.kind(), ScopeKind::Class);
         assert_eq!(
-            class_scope_id.to_scope_id(&db, file).name(&db, &module),
+            class_scope_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "C"
         );
 
@@ -1324,8 +1310,8 @@ def func():
 y = 2
 ",
         );
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["func", "y"]);
@@ -1338,7 +1324,9 @@ y = 2
         };
         assert_eq!(function_scope.kind(), ScopeKind::Function);
         assert_eq!(
-            function_scope_id.to_scope_id(&db, file).name(&db, &module),
+            function_scope_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "func"
         );
 
@@ -1361,8 +1349,8 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let index = semantic_index(&db, file);
-        let global_table = place_table(&db, global_scope(&db, file));
+        let index = semantic_index(&db, python_file(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         assert_eq!(names(global_table), vec!["str", "int", "f"]);
 
@@ -1406,8 +1394,8 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     fn lambda_parameter_symbols() {
         let TestCase { db, file } = test_case("lambda a, b, c=1, *args, d=2, **kwargs: None");
 
-        let index = semantic_index(&db, file);
-        let global_table = place_table(&db, global_scope(&db, file));
+        let index = semantic_index(&db, python_file(&db, file));
+        let global_table = place_table(&db, global_scope(&db, python_file(&db, file)));
 
         assert!(names(global_table).is_empty());
 
@@ -1472,8 +1460,8 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["iter1"]);
@@ -1488,7 +1476,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             comprehension_scope_id
-                .to_scope_id(&db, file)
+                .to_scope_id(&db, python_file(&db, file))
                 .name(&db, &module),
             "<listcomp>"
         );
@@ -1523,7 +1511,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let index = semantic_index(&db, file);
+        let index = semantic_index(&db, python_file(&db, file));
         let [(comprehension_scope_id, _)] = index
             .child_scopes(FileScopeId::global())
             .collect::<Vec<_>>()[..]
@@ -1533,7 +1521,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(comprehension_scope_id);
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
         let syntax = module.syntax();
         let element = syntax.body[0]
             .as_expr_stmt()
@@ -1544,7 +1532,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id = element.scoped_use_id(&db, file);
+        let element_use_id = element.scoped_use_id(&db, python_file(&db, file));
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -1568,8 +1556,8 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["iter1"]);
@@ -1584,7 +1572,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             comprehension_scope_id
-                .to_scope_id(&db, file)
+                .to_scope_id(&db, python_file(&db, file))
                 .name(&db, &module),
             "<listcomp>"
         );
@@ -1603,7 +1591,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(inner_comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             inner_comprehension_scope_id
-                .to_scope_id(&db, file)
+                .to_scope_id(&db, python_file(&db, file))
                 .name(&db, &module),
             "<setcomp>"
         );
@@ -1622,7 +1610,7 @@ with item1 as x, item2 as y:
 ",
         );
 
-        let index = semantic_index(&db, file);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["item1", "x", "item2", "y"]);
@@ -1645,7 +1633,7 @@ with context() as (x, y):
 ",
         );
 
-        let index = semantic_index(&db, file);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["context", "x", "y"]);
@@ -1669,8 +1657,8 @@ def func():
     y = 2
 ",
         );
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["func"]);
@@ -1687,12 +1675,16 @@ def func():
         assert_eq!(func_scope_1.kind(), ScopeKind::Function);
 
         assert_eq!(
-            func_scope1_id.to_scope_id(&db, file).name(&db, &module),
+            func_scope1_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "func"
         );
         assert_eq!(func_scope_2.kind(), ScopeKind::Function);
         assert_eq!(
-            func_scope2_id.to_scope_id(&db, file).name(&db, &module),
+            func_scope2_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "func"
         );
 
@@ -1717,8 +1709,8 @@ def func[T]():
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["func"]);
@@ -1732,7 +1724,9 @@ def func[T]():
 
         assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(
-            ann_scope_id.to_scope_id(&db, file).name(&db, &module),
+            ann_scope_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "func"
         );
         let ann_table = index.place_table(ann_scope_id);
@@ -1745,7 +1739,9 @@ def func[T]():
         };
         assert_eq!(func_scope.kind(), ScopeKind::Function);
         assert_eq!(
-            func_scope_id.to_scope_id(&db, file).name(&db, &module),
+            func_scope_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "func"
         );
         let func_table = index.place_table(func_scope_id);
@@ -1761,8 +1757,8 @@ class C[T]:
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
         let global_table = index.place_table(FileScopeId::global());
 
         assert_eq!(names(global_table), vec!["C"]);
@@ -1775,7 +1771,12 @@ class C[T]:
         };
 
         assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
-        assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db, &module), "C");
+        assert_eq!(
+            ann_scope_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
+            "C"
+        );
         let ann_table = index.place_table(ann_scope_id);
         assert_eq!(names(ann_table), vec!["T"]);
         assert!(
@@ -1793,7 +1794,9 @@ class C[T]:
 
         assert_eq!(class_scope.kind(), ScopeKind::Class);
         assert_eq!(
-            class_scope_id.to_scope_id(&db, file).name(&db, &module),
+            class_scope_id
+                .to_scope_id(&db, python_file(&db, file))
+                .name(&db, &module),
             "C"
         );
         assert_eq!(names(index.place_table(class_scope_id)), vec!["x"]);
@@ -1802,8 +1805,8 @@ class C[T]:
     #[test]
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
-        let module = parsed_module(&db, file).load(&db);
-        let scope = global_scope(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let scope = global_scope(&db, python_file(&db, file));
         let ast = module.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
             value: x_use_expr, ..
@@ -1814,7 +1817,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, file);
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, python_file(&db, file));
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
@@ -1834,8 +1837,8 @@ class C[T]:
     fn expression_scope() {
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
-        let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
         let ast = module.syntax();
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
@@ -1861,7 +1864,14 @@ class C[T]:
         ) -> Vec<&'a str> {
             scopes
                 .into_iter()
-                .map(|(scope_id, _)| scope_id.to_scope_id(db, file).name(db, module))
+                .map(|(scope_id, _)| {
+                    scope_id
+                        .to_scope_id(
+                            db,
+                            PythonFile::new(db, file, Program::get(db).python_version(db)),
+                        )
+                        .name(db, module)
+                })
                 .collect()
         }
 
@@ -1878,8 +1888,8 @@ def x():
     pass",
         );
 
-        let module = parsed_module(&db, file).load(&db);
-        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let index = semantic_index(&db, python_file(&db, file));
 
         let descendants = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
@@ -1925,7 +1935,7 @@ match subject:
 ",
         );
 
-        let global_scope_id = global_scope(&db, file);
+        let global_scope_id = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, global_scope_id);
 
         assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
@@ -1957,7 +1967,7 @@ match 1:
 ",
         );
 
-        let global_scope_id = global_scope(&db, file);
+        let global_scope_id = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, global_scope_id);
 
         assert_eq!(names(global_table), vec!["first", "second"]);
@@ -1974,7 +1984,7 @@ match 1:
     #[test]
     fn for_loops_single_assignment() {
         let TestCase { db, file } = test_case("for x in a: pass");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(&names(global_table), &["a", "x"]);
@@ -1990,7 +2000,7 @@ match 1:
     #[test]
     fn for_loops_simple_unpacking() {
         let TestCase { db, file } = test_case("for (x, y) in a: pass");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(&names(global_table), &["a", "x", "y"]);
@@ -2010,7 +2020,7 @@ match 1:
     #[test]
     fn for_loops_complex_unpacking() {
         let TestCase { db, file } = test_case("for [((a,) b), (c, d)] in e: pass");
-        let scope = global_scope(&db, file);
+        let scope = global_scope(&db, python_file(&db, file));
         let global_table = place_table(&db, scope);
 
         assert_eq!(&names(global_table), &["e", "a", "b", "c", "d"]);

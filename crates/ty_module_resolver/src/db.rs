@@ -66,6 +66,10 @@ pub(crate) mod tests {
             self
         }
 
+        pub(crate) fn python_version(&self) -> PythonVersion {
+            self.python_version
+        }
+
         pub(crate) fn set_search_paths(&mut self, search_paths: SearchPaths) {
             search_paths.try_register_static_roots(self);
             self.search_paths = Arc::new(search_paths);
@@ -105,10 +109,6 @@ pub(crate) mod tests {
 
         fn files(&self) -> &Files {
             &self.files
-        }
-
-        fn python_version(&self) -> PythonVersion {
-            self.python_version
         }
     }
 

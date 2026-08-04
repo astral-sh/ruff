@@ -57,7 +57,6 @@ A004 Import `BaseExceptionGroup` is shadowing a Python builtin
 10 | if sys.version_info < (3, 11):
 11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
    |                                ^^^^^^^^^^^^^^^^^^
-   |
 
 A004 Import `ExceptionGroup` is shadowing a Python builtin
   --> A004.py:11:52
@@ -65,4 +64,3 @@ A004 Import `ExceptionGroup` is shadowing a Python builtin
 10 | if sys.version_info < (3, 11):
 11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
    |                                                    ^^^^^^^^^^^^^^
-   |

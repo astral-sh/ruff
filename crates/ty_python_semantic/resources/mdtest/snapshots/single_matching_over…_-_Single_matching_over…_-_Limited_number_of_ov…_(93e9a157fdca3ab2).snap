@@ -39,13 +39,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   |
 3 | f("a")  # error: [invalid-argument-type]
   |   ^^^ Expected `int`, found `Literal["a"]`
-  |
 info: Matching overload defined here
  --> src/overloaded.pyi:6:5
   |
 6 | def f(x: int) -> int: ...
   |     ^ ------ Parameter declared here
-  |
 info: Non-matching overloads for function `f`:
 info:   () -> None
 info:   (x: int, y: int) -> int

@@ -1161,14 +1161,29 @@ class DictComp(expr):
     else:
         value: expr
     generators: list[comprehension]
-    if sys.version_info >= (3, 13):
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self, key: expr, value: expr | None = None, generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
+        ) -> None: ...
+    elif sys.version_info >= (3, 13):
         def __init__(
             self, key: expr, value: expr, generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
         ) -> None: ...
     else:
         def __init__(self, key: expr, value: expr, generators: list[comprehension], **kwargs: Unpack[_Attributes]) -> None: ...
 
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
+        def __replace__(
+            self,
+            *,
+            key: expr = ...,
+            value: expr | None = ...,
+            generators: list[comprehension] = ...,
+            **kwargs: Unpack[_Attributes],
+        ) -> Self:
+            """Return a copy of the AST node with new values for the specified fields."""
+
+    elif sys.version_info >= (3, 14):
         def __replace__(
             self, *, key: expr = ..., value: expr = ..., generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
@@ -2735,6 +2750,10 @@ class NodeVisitor:
         def visit_ParamSpec(self, node: ParamSpec) -> Any: ...
         def visit_TypeVarTuple(self, node: TypeVarTuple) -> Any: ...
         def visit_TypeAlias(self, node: TypeAlias) -> Any: ...
+
+    if sys.version_info >= (3, 14):
+        def visit_TemplateStr(self, node: TemplateStr) -> Any: ...
+        def visit_Interpolation(self, node: Interpolation) -> Any: ...
 
     # visit methods for deprecated nodes
     def visit_ExtSlice(self, node: ExtSlice) -> Any: ...

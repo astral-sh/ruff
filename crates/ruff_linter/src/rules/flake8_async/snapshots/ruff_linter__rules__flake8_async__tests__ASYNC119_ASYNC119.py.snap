@@ -8,7 +8,6 @@ ASYNC119 Yield in context manager in async generator may not trigger cleanup
 13 |     with open(""):
 14 |         yield  # ASYNC119
    |         ^^^^^
-   |
 help: Use `@asynccontextmanager` if appropriate, or refactor
 
 ASYNC119 Yield in context manager in async generator may not trigger cleanup
@@ -18,7 +17,6 @@ ASYNC119 Yield in context manager in async generator may not trigger cleanup
 18 |     async with open(""):
 19 |         yield  # ASYNC119
    |         ^^^^^
-   |
 help: Use `@asynccontextmanager` if appropriate, or refactor
 
 ASYNC119 Yield in context manager in async generator may not trigger cleanup
@@ -63,7 +61,6 @@ ASYNC119 Yield in context manager in async generator may not trigger cleanup
 27 |         yield  # ASYNC119
 28 |         yield  # ASYNC119
    |         ^^^^^
-   |
 help: Use `@asynccontextmanager` if appropriate, or refactor
 
 ASYNC119 Yield in context manager in async generator may not trigger cleanup
@@ -73,7 +70,6 @@ ASYNC119 Yield in context manager in async generator may not trigger cleanup
 33 |         with open(""):
 34 |             yield  # ASYNC119
    |             ^^^^^
-   |
 help: Use `@asynccontextmanager` if appropriate, or refactor
 
 ASYNC119 Yield in context manager in async generator may not trigger cleanup
@@ -83,5 +79,4 @@ ASYNC119 Yield in context manager in async generator may not trigger cleanup
 61 |             yield
 62 |         yield  # ASYNC119
    |         ^^^^^
-   |
 help: Use `@asynccontextmanager` if appropriate, or refactor

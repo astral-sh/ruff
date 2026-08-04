@@ -18,11 +18,12 @@ pub struct FileRoot {
     pub path: Box<SystemPath>,
 
     /// The kind of the root at the time of its creation.
+    #[returns(copy)]
     pub kind_at_time_of_creation: FileRootKind,
 }
 
 impl FileRoot {
-    pub fn durability(self, db: &dyn Db) -> salsa::Durability {
+    pub(crate) fn durability(self, db: &dyn Db) -> salsa::Durability {
         self.kind_at_time_of_creation(db).durability()
     }
 }
@@ -78,7 +79,7 @@ impl FileRoots {
 
         // Insert a new source root
         let root = FileRoot::builder(path.into(), kind)
-            .durability(Durability::HIGH)
+            .durability(Durability::NEVER_CHANGE)
             .new(db);
 
         // Insert a path that matches the root itself

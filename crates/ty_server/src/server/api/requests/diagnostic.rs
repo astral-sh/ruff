@@ -43,7 +43,7 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
             return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         };
 
-        let result_id = diagnostics.result_id();
+        let result_id = diagnostics.result_id(db, snapshot.resolved_client_capabilities());
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == params.previous_result_id.as_ref() => {

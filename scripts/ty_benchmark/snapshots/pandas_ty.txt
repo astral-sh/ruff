@@ -816,8 +816,6 @@ pandas/core/generic.py:1823:22: error[not-iterable] Object of type `list[Unknown
 pandas/core/generic.py:1836:22: error[not-iterable] Object of type `list[Unknown] | tuple[Unknown, ...] | None` may not be iterable
 pandas/core/generic.py:1842:22: error[not-iterable] Object of type `list[Unknown] | tuple[Unknown, ...] | None` may not be iterable
 pandas/core/generic.py:2810:13: error[invalid-argument-type] Argument to function `to_hdf` is incorrect: Expected `DataFrame | Series`, found `Self@to_hdf`
-pandas/core/generic.py:3624:31: error[no-matching-overload] No overload of bound method `dict.pop` matches arguments
-pandas/core/generic.py:3625:32: error[no-matching-overload] No overload of bound method `dict.pop` matches arguments
 pandas/core/generic.py:4309:32: warning[possibly-unresolved-reference] Name `new_index` used when possibly not defined
 pandas/core/generic.py:4319:28: warning[possibly-unresolved-reference] Name `new_index` used when possibly not defined
 pandas/core/generic.py:4688:13: error[invalid-assignment] Object of type `str` is not assignable to `int | Literal["columns", "index", "rows"]`
@@ -1140,6 +1138,8 @@ pandas/core/internals/construction.py:267:29: error[invalid-argument-type] Argum
 pandas/core/internals/construction.py:299:39: error[invalid-argument-type] Argument to function `_check_values_indices_shape_match` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `Unknown | ndarray[Unknown, dtype[Any]] | ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | ndarray[tuple[int, int], dtype[Any]]`
 pandas/core/internals/construction.py:399:34: error[invalid-argument-type] Argument to function `ensure_index` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | ... omitted 3 union elements`, found `dict_keys[Unknown, Unknown]`
 pandas/core/internals/construction.py:409:13: error[invalid-assignment] Invalid subscript assignment with key of type `int` and value of type `Unknown | list[Unknown]` on object of type `list[int | float]`
+pandas/core/internals/construction.py:430:21: error[invalid-argument-type] Argument to function `construct_1d_arraylike_from_scalar` is incorrect: Expected `str | bytes | date | ... omitted 10 union elements`, found `object`
+pandas/core/internals/construction.py:434:17: error[invalid-assignment] Invalid subscript assignment with key of type `int` and value of type `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]` on object of type `list[int | float]`
 pandas/core/internals/construction.py:597:50: error[invalid-argument-type] Argument to function `fast_multiget` is incorrect: Expected `ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`
 pandas/core/internals/construction.py:654:34: warning[possibly-unresolved-reference] Name `index` used when possibly not defined
 pandas/core/internals/construction.py:657:35: warning[possibly-unresolved-reference] Name `index` used when possibly not defined
@@ -1626,7 +1626,7 @@ pandas/io/parsers/readers.py:2068:21: error[unresolved-attribute] Object of type
 pandas/io/pytables.py:524:8: error[unsupported-operator] Operator `<=` is not supported between two objects of type `None | Unknown | int`
 pandas/io/pytables.py:528:11: error[unsupported-operator] Operator `>` is not supported between objects of type `None | Unknown | int` and `Literal[1]`
 pandas/io/pytables.py:687:30: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-pandas/io/pytables.py:754:20: error[invalid-return-type] Return type does not match returned value: expected `list[str]`, found `list[str | Unknown | None]`
+pandas/io/pytables.py:754:20: error[invalid-return-type] Return type does not match returned value: expected `list[str]`, found `list[str | None]`
 pandas/io/pytables.py:1371:13: warning[possibly-unresolved-reference] Name `s` used when possibly not defined
 pandas/io/pytables.py:1375:16: warning[possibly-unresolved-reference] Name `s` used when possibly not defined
 pandas/io/pytables.py:1377:16: warning[possibly-unresolved-reference] Name `s` used when possibly not defined
@@ -1732,11 +1732,11 @@ pandas/io/stata.py:2272:12: error[invalid-return-type] Return type does not matc
 pandas/io/stata.py:2933:21: error[invalid-argument-type] Argument to function `isfile` is incorrect: Expected `int | str | bytes | PathLike[str] | PathLike[bytes]`, found `str | PathLike[str] | (WriteBuffer[bytes] & PathLike[object])`
 pandas/io/stata.py:2936:35: error[invalid-argument-type] Argument to function `unlink` is incorrect: Expected `str | bytes | PathLike[str] | PathLike[bytes]`, found `str | PathLike[str] | (WriteBuffer[bytes] & PathLike[object])`
 pandas/io/xml.py:42:22: error[unresolved-import] Module `lxml` has no member `etree`
-pandas/io/xml.py:483:21: error[unresolved-attribute] Attribute `findall` is not defined on `None` in union `Element[Unknown] | Unknown | None`
-pandas/io/xml.py:516:26: error[unresolved-attribute] Attribute `find` is not defined on `None` in union `Element[Unknown] | Unknown | None`
+pandas/io/xml.py:483:21: error[unresolved-attribute] Attribute `findall` is not defined on `None` in union `Element[str] | Unknown | None`
+pandas/io/xml.py:516:26: error[unresolved-attribute] Attribute `find` is not defined on `None` in union `Element[str] | Unknown | None`
 pandas/io/xml.py:568:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
-pandas/io/xml.py:600:17: error[unresolved-attribute] Attribute `xpath` is not defined on `Element[Unknown]`, `None` in union `Element[Unknown] | Unknown | None`
-pandas/io/xml.py:626:28: error[unresolved-attribute] Attribute `xpath` is not defined on `Element[Unknown]`, `None` in union `Element[Unknown] | Unknown | None`
+pandas/io/xml.py:600:17: error[unresolved-attribute] Attribute `xpath` is not defined on `Element[str]`, `None` in union `Element[str] | Unknown | None`
+pandas/io/xml.py:626:28: error[unresolved-attribute] Attribute `xpath` is not defined on `Element[str]`, `None` in union `Element[str] | Unknown | None`
 pandas/io/xml.py:643:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
 pandas/io/xml.py:681:14: error[unresolved-import] Cannot resolve imported module `lxml.etree`
 pandas/plotting/_core.py:1403:60: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | Literal[False]`

@@ -227,10 +227,11 @@ fn query_was_not_run() {
 
     #[salsa::input(debug)]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database, input: Input) -> usize {
         input.text(db).len()
     }
@@ -262,10 +263,11 @@ fn query_was_not_run_fails_if_query_was_run() {
 
     #[salsa::input(debug)]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database, input: Input) -> usize {
         input.text(db).len()
     }
@@ -294,10 +296,11 @@ fn const_query_was_not_run_fails_if_query_was_run() {
 
     #[salsa::input]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database) -> usize {
         db.report_untracked_read();
         5
@@ -325,10 +328,11 @@ fn query_was_run_fails_if_query_was_not_run() {
 
     #[salsa::input(debug)]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database, input: Input) -> usize {
         input.text(db).len()
     }

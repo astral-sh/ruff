@@ -1,4 +1,4 @@
-"""Base16, Base32, Base64 (RFC 3548), Base85 and Ascii85 data encodings"""
+"""Base16, Base32, Base64 (RFC 4648), Base85 and Ascii85 data encodings"""
 
 import sys
 from _typeshed import ReadableBuffer, SupportsNoArgReadline, SupportsRead, SupportsWrite
@@ -174,7 +174,7 @@ if sys.version_info >= (3, 15):
         ignorechars should be a byte string containing characters to ignore
         from the input.
 
-        RFC 3548 allows for optional mapping of the digit 0 (zero) to the
+        RFC 4648 allows for optional mapping of the digit 0 (zero) to the
         letter O (oh), and for optional mapping of the digit 1 (one) to
         either the letter I (eye) or letter L (el).  The optional argument
         map01 when not None, specifies which letter the digit 1 should be
@@ -397,12 +397,14 @@ else:
     ) -> bytes:
         """Decode the Ascii85 encoded bytes-like object or ASCII string b.
 
-        foldspaces is a flag that specifies whether the 'y' short sequence should be
-        accepted as shorthand for 4 consecutive spaces (ASCII 0x20). This feature is
-        not supported by the "standard" Adobe encoding.
+        foldspaces is a flag that specifies whether the 'y' short sequence
+        should be accepted as shorthand for 4 consecutive spaces (ASCII
+        0x20).  This feature is not supported by the standard Ascii85
+        encoding used in PDF and PostScript.
 
-        adobe controls whether the input sequence is in Adobe Ascii85 format (i.e.
-        is framed with <~ and ~>).
+        adobe controls whether the <~ and ~> markers are present. While
+        the leading <~ is not required, the input must end with ~>, or a
+        ValueError is raised.
 
         ignorechars should be a byte string containing characters to ignore from the
         input. This should only contain whitespace characters, and by default
@@ -414,8 +416,10 @@ else:
     def b85encode(b: ReadableBuffer, pad: bool = False) -> bytes:
         """Encode bytes-like object b in base85 format and return a bytes object.
 
-        If pad is true, the input is padded with b'\\0' so its length is a multiple of
-        4 bytes before encoding.
+        The input is padded with b'\x00' so its length is a multiple of 4
+        bytes before encoding.  If pad is true, all the resulting
+        characters are retained in the output, which will always be a
+        multiple of 5 bytes.
         """
 
     def b85decode(b: str | ReadableBuffer) -> bytes:

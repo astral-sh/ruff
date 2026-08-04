@@ -97,7 +97,6 @@ F504 [*] `%`-format string has unused named argument(s): greeting
 19 | # https://github.com/astral-sh/ruff/issues/18806
 20 | "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove extra named arguments: greeting
    |
 19 | # https://github.com/astral-sh/ruff/issues/18806

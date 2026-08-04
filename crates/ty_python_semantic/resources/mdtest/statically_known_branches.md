@@ -1034,7 +1034,7 @@ reveal_type(c)  # revealed: Literal[1]
 python-version = "3.10"
 ```
 
-### Single-valued types, always true
+### Literal subject, always true
 
 ```py
 x = 1
@@ -1048,7 +1048,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Single-valued types, always true, with wildcard pattern
+### Literal subject, always true, with wildcard pattern
 
 ```py
 x = 1
@@ -1064,7 +1064,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Single-valued types, always true, with guard
+### Literal subject, always true, with guard
 
 Make sure we don't infer a static truthiness in case there is a case guard:
 
@@ -1085,7 +1085,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-### Single-valued types, always false
+### Literal subject, always false
 
 ```py
 x = 1
@@ -1099,7 +1099,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, always false, with wildcard pattern
+### Literal subject, always false, with wildcard pattern
 
 ```py
 x = 1
@@ -1115,7 +1115,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, always false, with guard
+### Literal subject, always false, with guard
 
 For definitely-false cases, the presence of a guard has no influence:
 
@@ -1136,7 +1136,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Non-single-valued types
+### Broad subject type
 
 ```py
 def _(s: str):

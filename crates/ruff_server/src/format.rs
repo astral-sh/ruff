@@ -33,14 +33,13 @@ pub(crate) enum FormatBackend {
 pub(crate) enum FormatResult {
     Formatted(String),
     Unchanged,
-    PreviewOnly { file_format: &'static str },
 }
 
 impl FormatResult {
     fn into_formatted(self) -> Option<String> {
         match self {
             Self::Formatted(formatted) => Some(formatted),
-            Self::Unchanged | Self::PreviewOnly { .. } => None,
+            Self::Unchanged => None,
         }
     }
 }
@@ -91,13 +90,6 @@ fn format_internal(
             }
         }
         SourceType::Markdown => {
-            if !formatter_settings.preview.is_enabled() {
-                tracing::warn!("Markdown formatting is experimental, enable preview mode.");
-                return Ok(FormatResult::PreviewOnly {
-                    file_format: "Markdown",
-                });
-            }
-
             match format_code_blocks(document.contents(), Some(path), formatter_settings) {
                 MarkdownResult::Formatted(formatted) => Ok(FormatResult::Formatted(formatted)),
                 MarkdownResult::Unchanged => Ok(FormatResult::Unchanged),
@@ -309,7 +301,7 @@ impl UvFormatCommand {
     }
 
     /// Execute the format command on the given source.
-    pub(crate) fn format(
+    fn format(
         &self,
         source: &str,
         path: &Path,
@@ -365,12 +357,12 @@ impl UvFormatCommand {
     }
 
     /// Format the entire document.
-    pub(crate) fn format_document(&self, source: &str, path: &Path) -> crate::Result<FormatResult> {
+    fn format_document(&self, source: &str, path: &Path) -> crate::Result<FormatResult> {
         self.format(source, path, None)
     }
 
     /// Format a specific range.
-    pub(crate) fn format_range(
+    fn format_range(
         &self,
         source: &str,
         range: TextRange,

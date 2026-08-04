@@ -47,10 +47,8 @@ mod tests {
     fn async109_python_310_or_older(path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
-            },
+            &LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
+                .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
         Ok(())

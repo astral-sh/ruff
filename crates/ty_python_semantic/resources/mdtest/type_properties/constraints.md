@@ -34,7 +34,8 @@ upper bound.
 
 ```py
 from typing import Any, final, Never, Sequence
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -126,7 +127,8 @@ strict subtype of the lower bound, a strict supertype of the upper bound, or inc
 
 ```pyi
 from typing import Any, final, Never, Sequence
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -224,7 +226,7 @@ cases, we can simplify the result of an intersection.
 ### Different typevars
 
 ```py
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -247,7 +249,8 @@ The intersection of two ranges is where the ranges "overlap".
 
 ```pyi
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -322,7 +325,8 @@ the intersection as removing the hole from the range constraint.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -359,7 +363,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 ```
 
-Otherwise we clip the negative constraint to the mininum range that overlaps with the positive
+Otherwise we clip the negative constraint to the minimum range that overlaps with the positive
 range.
 
 ```py
@@ -376,7 +380,8 @@ smaller constraint. For negated ranges, the smaller constraint is the one with t
 
 ```py
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -434,7 +439,7 @@ can simplify the result of an union.
 ### Different typevars
 
 ```py
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -458,7 +463,8 @@ bounds.
 
 ```py
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -562,7 +568,8 @@ the union as filling part of the hole with the types from the range constraint.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -599,7 +606,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 ```
 
-Otherwise we clip the positive constraint to the mininum range that overlaps with the negative
+Otherwise we clip the positive constraint to the minimum range that overlaps with the negative
 range.
 
 ```py
@@ -615,7 +622,8 @@ The union of two negated ranges has a hole where the ranges "overlap".
 
 ```py
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -657,7 +665,8 @@ def _[T]() -> None:
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -686,7 +695,8 @@ def _[T]() -> None:
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Base: ...
 
@@ -724,7 +734,8 @@ enforce an arbitrary ordering on typevars, and always place the constraint on th
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def f[S, T]():
     # (S@f ≤ T@f)
@@ -778,7 +789,8 @@ set.
 
 ```pyi
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def f[T]():
     c1 = ConstraintSet.range(Never, T, str | int)
@@ -799,7 +811,8 @@ static types.)
 
 ```pyi
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def same_typevar[T]():
     constraints = ConstraintSet.range(Never, T, T)
@@ -848,6 +861,84 @@ def same_typevar[T]():
     static_assert(constraints == expected)
 ```
 
+## Existential quantification
+
+Existential quantification removes the listed typevars from a constraint set. Any constraints that
+do not involve those typevars must remain in the result. The result holds whenever _at least one_
+valid assignment to the quantified variables satisfies the expression being quantified over.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def preserves_remaining_conjunct[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int & u_str).exists(tuple[U])
+    static_assert(quantified == t_int)
+
+def satisfies_uncertain_disjunct[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int | u_str).exists(tuple[U])
+    static_assert(quantified == ConstraintSet.always())
+
+def no_typevars_is_identity[T]() -> None:
+    constraints = ConstraintSet.range(Never, T, int)
+    static_assert(constraints.exists(tuple[()]) == constraints)
+```
+
+## Universal quantification
+
+Universal quantification removes the listed typevars from a constraint set. Any constraints that do
+not involve those typevars must remain in the result. The result holds whenever _every_ valid
+assignment to the quantified variables satisfies the expression being quantified over.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def preserves_uncertain_disjunct[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int | u_str).for_all(tuple[U])
+    static_assert(quantified == t_int)
+
+def removes_multiple_typevars[T, U]() -> None:
+    t_int = ConstraintSet.range(int, T, int)
+    u_str = ConstraintSet.range(str, U, str)
+    quantified = (t_int | u_str).for_all(tuple[T, U])
+    static_assert(quantified == ConstraintSet.never())
+
+def no_typevars_is_identity[T]() -> None:
+    constraints = ConstraintSet.range(Never, T, int)
+    static_assert(constraints.for_all(tuple[()]) == constraints)
+```
+
+The order of existential and universal quantifiers matters. For each target truth assignment there
+is some matching source truth assignment, but no single source truth assignment matches every target
+truth assignment.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def quantifier_order[S, T]() -> None:
+    source_is_int = ConstraintSet.range(int, S, int)
+    target_is_int = ConstraintSet.range(int, T, int)
+    equal = source_is_int.satisfies(target_is_int) & target_is_int.satisfies(source_is_int)
+
+    # ∀T.∃S.equal(S, T)
+    forall_target_exists_source = equal.exists(tuple[S]).for_all(tuple[T])
+    static_assert(forall_target_exists_source == ConstraintSet.always())
+
+    # ∃S.∀T.equal(S, T)
+    exists_source_forall_target = equal.for_all(tuple[T]).exists(tuple[S])
+    static_assert(exists_source_forall_target == ConstraintSet.never())
+```
+
 ## Displaying constraints
 
 The `with_detailed_display` method can be used to print out the boolean formula that a constraint
@@ -857,7 +948,7 @@ out all of the different kinds of constraints described above. Here we just test
 exists, and provides more detail than otherwise.
 
 ```py
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...

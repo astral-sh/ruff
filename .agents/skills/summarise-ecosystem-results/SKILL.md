@@ -17,6 +17,8 @@ Create `PR_<number>_ECOSYSTEM_SUMMARY.md` at the repository root by adapting [as
 
 Use the template's structure and omissions as the report contract. Remove all placeholders and HTML comments. Link external source locations with permalinks such as `[project file.py:123](permalink)`; never emit raw URLs.
 
+If summarising an ecosystem report is the only thing you're asked to do in a Codex App thread, you should rename that thread to "PR <number> ecosystem summary".
+
 ## Workflow
 
 1. **Locate the evidence.** Normalize the input to a PR number, find the ty ecosystem-results comment, open the linked detailed HTML report, and identify the exact Actions run that produced it. Use the comment as the change list and the detailed report as evidence.

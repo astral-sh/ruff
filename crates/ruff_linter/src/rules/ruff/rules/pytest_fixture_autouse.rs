@@ -7,6 +7,11 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 
+/// ## Removed
+/// This rule has been removed because it is highly opinionated and may encourage unidiomatic pytest
+/// usage. It may be reintroduced in the future under a different category but was not a good fit
+/// for the `RUF` category.
+///
 /// ## What it does
 /// Checks for `pytest` fixtures that set the parameter `autouse=True` in the decorator constructor.
 ///
@@ -60,7 +65,7 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 /// - [`pytest` documentation: Sharing fixtures across classes, modules, packages or session](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session)
 /// - [`pytest` documentation: Fixtures can request other fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixtures-can-request-other-fixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.17")]
+#[violation_metadata(removed_since = "0.15.20")]
 pub(crate) struct PytestFixtureAutouse;
 
 impl Violation for PytestFixtureAutouse {

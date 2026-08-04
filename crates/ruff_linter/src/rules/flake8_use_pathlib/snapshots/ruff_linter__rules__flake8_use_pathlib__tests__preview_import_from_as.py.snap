@@ -445,4 +445,3 @@ PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, an
 37 | xsamefile(p)
 38 | xsplitext(p)
    | ^^^^^^^^^
-   |

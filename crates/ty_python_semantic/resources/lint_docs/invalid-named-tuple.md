@@ -41,3 +41,13 @@ without a type annotation will raise an `AttributeError` at runtime.
 ...     _asdict = 42
 AttributeError: Cannot overwrite NamedTuple attribute _asdict
 ```
+
+Finally, `NamedTuple` field annotations cannot use the `ClassVar` or `Final` type
+qualifiers. These qualifiers also cause a runtime error when annotations are evaluated eagerly:
+
+```pycon
+>>> from typing import ClassVar, NamedTuple
+>>> class Foo(NamedTuple):
+...     x: ClassVar[int]
+TypeError: typing.ClassVar[int] is not valid as type argument
+```

@@ -35,7 +35,7 @@ reveal_type(C.ten)  # revealed: Literal[10]
 # This is fine:
 c.ten = 10
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `ten` on type `C`"
 c.ten = 11
 ```
 
@@ -78,7 +78,7 @@ c.flexible_int = "42"  # also okay!
 
 reveal_type(c.flexible_int)  # revealed: int | None
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `flexible_int` on type `C`"
 c.flexible_int = None  # not okay
 
 reveal_type(c.flexible_int)  # revealed: int | None
@@ -215,7 +215,7 @@ def f1(flag: bool):
             attr = DataDescriptor()
 
         def f(self):
-            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f` with custom `__set__` method"
+            # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `attr` on type `Self@f`"
             self.attr = b"foo"
 
     reveal_type(C1().attr)  # revealed: Literal["data"] | bytes
@@ -365,6 +365,7 @@ class C(metaclass=Meta):
     attribute: int = 1
 
 reveal_type(C.attribute)  # revealed: Any
+C.attribute = "could be accepted by the dynamic descriptor"
 
 class UnionMeta(type):
     attribute: Any | DataDescriptor = DataDescriptor()
@@ -479,7 +480,7 @@ on the metaclass:
 ```py
 C1.meta_data_descriptor = 1
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor` on type `<class 'C1'>`"
 C1.meta_data_descriptor = "invalid"
 ```
 
@@ -545,6 +546,10 @@ reveal_type(C3.meta_attribute1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_attribute2)  # revealed: Literal["class level data descriptor"]
 reveal_type(C3.meta_non_data_descriptor1)  # revealed: Literal["value on class"]
 reveal_type(C3.meta_non_data_descriptor2)  # revealed: Literal["class level data descriptor"]
+
+C3.meta_non_data_descriptor1 = "value on class"
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `meta_non_data_descriptor1` of type `Literal["value on class"]`"
+C3.meta_non_data_descriptor1 = "invalid"
 ```
 
 Finally, metaclass attributes and metaclass non-data descriptors are only accessible when they are
@@ -581,7 +586,7 @@ def _(flag: bool):
     # TODO: We currently emit two diagnostics here, corresponding to the two states of `flag`. The diagnostics are not
     # wrong, but they could be subsumed under a higher-level diagnostic.
 
-    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>` with custom `__set__` method"
+    # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>`"
     # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
@@ -730,7 +735,7 @@ reveal_type(C.name)  # revealed: property
 c.name = "new"
 c.name = None
 
-# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C` with custom `__set__` method"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C`"
 c.name = 42
 ```
 
@@ -786,7 +791,7 @@ DontAssignToMe().immutable = "the properties, they are a-changing"
 
 ```snapshot
 error[invalid-assignment]: Cannot assign to read-only property `immutable` on object of type `DontAssignToMe`
- --> src/mdtest_snippet.py:3:9
+ --> src/mdtest_snippet.py:6:1
   |
 3 |     def immutable(self): ...
   |         --------- Property `DontAssignToMe.immutable` defined here with no setter
@@ -794,7 +799,6 @@ error[invalid-assignment]: Cannot assign to read-only property `immutable` on ob
 5 | # snapshot: invalid-assignment
 6 | DontAssignToMe().immutable = "the properties, they are a-changing"
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
-  |
 ```
 
 ### Built-in `classmethod` descriptor
@@ -846,7 +850,8 @@ Here, we only demonstrate how `__get__` works on functions:
 ```py
 import types
 from inspect import getattr_static
-from ty_extensions import static_assert, is_subtype_of, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 def f(x: object) -> str:
     return "a"

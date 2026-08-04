@@ -740,7 +740,7 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
-pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
+fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     as_only_an_ellipsis(body, comments).is_some()
 }
 
@@ -985,7 +985,7 @@ fn new_logical_line_between_statements(source: &str, between_statement_range: Te
 mod tests {
     use ruff_formatter::format;
     use ruff_python_parser::parse_module;
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::TriviaRanges;
 
     use crate::PyFormatOptions;
     use crate::comments::Comments;
@@ -1015,12 +1015,13 @@ def trailing_func():
 ";
 
         let parsed = parse_module(source).unwrap();
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&comment_ranges),
+            Comments::empty(),
+            &trivia,
             parsed.tokens(),
         );
 

@@ -10,16 +10,16 @@ use ruff_db::system::{
     file_time_now,
 };
 use ruff_python_ast::PythonVersion;
-use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
-use ty_project::metadata::options::{
-    EnvironmentOptions, Options, ProjectOptionsOverrides, SrcOptions,
-};
+use ruff_ranged_value::{RangedValue, ValueSource};
+use ty_module_resolver::{Module, ModuleName};
+use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf};
+use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
+use ty_python_core::program::Program;
 use ty_static::EnvVars;
 
 struct TestCase {
@@ -31,6 +31,17 @@ struct TestCase {
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
+}
+
+fn resolve_module_confident<'db>(
+    db: &'db ProjectDatabase,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    ty_module_resolver::resolve_module_confident(
+        db,
+        Program::get(db).python_version(db),
+        module_name,
+    )
 }
 
 impl TestCase {
@@ -178,12 +189,8 @@ impl TestCase {
         Ok(all_events)
     }
 
-    fn apply_changes(
-        &mut self,
-        changes: &[ChangeEvent],
-        project_options_overrides: Option<&ProjectOptionsOverrides>,
-    ) -> ChangeResult {
-        self.db.apply_changes(changes, project_options_overrides)
+    fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
+        self.db.apply_changes(changes)
     }
 
     fn update_options(&mut self, options: Options) -> anyhow::Result<()> {
@@ -198,7 +205,7 @@ impl TestCase {
         .context("Failed to write configuration")?;
 
         let changes = self.take_watch_changes(event_for_file("pyproject.toml"));
-        self.apply_changes(&changes, None);
+        self.apply_changes(&changes);
 
         if let Some(watcher) = &mut self.watcher {
             watcher.update(&self.db);
@@ -279,6 +286,9 @@ struct SetupContext<'a> {
     system: &'a OsSystem,
     root_path: &'a SystemPath,
     options: Option<Options>,
+    config_file_override: Option<SystemPathBuf>,
+    override_options: Option<Options>,
+    fallback_options: Option<Options>,
     included_paths: Option<Vec<SystemPathBuf>>,
 }
 
@@ -341,6 +351,18 @@ impl<'a> SetupContext<'a> {
 
     fn set_options(&mut self, options: Options) {
         self.options = Some(options);
+    }
+
+    fn set_config_file_override(&mut self, path: impl AsRef<SystemPath>) {
+        self.config_file_override = Some(self.join_project_path(path));
+    }
+
+    fn set_override_options(&mut self, options: Options) {
+        self.override_options = Some(options);
+    }
+
+    fn set_fallback_options(&mut self, options: Options) {
+        self.fallback_options = Some(options);
     }
 
     fn set_included_paths(&mut self, paths: Vec<SystemPathBuf>) {
@@ -407,6 +429,9 @@ where
         system: &os_system,
         root_path: &root_path,
         options: None,
+        config_file_override: None,
+        override_options: None,
+        fallback_options: None,
         included_paths: None,
     };
 
@@ -414,7 +439,16 @@ where
         .setup(&mut setup_context)
         .context("Failed to setup test files")?;
 
-    if let Some(options) = setup_context.options {
+    let SetupContext {
+        options,
+        config_file_override,
+        override_options,
+        fallback_options,
+        included_paths,
+        ..
+    } = setup_context;
+
+    if let Some(options) = options {
         std::fs::write(
             project_path.join("pyproject.toml").as_std_path(),
             toml::to_string(&PyProject {
@@ -426,13 +460,22 @@ where
         .context("Failed to write configuration")?;
     }
 
-    let included_paths = setup_context.included_paths;
-
-    let mut project = ProjectMetadata::discover(&project_path, &system)?;
+    let mut project = if let Some(config_file_override) = config_file_override {
+        ProjectMetadata::from_config_file(config_file_override, &project_path, &system)?
+    } else {
+        ProjectMetadata::discover(&project_path, &system)?
+    };
+    if let Some(fallback_options) = fallback_options {
+        project.apply_fallback_options(fallback_options);
+    }
     project.apply_configuration_files(&system)?;
+    if let Some(override_options) = override_options {
+        project.apply_override_options(override_options);
+    }
 
     // We need a chance to create the directories here.
-    if let Some(environment) = project.options().environment.as_ref() {
+    let merged_options = project.to_merged_options();
+    if let Some(environment) = merged_options.options().environment.as_ref() {
         for path in environment
             .extra_paths
             .as_deref()
@@ -544,7 +587,7 @@ fn new_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let foo = case.system_file(&foo_path).expect("foo.py to exist.");
 
@@ -582,7 +625,7 @@ fn new_directory_with_python_files() -> anyhow::Result<()> {
         )
     });
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let init = case.system_file(&init_path).expect("__init__.py to exist");
     let module = case.system_file(&module_path).expect("module.py to exist");
@@ -612,7 +655,7 @@ fn new_non_python_file_is_not_indexed() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("README.md"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&readme_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -634,7 +677,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&foo_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -661,7 +704,7 @@ fn new_file_in_ignored_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("bad.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&bad_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -687,7 +730,7 @@ fn new_file_in_parent_ignored_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("bad.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&bad_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -712,7 +755,7 @@ fn new_ignore_file_in_ignored_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file(".gitignore"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&nested_ignore_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -731,7 +774,7 @@ fn ignore_file_change_reloads_files_not_project_metadata() -> anyhow::Result<()>
     update_file(case.project_path(".ignore"), "")?;
 
     let changes = case.stop_watch(event_for_file(".ignore"));
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
 
     assert!(!result.project_changed());
     case.assert_indexed_project_files([bar, foo]);
@@ -795,7 +838,7 @@ fn new_non_project_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("black.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&black_path).is_ok());
 
@@ -836,7 +879,7 @@ fn new_files_with_explicit_included_paths() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("test2.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let sub_a_file = case.system_file(&sub_a_path).expect("sub/a.py to exist");
 
@@ -881,7 +924,7 @@ fn new_file_in_included_out_of_project_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("script2.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let src_a_file = case.system_file(&src_a).unwrap();
     let outside_b_file = case.system_file(&outside_b_path).unwrap();
@@ -908,7 +951,7 @@ fn changed_file() -> anyhow::Result<()> {
 
     assert!(!changes.is_empty());
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
     case.assert_indexed_project_files([foo]);
@@ -932,7 +975,7 @@ fn deleted_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(!foo.exists(case.db()));
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("foo").unwrap()).is_none());
@@ -965,7 +1008,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(!foo.exists(case.db()));
     case.assert_indexed_project_files([]);
@@ -992,7 +1035,7 @@ fn move_file_to_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let foo_in_project = case.system_file(&foo_in_project)?;
 
@@ -1017,7 +1060,7 @@ fn rename_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("bar.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(!foo.exists(case.db()));
 
@@ -1056,7 +1099,7 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let init_file = case
         .system_file(sub_new_path.join("__init__.py"))
@@ -1105,7 +1148,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // `import sub.a` should no longer resolve
     assert!(
@@ -1156,7 +1199,7 @@ fn directory_renamed() -> anyhow::Result<()> {
     // Linux and windows only emit an event for the newly created root directory, but not for every new component.
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // `import sub.a` should no longer resolve
     assert!(
@@ -1217,7 +1260,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
     assert!(!result.project_changed());
 
     // `import sub.a` should no longer resolve
@@ -1260,7 +1303,7 @@ fn search_path() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("a.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
     case.assert_indexed_project_files([case.system_file(case.project_path("bar.py")).unwrap()]);
@@ -1291,7 +1334,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("a.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
 
@@ -1364,11 +1407,11 @@ print(sys.last_exc, os.getegid())
 
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
-        diagnostics[0].primary_message(),
+        diagnostics[0].headline_message(),
         "Module `sys` has no member `last_exc`"
     );
     assert_eq!(
-        diagnostics[1].primary_message(),
+        diagnostics[1].headline_message(),
         "Module `os` has no member `getegid`"
     );
 
@@ -1422,7 +1465,7 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
 
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(
-        diagnostics[0].primary_message(),
+        diagnostics[0].headline_message(),
         format!(
             "Ignoring unsupported inferred Python version `3.{unsupported_minor}`; ty will use Python {} instead.",
             PythonVersion::latest_ty()
@@ -1495,7 +1538,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("VERSIONS"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("os").unwrap()).is_some());
 
@@ -1549,7 +1592,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
 
@@ -1571,7 +1614,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 /// ```
 ///
 /// # Linux
-/// inotiyf doesn't support observing changes to hard linked files.
+/// inotify doesn't support observing changes to hard linked files.
 ///
 /// > Note: when monitoring a directory, events are not generated for
 /// > the files inside the directory when the events are performed via
@@ -1620,7 +1663,7 @@ fn hard_links_to_target_outside_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(ChangeEvent::is_changed);
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 2')");
 
@@ -1659,7 +1702,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("foo.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             foo.permissions(case.db()),
@@ -1739,7 +1782,7 @@ mod unix {
 
         let changes = case.take_watch_changes(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             source_text(case.db(), baz_file).as_str(),
@@ -1752,7 +1795,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             source_text(case.db(), baz_file).as_str(),
@@ -1820,7 +1863,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         // The file watcher is guaranteed to emit one event for the changed file, but it isn't specified
         // if the event is emitted for the "original" or linked path because both paths are watched.
@@ -1934,7 +1977,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             source_text(case.db(), baz_original_file).as_str(),
@@ -1972,7 +2015,7 @@ fn active_project_config_change_reloads_project() -> anyhow::Result<()> {
     )?;
 
     let changes = case.stop_watch(event_for_file("pyproject.toml"));
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
 
     assert!(result.project_changed());
 
@@ -1992,7 +2035,7 @@ fn nested_project_config_change_is_cheap_if_active_project_unchanged() -> anyhow
     std::fs::write(nested_pyproject.as_std_path(), "[tool.ty]\n")?;
 
     let changes = case.stop_watch(event_for_file("pyproject.toml"));
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
 
     assert!(!result.project_changed());
     assert_eq!(case.db().project().root(case.db()), &*project_root);
@@ -2032,7 +2075,7 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(ChangeEvent::is_deleted);
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // It should now pick up the outer project.
     assert_eq!(case.db().project().root(case.db()), case.root_path());
@@ -2096,15 +2139,102 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let changes = case.stop_watch(event_for_file("ty.toml"));
+    let changes = case.take_watch_changes(event_for_file("ty.toml"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let diagnostics = case.db().check_file(foo);
 
     assert!(
         diagnostics.len() == 1,
         "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    );
+
+    // Removing the option from the user configuration must not retain the old warning level.
+    update_file(case.root_path().join("home/.config/ty/ty.toml"), "")?;
+
+    let changes = case.stop_watch(event_for_file("ty.toml"));
+    case.apply_changes(&changes);
+
+    let diagnostics = case.db().check_file(foo);
+    assert!(
+        diagnostics.is_empty(),
+        "Expected no diagnostics but got: {diagnostics:#?}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn project_reload_preserves_override_options() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("foo.py", "prin('hello')")?;
+        context.set_options(Options::default());
+        context.set_override_options(Options::from_toml_str(
+            r#"
+            [rules]
+            unresolved-reference = "ignore"
+            "#,
+            ValueSource::Cli,
+        )?);
+        Ok(())
+    })?;
+
+    let foo = case
+        .system_file(case.project_path("foo.py"))
+        .expect("foo.py to exist");
+    assert!(case.db().check_file(foo).is_empty());
+
+    case.update_options(Options::from_toml_str(
+        r#"
+        [terminal]
+        error-on-warning = false
+        "#,
+        ValueSource::Cli,
+    )?)?;
+
+    let diagnostics = case.db().check_file(foo);
+    assert!(
+        diagnostics.is_empty(),
+        "Expected override options to survive reload but got: {diagnostics:#?}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn project_reload_preserves_fallback_options() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("foo.py", "a = 10 / 0")?;
+        context.set_options(Options::default());
+        context.set_fallback_options(Options::from_toml_str(
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            "#,
+            ValueSource::Editor,
+        )?);
+        Ok(())
+    })?;
+
+    let foo = case
+        .system_file(case.project_path("foo.py"))
+        .expect("foo.py to exist");
+    assert_eq!(case.db().check_file(foo).len(), 1);
+
+    case.update_options(Options::from_toml_str(
+        r#"
+        [terminal]
+        error-on-warning = false
+        "#,
+        ValueSource::Cli,
+    )?)?;
+
+    let diagnostics = case.db().check_file(foo);
+    assert_eq!(
+        diagnostics.len(),
+        1,
+        "Expected fallback options to survive reload but got: {diagnostics:#?}"
     );
 
     Ok(())
@@ -2133,6 +2263,7 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
             division-by-zero = "ignore"
             "#,
         )?;
+        context.set_config_file_override("ty-override.toml");
 
         Ok(())
     })?;
@@ -2158,13 +2289,7 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("ty-override.toml"));
 
-    case.apply_changes(
-        &changes,
-        Some(&ProjectOptionsOverrides::new(
-            Some(case.project_path("ty-override.toml")),
-            Options::default(),
-        )),
-    );
+    case.apply_changes(&changes);
 
     let diagnostics = case.db().check_file(foo);
 
@@ -2229,7 +2354,7 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
     .context("Failed to rename `temp.py` to `Lib.py`")?;
 
     let changes = case.stop_watch(event_for_file("Lib.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // Resolving `lib` should now fail but `Lib` should now succeed
     assert_eq!(
@@ -2259,7 +2384,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
     let changes = case.stop_watch(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
@@ -2293,7 +2418,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 
     std::fs::remove_file(case.project_path("bar/wazoo.py").as_std_path())?;
     let changes = case.stop_watch(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
@@ -2316,11 +2441,11 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
     let changes = case.take_watch_changes(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     std::fs::remove_file(case.project_path("bar/wazoo.py").as_std_path())?;
     let changes = case.stop_watch(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
@@ -2346,7 +2471,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
     let changes = case.take_watch_changes(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),

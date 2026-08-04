@@ -15,7 +15,6 @@ TC010 Invalid string member in `X | Y`-style union type
 4 | x: "int" | str  # TC010
 5 | x: ("int" | str) | "bool"  # TC010
   |     ^^^^^
-  |
 
 TC010 Invalid string member in `X | Y`-style union type
  --> TC010_2.py:5:20
@@ -23,7 +22,6 @@ TC010 Invalid string member in `X | Y`-style union type
 4 | x: "int" | str  # TC010
 5 | x: ("int" | str) | "bool"  # TC010
   |                    ^^^^^^
-  |
 
 TC010 Invalid string member in `X | Y`-style union type
   --> TC010_2.py:12:20
@@ -67,4 +65,3 @@ TC010 Invalid string member in `X | Y`-style union type
    |  _________________________^
 22 | |                         " | str" | None))
    | |________________________________^
-   |

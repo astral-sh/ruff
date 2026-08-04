@@ -8,8 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_future_required_preview_generics_enabled, is_pep604_future_annotations_fix_enabled,
-    is_up006_future_annotations_fix_enabled,
+    is_pep604_future_annotations_fix_enabled, is_up006_future_annotations_fix_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -78,11 +77,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     && checker.semantic.in_annotation()
                     && checker.semantic.in_runtime_evaluated_annotation()
                     && !checker.semantic.in_string_type_definition()
-                    && typing::is_pep585_generic(
-                        value,
-                        &checker.semantic,
-                        is_future_required_preview_generics_enabled(checker.settings()),
-                    )
+                    && typing::is_pep585_generic(value, &checker.semantic)
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,
@@ -922,9 +917,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinTupleCall) {
-                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                    checker, expr, call,
-                );
+                flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinListCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_list_call(checker, call);

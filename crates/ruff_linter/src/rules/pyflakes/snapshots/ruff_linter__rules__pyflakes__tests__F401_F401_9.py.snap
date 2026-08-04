@@ -7,7 +7,6 @@ F401 [*] `foo.baz` imported but unused
 3 | __all__ = ("bar",)
 4 | from foo import bar, baz
   |                      ^^^
-  |
 help: Remove unused import: `foo.baz`
   |
 3 | __all__ = ("bar",)
