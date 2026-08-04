@@ -307,14 +307,8 @@ impl Options {
         strategy: &Strategy,
     ) -> Result<SearchPaths, Strategy::Error<SearchPathSettingsError>> {
         let environment = self.environment.or_default();
-        let src = self.src.or_default();
 
-        #[allow(deprecated)]
-        let src_roots = if let Some(roots) = environment
-            .root
-            .as_deref()
-            .or_else(|| Some(std::slice::from_ref(src.root.as_ref()?)))
-        {
+        let environment_roots = if let Some(roots) = environment.root.as_deref() {
             roots
                 .iter()
                 .map(|root| root.absolute(project_root, system))
@@ -410,7 +404,7 @@ impl Options {
 
         let settings = SearchPathSettings {
             extra_paths,
-            src_roots,
+            src_roots: environment_roots,
             custom_typeshed: environment
                 .typeshed
                 .as_ref()
@@ -442,34 +436,6 @@ impl Options {
         };
 
         let src_options = self.src.or_default();
-
-        #[allow(deprecated)]
-        if let Some(src_root) = src_options.root.as_ref() {
-            let mut diagnostic = OptionDiagnostic::new(
-                DiagnosticId::DeprecatedSetting,
-                "The `src.root` setting is deprecated. Use `environment.root` instead.".to_string(),
-                Severity::Warning,
-            );
-
-            if let Some(file) = src_root
-                .source()
-                .file()
-                .and_then(|path| system_path_to_file(db, path).ok())
-            {
-                diagnostic = diagnostic.with_annotation(Some(Annotation::primary(
-                    Span::from(file).with_optional_range(src_root.range()),
-                )));
-            }
-
-            if self.environment.or_default().root.is_some() {
-                diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    "The `src.root` setting was ignored in favor of the `environment.root` setting",
-                ));
-            }
-
-            diagnostics.push(diagnostic);
-        }
 
         let src = src_options
             .to_settings(db, project_root, &mut diagnostics)
@@ -910,26 +876,6 @@ pub struct EnvironmentOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
-    /// The root of the project, used for finding first-party modules.
-    ///
-    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
-    /// The project root (`.`) is always included. Additionally, the following directories are included
-    /// if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
-    ///
-    /// * `./src`
-    /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
-    /// * `./python`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = r#"null"#,
-        value_type = "str",
-        example = r#"
-            root = "./app"
-        "#
-    )]
-    #[deprecated(note = "Use `environment.root` instead.")]
-    pub root: Option<RelativePathBuf>,
-
     /// Whether to automatically exclude files that are ignored by `.ignore`,
     /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
     /// Enabled by default.

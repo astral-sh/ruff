@@ -769,8 +769,8 @@ unclosed table, expected `]`
                     [project]
                     name = "project-root"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
                 (
@@ -779,8 +779,8 @@ unclosed table, expected `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
             ])
@@ -794,8 +794,10 @@ unclosed table, expected `]`
               name: ProjectName("nested-project"),
               root: "/app/packages/a",
               options: Options(
-                src: Some(SrcOptions(
-                  root: Some("src"),
+                environment: Some(EnvironmentOptions(
+                  root: Some([
+                    "src",
+                  ]),
                 )),
               ),
             )
@@ -819,8 +821,8 @@ unclosed table, expected `]`
                     [project]
                     name = "project-root"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
                 (
@@ -829,8 +831,8 @@ unclosed table, expected `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
             ])
@@ -844,8 +846,10 @@ unclosed table, expected `]`
               name: ProjectName("project-root"),
               root: "/app",
               options: Options(
-                src: Some(SrcOptions(
-                  root: Some("src"),
+                environment: Some(EnvironmentOptions(
+                  root: Some([
+                    "src",
+                  ]),
                 )),
               ),
             )
@@ -1221,15 +1225,15 @@ unclosed table, expected `]`
                     name = "super-app"
                     requires-python = ">=3.12"
 
-                    [tool.ty.src]
-                    root = "this_option_is_ignored"
+                    [tool.ty.environment]
+                    root = ["this_option_is_ignored"]
                     "#,
                 ),
                 (
                     root.join("ty.toml"),
                     r#"
-                    [src]
-                    root = "src"
+                    [environment]
+                    root = ["src"]
                     "#,
                 ),
             ])
@@ -1244,10 +1248,10 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
+                  root: Some([
+                    "src",
+                  ]),
                   r#python-version: Some(r#3.12),
-                )),
-                src: Some(SrcOptions(
-                  root: Some("src"),
                 )),
               ),
             )
