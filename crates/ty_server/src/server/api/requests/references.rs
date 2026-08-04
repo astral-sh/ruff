@@ -2,10 +2,8 @@ use std::borrow::Cow;
 
 use lsp_types::ReferencesRequest;
 use lsp_types::{Location, ReferenceParams, Uri};
-use ruff_db::PythonFile;
 use ty_ide::find_references;
-use ty_project::Db as _;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -53,12 +51,9 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
         let include_declaration = params.context.include_declaration;
 
-        let Some(references_result) = find_references(
-            db,
-            PythonFile::new(db, file, db.python_version()),
-            offset,
-            include_declaration,
-        ) else {
+        let Some(references_result) =
+            find_references(db, db.program_file(file), offset, include_declaration)
+        else {
             return Ok(None);
         };
 

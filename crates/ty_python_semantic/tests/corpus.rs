@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
+use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db, PythonFile};
 use ruff_python_ast::PythonVersion;
 
 use ty_module_resolver::SearchPathSettings;
@@ -12,12 +12,12 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
+use ty_python_semantic::{AnalysisSettings, Db as _, check_file_unwrap, default_lint_registry};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
-use ty_python_core::Db as _;
+use ty_python_core::{Db as _, ProgramFile};
 
 fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
     SystemPath::new(env!("CARGO_MANIFEST_DIR"))
@@ -112,7 +112,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             let file = system_path_to_file(&db, path).unwrap();
 
             if let Err(err) = std::panic::catch_unwind(|| {
-                pull_types(&db, PythonFile::new(&db, file, db.python_version()));
+                pull_types(&db, db.program_file(file));
             }) {
                 println!("Check failed for {relative_path:?}.");
                 std::panic::resume_unwind(err);
@@ -179,10 +179,6 @@ impl CorpusDb {
 
         db
     }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 impl DbWithTestSystem for CorpusDb {
@@ -211,11 +207,7 @@ impl ruff_db::Db for CorpusDb {
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for CorpusDb {
-    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for CorpusDb {}
 
 #[salsa::db]
 impl ty_python_core::Db for CorpusDb {
@@ -228,10 +220,14 @@ impl ty_python_core::Db for CorpusDb {
 impl ty_python_semantic::Db for CorpusDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
-            check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
+            check_file_unwrap(self, self.program_file(file))
         } else {
             Vec::new()
         }
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        Program::get(self).program_file(self, file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {

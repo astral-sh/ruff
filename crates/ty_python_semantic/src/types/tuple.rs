@@ -131,7 +131,7 @@ impl TupleLength {
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct TupleType<'db> {
     #[returns(copy)]
-    pub(crate) program: Program,
+    pub(crate) program: Program<'db>,
 
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,

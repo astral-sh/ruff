@@ -1,11 +1,14 @@
 use crate::{Db, platform::PythonPlatform};
 
+use ruff_db::files::File;
 use ruff_db::system::SystemPath;
 use ruff_python_ast::PythonVersion;
 use salsa::Durability;
 use salsa::Setter;
-use ty_module_resolver::SearchPaths;
+use ty_module_resolver::{ResolverEnvironment, SearchPaths};
 use ty_site_packages::PythonVersionWithSource;
+
+use crate::ProgramFile;
 
 // Re-export the misconfiguration strategy types from ty_module_resolver.
 pub use ty_module_resolver::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
@@ -22,6 +25,7 @@ pub struct Program {
     pub search_paths: SearchPaths,
 }
 
+#[salsa::tracked]
 impl Program {
     pub fn init_or_update(db: &mut dyn Db, settings: ProgramSettings) -> Self {
         match Self::try_get(db) {
@@ -49,6 +53,15 @@ impl Program {
 
     pub fn python_version(self, db: &dyn Db) -> PythonVersion {
         self.python_version_with_source(db).version
+    }
+
+    /// Returns the module-resolution environment for this program.
+    pub fn resolver_environment(self, db: &dyn Db) -> ResolverEnvironment<'_> {
+        ResolverEnvironment::new(db, self.python_version(db), self.search_paths(db))
+    }
+
+    pub fn program_file(self, db: &dyn Db, file: File) -> ProgramFile<'_> {
+        ProgramFile::new(db, file, self.resolver_environment(db))
     }
 
     pub fn update_from_settings(self, db: &mut dyn Db, settings: ProgramSettings) {

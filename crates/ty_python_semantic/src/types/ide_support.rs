@@ -15,16 +15,15 @@ use crate::types::{
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use itertools::Either;
-use ruff_db::PythonFile;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::Module;
+use ty_module_resolver::{ImportingFile, Module, ResolverFile};
 use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
-use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use ty_python_core::{ProgramFile, attribute_scopes, global_scope, semantic_index, use_def_map};
 
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
@@ -64,7 +63,8 @@ pub fn definitions_for_name<'db>(
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let file = model.python_file();
+    let env = model.program_environment();
+    let file = model.program_file();
     let index = semantic_index(db, file);
 
     // Get the scope for this name expression
@@ -165,12 +165,11 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(db, *definition, Some(name_str), alias_resolution);
+        let resolved = resolve_definition(db, &env, *definition, Some(name_str), alias_resolution);
         resolved_definitions.extend(resolved);
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    let env = model.program_environment();
     if resolved_definitions.is_empty()
         && let Some(builtins_scope) = implicit_builtins_symbol_scope(db, &env, name_str)
     {
@@ -209,6 +208,7 @@ pub fn definitions_for_name<'db>(
             .flat_map(|def| {
                 resolve_definition(
                     db,
+                    &env,
                     def,
                     Some(name_str),
                     ImportAliasResolution::ResolveAliases,
@@ -275,11 +275,16 @@ pub fn definitions_for_attribute<'db>(
     for ty in expanded_tys {
         // Handle modules
         if let Type::ModuleLiteral(module_literal) = ty {
-            if let Some(module_file) = module_literal.module(db).python_file(db) {
+            if let Some(module_file) = module_literal
+                .module(db)
+                .file(db)
+                .map(|file| ProgramFile::new(db, file, model.program_environment().program(db)))
+            {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
                     resolved.extend(resolve_definition(
                         db,
+                        &env,
                         def,
                         Some(name_str),
                         ImportAliasResolution::ResolveAliases,
@@ -437,7 +442,7 @@ impl<'db> ImplementationsFinder<'db> {
     pub fn implementations_for_file<'scan>(
         &'scan self,
         db: &'scan dyn Db,
-        file: PythonFile<'scan>,
+        file: ProgramFile<'scan>,
     ) -> Vec<ResolvedDefinition<'scan>>
     where
         'db: 'scan,
@@ -524,7 +529,7 @@ impl<'db> ImplementationsFinder<'db> {
             .and_then(Type::as_property_instance)
             .and_then(|property| property.accessor_role(db, function_definition));
         let class_node = containing_scope.node(db).as_class()?;
-        let class_definition = semantic_index(db, containing_scope.python_file(db))
+        let class_definition = semantic_index(db, containing_scope.program_file(db))
             .expect_single_definition(class_node);
         let class_ty = binding_type(db, class_definition);
         let root = extract_class_literal(db, &env, class_ty)?;
@@ -637,7 +642,7 @@ impl<'db> ImplementationsFinder<'db> {
 /// Finds subclasses of `roots` defined in `file`.
 fn class_implementations_for_file<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
     if !contains_identifier(&source_text(db, file.file(db)), "class") {
@@ -680,6 +685,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     attribute_name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
+    let env = model.program_environment();
     let mut resolved = Vec::new();
     'scopes: for ancestor in class_literal
         .iter_mro(db)
@@ -694,6 +700,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
             let use_def = use_def_map(db, class_scope);
             let resolved_in_scope = resolve_reachable_definitions(
                 db,
+                &env,
                 attribute_name,
                 use_def
                     .reachable_symbol_declarations(place_id)
@@ -711,7 +718,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
         }
 
         // Look for instance attributes in method scopes (e.g., self.x = 1)
-        let index = semantic_index(db, class_scope.python_file(db));
+        let index = semantic_index(db, class_scope.program_file(db));
 
         for function_scope_id in attribute_scopes(db, class_scope) {
             if let Some(place_id) = index
@@ -721,6 +728,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 let use_def = index.use_def_map(function_scope_id);
                 let resolved_in_scope = resolve_reachable_definitions(
                     db,
+                    &env,
                     attribute_name,
                     use_def
                         .reachable_member_declarations(place_id)
@@ -745,7 +753,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 /// Finds member implementations contributed by subclasses of `roots` defined in `file`.
 fn member_implementations_for_file<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
     member_name: &str,
     accessor_role: Option<PropertyAccessorRole>,
@@ -877,7 +885,7 @@ fn own_member_definitions<'db>(
         }
     }
 
-    let file = class_scope.python_file(db);
+    let file = class_scope.program_file(db);
     let index = semantic_index(db, file);
     let mut instance_definitions = Vec::new();
     for function_scope_id in attribute_scopes(db, class_scope) {
@@ -1073,7 +1081,7 @@ fn user_visible_definitions<'db>(
 
         match definition.kind(db) {
             DefinitionKind::NestedBindings(nested) => {
-                let index = semantic_index(db, definition.python_file(db));
+                let index = semantic_index(db, definition.program_file(db));
                 let sources = nested
                     .visible_binding_sources(index, definition.file_scope(db))
                     .flatten()
@@ -1110,8 +1118,8 @@ fn is_reachable_implementation_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> bool {
-    let file = definition.python_file(db);
-    let parsed = parsed_module(db, file).load(db);
+    let file = definition.program_file(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     is_range_reachable(
         db,
         semantic_index(db, file),
@@ -1152,6 +1160,7 @@ fn is_ascii_identifier_continue(byte: u8) -> bool {
 
 fn resolve_reachable_definitions<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     symbol_name: &str,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
@@ -1160,6 +1169,7 @@ fn resolve_reachable_definitions<'db>(
         .flat_map(|definition| {
             resolve_definition(
                 db,
+                env,
                 definition,
                 Some(symbol_name),
                 ImportAliasResolution::ResolveAliases,
@@ -1267,9 +1277,11 @@ pub fn definitions_for_imported_symbol<'db>(
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
+    let env = model.program_environment();
     resolve_definition::resolve_from_import_definitions(
         model.db(),
-        model.python_file(),
+        &env,
+        ImportingFile::File(model.file(), env.resolver_environment(model.db())),
         import_node,
         symbol_name,
         &mut visited,
@@ -2056,7 +2068,6 @@ mod resolve_definition {
     }
 
     use indexmap::IndexSet;
-    use ruff_db::PythonFile;
     use ruff_db::files::{FileRange, vendored_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::system::SystemPath;
@@ -2066,14 +2077,17 @@ mod resolve_definition {
     use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
     use tracing::trace;
-    use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
+    use ty_module_resolver::{
+        ImportingFile, ModuleName, file_to_module, resolve_module, resolve_real_module,
+    };
 
     use crate::Db;
+    use crate::ProgramEnvironment;
     use crate::module_docstring;
     use crate::types::binding_type;
     use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
     use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
-    use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
+    use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -2085,7 +2099,7 @@ mod resolve_definition {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
         /// The import resolved to an entire module
-        Module(PythonFile<'db>),
+        Module(ProgramFile<'db>),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
     }
@@ -2126,9 +2140,9 @@ mod resolve_definition {
             }
         }
 
-        fn python_file(&self, db: &'db dyn Db) -> Option<PythonFile<'db>> {
+        fn program_file(&self, db: &'db dyn Db) -> Option<ProgramFile<'db>> {
             match *self {
-                ResolvedDefinition::Definition(definition) => Some(definition.python_file(db)),
+                ResolvedDefinition::Definition(definition) => Some(definition.program_file(db)),
                 ResolvedDefinition::Module(file) => Some(file),
                 ResolvedDefinition::FileWithRange(_) => None,
             }
@@ -2137,7 +2151,7 @@ mod resolve_definition {
         pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.docstring(db),
-                ResolvedDefinition::Module(file) => module_docstring(db, *file),
+                ResolvedDefinition::Module(file) => module_docstring(db, file.python_file(db)),
                 ResolvedDefinition::FileWithRange(_) => None,
             }
         }
@@ -2198,6 +2212,7 @@ mod resolve_definition {
     /// Always returns at least the original definition as a fallback if resolution fails.
     pub(crate) fn resolve_definition<'db>(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         definition: Definition<'db>,
         symbol_name: Option<&str>,
         alias_resolution: ImportAliasResolution,
@@ -2205,6 +2220,7 @@ mod resolve_definition {
         let mut visited = FxHashSet::default();
         let resolved = resolve_definition_recursive(
             db,
+            env,
             definition,
             &mut visited,
             symbol_name,
@@ -2222,6 +2238,7 @@ mod resolve_definition {
     /// Helper function to resolve import definitions recursively.
     fn resolve_definition_recursive<'db>(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         definition: Definition<'db>,
         visited: &mut FxHashSet<Definition<'db>>,
         symbol_name: Option<&str>,
@@ -2237,8 +2254,8 @@ mod resolve_definition {
 
         match kind {
             DefinitionKind::Import(import_def) => {
-                let file = definition.python_file(db);
-                let module = parsed_module(db, file).load(db);
+                let file = definition.program_file(db);
+                let module = parsed_module(db, file.python_file(db)).load(db);
                 let alias = import_def.alias(&module);
 
                 if alias.asname.is_some()
@@ -2253,13 +2270,16 @@ mod resolve_definition {
                 };
 
                 // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
+                let importing_file =
+                    ImportingFile::File(file.file(db), env.resolver_environment(db));
+                let Some(resolved_module) = resolve_module(db, importing_file, &module_name) else {
                     return Vec::new(); // Module not found, return empty list
                 };
 
-                let Some(module_file) = resolved_module.python_file(db) else {
+                let Some(module_file) = resolved_module.file(db) else {
                     return Vec::new(); // No file for module, return empty list
                 };
+                let module_file = ProgramFile::new(db, module_file, env.program(db));
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
@@ -2267,8 +2287,8 @@ mod resolve_definition {
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
-                let file = definition.python_file(db);
-                let module = parsed_module(db, file).load(db);
+                let file = definition.program_file(db);
+                let module = parsed_module(db, file.python_file(db)).load(db);
                 let import_node = import_from_def.import(&module);
                 let alias = import_from_def.alias(&module);
 
@@ -2282,7 +2302,8 @@ mod resolve_definition {
                 // (alias.name), not the local alias (symbol_name)
                 resolve_from_import_definitions(
                     db,
-                    file,
+                    env,
+                    ImportingFile::File(file.file(db), env.resolver_environment(db)),
                     import_node,
                     &alias.name,
                     visited,
@@ -2292,15 +2313,16 @@ mod resolve_definition {
 
             // For star imports, try to resolve to the specific symbol being accessed
             DefinitionKind::StarImport(star_import_def) => {
-                let file = definition.python_file(db);
-                let module = parsed_module(db, file).load(db);
+                let file = definition.program_file(db);
+                let module = parsed_module(db, file.python_file(db)).load(db);
                 let import_node = star_import_def.import(&module);
 
                 // If we have a symbol name, use the helper to resolve it in the target module
                 if let Some(symbol_name) = symbol_name {
                     resolve_from_import_definitions(
                         db,
-                        file,
+                        env,
+                        ImportingFile::File(file.file(db), env.resolver_environment(db)),
                         import_node,
                         symbol_name,
                         visited,
@@ -2320,7 +2342,8 @@ mod resolve_definition {
     /// Helper function to resolve import definitions for `ImportFrom` and `StarImport` cases.
     pub(crate) fn resolve_from_import_definitions<'db>(
         db: &'db dyn Db,
-        file: PythonFile<'db>,
+        env: &ProgramEnvironment<'db>,
+        importing_file: ImportingFile<'db>,
         import_node: &ast::StmtImportFrom,
         symbol_name: &str,
         visited: &mut FxHashSet<Definition<'db>>,
@@ -2331,7 +2354,7 @@ mod resolve_definition {
                 if let Some(asname) = &alias.asname {
                     if asname.as_str() == symbol_name {
                         return vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                            file.file(db),
+                            importing_file.file(db),
                             asname.range,
                         ))];
                     }
@@ -2340,22 +2363,26 @@ mod resolve_definition {
         }
 
         // Resolve the module being imported from (handles both relative and absolute imports)
-        let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
+        let Some(module_name) =
+            ModuleName::from_import_statement(db, importing_file, import_node).ok()
         else {
             return Vec::new();
         };
-        let Some(resolved_module) = resolve_module(db, file, &module_name) else {
+        let Some(resolved_module) = resolve_module(db, importing_file, &module_name) else {
             return Vec::new();
         };
 
         // Resolve the target module file
-        let module_file = resolved_module.python_file(db);
+        let module_file = resolved_module
+            .file(db)
+            .map(|file| ProgramFile::new(db, file, env.program(db)));
 
         let Some(module_file) = module_file else {
             // No file means this is a namespace package, try to import the submodule
             return Vec::from_iter(resolve_from_import_submodule_definitions(
                 db,
-                file,
+                env,
+                importing_file,
                 symbol_name,
                 module_name,
             ));
@@ -2368,8 +2395,14 @@ mod resolve_definition {
         // Recursively resolve any import definitions found in the target module
         let mut resolved_definitions = Vec::new();
         for def in definitions_in_module {
-            let resolved =
-                resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
+            let resolved = resolve_definition_recursive(
+                db,
+                env,
+                def,
+                visited,
+                Some(symbol_name),
+                alias_resolution,
+            );
             resolved_definitions.extend(resolved);
         }
 
@@ -2382,7 +2415,8 @@ mod resolve_definition {
             // `child` has no binding in `pkg/__init__.py`.
             Vec::from_iter(resolve_from_import_submodule_definitions(
                 db,
-                file,
+                env,
+                importing_file,
                 symbol_name,
                 module_name,
             ))
@@ -2394,15 +2428,16 @@ mod resolve_definition {
     // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
     fn resolve_from_import_submodule_definitions<'db>(
         db: &'db dyn Db,
-        file: PythonFile<'db>,
+        env: &ProgramEnvironment<'db>,
+        importing_file: ImportingFile<'db>,
         symbol_name: &str,
         module_name: ModuleName,
     ) -> Option<ResolvedDefinition<'db>> {
         let submodule_name = ModuleName::new(symbol_name)?;
         let mut full_submodule_name = module_name;
         full_submodule_name.extend(&submodule_name);
-        let module = resolve_module(db, file, &full_submodule_name)?;
-        let file = module.python_file(db)?;
+        let module = resolve_module(db, importing_file, &full_submodule_name)?;
+        let file = ProgramFile::new(db, module.file(db)?, env.program(db));
 
         Some(ResolvedDefinition::Module(file))
     }
@@ -2449,13 +2484,14 @@ mod resolve_definition {
         def: &ResolvedDefinition<'db>,
         cached_vendored_typeshed: Option<&SystemPath>,
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
-        let Some(stub_parse_file) = def.python_file(db) else {
+        let Some(stub_program_file) = def.program_file(db) else {
             trace!("Found arbitrary FileWithRange while stub mapping, giving up");
             return None;
         };
+        let env = ProgramEnvironment::from_file(stub_program_file);
 
         // If the file isn't a stub, this is presumably the real definition
-        let stub_file = stub_parse_file.file(db);
+        let stub_file = stub_program_file.file(db);
         trace!("Stub mapping definition in: {}", stub_file.path(db));
         if !stub_file.is_stub(db) {
             trace!("File isn't a stub, no stub mapping to do");
@@ -2472,7 +2508,7 @@ mod resolve_definition {
         // we're in typeshed to successfully stub-map to the Real Stdlib. So here we attempt
         // to do just that. The resulting file must not be used for anything other than
         // this module lookup, as the `ResolvedDefinition` we're handling isn't for that file.
-        let mut stub_file_for_module_lookup = stub_parse_file;
+        let mut stub_file_for_module_lookup = stub_program_file;
         if let Some(vendored_typeshed) = cached_vendored_typeshed
             && let Some(stub_path) = stub_file.path(db).as_system_path()
             && let Ok(rel_path) = stub_path.strip_prefix(vendored_typeshed)
@@ -2483,12 +2519,12 @@ mod resolve_definition {
                 "Stub is cached vendored typeshed: {}",
                 typeshed_file.path(db)
             );
-            stub_file_for_module_lookup =
-                PythonFile::new(db, typeshed_file, stub_parse_file.python_version(db));
+            stub_file_for_module_lookup = ProgramFile::new(db, typeshed_file, env.program(db));
         }
 
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
-        let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
+        let resolver_file = stub_file_for_module_lookup.resolver_file(db);
+        let stub_module = file_to_module(db, resolver_file)?;
         trace!("Found stub module: {}", stub_module.name(db));
         // We need to pass an importing file to `resolve_real_module` which is a bit odd
         // here because there isn't really an importing file. However this `resolve_real_module`
@@ -2502,10 +2538,13 @@ mod resolve_definition {
         if is_builtin_module(stub_module.python_version(db).minor, stub_module.name(db)) {
             return None;
         }
-        let real_module =
-            resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
+        let real_module = resolve_real_module(
+            db,
+            ImportingFile::ResolverFile(resolver_file),
+            stub_module.name(db),
+        )?;
         trace!("Found real module: {}", real_module.name(db));
-        let real_parse_file = real_module.python_file(db)?;
+        let real_parse_file = ProgramFile::new(db, real_module.file(db)?, env.program(db));
         let real_file = real_parse_file.file(db);
         trace!("Found real file: {}", real_file.path(db));
 
@@ -2539,7 +2578,7 @@ mod resolve_definition {
                 path.push(leaf);
 
                 // Get the ancestors of the path (all the definitions we're nested under)
-                let index = semantic_index(db, definition.python_file(db));
+                let index = semantic_index(db, definition.program_file(db));
                 for (_scope_id, scope) in index.ancestor_scopes(definition.file_scope(db)) {
                     let node = scope.node();
                     let component = definition_path_component_for_node(&stub_ref, node)
@@ -2592,6 +2631,7 @@ mod resolve_definition {
                             .flat_map(|definition| {
                                 resolve_definition(
                                     db,
+                                    &env,
                                     definition,
                                     Some(component),
                                     ImportAliasResolution::ResolveAliases,
@@ -2717,7 +2757,7 @@ pub struct TypeHierarchyClass<'db> {
     /// The name of the class.
     pub name: Name,
     /// The file containing the class definition.
-    pub file: PythonFile<'db>,
+    pub file: ResolverFile<'db>,
     /// The range covering the full class definition header.
     pub full_range: TextRange,
     /// The range of the class name (for selection/focus).
@@ -2789,7 +2829,7 @@ pub fn type_hierarchy_subtypes<'db>(
     let Some(target_class) = extract_class_literal(db, env, ty) else {
         return vec![];
     };
-    direct_subtypes(db, target_class, modules)
+    direct_subtypes(db, env, target_class, modules)
         .into_iter()
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
         .collect()
@@ -2806,6 +2846,7 @@ pub fn type_hierarchy_subtypes<'db>(
 /// For `Animal`, this returns `Dog`, but not `LoudDog`.
 fn direct_subtypes<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     target_class: ClassLiteral<'db>,
     modules: &[Module<'db>],
 ) -> Vec<ClassLiteral<'db>> {
@@ -2814,10 +2855,9 @@ fn direct_subtypes<'db>(
     let mut subtypes = vec![];
 
     for &module in modules {
-        let Some(python_file) = module.python_file(db) else {
+        let Some(file) = module.file(db) else {
             continue;
         };
-        let file = python_file.file(db);
 
         // Note that this will always consider namespace
         // packages to be "not firsty party." This isn't
@@ -2847,8 +2887,9 @@ fn direct_subtypes<'db>(
             continue;
         }
 
-        let file_env = ProgramEnvironment::from_file(python_file);
-        for class_ty in reachable_class_literals_in_file(db, python_file) {
+        let program_file = ProgramFile::new(db, file, env.program(db));
+        let file_env = ProgramEnvironment::from_file(program_file);
+        for class_ty in reachable_class_literals_in_file(db, program_file) {
             let bases = class_ty.explicit_bases(db);
             let is_subtype = if target_is_object
                 && bases.is_empty()
@@ -2872,11 +2913,11 @@ fn direct_subtypes<'db>(
 /// Enumerates the reachable class definitions in `file`.
 fn reachable_class_literals_in_file<'db>(
     db: &'db dyn Db,
-    file: PythonFile<'db>,
+    file: ProgramFile<'db>,
 ) -> Vec<ClassLiteral<'db>> {
     let env = ProgramEnvironment::from_file(file);
     let index = semantic_index(db, file);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let mut classes = Vec::new();
 
     for scope_id in index.scope_ids() {
@@ -2945,7 +2986,7 @@ fn class_literal_to_hierarchy_info<'db>(
     class_literal: ClassLiteral<'db>,
 ) -> TypeHierarchyClass<'db> {
     let name = class_literal.name(db).clone();
-    let file = class_literal.python_file(db);
+    let file = class_literal.program_file(db).resolver_file(db);
 
     let (full_range, selection_range) = match class_literal {
         ClassLiteral::Static(static_class) => {
@@ -3076,9 +3117,9 @@ mod tests {
     use super::{CallArgumentForm, call_argument_forms, contains_identifier};
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
-    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ty_python_core::ProgramFile;
 
     #[test]
     fn source_candidate_prefilters_use_identifier_boundaries() {
@@ -3105,8 +3146,8 @@ cast(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3146,8 +3187,8 @@ f(y="", x=1)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3183,8 +3224,8 @@ f(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3221,8 +3262,8 @@ f("", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3262,8 +3303,8 @@ f(int, x)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -3307,8 +3348,8 @@ TypeAliasType("Alias", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let calls: Vec<_> = parsed
             .suite()
             .iter()
@@ -3353,8 +3394,8 @@ cast(*args)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let file = PythonFile::new(&db, file, db.python_version());
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()

@@ -52,7 +52,6 @@ use crate::{
     },
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -61,7 +60,7 @@ use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{place_table, use_def_map};
+use ty_python_core::{ProgramFile, place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
@@ -495,7 +494,7 @@ impl<'db> GenericAlias<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let origin = self.origin(db);
-        let env = ProgramEnvironment::from_file(origin.python_file(db));
+        let env = ProgramEnvironment::from_file(origin.program_file(db));
 
         let specialization = self.specialization(db);
 
@@ -783,13 +782,13 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    pub(crate) fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
         match self {
-            Self::Static(class) => class.python_file(db),
-            Self::Dynamic(class) => class.scope(db).python_file(db),
-            Self::DynamicNamedTuple(class) => class.scope(db).python_file(db),
-            Self::DynamicTypedDict(class) => class.scope(db).python_file(db),
-            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).python_file(db),
+            Self::Static(class) => class.program_file(db),
+            Self::Dynamic(class) => class.scope(db).program_file(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).program_file(db),
+            Self::DynamicTypedDict(class) => class.scope(db).program_file(db),
+            Self::DynamicEnum(enum_lit) => enum_lit.scope(db).program_file(db),
         }
     }
 
@@ -1384,7 +1383,7 @@ impl<'db> ClassType<'db> {
         }
 
         let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
-        let env = &ProgramEnvironment::from_file(self.class_literal(db).python_file(db));
+        let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
 
         // Iterate through the MRO in reverse order,
         // skipping `object` (we know it doesn't define any abstract methods)
@@ -2203,7 +2202,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         receiver: Type<'db>,
     ) -> CallableTypes<'db> {
-        let env = &ProgramEnvironment::from_file(self.class_literal(db).python_file(db));
+        let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
         // then relying on the call binding machinery to Just Work™?
@@ -2986,7 +2985,7 @@ impl<'db> QualifiedClassName<'db> {
                 let body_scope = class.body_scope(self.db);
                 // Skip the class body scope itself.
                 (
-                    body_scope.python_file(self.db),
+                    body_scope.program_file(self.db),
                     body_scope.file_scope_id(self.db),
                     1,
                 )
@@ -2994,20 +2993,20 @@ impl<'db> QualifiedClassName<'db> {
             ClassLiteral::Dynamic(class) => {
                 // Dynamic classes don't have a body scope; start from the enclosing scope.
                 let scope = class.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicNamedTuple(namedtuple) => {
                 // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
                 let scope = namedtuple.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicTypedDict(typeddict) => {
                 let scope = typeddict.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
             ClassLiteral::DynamicEnum(enum_lit) => {
                 let scope = enum_lit.scope(self.db);
-                (scope.python_file(self.db), scope.file_scope_id(self.db), 0)
+                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
             }
         };
 

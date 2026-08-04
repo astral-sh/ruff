@@ -76,7 +76,7 @@ use crate::types::{
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
-use ty_python_core::semantic_index;
+use ty_python_core::{ProgramFile, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -2305,7 +2305,8 @@ impl<'db> Bindings<'db> {
                                     Type::ModuleLiteral(module_literal) => {
                                         let all_names = module_literal
                                             .module(db)
-                                            .python_file(db)
+                                            .file(db)
+                                            .map(|file| ProgramFile::new(db, file, env.program(db)))
                                             .map(|file| dunder_all_names(db, file))
                                             .unwrap_or_default();
                                         match all_names {
@@ -7658,7 +7659,7 @@ impl<'db> CallableDescription<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> Cow<'db, str> {
-            let semantic_index = semantic_index(db, function.python_file(db));
+            let semantic_index = semantic_index(db, function.program_file(db));
             let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
             if let Some(class_node) = enclosing_scope.node().as_class()
                 && let Some(class) =

@@ -1126,7 +1126,7 @@ fn effective_superclass_variable_kind<'db>(
     superclass: ClassType<'db>,
     name: Name,
 ) -> Option<VariableKind> {
-    let env = &ProgramEnvironment::from_file(superclass.class_literal(db).python_file(db));
+    let env = &ProgramEnvironment::from_file(superclass.class_literal(db).program_file(db));
     let inherited_variable_kind = || {
         superclass
             .iter_mro(db)

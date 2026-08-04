@@ -263,7 +263,7 @@ impl<'db> NominalInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<&'db ModuleName> {
         let class = self.class(db, env).class_literal(db);
-        file_to_module(db, class.python_file(db)).map(|module| module.name(db))
+        file_to_module(db, class.program_file(db).resolver_file(db)).map(|module| module.name(db))
     }
 
     pub(super) fn class(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
@@ -845,7 +845,7 @@ fn non_recursive_protocol_interface<'db>(
         }
     }
 
-    let env = ProgramEnvironment::from_file(protocol.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(protocol.class_literal(db).program_file(db));
     interface.filter_members(db, |member| {
         let visitor = ProtocolReferenceFinder {
             env: &env,

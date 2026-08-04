@@ -23,8 +23,8 @@ use crate::{
     },
 };
 use ty_python_core::{
-    attribute_scopes, definition::Definition, global_scope, place_table, scope::ScopeId,
-    semantic_index, use_def_map,
+    ProgramFile, attribute_scopes, definition::Definition, global_scope, place_table,
+    scope::ScopeId, semantic_index, use_def_map,
 };
 
 /// Iterate over all declarations and bindings that exist at the end
@@ -423,18 +423,19 @@ impl<'db> AllMembers<'db> {
 
                 self.extend_with_type(db, env, KnownClass::ModuleType.to_instance(db, env));
 
-                let Some(python_file) = module.python_file(db) else {
+                let Some(file) = module.file(db) else {
                     return;
                 };
+                let program_file = ProgramFile::new(db, file, env.program(db));
 
-                let module_scope = global_scope(db, python_file);
+                let module_scope = global_scope(db, program_file);
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(defined) =
-                        imported_symbol(db, env, Some(python_file), symbol_name, None).place
+                        imported_symbol(db, env, Some(program_file), symbol_name, None).place
                     else {
                         continue;
                     };
@@ -443,7 +444,7 @@ impl<'db> AllMembers<'db> {
                         && !exists_at_runtime(db, definition)
                         // Source-module completions retain `@type_check_only` symbols and rank them
                         // lower.
-                        && (python_file.file(db).is_stub(db) || !defined.ty.is_type_check_only(db))
+                        && (file.is_stub(db) || !defined.ty.is_type_check_only(db))
                         // The decorator itself is typing-only, but users must still be able to
                         // import it when defining typing-only classes and functions.
                         && !matches!(
@@ -550,8 +551,8 @@ impl<'db> AllMembers<'db> {
         class_literal: StaticClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
-        let python_file = class_body_scope.python_file(db);
-        let index = semantic_index(db, python_file);
+        let program_file = class_body_scope.program_file(db);
+        let index = semantic_index(db, program_file);
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {

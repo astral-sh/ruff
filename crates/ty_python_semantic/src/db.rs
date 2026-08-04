@@ -2,12 +2,15 @@ use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
-use ty_python_core::Db as PythonCoreDb;
+use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic>;
+
+    /// Returns the program file for `file`.
+    fn program_file(&self, file: File) -> ProgramFile<'_>;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -37,14 +40,14 @@ pub(crate) mod tests {
     use ty_python_core::platform::PythonPlatform;
 
     use crate::{ProgramEnvironment, check_file_unwrap, default_lint_registry};
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, PythonFile};
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
+    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
@@ -90,7 +93,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
-            ProgramEnvironment::from_program(self.python_version())
+            ProgramEnvironment::from_program(Program::get(self).resolver_environment(self))
         }
 
         /// Marks `file` as open in the editor.
@@ -155,7 +158,11 @@ pub(crate) mod tests {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
+            check_file_unwrap(self, self.program_file(file))
+        }
+
+        fn program_file(&self, file: File) -> ProgramFile<'_> {
+            Program::get(self).program_file(self, file)
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -184,11 +191,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}

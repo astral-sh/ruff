@@ -119,8 +119,9 @@ fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
-    let python_file = pattern.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = pattern.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     NarrowingConstraintsBuilder::new(db, &env, &module, PredicateNode::Pattern(pattern), true)
         .finish()
@@ -135,8 +136,9 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> ExpressionNarrowingConstraints<'db> {
-    let python_file = expression.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = expression.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let predicate = PredicateNode::Expression(expression);
     ExpressionNarrowingConstraints {
@@ -150,8 +152,9 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
-    let python_file = pattern.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = pattern.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     NarrowingConstraintsBuilder::new(db, &env, &module, PredicateNode::Pattern(pattern), false)
         .finish()
@@ -163,8 +166,9 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
     pattern: PatternPredicate<'db>,
     target: ExpressionNodeKey,
 ) -> Option<FrozenNarrowingConstraints<'db>> {
-    let python_file = pattern.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = pattern.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     NarrowingConstraintsBuilder::new(
         db,
@@ -1164,7 +1168,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let db = self.db;
         match expression_node {
             ast::Expr::Name(_) => {
-                let index = semantic_index(db, expression.python_file(db));
+                let index = semantic_index(db, expression.program_file(db));
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 if let Some(alias_predicate) = index.narrowing_alias_predicate(expression_node) {
                     let aliased_constraints =

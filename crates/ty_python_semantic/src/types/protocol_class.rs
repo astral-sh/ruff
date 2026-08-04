@@ -330,7 +330,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(copy)]
-    pub(super) program: Program,
+    pub(super) program: Program<'db>,
 
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
@@ -3493,7 +3493,7 @@ fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = ProgramEnvironment::from_file(class.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
     let mut members = BTreeMap::default();
 
     ProtocolClass(class).for_each_member_candidate(db, &env, |name, candidate, specialization| {
@@ -3555,7 +3555,7 @@ fn protocol_interface_cycle_initial<'db>(
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(
         db,
-        &ProgramEnvironment::from_file(class.class_literal(db).python_file(db)),
+        &ProgramEnvironment::from_file(class.class_literal(db).program_file(db)),
     )
 }
 
@@ -3567,7 +3567,7 @@ fn proto_interface_cycle_recover<'db>(
     value: ProtocolInterface<'db>,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = ProgramEnvironment::from_file(class.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
     value.cycle_normalized(db, &env, *previous, cycle)
 }
 
@@ -3580,7 +3580,7 @@ fn proto_interface_cycle_recover<'db>(
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
@@ -3596,7 +3596,7 @@ fn protocol_bind_self<'db>(
 )]
 fn protocol_apply_self_with_receiver<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     callable: CallableType<'db>,
     receiver_type: Type<'db>,
     self_type: Type<'db>,

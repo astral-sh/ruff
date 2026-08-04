@@ -80,7 +80,7 @@ impl<'db> ExpectedReturnType<'db> {
             }
         }
 
-        let env = ProgramEnvironment::from_file(function.python_file(db));
+        let env = ProgramEnvironment::from_file(function.program_file(db));
         let public = normalize(
             db,
             &env,
@@ -417,7 +417,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Function(function))
-            .to_scope_id(db, self.python_file());
+            .to_scope_id(db, self.program_file());
 
         let overload_literal = OverloadLiteral::new(
             db,
@@ -601,7 +601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let type_params_scope = self
                     .index
                     .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
-                    .to_scope_id(db, self.python_file());
+                    .to_scope_id(db, self.program_file());
                 let type_params_inference =
                     infer_scope_types(self.db(), type_params_scope, TypeContext::default());
 
@@ -1016,7 +1016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
-        let file = self.python_file();
+        let file = self.program_file();
 
         let function_scope_id = self.scope();
         let function_scope = function_scope_id.scope(db);

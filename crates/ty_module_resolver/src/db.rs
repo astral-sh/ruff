@@ -1,12 +1,7 @@
 use ruff_db::Db as SourceDb;
 
-use crate::resolve::SearchPaths;
-
 #[salsa::db]
-pub trait Db: SourceDb {
-    /// Returns the search paths for module resolution.
-    fn search_paths(&self) -> &SearchPaths;
-}
+pub trait Db: SourceDb {}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -19,7 +14,7 @@ pub(crate) mod tests {
     use ruff_python_ast::PythonVersion;
 
     use super::Db;
-    use crate::resolve::SearchPaths;
+    use crate::{ResolverEnvironment, resolve::SearchPaths};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -66,13 +61,17 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn python_version(&self) -> PythonVersion {
-            self.python_version
-        }
-
         pub(crate) fn set_search_paths(&mut self, search_paths: SearchPaths) {
             search_paths.try_register_static_roots(self);
             self.search_paths = Arc::new(search_paths);
+        }
+
+        pub(crate) fn search_paths(&self) -> &SearchPaths {
+            &self.search_paths
+        }
+
+        pub(crate) fn resolver_environment(&self) -> ResolverEnvironment<'_> {
+            ResolverEnvironment::new(self, self.python_version, self.search_paths.as_ref())
         }
 
         /// Takes the salsa events.
@@ -113,11 +112,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            &self.search_paths
-        }
-    }
+    impl Db for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}

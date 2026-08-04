@@ -403,7 +403,6 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::PythonFile;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
     };
@@ -416,7 +415,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
-    use ty_project::{Db as _, ProjectMetadata};
+    use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
+    use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
@@ -440,8 +440,8 @@ mod tests {
             CursorTestBuilder::default()
         }
 
-        pub(super) fn python_file(&self, file: File) -> PythonFile<'_> {
-            PythonFile::new(&self.db, file, self.db.python_version())
+        pub(super) fn program_file(&self, file: File) -> ProgramFile<'_> {
+            self.db.program_file(file)
         }
 
         pub(super) fn write_file(
@@ -569,8 +569,7 @@ mod tests {
 
                     let source = source_text(&db, file);
                     let parsed =
-                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
-                            .load(&db);
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -723,8 +722,7 @@ mod tests {
 
                     let source = source_text(&db, file);
                     let parsed =
-                        parsed_module(&db, PythonFile::new(&db, file, db.python_version()))
-                            .load(&db);
+                        parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
