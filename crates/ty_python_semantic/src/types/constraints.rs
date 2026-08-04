@@ -540,34 +540,6 @@ impl RelationEvidence {
     }
 }
 
-#[derive(Clone, Copy)]
-enum RelationJunction {
-    Union,
-    Intersection,
-}
-
-impl RelationJunction {
-    fn dual(self) -> Self {
-        match self {
-            Self::Union => Self::Intersection,
-            Self::Intersection => Self::Union,
-        }
-    }
-
-    fn apply<'db, 'c>(
-        self,
-        mut left: ConstraintSet<'db, 'c>,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        right: ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        match self {
-            Self::Union => left.union(db, builder, right),
-            Self::Intersection => left.intersect(db, builder, right),
-        }
-    }
-}
-
 pub(crate) trait IntoRelationConstraintSet<'db, 'c> {
     fn into_relation_constraint_set(
         self,
@@ -769,33 +741,6 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         }
     }
 
-    fn combine<T>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        other: T,
-        junction: RelationJunction,
-    ) -> Self
-    where
-        T: IntoRelationConstraintSet<'db, 'c>,
-    {
-        let other = other.into_relation_constraint_set(db, builder);
-        *self = match (*self, other) {
-            (Self::Boolean(left), Self::Boolean(right)) => {
-                Self::Boolean(junction.apply(left, db, builder, right))
-            }
-            (left, right) => {
-                let (positive, negative) = left.into_evidence_pair();
-                let (other_positive, other_negative) = right.into_evidence_pair();
-                Self::from_evidence_pair(
-                    junction.apply(positive, db, builder, other_positive),
-                    junction.dual().apply(negative, db, builder, other_negative),
-                )
-            }
-        };
-        *self
-    }
-
     pub(crate) fn union<T>(
         &mut self,
         db: &'db dyn Db,
@@ -805,7 +750,21 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     where
         T: IntoRelationConstraintSet<'db, 'c>,
     {
-        self.combine(db, builder, other, RelationJunction::Union)
+        let other = other.into_relation_constraint_set(db, builder);
+        *self = match (*self, other) {
+            (Self::Boolean(mut left), Self::Boolean(right)) => {
+                left.union(db, builder, right);
+                Self::Boolean(left)
+            }
+            (left, right) => {
+                let (mut positive, mut negative) = left.into_evidence_pair();
+                let (other_positive, other_negative) = right.into_evidence_pair();
+                positive.union(db, builder, other_positive);
+                negative.intersect(db, builder, other_negative);
+                Self::from_evidence_pair(positive, negative)
+            }
+        };
+        *self
     }
 
     pub(crate) fn intersect<T>(
@@ -817,7 +776,21 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     where
         T: IntoRelationConstraintSet<'db, 'c>,
     {
-        self.combine(db, builder, other, RelationJunction::Intersection)
+        let other = other.into_relation_constraint_set(db, builder);
+        *self = match (*self, other) {
+            (Self::Boolean(mut left), Self::Boolean(right)) => {
+                left.intersect(db, builder, right);
+                Self::Boolean(left)
+            }
+            (left, right) => {
+                let (mut positive, mut negative) = left.into_evidence_pair();
+                let (other_positive, other_negative) = right.into_evidence_pair();
+                positive.intersect(db, builder, other_positive);
+                negative.union(db, builder, other_negative);
+                Self::from_evidence_pair(positive, negative)
+            }
+        };
+        *self
     }
 
     pub(crate) fn negate(self, _db: &'db dyn Db, _builder: &'c ConstraintSetBuilder<'db>) -> Self {
