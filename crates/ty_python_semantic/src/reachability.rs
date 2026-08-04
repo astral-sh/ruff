@@ -281,7 +281,7 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let env = ProgramEnvironment::from_file(predicate.python_file(db));
+    let env = ProgramEnvironment::from_file(predicate.program_file(db));
     pattern_binding_fallthrough_type(db, &env, predicate.kind(db), subject_ty)
 }
 
@@ -1538,8 +1538,8 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
             let symbol = place_table.symbol(star_import.symbol_id(db));
-            let python_file = star_import.referenced_parse_file(db);
-            let requires_explicit_reexport = match dunder_all_names(db, python_file) {
+            let program_file = star_import.referenced_file(db);
+            let requires_explicit_reexport = match dunder_all_names(db, program_file) {
                 Some(all_names) => {
                     if all_names.contains(symbol.name()) {
                         Some(RequiresExplicitReExport::No)
@@ -1547,7 +1547,7 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
                         tracing::trace!(
                             "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                             symbol.name(),
-                            python_file.file(db).path(db)
+                            program_file.file(db).path(db)
                         );
                         return Truthiness::AlwaysFalse;
                     }
@@ -1558,7 +1558,7 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             match imported_symbol(
                 db,
                 env,
-                Some(python_file),
+                Some(program_file),
                 symbol.name(),
                 requires_explicit_reexport,
             )
@@ -1790,9 +1790,9 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use ruff_db::PythonFile;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
@@ -1826,8 +1826,8 @@ class TargetB:
         db.write_files([("/src/a.py", a.as_str()), ("/src/b.py", b.as_str())])?;
 
         let file = system_path_to_file(&db, "/src/a.py").unwrap();
-        let python_file = PythonFile::new(&db, file, db.python_version());
-        let index = semantic_index(&db, python_file);
+        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let index = semantic_index(&db, program_file);
         let class_scope = index
             .child_scopes(FileScopeId::global())
             .find(|(_, scope)| scope.node().as_class().is_some())
@@ -1838,7 +1838,7 @@ class TargetB:
             .find(|(_, scope)| scope.node().as_function().is_some())
             .unwrap()
             .0
-            .to_scope_id(&db, python_file);
+            .to_scope_id(&db, program_file);
 
         // Enter the range directly so it becomes the cycle head when inferring `other.target`
         // reaches the other module and then re-enters this scope.
@@ -1860,13 +1860,13 @@ class TargetB:
 
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
         let function_scope = {
-            let python_file = PythonFile::new(&db, file, db.python_version());
-            let index = semantic_index(&db, python_file);
+            let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+            let index = semantic_index(&db, program_file);
             index.child_scopes(FileScopeId::global()).next().unwrap().0
         };
         {
-            let python_file = PythonFile::new(&db, file, db.python_version());
-            let scope = function_scope.to_scope_id(&db, python_file);
+            let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+            let scope = function_scope.to_scope_id(&db, program_file);
             let use_def = use_def_map(&db, scope);
             assert!(
                 evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
@@ -1879,8 +1879,8 @@ class TargetB:
             "from typing import NoReturn\ndef callback() -> NoReturn: ...",
         )?;
 
-        let python_file = PythonFile::new(&db, file, db.python_version());
-        let scope = function_scope.to_scope_id(&db, python_file);
+        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let scope = function_scope.to_scope_id(&db, program_file);
         let use_def = use_def_map(&db, scope);
         assert!(
             evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
@@ -1908,7 +1908,9 @@ class TargetB:
                 )?;
 
                 let file = system_path_to_file(&db, "/src/test.py").unwrap();
-                let index = semantic_index(&db, PythonFile::new(&db, file, db.python_version()));
+                let program_file =
+                    ProgramFile::new(&db, file, db.program_environment().program(&db));
+                let index = semantic_index(&db, program_file);
                 let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
                 let use_def = index.use_def_map(function_scope);
                 let predicate = use_def

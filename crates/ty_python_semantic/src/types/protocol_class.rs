@@ -330,7 +330,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(copy)]
-    pub(super) program: Program,
+    pub(super) program: Program<'db>,
 
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
@@ -2817,15 +2817,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (implementation_self_binding_ty, protocol_self_binding_ty)
             };
 
-        // Checking a class object against a protocol's instance capabilities can expose the
-        // property descriptor itself rather than the value returned by its getter. Compatibility
-        // for properties on class objects is not yet modeled; retain the previous name-only
-        // behavior until generic upper-bound solving can handle the large recursive unions this
-        // otherwise creates.
-        if member.is_property() && matches!(attribute_type, Type::PropertyInstance(_)) {
-            return self.always();
-        }
-
         if member.is_method() && access == ProtocolMemberAccessMode::Instance {
             let Some(required_ty) = required_ty.resolve(db, env) else {
                 return self.never();
@@ -3328,11 +3319,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // An unbound property descriptor does not establish that the value returned by its
-        // getter is disjoint from the required property type.
-        if member.is_property() && matches!(ty, Type::PropertyInstance(_)) {
-            return self.never();
-        }
         let env = self.env;
         let access = member.access(db, env, ProtocolMemberAccessMode::Instance);
         if !member.is_method() {
@@ -3507,7 +3493,7 @@ fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = ProgramEnvironment::from_file(class.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
     let mut members = BTreeMap::default();
 
     ProtocolClass(class).for_each_member_candidate(db, &env, |name, candidate, specialization| {
@@ -3569,7 +3555,7 @@ fn protocol_interface_cycle_initial<'db>(
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(
         db,
-        &ProgramEnvironment::from_file(class.class_literal(db).python_file(db)),
+        &ProgramEnvironment::from_file(class.class_literal(db).program_file(db)),
     )
 }
 
@@ -3581,7 +3567,7 @@ fn proto_interface_cycle_recover<'db>(
     value: ProtocolInterface<'db>,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = ProgramEnvironment::from_file(class.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
     value.cycle_normalized(db, &env, *previous, cycle)
 }
 
@@ -3594,7 +3580,7 @@ fn proto_interface_cycle_recover<'db>(
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
@@ -3610,7 +3596,7 @@ fn protocol_bind_self<'db>(
 )]
 fn protocol_apply_self_with_receiver<'db>(
     db: &'db dyn Db,
-    program: Program,
+    program: Program<'db>,
     callable: CallableType<'db>,
     receiver_type: Type<'db>,
     self_type: Type<'db>,

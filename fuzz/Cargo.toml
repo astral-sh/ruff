@@ -26,7 +26,7 @@ ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 ruff_text_size = { path = "../crates/ruff_text_size" }
 
 ty_module_resolver = { path = "../crates/ty_module_resolver" }
-ty_python_semantic = { path = "../crates/ty_python_semantic" }
+ty_python_semantic = { path = "../crates/ty_python_semantic", features = ["testing"] }
 ty_vendored = { path = "../crates/ty_vendored" }
 ty_python_core = { path = "../crates/ty_python_core" }
 

@@ -3,24 +3,28 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
+use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
+use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
+use ty_python_core::{
+    ProgramFile, TestProgramDb as _, global_scope, place_table, semantic_index, use_def_map,
+};
+use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
 
-fn python_file(db: &TestDb, file: File) -> PythonFile<'_> {
-    PythonFile::new(db, file, db.python_version())
+fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
+    ProgramFile::new(db, file, db.program_environment().program(db))
 }
 
 fn global_symbol<'db>(db: &'db TestDb, file: File, name: &str) -> PlaceAndQualifiers<'db> {
-    crate::place::global_symbol(db, python_file(db, file), name)
+    crate::place::global_symbol(db, program_file(db, file), name)
 }
 
 #[track_caller]
@@ -31,8 +35,8 @@ fn get_symbol<'db>(
     symbol_name: &str,
 ) -> Place<'db> {
     let file = system_path_to_file(db, file_name).expect("file to exist");
-    let file = python_file(db, file);
-    let module = parsed_module(db, file).load(db);
+    let file = program_file(db, file);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
     let mut file_scope_id = FileScopeId::global();
     let mut scope = file_scope_id.to_scope_id(db, file);
@@ -61,7 +65,7 @@ fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
 #[track_caller]
 fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
     let file = system_path_to_file(db, filename).unwrap();
-    let diagnostics = check_types(db, python_file(db, file));
+    let diagnostics = check_types(db, program_file(db, file));
 
     assert_diagnostic_messages(&diagnostics, expected);
 }
@@ -69,7 +73,7 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
 #[track_caller]
 fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
     let file = system_path_to_file(db, filename).unwrap();
-    let diagnostics = check_types(db, python_file(db, file));
+    let diagnostics = check_types(db, program_file(db, file));
     assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
 
     let diagnostic = &diagnostics[0];
@@ -110,8 +114,39 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     db.write_dedented("src/py312_dependency.py", "value: int = 312")?;
 
     let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-    let py311 = PythonFile::new(&db, file, PythonVersion::PY311);
-    let py312 = PythonFile::new(&db, file, PythonVersion::PY312);
+    let default_program = db.program();
+    let search_paths = default_program.search_paths(&db).clone();
+    let python_platform = default_program.python_platform(&db).clone();
+    let py311 = ProgramFile::new(
+        &db,
+        file,
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY311,
+                    source: PythonVersionSource::Default,
+                },
+                python_platform: python_platform.clone(),
+                search_paths: search_paths.clone(),
+            },
+        ),
+    );
+    let py312 = ProgramFile::new(
+        &db,
+        file,
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY312,
+                    source: PythonVersionSource::Default,
+                },
+                python_platform,
+                search_paths,
+            },
+        ),
+    );
 
     let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
         let diagnostics = crate::check_file_unwrap(&db, file);
@@ -152,6 +187,52 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
 }
 
 #[test]
+fn program_file_changes_with_python_version() -> anyhow::Result<()> {
+    let db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .with_file("src/main.py", "type Alias = int")
+        .build()?;
+    let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
+    let program = db.program();
+    let (program_file_id, py311) = {
+        let program_file = program.program_file(&db, file);
+        (program_file.as_id(), program_file.python_file(&db).as_id())
+    };
+
+    let equivalent_program = Program::from_settings(
+        &db,
+        ProgramSettings {
+            python_version: db.program_settings().python_version.clone(),
+            python_platform: program.python_platform(&db).clone(),
+            search_paths: program.search_paths(&db).clone(),
+        },
+    );
+    assert_eq!(program, equivalent_program);
+    assert_eq!(
+        program_file_id,
+        equivalent_program.program_file(&db, file).as_id()
+    );
+
+    let py312_program = Program::from_settings(
+        &db,
+        ProgramSettings {
+            python_version: PythonVersionWithSource {
+                version: PythonVersion::PY312,
+                source: PythonVersionSource::Default,
+            },
+            python_platform: program.python_platform(&db).clone(),
+            search_paths: program.search_paths(&db).clone(),
+        },
+    );
+
+    let program_file = py312_program.program_file(&db, file);
+    assert_ne!(program_file_id, program_file.as_id());
+    assert_eq!(program_file.python_version(&db), PythonVersion::PY312);
+    assert_ne!(py311, program_file.python_file(&db).as_id());
+    Ok(())
+}
+
+#[test]
 fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
     let has_expected_type = |open_file: bool| -> anyhow::Result<bool> {
         let mut db = setup_db();
@@ -169,7 +250,7 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
             db.open_file(file);
         }
 
-        let module = parsed_module(&db, python_file(&db, file)).load(&db);
+        let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let assignment = module.syntax().body[1]
             .as_ann_assign_stmt()
             .expect("annotated assignment");
@@ -179,7 +260,7 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
             .expect("annotated assignment to have a value")
             .as_string_literal_expr()
             .expect("string literal value");
-        let scope = global_scope(&db, python_file(&db, file));
+        let scope = global_scope(&db, program_file(&db, file));
 
         Ok(infer_complete_scope_types(&db, scope)
             .try_expected_type(ruff_python_ast::ExprRef::from(string_expr))
@@ -209,12 +290,12 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     )?;
 
     let file = system_path_to_file(&db, "/src/definitions.py").unwrap();
-    let module = parsed_module(&db, python_file(&db, file)).load(&db);
+    let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
     let first_assignment = module.syntax().body[0].as_assign_stmt().unwrap();
     let second_assignment = module.syntax().body[1].as_assign_stmt().unwrap();
-    let first = semantic_index(&db, python_file(&db, file))
+    let first = semantic_index(&db, program_file(&db, file))
         .expect_single_definition(first_assignment.targets[0].as_name_expr().unwrap());
-    let second = semantic_index(&db, python_file(&db, file))
+    let second = semantic_index(&db, program_file(&db, file))
         .expect_single_definition(second_assignment.targets[0].as_name_expr().unwrap());
 
     let owner_type = Type::unknown();
@@ -666,7 +747,7 @@ class Form(Ui):
 // Incremental inference tests
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
-    let scope = global_scope(db, python_file(db, file));
+    let scope = global_scope(db, program_file(db, file));
     use_def_map(db, scope)
         .end_of_scope_symbol_bindings(place_table(db, scope).symbol_id(name).unwrap())
         .find_map(|b| b.binding.definition())
@@ -792,12 +873,12 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, python_file(db, file_main)).load(db);
+        let ast = parsed_module(db, program_file(db, file_main).python_file(db)).load(db);
         // Get the second statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
         let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
 
-        let index = semantic_index(db, python_file(db, file_main));
+        let index = semantic_index(db, program_file(db, file_main));
         index.expression(x_rhs_node.as_ref())
     }
 
@@ -890,12 +971,12 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 fn dependency_own_instance_member() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, python_file(db, file_main)).load(db);
+        let ast = parsed_module(db, program_file(db, file_main).python_file(db)).load(db);
         // Get the second statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
         let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
 
-        let index = semantic_index(db, python_file(db, file_main));
+        let index = semantic_index(db, program_file(db, file_main));
         index.expression(x_rhs_node.as_ref())
     }
 
@@ -992,12 +1073,12 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 fn dependency_implicit_class_member() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, python_file(db, file_main)).load(db);
+        let ast = parsed_module(db, program_file(db, file_main).python_file(db)).load(db);
         // Get the third statement in `main.py` (x = …) and extract the expression
         // node on the right-hand side:
         let x_rhs_node = &ast.syntax().body[2].as_assign_stmt().unwrap().value;
 
-        let index = semantic_index(db, python_file(db, file_main));
+        let index = semantic_index(db, program_file(db, file_main));
         index.expression(x_rhs_node.as_ref())
     }
 
@@ -1129,9 +1210,9 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     );
     let events = db.take_salsa_events();
 
-    let module = parsed_module(&db, python_file(&db, bar)).load(&db);
+    let module = parsed_module(&db, program_file(&db, bar).python_file(&db)).load(&db);
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
-    let foo_call = semantic_index(&db, python_file(&db, bar)).expression(call);
+    let foo_call = semantic_index(&db, program_file(&db, bar)).expression(call);
 
     assert_function_query_was_run(
         &db,
@@ -1160,9 +1241,9 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     );
     let events = db.take_salsa_events();
 
-    let module = parsed_module(&db, python_file(&db, bar)).load(&db);
+    let module = parsed_module(&db, program_file(&db, bar).python_file(&db)).load(&db);
     let call = &*module.syntax().body[1].as_assign_stmt().unwrap().value;
-    let foo_call = semantic_index(&db, python_file(&db, bar)).expression(call);
+    let foo_call = semantic_index(&db, program_file(&db, bar)).expression(call);
 
     assert_function_query_was_not_run(
         &db,

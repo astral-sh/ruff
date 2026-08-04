@@ -1754,7 +1754,7 @@ import sys
 from enum import Enum, IntEnum
 from typing import Any, Literal, TypeAlias, TypeVar
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import assert_never, assert_type
 
 T = TypeVar("T", bound=object)

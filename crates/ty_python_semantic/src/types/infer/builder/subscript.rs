@@ -2054,7 +2054,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     instance.class(db, env).static_class_literal(db)
                                 })
                                 .and_then(|(class_literal, _)| {
-                                    file_to_module(db, class_literal.python_file(db))
+                                    let file = class_literal.program_file(db);
+                                    file_to_module(db, file.resolver_file(db))
                                 })
                                 .and_then(|module| module.search_path(db))
                                 .is_some_and(ty_module_resolver::SearchPath::is_first_party)

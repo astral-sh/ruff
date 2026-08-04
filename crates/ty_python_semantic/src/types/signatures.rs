@@ -37,7 +37,9 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{TypeVarSet, max_typevar_freshness_matching_generic_context};
+use crate::types::typevar::{
+    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
@@ -72,7 +74,7 @@ fn function_signature_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.python_file(db);
+    let file = definition.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -90,7 +92,7 @@ fn function_signature_type_expression_flags<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeExpressionFlags {
-    let file = definition.python_file(db);
+    let file = definition.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -827,6 +829,23 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
+    }
+
+    /// Returns the binding referenced by a direct `P.args` or `P.kwargs` variadic parameter.
+    ///
+    /// Returns `None` if this signature has no `ParamSpec` component parameters, or if none of
+    /// their `ParamSpec`s has the same identity as `typevar`.
+    ///
+    /// This also exposes captured bindings that are intentionally absent from the function's own
+    /// generic context.
+    pub(super) fn paramspec_component_binding(
+        &self,
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        self.parameters
+            .paramspec_component_bindings(db)
+            .find(|bound| bound.typevar(db).identity(db) == typevar.identity(db))
     }
 
     pub(super) fn wrap_coroutine_return_type(
@@ -3197,6 +3216,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
         if target.parameters.is_gradual()
+            && (matches!(target.parameters.kind(), ParametersKind::Gradual)
+                || self.typevar_evaluation == TypeVarEvaluation::Lazy)
             && !source.parameters.is_top()
             && source
                 .parameters
@@ -3207,13 +3228,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
-            return self.always();
+            return result;
         }
 
         // The top signature is supertype of (and assignable from) all other signatures. It is a
         // subtype of no signature except itself, and assignable only to the gradual signature.
         if target.parameters.is_top() {
-            return self.always();
+            return result;
         } else if source.parameters.is_top() && !target.parameters.is_gradual() {
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::TopCallableAssignedToNonTop {
@@ -4766,6 +4787,25 @@ impl<'db> Parameters<'db> {
         self.data.value.iter()
     }
 
+    /// Iterates over the `ParamSpec` bindings referenced by direct variadic component annotations.
+    ///
+    /// The returned bindings represent `P` itself, with the `args` or `kwargs` component removed.
+    fn paramspec_component_bindings(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> + '_ {
+        self.iter()
+            .filter(|parameter| parameter.is_variadic() || parameter.is_keyword_variadic())
+            .filter_map(move |parameter| match parameter.annotated_type() {
+                Type::TypeVar(typevar)
+                    if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_some() =>
+                {
+                    Some(typevar.without_paramspec_attr(db))
+                }
+                _ => None,
+            })
+    }
+
     /// Iterate initial positional parameters, not including variadic parameter, if any.
     ///
     /// For a valid signature, this will be all positional parameters. In an invalid signature,
@@ -5324,7 +5364,7 @@ impl<'db> Parameter<'db> {
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let index = semantic_index(db, function_definition.python_file(db));
+        let index = semantic_index(db, function_definition.program_file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
         let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
@@ -5655,13 +5695,13 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::{FunctionType, KnownClass, LiteralValueType};
-    use ruff_db::PythonFile;
     use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
-        let module = PythonFile::new(db, module, db.python_version());
+        let module = ProgramFile::new(db, module, db.program_environment().program(db));
         global_symbol(db, module, "f")
             .place
             .expect_type()

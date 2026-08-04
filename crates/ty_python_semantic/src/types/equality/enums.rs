@@ -1108,7 +1108,7 @@ fn enum_class_key_profile<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> EnumClassKeyProfile<'db> {
-    let env = ProgramEnvironment::from_file(enum_class.class_literal(db).python_file(db));
+    let env = ProgramEnvironment::from_file(enum_class.class_literal(db).program_file(db));
     let semantics = KnownComparisonSemantics::of_instance(
         db,
         &env,

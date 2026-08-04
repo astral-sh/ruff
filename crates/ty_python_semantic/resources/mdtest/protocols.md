@@ -2015,7 +2015,7 @@ read/write property, a `Final` attribute, or a `ClassVar` attribute:
 ```py
 from typing import ClassVar, Final, Protocol, final
 from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of, is_assignable_to, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_subtype_of, is_assignable_to, is_disjoint_from
 
 class HasXProperty(Protocol):
     @property
@@ -2084,6 +2084,18 @@ class HasStrXProperty(Protocol):
 static_assert(not is_assignable_to(XAttrBad, HasXProperty))
 static_assert(not is_assignable_to(HasStrXProperty, HasXProperty))
 static_assert(not is_assignable_to(HasXProperty, HasStrXProperty))
+```
+
+Accessing an instance property on the class object exposes the property descriptor, not the value
+returned by its getter. A class object with only an instance property is therefore disjoint from the
+protocol:
+
+```py
+static_assert(not is_subtype_of(TypeOf[XReadProperty], HasXProperty))
+static_assert(not is_assignable_to(TypeOf[XReadProperty], HasXProperty))
+static_assert(is_disjoint_from(TypeOf[XReadProperty], HasXProperty))
+
+x_class: HasXProperty = XReadProperty  # error: [invalid-assignment]
 ```
 
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below
@@ -5685,7 +5697,7 @@ python-version = "3.12"
 ```py
 from typing import Protocol, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class UnknownMethod[T](Protocol):
     def method(self) -> Unknown: ...
@@ -5700,7 +5712,7 @@ checked.
 ```py
 from typing import Protocol, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class IntProperty[T](Protocol):
     @property
@@ -5723,7 +5735,7 @@ has been replaced by `int`, so the cast is redundant.
 ```py
 from typing import Protocol, TypeVar, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 T = TypeVar("T", bound=Unknown)
 
@@ -5776,7 +5788,7 @@ example, descriptor overload resolution exposes `Unknown` only through the neste
 ```py
 from typing import Protocol, cast, overload
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class Descriptor:
     @overload

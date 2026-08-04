@@ -13,7 +13,6 @@ pub(crate) mod outgoing_calls;
 
 use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, SymbolKind};
-use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::CoveringNode;
@@ -21,6 +20,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_module_resolver::ResolverFile;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
@@ -33,10 +34,10 @@ use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticMode
 /// cursor on a specific `@overload def` yields just that one.
 pub fn prepare_call_hierarchy(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<CallHierarchyItem>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definitions = goto_target
@@ -109,7 +110,7 @@ impl CallHierarchyItem {
         Some(CallHierarchyItem {
             name: Name::new(name),
             kind,
-            detail: module_detail(db, def.python_file(db)),
+            detail: module_detail(db, def.program_file(db).resolver_file(db)),
             file: def_file,
             full_range: def.full_range(db, module).range(),
             selection_range: def.focus_range(db, module).range(),
@@ -117,7 +118,7 @@ impl CallHierarchyItem {
     }
 }
 
-fn module_detail(db: &dyn Db, file: PythonFile<'_>) -> Option<String> {
+fn module_detail(db: &dyn Db, file: ResolverFile<'_>) -> Option<String> {
     ty_module_resolver::file_to_module(db, file).map(|module| module.name(db).to_string())
 }
 
@@ -199,7 +200,7 @@ mod tests {
         pub(super) fn prepare_calls(&self) -> Option<Vec<CallHierarchyItem>> {
             prepare_call_hierarchy(
                 &self.db,
-                self.python_file(self.cursor.file),
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
             )
         }

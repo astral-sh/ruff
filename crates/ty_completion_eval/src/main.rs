@@ -10,16 +10,14 @@ use anyhow::{Context, anyhow};
 use clap::Parser;
 use regex::bytes::Regex;
 
-use ruff_db::PythonFile;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::{Completion, CompletionCapabilities};
 use ty_module_resolver::ModuleName;
-use ty_project::Db as _;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -332,7 +330,7 @@ impl Task {
             &self.db,
             &self.settings,
             CompletionCapabilities::default(),
-            PythonFile::new(&self.db, file, self.db.python_version()),
+            self.db.program_file(file),
             offset,
         );
         Ok(completions)

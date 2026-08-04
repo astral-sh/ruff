@@ -153,7 +153,7 @@ def _(
 ## Do not erase `Unknown`
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -166,7 +166,7 @@ Since `Unknown` is a gradual type, it is not a subtype of anything, but multiple
 union are still redundant:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknown | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -179,7 +179,7 @@ def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknow
 Simplifications still apply when `Unknown` is present.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: int | Unknown | bool) -> None:
     reveal_type(u1)  # revealed: int | Unknown

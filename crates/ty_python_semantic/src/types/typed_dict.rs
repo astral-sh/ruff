@@ -259,8 +259,9 @@ impl<'db> TypedDictType<'db> {
                 }
             };
 
-            let python_file = static_class.python_file(db);
-            let env = ProgramEnvironment::from_file(python_file);
+            let program_file = static_class.program_file(db);
+            let python_file = program_file.python_file(db);
+            let env = ProgramEnvironment::from_file(program_file);
             let module = parsed_module(db, python_file).load(db);
             let class_definition = static_class.definition(db);
             let class_stmt = class_definition
@@ -1297,8 +1298,9 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
-    let python_file = definition.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
@@ -1361,8 +1363,9 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
-    let python_file = definition.python_file(db);
-    let env = ProgramEnvironment::from_file(python_file);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)

@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::ProgramEnvironment;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
 use crate::types::known_instance::KnownInstanceType;
@@ -9,13 +8,13 @@ use crate::types::{
     IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
+use crate::{Program, ProgramEnvironment};
 use quickcheck::{Arbitrary, Gen};
-use ruff_db::PythonFile;
 use ruff_db::files::system_path_to_file;
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_module_resolver::KnownModule;
+use ty_python_core::ProgramFile;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
@@ -142,11 +141,11 @@ enum ParamKind {
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
-    python_version: PythonVersion,
+    program: Program<'db>,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    let env = ProgramEnvironment::from_program(python_version);
+    let env = ProgramEnvironment::from_program(program);
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
@@ -265,7 +264,7 @@ impl Ty {
                 let builtins_class = builtins_symbol(db, env, class).place.expect_type();
                 let function = builtins_class.member(db, env, method).place.expect_type();
 
-                create_bound_method(db, env.python_version(db), function, builtins_class)
+                create_bound_method(db, env.program(db), function, builtins_class)
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,
@@ -301,7 +300,7 @@ fn divergent<'db>(
 fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
-    let file = PythonFile::new(db, file, env.python_version(db));
+    let file = ProgramFile::new(db, file, env.program(db));
     let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
         panic!(
             "Expected a global symbol for `{name}` in the property test module, but it was not found"

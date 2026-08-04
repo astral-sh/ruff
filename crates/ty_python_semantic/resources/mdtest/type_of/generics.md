@@ -97,7 +97,8 @@ reveal_type(union_bound(Multiply))  # revealed: Multiply
 ## Union
 
 ```py
-from ty_extensions import Intersection, Unknown
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
 
 def _[T: int](x: type | type[T]):
     reveal_type(x())  # revealed: Any

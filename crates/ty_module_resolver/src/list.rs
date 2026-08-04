@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
-use ruff_db::PythonFile;
 use ruff_db::files::directory_listing;
-use ruff_python_ast::PythonVersion;
 
+use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
@@ -12,8 +11,11 @@ use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
-pub fn all_modules(db: &dyn Db, python_version: PythonVersion) -> Vec<Module<'_>> {
-    let mut modules = list_modules(db, python_version).to_vec();
+pub fn all_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> Vec<Module<'db>> {
+    let mut modules = list_modules(db, resolver_environment).to_vec();
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
@@ -26,27 +28,23 @@ pub fn all_modules(db: &dyn Db, python_version: PythonVersion) -> Vec<Module<'_>
 }
 
 /// List all available top-level modules.
-pub fn list_modules(db: &dyn Db, python_version: PythonVersion) -> &[Module<'_>] {
-    list_modules_impl(db, PythonVersionIngredient::new(db, python_version))
-}
-
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct PythonVersionIngredient<'db> {
-    #[returns(copy)]
-    python_version: PythonVersion,
+pub fn list_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> &'db [Module<'db>] {
+    list_modules_impl(db, resolver_environment)
 }
 
 #[salsa::tracked(returns(deref))]
 fn list_modules_impl<'db>(
     db: &'db dyn Db,
-    version: PythonVersionIngredient<'db>,
+    resolver_environment: ResolverEnvironment<'db>,
 ) -> Box<[Module<'db>]> {
-    let python_version = version.python_version(db);
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::Typing) {
+    for search_path in search_paths(db, resolver_environment, ModuleResolveMode::Typing) {
         for &new in list_modules_in(
             db,
-            SearchPathIngredient::new(db, search_path.clone(), python_version),
+            SearchPathIngredient::new(db, resolver_environment, search_path.clone()),
         ) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
@@ -83,10 +81,10 @@ fn list_modules_impl<'db>(
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 struct SearchPathIngredient<'db> {
+    #[returns(copy)]
+    resolver_environment: ResolverEnvironment<'db>,
     #[returns(ref)]
     path: SearchPath,
-    #[returns(copy)]
-    python_version: PythonVersion,
 }
 
 /// List all available top-level modules in the given `SearchPath`.
@@ -97,7 +95,7 @@ fn list_modules_in<'db>(
 ) -> Vec<ListedModule<'db>> {
     let path = search_path.path(db);
     tracing::debug!("Listing modules in search path '{}'", path);
-    let mut lister = Lister::new(db, path, search_path.python_version(db));
+    let mut lister = Lister::new(db, search_path.resolver_environment(db), path);
     match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
             let Ok(listing) = directory_listing(db, system_search_path) else {
@@ -138,7 +136,7 @@ impl get_size2::GetSize for ListedModule<'_> {}
 struct Lister<'db> {
     db: &'db dyn Db,
     search_path: &'db SearchPath,
-    python_version: PythonVersion,
+    resolver_environment: ResolverEnvironment<'db>,
     modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
 
@@ -147,13 +145,13 @@ impl<'db> Lister<'db> {
     /// of file paths.
     fn new(
         db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
         search_path: &'db SearchPath,
-        python_version: PythonVersion,
     ) -> Lister<'db> {
         Lister {
             db,
             search_path,
-            python_version,
+            resolver_environment,
             modules: BTreeMap::new(),
         }
     }
@@ -205,10 +203,11 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::file_module(
                             self.db,
+                            file,
+                            self.resolver_environment,
                             Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
-                            PythonFile::new(self.db, file, self.python_version),
                         ),
                     );
                     return;
@@ -251,8 +250,8 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::namespace_package(
                             self.db,
+                            self.resolver_environment,
                             Cow::Owned(module_name),
-                            self.python_version,
                         ),
                     );
                 }
@@ -281,10 +280,11 @@ impl<'db> Lister<'db> {
             &module_path,
             Module::file_module(
                 self.db,
+                file,
+                self.resolver_environment,
                 Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
-                PythonFile::new(self.db, file, self.python_version),
             ),
         );
     }
@@ -347,14 +347,17 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::Typing.is_non_shadowable(self.python_version.minor, name.as_str())
+        ModuleResolveMode::Typing.is_non_shadowable(
+            self.resolver_environment.python_version(self.db).minor,
+            name.as_str(),
+        )
     }
 
     /// Constructs a resolver context for use with some APIs that require it.
     fn context(&self) -> ResolverContext<'db> {
         ResolverContext {
             db: self.db,
-            python_version: self.python_version,
+            resolver_environment: self.resolver_environment,
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
             mode: ModuleResolveMode::Typing,
@@ -432,7 +435,7 @@ mod tests {
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     fn list_modules(db: &TestDb) -> &[Module<'_>] {
-        super::list_modules(db, db.python_version())
+        super::list_modules(db, db.resolver_environment())
     }
 
     struct ModuleDebugSnapshot<'db> {
@@ -449,14 +452,11 @@ mod tests {
                 Module::File(module) => {
                     // For snapshots, just normalize all paths to using
                     // Unix slashes for simplicity.
-                    let path_components =
-                        match module.python_file(self.db).file(self.db).path(self.db) {
-                            FilePath::System(path) => path.components(),
-                            FilePath::Vendored(path) => path.components(),
-                            FilePath::SystemVirtual(path) => {
-                                Utf8Path::new(path.as_str()).components()
-                            }
-                        };
+                    let path_components = match module.file(self.db).path(self.db) {
+                        FilePath::System(path) => path.components(),
+                        FilePath::Vendored(path) => path.components(),
+                        FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
+                    };
                     let nice_path = path_components
                         // Avoid including a root component, since that
                         // results in a platform dependent separator.
@@ -1465,7 +1465,11 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
+            ModuleResolveModeIngredient::new(
+                &db,
+                db.resolver_environment(),
+                ModuleResolveMode::Typing,
+            ),
             &events,
         );
     }

@@ -332,7 +332,7 @@ fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
-    let env = ProgramEnvironment::from_file(class.python_file(db));
+    let env = ProgramEnvironment::from_file(class.program_file(db));
     let metadata = enum_metadata(db, class)?;
     let members = metadata
         .members
@@ -1056,7 +1056,7 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    let env = ProgramEnvironment::from_file(class.python_file(db));
+    let env = ProgramEnvironment::from_file(class.program_file(db));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;

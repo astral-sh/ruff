@@ -58,11 +58,11 @@
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
 use rayon::prelude::*;
-use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_project::parallel::ParallelIteratorExt;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, SemanticModel,
 };
@@ -73,15 +73,15 @@ use ty_python_semantic::{
 /// identified.
 pub fn goto_implementation(
     db: &dyn Db,
-    file: PythonFile<'_>,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let finder = prepare_implementations_finder_for_goto_target(&model, &goto_target)?;
     let source_file = file.file(db);
-    let python_version = file.python_version(db);
+    let program = file.program(db);
 
     let mut candidate_files: Vec<File> = db
         .project()
@@ -95,7 +95,7 @@ pub fn goto_implementation(
     let batches = candidate_files
         .into_par_iter()
         .map_with_db(db, |db, file| {
-            let file = PythonFile::new(db, file, python_version);
+            let file = ProgramFile::new(db, file, program);
             let definitions = finder.implementations_for_file(db, file);
             definitions_to_implementation_targets(db, definitions)
         })
@@ -838,7 +838,7 @@ mod tests {
         let targets = salsa::attach(&test.db, || {
             goto_implementation(
                 &test.db,
-                test.python_file(test.cursor.file),
+                test.program_file(test.cursor.file),
                 test.cursor.offset,
             )
             .expect("implementation targets")
@@ -2144,7 +2144,7 @@ class MyClass:
             let Some(targets) = salsa::attach(&self.db, || {
                 goto_implementation(
                     &self.db,
-                    self.python_file(self.cursor.file),
+                    self.program_file(self.cursor.file),
                     self.cursor.offset,
                 )
             }) else {

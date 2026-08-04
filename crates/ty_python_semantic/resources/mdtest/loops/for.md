@@ -1490,8 +1490,8 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import TypeOf, is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to, reveal_mro
 
 class Foo(SomethingUnknown): ...
 

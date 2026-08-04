@@ -890,8 +890,8 @@ of the first type represent sets of values that are a subset of every possible s
 represented by a materialization of the second type.
 
 ```pyi
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
 from typing_extensions import Any
 
 static_assert(not is_subtype_of(Any, Any))

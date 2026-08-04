@@ -4722,6 +4722,7 @@ dependencies = [
  "compact_str",
  "get-size2",
  "insta",
+ "ordermap",
  "regex",
  "regex-syntax",
  "ruff_db",

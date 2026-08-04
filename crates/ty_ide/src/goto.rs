@@ -14,6 +14,7 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
@@ -265,7 +266,7 @@ impl<'db> Definitions<'db> {
         let ty_def = ty.definition(db, env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.python_file(db)?)
+                ResolvedDefinition::Module(ProgramFile::new(db, module.file(db)?, env.program(db)))
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -1451,7 +1452,7 @@ fn definitions_for_module<'db>(
     level: u32,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
-    let file = module.python_file(model.db())?;
+    let file = ProgramFile::new(model.db(), module.file(model.db())?, model.program());
     Some(vec![ResolvedDefinition::Module(file)])
 }
 

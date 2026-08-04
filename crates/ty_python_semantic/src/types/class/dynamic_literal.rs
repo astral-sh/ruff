@@ -202,8 +202,9 @@ impl<'db> DynamicClassLiteral<'db> {
             db: &'db dyn Db,
             definition: Definition<'db>,
         ) -> Box<[Type<'db>]> {
-            let python_file = definition.python_file(db);
-            let env = ProgramEnvironment::from_file(python_file);
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let env = ProgramEnvironment::from_file(program_file);
             let module = parsed_module(db, python_file).load(db);
 
             let value = definition

@@ -14,14 +14,13 @@ use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 pub use context::ProgramEnvironment;
 use ruff_db::Instant;
-use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 use smallvec::smallvec_inline;
-use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
@@ -101,7 +100,7 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -111,10 +110,10 @@ pub(crate) use literal::{
 };
 pub use special_form::SpecialFormType;
 pub(crate) use special_form::TypedDictModule;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
+use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
 
 mod attribute_write;
 mod bool;
@@ -173,7 +172,7 @@ mod definition;
 mod property_tests;
 mod subscript;
 
-pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
+pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
     tracing::debug!("Checking file '{path}'", path = source_file.path(db));
@@ -204,7 +203,7 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file, diagnostics);
+    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {
@@ -221,6 +220,100 @@ pub fn check_types(db: &dyn Db, file: PythonFile<'_>) -> Vec<Diagnostic> {
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
     inference.binding_type(definition)
+}
+
+/// Returns whether a definition represents a value that exists at runtime.
+///
+/// Type-checking-only decorators and guards never represent runtime values. Private type-variable
+/// declarations, explicit aliases, and unambiguous typing aliases in stub files are also
+/// typing-only, while public aliases and genuine runtime values remain visible.
+///
+/// ```python
+/// _T = TypeVar("_T")  # Typing-only helper.
+/// _Alias: TypeAlias = list[int]  # Typing-only alias.
+/// _runtime_typevar = make_typevar()  # Runtime value.
+/// _runtime_callback = callbacks[0]  # Runtime value.
+/// ```
+#[salsa::tracked(returns(copy))]
+pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let file = definition.program_file(db);
+    let inference = infer_definition_types(db, definition);
+    let ty = inference.binding_type(definition);
+
+    // A class or function decorated with `@type_check_only` never exists at runtime.
+    if ty.is_type_check_only(db)
+        || inference
+            .undecorated_type()
+            .is_some_and(|ty| ty.is_type_check_only(db))
+    {
+        return false;
+    }
+
+    let parsed = parsed_module(db, file.python_file(db));
+    let module = parsed.load(db);
+
+    // Definitions inside an `if TYPE_CHECKING` block are never available at runtime.
+    if semantic_index(db, file).is_in_type_checking_block(
+        definition.file_scope(db),
+        definition.full_range(db, &module).range(),
+    ) {
+        return false;
+    }
+
+    // The remaining heuristics only apply to stub definitions.
+    if !file.file(db).is_stub(db) {
+        return true;
+    }
+
+    let is_private = definition.place(db).as_symbol().is_some_and(|symbol| {
+        matches!(
+            NameKind::classify(place_table(db, definition.scope(db)).symbol(symbol).name()),
+            NameKind::Sunder
+        )
+    });
+
+    if !is_private {
+        return true;
+    }
+
+    // Private type variables, parameter specifications, and type-variable tuples in stubs are
+    // implementation details rather than runtime values.
+    if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+        && typevar.definition(db) == Some(definition)
+    {
+        return false;
+    }
+
+    // Explicit PEP 613 and PEP 695 type aliases in stubs are also typing-only helpers.
+    let model = SemanticModel::new(db, file);
+    if model.is_type_alias_definition(definition) {
+        return false;
+    }
+
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return true;
+    };
+
+    // Treat only unambiguous union, `Literal`, and `Annotated` expressions as implicit aliases.
+    // Other expressions may also be aliases, but a false negative is preferable to incorrectly
+    // hiding a value that exists at runtime.
+    match (ty, assignment.value(&module)) {
+        (
+            Type::KnownInstance(KnownInstanceType::UnionType(_)),
+            ast::Expr::BinOp(ast::ExprBinOp {
+                op: ast::Operator::BitOr,
+                ..
+            }),
+        ) => false,
+        (
+            Type::KnownInstance(KnownInstanceType::Literal(_) | KnownInstanceType::Annotated(_)),
+            ast::Expr::Subscript(subscript),
+        ) => !matches!(
+            subscript.value.inferred_type(&model),
+            Some(Type::SpecialForm(_) | Type::ClassLiteral(_) | Type::GenericAlias(_))
+        ),
+        _ => true,
+    }
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.
@@ -243,7 +336,7 @@ fn definition_expression_type<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
-    let file = definition.python_file(db);
+    let file = definition.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -270,7 +363,7 @@ fn definition_expression_annotation<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> TypeAndQualifiers<'db> {
-    let file = definition.python_file(db);
+    let file = definition.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
@@ -544,7 +637,7 @@ impl Default for MemberLookupPolicy {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct MemberLookupKey<'db> {
     #[returns(copy)]
-    program: Program,
+    program: Program<'db>,
     #[returns(copy)]
     ty: Type<'db>,
     #[returns(ref)]
@@ -1098,7 +1191,7 @@ impl<T> InstanceProjection<T> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct TypePair<'db> {
     #[returns(copy)]
-    program: Program,
+    program: Program<'db>,
     #[returns(copy)]
     first: Type<'db>,
     #[returns(copy)]
@@ -1600,7 +1693,7 @@ impl<'db> Type<'db> {
     fn cached_materialization(
         self,
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
         materialization_kind: MaterializationKind,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(program);
@@ -1800,7 +1893,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn module_literal(
         db: &'db dyn Db,
-        importing_file: PythonFile<'db>,
+        importing_file: ProgramFile<'db>,
         submodule: Module<'db>,
     ) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(
@@ -2779,7 +2872,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn lookup_dunder_new_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             ty: Type<'db>,
         ) -> Option<PlaceAndQualifiers<'db>> {
             let env = &ProgramEnvironment::from_program(program);
@@ -3369,7 +3462,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
-            program: Program,
+            program: Program<'db>,
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
@@ -3704,7 +3797,11 @@ impl<'db> Type<'db> {
         cycle_initial=|_, _, _, _| true,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn is_definitely_non_data_descriptor_impl(self, db: &'db dyn Db, program: Program) -> bool {
+    fn is_definitely_non_data_descriptor_impl(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> bool {
         let env = &ProgramEnvironment::from_program(program);
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
@@ -3732,7 +3829,7 @@ impl<'db> Type<'db> {
     fn is_data_descriptor_impl(
         self,
         db: &'db dyn Db,
-        program: Program,
+        program: Program<'db>,
         any_of_union: bool,
     ) -> bool {
         let env = &ProgramEnvironment::from_program(program);
@@ -4423,17 +4520,11 @@ impl<'db> Type<'db> {
                     ty.map(Place::bound).unwrap_or_default().into()
                 }
 
-                Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
-                    Place::declared(Type::TypeVar(
-                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
-                    ))
-                    .into()
-                }
-                Type::TypeVar(typevar) if name_str == "kwargs" && typevar.is_paramspec(db) => {
-                    Place::declared(Type::TypeVar(
-                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
-                    ))
-                    .into()
+                Type::TypeVar(typevar)
+                    if typevar.is_paramspec(db)
+                        && let Some(attr) = ParamSpecAttrKind::from_name(name_str) =>
+                {
+                    Place::declared(Type::TypeVar(typevar.with_paramspec_attr(db, attr))).into()
                 }
                 Type::TypeVar(typevar) => {
                     let receiver = receiver.unwrap_or(this);
@@ -6474,7 +6565,7 @@ impl<'db> Type<'db> {
                             fallback_type: Type::unknown(),
                         });
                     }
-                    let index = semantic_index(db, scope_id.python_file(db));
+                    let index = semantic_index(db, scope_id.program_file(db));
                     Ok(bind_typevar(
                         db,
                         index,
@@ -7559,7 +7650,7 @@ impl<'db> Type<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn expand_eagerly_(self, db: &'db dyn Db, program: Program) -> Type<'db> {
+    fn expand_eagerly_(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(program);
         self.apply_type_mapping(
             db,
@@ -8970,7 +9061,7 @@ impl<'db> InvalidTypeExpression<'db> {
             && function_body_scope
                 .scope(db)
                 .parent()
-                .map(|parent| parent.to_scope_id(db, function_body_scope.python_file(db)))
+                .map(|parent| parent.to_scope_id(db, function_body_scope.program_file(db)))
                 == builtins_module_scope(db, env)
         {
             diagnostic.set_primary_annotation_message("Did you mean `collections.abc.Callable`?");
@@ -9110,14 +9201,14 @@ pub struct ModuleLiteralType<'db> {
     /// the same underlying single-file module are understood by ty as being equivalent types
     /// in all situations.
     #[returns(copy)]
-    _importing_file: Option<PythonFile<'db>>,
+    _importing_file: Option<ProgramFile<'db>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn importing_file(self, db: &'db dyn Db) -> Option<PythonFile<'db>> {
+    fn importing_file(self, db: &'db dyn Db) -> Option<ProgramFile<'db>> {
         debug_assert_eq!(
             self._importing_file(db).is_some(),
             self.module(db).kind(db).is_package()
@@ -9189,7 +9280,14 @@ impl<'db> ModuleLiteralType<'db> {
         let relative_submodule_name = ModuleName::new(name)?;
         let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
-        let submodule = resolve_module(db, importing_file, &absolute_submodule_name)?;
+        let submodule = resolve_module(
+            db,
+            ImportingFile::File(
+                importing_file.file(db),
+                importing_file.resolver_environment(db),
+            ),
+            &absolute_submodule_name,
+        )?;
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
@@ -9202,7 +9300,10 @@ impl<'db> ModuleLiteralType<'db> {
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         let module = self.module(db);
-        if let Some(file) = module.python_file(db) {
+        if let Some(file) = module
+            .file(db)
+            .map(|file| ProgramFile::new(db, file, env.program(db)))
+        {
             let getattr_symbol = imported_symbol(db, env, Some(file), "__getattr__", None);
             // If we found a __getattr__ function, try to call it with the name argument
             if let Place::Defined(place) = getattr_symbol.place
@@ -9257,7 +9358,10 @@ impl<'db> ModuleLiteralType<'db> {
             return Place::bound(submodule).into();
         }
 
-        let place_and_qualifiers = imported_symbol(db, env, module.python_file(db), name, None);
+        let file = module
+            .file(db)
+            .map(|file| ProgramFile::new(db, file, env.program(db)));
+        let place_and_qualifiers = imported_symbol(db, env, file, name, None);
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {
