@@ -1040,6 +1040,46 @@ def f[T](x: T, y: Not[T]) -> T:
 
 ## `Callable` parameters
 
+### Return type inference from object-variadic callbacks
+
+Object-variadic callbacks must preserve `Callable[..., T]` return constraints.
+
+```py
+from collections.abc import Callable
+
+def call[T](callback: Callable[..., T]) -> T:
+    return callback()
+
+def bounded[T: int](callback: Callable[..., T]) -> T:
+    return callback()
+
+def callback(*args: object, **kwargs: object) -> int:
+    return 1
+
+reveal_type(call(callback))  # revealed: int
+reveal_type(bounded(callback))  # revealed: int
+```
+
+### Gradual callable parameters with a required prefix
+
+```py
+from collections.abc import Callable
+from typing import Concatenate
+
+def invoke[T](callback: Callable[Concatenate[int, ...], T]) -> T:
+    return callback(1)
+
+def accepts_int(value: int, *args: object, **kwargs: object) -> int:
+    return value
+
+def needs_str(value: str, *args: object, **kwargs: object) -> int:
+    return len(value)
+
+reveal_type(invoke(accepts_int))  # revealed: int
+# error: [invalid-argument-type]
+reveal_type(invoke(needs_str))  # revealed: int
+```
+
 ### Class constructors
 
 We can recurse into the parameters and return values of `Callable` parameters to infer

@@ -3191,6 +3191,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
         if target.parameters.is_gradual()
+            && (matches!(target.parameters.kind(), ParametersKind::Gradual)
+                || self.typevar_evaluation == TypeVarEvaluation::Lazy)
             && !source.parameters.is_top()
             && source
                 .parameters
@@ -3201,7 +3203,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
-            return self.always();
+            return result;
         }
 
         // The top signature is supertype of (and assignable from) all other signatures. It is a
