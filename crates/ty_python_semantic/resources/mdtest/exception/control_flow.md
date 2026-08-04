@@ -10,7 +10,7 @@ to mark definitions that might or might not succeed (as the function could raise
 type checker must assume that any arbitrary function call could raise an exception in Python; this
 is just a naming convention used in these tests for clarity.
 
-## Exception checkpoints
+## Operations that cannot raise
 
 Exception handlers are reachable only from operations that can raise. A local assignment of a
 literal cannot raise, so it does not make the handler reachable:
@@ -48,6 +48,8 @@ def known_safe_conditions(value: int | None) -> None:
     reveal_type(state)  # revealed: Literal[1]
 ```
 
+## Calls preserve completed argument evaluation
+
 A checkpoint is recorded immediately before the raising operation, after evaluating its child
 expressions. If the outer call below raises, the assignment expression has therefore completed:
 
@@ -61,6 +63,8 @@ except:
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Imports preserve completed aliases
+
 Imports also checkpoint between aliases because a later import can fail after an earlier name has
 been bound:
 
@@ -71,6 +75,8 @@ try:
 except:
     reveal_type(first)  # revealed: Literal[0] | <class 'Awaitable'>
 ```
+
+## Explicit raises and failing assertions
 
 Explicit raises and failing assertions also create checkpoints after their child expressions have
 been evaluated:
@@ -97,12 +103,12 @@ def check_short_circuit_assertion(flag: bool) -> None:
         reveal_type(state)  # revealed: Literal[2, 0]
 ```
 
+## Attribute access, subscripting, and operators can raise
+
 Operations implemented by Python protocols create checkpoints after their operands have been
 evaluated:
 
 ```py
-from collections.abc import AsyncIterable, Awaitable, Iterable
-
 class C:
     value: int
 
@@ -152,6 +158,18 @@ def augmented_assignment(number: Number) -> None:
     except:
         reveal_type(target_state)  # revealed: Literal[1]
         reveal_type(rhs_state)  # revealed: Literal[0, 1]
+```
+
+## Truth testing, iteration, and unpacking can raise
+
+Truth testing and iteration use Python protocols that can raise before a loop body runs or after
+earlier iterations have completed. Assigning an iteration target and unpacking can raise too.
+
+```py
+from collections.abc import AsyncIterable, Iterable
+
+class C:
+    value: int
 
 def truthiness(value: object) -> None:
     state = 0
@@ -200,6 +218,14 @@ def unpacking(values: Iterable[int]) -> None:
         state = 1
     except:
         reveal_type(state)  # revealed: Literal[0]
+```
+
+## Await and yield can raise
+
+Awaiting and yielding can raise when a coroutine or generator resumes.
+
+```py
+from collections.abc import Awaitable, Iterable
 
 async def awaiting(value: Awaitable[int]) -> None:
     state = 0
@@ -222,6 +248,8 @@ def yielding():
     except:
         reveal_type(state)  # revealed: Literal[0]
 ```
+
+## Eager and lazy scopes
 
 Checkpoints propagate through eagerly evaluated nested scopes, but not through lazy generator
 expression bodies:
@@ -254,6 +282,15 @@ except:
     z = 1
 
 reveal_type(z)  # revealed: Literal[0]
+```
+
+## Comprehension assignment expressions at exception checkpoints
+
+Assignment expressions in an eager comprehension are visible to an enclosing exception handler only
+after they have actually executed.
+
+```py
+from collections.abc import AsyncIterable, Awaitable
 
 def comprehension_may_raise() -> None: ...
 def comprehension_walrus_exception() -> None:
@@ -276,7 +313,12 @@ def comprehension_exception_before_later_walrus() -> None:
         [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]
     except:
         reveal_type(state)  # revealed: int
+```
 
+Conditional assignments and multiple assignment targets retain their independent states at each
+checkpoint.
+
+```py
 def comprehension_exception_after_conditional_walrus(flag: bool) -> None:
     state = "before"
     try:
@@ -292,21 +334,23 @@ def comprehension_exception_with_multiple_walruses() -> None:
     except:
         reveal_type(first)  # revealed: int
         reveal_type(second)  # revealed: str
+```
 
-def nested_comprehension_walrus_exception() -> None:
-    state = 0
-    try:
-        [[(state := 1, comprehension_may_raise()) for _ in [0]] for _ in [0]]
-    except:
-        reveal_type(state)  # revealed: int
+Nested comprehensions apply assignments in execution order, so the inner assignment replaces the
+earlier outer assignment.
 
+```py
 def nested_comprehension_walrus_order() -> None:
     state = 0
     try:
         [((state := "outer"), [(state := 1, comprehension_may_raise()) for _ in [0]]) for _ in [0]]
     except:
         reveal_type(state)  # revealed: int
+```
 
+Assignment expressions also preserve the correct module or explicitly global owning scope.
+
+```py
 module_comprehension_state = "before"
 try:
     [(module_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
@@ -321,7 +365,12 @@ def global_comprehension_walrus_exception() -> None:
         [(global_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
     except:
         reveal_type(global_comprehension_state)  # revealed: Literal["before"] | int
+```
 
+Async comprehensions preserve assignments that occurred before awaiting, while also accounting for
+exceptions raised by iteration before the assignment executes.
+
+```py
 async def async_comprehension_walrus_exception(values: AsyncIterable[int], awaitable: Awaitable[int]) -> None:
     state = "before"
     try:
@@ -329,6 +378,8 @@ async def async_comprehension_walrus_exception(values: AsyncIterable[int], await
     except:
         reveal_type(state)  # revealed: Literal["before"] | int
 ```
+
+## Nested handlers and bare-handler barriers
 
 An active bare handler receives a checkpoint and prevents it from propagating to an enclosing
 handler. Once execution is inside that handler, however, a new checkpoint can propagate outward:
