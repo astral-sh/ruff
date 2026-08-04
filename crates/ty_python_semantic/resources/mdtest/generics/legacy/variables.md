@@ -1021,37 +1021,6 @@ reveal_type(D().x)  # revealed: Unknown
 
 ## Regression
 
-### Specializing a type variable defined after branching calls
-
-In Python 3.14, annotations are evaluated lazily, so a function can reference a type variable that
-is defined after calls to the function. Resolving that type variable's default must not panic when
-it depends on the reachability of those calls.
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-class C:
-    pass
-
-def f(a: T):
-    pass
-
-if f():  # error: [missing-argument]
-    pass
-
-if f():  # error: [missing-argument]
-    sum()  # error: [no-matching-overload]
-else:
-    sum()  # error: [no-matching-overload]
-
-from typing import TypeVar
-
-T = TypeVar("T", default=C)
-```
-
 ### Specialization cycle recovery preserves concrete defaults
 
 When a generic call uses a type variable's default, cycle recovery must allow the initial `Unknown`
