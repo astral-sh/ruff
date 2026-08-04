@@ -715,6 +715,8 @@ struct SymbolVisitor<'db> {
     in_class: bool,
     /// The statement whose expressions are currently being visited.
     current_stmt: Option<&'db ast::Stmt>,
+    /// The binding declared directly by the pattern currently being visited.
+    pattern_binding: Option<&'db ast::Identifier>,
     /// Whether store-context names should be excluded from the enclosing scope.
     suppress_store_symbols: bool,
     /// When enabled, the visitor should only try to extract
@@ -747,6 +749,7 @@ impl<'db> SymbolVisitor<'db> {
             in_function: false,
             in_class: false,
             current_stmt: None,
+            pattern_binding: None,
             suppress_store_symbols: false,
             exports_only: false,
             all_origin: None,
@@ -1603,47 +1606,28 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     }
 
     fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
-        let Some(stmt) = self.current_stmt else {
-            source_order::walk_pattern(self, pattern);
-            return;
+        let binding = match pattern {
+            ast::Pattern::MatchStar(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchMapping(pattern) => pattern.rest.as_ref(),
+            _ => None,
         };
 
-        match pattern {
-            ast::Pattern::MatchStar(ast::PatternMatchStar {
-                name: Some(name), ..
-            }) => {
-                self.add_pattern_binding(stmt, name);
-                source_order::walk_pattern(self, pattern);
-            }
-            ast::Pattern::MatchAs(ast::PatternMatchAs { name, .. }) => {
-                source_order::walk_pattern(self, pattern);
-                if let Some(name) = name {
-                    self.add_pattern_binding(stmt, name);
-                }
-            }
-            ast::Pattern::MatchMapping(mapping) => {
-                let rest_before_keys = mapping.rest.as_ref().filter(|rest| {
-                    mapping
-                        .keys
-                        .first()
-                        .is_some_and(|key| rest.start() < key.start())
-                });
-                let rest_after_keys = mapping.rest.as_ref().filter(|rest| {
-                    mapping
-                        .keys
-                        .first()
-                        .is_none_or(|key| rest.start() >= key.start())
-                });
+        let previous_binding = self.pattern_binding;
+        self.pattern_binding = binding;
+        source_order::walk_pattern(self, pattern);
+        self.pattern_binding = previous_binding;
+    }
 
-                if let Some(rest) = rest_before_keys {
-                    self.add_pattern_binding(stmt, rest);
-                }
-                source_order::walk_pattern(self, pattern);
-                if let Some(rest) = rest_after_keys {
-                    self.add_pattern_binding(stmt, rest);
-                }
-            }
-            _ => source_order::walk_pattern(self, pattern),
+    fn visit_identifier(&mut self, identifier: &'db ast::Identifier) {
+        source_order::walk_identifier(self, identifier);
+
+        if let Some(stmt) = self.current_stmt
+            && self
+                .pattern_binding
+                .is_some_and(|binding| std::ptr::eq(binding, identifier))
+        {
+            self.add_pattern_binding(stmt, identifier);
         }
     }
 }
@@ -1847,6 +1831,24 @@ keyword :: Variable\n\
 alternative :: Variable\n\
 wildcard_body :: Variable\n\
 CONSTANT_CAPTURE :: Constant"
+        );
+    }
+
+    #[test]
+    fn exports_reports_mapping_pattern_bindings_in_source_order() {
+        let test = public_test(
+            "\
+match subject:
+    case {\"a\": before, **between, \"b\": after}:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "before :: Variable\n\
+between :: Variable\n\
+after :: Variable"
         );
     }
 

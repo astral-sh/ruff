@@ -495,6 +495,24 @@ match subject:
     }
 
     #[test]
+    fn document_symbols_reports_mapping_pattern_bindings_in_source_order() {
+        let test = cursor_test(
+            "
+match subject:
+    case {\"a\": before, **between, \"b\": after}:
+        pass
+<CURSOR>",
+        );
+
+        let names = document_symbols(&test.db, test.program_file(test.cursor.file))
+            .iter()
+            .map(|(_, symbol)| symbol.name.into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, ["before", "between", "after"]);
+    }
+
+    #[test]
     fn document_symbols_match_pattern_scopes() {
         let test = cursor_test(
             "
