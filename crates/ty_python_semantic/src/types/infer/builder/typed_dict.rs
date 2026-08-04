@@ -512,15 +512,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             bindings.report_diagnostics(&self.context, call_expression.into());
-            if can_infer {
-                // TODO: Remove this fallback once failed generic binding no longer exposes
-                // unresolved type variables. For example, if `Consumer[T]` has a callback
-                // field and `accepts_dog` only accepts `Dog`, then
-                // `value: Consumer[Animal] = Consumer(callback=accepts_dog)` fails while
-                // inferring `T`. Returning `Consumer[T]` would leak the unresolved type
-                // variable and produce an additional assignment error.
-                return fallback_ty;
-            }
         }
 
         bindings.return_type(db, env)

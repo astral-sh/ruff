@@ -370,7 +370,10 @@ impl<'db> ConstructorBinding<'db> {
 
         let mut combined: Option<Specialization<'db>> = None;
         let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
-            let Some(overload) = binding.first_matching_overload() else {
+            let Some(overload) = binding
+                .first_matching_overload()
+                .or_else(|| binding.callable().unambiguous_failing_overload())
+            else {
                 return;
             };
             let return_specialization = static_class_literal
