@@ -3947,6 +3947,43 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            (
+                formal @ Type::TypedDict(formal_typed_dict),
+                actual @ Type::TypedDict(actual_typed_dict),
+            ) => {
+                let (
+                    Some(ClassType::Generic(formal_alias)),
+                    Some(ClassType::Generic(actual_alias)),
+                ) = (
+                    formal_typed_dict.defining_class(),
+                    actual_typed_dict.defining_class(),
+                )
+                else {
+                    return Ok(());
+                };
+                if formal_alias.origin(db) != actual_alias.origin(db) {
+                    return Ok(());
+                }
+
+                let actual_specialization = actual_alias.specialization(db);
+                if actual_specialization
+                    .types(db)
+                    .iter()
+                    .any(|ty| ty.has_unspecialized_type_var(db, self.env))
+                {
+                    return Ok(());
+                }
+
+                let when = actual.when_constraint_set_assignable_to(
+                    db,
+                    self.env,
+                    formal,
+                    self.constraints,
+                );
+                self.infer_from_constraint_set(when)?;
+                return Ok(());
+            }
+
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
