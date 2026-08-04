@@ -321,6 +321,57 @@ mod tests {
     }
 
     #[test]
+    fn or_pattern_captures_used_in_body_are_not_reported() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                match subject:
+                    case [first, second] | {\"first\": first, \"second\": second} | (first, second):
+                        print(first, second)
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn nested_or_pattern_capture_used_in_guard_is_not_reported() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                match subject:
+                    case [[value] | {\"item\": value}] if value:
+                        pass
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn or_pattern_captures_do_not_hide_other_unused_bindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                value = 0
+                match subject:
+                    case [value] | {\"used\": value}:
+                        print(value)
+                    case {\"unused\": value} | {\"also_unused\": value}:
+                        pass
+            ",
+        );
+
+        assert_eq!(
+            collect_unused_names(&source)?,
+            vec!["value", "value", "value"]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn skips_module_and_class_scope_bindings() -> anyhow::Result<()> {
         let source = dedent(
             "

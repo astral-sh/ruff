@@ -4949,6 +4949,33 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern
+            && let Some((first, alternatives)) = patterns.split_first()
+        {
+            let incoming = self.flow_snapshot();
+            let first_definition = self.current_use_def_map().next_definition_id();
+            self.visit_pattern(first);
+
+            // Valid alternatives bind the same names, so capture-free patterns need no flow merge.
+            if self.current_use_def_map().next_definition_id() == first_definition {
+                for alternative in alternatives {
+                    self.visit_pattern(alternative);
+                }
+                return;
+            }
+
+            // Each alternative starts with the same bindings. Otherwise a repeated capture in a
+            // later alternative shadows the earlier capture even though only one pattern matches.
+            let mut merged_alternatives = self.flow_snapshot();
+            for alternative in alternatives {
+                self.flow_restore(incoming.clone());
+                self.visit_pattern(alternative);
+                self.flow_merge(merged_alternatives);
+                merged_alternatives = self.flow_snapshot();
+            }
+            return;
+        }
+
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
