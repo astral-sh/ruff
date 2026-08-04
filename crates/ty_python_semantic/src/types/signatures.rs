@@ -3841,6 +3841,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ) {
                                 return result;
                             }
+
+                            // An unpacked target tuple can have a fixed positional suffix. Reuse
+                            // the source variadic parameter unless the source has its own fixed
+                            // suffix to match against it.
+                            reuse_current_source = parameters
+                                .peek_target()
+                                .is_some_and(Parameter::is_positional)
+                                && !parameters
+                                    .source_iter
+                                    .as_slice()
+                                    .first()
+                                    .is_some_and(Parameter::is_positional);
                         }
 
                         (

@@ -1077,6 +1077,51 @@ static_assert(is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable
 static_assert(is_assignable_to(RegularCallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Unpacked positional parameters with a required suffix
+
+A variadic positional parameter can accept both the unpacked tuple and a required positional
+parameter following that tuple.
+
+```py
+from typing import Callable, Unpack
+
+def expects_suffix(callback: Callable[[Unpack[tuple[str, ...]], None], None]) -> None: ...
+def accepts_unknown(*args): ...
+
+expects_suffix(accepts_unknown)
+```
+
+The variadic parameter's annotation must be compatible with the unpacked elements and the required
+suffix.
+
+```py
+def accepts_objects(*args: object) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+expects_suffix(accepts_objects)
+expects_suffix(accepts_strings)  # error: [invalid-argument-type]
+```
+
+A required keyword-only parameter cannot be supplied by the positional callback signature.
+
+```py
+def requires_keyword(*args: object, value: int) -> None: ...
+
+expects_suffix(requires_keyword)  # error: [invalid-argument-type]
+```
+
+A required positional prefix does not prevent the source variadic parameter from also accepting the
+target's required suffix.
+
+```py
+def expects_prefix_and_suffix(
+    callback: Callable[[int, Unpack[tuple[str, ...]], None], None],
+) -> None: ...
+def accepts_prefixed_objects(first: int, *args: object) -> None: ...
+
+expects_prefix_and_suffix(accepts_prefixed_objects)
+```
+
 ### Function types
 
 ```py
