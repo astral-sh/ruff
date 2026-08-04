@@ -449,15 +449,24 @@ impl<'a> SourceMap<'a> {
 
         // Find the bounding span.
         let (lo, hi) = if fold {
-            let lo = patches.iter().map(|p| p.span.start).min()?;
-            let hi = patches.iter().map(|p| p.span.end).max()?;
+            let lo = patches
+                .iter()
+                .map(|p| p.span.clone())
+                .min_by_key(|s| s.start)?;
+            let hi = patches
+                .iter()
+                .map(|p| p.span.clone())
+                .max_by_key(|s| s.end)?;
             (lo, hi)
         } else {
-            (0, source_len)
+            let lo = 0..source_len;
+            let hi = 0..source_len;
+            (lo, hi)
         };
 
-        let lines = self.span_to_lines(lo..hi);
-        let (bounding_lo, bounding_hi) = self.span_to_locations(lo..hi);
+        let lines = self.span_to_lines(lo.start..hi.end);
+        let (bounding_lo, _) = self.span_to_locations(lo);
+        let (_, bounding_hi) = self.span_to_locations(hi);
 
         let mut highlights = vec![];
         // To build up the result, we do this for each span:
