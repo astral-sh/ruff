@@ -4329,7 +4329,7 @@ impl<'db> CallableBinding<'db> {
     /// The overload chosen for diagnostics can be arbitrary when multiple signatures accept the
     /// same argument shape. Its specialization must not determine a constructor's return type:
     /// for example, `dict(value)` may match the shapes of both mapping and iterable overloads.
-    pub(crate) fn unambiguous_failing_overload(&self) -> Option<&Binding<'db>> {
+    fn unambiguous_failing_overload(&self) -> Option<&Binding<'db>> {
         match self.overloads.as_slice() {
             [overload] => Some(overload),
             _ => self
