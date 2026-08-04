@@ -5,8 +5,7 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
     StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
-use crate::diagnostic::did_you_mean;
-use crate::diagnostic::format_enumeration;
+use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
