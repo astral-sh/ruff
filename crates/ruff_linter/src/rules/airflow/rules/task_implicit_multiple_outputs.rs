@@ -221,7 +221,7 @@ fn annotation_is_typed_dict_subclass(annotation: &Expr, semantic: &SemanticModel
     };
     let Some(binding_id) = semantic
         .resolve_name(name)
-        .or_else(|| semantic.lookup_symbol(&name.id))
+        .or_else(|| semantic.lookup_symbol(&name.id).binding_id())
     else {
         return false;
     };

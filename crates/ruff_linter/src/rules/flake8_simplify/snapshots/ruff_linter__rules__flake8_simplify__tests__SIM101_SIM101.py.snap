@@ -346,7 +346,6 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
 71 | ((isinstance(x, int)) or isinstance(x, str))
 72 | isinstance(x, int) or (isinstance(x, str))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Merge `isinstance` calls for `x`
    |
 71 | ((isinstance(x, int)) or isinstance(x, str))

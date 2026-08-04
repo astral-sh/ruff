@@ -2,8 +2,8 @@ import os
 import sys
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterator
-from typing import Final, Literal, NoReturn, SupportsIndex, overload
-from typing_extensions import Self, disjoint_base
+from typing import Final, Literal, SupportsIndex, overload
+from typing_extensions import Never, Self, disjoint_base
 
 ACCESS_DEFAULT: Final = 0
 ACCESS_READ: Final = 1
@@ -139,7 +139,7 @@ class mmap:
     @overload
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytes: ...
 
-    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> NoReturn:
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> Never:
         """Delete self[key]."""
 
     @overload

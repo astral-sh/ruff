@@ -22,7 +22,8 @@ Types that "produce" data on demand are covariant in their typevar. If you expec
 get from the sequence is a valid `int`.
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -103,7 +104,8 @@ Types that "consume" data are contravariant in their typevar. If you expect a co
 that you pass into the consumer is a valid `int`.
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -215,7 +217,8 @@ In the end, if you expect a mutable list, you must always be given a list of exa
 since we can't know in advance which of the allowed methods you'll want to use.
 
 ```py
-from ty_extensions import is_assignable_to, is_equivalent_to, is_subtype_of, static_assert, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -362,7 +365,6 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
    |
 18 | class BadInvariantCo(Invariant[T_co]): ...
    |                      ^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_co` is declared as covariant, but base class `Invariant` requires it to be invariant
 
 
@@ -371,7 +373,6 @@ error[invalid-generic-class]: Variance of type variable `T_contra` is incompatib
    |
 21 | class BadInvariantContra(Invariant[T_contra]): ...
    |                          ^^^^^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_contra` is declared as contravariant, but base class `Invariant` requires it to be invariant
 
 
@@ -380,7 +381,6 @@ error[invalid-generic-class]: Variance of type variable `T_contra` is incompatib
    |
 24 | class BadCovariant(Covariant[T_contra]): ...
    |                    ^^^^^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_contra` is declared as contravariant, but base class `Covariant` requires it to be covariant
 
 
@@ -389,7 +389,6 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
    |
 27 | class BadContravariant(Contravariant[T_co]): ...
    |                        ^^^^^^^^^^^^^^^^^^^
-   |
 help: Type variable `T_co` is declared as covariant, but base class `Contravariant` requires it to be contravariant
 ```
 
@@ -404,7 +403,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing import Generic, TypeVar
 
 class A: ...

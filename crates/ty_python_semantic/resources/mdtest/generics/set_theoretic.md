@@ -9,7 +9,8 @@ python-version = "3.14"
 
 ```pyi
 from typing import Any
-from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
 
 Throughout the document, we use the following classes as canonical examples for covariant,
@@ -244,8 +245,9 @@ If we use the interpretation where `Bottom[Invariant[Any]]` is a special bottom 
 Invariant[P] & Invariant[Any] = Invariant[P]
 ```
 
-One seemingly problematic observation here is the following. If we compute the bottom materalization
-of the left hand side of this relation by "distributing" `Bottom` over the intersection, we get:
+One seemingly problematic observation here is the following. If we compute the bottom
+materialization of the left hand side of this relation by "distributing" `Bottom` over the
+intersection, we get:
 
 ```ignore
 Bottom[Invariant[P] & Invariant[Any]]  

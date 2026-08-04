@@ -158,7 +158,7 @@ impl Violation for PytestWarnsWithoutWarning {
     }
 }
 
-pub(crate) fn is_pytest_warns(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_pytest_warns(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "warns"]))

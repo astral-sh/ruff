@@ -27,4 +27,3 @@ A003 Python builtin is shadowed by class attribute `bin` from line 35
 35 |     bin = 2
 36 |     foo = [bin]
    |            ^^^
-   |

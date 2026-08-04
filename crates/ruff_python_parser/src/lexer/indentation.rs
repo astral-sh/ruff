@@ -2,6 +2,8 @@ use static_assertions::assert_eq_size;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
+use ruff_python_trivia::tab_offset_u32;
+
 /// The column index of an indentation.
 ///
 /// A space increments the column by one. A tab adds up to 2 (if tab size is 2) indices, but just one
@@ -10,7 +12,7 @@ use std::fmt::Debug;
 pub(super) struct Column(u32);
 
 impl Column {
-    pub(super) const fn new(column: u32) -> Self {
+    const fn new(column: u32) -> Self {
         Self(column)
     }
 }
@@ -20,7 +22,7 @@ impl Column {
 pub(super) struct Character(u32);
 
 impl Character {
-    pub(super) const fn new(characters: u32) -> Self {
+    const fn new(characters: u32) -> Self {
         Self(characters)
     }
 }
@@ -43,7 +45,7 @@ impl Indentation {
     }
 
     #[cfg(test)]
-    pub(super) const fn new(column: Column, character: Character) -> Self {
+    const fn new(column: Column, character: Character) -> Self {
         Self { column, character }
     }
 
@@ -63,7 +65,7 @@ impl Indentation {
             // * Adds `TAB_SIZE` if `column` is a multiple of `TAB_SIZE`
             // * Rounds `column` up to the next multiple of `TAB_SIZE` otherwise.
             // https://github.com/python/cpython/blob/2cf99026d6320f38937257da1ab014fc873a11a6/Parser/tokenizer.c#L1818
-            column: Column((self.column.0 / Self::TAB_SIZE + 1) * Self::TAB_SIZE),
+            column: Column(self.column.0 + tab_offset_u32(self.column.0, Self::TAB_SIZE)),
         }
     }
 

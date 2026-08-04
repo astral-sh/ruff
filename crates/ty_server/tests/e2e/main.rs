@@ -34,6 +34,7 @@ mod completions;
 mod configuration;
 mod folding_range;
 mod hover;
+mod implementation;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -125,9 +126,6 @@ pub(crate) enum AwaitResponseError {
     /// The response came back, but was an error response, not a successful one.
     #[error("request failed because the server replied with an error: {0:?}")]
     RequestFailed(ResponseError),
-
-    #[error("malformed response message with both result and error: {0:#?}")]
-    MalformedResponse(Box<Response>),
 
     #[error("received multiple responses for the same request ID: {0:#?}")]
     MultipleResponses(Box<[Response]>),
@@ -477,23 +475,12 @@ impl TestServer {
 
                 let response = responses.pop().unwrap();
 
-                match response {
-                    Response {
-                        error: None,
-                        result: Some(result),
-                        ..
-                    } => {
+                match response.response_result {
+                    Ok(result) => {
                         return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
-                    Response {
-                        error: Some(err),
-                        result: None,
-                        ..
-                    } => {
+                    Err(err) => {
                         return Err(AwaitResponseError::RequestFailed(err));
-                    }
-                    response => {
-                        return Err(AwaitResponseError::MalformedResponse(Box::new(response)));
                     }
                 }
             }
@@ -580,7 +567,7 @@ impl TestServer {
             {
                 panic!(
                     "Received multiple publish diagnostic notifications for {uri}: ({existing:#?})",
-                    uri = &notification.uri
+                    uri = notification.uri
                 );
             }
         }
@@ -1391,9 +1378,41 @@ impl TestServerBuilder {
 
     /// Advertise support for ty's fully rendered diagnostic output.
     pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
-        self.client_capabilities.experimental = Some(serde_json::json!({
-            "fullDiagnosticOutput": true,
-        }));
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert("fullDiagnosticOutput".to_string(), serde_json::json!(true));
+        self
+    }
+
+    /// Advertise support for the `ty.triggerParameterHints` completion command.
+    pub(crate) fn with_trigger_parameter_hints_command(mut self) -> Self {
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert(
+                "commands".to_string(),
+                serde_json::json!({ "commands": ["ty.triggerParameterHints"] }),
+            );
+        self
+    }
+
+    /// Enable or disable location link support for goto implementations
+    pub(crate) fn enable_implementations_link_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .implementation
+            .get_or_insert_default()
+            .link_support = Some(enabled);
         self
     }
 

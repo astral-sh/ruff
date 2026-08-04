@@ -43,7 +43,7 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        pub(crate) fn new() -> Self {
+        fn new() -> Self {
             let events = Events::default();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
@@ -82,10 +82,6 @@ pub(crate) mod tests {
 
         fn files(&self) -> &Files {
             &self.files
-        }
-
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
         }
     }
 

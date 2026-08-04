@@ -67,7 +67,7 @@ pub(super) const EXPR_SET: TokenSet = TokenSet::new([
 .union(LITERAL_SET);
 
 /// Tokens that can appear after an expression.
-pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
+const END_EXPR_SET: TokenSet = TokenSet::new([
     // Ex) `expr` (without a newline)
     TokenKind::EndOfFile,
     // Ex) `expr`
@@ -253,7 +253,7 @@ impl<'src> Parser<'src> {
         self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
     }
 
-    pub(super) fn parse_binary_expression_or_higher_recursive(
+    fn parse_binary_expression_or_higher_recursive(
         &mut self,
         mut left: ParsedExpr,
         left_precedence: OperatorPrecedence,
@@ -583,7 +583,8 @@ impl<'src> Parser<'src> {
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = Name::new(self.src_text(range));
+            let text = self.src_text(range);
+            let id = self.intern_name(text);
             self.bump_soft_keyword_as_name();
             return ast::Identifier {
                 id,
@@ -617,7 +618,8 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = Name::new(self.src_text(range));
+            let text = self.src_text(range);
+            let id = self.intern_name(text);
             self.bump_any();
             ast::Identifier {
                 id,
@@ -744,7 +746,7 @@ impl<'src> Parser<'src> {
     /// expression, `[` for a subscript expression, or `.` for an attribute expression.
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
-    pub(super) fn parse_postfix_expression(
+    fn parse_postfix_expression(
         &mut self,
         mut lhs: Expr,
         start: TextSize,
@@ -784,7 +786,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
 
         ast::ExprCall {
@@ -815,8 +817,8 @@ impl<'src> Parser<'src> {
             };
         }
 
-        let mut args = vec![];
-        let mut keywords = vec![];
+        let args_snapshot = self.expr_scratch.snapshot();
+        let keywords_snapshot = self.keyword_scratch.snapshot();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -826,7 +828,7 @@ impl<'src> Parser<'src> {
                 if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
-                    keywords.push(ast::Keyword {
+                    parser.keyword_scratch.push(ast::Keyword {
                         arg: None,
                         value: value.expr,
                         range: parser.node_range(argument_start),
@@ -916,7 +918,7 @@ impl<'src> Parser<'src> {
 
                         let value = parser.parse_conditional_expression_or_higher();
 
-                        keywords.push(ast::Keyword {
+                        parser.keyword_scratch.push(ast::Keyword {
                             arg: Some(arg),
                             value: value.expr,
                             range: parser.node_range(argument_start),
@@ -936,23 +938,19 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        // Reserve exactly one slot for the first positional argument, while
-                        // avoiding any allocation for keyword-only calls.
-                        if args.is_empty() {
-                            args.reserve_exact(1);
-                        }
-                        args.push(parsed_expr.expr);
+                        parser.expr_scratch.push(parsed_expr.expr);
                     }
                 }
             });
 
         self.expect(TokenKind::Rpar);
 
+        let keywords = self.keyword_scratch.take_thin_vec(keywords_snapshot);
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: args.into_boxed_slice(),
-            keywords: keywords.into(),
+            args: self.expr_scratch.take(args_snapshot),
+            keywords,
         };
 
         self.validate_arguments(&arguments, has_trailing_comma, context);
@@ -1005,16 +1003,16 @@ impl<'src> Parser<'src> {
         // If there are more than one element in the slice, we need to create a tuple
         // expression to represent it.
         if self.eat(TokenKind::Comma) {
-            let mut slices = vec![slice];
+            let slices_snapshot = self.expr_scratch.snapshot();
+            self.expr_scratch.push(slice);
 
             self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
-                slices.push(parser.parse_slice());
+                let slice = parser.parse_slice();
+                parser.expr_scratch.push(slice);
             });
 
-            slices.shrink_to_fit();
-
             slice = Expr::Tuple(ast::ExprTuple {
-                elts: slices,
+                elts: self.expr_scratch.take(slices_snapshot),
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
@@ -1252,8 +1250,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprBoolOp {
         self.bump(TokenKind::from(op));
 
-        let mut values = Vec::with_capacity(2);
-        values.push(lhs);
+        let values_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(lhs);
         let mut progress = ParserProgress::default();
 
         // Keep adding the expression to `values` until we see a different
@@ -1263,17 +1261,15 @@ impl<'src> Parser<'src> {
 
             let parsed_expr =
                 self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
-            values.push(parsed_expr.expr);
+            self.expr_scratch.push(parsed_expr.expr);
 
             if !self.eat(TokenKind::from(op)) {
                 break;
             }
         }
 
-        values.shrink_to_fit();
-
         ast::ExprBoolOp {
-            values,
+            values: self.expr_scratch.take(values_snapshot),
             op,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -1322,7 +1318,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let mut comparators = vec![];
+        let comparators_snapshot = self.expr_scratch.snapshot();
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1330,13 +1326,13 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            comparators.push(
-                self.parse_binary_expression_or_higher(
+            let comparator = self
+                .parse_binary_expression_or_higher(
                     OperatorPrecedence::ComparisonsMembershipIdentity,
                     context,
                 )
-                .expr,
-            );
+                .expr;
+            self.expr_scratch.push(comparator);
 
             let next_token = self.current_token_kind();
             if matches!(next_token, TokenKind::In) && context.is_in_excluded() {
@@ -1356,7 +1352,7 @@ impl<'src> Parser<'src> {
         ast::ExprCompare {
             left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: comparators.into_boxed_slice(),
+            comparators: self.expr_scratch.take(comparators_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2455,20 +2451,20 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        let elts_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::TupleElements(parenthesized), |p| {
-            elts.push(parse_func(p).expr);
+            let element = parse_func(p).expr;
+            p.expr_scratch.push(element);
         });
 
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
 
-        elts.shrink_to_fit();
-
         ast::ExprTuple {
-            elts,
+            elts: self.expr_scratch.take(elts_snapshot),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2484,22 +2480,20 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        let elts_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
-            elts.push(
-                parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            );
+            let element = parser
+                .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                .expr;
+            parser.expr_scratch.push(element);
         });
 
         self.expect(TokenKind::Rsqb);
 
-        elts.shrink_to_fit();
-
         ast::ExprList {
-            elts,
+            elts: self.expr_scratch.take(elts_snapshot),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2529,7 +2523,8 @@ impl<'src> Parser<'src> {
             );
         }
 
-        let mut elts = vec![first_element.expr];
+        let elts_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(first_element.expr);
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
             let parsed_expr =
@@ -2544,7 +2539,7 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            elts.push(parsed_expr.expr);
+            parser.expr_scratch.push(parsed_expr.expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -2552,7 +2547,7 @@ impl<'src> Parser<'src> {
         ast::ExprSet {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            elts,
+            elts: self.expr_scratch.take(elts_snapshot),
         }
     }
 
@@ -2653,7 +2648,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(ExpressionContext::default());
 
-        let mut ifs = Vec::new();
+        let ifs_snapshot = self.expr_scratch.snapshot();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::If) {
@@ -2661,20 +2656,15 @@ impl<'src> Parser<'src> {
 
             let parsed_expr = self.parse_simple_expression(ExpressionContext::default());
 
-            if ifs.is_empty() {
-                ifs.reserve_exact(1);
-            }
-            ifs.push(parsed_expr.expr);
+            self.expr_scratch.push(parsed_expr.expr);
         }
-
-        ifs.shrink_to_fit();
 
         ast::Comprehension {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             target: target.expr,
             iter: iter.expr,
-            ifs,
+            ifs: self.expr_scratch.take(ifs_snapshot),
             is_async,
         }
     }
@@ -2685,7 +2675,7 @@ impl<'src> Parser<'src> {
     /// parenthesized or the first token of the expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
-    pub(super) fn parse_generator_expression(
+    fn parse_generator_expression(
         &mut self,
         element: Expr,
         start: TextSize,
@@ -2929,11 +2919,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `:=` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
-    pub(super) fn parse_named_expression(
-        &mut self,
-        mut target: Expr,
-        start: TextSize,
-    ) -> ast::ExprNamed {
+    fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
         if !target.is_name_expr() {
@@ -3027,7 +3013,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
@@ -3169,7 +3155,7 @@ impl ParsedExpr {
     }
 
     #[inline]
-    pub(super) const fn is_unparenthesized_named_expr(&self) -> bool {
+    const fn is_unparenthesized_named_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_named_expr()
     }
 }
@@ -3293,7 +3279,7 @@ impl ExpressionContext {
         ExpressionContext::starred_bitwise_or().with_yield_expression_allowed()
     }
 
-    pub(super) fn disallow_starred_expressions(self) -> Self {
+    fn disallow_starred_expressions(self) -> Self {
         let flags = self.0 & !ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
         ExpressionContext(flags)
     }

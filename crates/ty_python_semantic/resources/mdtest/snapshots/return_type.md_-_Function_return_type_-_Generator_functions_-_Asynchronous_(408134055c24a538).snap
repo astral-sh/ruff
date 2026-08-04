@@ -44,7 +44,6 @@ error[invalid-return-type]: Return type does not match returned value
    |
 16 | async def j() -> str:  # error: [invalid-return-type]
    |                  ^^^ expected `str`, found `types.AsyncGeneratorType`
-   |
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
 
@@ -56,6 +55,5 @@ error[invalid-syntax]: `return` with value in async generator
    |
 21 |     return 2  # error: [invalid-syntax] "`return` with value in async generator"
    |     ^^^^^^^^
-   |
 
 ```

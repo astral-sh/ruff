@@ -39,7 +39,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: 37bb98842b0d8c4ffebdb75301a13db0267cef89 # frozen: v1.47.2
+    rev: bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # frozen: v1.48.0
     hooks:
       - id: typos
         priority: 0
@@ -54,7 +54,7 @@ repos:
         priority: 0
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: 06507ab9500d4a9919b5ebd76d9d5b7074f15c1f # frozen: v3.8.4
+    rev: 0ee178619d696787ca73d210cc191d720868c631 # frozen: v3.9.6
     hooks:
       - id: prettier
         types: [yaml]
@@ -63,13 +63,13 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: e3eebf65325ccc992422292cb7a4baee967cf815 # frozen: v1.26.1
+    rev: 067260dc5fe6ea86b7551bfd6f8b3ba4e6c93129 # frozen: v1.28.0
     hooks:
       - id: zizmor
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 5030dca3047414c338091455ac41803200ec1f0f # frozen: 0.37.3
+    rev: 6b63472e72e1a91ed8a2f6d483790dfb644fa1d3 # frozen: 0.37.4
     hooks:
       - id: check-github-workflows
         priority: 0
@@ -102,7 +102,7 @@ repos:
       - id: mdformat
         language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
-          - mdformat-mkdocs==5.1.4
+          - mdformat-mkdocs==5.2.1
           - mdformat-footnote==0.1.3
         exclude: |
           (?x)^(
@@ -113,13 +113,13 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: fc310cf5c89c3772bdfae0073eeb2f200b6118bb # frozen: 0.11.25
+    rev: 5900cba2cfe6d20f562458d4d308ac55569f92eb # frozen: 0.12.0
     hooks:
       - id: uv-lock
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: c59bba8fb259db0fec2bbb77ad8ba51ea7341b56 # frozen: v0.15.20
+    rev: cb8c523fd4835aba42af70f4cad5568db4df0b6c # frozen: v0.16.0
     hooks:
       - id: ruff-format
         exclude: crates/ty_python_semantic/resources/corpus/
@@ -127,7 +127,7 @@ repos:
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 745be0411e3c150e246d527e531e5a221b8c3462 # frozen: v0.15.19
+    rev: cb8c523fd4835aba42af70f4cad5568db4df0b6c # frozen: v0.16.0
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -137,7 +137,7 @@ repos:
         priority: 1
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: a4d5d37e66ebcd6b3705204a1d6dbb56dea66338 # frozen: v0.49.0
+    rev: 5b5dddc4fb0f83c3ea1fc5616fa63e115dce83e0 # frozen: v0.49.1
     hooks:
       - id: markdownlint-fix
         exclude: |
@@ -150,7 +150,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: c59bba8fb259db0fec2bbb77ad8ba51ea7341b56 # frozen: v0.15.20
+    rev: cb8c523fd4835aba42af70f4cad5568db4df0b6c # frozen: v0.16.0
     hooks:
       - id: ruff-format
         name: mdtest format

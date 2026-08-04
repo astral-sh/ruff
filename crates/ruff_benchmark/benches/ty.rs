@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -163,13 +163,10 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn incremental(case: &mut Case) {
         let Case { db, .. } = case;
 
-        db.apply_changes(
-            &[ChangeEvent::Changed {
-                path: case.file_path.clone(),
-                kind: ChangedKind::FileContent,
-            }],
-            None,
-        );
+        db.apply_changes(&[ChangeEvent::Changed {
+            path: case.file_path.clone(),
+            kind: ChangedKind::FileContent,
+        }]);
 
         let result = db.check();
 
@@ -215,7 +212,7 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
                     .primary_span()
                     .and_then(|span| span.range())
                     .map(Range::<usize>::from),
-                diagnostic.primary_message(),
+                diagnostic.headline_message(),
                 diagnostic.severity(),
             )
         })
@@ -267,7 +264,7 @@ fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             python,
@@ -666,6 +663,44 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4069>.
+///
+/// Compare a large enum with optional enum fields in a chain of conditions.
+fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code =
+        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
+            .to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
+    }
+    code.push_str(
+        r#"
+
+@dataclass
+class Category:
+    default_model: ModelSlug | None = None
+    browsing_model: ModelSlug | None = None
+    code_interpreter_model: ModelSlug | None = None
+    plugins_model: ModelSlug | None = None
+    dalle_model: ModelSlug | None = None
+
+
+def belongs(slug: ModelSlug, category: Category) -> bool:
+    return (
+        category.default_model == slug
+        or category.browsing_model == slug
+        or category.code_interpreter_model == slug
+        or category.plugins_model == slug
+        or category.dalle_model == slug
+    )
+"#,
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[optional_str_enum_comparison]", &code);
 }
 
 /// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
@@ -1416,6 +1451,51 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3986>.
+///
+/// Non-terminal-call predicates must gate later narrowing. Keeping these scope-wide constraints in
+/// an append-only tree avoids eagerly rewriting every live place state after each call. Exercise
+/// unnarrowed, already-narrowed, and fixed-reachability bindings because each takes a different
+/// path through reachability and narrowing evaluation.
+fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_statement_calls]",
+            String::from("def f() -> None:\n    value = 'abc'\n"),
+            "    value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_pre_narrowed]",
+            String::from(
+                "def f(value: str | None) -> None:\n    if value is None:\n        return\n",
+            ),
+            "    value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_fixed_reachability]",
+            String::from("def f(value: str, flag: bool) -> None:\n    if flag:\n"),
+            "        value.upper()\n",
+        ),
+    ];
+
+    for (name, mut code, statement) in cases {
+        code.push_str(&statement.repeat(1_500));
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
@@ -1471,6 +1551,41 @@ fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     });
 }
 
+/// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
+fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
+    const NUM_CALLBACKS: usize = 1_200;
+
+    setup_rayon();
+
+    let mut code = String::from(
+        "from collections.abc import Callable\nfrom typing import Literal\n\ndef accepts[T](\n",
+    );
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "    cb{i}: Callable[[T], None],").ok();
+    }
+    code.push_str(") -> None: ...\n\ndef call_many(\n");
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "    cb{i}: Callable[[Literal[{i}]], None],").ok();
+    }
+    code.push_str(") -> None:\n    accepts(\n");
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "        cb{i},").ok();
+    }
+    code.push_str("    )\n");
+
+    criterion.bench_function("ty_micro[many_upper_bound_callbacks]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
     let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
@@ -1490,6 +1605,79 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     criterion.bench_function("ty_micro[pandas_tdd]", |b| {
         b.iter_batched_ref(
             || setup_micro_case_inner(code, Some(&venv_path)),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_mixed_typed_dict_union_copy(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 12;
+
+    setup_rayon();
+
+    let mut code = concat!(
+        "from collections import ChainMap, OrderedDict, defaultdict\n",
+        "from collections.abc import Mapping, MutableMapping\n",
+        "from typing import Any, Literal, TypedDict\n\n",
+    )
+    .to_string();
+
+    for i in 0..NUM_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Item{i}(TypedDict):\n    type: Literal[{i}]"
+        )
+        .ok();
+        if i == 0 {
+            code.push_str("    other: Any\n");
+        }
+        code.push('\n');
+    }
+
+    code.push_str("type Item = ");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Item{i}").ok();
+    }
+
+    code.push_str(
+        r#"
+
+def copy_dict(value: Item | dict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mapping(value: Item | Mapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mutable_mapping(value: Item | MutableMapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_ordered_dict(value: Item | OrderedDict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_default_dict(value: Item | defaultdict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_chain_map(value: Item | ChainMap[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    return None
+"#,
+    );
+
+    criterion.bench_function("ty_micro[mixed_typed_dict_union_copy]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
             |case| {
                 let Case { db, .. } = case;
                 let result = db.check();
@@ -1556,6 +1744,169 @@ value: list[Node] = [
     );
 }
 
+fn benchmark_invariant_generic_return_union(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 21;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3896.
+    let mut code = String::new();
+    for i in 0..NUM_VARIANTS {
+        writeln!(&mut code, "class M{i}: pass").ok();
+    }
+    code.push_str("\nAllResults = (\n");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" |\n");
+        }
+        write!(&mut code, "    dict[int, M{i}]").ok();
+    }
+    code.push_str("\n)\n\nRows = (\n");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" |\n");
+        }
+        write!(&mut code, "    list[tuple[int, M{i}]]").ok();
+    }
+    code.push_str(
+        r#"
+)
+
+def map_rows[T](rows: list[tuple[int, T]]) -> dict[int, T]:
+    return {}
+
+def perform(rows: Rows) -> AllResults:
+    return map_rows(rows)
+"#,
+    );
+
+    criterion.bench_function("ty_micro[invariant_generic_return_union]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_sequence_literal_union_access(criterion: &mut Criterion) {
+    const NUM_LITERALS: usize = 1_200;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/4089.
+    let mut code = String::from(
+        "from collections.abc import Sequence\nfrom typing import Literal\n\nItem = Literal[\n",
+    );
+    for i in 0..NUM_LITERALS {
+        writeln!(&mut code, "    'value-{i}',").ok();
+    }
+    code.push_str(
+        r#"]
+
+def iterate(items: Sequence[Item]) -> None:
+    for item in items:
+        pass
+
+def access(items: Sequence[Item]) -> None:
+    items[0]
+"#,
+    );
+
+    criterion.bench_function("ty_micro[sequence_literal_union_access]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_invariant_generic_union_bound(criterion: &mut Criterion) {
+    const NUM_ALIASES: usize = 64;
+
+    setup_rayon();
+
+    let mut code =
+        String::from("from collections.abc import Iterable\nfrom typing import Literal\n\n");
+    for i in 0..NUM_ALIASES {
+        writeln!(
+            &mut code,
+            "type A{i} = Literal[{i}] | int | str | bytes | float"
+        )
+        .ok();
+    }
+    code.push_str("\nALIASES = {\n");
+    for i in 0..NUM_ALIASES {
+        writeln!(&mut code, "    A{i}: {{{i}: A{i}}},").ok();
+    }
+    code.push_str(
+        r#"}
+
+def consume(items: Iterable[object]) -> None: ...
+
+consume(ALIASES.items())
+"#,
+    );
+
+    criterion.bench_function("ty_micro[invariant_generic_union_bound]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_many_invariant_typevars(criterion: &mut Criterion) {
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3989.
+    let code = r#"
+class Invariant[T]:
+    x: T
+
+def f[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](
+    box1: Invariant[T1],
+    box2: Invariant[T2],
+    box3: Invariant[T3],
+    box4: Invariant[T4],
+    box5: Invariant[T5],
+    box6: Invariant[T6],
+    box7: Invariant[T7],
+    box8: Invariant[T8],
+    box9: Invariant[T9],
+    box10: Invariant[T10],
+) -> None: ...
+
+x = Invariant[int]()
+f(x, x, x, x, x, x, x, x, x, x)
+"#;
+
+    criterion.bench_function("ty_micro[many_invariant_typevars]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
 fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
 
@@ -1636,7 +1987,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_options(Options {
+        metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
@@ -1716,7 +2067,7 @@ fn hydra(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        510,
+        520,
     );
 
     bench_project(&benchmark, criterion);
@@ -1733,10 +2084,14 @@ fn attrs(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        102,
+        104,
     );
 
     bench_project(&benchmark, criterion);
+
+    // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
+    let frozen_benchmark = benchmark.freeze_inputs();
+    bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
 }
 
 fn anyio(criterion: &mut Criterion) {
@@ -1771,10 +2126,6 @@ fn datetype(criterion: &mut Criterion) {
     );
 
     bench_project(&benchmark, criterion);
-
-    // Keep one cheap real-world benchmark frozen to catch regressions from newly added inputs.
-    let frozen_benchmark = benchmark.freeze_inputs();
-    bench_project_named(&frozen_benchmark, criterion, "DateType (frozen inputs)");
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
@@ -1790,6 +2141,7 @@ criterion_group!(
     benchmark_large_enum_membership,
     benchmark_many_enum_members,
     benchmark_narrowed_str_enum_comparison,
+    benchmark_optional_str_enum_comparison,
     benchmark_enum_literal_union_comparison,
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
@@ -1807,9 +2159,16 @@ criterion_group!(
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
+    benchmark_repeated_statement_calls,
     benchmark_factored_upper_bounds,
+    benchmark_many_upper_bound_callbacks,
     benchmark_pandas_tdd,
+    benchmark_mixed_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
+    benchmark_invariant_generic_return_union,
+    benchmark_sequence_literal_union_access,
+    benchmark_invariant_generic_union_bound,
+    benchmark_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);

@@ -27,7 +27,6 @@ AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in
 8 | JdbcHook()
 9 | jaydebeapi()
   | ^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `jaydebeapi` from `airflow.providers.jdbc.hooks.jdbc` instead.
   |
 4 |     JdbcHook,

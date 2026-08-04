@@ -140,7 +140,6 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
 38 | key_0 = "z"
 39 | dict.fromkeys("ABC", list(key))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with comprehension
    |
 38 | key_0 = "z"

@@ -8,4 +8,3 @@ F821 Undefined name `captured`
 21 |         case True:
 22 |             return captured  # F821
    |                    ^^^^^^^^
-   |

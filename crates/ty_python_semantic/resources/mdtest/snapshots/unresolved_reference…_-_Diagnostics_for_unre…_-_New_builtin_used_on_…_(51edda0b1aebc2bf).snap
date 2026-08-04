@@ -24,7 +24,6 @@ error[unresolved-reference]: Name `PythonFinalizationError` used when not define
   |
 1 | PythonFinalizationError  # error: [unresolved-reference]
   | ^^^^^^^^^^^^^^^^^^^^^^^
-  |
 info: `PythonFinalizationError` was added as a builtin in Python 3.13
 info: Python 3.12 was assumed when resolving types because it was specified on the command line
 

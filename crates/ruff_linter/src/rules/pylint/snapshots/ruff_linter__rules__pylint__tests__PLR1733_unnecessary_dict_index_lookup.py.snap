@@ -94,7 +94,6 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
 10 |         blah = FRUITS[fruit_name]  # PLR1733
 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |                ^^^^^^^^^^^^^^^^^^
-   |
 help: Use existing variable
    |
 10 |         blah = FRUITS[fruit_name]  # PLR1733

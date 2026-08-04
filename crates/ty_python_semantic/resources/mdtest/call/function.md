@@ -1302,7 +1302,7 @@ len([], 1)
 ### Type property predicates
 
 ```py
-from ty_extensions import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # error: [missing-argument]
 is_subtype_of()
@@ -1471,13 +1471,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 15 | f(**Foo1(a=1, b="b"))
    |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:11:5
    |
 11 | def f(**kwargs: int) -> None: ...
    |     ^ ------------- Parameter declared here
-   |
 
 
 error[invalid-argument-type]: Argument to function `f` is incorrect
@@ -1485,13 +1483,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 15 | f(**Foo1(a=1, b="b"))
    |   ^^^^^^^^^^^^^^^^^^ Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:11:5
    |
 11 | def f(**kwargs: int) -> None: ...
    |     ^ ------------- Parameter declared here
-   |
 ```
 
 ### TypedDict union
@@ -1577,7 +1573,7 @@ Or, it can be a type that is assignable to `str`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(kwargs1: dict[Any, int], kwargs2: dict[Unknown, int]) -> None:
     f(**kwargs1)
@@ -1620,7 +1616,7 @@ def _(kwargs: dict[str, int]) -> None:
 ### `Unknown` type
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(**kwargs: int) -> None: ...
 def _(kwargs: Unknown):
@@ -1764,7 +1760,7 @@ variadic expansion should not greedily consume optional positional parameters th
 as explicit keyword arguments.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
 def _(args: "Unknown | tuple[int, int, int]"):

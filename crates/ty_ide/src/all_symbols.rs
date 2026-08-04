@@ -1,7 +1,8 @@
-use ruff_db::files::File;
-use ruff_python_ast::name::Name;
+use compact_str::CompactString;
+use rayon::prelude::*;
+use ruff_db::{PythonFile, files::File};
 use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
-use ty_project::Db;
+use ty_project::{Db, parallel::ParallelIteratorExt};
 
 use crate::{
     SymbolKind,
@@ -14,7 +15,7 @@ use crate::{
 /// by the query.
 pub fn all_symbols<'db>(
     db: &'db dyn Db,
-    importing_from: File,
+    importing_from: PythonFile<'db>,
     query: &QueryPattern,
 ) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
@@ -26,78 +27,69 @@ pub fn all_symbols<'db>(
     let _span = all_symbols_span.enter();
 
     let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
-    let is_typing_extensions_available = importing_from.is_stub(db)
+    let is_typing_extensions_available = importing_from.file(db).is_stub(db)
         || resolve_real_shadowable_module(db, importing_from, &typing_extensions).is_some();
 
-    let results = std::sync::Mutex::new(Vec::new());
-    {
-        let modules = all_modules(db);
-        let db = Db::dyn_clone(db);
-        let all_symbols_span = &all_symbols_span;
-        let results = &results;
-        let query = &query;
+    let results = all_modules(db, importing_from.python_version(db))
+        .into_par_iter()
+        .map_with_db(db, |db, module| {
+            let name = module.name(db);
 
-        rayon::scope(move |s| {
-            // For each file, extract symbols and add them to results
-            for module in modules {
-                let db = Db::dyn_clone(&*db);
-                let Some(file) = module.file(&*db) else {
-                    continue;
-                };
-                let name = module.name(&*db);
+            // Note that this will always consider namespace
+            // packages to be "not firsty party." This isn't
+            // necessarily correct, and we can probably improve
+            // on this in response to user feedback. (At time
+            // of writing, 2026-02-13, we don't really handle
+            // namespace packages in auto-import anyway.)
+            let is_non_first_party = module.search_path(db).is_none_or(|sp| !sp.is_first_party());
 
-                // Note that this will always consider namespace
-                // packages to be "not firsty party." This isn't
-                // necessarily correct, and we can probably improve
-                // on this in response to user feedback. (At time
-                // of writing, 2026-02-13, we don't really handle
-                // namespace packages in auto-import anyway.)
-                let is_non_first_party = module
-                    .search_path(&*db)
-                    .is_none_or(|sp| !sp.is_first_party());
-
-                // Filter out non-first-party modules that are conventionally
-                // regarded as private or tests.
-                if is_non_first_party && (name.is_private() || name.is_test_module()) {
-                    continue;
-                }
-
-                // TODO: also make it available in `TYPE_CHECKING` blocks
-                // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
-                if !is_typing_extensions_available && name == &typing_extensions {
-                    continue;
-                }
-                s.spawn(move |_| {
-                    let symbols_for_file_span = tracing::debug_span!(
-                        parent: all_symbols_span,
-                        "symbols_for_file_global_only",
-                        path = %file.path(&*db),
-                    );
-                    let _entered = symbols_for_file_span.entered();
-
-                    let mut symbols = vec![];
-                    if query.is_match_symbol_name(module.name(&*db)) {
-                        symbols.push(AllSymbolInfo::from_module(&*db, module, file));
-                    }
-                    for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
-                        // Test functions (starting with `test_`) in third-party
-                        // packages are almost never useful to import.
-                        if is_non_first_party && symbol.name.starts_with("test_") {
-                            continue;
-                        }
-                        symbols.push(AllSymbolInfo::from_non_module_symbol(
-                            &*db,
-                            symbol.to_owned(),
-                            module,
-                            file,
-                        ));
-                    }
-                    results.lock().unwrap().extend(symbols);
-                });
+            // Filter out non-first-party modules that are conventionally
+            // regarded as private or tests.
+            if is_non_first_party && (name.is_private() || name.is_test_module()) {
+                return Vec::new();
             }
-        });
-    }
-    merge::merge(db, results.into_inner().unwrap())
+
+            // TODO: also make it available in `TYPE_CHECKING` blocks
+            // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
+            if !is_typing_extensions_available && name == &typing_extensions {
+                return Vec::new();
+            }
+
+            let Some(python_file) = module.python_file(db) else {
+                return Vec::new();
+            };
+            let file = python_file.file(db);
+
+            let symbols_for_file_span = tracing::debug_span!(
+                parent: &all_symbols_span,
+                "symbols_for_file_global_only",
+                path = %file.path(db),
+            );
+            let _entered = symbols_for_file_span.entered();
+
+            let mut symbols = vec![];
+            if query.is_match_symbol_name(module.name(db)) {
+                symbols.push(AllSymbolInfo::from_module(db, module, file));
+            }
+            for (_, symbol) in symbols_for_file_global_only(db, python_file).search(query) {
+                // Test functions (starting with `test_`) in third-party
+                // packages are almost never useful to import.
+                if is_non_first_party && symbol.name.starts_with("test_") {
+                    continue;
+                }
+                symbols.push(AllSymbolInfo::from_non_module_symbol(
+                    db,
+                    symbol.to_owned(),
+                    module,
+                    file,
+                ));
+            }
+            symbols
+        })
+        .flat_map_iter(|symbols| symbols)
+        .collect();
+
+    merge::merge(db, results)
 }
 
 /// A symbol found in the workspace and dependencies, including the
@@ -109,7 +101,7 @@ pub struct AllSymbolInfo<'db> {
     /// When absent, this implies the symbol is the module itself.
     symbol: Option<SymbolInfo<'static>>,
     /// The fully qualified name of this symbol.
-    qualified: Name,
+    qualified: CompactString,
     /// The module containing the symbol.
     module: Module<'db>,
     /// The file containing the symbol.
@@ -126,11 +118,11 @@ impl<'db> AllSymbolInfo<'db> {
         module: Module<'db>,
         file: File,
     ) -> AllSymbolInfo<'db> {
-        let qualified = Name::from(compact_str::format_compact!(
+        let qualified = compact_str::format_compact!(
             "{module_name}.{name}",
             module_name = module.name(db),
             name = symbol.name,
-        ));
+        );
         AllSymbolInfo {
             symbol: Some(symbol),
             qualified,
@@ -203,7 +195,7 @@ impl<'db> AllSymbolInfo<'db> {
     ///
     /// This is only available for symbols that have been imported
     /// into `Self::module()` *and* are determined to be re-exports.
-    pub(crate) fn imported_from(&self) -> Option<&ImportedFrom> {
+    fn imported_from(&self) -> Option<&ImportedFrom> {
         self.symbol
             .as_ref()
             .and_then(|symbol| symbol.imported_from.as_ref())
@@ -625,7 +617,6 @@ def zqzqzq():
           |
         2 | from pandas.io.api import zqzqzq
           |                           ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -670,7 +661,6 @@ def zqzqzq():
           |
         2 | from pandas.io.api import zqzqzq as zqzqzq
           |                                     ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -715,11 +705,14 @@ def zqzqzq():
           |
         2 | from pandas.io.api import *
           |                           ^
-          |
         info: Function zqzqzq
         ");
 
-        let symbols = all_symbols(&test.db, test.cursor.file, &QueryPattern::fuzzy("zqzqzq"));
+        let symbols = all_symbols(
+            &test.db,
+            test.python_file(test.cursor.file),
+            &QueryPattern::fuzzy("zqzqzq"),
+        );
         let symbol = symbols
             .iter()
             .find_map(|info| info.symbol.as_ref())
@@ -773,7 +766,6 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers import zqzqzq
           |                               ^^^^^^
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -781,7 +773,6 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers.readers import zqzqzq
           |                                       ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -834,7 +825,6 @@ __all__ = ['zqzqzq']
           |
         2 | def zqzqzq():
           |     ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -865,7 +855,6 @@ def zqzqzq():
           |
         2 | def zqzqzq():
           |     ^^^^^^
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -873,7 +862,6 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -907,7 +895,6 @@ def zqzqzq():
           |
         2 | def zqzqzq():
           |     ^^^^^^
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -915,7 +902,6 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -923,7 +909,6 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -965,7 +950,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | ABCDEFGHIJKLMNOP = 'https://api.example.com'
           | ^^^^^^^^^^^^^^^^
-          |
         info: Constant ABCDEFGHIJKLMNOP
 
         info[all-symbols]: AllSymbolInfo
@@ -973,7 +957,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | class Abcdefghijklmnop:
           |       ^^^^^^^^^^^^^^^^
-          |
         info: Class Abcdefghijklmnop
 
         info[all-symbols]: AllSymbolInfo
@@ -981,7 +964,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | def abcdefghijklmnop():
           |     ^^^^^^^^^^^^^^^^
-          |
         info: Function abcdefghijklmnop
         ");
     }
@@ -1012,7 +994,6 @@ def test_helper_xyzxyzxyz():
           |
         2 | def test_helper_xyzxyzxyz():
           |     ^^^^^^^^^^^^^^^^^^^^^
-          |
         info: Function test_helper_xyzxyzxyz
         ");
     }
@@ -1048,7 +1029,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | def helper_xyzxyzxyz(): pass
           |     ^^^^^^^^^^^^^^^^
-          |
         info: Function helper_xyzxyzxyz
 
         info[all-symbols]: AllSymbolInfo
@@ -1056,7 +1036,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | def useful_xyzxyzxyz(): pass
           |     ^^^^^^^^^^^^^^^^
-          |
         info: Function useful_xyzxyzxyz
         ");
     }
@@ -1081,7 +1060,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
-          |
         info: Constant ZQZQZQ
 
         info[all-symbols]: AllSymbolInfo
@@ -1089,7 +1067,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
-          |
         info: Constant ZQZQZQ
 
         info[all-symbols]: AllSymbolInfo
@@ -1097,7 +1074,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
-          |
         info: Constant ZQZQZQ
 
         info[all-symbols]: AllSymbolInfo
@@ -1105,7 +1081,6 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
-          |
         info: Constant ZQZQZQ
         ");
     }
@@ -1129,14 +1104,17 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
-          |
         info: Constant ZQZQZQ
         ");
     }
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, self.cursor.file, &QueryPattern::fuzzy(query));
+            let symbols = all_symbols(
+                &self.db,
+                self.python_file(self.cursor.file),
+                &QueryPattern::fuzzy(query),
+            );
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

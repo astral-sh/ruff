@@ -85,7 +85,7 @@ fn debug_information(session: &Session) -> crate::Result<String> {
             "  search-paths: {:#}",
             program
                 .search_paths(db)
-                .display(db, ModuleResolveMode::StubsAllowed)
+                .display(db, ModuleResolveMode::Typing)
         )?;
 
         writeln!(buffer, "Settings: {:#?}", db.project().settings(db))?;

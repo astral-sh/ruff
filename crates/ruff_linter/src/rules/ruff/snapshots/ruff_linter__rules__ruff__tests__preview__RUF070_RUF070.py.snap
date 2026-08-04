@@ -248,7 +248,6 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 62 |         x = f.read()
 63 |     yield x  # RUF070
    |           ^
-   |
 help: Remove unnecessary assignment
    |
 61 |     with open("foo.txt") as f:

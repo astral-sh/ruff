@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use rand::{RngExt, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
@@ -303,10 +302,10 @@ impl Notebook {
     fn update_cell_content(&mut self, transformed: &str) -> bool {
         let mut missing_separator = false;
 
-        for (&idx, (start, end)) in self
+        for (&idx, &[start, end]) in self
             .valid_code_cells
             .iter()
-            .zip(self.cell_offsets.iter().tuple_windows::<(_, _)>())
+            .zip(self.cell_offsets.array_windows::<2>())
         {
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
@@ -442,10 +441,6 @@ impl Notebook {
     /// Return a slice of [`Cell`] in the Jupyter notebook.
     pub fn cells(&self) -> &[Cell] {
         &self.raw.cells
-    }
-
-    pub fn metadata(&self) -> &RawNotebookMetadata {
-        &self.raw.metadata
     }
 
     /// Check if it's a Python notebook.

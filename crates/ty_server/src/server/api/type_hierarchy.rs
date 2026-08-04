@@ -1,6 +1,6 @@
 use lsp_types::{SymbolKind, TypeHierarchyItem};
-use ruff_db::files::File;
-use ruff_text_size::TextSize;
+use ruff_db::PythonFile;
+use ty_project::Db as _;
 use ty_project::ProjectDatabase;
 
 use crate::PositionEncoding;
@@ -8,14 +8,17 @@ use crate::document::{ToRangeExt, resolve_file_uri_range};
 use crate::session::SessionSnapshot;
 use crate::system::file_to_uri;
 
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum TypeHierarchyKind {
+    Subtypes,
+    Supertypes,
+}
+
 /// The subtype and supertype implementation.
-///
-/// `hierarchy_types` should be either `ty_ide::type_hierarchy_subtypes`
-/// or `ty_ide::type_hierarchy_supertypes`.
 pub(crate) fn hierarchy_handler(
     snapshot: &SessionSnapshot,
     requested_item: &TypeHierarchyItem,
-    hierarchy_types: fn(&dyn ty_project::Db, File, TextSize) -> Vec<ty_ide::TypeHierarchyItem>,
+    hierarchy_kind: TypeHierarchyKind,
 ) -> Option<Vec<TypeHierarchyItem>> {
     let encoding = snapshot.position_encoding();
 
@@ -32,8 +35,13 @@ pub(crate) fn hierarchy_handler(
         ) else {
             continue;
         };
+        let file = PythonFile::new(db, file, db.python_version());
+        let hierarchy_types = match hierarchy_kind {
+            TypeHierarchyKind::Subtypes => ty_ide::type_hierarchy_subtypes(db, file, offset),
+            TypeHierarchyKind::Supertypes => ty_ide::type_hierarchy_supertypes(db, file, offset),
+        };
         items.extend(
-            hierarchy_types(db, file, offset)
+            hierarchy_types
                 .into_iter()
                 .filter_map(|item| convert_to_lsp_item(db, item, encoding)),
         );

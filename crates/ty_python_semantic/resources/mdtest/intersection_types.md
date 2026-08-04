@@ -37,7 +37,8 @@ classes.
 We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class P: ...
 class Q: ...
@@ -58,7 +59,8 @@ We use `Literal[1]`, `Literal[2]`, … as examples of pairwise-disjoint types, a
 supertype of these:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
 from typing import Literal
 
 static_assert(is_disjoint_from(Literal[1], Literal[2]))
@@ -75,7 +77,8 @@ static_assert(is_subtype_of(Literal[3], int))
 Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 
 class A: ...
 class B(A): ...
@@ -284,7 +287,8 @@ in intersections, and can be eagerly simplified out. `object & P` is equivalent 
 `object & ~P` is equivalent to `~P` for any type `P`.
 
 ```pyi
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 
@@ -723,7 +727,8 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -822,7 +827,8 @@ This slightly strange-looking test is a regression test for a mistake that was n
 <https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
 
 ```py
-from ty_extensions import AlwaysFalsy, Unknown
+from ty_extensions import AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import Literal
 
 def _(x: str & Unknown & AlwaysFalsy & Literal[""]):
@@ -838,7 +844,7 @@ is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We 
 simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any, Never
 
 class P: ...
@@ -868,7 +874,7 @@ The intersection of an unknown set of runtime values with (another) unknown set 
 still an unknown set of runtime values:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any
 
 class P: ...
@@ -903,7 +909,7 @@ of another unknown set of values is not necessarily empty, so we keep the positi
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def any(
     i1: Any & ~Any,
@@ -926,7 +932,7 @@ Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def mixed(
     i1: Any & Unknown,
@@ -1345,7 +1351,7 @@ For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class P: ...
 class Q: ...

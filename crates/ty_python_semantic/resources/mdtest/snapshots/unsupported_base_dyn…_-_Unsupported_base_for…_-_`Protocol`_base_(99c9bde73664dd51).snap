@@ -26,7 +26,6 @@ info[unsupported-dynamic-base]: Unsupported base for class created via `type()`
   |
 3 | X = type("X", (Protocol,), {})  # error: [unsupported-dynamic-base]
   |                ^^^^^^^^ Has type `<special-form 'typing.Protocol'>`
-  |
 info: Classes created via `type()` cannot be protocols
 info: Consider using `class X(Protocol): ...` instead
 

@@ -1,9 +1,12 @@
+use std::borrow::Cow;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::SystemPath;
 use ruff_db::vendored::VendoredPath;
+use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
@@ -12,7 +15,7 @@ use crate::module_name::ModuleName;
 use crate::path::{SearchPath, SystemOrVendoredPathRef};
 
 /// Representation of a Python module.
-#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
 pub enum Module<'db> {
     File(FileModule<'db>),
     Namespace(NamespacePackage<'db>),
@@ -25,18 +28,22 @@ impl get_size2::GetSize for Module<'_> {}
 impl<'db> Module<'db> {
     pub(crate) fn file_module(
         db: &'db dyn Db,
-        name: ModuleName,
+        name: Cow<'_, ModuleName>,
         kind: ModuleKind,
         search_path: SearchPath,
-        file: File,
+        file: PythonFile<'db>,
     ) -> Self {
         let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
 
         Self::File(FileModule::new(db, name, kind, search_path, file, known))
     }
 
-    pub(crate) fn namespace_package(db: &'db dyn Db, name: ModuleName) -> Self {
-        Self::Namespace(NamespacePackage::new(db, name))
+    pub(crate) fn namespace_package(
+        db: &'db dyn Db,
+        name: Cow<'_, ModuleName>,
+        python_version: PythonVersion,
+    ) -> Self {
+        Self::Namespace(NamespacePackage::new(db, name, python_version))
     }
 
     /// The absolute name of the module (e.g. `foo.bar`)
@@ -52,8 +59,26 @@ impl<'db> Module<'db> {
     /// This is `None` for namespace packages.
     pub fn file(self, db: &'db dyn Database) -> Option<File> {
         match self {
-            Module::File(module) => Some(module.file(db)),
+            Module::File(module) => Some(module.python_file(db).file(db)),
             Module::Namespace(_) => None,
+        }
+    }
+
+    /// The versioned file used to parse this module.
+    ///
+    /// This is `None` for namespace packages.
+    pub fn python_file(self, db: &'db dyn Database) -> Option<PythonFile<'db>> {
+        match self {
+            Module::File(module) => Some(module.python_file(db)),
+            Module::Namespace(_) => None,
+        }
+    }
+
+    /// The Python version used to resolve this module.
+    pub fn python_version(self, db: &'db dyn Database) -> PythonVersion {
+        match self {
+            Module::File(module) => module.python_file(db).python_version(db),
+            Module::Namespace(module) => module.python_version(db),
         }
     }
 
@@ -162,7 +187,8 @@ fn all_submodule_names_for_package<'db>(
         return None;
     }
 
-    let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
+    let python_file = module.python_file(db);
+    let path = SystemOrVendoredPathRef::try_from_file(db, python_file.file(db))?;
     debug_assert!(
         matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
         "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
@@ -204,10 +230,10 @@ fn all_submodule_names_for_package<'db>(
                     };
                     Some(Module::file_module(
                         db,
-                        name,
+                        Cow::Owned(name),
                         kind,
                         module.search_path(db).clone(),
-                        file,
+                        PythonFile::new(db, file, python_file.python_version(db)),
                     ))
                 })
                 .collect()
@@ -241,25 +267,28 @@ fn all_submodule_names_for_package<'db>(
                 };
                 Some(Module::file_module(
                     db,
-                    name,
+                    Cow::Owned(name),
                     kind,
                     module.search_path(db).clone(),
-                    file,
+                    PythonFile::new(db, file, python_file.python_version(db)),
                 ))
             })
             .collect(),
     })
 }
 
-/// A module that resolves to a file (`lib.py` or `package/__init__.py`)
+/// A module that resolves to a file (`lib.py` or `package/__init__.py`).
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    #[returns(copy)]
     pub(super) kind: ModuleKind,
     #[returns(ref)]
     pub(super) search_path: SearchPath,
-    pub(super) file: File,
+    #[returns(copy)]
+    pub(super) python_file: PythonFile<'db>,
+    #[returns(copy)]
     pub(super) known: Option<KnownModule>,
 }
 
@@ -271,6 +300,8 @@ pub struct FileModule<'db> {
 pub struct NamespacePackage<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    #[returns(copy)]
+    pub(super) python_version: PythonVersion,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -291,7 +322,7 @@ impl ModuleKind {
     }
 }
 
-/// Enumeration of various core stdlib modules in which important types are located
+/// Enumeration of modules in which types with dedicated semantic behavior are located.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
@@ -307,6 +338,10 @@ pub enum KnownModule {
     Os,
     Tempfile,
     Pathlib,
+    Datetime,
+    Decimal,
+    Ipaddress,
+    Re,
     Abc,
     Dataclasses,
     Functools,
@@ -321,6 +356,10 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
+    #[strum(serialize = "ty_extensions._internal")]
+    TyExtensionsInternal,
+    #[strum(serialize = "ty_extensions.pydantic")]
+    TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
     #[strum(serialize = "unittest.mock")]
@@ -330,6 +369,21 @@ pub enum KnownModule {
     Numbers,
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
+    // Third-party modules
+    #[strum(serialize = "pydantic.config")]
+    PydanticConfig,
+    #[strum(serialize = "pydantic.fields")]
+    PydanticFields,
+    #[strum(serialize = "pydantic.functional_validators")]
+    PydanticFunctionalValidators,
+    #[strum(serialize = "pydantic.main")]
+    PydanticMain,
+    #[strum(serialize = "pydantic.root_model")]
+    PydanticRootModel,
+    #[strum(serialize = "pydantic_settings.main")]
+    PydanticSettingsMain,
+    #[strum(serialize = "pydantic.types")]
+    PydanticTypes,
 }
 
 impl KnownModule {
@@ -345,6 +399,10 @@ impl KnownModule {
             Self::Os => "os",
             Self::Tempfile => "tempfile",
             Self::Pathlib => "pathlib",
+            Self::Datetime => "datetime",
+            Self::Decimal => "decimal",
+            Self::Ipaddress => "ipaddress",
+            Self::Re => "re",
             Self::Abc => "abc",
             Self::Dataclasses => "dataclasses",
             Self::Functools => "functools",
@@ -354,6 +412,8 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
+            Self::TyExtensionsInternal => "ty_extensions._internal",
+            Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
@@ -361,6 +421,13 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::PydanticConfig => "pydantic.config",
+            Self::PydanticFields => "pydantic.fields",
+            Self::PydanticFunctionalValidators => "pydantic.functional_validators",
+            Self::PydanticMain => "pydantic.main",
+            Self::PydanticRootModel => "pydantic.root_model",
+            Self::PydanticSettingsMain => "pydantic_settings.main",
+            Self::PydanticTypes => "pydantic.types",
         }
     }
 
@@ -370,10 +437,59 @@ impl KnownModule {
     }
 
     fn try_from_search_path_and_name(search_path: &SearchPath, name: &ModuleName) -> Option<Self> {
-        if search_path.is_standard_library() {
-            Self::from_str(name.as_str()).ok()
+        let known_module = Self::from_str(name.as_str()).ok()?;
+
+        let is_expected_search_path = if known_module.is_third_party() {
+            search_path.can_contain_third_party_code()
         } else {
-            None
+            search_path.is_standard_library()
+        };
+
+        is_expected_search_path.then_some(known_module)
+    }
+
+    /// Return `true` if this module is provided by a supported third-party package.
+    pub const fn is_third_party(self) -> bool {
+        match self {
+            Self::PydanticConfig
+            | Self::PydanticFields
+            | Self::PydanticFunctionalValidators
+            | Self::PydanticMain
+            | Self::PydanticRootModel
+            | Self::PydanticSettingsMain
+            | Self::PydanticTypes => true,
+            Self::Builtins
+            | Self::Enum
+            | Self::Types
+            | Self::Typeshed
+            | Self::TypingExtensions
+            | Self::Typing
+            | Self::Sys
+            | Self::Os
+            | Self::Tempfile
+            | Self::Pathlib
+            | Self::Datetime
+            | Self::Decimal
+            | Self::Ipaddress
+            | Self::Re
+            | Self::Abc
+            | Self::Dataclasses
+            | Self::Functools
+            | Self::Collections
+            | Self::CollectionsAbc
+            | Self::CollectionsAbcInternal
+            | Self::Inspect
+            | Self::Templatelib
+            | Self::TypeCheckerInternals
+            | Self::TyExtensions
+            | Self::TyExtensionsInternal
+            | Self::TyExtensionsPydantic
+            | Self::ImportLib
+            | Self::UnittestMock
+            | Self::Uuid
+            | Self::Warnings
+            | Self::Numbers
+            | Self::Struct => false,
         }
     }
 
@@ -391,6 +507,10 @@ impl KnownModule {
 
     pub const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
+    }
+
+    pub const fn is_ty_extensions_internal(self) -> bool {
+        matches!(self, Self::TyExtensionsInternal)
     }
 
     pub const fn is_inspect(self) -> bool {
@@ -425,7 +545,7 @@ mod tests {
     fn known_module_roundtrip_from_str() {
         let stdlib_search_path = SearchPath::vendored_stdlib();
 
-        for module in KnownModule::iter() {
+        for module in KnownModule::iter().filter(|module| !module.is_third_party()) {
             let module_name = module.name();
 
             assert_eq!(

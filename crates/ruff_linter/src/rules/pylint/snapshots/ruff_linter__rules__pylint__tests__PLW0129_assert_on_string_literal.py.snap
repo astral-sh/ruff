@@ -8,7 +8,6 @@ PLW0129 Asserting on a non-empty string literal will always pass
 2 |     a = 9 / 3
 3 |     assert "No ZeroDivisionError were raised"  # [assert-on-string-literal]
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 
 PLW0129 Asserting on a non-empty string literal will always pass
   --> assert_on_string_literal.py:12:12

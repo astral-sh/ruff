@@ -8,7 +8,6 @@ PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior
 3 | x = pd.DataFrame()
 4 | x.drop(["a"], axis=1, inplace=True)
   |                       ^^^^^^^^^^^^
-  |
 help: Assign to variable; remove `inplace` arg
   |
 3 | x = pd.DataFrame()

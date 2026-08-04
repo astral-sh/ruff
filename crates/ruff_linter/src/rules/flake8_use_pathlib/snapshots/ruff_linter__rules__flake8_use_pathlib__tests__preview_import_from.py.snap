@@ -479,7 +479,6 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 35 |     fp.read()
 36 | open(p).close()
    | ^^^^
-   |
 help: Replace with `Path.open()`
    |
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
@@ -499,7 +498,6 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 42 |
 43 |     with open(p) as _: ...  # Error
    |          ^^^^
-   |
 help: Replace with `Path.open()`
    |
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext

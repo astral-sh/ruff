@@ -88,4 +88,3 @@ S506 Probable use of unsafe loader `CBaseLoader` with `yaml.load`. Allows instan
 49 | from yaml.cyaml import CBaseLoader
 50 | yaml.load("{}", Loader=CBaseLoader)
    |                        ^^^^^^^^^^^
-   |

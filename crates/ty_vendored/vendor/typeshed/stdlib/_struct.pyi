@@ -44,8 +44,8 @@ def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any
 
     Pack the provided values according to the format string and write the
     packed bytes into the writable buffer starting at offset.  Note that the
-    offset is a required argument.  See help(struct) for more on format
-    strings.
+    offset is a required argument.  A negative offset counts from the end of
+    the buffer.  See help(struct) for more on format strings.
     """
 
 def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
@@ -58,7 +58,8 @@ def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
 def unpack_from(format: str | bytes, /, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
     """Return a tuple containing values unpacked according to the format string.
 
-    The buffer's size, minus offset, must be at least calcsize(format).  See
+    The buffer must contain at least calcsize(format) bytes starting at
+    offset.  A negative offset counts from the end of the buffer.  See
     help(struct) for more on format strings.
     """
 
@@ -103,8 +104,9 @@ class Struct:
 
         Pack the provided values according to the struct format string
         and write the packed bytes into the writable buffer starting at
-        offset.  Note that the offset is a required argument.  See
-        help(struct) for more on format strings.
+        offset.  Note that the offset is a required argument.  A negative
+        offset counts from the end of the buffer.  See help(struct) for
+        more on format strings.
         """
 
     def unpack(self, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
@@ -120,8 +122,8 @@ class Struct:
 
         Values are unpacked according to the struct format string.  The
         buffer's size in bytes, starting at position offset, must be at
-        least the struct size.  See help(struct) for more on format
-        strings.
+        least the struct size.  A negative offset counts from the end of
+        the buffer.  See help(struct) for more on format strings.
         """
 
     def iter_unpack(self, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:

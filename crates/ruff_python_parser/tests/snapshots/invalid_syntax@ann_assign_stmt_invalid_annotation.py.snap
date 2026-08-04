@@ -219,7 +219,6 @@ Module(
 3 | x: yield from b = 1
 4 | x: y := int = 1
   |      ^^ Syntax Error: Expected a statement
-  |
 
 
 ## Semantic Syntax Errors

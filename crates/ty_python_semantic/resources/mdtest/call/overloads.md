@@ -1030,7 +1030,6 @@ error[no-matching-overload]: No overload of function `f` matches arguments
 39 | |             a30=a,
 40 | |         )
    | |_________^
-   |
 info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
  --> src/overloaded.pyi:7:1
@@ -1038,7 +1037,6 @@ info: First overload defined here
 7 | / @overload
 8 | | def f() -> None: ...
   | |____________________^ First overload defined here
-  |
 info: Possible overloads for function `f`:
 info:   () -> None
 info:   (**kwargs: int) -> C
@@ -1164,6 +1162,22 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     # The defaulted third parameter lets the second overload survive provisional arity checking,
     # but argument expansion should still revive the 2-arg overload and combine both return types.
     reveal_type(m(*t))  # revealed: Literal[1, 2]
+```
+
+### Retry from parameter matching with type context
+
+When retrying, arguments are inferred with the correct type context:
+
+```py
+from typing import Callable, overload
+
+@overload
+def n(callback: Callable[[int], int], value: int, /) -> int: ...
+@overload
+def n(callback: Callable[[str], str], first: str, second: str, /) -> str: ...
+def n(*args: object) -> object: ...
+def _(values: tuple[int] | tuple[str, str]):
+    reveal_type(n(lambda value: value, *values))  # revealed: int | str
 ```
 
 ## Filtering based on variadic arguments
@@ -1469,7 +1483,7 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
 ```pyi
 from typing_extensions import Iterable, overload, LiteralString, Protocol
-from ty_extensions import Unknown, is_assignable_to
+from ty_extensions._internal import Unknown, is_assignable_to
 
 class Foo:
     @overload
@@ -1744,7 +1758,7 @@ def _(arg: list[Any]):
     reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
-### Varidic argument with generics
+### Variadic argument with generics
 
 `overloaded.pyi`:
 
@@ -1812,7 +1826,7 @@ reveal_type(f3(z=1))  # revealed: dict[str, Any]
 reveal_type(f3(1, 2, x=3))  # revealed: Unknown
 ```
 
-### Varidic argument with generic iterable
+### Variadic argument with generic iterable
 
 `overloaded.pyi`:
 
@@ -2140,6 +2154,81 @@ def f(a: T | dict[str, int], b: int | str) -> int | str:
 
 x = f({"y": 1}, "a")
 reveal_type(x)  # revealed: str
+```
+
+Only the types and diagnostics produced by inference against matching overloads are preserved:
+
+```py
+from collections.abc import Callable
+from typing import TypedDict, overload
+
+@overload
+def transform(value: str, callback: Callable[[int], str], /) -> str: ...
+@overload
+def transform(value: bytes, callback: Callable[[int], bytes], /) -> bytes: ...
+def transform(value: str | bytes, callback: Callable[..., str | bytes], /) -> str | bytes:
+    return value
+
+string_result = transform(
+    "",
+    reveal_type(lambda x: str(x) * x),  # revealed: (x: int) -> str
+)
+reveal_type(string_result)  # revealed: str
+bytes_result = transform(
+    b"",
+    reveal_type(lambda x: x.to_bytes(1)),  # revealed: (x: int) -> bytes
+)
+reveal_type(bytes_result)  # revealed: bytes
+
+class Payload(TypedDict):
+    name: str
+    count: int
+
+@overload
+def select_payload(payload: Payload, discriminator: int, /) -> int: ...
+@overload
+def select_payload(payload: dict[str, object], discriminator: str, /) -> str: ...
+def select_payload(payload: Payload | dict[str, object], discriminator: int | str, /) -> int | str:
+    return discriminator
+
+# error: [missing-typed-dict-key] "Missing required key 'count' in TypedDict `Payload` constructor"
+# error: [no-matching-overload]
+select_payload({"name": "missing count"}, 1)
+
+# error: [invalid-argument-type]
+# error: [no-matching-overload]
+select_payload({"name": "bad count", "count": "not an int"}, 1)
+
+# error: [invalid-key]
+# error: [no-matching-overload]
+select_payload({"name": "extra key", "count": 1, "extra": None}, 1)
+
+select_payload({"extra": None}, "plain dictionary")
+
+@overload
+def select_generic_payload[T](value: T, payload: Payload, discriminator: int, /) -> T: ...
+@overload
+def select_generic_payload[T](value: T, payload: dict[str, object], discriminator: str, /) -> T: ...
+def select_generic_payload[T](
+    value: T,
+    payload: Payload | dict[str, object],
+    discriminator: int | str,
+    /,
+) -> T:
+    return value
+
+selected_generic_payload = select_generic_payload(
+    1,
+    reveal_type({"name": "generic", "count": 1}),  # revealed: Payload
+    1,
+)
+reveal_type(selected_generic_payload)  # revealed: Literal[1]
+
+# error: [missing-typed-dict-key] "Missing required key 'count' in TypedDict `Payload` constructor"
+# error: [no-matching-overload]
+select_generic_payload(1, {"name": "generic"}, 1)
+
+select_generic_payload(1, {"extra": None}, "plain dictionary")
 ```
 
 ```py

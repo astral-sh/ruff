@@ -11,6 +11,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::SourceType;
+use ruff_python_parser::ParseOptions;
 use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
@@ -99,12 +100,6 @@ pub(crate) fn analyze_graph(
     let db = ModuleDb::from_src_roots(
         system,
         src_roots.into_iter().collect(),
-        pyproject_config
-            .settings
-            .analyze
-            .target_version
-            .as_tuple()
-            .into(),
         args.python
             .and_then(|python| SystemPathBuf::from_path_buf(python).ok()),
     )?;
@@ -135,6 +130,7 @@ pub(crate) fn analyze_graph(
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
                 let type_checking_imports = settings.analyze.type_checking_imports;
+                let python_version = settings.analyze.target_version;
                 let source_type = settings.analyze.extension.get_source_type(path);
 
                 // Skip excluded files.
@@ -182,7 +178,8 @@ pub(crate) fn analyze_graph(
                     let mut imports = ModuleImports::detect(
                         &db,
                         source_code,
-                        source_type.expect_python(),
+                        ParseOptions::from(source_type.expect_python())
+                            .with_target_version(python_version),
                         &path,
                         package.as_deref(),
                         string_imports,

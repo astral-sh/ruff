@@ -1,6 +1,7 @@
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
@@ -68,7 +69,7 @@ impl TestSystem {
     }
 
     /// Returns the `InMemorySystem` or `None` if the underlying test system isn't the [`InMemorySystem`].
-    pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
+    fn as_in_memory(&self) -> Option<&InMemorySystem> {
         self.system().as_any().downcast_ref::<InMemorySystem>()
     }
 
@@ -87,7 +88,7 @@ impl TestSystem {
         self.inner = Arc::new(system);
     }
 
-    pub fn system(&self) -> &dyn WritableSystem {
+    fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
@@ -138,6 +139,15 @@ impl System for TestSystem {
 
     fn which(&self, _name: &str) -> WhichResult {
         Err(WhichError::CannotFindBinaryPath)
+    }
+
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        self.system().run_command(program, args, current_directory)
     }
 
     fn read_directory<'a>(
@@ -323,13 +333,6 @@ pub struct InMemorySystem {
 }
 
 impl InMemorySystem {
-    pub fn new(cwd: SystemPathBuf) -> Self {
-        Self {
-            user_config_directory: Mutex::new(None).into(),
-            memory_fs: MemoryFileSystem::with_current_directory(cwd),
-        }
-    }
-
     pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
         Self {
             user_config_directory: Mutex::new(None).into(),

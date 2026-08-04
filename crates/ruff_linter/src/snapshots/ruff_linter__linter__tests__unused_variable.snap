@@ -26,7 +26,6 @@ F841 [*] Local variable `foo2` is assigned to but never used
 2 |     foo1 = %matplotlib --list
 3 |     foo2: list[str] = %matplotlib --list
   |     ^^^^
-  |
 help: Remove assignment to unused variable `foo2`
  ::: cell 1
   |
@@ -61,7 +60,6 @@ F841 [*] Local variable `bar2` is assigned to but never used
 2 |     bar1 = !pwd
 3 |     bar2: str = !pwd
   |     ^^^^
-  |
 help: Remove assignment to unused variable `bar2`
  ::: cell 2
   |

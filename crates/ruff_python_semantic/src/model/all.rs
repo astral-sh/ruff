@@ -30,8 +30,8 @@ pub struct DunderAllName<'a> {
     range: TextRange,
 }
 
-impl DunderAllName<'_> {
-    pub fn name(&self) -> &str {
+impl<'a> DunderAllName<'a> {
+    pub fn name(&self) -> &'a str {
         self.name
     }
 }

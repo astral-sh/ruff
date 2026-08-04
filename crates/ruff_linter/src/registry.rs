@@ -12,10 +12,6 @@ use crate::codes::{self};
 
 mod rule_set;
 
-pub trait AsRule {
-    fn rule(&self) -> Rule;
-}
-
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
@@ -241,7 +237,8 @@ pub enum LintSource {
     Imports,
     Noqa,
     Filesystem,
-    PyprojectToml,
+    /// A TOML config file, either `pyproject.toml`, `ruff.toml`, or `.ruff.toml`.
+    Toml,
 }
 
 impl Rule {
@@ -249,8 +246,12 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::BlanketNOQA | Rule::RedirectedNOQA | Rule::UnusedNOQA => LintSource::Noqa,
+            Rule::InvalidPyprojectToml | Rule::RuleCodesInSelectors => LintSource::Toml,
+            Rule::BlanketNOQA
+            | Rule::NoqaComments
+            | Rule::RedirectedNOQA
+            | Rule::RuleCodesInSuppressionComments
+            | Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong

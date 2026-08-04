@@ -281,3 +281,43 @@ AIR201 Use the `.output` attribute on the task object for "unknown_task" instead
 115 | )
     |
 help: Replace with `unknown_task.output`
+
+AIR201 Use the `.output` attribute on the task object for "len" instead of `xcom_pull` in a template string
+   --> AIR201.py:120:13
+    |
+118 | task_26 = PythonOperator(
+119 |     task_id="task_26",
+120 |     op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (no fix)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+121 | )
+    |
+help: Replace with `len.output`
+
+AIR201 Use the `.output` attribute on the task object for "max" instead of `xcom_pull` in a template string
+   --> AIR201.py:127:13
+    |
+125 | task_27 = PythonOperator(
+126 |     task_id="task_27",
+127 |     op_args="{{ ti.xcom_pull(task_ids='max') }}",  # AIR201 (no fix)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+128 | )
+    |
+help: Replace with `max.output`
+
+AIR201 [*] Use the `.output` attribute on the task object for "len" instead of `xcom_pull` in a template string
+   --> AIR201.py:134:13
+    |
+132 | task_28 = PythonOperator(
+133 |     task_id="task_28",
+134 |     op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (fix: len.output)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+135 | )
+    |
+help: Replace with `len.output`
+    |
+133 |     task_id="task_28",
+    -     op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (fix: len.output)
+134 +     op_args=len.output,  # AIR201 (fix: len.output)
+135 | )
+    |
+note: This is an unsafe fix and may change runtime behavior

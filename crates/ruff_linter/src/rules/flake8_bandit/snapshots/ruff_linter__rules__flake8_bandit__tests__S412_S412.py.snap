@@ -6,4 +6,3 @@ S412 `httpoxy` is a set of vulnerabilities that affect application code running 
   |
 1 | from twisted.web.twcgi import CGIScript  # S412
   |      ^^^^^^^^^^^^^^^^^
-  |

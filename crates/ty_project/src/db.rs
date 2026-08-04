@@ -13,6 +13,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
+use ruff_python_ast::PythonVersion;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_core::program::{
@@ -22,13 +23,22 @@ use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
 
 mod changes;
-mod ignore;
 
 #[salsa::db]
 pub trait Db: SemanticDb {
+    /// Returns the Python version for files in the primary environment.
+    fn python_version(&self) -> PythonVersion;
+
     fn project(&self) -> Project;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+}
+
+/// Tracked so that a change to the open-file set only invalidates queries
+/// for files whose open state actually changed.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
+fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
+    db.project().open_files(db).contains(&file)
 }
 
 #[salsa::db]
@@ -90,6 +100,12 @@ impl ProjectDatabase {
         self.files.freeze();
     }
 
+    /// Permanently marks the project as never having open files.
+    pub fn freeze_open_files(&mut self) {
+        let project = self.project();
+        project.freeze_open_files(self);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
@@ -124,10 +140,11 @@ impl ProjectDatabase {
         // cache key before loading the DB. Because of that, access to the `db` (other than system and vendored) is
         // strictly forbidden before resolving the `program_settings`.
 
+        let merged_options = project_metadata.to_merged_options();
+
         // Initialize the `Program` singleton
-        let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
-            project_metadata.to_program_settings(db.system(), db.vendored(), strategy),
-        )?;
+        let (program_settings, program_settings_diagnostics) = strategy
+            .to_anyhow(merged_options.to_program_settings(db.system(), db.vendored(), strategy))?;
 
         // This must be called before `from_settings`, or the `SearchPath` root
         // will take precedence over the `Project` root, resulting in
@@ -136,12 +153,10 @@ impl ProjectDatabase {
 
         Program::from_settings(&db, program_settings);
 
-        let (settings, settings_diagnostics) = strategy.map_err(
-            project_metadata
-                .options()
-                .to_settings(&db, project_metadata.root(), strategy),
-            |error| anyhow::anyhow!("{}", error.pretty(&db)),
-        )?;
+        let (settings, settings_diagnostics) = strategy
+            .map_err(merged_options.to_settings(&db, strategy), |error| {
+                anyhow::anyhow!("{}", error.pretty(&db))
+            })?;
 
         db.project = Some(Project::from_metadata(
             &db,
@@ -176,7 +191,7 @@ impl ProjectDatabase {
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
-        self.project().check_file(self, file)
+        crate::check_file(self, file)
     }
 
     /// Set the check mode for the project.
@@ -553,6 +568,10 @@ impl SemanticDb for ProjectDatabase {
         self.project().verbose(self)
     }
 
+    fn is_open_file(&self, file: File) -> bool {
+        is_open_file_impl(self, file)
+    }
+
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }
@@ -561,8 +580,13 @@ impl SemanticDb for ProjectDatabase {
 #[salsa::db]
 impl ty_python_core::Db for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
+        // Avoid creating a dependency on the `should_check_file` query for vendored files.
+        if file.path(self).is_vendored_path() {
+            return false;
+        }
+
         self.project
-            .is_some_and(|project| project.should_check_file(self, file))
+            .is_some_and(|_| crate::should_check_file(self, file))
     }
 }
 
@@ -579,10 +603,6 @@ impl SourceDb for ProjectDatabase {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
@@ -590,6 +610,10 @@ impl salsa::Database for ProjectDatabase {}
 
 #[salsa::db]
 impl Db for ProjectDatabase {
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self).python_version(self)
+    }
+
     fn project(&self) -> Project {
         self.project.unwrap()
     }
@@ -601,7 +625,7 @@ impl Db for ProjectDatabase {
 
 #[cfg(feature = "format")]
 mod format {
-    use crate::ProjectDatabase;
+    use crate::{Db as _, ProjectDatabase};
     use ruff_db::files::File;
     use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
 
@@ -609,7 +633,7 @@ mod format {
     impl FormatDb for ProjectDatabase {
         fn format_options(&self, file: File) -> PyFormatOptions {
             let source_ty = file.source_type(self);
-            PyFormatOptions::from_source_type(source_ty)
+            PyFormatOptions::from_source_type(source_ty).with_target_version(self.python_version())
         }
     }
 }
@@ -629,7 +653,7 @@ pub(crate) mod testing {
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
+    use ty_python_semantic::{AnalysisSettings, ProgramEnvironment, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -666,8 +690,8 @@ pub(crate) mod testing {
             };
 
             let (settings, settings_diagnostics) = project
-                .options()
-                .to_settings(&db, project.root(), &FallibleStrategy)
+                .to_merged_options()
+                .to_settings(&db, &FallibleStrategy)
                 .unwrap();
             let project =
                 Project::from_metadata(&db, project, settings, settings_diagnostics, Vec::new());
@@ -708,6 +732,14 @@ pub(crate) mod testing {
     }
 
     impl TestDb {
+        pub fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
+        pub fn program_environment(&self) -> ProgramEnvironment<'_> {
+            ProgramEnvironment::from_program(self.python_version())
+        }
+
         /// Takes the salsa events.
         pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
@@ -739,10 +771,6 @@ pub(crate) mod testing {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]
@@ -755,7 +783,7 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_core::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
-            !file.path(self).is_vendored_path()
+            crate::should_check_file(self, file)
         }
     }
 
@@ -763,7 +791,7 @@ pub(crate) mod testing {
     impl ty_python_semantic::Db for TestDb {
         #[inline]
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
-            self.project().check_file(self, file)
+            crate::check_file(self, file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
@@ -782,6 +810,10 @@ pub(crate) mod testing {
             false
         }
 
+        fn is_open_file(&self, file: File) -> bool {
+            super::is_open_file_impl(self, file)
+        }
+
         fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
             Box::new(self.clone())
         }
@@ -789,6 +821,10 @@ pub(crate) mod testing {
 
     #[salsa::db]
     impl Db for TestDb {
+        fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
         fn project(&self) -> Project {
             self.project.unwrap()
         }
@@ -809,7 +845,7 @@ mod tests {
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ty_module_resolver::list_modules;
 
-    use crate::{ProjectDatabase, ProjectMetadata};
+    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
 
     #[test]
     fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
@@ -853,7 +889,7 @@ mod tests {
         let metadata = ProjectMetadata::discover(&project, &system)?;
         let db = ProjectDatabase::fallible(metadata, system)?;
 
-        let modules = list_modules(&db);
+        let modules = list_modules(&db, db.python_version());
         assert!(
             modules
                 .iter()

@@ -13,9 +13,7 @@ pub use resolve::{
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
-pub use typeshed::{
-    PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
-};
+pub use typeshed::{PyVersionRange, TypeshedVersions, TypeshedVersionsParseError};
 
 pub use list::{all_modules, list_modules};
 pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, ModuleNameMatch};
@@ -38,9 +36,9 @@ mod testing;
 /// Returns an iterator over all search paths pointing to a system path
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
     SystemModuleSearchPathsIter {
-        // Always run in `StubsAllowed` mode because we want to include as much as possible
+        // Always run in `Typing` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
-        inner: search_paths(db, ModuleResolveMode::StubsAllowed),
+        inner: search_paths(db, ModuleResolveMode::Typing),
     }
 }
 

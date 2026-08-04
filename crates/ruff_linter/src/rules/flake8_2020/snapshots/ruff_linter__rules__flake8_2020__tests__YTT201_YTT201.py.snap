@@ -39,4 +39,3 @@ YTT201 `sys.version_info[0] != 3` referenced (python4), use `<`
  9 | PY2 = sys.version_info[0] != 3
 10 | PY2 = version_info[0] != 3
    |       ^^^^^^^^^^^^^^^
-   |

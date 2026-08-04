@@ -34,17 +34,6 @@ invalid-syntax: Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
-invalid-syntax: Expected a statement
-  --> E11.py:14:1
-   |
-12 |     print()
-13 | #: E114 E116
-14 | mimetype = 'application/x-directory'
-   | ^
-15 |      # 'httpd/unix-directory'
-16 | create_date = False
-   |
-
 E117 Over-indented
   --> E11.py:39:1
    |

@@ -47,4 +47,3 @@ ISC002 Implicitly concatenated string literals over multiple lines
     |  __________^
 209 | |     t"def"} g"
     | |__________^
-    |

@@ -33,17 +33,6 @@ pub struct Pyproject {
     project: Option<Project>,
 }
 
-impl Pyproject {
-    pub const fn new(options: Options) -> Self {
-        Self {
-            tool: Some(Tools {
-                ruff: Some(options),
-            }),
-            project: None,
-        }
-    }
-}
-
 fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
     let path = path.as_ref();
 
@@ -87,7 +76,7 @@ fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
-pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
+fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
     let pyproject = parse_pyproject_toml(path)?;
     Ok(pyproject.tool.and_then(|tool| tool.ruff).is_some())
 }

@@ -12,6 +12,7 @@ use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_ide::{Hint, hints};
 
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{
     Annotation, DisplayDiagnosticConfig, HyperlinkMode, Severity, SubDiagnostic,
 };
@@ -401,7 +402,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, file);
+    let unnecessary_hints = hints(db, PythonFile::new(db, file, db.python_version()));
 
     Some(Diagnostics {
         items: diagnostics,
@@ -540,9 +541,9 @@ pub(super) fn to_lsp_diagnostic(
             .primary_annotation()
             .and_then(|annotation| annotation.get_message())
         {
-            format!("{}: {annotation_message}", diagnostic.primary_message())
+            format!("{}: {annotation_message}", diagnostic.headline_message())
         } else {
-            diagnostic.primary_message().to_string()
+            diagnostic.headline_message().to_string()
         }
     } else {
         diagnostic.concise_message().to_string()

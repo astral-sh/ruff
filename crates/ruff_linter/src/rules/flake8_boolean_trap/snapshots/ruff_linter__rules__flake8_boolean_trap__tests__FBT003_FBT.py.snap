@@ -36,7 +36,6 @@ FBT003 Boolean positional value in function call
     |
 123 | settings(True)
     |          ^^^^
-    |
 
 FBT003 Boolean positional value in function call
    --> FBT.py:147:20
@@ -65,4 +64,3 @@ FBT003 Boolean positional value in function call
 158 | class Settings(BaseSettings):
 159 |     foo: bool = Field(True, exclude=True)
     |                       ^^^^
-    |

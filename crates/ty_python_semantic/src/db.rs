@@ -19,6 +19,11 @@ pub trait Db: PythonCoreDb {
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
 
+    /// Returns `true` if `file` is open in the editor.
+    ///
+    /// Expected types for string-literal completions are only collected for open files.
+    fn is_open_file(&self, file: File) -> bool;
+
     fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
@@ -31,13 +36,13 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::{check_file_unwrap, default_lint_registry};
-    use ruff_db::Db as SourceDb;
+    use crate::{ProgramEnvironment, check_file_unwrap, default_lint_registry};
     use ruff_db::files::Files;
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::{Db as SourceDb, PythonFile};
     use ruff_python_ast::PythonVersion;
     use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
@@ -55,10 +60,11 @@ pub(crate) mod tests {
         events: Events,
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
+        open_files: rustc_hash::FxHashSet<File>,
     }
 
     impl TestDb {
-        pub(crate) fn new() -> Self {
+        fn new() -> Self {
             let events = Events::default();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
@@ -75,7 +81,23 @@ pub(crate) mod tests {
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
+                open_files: rustc_hash::FxHashSet::default(),
             }
+        }
+
+        pub(crate) fn python_version(&self) -> PythonVersion {
+            Program::get(self).python_version(self)
+        }
+
+        pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
+            ProgramEnvironment::from_program(self.python_version())
+        }
+
+        /// Marks `file` as open in the editor.
+        ///
+        /// This is untracked state: open a file before running any queries.
+        pub(crate) fn open_file(&mut self, file: File) {
+            self.open_files.insert(file);
         }
 
         /// Takes the salsa events.
@@ -117,10 +139,6 @@ pub(crate) mod tests {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]
@@ -137,7 +155,7 @@ pub(crate) mod tests {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, PythonFile::new(self, file, self.python_version()))
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -154,6 +172,10 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+
+        fn is_open_file(&self, file: File) -> bool {
+            self.open_files.contains(&file)
         }
 
         fn dyn_clone(&self) -> Box<dyn crate::Db> {

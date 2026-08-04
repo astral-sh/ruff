@@ -34,7 +34,7 @@ We also support unions in type aliases:
 
 ```py
 from typing_extensions import Any, Never, Literal, LiteralString, Tuple, Annotated, Optional, Union, Callable, TypeVar
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 T = TypeVar("T")
 
@@ -613,7 +613,7 @@ def _(
 
 ```py
 from typing_extensions import Generic
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class GenericBase(Generic[T]):
     pass
@@ -826,7 +826,7 @@ def _(
 Trying to specialize a non-name node results in an error:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions._internal import TypeOf
 
 IntOrStr = int | str
 
@@ -881,7 +881,6 @@ error[not-subscriptable]: Cannot subscript non-generic type alias `ListOfInts2`
   |                     -----------^^^^^
   |                     |
   |                     Alias to `list[int]`, which is already specialized
-  |
 ```
 
 ```py
@@ -899,7 +898,6 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, 
   |             ---------^^^^^
   |             |
   |             Type is already specialized
-  |
 ```
 
 ```py
@@ -919,7 +917,6 @@ error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
    |              ---------^^^^^
    |              |
    |              Type is already specialized
-   |
 ```
 
 ### Multiple definitions
@@ -1785,7 +1782,8 @@ def _(
 
 ```py
 from typing import TypeVar, Union
-from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
 
 T = TypeVar("T")
 K = TypeVar("K")

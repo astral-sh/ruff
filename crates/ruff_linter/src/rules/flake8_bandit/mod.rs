@@ -12,7 +12,6 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, assert_diagnostics_diff};
 
@@ -105,8 +104,6 @@ mod tests {
     #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
     #[test_case(Rule::SuspiciousNonCryptographicRandomUsage, Path::new("S311.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
-    #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
-    #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
@@ -118,14 +115,8 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("flake8_bandit").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }

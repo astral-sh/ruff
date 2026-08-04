@@ -129,6 +129,55 @@ def _(x: Literal[b"", b"a"], y: Literal["a", "ab"]):
         reveal_type(y)  # revealed: Literal["ab"]
 ```
 
+Exact length narrowing projects through type-variable constraints and bounds while preserving the
+type variable:
+
+```py
+from typing import TypeVar, assert_never
+
+ConstrainedTuple = TypeVar(
+    "ConstrainedTuple",
+    tuple[int, int],
+    tuple[int, int, str],
+)
+
+def constrained_tuple(value: ConstrainedTuple) -> ConstrainedTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: ConstrainedTuple@constrained_tuple & tuple[int, int]
+        return value
+    elif len(value) == 3:
+        reveal_type(value)  # revealed: ConstrainedTuple@constrained_tuple & tuple[int, int, str]
+        return value
+    else:
+        assert_never(value)
+
+BoundTuple = TypeVar(
+    "BoundTuple",
+    bound=tuple[int, int] | tuple[int, int, str],
+)
+
+def bounded_tuple(value: BoundTuple) -> BoundTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: BoundTuple@bounded_tuple & tuple[int, int]
+        return value
+    elif len(value) == 3:
+        reveal_type(value)  # revealed: BoundTuple@bounded_tuple & tuple[int, int, str]
+        return value
+    else:
+        assert_never(value)
+
+VariableTuple = TypeVar(
+    "VariableTuple",
+    tuple[int, ...],
+    tuple[str],
+)
+
+def variable_tuple(value: VariableTuple) -> VariableTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: VariableTuple@variable_tuple & tuple[int, int]
+    return value
+```
+
 Tuple subclasses are filtered using their tuple spec while preserving the subclass:
 
 ```py

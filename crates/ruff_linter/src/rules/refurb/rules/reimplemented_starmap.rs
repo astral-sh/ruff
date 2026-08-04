@@ -212,7 +212,7 @@ impl Ranged for StarmapCandidate<'_> {
 
 impl StarmapCandidate<'_> {
     /// Return the generated element for the candidate.
-    pub(crate) fn element(&self) -> &Expr {
+    fn element(&self) -> &Expr {
         match self {
             Self::Generator(generator) => generator.elt.as_ref(),
             Self::ListComp(list_comp) => list_comp.elt.as_ref(),
@@ -221,7 +221,7 @@ impl StarmapCandidate<'_> {
     }
 
     /// Return the generator comprehensions for the candidate.
-    pub(crate) fn generators(&self) -> &[ast::Comprehension] {
+    fn generators(&self) -> &[ast::Comprehension] {
         match self {
             Self::Generator(generator) => generator.generators.as_slice(),
             Self::ListComp(list_comp) => list_comp.generators.as_slice(),
@@ -230,7 +230,7 @@ impl StarmapCandidate<'_> {
     }
 
     /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
-    pub(crate) fn try_make_suggestion(
+    fn try_make_suggestion(
         &self,
         name: Name,
         iter: &Expr,
