@@ -1098,14 +1098,22 @@ suffix.
 
 ```py
 def accepts_objects(*args: object) -> None: ...
+def accepts_strings_or_none(*args: str | None) -> None: ...
 def accepts_strings(*args: str) -> None: ...
 
 expects_suffix(accepts_objects)
+expects_suffix(accepts_strings_or_none)
 expects_suffix(accepts_strings)  # error: [invalid-argument-type]
 
 static_assert(
     is_assignable_to(
         RegularCallableTypeOf[accepts_objects],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[accepts_strings_or_none],
         Callable[[Unpack[tuple[str, ...]], None], None],
     )
 )
@@ -1139,15 +1147,39 @@ expects_prefix_and_suffix(accepts_prefixed_objects)
 
 ### Fixed-length unpacked positional parameters
 
-An unpacked fixed-length tuple accepts only its declared positional arguments. It cannot satisfy a
-callable that accepts arbitrarily many tuple arguments.
+An unpacked fixed-length tuple accepts exactly its declared positional arguments, including when the
+tuple is empty. Equivalent unpacked source and target tuples are compatible.
 
 ```py
 from typing import Callable, Unpack
 from ty_extensions import static_assert
 from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
 
+def accepts_no_arguments(*args: Unpack[tuple[()]]) -> None: ...
 def accepts_one_integer(*args: Unpack[tuple[int]]) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+empty_callback: Callable[[Unpack[tuple[()]]], None] = accepts_no_arguments
+fixed_callback: Callable[[Unpack[tuple[int]]], None] = accepts_one_integer
+fixed_strings: Callable[[Unpack[tuple[str, str]]], None] = accepts_strings
+empty_strings: Callable[[Unpack[tuple[()]]], None] = accepts_strings
+
+static_assert(is_assignable_to(RegularCallableTypeOf[accepts_no_arguments], Callable[[Unpack[tuple[()]]], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[accepts_one_integer], Callable[[Unpack[tuple[int]]], None]))
+```
+
+Empty and exhausted fixed-length source tuples cannot satisfy a target with additional positional
+arguments or an open-ended variadic parameter.
+
+```py
+# error: [invalid-assignment]
+empty_with_prefix: Callable[[int, Unpack[tuple[str, ...]], None], None] = accepts_no_arguments
+
+# error: [invalid-assignment]
+empty_with_suffix: Callable[[Unpack[tuple[str, ...]], None], None] = accepts_no_arguments
+
+# error: [invalid-assignment]
+exhausted_with_suffix: Callable[[int, Unpack[tuple[str, ...]], None], None] = accepts_one_integer
 
 # error: [invalid-assignment]
 callback: Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None] = accepts_one_integer
