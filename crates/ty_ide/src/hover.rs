@@ -3204,6 +3204,28 @@ def ab(a: str):
     }
 
     #[test]
+    fn hover_overload_disambiguated_by_unpacked_dictionary_literal() {
+        let test = hover_test(
+            r#"
+from typing import overload
+
+@overload
+def convert(*, value: int, label: str) -> int: ...
+@overload
+def convert(*, value: str, label: int) -> str: ...
+def convert(*, value: object, label: object) -> object:
+    return value
+
+conv<CURSOR>ert(**{"value": 1, "label": "x"})
+"#,
+        );
+
+        let hover = test.hover();
+        assert!(hover.contains("value: int"), "{hover}");
+        assert!(!hover.contains("value: str"), "{hover}");
+    }
+
+    #[test]
     fn hover_overload_arity_disambiguated1() {
         let test = CursorTest::builder()
             .source(

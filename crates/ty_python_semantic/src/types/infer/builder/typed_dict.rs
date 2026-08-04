@@ -1,6 +1,7 @@
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex, PythonVersion};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 
@@ -451,7 +452,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         );
         if is_generic && arguments.args.is_empty() {
             for keyword in &arguments.keywords {
-                if keyword.arg.is_none() && !keyword.value.is_dict_expr() {
+                if keyword.arg.is_none() {
                     self.get_or_infer_expression(&keyword.value, TypeContext::default());
                 }
             }
@@ -571,6 +572,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         })
                 })
             });
+        let mut has_ambiguous_class_context = false;
+        let concrete_class_context = class_literal.as_static().and_then(|class_literal| {
+            let concrete_context = |annotation: Type<'db>| {
+                let annotation = annotation.resolve_type_alias(db);
+                let specialization = annotation.specialization_of(db, env, class_literal)?;
+                if specialization
+                    .types(db)
+                    .iter()
+                    .any(|ty| ty.is_unknown() || ty.has_typevar(db, env))
+                {
+                    return None;
+                }
+                annotation.as_typed_dict()
+            };
+
+            if let Some(targets) = call_expression_tcx.narrow_targets(db, env) {
+                let mut contexts = targets.iter().copied().filter_map(concrete_context);
+                let context = contexts.next()?;
+                if contexts.next().is_some() {
+                    has_ambiguous_class_context = true;
+                    None
+                } else {
+                    Some(context)
+                }
+            } else {
+                call_expression_tcx.annotation.and_then(concrete_context)
+            }
+        });
         let typed_dict = TypedDictType::new(class_literal.identity_specialization(db));
 
         arguments.args.is_empty()
@@ -591,13 +620,50 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return permits_field_inference(name.id.as_str());
                 }
 
-                self.try_expression_type(&keyword.value)
-                    .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
-                    .is_some_and(|unpacked| {
-                        unpacked.items(db).iter().all(|(name, field)| {
-                            field.is_required() && permits_field_inference(name.as_str())
-                        })
+                if let Some(dict) = keyword.value.as_dict_expr() {
+                    if has_ambiguous_class_context {
+                        return false;
+                    }
+
+                    let mut seen_keys = FxHashSet::default();
+                    dict.items.iter().rev().all(|item| {
+                        let Some(key) = item
+                            .key
+                            .as_ref()
+                            .and_then(ast::Expr::as_string_literal_expr)
+                        else {
+                            return false;
+                        };
+                        let key = key.value.to_str();
+
+                        if !seen_keys.insert(key) {
+                            return true;
+                        }
+
+                        if any_over_expr(&item.value, ast::Expr::is_lambda_expr) {
+                            return false;
+                        }
+
+                        permits_field_inference(key)
+                            && concrete_class_context.is_none_or(|context| {
+                                context.item(db, key).is_none_or(|field| {
+                                    self.expression_type(&item.value).is_assignable_to(
+                                        db,
+                                        env,
+                                        field.declared_ty,
+                                    )
+                                })
+                            })
                     })
+                } else {
+                    self.try_expression_type(&keyword.value)
+                        .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
+                        .is_some_and(|unpacked| {
+                            unpacked.items(db).iter().all(|(name, field)| {
+                                field.is_required() && permits_field_inference(name.as_str())
+                            })
+                        })
+                }
             })
     }
 

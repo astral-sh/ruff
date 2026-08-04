@@ -1385,6 +1385,70 @@ f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
 ```
 
+### Generic functions with unpacked dictionary literals
+
+Each value in an unpacked dictionary is matched with the parameter named by its key.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def value_and_label[T](*, value: T, label: str) -> T:
+    return value
+
+reveal_type(value_and_label(**{"value": 1, "label": "x"}))  # revealed: Literal[1]
+```
+
+Values from separate unpacked dictionaries are matched independently.
+
+```py
+reveal_type(value_and_label(**{"value": 1}, **{"label": "x"}))  # revealed: Literal[1]
+```
+
+### Generic methods with unpacked dictionary literals
+
+An unpacked dictionary preserves its key-value pairs when a method supplies `self`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Reader:
+    def value_and_label[T](self, *, value: T, label: str) -> T:
+        return value
+
+reveal_type(Reader().value_and_label(**{"value": 1, "label": "x"}))  # revealed: Literal[1]
+```
+
+### Forwarded unpacked dictionary literals
+
+Forwarding an unpacked dictionary through a `ParamSpec` preserves each parameter's type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+
+def target(value: int, *, other: str) -> None: ...
+def forward[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    callback(*args, **kwargs)
+
+forward(target, **{"value": 1, "other": "x"})
+```
+
+An argument with the wrong type still produces an error after forwarding.
+
+```py
+forward(target, **{"value": "invalid", "other": "x"})  # error: [invalid-argument-type]
+```
+
 ### Keyword-only parameters
 
 ```py

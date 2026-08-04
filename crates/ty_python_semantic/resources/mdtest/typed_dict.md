@@ -3624,25 +3624,148 @@ class ListBox[T](TypedDict):
 reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
 ```
 
-Positional and unpacked dictionary literals are validated but do not yet infer type arguments.
+Positional dictionary literals are validated but do not yet infer type arguments.
 
 ```py
 # TODO: Infer `ListBox[int]`.
 reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[Unknown]
-# TODO: Infer `ListBox[int]`.
-reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[Unknown]
 ```
 
-A dictionary containing different field types, or multiple unpacked dictionaries, must not cause
-spurious argument errors.
+### Constructor inference from unpacked dictionary literals
+
+An unpacked dictionary literal preserves the type of each value.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class ListBox[T](TypedDict):
+    value: list[T]
+
+reveal_type(ListBox(**{"value": [1]}))  # revealed: ListBox[int]
+```
+
+The values of other fields do not affect the field that determines the type argument.
 
 ```py
 class Pair[T](TypedDict):
     first: T
     second: str
 
-reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[Unknown]
-reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[Unknown]
+reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[int]
+```
+
+Separate unpacked dictionaries contribute their values to the same constructor.
+
+```py
+reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[int]
+```
+
+### Constructor inference from overwritten dictionary values
+
+The last value for a repeated key determines the inferred type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T](TypedDict):
+    value: T
+
+reveal_type(Box(**{"value": "overwritten", "value": 1}))  # revealed: Box[int]
+```
+
+An overwritten callback is ignored because it is not part of the final dictionary.
+
+```py
+reveal_type(Box(**{"value": lambda value: value.upper(), "value": 1}))  # revealed: Box[int]
+```
+
+### Constructor inference from unpacked dictionaries with an expected type
+
+An expected literal type is preserved when the value is unpacked from a dictionary.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, TypedDict
+
+class Box[T](TypedDict):
+    value: list[T]
+
+literal: Box[Literal[1]] = Box(**{"value": [1]})
+```
+
+A union containing the expected `TypedDict` provides the same context.
+
+```py
+optional: Box[Literal[1]] | None = Box(**{"value": [1]})
+```
+
+A type alias to that union also preserves the expected literal type.
+
+```py
+type OptionalBox[T] = Box[T] | None
+
+aliased: OptionalBox[Literal[1]] = Box(**{"value": [1]})
+```
+
+Multiple matching `TypedDict` types do not determine which type argument should be used.
+
+```py
+choices: Box[Literal[1]] | Box[Literal[2]] = Box(**{"value": [1]})
+```
+
+A wider expected type is not replaced by the narrower dictionary value.
+
+```py
+class Animal: ...
+class Dog(Animal): ...
+
+animal: Box[Animal] | None = Box(**{"value": [Dog()]})
+```
+
+### Constructor inference from unpacked callbacks
+
+A callback needs its parameter type before its body can be checked. Until an unpacked value receives
+that information, the constructor cannot safely infer its type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+    callback: Callable[[T], int]
+
+# TODO: Infer `Box[int]` and report the invalid attribute access.
+reveal_type(Box(**{"value": 1, "callback": lambda value: value.upper()}))  # revealed: Box[Unknown]
+```
+
+The same limitation applies when a callback is inside another expression.
+
+```py
+def conditional_callback(flag: bool):
+    callback = Box(**{
+        "value": 1,
+        "callback": (lambda value: value.upper()) if flag else (lambda value: 0),
+    })
+    reveal_type(callback)  # revealed: Box[Unknown]
 ```
 
 ### Constructor inference from unpacked TypedDicts

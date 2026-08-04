@@ -8483,7 +8483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> CallArguments<'a, 'db> {
         let db = self.db();
         let env = self.program_environment();
-        let call_arguments =
+        let mut call_arguments =
             CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
                 let ty = self.get_or_infer_expression(splatted_value, TypeContext::default());
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
@@ -8496,6 +8496,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 ty
             });
+
+        call_arguments.infer_exact_keyword_items(arguments, |value| self.expression_type(value));
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
