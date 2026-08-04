@@ -3873,6 +3873,12 @@ class Pair[T](TypedDict):
 reveal_type(Pair({"first": 1, "second": "x"}))  # revealed: Pair[int | str]
 ```
 
+An overwritten callback cannot affect the final values or prevent inference.
+
+```py
+reveal_type(Pair({"first": [lambda value: value.upper()], "first": 1, "second": "x"}))  # revealed: Pair[int | str]
+```
+
 A missing required field retains its existing constructor diagnostic.
 
 ```py
@@ -3912,6 +3918,68 @@ def get_inferred[T](value: PartiallySpecialized[object, T]) -> T:
     return value["inferred"]
 
 reveal_type(get_inferred({"fixed": 1, "inferred": "x"}))  # revealed: str
+```
+
+An unrelated `TypedDict` does not provide a specialization for the generic parameter.
+
+```py
+class Source(TypedDict):
+    value: int
+
+def unrelated_source(source: Source):
+    reveal_type(get_value(source))  # revealed: Unknown
+```
+
+### Generic function inference with unused TypedDict parameters
+
+A type parameter absent from a `TypedDict` schema does not constrain another function argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Box(TypedDict, Generic[T]):
+    value: int
+
+def choose[U](box: Box[U], fallback: U) -> U:
+    return fallback
+
+def use(box: Box[str]):
+    result: int = choose(box, 1)
+```
+
+### Generic function inference with legacy contravariant fields
+
+A legacy type parameter inherits the structural variance of a read-only callable field.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, TypeVar, TypedDict
+from typing_extensions import ReadOnly
+
+class Animal: ...
+class Dog(Animal): ...
+
+T = TypeVar("T")
+
+class Consumer(TypedDict, Generic[T]):
+    callback: ReadOnly[Callable[[T], None]]
+
+def choose[U](consumer: Consumer[U], fallback: U) -> U:
+    return fallback
+
+def use(consumer: Consumer[Animal]):
+    dog: Dog = choose(consumer, Dog())
 ```
 
 ### Constructor inference from positional callable signatures
@@ -4175,6 +4243,15 @@ reveal_type(positional_literal_box)  # revealed: Box[Unknown]
 positional_literal: Box[Literal[1]] = positional_literal_box
 ```
 
+A read-only dictionary literal passed to a generic function also remains gradual.
+
+```py
+def get_value[T](value: Box[T]) -> T:
+    return value["value"]
+
+reveal_type(get_value({"value": 1}))  # revealed: Unknown
+```
+
 A legacy type variable is invariant by default, so assigning `LegacyBox[Dog]` to `LegacyBox[Animal]`
 should eventually produce an error.
 
@@ -4279,6 +4356,27 @@ class Box[T](TypedDict):
 
 Box(value=1, callback=lambda x: x.upper())  # error: [unresolved-attribute]
 Box({"value": 1, "callback": lambda x: x.upper()})  # error: [unresolved-attribute]
+```
+
+### Constructor inference from nested callbacks
+
+A callback inside a positional container remains gradual until inference can propagate its field
+context into the nested expression.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class Box[T](TypedDict):
+    value: T
+    callbacks: list[Callable[[T], int]]
+
+# TODO: Infer `Box[int]`.
+reveal_type(Box({"value": 1, "callbacks": [lambda value: value + 1]}))  # revealed: Box[Unknown]
 ```
 
 ### Constructor inference with a contextual callable

@@ -481,6 +481,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if !seen_keys.insert(name) {
                 continue;
             }
+            if !item.value.is_lambda_expr() && any_over_expr(&item.value, ast::Expr::is_lambda_expr)
+            {
+                return None;
+            }
             let field_ty = if let Some(field) = identity.item(db, name) {
                 if field.is_read_only() {
                     return None;
@@ -799,27 +803,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && let [ast::Expr::Dict(dict)] = &arguments.args[..]
         {
             let mut provided_keys = FxHashSet::default();
-            dict.items.iter().all(|item| {
-                item.key
+            dict.items.iter().rev().all(|item| {
+                let Some(key) = item
+                    .key
                     .as_ref()
                     .and_then(ast::Expr::as_string_literal_expr)
-                    .and_then(|key| {
-                        let key = key.value.to_str();
-                        provided_keys.insert(key);
-                        if let Some(field) = typed_dict.item(db, key) {
-                            (!field.is_read_only()).then_some(field.declared_ty)
-                        } else {
-                            typed_dict.arbitrary_key_initialization_type(db, env)
-                        }
-                    })
-                    .is_some_and(|field_ty| {
-                        !contains_generic_typed_dict(
-                            db,
-                            env,
-                            field_ty,
-                            &ActiveRecursionDetector::default(),
-                        )
-                    })
+                else {
+                    return false;
+                };
+                let key = key.value.to_str();
+                if !provided_keys.insert(key) {
+                    return true;
+                }
+
+                if !item.value.is_lambda_expr()
+                    && any_over_expr(&item.value, ast::Expr::is_lambda_expr)
+                {
+                    return false;
+                }
+
+                let field_ty = if let Some(field) = typed_dict.item(db, key) {
+                    if field.is_read_only() {
+                        return false;
+                    }
+                    field.declared_ty
+                } else if let Some(field_ty) = typed_dict.arbitrary_key_initialization_type(db, env)
+                {
+                    field_ty
+                } else {
+                    return false;
+                };
+
+                !contains_generic_typed_dict(db, env, field_ty, &ActiveRecursionDetector::default())
             }) && typed_dict
                 .items(db)
                 .iter()
