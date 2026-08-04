@@ -2611,6 +2611,19 @@ x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
+A lambda's provisional parameter type must not prevent its callable type from constraining the keys
+of an unannotated dictionary:
+
+```py
+def _():
+    values = {}
+    values["first"] = 1
+    key = lambda value: value
+    reveal_type(values)  # revealed: dict[str | ((value) -> Unknown), int]
+    values[key] = 2
+    reveal_type(values[key])  # revealed: int
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:

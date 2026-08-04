@@ -7455,7 +7455,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     statement_use_types.collection_use_constraints(collection_def)
                 {
                     for constraint in constraints {
-                        if constraint.has_provisional_marker(db, env) {
+                        // A lambda with provisional parameters can still be a concrete element.
+                        if any_over_type(db, env, *constraint, false, |ty| {
+                            matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                        }) {
                             continue;
                         }
 
