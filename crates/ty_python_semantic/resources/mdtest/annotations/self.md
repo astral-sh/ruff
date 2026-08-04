@@ -964,6 +964,107 @@ class MultipleAnnotations:
     ) -> None: ...
 ```
 
+## Generic methods with explicit receiver annotations
+
+The receiver restriction also applies to methods with their own type parameters, whose annotations
+are inferred in a separate type-parameter scope.
+
+```py
+from typing import Self
+
+class GenericMethods:
+    def valid[U](self: Self, value: U) -> Self:
+        return self
+
+    @classmethod
+    def valid_classmethod[U](cls: type[Self], value: U) -> Self:
+        return cls()
+
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def invalid[U](self: U, value: U) -> Self:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def invalid_classmethod[U](cls: type[U], value: U) -> Self:
+        raise NotImplementedError
+```
+
+## Quoted `Self` with explicit receiver annotations
+
+Quoted annotations follow the same receiver restriction, even when `Self` is nested in a generic,
+removed by union normalization, or wrapped in a type alias.
+
+```py
+from typing import Self, TypeVar, Union
+
+T = TypeVar("T")
+type Identity[X] = X
+
+class QuotedAnnotations:
+    def valid(self: "Self") -> "Self":
+        return self
+
+    @classmethod
+    def valid_classmethod(cls: "type[Self]") -> "Self":
+        return cls()
+
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def simple_return(self: T) -> "Self":
+        raise NotImplementedError
+
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def nested_return(self: T) -> "list[Self]":
+        raise NotImplementedError
+
+    # snapshot: invalid-type-form
+    def union_return(self: T) -> "Self | object":
+        raise NotImplementedError
+
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def union_parameter(self: T, other: "Self | object") -> None: ...
+
+    # error: [invalid-type-form] "`Self` is incompatible with this receiver annotation"
+    def alias_return(self: T) -> "Identity[Self]":
+        raise NotImplementedError
+
+    # snapshot: invalid-type-form
+    def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
+
+    # snapshot: invalid-type-form
+    # snapshot: invalid-type-form
+    def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
+```
+
+```snapshot
+error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+  --> src/mdtest_snippet.py:23:35
+   |
+23 |     def union_return(self: T) -> "Self | object":
+   |                                   ^^^^
+
+
+error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+  --> src/mdtest_snippet.py:34:51
+   |
+34 |     def alias_parameter(self: T, other: "Identity[Self]") -> None: ...
+   |                                                   ^^^^
+
+
+error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+  --> src/mdtest_snippet.py:38:47
+   |
+38 |     def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
+   |                                               ^^^^
+
+
+error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+  --> src/mdtest_snippet.py:38:53
+   |
+38 |     def repeated_union(self: T, other: "Union[Self, Self]") -> None: ...
+   |                                                     ^^^^
+```
+
 ## Self usage in static methods
 
 `Self` cannot be used anywhere in a static method, including parameters, return types, nested

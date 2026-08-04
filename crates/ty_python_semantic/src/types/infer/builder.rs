@@ -313,6 +313,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The returned types and their corresponding ranges of the region, if it is a function body.
     return_types_and_ranges: Vec<TypeAndRange<'db>>,
 
+    /// `Self` occurrences in the function signature currently being inferred.
+    ///
+    /// Return annotations are inferred before receiver annotations, so these occurrences must be
+    /// retained until the complete signature can be checked against the receiver.
+    self_annotations: SmallVec<[TypeAndRange<'db>; 1]>,
+
     /// A set of functions that have been defined **and** called in this region.
     ///
     /// This is a set because the same function could be called multiple times in the same region.
@@ -474,6 +480,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region,
             scope,
             return_types_and_ranges: vec![],
+            self_annotations: SmallVec::new(),
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
@@ -11119,6 +11126,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
+            self_annotations: _,
             called_functions,
             index: _,
             region: _,
@@ -11181,6 +11189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            self_annotations: _,
             index: _,
             region: _,
         } = self;
@@ -11285,6 +11294,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
+            self_annotations: _,
             index: _,
             region: _,
             cycle_recovery: _,
@@ -11334,6 +11344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            self_annotations: _,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -11472,6 +11483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            self_annotations: _,
             called_functions: _,
             index: _,
             region: _,
@@ -11545,6 +11557,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             qualifiers: _,
             type_expression_flags: _,
+            self_annotations: _,
         } = *self;
 
         let mut builder = TypeInferenceBuilder::new(
@@ -11613,6 +11626,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
+            self_annotations,
             called_functions,
             index: _,
             region: _,
@@ -11640,6 +11654,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expected_types.extend(expected_types.iter());
         self.type_expression_flags
             .extend(type_expression_flags.iter());
+        self.self_annotations.extend(self_annotations);
         self.called_functions.extend(called_functions);
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {

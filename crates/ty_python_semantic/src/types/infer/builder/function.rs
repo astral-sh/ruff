@@ -24,8 +24,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorators, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            function_known_decorator_flags, function_known_decorators, infer_statement_types,
+            nearest_enclosing_function, original_class_type,
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
@@ -39,9 +39,8 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast, visitor, visitor::Visitor};
-use ruff_text_size::{Ranged, TextRange};
-use smallvec::SmallVec;
+use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 
 fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
     parameters
@@ -110,28 +109,6 @@ impl<'db> ExpectedReturnType<'db> {
     }
 }
 
-/// Finds `Self` before unions or lazy type aliases can erase it from an annotation's type.
-struct SelfAnnotationVisitor<'builder, 'db, 'ast> {
-    builder: &'builder TypeInferenceBuilder<'db, 'ast>,
-    self_ranges: SmallVec<[TextRange; 1]>,
-}
-
-impl<'expr> Visitor<'expr> for SelfAnnotationVisitor<'_, '_, '_> {
-    fn visit_expr(&mut self, expression: &'expr ast::Expr) {
-        if matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_))
-            && let Type::TypeVar(typevar) = self.builder.file_expression_type(expression)
-            && typevar
-                .typevar(self.builder.db())
-                .is_self(self.builder.db())
-        {
-            self.self_ranges.push(expression.range());
-            return;
-        }
-
-        visitor::walk_expr(self, expression);
-    }
-}
-
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
@@ -155,7 +132,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(parameter);
         }
 
-        self.validate_self_receiver_annotation(function);
         validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
             self.file_expression_type(expr)
         });
@@ -611,6 +587,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !has_type_params {
             self.infer_return_type_annotation(function.returns.as_deref());
             self.infer_parameters(function.parameters.as_ref());
+            self.validate_self_receiver_annotation(function, definition);
         }
 
         if has_defaults {
@@ -691,6 +668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_return_type_annotation(function.returns.as_deref());
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+        self.validate_self_receiver_annotation(function, binding_context);
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -729,8 +707,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Reject `Self` in method signatures whose receiver has an incompatible explicit annotation.
-    fn validate_self_receiver_annotation(&mut self, function: &ast::StmtFunctionDef) {
+    fn validate_self_receiver_annotation(
+        &mut self,
+        function: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) {
+        let self_annotations = std::mem::take(&mut self.self_annotations);
+        if self_annotations.is_empty() {
+            return;
+        }
+
         let db = self.db();
+        if !definition.scope(db).scope(db).kind().is_class() {
+            return;
+        }
+
         let parameters = function.parameters.as_ref();
         let Some(receiver) = parameters
             .posonlyargs
@@ -742,43 +733,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(receiver_annotation) = receiver.parameter.annotation.as_deref() else {
             return;
         };
-        let Some(expected_receiver_type) =
-            self.special_first_method_parameter_type(&receiver.parameter)
+        let receiver_range = receiver_annotation.range();
+        let Some(TypeAndRange {
+            ty: Type::TypeVar(typing_self),
+            ..
+        }) = self_annotations
+            .iter()
+            .find(|annotation| !receiver_range.contains_range(annotation.range))
         else {
             return;
         };
 
-        if self.file_expression_type(receiver_annotation) == expected_receiver_type {
+        let decorators = function_known_decorator_flags(db, definition);
+        if decorators.contains(FunctionDecorators::STATICMETHOD) && function.name.id != "__new__" {
             return;
         }
 
-        let signature_annotations = function.returns.as_deref().into_iter().chain(
-            parameters
-                .iter()
-                .skip(1)
-                .filter_map(ast::AnyParameterRef::annotation),
-        );
+        let expected_receiver_type = if decorators.contains(FunctionDecorators::CLASSMETHOD)
+            || is_implicit_classmethod(&function.name)
+            || function.name.id == "__new__"
+        {
+            SubclassOfType::from(
+                db,
+                self.program_environment(),
+                SubclassOfInner::TypeVar(*typing_self),
+            )
+        } else {
+            Type::TypeVar(*typing_self)
+        };
 
-        for annotation in signature_annotations {
-            let mut visitor = SelfAnnotationVisitor {
-                builder: self,
-                self_ranges: SmallVec::new(),
-            };
-            visitor.visit_expr(annotation);
+        if self.expression_type(receiver_annotation) == expected_receiver_type {
+            return;
+        }
 
-            let mut self_ranges = visitor.self_ranges;
-            if self_ranges.is_empty()
-                && self
-                    .file_expression_type(annotation)
-                    .contains_self(db, self.program_environment())
+        for annotation in self_annotations
+            .into_iter()
+            .filter(|annotation| !receiver_range.contains_range(annotation.range))
+        {
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_FORM, annotation.range)
             {
-                self_ranges.push(annotation.range());
-            }
-
-            for self_range in self_ranges {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, self_range) {
-                    builder.into_diagnostic("`Self` is incompatible with this receiver annotation");
-                }
+                builder.into_diagnostic("`Self` is incompatible with this receiver annotation");
             }
         }
     }
