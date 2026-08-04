@@ -568,6 +568,8 @@ impl<'db> DescriptorGetCallContext<'db> {
         let descriptor_type = self.descriptor_type(db);
         // `property.__get__` evaluates the property's getter as part of the call. A failure in
         // that nested call is not evidence that the implicit descriptor call itself is invalid.
+        // TODO: Remove this exception once call errors distinguish failures in `__get__` itself
+        // from failures raised by the property's getter.
         if descriptor_type.is_property_instance() {
             return None;
         }
@@ -594,7 +596,7 @@ impl<'db> DescriptorGetCallContext<'db> {
 ///
 /// An invalid descriptor call is definite only if both paths fail. When either path can succeed,
 /// the descriptor failure is only possible and should not produce a diagnostic.
-fn combine_alternative_descriptor_get_errors<'db>(
+fn combine_descriptor_errors<'db>(
     first: Option<DescriptorGetCallContext<'db>>,
     second: Option<DescriptorGetCallContext<'db>>,
 ) -> Option<DescriptorGetCallContext<'db>> {
@@ -625,24 +627,24 @@ struct DescriptorGetCallError<'db> {
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct MemberLookupResult<'db> {
     member: PlaceAndQualifiers<'db>,
-    descriptor_get_error: Option<DescriptorGetCallContext<'db>>,
+    descriptor_error: Option<DescriptorGetCallContext<'db>>,
 }
 
 impl<'db> MemberLookupResult<'db> {
     fn new(
         member: PlaceAndQualifiers<'db>,
-        descriptor_get_error: Option<DescriptorGetCallContext<'db>>,
+        descriptor_error: Option<DescriptorGetCallContext<'db>>,
     ) -> Self {
         Self {
             member,
-            descriptor_get_error,
+            descriptor_error,
         }
     }
 
     fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             member: self.member.map_type(f),
-            descriptor_get_error: self.descriptor_get_error,
+            descriptor_error: self.descriptor_error,
         }
     }
 
@@ -656,21 +658,21 @@ impl<'db> MemberLookupResult<'db> {
             Place::Undefined => None,
             Place::Defined(DefinedPlace { definedness, .. }) => Some(definedness),
         };
-        let primary_error = self.descriptor_get_error;
+        let primary_error = self.descriptor_error;
         let mut fallback_error = None;
         let member = self.member.or_fall_back_to(db, env, || {
             let fallback = fallback_fn();
-            fallback_error = fallback.descriptor_get_error;
+            fallback_error = fallback.descriptor_error;
             fallback.member
         });
-        let descriptor_get_error = match primary_definedness {
+        let descriptor_error = match primary_definedness {
             None => fallback_error,
             Some(Definedness::AlwaysDefined) => primary_error,
             Some(Definedness::PossiblyUndefined) => {
-                combine_alternative_descriptor_get_errors(primary_error, fallback_error)
+                combine_descriptor_errors(primary_error, fallback_error)
             }
         };
-        Self::new(member, descriptor_get_error)
+        Self::new(member, descriptor_error)
     }
 
     fn cycle_normalized(
@@ -684,13 +686,10 @@ impl<'db> MemberLookupResult<'db> {
             member: self
                 .member
                 .cycle_normalized(db, env, previous.member, cycle),
-            descriptor_get_error: if cycle.iteration() <= crate::TAINTED_CYCLES {
-                self.descriptor_get_error
+            descriptor_error: if cycle.iteration() <= crate::TAINTED_CYCLES {
+                self.descriptor_error
             } else {
-                combine_alternative_descriptor_get_errors(
-                    self.descriptor_get_error,
-                    previous.descriptor_get_error,
-                )
+                combine_descriptor_errors(self.descriptor_error, previous.descriptor_error)
             },
         }
     }
@@ -4249,7 +4248,7 @@ impl<'db> Type<'db> {
             ty.to_meta_type(db, env),
         );
 
-        let fallback_error = fallback.descriptor_get_error;
+        let fallback_error = fallback.descriptor_error;
         let PlaceAndQualifiers {
             place: fallback,
             qualifiers: fallback_qualifiers,
@@ -4274,7 +4273,7 @@ impl<'db> Type<'db> {
                 _,
             ) => MemberLookupResult::new(
                 meta_attr.with_qualifiers(meta_attr_qualifiers),
-                combine_alternative_descriptor_get_errors(meta_attr_error, fallback_error),
+                combine_descriptor_errors(meta_attr_error, fallback_error),
             ),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
@@ -4305,7 +4304,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                combine_alternative_descriptor_get_errors(meta_attr_error, fallback_error),
+                combine_descriptor_errors(meta_attr_error, fallback_error),
             ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -4326,7 +4325,7 @@ impl<'db> Type<'db> {
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 MemberLookupResult::new(
                     fallback.with_qualifiers(fallback_qualifiers),
-                    combine_alternative_descriptor_get_errors(meta_attr_error, fallback_error),
+                    combine_descriptor_errors(meta_attr_error, fallback_error),
                 )
             }
 
@@ -4358,7 +4357,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                combine_alternative_descriptor_get_errors(meta_attr_error, fallback_error),
+                combine_descriptor_errors(meta_attr_error, fallback_error),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
@@ -4560,7 +4559,7 @@ impl<'db> Type<'db> {
                         let result = elem.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
                         );
-                        error = error.or(result.descriptor_get_error);
+                        error = error.or(result.descriptor_error);
                         result.member
                     });
                     MemberLookupResult::new(member, error)
@@ -6563,7 +6562,7 @@ impl<'db> Type<'db> {
         // member type, but do not report its descriptor failure as definite when an override
         // intercepts the access. This includes an invalid override that fails before Python can
         // invoke the descriptor.
-        let result = if result.descriptor_get_error.is_some() && custom_getattribute().1 {
+        let result = if result.descriptor_error.is_some() && custom_getattribute().1 {
             MemberLookupResult::new(result.member, None)
         } else {
             result

@@ -9192,7 +9192,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::instance(db, env, collection_literal.identity_specialization(db));
                 let collection_generic_context = collection_literal.generic_context(db);
                 let mut identity_bindings = self
-                    .infer_attribute_load_impl(attribute, identity_instance, true)
+                    .infer_attribute_load_impl(attribute, identity_instance)
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -10257,18 +10257,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
-        self.infer_attribute_load_impl(attribute, value_type, true)
+        self.infer_attribute_load_impl(attribute, value_type)
     }
 
     /// Infers an attribute load using a previously inferred receiver type.
-    ///
-    /// `report_descriptor_get_error` is false for deletion targets, where this load only provides
-    /// the input to `__delete__` validation and does not represent a runtime `__get__` call.
     fn infer_attribute_load_impl(
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
-        report_descriptor_get_error: bool,
     ) -> Type<'db> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
@@ -10322,9 +10318,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             constraint_keys.extend(keys);
         }
         let fallback = value_type.member_with_diagnostics(db, env, &attr.id);
-        if report_descriptor_get_error
+        if !matches!(attribute.ctx, ExprContext::Del)
             && assigned_type.is_none()
-            && let Some(context) = fallback.descriptor_get_error
+            && let Some(context) = fallback.descriptor_error
             && let Some(failure) = context.into_error(db, env)
         {
             report_bad_dunder_get_call(&self.context, &failure, value_type, attribute);
@@ -10619,9 +10615,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Never
             }
             ExprContext::Del => {
-                let value_type =
-                    self.infer_maybe_standalone_expression(value, TypeContext::default());
-                self.infer_attribute_load_impl(attribute, value_type, false);
+                self.infer_attribute_load(attribute);
                 self.validate_attribute_deletion(
                     attribute,
                     self.expression_type(value),
