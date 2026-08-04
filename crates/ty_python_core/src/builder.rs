@@ -2221,7 +2221,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn exception_checkpoint_snapshot(
         &mut self,
         scope_id: FileScopeId,
-        crossed_comprehensions: &[FileScopeId],
+        crossed_comprehensions: &[usize],
     ) -> FlowSnapshot {
         if crossed_comprehensions.is_empty() {
             return self.use_def_maps[scope_id].snapshot();
@@ -2229,15 +2229,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let original = self.use_def_maps[scope_id].snapshot();
 
-        for &comprehension_scope in crossed_comprehensions.iter().rev() {
-            let Some(comprehension_stack_index) = self
-                .scope_stack
-                .iter()
-                .position(|scope| scope.file_scope_id == comprehension_scope)
-            else {
-                continue;
-            };
-
+        for &comprehension_stack_index in crossed_comprehensions.iter().rev() {
+            let comprehension_scope = self.scope_stack[comprehension_stack_index].file_scope_id;
             let containing_scope = self.scope_stack[..comprehension_stack_index]
                 .iter()
                 .rev()
@@ -2427,20 +2420,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn target_assignment_can_raise(target: &ast::Expr) -> bool {
         !target.is_name_expr()
-    }
-
-    /// Returns `true` if the parser reported invalid or version-incompatible syntax within
-    /// `range`.
-    fn has_syntax_error_in_range(&self, range: TextRange) -> bool {
-        self.module
-            .errors()
-            .iter()
-            .any(|error| range.contains_range(error.range()))
-            || self
-                .module
-                .unsupported_syntax_errors()
-                .iter()
-                .any(|error| range.contains_range(error.range()))
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
@@ -4350,7 +4329,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 orelse,
                 finalbody,
                 is_star,
-                range,
+                range: _,
                 node_index: _,
             }) => {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
@@ -4362,13 +4341,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 });
                 self.try_node_context_stack_manager
                     .push_context(!handlers.is_empty(), has_bare_handler);
-
-                // Invalid syntax means that the runtime behavior of this statement is undefined.
-                // Treat it as a possible exception edge so that parser recovery does not make its
-                // handlers spuriously unreachable.
-                if self.has_syntax_error_in_range(*range) {
-                    self.record_exception_checkpoint();
-                }
 
                 // Visit the `try` block!
                 self.visit_body(body);

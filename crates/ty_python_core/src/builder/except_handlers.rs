@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::scope::{FileScopeId, ScopeKind};
+use crate::scope::ScopeKind;
 use crate::use_def::FlowSnapshot;
 
 use super::SemanticIndexBuilder;
@@ -52,7 +52,7 @@ impl TryNodeContextStackManager {
     pub(super) fn record_exception_checkpoint(&mut self, builder: &mut SemanticIndexBuilder) {
         debug_assert_eq!(self.0.len(), builder.scope_stack.len());
 
-        let mut crossed_comprehensions = SmallVec::<[FileScopeId; 2]>::new();
+        let mut crossed_comprehensions = SmallVec::<[usize; 2]>::new();
 
         for (scope_stack_index, try_context_stack) in self.0.iter_mut().enumerate().rev() {
             let scope_id = builder.scope_stack[scope_stack_index].file_scope_id;
@@ -75,7 +75,7 @@ impl TryNodeContextStackManager {
             }
 
             if builder.scopes[scope_id].kind() == ScopeKind::Comprehension {
-                crossed_comprehensions.push(scope_id);
+                crossed_comprehensions.push(scope_stack_index);
             }
         }
     }
