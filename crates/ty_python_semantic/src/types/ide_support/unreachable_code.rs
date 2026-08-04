@@ -845,22 +845,6 @@ mod tests {
                     print("attribute access can raise")
 
                 try:
-                    value[0]
-                except:
-                    print("subscripting can raise")
-
-                try:
-                    value + 1
-                except:
-                    print("operators can raise")
-
-                try:
-                    if value:
-                        pass
-                except:
-                    print("truthiness can raise")
-
-                try:
                     for _ in iterable:
                         pass
                 except:

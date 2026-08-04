@@ -2216,6 +2216,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// enclosing scope. Generator-expression bodies are lazy even though they share the
     /// comprehension scope kind; their eagerly evaluated first iterable is visited before entering
     /// the generator scope.
+    ///
+    /// Only the list comprehension's call can reach the handler immediately:
+    ///
+    /// ```python
+    /// try:
+    ///     [may_raise() for _ in [0]]
+    ///     (may_raise() for _ in [0])
+    /// except Exception:
+    ///     ...
+    /// ```
     fn exception_checkpoint_crosses_scope_boundary(&self, scope_id: FileScopeId) -> bool {
         let scope = &self.scopes[scope_id];
         scope.is_eager() && !matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_))
@@ -2226,6 +2236,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Comprehensions normally publish their bindings only after their scope is popped. An
     /// exception can escape before then, so an enclosing handler needs an outer-scoped proxy for
     /// each binding that is live at the checkpoint, without changing normal comprehension flow.
+    ///
+    /// ```python
+    /// state = 0
+    /// try:
+    ///     [(state := 1, may_raise(), state := "later") for _ in [0]]
+    /// except Exception:
+    ///     reveal_type(state)  # int; the later assignment has not executed
+    /// ```
+    ///
+    /// The original outer flow is restored immediately after capturing the checkpoint.
     fn exception_checkpoint_snapshot(
         &mut self,
         scope_id: FileScopeId,
@@ -2344,6 +2364,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Records the current flow state immediately before an operation that may raise an exception.
+    ///
+    /// Child expressions must already have been visited, so their completed assignments are
+    /// visible if the parent operation fails:
+    ///
+    /// ```python
+    /// state = 0
+    /// try:
+    ///     may_raise(state := 1)
+    /// except Exception:
+    ///     reveal_type(state)  # Literal[1]
+    /// ```
+    ///
+    /// Skips snapshot construction entirely when no enclosing `try` suite has active handlers.
     fn record_exception_checkpoint(&mut self) {
         if !self
             .try_node_context_stack_manager
@@ -2364,6 +2397,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Returns whether evaluating and truth-testing `expr` cannot invoke Python user code.
+    ///
+    /// Identity comparisons are safe, but testing an arbitrary value may call `__bool__`:
+    ///
+    /// ```python
+    /// if value is None: ...  # safe
+    /// if value: ...  # can raise
+    /// ```
     fn condition_evaluation_is_known_safe(expr: &ast::Expr) -> bool {
         if expr.is_literal_expr() || matches!(expr, ast::Expr::Lambda(_)) {
             return true;
@@ -2399,6 +2439,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Returns whether evaluating `expr` cannot invoke Python user code.
+    ///
+    /// Unlike [`Self::condition_evaluation_is_known_safe`], this does not truth-test the resulting
+    /// value, so loading a name is safe even when that value's `__bool__` method could raise.
     fn expression_evaluation_is_known_safe(expr: &ast::Expr) -> bool {
         if expr.is_literal_expr() || matches!(expr, ast::Expr::Name(_) | ast::Expr::Lambda(_)) {
             return true;
@@ -2416,6 +2459,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Returns whether iterating `expr` uses an exact builtin iterator that cannot raise anything
     /// other than `StopIteration` (ignoring ambient failures such as `MemoryError`).
+    ///
+    /// ```python
+    /// for value in [1, 2]: ...  # safe
+    /// for value in values: ...  # can invoke user-defined iteration
+    /// ```
     fn iteration_is_known_safe(expr: &ast::Expr) -> bool {
         matches!(
             expr,
@@ -2424,10 +2472,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 | ast::Expr::List(_)
                 | ast::Expr::Tuple(_)
         ) && Self::expression_evaluation_is_known_safe(expr)
-    }
-
-    fn target_assignment_can_raise(target: &ast::Expr) -> bool {
-        !target.is_name_expr()
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
@@ -2879,8 +2923,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let first_iteration_can_raise =
             generator.is_async || !Self::iteration_is_known_safe(&generator.iter);
         self.record_exception_checkpoint_if(first_iteration_can_raise);
-        let mut loopback_can_raise =
-            first_iteration_can_raise || Self::target_assignment_can_raise(&generator.target);
+        let mut loopback_can_raise = first_iteration_can_raise || !generator.target.is_name_expr();
 
         // Clear the assignment stack before entering the comprehension scope.
         // If the comprehension appears inside an assignment target (e.g., error-recovered
@@ -2915,8 +2958,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let iteration_can_raise =
                 generator.is_async || !Self::iteration_is_known_safe(&generator.iter);
             self.record_exception_checkpoint_if(iteration_can_raise);
-            loopback_can_raise |=
-                iteration_can_raise || Self::target_assignment_can_raise(&generator.target);
+            loopback_can_raise |= iteration_can_raise || !generator.target.is_name_expr();
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
@@ -4157,9 +4199,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
                 }
 
-                self.record_exception_checkpoint_if(
-                    iteration_can_raise || Self::target_assignment_can_raise(target),
-                );
+                self.record_exception_checkpoint_if(iteration_can_raise || !target.is_name_expr());
 
                 if let Some(after_iter) = after_empty_iter {
                     self.flow_restore(after_iter);
@@ -4979,7 +5019,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 walk_expr(self, expr);
 
-                self.record_exception_checkpoint_if(!matches!(expr, ast::Expr::Name(_)));
+                self.record_exception_checkpoint_if(!expr.is_name_expr());
 
                 if let Some((place_expr, is_use, is_definition)) = deferred_effects {
                     let place_id = self.add_place(place_expr);

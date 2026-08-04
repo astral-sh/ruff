@@ -31,6 +31,9 @@ impl TryNodeContextStackManager {
 
     /// Push a [`TryNodeContext`] onto the [`TryNodeContextStack`] at the top of our stack of
     /// stacks.
+    ///
+    /// Only suites with handlers collect exception checkpoints; a bare handler prevents those
+    /// exceptions from propagating to enclosing suites.
     pub(super) fn push_context(&mut self, has_handlers: bool, has_bare_handler: bool) {
         self.current_try_context_stack()
             .push_context(has_handlers, has_bare_handler);
@@ -43,12 +46,17 @@ impl TryNodeContextStackManager {
 
     /// Retrieve the [`TryNodeContext`] that is currently at the top of the stack, and take all
     /// snapshots recorded while visiting the `try` suite.
+    ///
+    /// Taking the snapshots deactivates the suite's handlers before their bodies are visited.
     pub(super) fn take_try_suite_snapshots(&mut self) -> Vec<FlowSnapshot> {
         self.current_try_context_stack().take_try_suite_snapshots()
     }
 
     /// Record a checkpoint for every active `try` suite that could handle an exception raised at
     /// the current point in control flow.
+    ///
+    /// Crosses eager scopes, but stops at lazy scopes, unreachable flow, and bare handlers.
+    /// Comprehension bindings are materialized only for scopes that actually have active handlers.
     pub(super) fn record_exception_checkpoint(&mut self, builder: &mut SemanticIndexBuilder) {
         debug_assert_eq!(self.0.len(), builder.scope_stack.len());
 
@@ -80,6 +88,9 @@ impl TryNodeContextStackManager {
         }
     }
 
+    /// Returns whether any enclosing `try` suite can currently receive exception checkpoints.
+    ///
+    /// A context can remain on the stack for its `finally` suite after its handlers become inactive.
     pub(super) fn has_active_exception_handler(&self) -> bool {
         self.0
             .iter()
@@ -107,6 +118,7 @@ impl TryNodeContextStackManager {
 struct TryNodeContextStack(Vec<TryNodeContext>);
 
 impl TryNodeContextStack {
+    /// Returns whether a `try` suite in this scope is still collecting exception checkpoints.
     fn has_active_exception_handler(&self) -> bool {
         self.0
             .iter()
@@ -130,7 +142,7 @@ impl TryNodeContextStack {
             .expect("Cannot pop a `try` block off an empty `TryBlockContexts` stack")
     }
 
-    /// Take all snapshots recorded while visiting the `try` suite.
+    /// Take all snapshots recorded while visiting the `try` suite and deactivate its handlers.
     fn take_try_suite_snapshots(&mut self) -> Vec<FlowSnapshot> {
         let context = self
             .0
@@ -141,6 +153,8 @@ impl TryNodeContextStack {
 
     /// Records the checkpoint for all enclosing active `try` suites in this scope. Returns whether
     /// the checkpoint should continue propagating to an enclosing scope.
+    ///
+    /// A bare handler consumes the exception, preventing any outer handler from seeing it.
     fn record_exception_checkpoint(&mut self, snapshot: &FlowSnapshot) -> bool {
         for context in self.0.iter_mut().rev() {
             let Some(try_suite_snapshots) = &mut context.try_suite_snapshots else {
@@ -172,8 +186,10 @@ impl TryNodeContextStack {
 /// when we add more advanced handling of `finally` branches.
 #[derive(Debug, Default)]
 pub(super) struct TryNodeContext {
+    /// Present only while visiting a `try` suite that has exception handlers.
     try_suite_snapshots: Option<Vec<FlowSnapshot>>,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
+    /// Whether an active catch-all handler stops propagation to enclosing suites.
     has_bare_handler: bool,
 }
 
