@@ -433,6 +433,119 @@ def function():
     }
 
     #[test]
+    fn document_symbols_match_pattern_bindings() {
+        let test = cursor_test(
+            "
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+    case _:
+        wildcard_body = 3
+
+match other:
+    case CONSTANT_CAPTURE:
+        pass
+<CURSOR>",
+        );
+
+        let symbols = document_symbols(&test.db, test.program_file(test.cursor.file))
+            .iter()
+            .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            symbols,
+            [
+                ("first", SymbolKind::Variable),
+                ("middle", SymbolKind::Variable),
+                ("last", SymbolKind::Variable),
+                ("sequence", SymbolKind::Variable),
+                ("body_target", SymbolKind::Variable),
+                ("mapping_value", SymbolKind::Variable),
+                ("remaining", SymbolKind::Variable),
+                ("fallback_target", SymbolKind::Variable),
+                ("positional", SymbolKind::Variable),
+                ("keyword", SymbolKind::Variable),
+                ("alternative", SymbolKind::Variable),
+                ("alternative", SymbolKind::Variable),
+                ("wildcard_body", SymbolKind::Variable),
+                ("CONSTANT_CAPTURE", SymbolKind::Constant),
+            ]
+            .map(|(name, kind)| (name.to_owned(), kind))
+        );
+    }
+
+    #[test]
+    fn document_symbols_ignore_invalid_pattern_bindings() {
+        let test = cursor_test(
+            "
+match subject:
+    case [*]:
+        pass
+<CURSOR>",
+        );
+
+        assert!(document_symbols(&test.db, test.program_file(test.cursor.file)).is_empty());
+    }
+
+    #[test]
+    fn document_symbols_reports_mapping_pattern_bindings_in_source_order() {
+        let test = cursor_test(
+            "
+match subject:
+    case {\"a\": before, **between, \"b\": after}:
+        pass
+<CURSOR>",
+        );
+
+        let names = document_symbols(&test.db, test.program_file(test.cursor.file))
+            .iter()
+            .map(|(_, symbol)| symbol.name.into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, ["before", "between", "after"]);
+    }
+
+    #[test]
+    fn document_symbols_match_pattern_scopes() {
+        let test = cursor_test(
+            "
+class C:
+    match subject:
+        case class_capture:
+            body_field = 1
+
+def function():
+    match subject:
+        case local_capture:
+            pass
+<CURSOR>",
+        );
+
+        let symbols = document_symbols(&test.db, test.program_file(test.cursor.file))
+            .iter()
+            .map(|(_, symbol)| (symbol.name.into_owned(), symbol.kind))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            symbols,
+            [
+                ("C", SymbolKind::Class),
+                ("class_capture", SymbolKind::Field),
+                ("body_field", SymbolKind::Field),
+                ("function", SymbolKind::Function),
+            ]
+            .map(|(name, kind)| (name.to_owned(), kind))
+        );
+    }
+
+    #[test]
     fn document_symbols_comprehension_and_lambda_scopes() {
         let test = cursor_test(
             "
