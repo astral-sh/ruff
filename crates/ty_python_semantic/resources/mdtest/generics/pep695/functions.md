@@ -997,7 +997,9 @@ def f[T](x: T, y: Not[T]) -> T:
     return x
 ```
 
-## Return type inference from object-variadic callbacks
+## `Callable` parameters
+
+### Return type inference from object-variadic callbacks
 
 Object-variadic callbacks must preserve `Callable[..., T]` return constraints.
 
@@ -1017,7 +1019,25 @@ reveal_type(call(callback))  # revealed: int
 reveal_type(bounded(callback))  # revealed: int
 ```
 
-## `Callable` parameters
+### Gradual callable parameters with a required prefix
+
+```py
+from collections.abc import Callable
+from typing import Concatenate
+
+def invoke[T](callback: Callable[Concatenate[int, ...], T]) -> T:
+    return callback(1)
+
+def accepts_int(value: int, *args: object, **kwargs: object) -> int:
+    return value
+
+def needs_str(value: str, *args: object, **kwargs: object) -> int:
+    return len(value)
+
+reveal_type(invoke(accepts_int))  # revealed: int
+# TODO: Emit an invalid-argument-type diagnostic for the incompatible `str` prefix.
+reveal_type(invoke(needs_str))  # revealed: int
+```
 
 ### Class constructors
 
