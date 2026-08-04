@@ -43,6 +43,7 @@ mod pull_diagnostics;
 mod rename;
 mod semantic_tokens;
 mod signature_help;
+mod test_discovery;
 mod type_hierarchy;
 mod workspace_folders;
 
@@ -1381,6 +1382,15 @@ impl TestServerBuilder {
         self.client_capabilities.experimental = Some(serde_json::json!({
             "fullDiagnosticOutput": true,
         }));
+        self
+    }
+
+    /// Advertise that the client can run tests by executing the `ty.runTest` command
+    /// attached to test code lenses.
+    pub(crate) fn with_run_tests_support(mut self) -> Self {
+        self.client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}))["runTests"] = serde_json::json!(true);
         self
     }
 

@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
+        const RUN_TESTS = 1 << 21;
     }
 }
 
@@ -52,7 +53,6 @@ impl std::fmt::Display for ResolvedClientCapabilities {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SupportedCommand {
     Debug,
-    RunTest,
 }
 
 impl SupportedCommand {
@@ -60,13 +60,12 @@ impl SupportedCommand {
     pub(crate) const fn identifier(self) -> &'static str {
         match self {
             SupportedCommand::Debug => "ty.printDebugInformation",
-            SupportedCommand::RunTest => "ty.runTest",
         }
     }
 
     /// Returns all the commands that the server currently supports.
-    const fn all() -> [SupportedCommand; 2] {
-        [SupportedCommand::Debug, SupportedCommand::RunTest]
+    const fn all() -> [SupportedCommand; 1] {
+        [SupportedCommand::Debug]
     }
 }
 
@@ -76,7 +75,6 @@ impl FromStr for SupportedCommand {
     fn from_str(name: &str) -> anyhow::Result<Self, Self::Err> {
         Ok(match name {
             "ty.printDebugInformation" => Self::Debug,
-            "ty.runTest" => Self::RunTest,
             _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
         })
     }
@@ -198,6 +196,12 @@ impl ResolvedClientCapabilities {
         self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
+    /// Returns `true` if the client can run tests, i.e. it executes the `ty.runTest`
+    /// command attached to test code lenses itself.
+    pub(crate) const fn supports_run_tests(self) -> bool {
+        self.contains(Self::RUN_TESTS)
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -267,6 +271,16 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("runTests"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default()
+        {
+            flags |= Self::RUN_TESTS;
         }
 
         if text_document
@@ -480,8 +494,12 @@ pub(crate) fn server_capabilities(
         }),
         selection_range_provider: Some(true.into()),
         folding_range_provider: Some(true.into()),
-        code_lens_provider: Some(types::CodeLensOptions {
-            resolve_provider: Some(false),
+        // TODO: Not sure if this flag is enough or change it
+        code_lens_provider: resolved_client_capabilities.supports_run_tests().then(|| {
+            types::CodeLensOptions {
+                resolve_provider: Some(false),
+                ..Default::default()
+            }
         }),
         document_symbol_provider: Some(true.into()),
         workspace_symbol_provider: Some(true.into()),

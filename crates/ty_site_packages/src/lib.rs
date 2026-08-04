@@ -416,7 +416,7 @@ impl PythonEnvironment {
     pub fn sys_prefix(&self) -> &SystemPath {
         match self {
             Self::Virtual(env) => &env.root_path.inner,
-            Self::System(env) => &env.root_path.inner,
+            Self::System(env) => env.path.sys_prefix(),
         }
     }
 }
