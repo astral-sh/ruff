@@ -1255,7 +1255,7 @@ class SupportsHash(Protocol):
     def __hash__(self) -> int: ...
 
 static_assert(not is_equivalent_to(object, Hashable))
-static_assert(not is_assignable_to(object, Hashable))
+static_assert(is_assignable_to(object, Hashable))
 static_assert(not is_subtype_of(object, Hashable))
 
 def check_object_or_hashable(x: object | Hashable):
@@ -1508,6 +1508,18 @@ accepts_hashable("value")
 accepts_hashable(("value",))
 ```
 
+Concrete `object()` instances are hashable and commonly used as sentinel values, even though the
+`object` type can also include unhashable subclasses.
+
+```py
+SENTINEL = object()
+
+def accepts_hashable_default(value: Hashable = SENTINEL) -> None: ...
+
+accepts_hashable(object())
+accepts_hashable(SENTINEL)
+```
+
 The same distinction applies to both assignability and subtyping checks.
 
 ```py
@@ -1540,6 +1552,7 @@ def accepts_hashable(value: SupportsHash) -> None: ...
 accepts_hashable(ExplicitNone())  # error: [invalid-argument-type]
 accepts_hashable([])  # error: [invalid-argument-type]
 accepts_hashable(ExplicitHash())
+accepts_hashable(object())
 ```
 
 ## Hashability of dataclasses

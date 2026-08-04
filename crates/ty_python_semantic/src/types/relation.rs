@@ -1699,16 +1699,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Fast path for various types that we know `object` is never a subtype of
-            // (`object` can be a subtype of some protocols, or of itself, but those cases are
-            // handled above).
+            // Fast path for various types that we know `object` is never a subtype of.
             (
                 Type::NominalInstance(source),
-                Type::NominalInstance(_)
-                | Type::SubclassOf(_)
-                | Type::Callable(_)
-                | Type::ProtocolInstance(_),
+                Type::NominalInstance(_) | Type::SubclassOf(_) | Type::Callable(_),
             ) if source.is_object() => self.never(),
+
+            // `object` is not a subtype of a non-universal protocol because some subclasses
+            // might not implement it. For assignability, still inspect its actual members:
+            // `object()` is hashable and commonly used as a sentinel for `Hashable` parameters.
+            (Type::NominalInstance(source), Type::ProtocolInstance(_))
+                if source.is_object() && !self.relation.is_assignability() =>
+            {
+                self.never()
+            }
 
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
