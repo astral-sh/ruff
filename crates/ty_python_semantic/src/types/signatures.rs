@@ -1164,7 +1164,7 @@ impl<'db> Signature<'db> {
         };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
-        let receiver_constraint = explicit_receiver.map(|parameter| {
+        let receiver_constraint = explicit_receiver.and_then(|parameter| {
             let receiver = receiver_type.unwrap_or_else(|| {
                 Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                     db,
@@ -1188,6 +1188,15 @@ impl<'db> Signature<'db> {
             } else {
                 parameter.annotated_type()
             };
+            // A receiver annotation that can materialize to `object` cannot restrict which
+            // instances can bind the method.
+            if annotation
+                .resolve_type_alias(db)
+                .top_materialization(db, env)
+                .is_object()
+            {
+                return None;
+            }
             // TODO: Also intersect nested receiver type variables, such as the `T` in
             // `self: list[T]`, with their valid specializations when constructing or solving the
             // receiver constraint set.
@@ -1199,9 +1208,9 @@ impl<'db> Signature<'db> {
             if receiver_typevar.is_some_and(|typevar| {
                 Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
             }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
+                return Some(std::borrow::Cow::Owned(OwnedConstraintSet::default()));
             }
-            receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+            Some(receiver.when_constraint_set_assignable_to_owned(db, env, annotation))
         });
         let receiver_constraints = merge_receiver_constraints(
             db,
