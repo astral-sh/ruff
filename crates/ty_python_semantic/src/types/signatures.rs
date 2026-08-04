@@ -2292,11 +2292,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        // An implicit `Self` can reach type variables bound by an enclosing class. An eager
-        // comparison must infer those variables from a concrete receiver, even when an outer
-        // callable has its own inferable type variables. A lazy solve must keep them symbolic:
-        // quantifying `T@C` out of `T@C <= R` leaves a decorator's return variable `R`
-        // unconstrained.
+        // `inferable` has different roles in the two type-variable evaluation modes:
+        //
+        // * Eager comparisons decide whether the relation holds immediately. An unbound generic
+        //   method's `Self` can have an upper bound such as `C[T]`, so `T` must also be
+        //   inferable; otherwise, a concrete receiver such as `C[int]` is compared against a
+        //   fixed, symbolic `T` and valid higher-order calls are rejected.
+        // * Lazy comparisons record constraints for every type variable, regardless of whether
+        //   it is inferable. Here, `signature_inferable` also determines which type variables
+        //   `reduce_inferable` existentially removes below, so it must contain only variables
+        //   actually bound by these signatures. Including an enclosing class's `T` would turn a
+        //   decorator's return constraint `T <= R` into `exists T. T <= R`, losing the
+        //   relationship needed to infer `R = T`.
         let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager;
         let signature_typevars = |signature: &Signature<'db>| {
             signature
