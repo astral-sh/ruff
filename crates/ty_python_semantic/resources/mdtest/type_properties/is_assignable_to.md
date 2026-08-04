@@ -1084,6 +1084,8 @@ parameter following that tuple.
 
 ```py
 from typing import Callable, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
 
 def expects_suffix(callback: Callable[[Unpack[tuple[str, ...]], None], None]) -> None: ...
 def accepts_unknown(*args): ...
@@ -1100,6 +1102,19 @@ def accepts_strings(*args: str) -> None: ...
 
 expects_suffix(accepts_objects)
 expects_suffix(accepts_strings)  # error: [invalid-argument-type]
+
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[accepts_objects],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[accepts_strings],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
 ```
 
 A required keyword-only parameter cannot be supplied by the positional callback signature.
@@ -1120,6 +1135,29 @@ def expects_prefix_and_suffix(
 def accepts_prefixed_objects(first: int, *args: object) -> None: ...
 
 expects_prefix_and_suffix(accepts_prefixed_objects)
+```
+
+### Fixed-length unpacked positional parameters
+
+An unpacked fixed-length tuple accepts only its declared positional arguments. It cannot satisfy a
+callable that accepts arbitrarily many tuple arguments.
+
+```py
+from typing import Callable, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def accepts_one_integer(*args: Unpack[tuple[int]]) -> None: ...
+
+# error: [invalid-assignment]
+callback: Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None] = accepts_one_integer
+
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[accepts_one_integer],
+        Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None],
+    )
+)
 ```
 
 ### Function types

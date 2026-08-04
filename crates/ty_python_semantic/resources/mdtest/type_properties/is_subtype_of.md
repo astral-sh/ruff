@@ -1345,6 +1345,46 @@ static_assert(is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableType
 static_assert(is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[positional_variadic]))
 ```
 
+#### Variadic with an unpacked positional suffix
+
+A variadic positional parameter must accept both the unpacked elements and any fixed positional
+suffix in the supertype.
+
+```py
+from typing import Callable, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
+
+def accepts_objects(*args: object) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[accepts_objects],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_strings],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+```
+
+An unpacked fixed-length parameter cannot be reused for additional positional arguments.
+
+```py
+def accepts_one_integer(*args: Unpack[tuple[int]]) -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_one_integer],
+        Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None],
+    )
+)
+```
+
 #### Variadic with other kinds
 
 Variadic parameter in a subtype can only be used to match against an unmatched positional-only
