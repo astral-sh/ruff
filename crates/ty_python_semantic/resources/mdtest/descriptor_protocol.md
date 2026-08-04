@@ -1023,11 +1023,10 @@ class C:
 C().value
 ```
 
-### Errors while evaluating a property getter are not descriptor-call errors
+### Property getters reject invalid receiver specializations
 
-A property is a descriptor, but a failure while checking the getter call does not mean that the
-implicit call to `property.__get__` is invalid. In particular, expanding a generic alias can create
-an intermediate specialization that does not satisfy one of the original type-variable bounds.
+A property getter checks the same specialized receiver as an ordinary method. A generic alias with
+alternatives that impose different type-variable bounds can produce an invalid property access.
 
 ```py
 from collections.abc import Callable
@@ -1052,6 +1051,7 @@ Callback = TypeVar("Callback", bound=Callable[[int], str])
 
 def access(value: Callback | Command[Callback]) -> None:
     if isinstance(value, A | B):
+        # error: [invalid-attribute-access]
         value.callback
 ```
 
@@ -1120,10 +1120,10 @@ def access(flag: bool) -> None:
     reveal_type(C().value)  # revealed: int | str
 ```
 
-### A successful `__getattr__` fallback prevents a descriptor diagnostic
+### A possible `__getattr__` fallback does not hide an invalid descriptor
 
-When the descriptor is only conditionally present, the path where it is absent can succeed through
-`__getattr__`.
+When a descriptor is only conditionally present, `__getattr__` handles the path where it is absent.
+The other path still invokes the invalid descriptor and must produce a diagnostic.
 
 ```py
 def access(flag: bool) -> None:
@@ -1138,6 +1138,7 @@ def access(flag: bool) -> None:
         def __getattr__(self, name: str) -> str:
             return name
 
+    # error: [invalid-attribute-access]
     reveal_type(C().value)  # revealed: int | str
 ```
 
@@ -1271,6 +1272,77 @@ class Meta(type):
 
 class C(metaclass=Meta):
     value = 1
+
+reveal_type(C.value)  # revealed: int
+```
+
+### A possible class attribute does not shadow a metaclass descriptor
+
+A conditionally defined class attribute shadows a metaclass descriptor only when it exists. The
+other path invokes the invalid descriptor.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    value = Descriptor()
+
+def access(flag: bool) -> None:
+    class C(metaclass=Meta):
+        if flag:
+            value = 1
+
+    # error: [invalid-attribute-access]
+    reveal_type(C.value)  # revealed: str | int
+```
+
+### A metaclass data descriptor takes precedence over a class attribute
+
+A data descriptor on the metaclass runs even when the class defines an attribute with the same name,
+so an invalid descriptor call must be reported.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class Meta(type):
+    value = Descriptor()
+
+class C(metaclass=Meta):
+    value = 1
+
+# error: [invalid-attribute-access]
+reveal_type(C.value)  # revealed: str
+```
+
+### A metaclass data descriptor shadows an invalid class descriptor
+
+A data descriptor on the metaclass has priority over a descriptor stored on the class. The class
+descriptor is never called, so its invalid signature does not affect the access.
+
+```py
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class InvalidDescriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    value = DataDescriptor()
+
+class C(metaclass=Meta):
+    value = InvalidDescriptor()
 
 reveal_type(C.value)  # revealed: int
 ```

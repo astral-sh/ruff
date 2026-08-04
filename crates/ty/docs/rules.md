@@ -1287,9 +1287,8 @@ C().value  # error: [invalid-attribute-access]
 ```
 
 As with other operations on unions, every possible descriptor implementation
-must accept the implicit call. We avoid reporting when member lookup has a
-successful alternative that does not invoke the descriptor. We also avoid
-reporting errors caused only by evaluating a property's getter.
+must accept the implicit call. A descriptor error is suppressed only when a
+higher-priority lookup path prevents the descriptor from being called.
 
 ## `invalid-attribute-override`
 

@@ -566,14 +566,6 @@ impl<'db> DescriptorGetCallContext<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<DescriptorGetCallError<'db>> {
         let descriptor_type = self.descriptor_type(db);
-        // `property.__get__` evaluates the property's getter as part of the call. A failure in
-        // that nested call is not evidence that the implicit descriptor call itself is invalid.
-        // TODO: Remove this exception once call errors distinguish failures in `__get__` itself
-        // from failures raised by the property's getter.
-        if descriptor_type.is_property_instance() {
-            return None;
-        }
-
         let descr_get = descriptor_type.try_lookup_dunder_get(db, env)?;
         let instance = self.instance(db).unwrap_or_else(|| Type::none(db, env));
         let owner = self.owner(db);
@@ -589,20 +581,6 @@ impl<'db> DescriptorGetCallContext<'db> {
             descriptor_type,
             error,
         })
-    }
-}
-
-/// Combines errors from alternative lookup paths.
-///
-/// An invalid descriptor call is definite only if both paths fail. When either path can succeed,
-/// the descriptor failure is only possible and should not produce a diagnostic.
-fn combine_descriptor_errors<'db>(
-    first: Option<DescriptorGetCallContext<'db>>,
-    second: Option<DescriptorGetCallContext<'db>>,
-) -> Option<DescriptorGetCallContext<'db>> {
-    match (first, second) {
-        (Some(first), Some(_)) => Some(first),
-        _ => None,
     }
 }
 
@@ -622,8 +600,8 @@ struct DescriptorGetCallError<'db> {
 
 /// A member lookup result together with a deferred invalid descriptor call.
 ///
-/// Keeping the failure attached to the member lets unions, `__getattr__`, and lower-precedence
-/// lookup stages suppress it when any runtime path can avoid the descriptor.
+/// Keeping the failure attached to the member preserves errors from possible lookup paths while
+/// allowing higher-precedence stages to discard errors from descriptors that cannot run.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct MemberLookupResult<'db> {
     member: PlaceAndQualifiers<'db>,
@@ -668,9 +646,7 @@ impl<'db> MemberLookupResult<'db> {
         let descriptor_error = match primary_definedness {
             None => fallback_error,
             Some(Definedness::AlwaysDefined) => primary_error,
-            Some(Definedness::PossiblyUndefined) => {
-                combine_descriptor_errors(primary_error, fallback_error)
-            }
+            Some(Definedness::PossiblyUndefined) => primary_error.or(fallback_error),
         };
         Self::new(member, descriptor_error)
     }
@@ -689,7 +665,8 @@ impl<'db> MemberLookupResult<'db> {
             descriptor_error: if cycle.iteration() <= crate::TAINTED_CYCLES {
                 self.descriptor_error
             } else {
-                combine_descriptor_errors(self.descriptor_error, previous.descriptor_error)
+                self.descriptor_error
+                    .filter(|_| previous.descriptor_error.is_some())
             },
         }
     }
@@ -4273,7 +4250,7 @@ impl<'db> Type<'db> {
                 _,
             ) => MemberLookupResult::new(
                 meta_attr.with_qualifiers(meta_attr_qualifiers),
-                combine_descriptor_errors(meta_attr_error, fallback_error),
+                meta_attr_error,
             ),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
@@ -4304,7 +4281,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                combine_descriptor_errors(meta_attr_error, fallback_error),
+                meta_attr_error.or(fallback_error),
             ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -4325,7 +4302,7 @@ impl<'db> Type<'db> {
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 MemberLookupResult::new(
                     fallback.with_qualifiers(fallback_qualifiers),
-                    combine_descriptor_errors(meta_attr_error, fallback_error),
+                    fallback_error,
                 )
             }
 
@@ -4357,7 +4334,7 @@ impl<'db> Type<'db> {
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                combine_descriptor_errors(meta_attr_error, fallback_error),
+                meta_attr_error.or(fallback_error),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
