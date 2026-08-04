@@ -3624,7 +3624,7 @@ class ListBox[T](TypedDict):
 reveal_type(ListBox(value=[1]))  # revealed: ListBox[int]
 ```
 
-An exact positional dictionary literal contributes its individual field values to inference.
+A positional dictionary literal can infer the element type of a mutable container.
 
 ```py
 reveal_type(ListBox({"value": [1]}))  # revealed: ListBox[int]
@@ -3856,7 +3856,7 @@ def unpack(source: IntSource | StrSource):
 
 ### Constructor inference from positional dictionary literals
 
-Different values in a positional dictionary literal can constrain the same type parameter.
+When two fields use the same type parameter, both values determine its inferred type.
 
 ```toml
 [environment]
@@ -3873,13 +3873,13 @@ class Pair[T](TypedDict):
 reveal_type(Pair({"first": 1, "second": "x"}))  # revealed: Pair[int | str]
 ```
 
-An overwritten callback cannot affect the final values or prevent inference.
+An overwritten value is ignored even when it contains a callback.
 
 ```py
 reveal_type(Pair({"first": [lambda value: value.upper()], "first": 1, "second": "x"}))  # revealed: Pair[int | str]
 ```
 
-A missing required field retains its existing constructor diagnostic.
+A missing required key still produces the existing error.
 
 ```py
 Pair({"first": 1})  # error: [missing-typed-dict-key]
@@ -3887,8 +3887,7 @@ Pair({"first": 1})  # error: [missing-typed-dict-key]
 
 ### Generic function inference from TypedDict literals
 
-A dictionary literal passed to a generic `TypedDict` parameter constrains the function's type
-argument.
+A dictionary literal passed to a `TypedDict` parameter determines the function's type argument.
 
 ```toml
 [environment]
@@ -3907,20 +3906,20 @@ def get_value[T](box: Box[T]) -> T:
 reveal_type(get_value({"value": 1}))  # revealed: int
 ```
 
-A partially specialized parameter keeps its existing concrete type argument.
+A type argument already fixed by the function parameter is preserved.
 
 ```py
-class PartiallySpecialized[A, B](TypedDict):
+class Pair[A, B](TypedDict):
     fixed: A
-    inferred: B
+    value: B
 
-def get_inferred[T](value: PartiallySpecialized[object, T]) -> T:
-    return value["inferred"]
+def get_pair_value[T](pair: Pair[object, T]) -> T:
+    return pair["value"]
 
-reveal_type(get_inferred({"fixed": 1, "inferred": "x"}))  # revealed: str
+reveal_type(get_pair_value({"fixed": 1, "value": "x"}))  # revealed: str
 ```
 
-An unrelated `TypedDict` does not provide a specialization for the generic parameter.
+An unrelated `TypedDict` does not determine the function's type argument.
 
 ```py
 class Source(TypedDict):
@@ -3932,7 +3931,7 @@ def unrelated_source(source: Source):
 
 ### Generic function inference with unused TypedDict parameters
 
-A type parameter absent from a `TypedDict` schema does not constrain another function argument.
+A type parameter that does not appear in any field does not constrain another function argument.
 
 ```toml
 [environment]
@@ -3954,9 +3953,9 @@ def use(box: Box[str]):
     result: int = choose(box, 1)
 ```
 
-### Generic function inference with legacy contravariant fields
+### Generic function inference with legacy read-only callbacks
 
-A legacy type parameter inherits the structural variance of a read-only callable field.
+A read-only callback that accepts any `Animal` is valid when another argument requires a `Dog`.
 
 ```toml
 [environment]
@@ -3982,9 +3981,9 @@ def use(consumer: Consumer[Animal]):
     dog: Dog = choose(consumer, Dog())
 ```
 
-### Constructor inference from positional callable signatures
+### Constructor inference from positional callable fields
 
-A callable field can infer a `ParamSpec` from a positional dictionary literal.
+A callable field determines the constructor's `ParamSpec`.
 
 ```toml
 [environment]
@@ -4122,8 +4121,7 @@ reveal_type(AliasBox(value=[1]))  # revealed: AliasBox[int]
 
 ### Constructor inference with upper bounds
 
-A literal upper bound preserves its literal, while an ordinary `int` upper bound permits the usual
-promotion.
+A literal upper bound preserves the literal type.
 
 ```toml
 [environment]
@@ -4138,19 +4136,40 @@ class LiteralBound[T: Literal[1]](TypedDict):
 
 reveal_type(LiteralBound(value=1))  # revealed: LiteralBound[Literal[1]]
 reveal_type(LiteralBound({"value": 1}))  # revealed: LiteralBound[Literal[1]]
+```
 
+An ordinary `int` upper bound allows a literal value to widen to `int`.
+
+```py
 class IntBound[T: int](TypedDict):
     value: T
 
 reveal_type(IntBound(value=1))  # revealed: IntBound[int]
 reveal_type(IntBound({"value": 1}))  # revealed: IntBound[int]
+```
 
+A value outside the upper bound produces an error.
+
+```py
 IntBound({"value": "invalid"})  # error: [invalid-argument-type]
+```
 
-class Constrained[T: (int, str)](TypedDict):
+### Constructor inference with constrained type parameters
+
+A positional dictionary value selects one of the declared type constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Box[T: (int, str)](TypedDict):
     value: T
 
-reveal_type(Constrained({"value": True}))  # revealed: Constrained[int]
+reveal_type(Box({"value": True}))  # revealed: Box[int]
 ```
 
 ### Constructor inference with callable parameters
@@ -4191,6 +4210,11 @@ class Box[T](TypedDict):
     value: T
 
 literal: Box[Literal[1]] = Box(value=1)
+```
+
+A positional dictionary receives the same expected literal type.
+
+```py
 positional_literal: Box[Literal[1]] = Box({"value": 1})
 ```
 
@@ -4201,6 +4225,11 @@ class Animal: ...
 class Dog(Animal): ...
 
 animal: Box[Animal] = Box(value=Dog())
+```
+
+The wider expected type also applies to positional dictionary values.
+
+```py
 positional_animal: Box[Animal] = Box({"value": Dog()})
 ```
 
@@ -4234,16 +4263,14 @@ literal_box = Box(value=1)
 literal: Box[Literal[1]] = literal_box
 ```
 
-Read-only positional fields remain gradual until positional inference can preserve covariance.
+A positional read-only field keeps an unknown type until its literal type can be preserved.
 
 ```py
-positional_literal_box = Box({"value": 1})
 # TODO: Infer `Box[Literal[1]]`.
-reveal_type(positional_literal_box)  # revealed: Box[Unknown]
-positional_literal: Box[Literal[1]] = positional_literal_box
+reveal_type(Box({"value": 1}))  # revealed: Box[Unknown]
 ```
 
-A read-only dictionary literal passed to a generic function also remains gradual.
+A generic function also keeps its return type unknown when the dictionary field is read-only.
 
 ```py
 def get_value[T](value: Box[T]) -> T:
@@ -4318,7 +4345,11 @@ class Box[T](TypedDict, extra_items=T): ...
 box = Box(value=1)
 reveal_type(box)  # revealed: Box[int]
 box["value"] = "invalid"  # error: [invalid-assignment]
+```
 
+A positional dictionary also determines the type of mutable extra items.
+
+```py
 positional = Box({"value": 1})
 reveal_type(positional)  # revealed: Box[int]
 positional["value"] = "invalid"  # error: [invalid-assignment]
@@ -4355,13 +4386,18 @@ class Box[T](TypedDict):
     callback: Callable[[T], int]
 
 Box(value=1, callback=lambda x: x.upper())  # error: [unresolved-attribute]
+```
+
+A callback in a positional dictionary receives the same inferred parameter type.
+
+```py
 Box({"value": 1, "callback": lambda x: x.upper()})  # error: [unresolved-attribute]
 ```
 
-### Constructor inference from nested callbacks
+### Constructor inference from positional nested callbacks
 
-A callback inside a positional container remains gradual until inference can propagate its field
-context into the nested expression.
+A callback inside a list needs its parameter type before its body can be checked. The constructor
+keeps its type argument unknown until that information can reach the callback.
 
 ```toml
 [environment]
