@@ -152,6 +152,7 @@ function RunOutput({
         "text-sm",
         "whitespace-pre-wrap",
         "break-all",
+        "overflow-auto",
         theme === "dark" ? "text-white" : null,
       )}
     >
