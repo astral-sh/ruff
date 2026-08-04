@@ -21,12 +21,12 @@ PublishDiagnosticsParams {
         Diagnostic {
             range: Range {
                 start: Position {
-                    line: 0,
-                    character: 0,
+                    line: 2,
+                    character: 2,
                 },
                 end: Position {
-                    line: 0,
-                    character: 0,
+                    line: 2,
+                    character: 14,
                 },
             },
             severity: Some(
