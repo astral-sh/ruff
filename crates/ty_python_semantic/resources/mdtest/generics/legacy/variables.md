@@ -1021,6 +1021,71 @@ reveal_type(D().x)  # revealed: Unknown
 
 ## Regression
 
+### Specialization cycle recovery preserves concrete defaults
+
+When a generic call uses a type variable's default, cycle recovery must allow the initial `Unknown`
+specialization to resolve to the concrete default.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C:
+    pass
+
+def f(a: T | None = None) -> T:
+    raise NotImplementedError
+
+if f():
+    pass
+
+if f():
+    sum()  # error: [no-matching-overload]
+else:
+    sum()  # error: [no-matching-overload]
+
+from typing import TypeVar
+
+T = TypeVar("T", default=C)
+
+reveal_type(f())  # revealed: C
+```
+
+### Specialization cycle recovery prevents oscillating defaults
+
+A type variable's default can depend on an overloaded call that itself uses the same type variable.
+Specialization must converge even when overload selection changes between cycle iterations.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar, overload
+
+@overload
+def choose(value: int) -> type[int]: ...
+@overload
+def choose(value: object) -> type[str]: ...
+def choose(value: object) -> type[int] | type[str]:
+    return str
+
+def f() -> T:
+    raise NotImplementedError
+
+if f():
+    Default = str
+else:
+    Default = choose(f())
+
+T = TypeVar("T", default=Default)
+
+reveal_type(f())  # revealed: Unknown
+```
+
 ### Use of typevar with default inside a function body that binds it
 
 ```toml

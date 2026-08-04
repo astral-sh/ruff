@@ -2380,7 +2380,21 @@ impl get_size2::GetSize for TypeVarInference<'_> {}
 impl<'db> TypeVarInference<'db> {
     /// Project this inference result into a closed specialization.
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        #[salsa::tracked(returns(copy))]
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|db, _, inference: TypeVarInference<'db>| {
+                inference.generic_context(db).unknown_specialization(db, None)
+            },
+            cycle_fn=|db, cycle: &salsa::Cycle, previous: &Specialization<'db>, current: Specialization<'db>, inference: TypeVarInference<'db>| {
+                if cycle.iteration() <= crate::TAINTED_CYCLES {
+                    current
+                } else {
+                    current
+                        .merge_cycle_recovery(db, *previous)
+                        .unwrap_or_else(|| inference.generic_context(db).unknown_specialization(db, None))
+                }
+            }
+        )]
         fn specialization_inner<'db>(
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,
