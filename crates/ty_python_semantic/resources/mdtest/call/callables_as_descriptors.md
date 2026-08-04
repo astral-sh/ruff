@@ -143,6 +143,45 @@ class C2:
 C2().method_decorated(1)
 ```
 
+A generic decorator must preserve a type variable bound by the method's enclosing class, even when
+the decorator uses an ellipsis instead of a `ParamSpec`:
+
+```py
+def preserve_return[R](function: Callable[..., R]) -> Callable[..., R]:
+    return function
+
+class DecoratedBox[T]:
+    @preserve_return
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @preserve_return
+    def values(self) -> list[T]:
+        raise NotImplementedError
+
+reveal_type(DecoratedBox[int]().value())  # revealed: int
+reveal_type(DecoratedBox[int]().values())  # revealed: list[int]
+```
+
+The same behavior applies to decorators and classes using legacy type variables:
+
+```py
+from typing import Generic, TypeVar
+
+LegacyT = TypeVar("LegacyT")
+LegacyR = TypeVar("LegacyR")
+
+def legacy_preserve_return(function: Callable[..., LegacyR]) -> Callable[..., LegacyR]:
+    return function
+
+class LegacyDecoratedBox(Generic[LegacyT]):
+    @legacy_preserve_return
+    def value(self) -> LegacyT:
+        raise NotImplementedError
+
+reveal_type(LegacyDecoratedBox[int]().value())  # revealed: int
+```
+
 And if the callable-typed decorator leaves some generic parameters unconstrained, we should keep
 those parameters unspecialized rather than collapsing them to `Never`:
 

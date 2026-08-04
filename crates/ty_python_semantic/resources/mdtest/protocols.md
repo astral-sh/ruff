@@ -2768,9 +2768,8 @@ has_name: HasCachedName = WithCachedName()
 
 ### Generic descriptor result types
 
-Applying a generic descriptor decorator to a generic protocol method currently loses the protocol's
-type variable and produces `cached_property[Unknown]`. The protocol must preserve that descriptor
-type instead of reducing it to a bare `Unknown`, which would allow an incompatible implementation.
+Applying a generic descriptor decorator to a generic protocol method must preserve the protocol's
+type variable and expose the specialized descriptor's readable and writable member types.
 
 ```py
 from functools import cached_property
@@ -2791,9 +2790,7 @@ class StrValue:
 
 static_assert(not is_assignable_to(StrValue, HasValue[int]))
 
-# TODO: This should be a property with an `int` read type once decorator calls preserve enclosing
-# type variables.
-# revealed: {"value": AttributeMember(`cached_property[Unknown]`)}
+# revealed: {"value": PropertyMember { read: `int`, write: `int` }}
 reveal_protocol_interface(HasValue[int])
 ```
 
