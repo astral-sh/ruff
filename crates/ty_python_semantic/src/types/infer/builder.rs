@@ -10317,7 +10317,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback = value_type.member_with_diagnostics(db, env, &attr.id);
+        let fallback = value_type.try_member_lookup(db, env, &attr.id);
         if !matches!(attribute.ctx, ExprContext::Del)
             && let Some(context) = fallback.descriptor_error
             && (assigned_type.is_none() || context.descriptor_type(db).is_data_descriptor(db, env))

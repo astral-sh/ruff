@@ -4300,11 +4300,11 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        self.member_with_diagnostics(db, env, name).member
+        self.try_member_lookup(db, env, name).member
     }
 
     /// Performs member lookup and retains errors raised by an implicit descriptor `__get__` call.
-    fn member_with_diagnostics(
+    fn try_member_lookup(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
