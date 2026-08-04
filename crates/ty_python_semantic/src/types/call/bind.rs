@@ -2141,6 +2141,7 @@ impl<'db> Bindings<'db> {
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_equivalent_to(db, env, ty_b, constraints)
+                                        .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2205,6 +2206,7 @@ impl<'db> Bindings<'db> {
                                         ty_b,
                                         constraints,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -3806,7 +3808,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env)
+                        .is_always_true(db, env)
                     {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
@@ -4113,7 +4115,7 @@ impl<'db> CallableBinding<'db> {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env)
+                            .is_always_true(db, env)
                         {
                             participating_slot_indices.insert(slot_index);
                         }
@@ -4205,7 +4207,7 @@ impl<'db> CallableBinding<'db> {
                     constraints,
                     self.overloads[*current_index].inferable_typevars,
                 )
-                .is_always_satisfied(db, env)
+                .is_always_true(db, env)
             {
                 filter_remaining_overloads = true;
             }
@@ -4224,7 +4226,7 @@ impl<'db> CallableBinding<'db> {
                     overload
                         .return_type()
                         .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env)
+                        .is_always_true(db, env)
                 })
             } else {
                 // No matching overload
@@ -5308,7 +5310,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env)
+        .is_always_true(db, env)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -5973,6 +5975,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     self.inferable_typevars,
                 )
+                .positive_evidence()
                 .is_never_satisfied(db, self.env)
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),

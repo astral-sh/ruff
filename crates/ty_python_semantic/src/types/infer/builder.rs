@@ -1728,20 +1728,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let declared_type = declared_ty.inner_type();
-                if inferred_ty.is_assignable_to(db, env, declared_type) {
-                    if !should_preserve_inferred_binding_type(inferred_ty)
-                        // TODO We currently can't distinguish here between "no declared type" and
-                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                        // but use inferred type if there is no declared type.
-                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
-                        && declared_type.is_assignable_to(db, env, inferred_ty)
-                    {
-                        (declared_ty, declared_type)
-                    } else {
-                        (declared_ty, inferred_ty)
-                    }
-                } else {
+                let constraints = ConstraintSetBuilder::new();
+                let assignability = inferred_ty.when_assignable_to(
+                    db,
+                    env,
+                    declared_type,
+                    &constraints,
+                    TypeVarSet::None,
+                );
+                if assignability.is_always_false(db, env) {
                     self.discard_dict_key_assignments_for(definition);
                     report_invalid_assignment(
                         &self.context,
@@ -1760,8 +1755,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // import, etc.)". Ideally we would still prefer `Unknown` declared type,
                         // but use inferred type if there is no declared type.
                         && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
-                        && assignability.is_always_true(self.db())
-                        && declared_type.is_assignable_to(self.db(), inferred_ty)
+                        && assignability.is_always_true(db, env)
+                        && declared_type.is_assignable_to(db, env, inferred_ty)
                     {
                         (declared_ty, declared_type)
                     } else {
@@ -4199,9 +4194,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // type, report an error and fall back to the annotated type.
             let target_ty = if let Some(value_ty) = value_ty {
                 let declared_ty = annotated.inner_type();
-                if value_ty.is_assignable_to(db, env, declared_ty) {
-                    value_ty
-                } else {
+                if value_ty.has_only_negative_assignability_evidence(db, env, declared_ty) {
                     if let Some(builder) = self
                         .context
                         .report_lint(&INVALID_ASSIGNMENT, value.as_deref().unwrap())
@@ -5432,7 +5425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 !overload
                     .return_ty
                     .when_assignable_to(db, env, narrowed_ty, &constraints, inferable)
-                    .is_never_satisfied(db, env)
+                    .is_always_false(db, env)
             }) {
                 return None;
             }
@@ -12350,7 +12343,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, env, declared_ty) {
+        if bound_ty.has_only_negative_assignability_evidence(db, env, declared_ty) {
             builder.discard_dict_key_assignments_for(self.binding);
             report_invalid_assignment(
                 &builder.context,

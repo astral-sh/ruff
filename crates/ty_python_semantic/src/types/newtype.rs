@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::ProgramEnvironment;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::RelationConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;

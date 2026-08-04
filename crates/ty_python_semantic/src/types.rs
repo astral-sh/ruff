@@ -2298,7 +2298,7 @@ impl<'db> Type<'db> {
         self.filter_union(db, |elem| {
             !elem
                 .when_disjoint_from(db, env, target, &constraints, inferable)
-                .is_always_satisfied(db, env)
+                .is_always_true(db, env)
         })
     }
 

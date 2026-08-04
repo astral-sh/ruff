@@ -233,7 +233,7 @@ fn check_inherited_method_conflicts<'db>(
                     continue;
                 };
                 if selected_decorator == contract_decorator
-                    && selected_ty.is_assignable_to(db, env, contract_ty)
+                    && !selected_ty.has_only_negative_assignability_evidence(db, env, contract_ty)
                 {
                     continue;
                 }
@@ -864,7 +864,11 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            if subclass_override_type.is_assignable_to(db, env, superclass_override_type) {
+            if !subclass_override_type.has_only_negative_assignability_evidence(
+                db,
+                env,
+                superclass_override_type,
+            ) {
                 continue;
             }
 

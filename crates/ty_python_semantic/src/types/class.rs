@@ -1486,7 +1486,7 @@ impl<'db> ClassType<'db> {
         );
         checker
             .check_class_pair(db, self, target)
-            .is_always_satisfied(db, env)
+            .is_always_true(db, env)
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -1524,7 +1524,7 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
             this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                .is_always_satisfied(db, env)
+                .is_always_true(db, env)
         })
     }
 
@@ -1540,7 +1540,7 @@ impl<'db> ClassType<'db> {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
             checker
                 .check_specialization_pair(db, this, other)
-                .is_always_satisfied(db, env)
+                .is_always_true(db, env)
         })
     }
 
@@ -1614,11 +1614,11 @@ impl<'db> ClassType<'db> {
             |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
             |this, other| {
                 this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env)
+                    .is_always_true(db, env)
             },
             |this, other| {
                 this.when_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env)
+                    .is_always_true(db, env)
             },
         )
     }
@@ -1642,14 +1642,13 @@ impl<'db> ClassType<'db> {
             |this, other| {
                 checker
                     .check_specialization_pair(db, this, other)
-                    .is_always_satisfied(db, env)
+                    .is_always_true(db, env)
             },
             |this, other| {
                 checker
                     .check_type_pair(db, this, other)
-                    .is_always_satisfied(db, env)
+                    .is_always_true(db, env)
             },
-            |this, other| checker.check_type_pair(db, this, other).is_always_true(db),
         )
     }
 
