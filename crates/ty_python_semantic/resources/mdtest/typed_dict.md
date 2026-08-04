@@ -3865,7 +3865,8 @@ literal_box = Box(value=1)
 literal: Box[Literal[1]] = literal_box
 ```
 
-Legacy generic parameters remain structurally covariant when they occur only in a read-only field.
+A legacy type variable is invariant by default, so assigning `LegacyBox[Dog]` to `LegacyBox[Animal]`
+should eventually produce an error.
 
 ```py
 T = TypeVar("T")
@@ -3874,12 +3875,14 @@ class LegacyBox(TypedDict, Generic[T]):
     value: ReadOnly[T]
 
 legacy_dog = LegacyBox(value=Dog())
+# TODO: Reject this assignment: https://github.com/astral-sh/ty/issues/1017
 legacy_animal: LegacyBox[Animal] = legacy_dog
 ```
 
 ### Constructor inference with contravariant fields
 
-A read-only callable field makes its type parameter contravariant.
+A read-only field is covariant in its value, while a callable is contravariant in its parameter.
+Combining them makes the `TypedDict`'s type parameter contravariant.
 
 ```toml
 [environment]
