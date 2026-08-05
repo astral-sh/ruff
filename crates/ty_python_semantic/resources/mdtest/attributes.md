@@ -2869,6 +2869,9 @@ reveal_type(InvalidGetAttribute().missing)  # revealed: str
 
 # error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `InvalidGetAttribute`"
 reveal_type(InvalidGetAttribute().defined)  # revealed: bool
+
+# error: [invalid-attribute-access] "Invalid access to attribute `__getattribute__` on type `InvalidGetAttribute`"
+InvalidGetAttribute().__getattribute__
 ```
 
 ```snapshot
@@ -2878,6 +2881,7 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
 8 | InvalidGetAttribute().missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttribute.__getattribute__`: expected 1, got 2
 info: This access implicitly calls `__getattribute__`
+info: Method signature here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __getattribute__(self) -> str:
@@ -3056,6 +3060,9 @@ reveal_type(Foo.missing)  # revealed: int
 
 # error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `<class 'Foo'>`"
 reveal_type(Foo.defined)  # revealed: str
+
+# error: [invalid-attribute-access] "Invalid access to attribute `__getattribute__` on type `<class 'Foo'>`"
+Foo.__getattribute__
 ```
 
 ### Class attributes take precedence

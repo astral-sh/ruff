@@ -6639,42 +6639,43 @@ impl<'db> Type<'db> {
             }
         };
 
-        let custom_getattribute = if "__getattribute__" == name.as_str() {
-            (MemberLookupResult::from(Place::Undefined), false)
-        } else {
-            // Skip `object.__getattribute__`, which is the default mechanism we
-            // already model via the normal attribute-lookup path.
-            let name_type = Type::string_literal(db, name);
-            match self.try_call_dunder_with_policy(
+        // This lookup is shared by every attribute on the receiver. Only create the requested
+        // name's literal type and check the call when an override actually exists.
+        let getattribute_policy = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
+        if self
+            .class_member_with_policy(db, env, "__getattribute__", getattribute_policy)
+            .place
+            .is_undefined()
+        {
+            return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
+        }
+
+        let name_type = Type::string_literal(db, name);
+        let custom_getattribute = match self.try_call_dunder_with_policy(
+            db,
+            env,
+            "__getattribute__",
+            &mut CallArguments::positional([name_type]),
+            TypeContext::default(),
+            getattribute_policy,
+        ) {
+            Ok(bindings) => Place::bound(bindings.return_type(db, env)).into(),
+            Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
                 db,
-                env,
-                "__getattribute__",
-                &mut CallArguments::positional([name_type]),
-                TypeContext::default(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            ) {
-                Ok(bindings) => (Place::bound(bindings.return_type(db, env)).into(), true),
-                Err(CallDunderError::CallError(_, bindings, _)) => (
-                    member_lookup_result(
-                        db,
-                        Place::bound(bindings.return_type(db, env)).into(),
-                        Some(MemberLookupErrorKind::GetAttribute {
-                            receiver: self,
-                            name: name_type,
-                        }),
-                    ),
-                    true,
-                ),
-                Err(CallDunderError::PossiblyUnbound { .. }) => {
-                    (MemberLookupResult::from(Place::Undefined), true)
-                }
-                Err(CallDunderError::MethodNotAvailable) => {
-                    (MemberLookupResult::from(Place::Undefined), false)
-                }
+                Place::bound(bindings.return_type(db, env)).into(),
+                Some(MemberLookupErrorKind::GetAttribute {
+                    receiver: self,
+                    name: name_type,
+                }),
+            ),
+            Err(CallDunderError::PossiblyUnbound { .. }) => Place::Undefined.into(),
+            Err(CallDunderError::MethodNotAvailable) => {
+                return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
             }
         };
 
-        if let Err(error) = custom_getattribute.0 {
+        if let Err(error) = custom_getattribute {
             let member = result.unwrap_or_else(|error| error.fallback_member(db));
             return Err(MemberLookupError::new(
                 db,
@@ -6687,14 +6688,13 @@ impl<'db> Type<'db> {
         let result = if matches!(
             result.err().map(|error| error.kind(db)),
             Some(MemberLookupErrorKind::DescriptorGet(_))
-        ) && custom_getattribute.1
-        {
+        ) {
             Ok(result.unwrap_or_else(|error| error.fallback_member(db)))
         } else {
             result
         };
 
-        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute.0);
+        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute);
         member_lookup_or_fall_back_to(db, env, result, custom_getattr_result)
     }
 
