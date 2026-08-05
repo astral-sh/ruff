@@ -36,7 +36,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
 };
-use crate::types::context::LintDiagnosticGuardBuilder;
+use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -124,28 +124,23 @@ impl<'db> CallDiagnosticContext<'_, '_, 'db, '_> {
             .copied()
             .unwrap_or_else(|| BindingError::get_node(node, argument_index).range())
     }
+}
 
-    /// Attaches a callable signature to existing implicit-call context when available.
-    fn annotate_callable_signature(
-        &self,
-        diagnostic: &mut Diagnostic,
-        signature: Span,
-        callable_kind: &str,
-    ) {
-        if let Some(overrides) = self.overrides
-            && let Some(info) = diagnostic
-                .sub_diagnostics_mut()
-                .find(|info| info.headline_message() == overrides.info)
-        {
-            info.annotate(Annotation::primary(signature));
-        } else {
-            let mut info = SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format_args!("{callable_kind} signature here"),
-            );
-            info.annotate(Annotation::primary(signature));
-            diagnostic.sub(info);
-        }
+/// Attaches a callable signature to existing implicit-call context when available.
+fn annotate_callable_signature(
+    diagnostic: &mut LintDiagnosticGuard<'_, '_>,
+    signature: Span,
+    callable_kind: &str,
+) {
+    if let Some(info) = diagnostic.message_override_info_mut() {
+        info.annotate(Annotation::primary(signature));
+    } else {
+        let mut info = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!("{callable_kind} signature here"),
+        );
+        info.annotate(Annotation::primary(signature));
+        diagnostic.sub(info);
     }
 }
 
@@ -8432,11 +8427,7 @@ impl<'db> BindingError<'db> {
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
-                        context.annotate_callable_signature(
-                            &mut diag,
-                            spans.signature,
-                            callable_kind,
-                        );
+                        annotate_callable_signature(&mut diag, spans.signature, callable_kind);
                     }
                 }
             }
@@ -8501,11 +8492,7 @@ impl<'db> BindingError<'db> {
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
-                        context.annotate_callable_signature(
-                            &mut diag,
-                            spans.signature,
-                            callable_kind,
-                        );
+                        annotate_callable_signature(&mut diag, spans.signature, callable_kind);
                     }
                 }
             }
@@ -8522,11 +8509,7 @@ impl<'db> BindingError<'db> {
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
-                        context.annotate_callable_signature(
-                            &mut diag,
-                            spans.signature,
-                            callable_kind,
-                        );
+                        annotate_callable_signature(&mut diag, spans.signature, callable_kind);
                     }
                 }
             }
@@ -8548,11 +8531,7 @@ impl<'db> BindingError<'db> {
                     if let Some(compound_diag) = compound_diag {
                         compound_diag.add_context(db, env, &mut diag);
                     } else if let Some(spans) = callable_ty.function_spans(context.db()) {
-                        context.annotate_callable_signature(
-                            &mut diag,
-                            spans.signature,
-                            callable_kind,
-                        );
+                        annotate_callable_signature(&mut diag, spans.signature, callable_kind);
                     }
                 }
             }
