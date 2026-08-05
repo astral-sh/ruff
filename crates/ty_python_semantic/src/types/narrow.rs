@@ -696,12 +696,14 @@ impl ClassInfoConstraintFunction {
 }
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone, Copy, get_size2::GetSize, salsa::SalsaValue)]
-enum NarrowingConjunct<'db> {
+enum NarrowingOperation<'db> {
+    /// Narrow the subject by intersecting it directly with this type.
     Intersection(Type<'db>),
+    /// Narrow to this generic type while preserving type arguments already known about the subject.
     GenericFiltering(Type<'db>),
 }
 
-impl<'db> NarrowingConjunct<'db> {
+impl<'db> NarrowingOperation<'db> {
     const fn ty(self) -> Type<'db> {
         match self {
             Self::Intersection(ty) | Self::GenericFiltering(ty) => ty,
@@ -711,19 +713,19 @@ impl<'db> NarrowingConjunct<'db> {
 
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
-    conjuncts: SmallVec<[NarrowingConjunct<'db>; 2]>,
+    conjuncts: SmallVec<[NarrowingOperation<'db>; 2]>,
 }
 
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![NarrowingConjunct::Intersection(ty)],
+            conjuncts: smallvec![NarrowingOperation::Intersection(ty)],
         }
     }
 
     fn generic_filtering(ty: Type<'db>) -> Self {
         Self {
-            conjuncts: smallvec![NarrowingConjunct::GenericFiltering(ty)],
+            conjuncts: smallvec![NarrowingOperation::GenericFiltering(ty)],
         }
     }
 
@@ -757,10 +759,10 @@ impl<'db> Conjunctions<'db> {
         self.conjuncts
             .into_iter()
             .fold(Type::object(), |accumulated, conjunct| match conjunct {
-                NarrowingConjunct::Intersection(ty) => {
+                NarrowingOperation::Intersection(ty) => {
                     IntersectionType::from_two_elements(db, env, accumulated, ty)
                 }
-                NarrowingConjunct::GenericFiltering(ty) => {
+                NarrowingOperation::GenericFiltering(ty) => {
                     filter_generic_narrowing_constraint(db, env, accumulated, ty)
                 }
             })
