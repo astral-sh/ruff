@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -38,6 +38,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for unio
    |
 15 | 10 and get() and True
    |        ^^^^^
-   |
 
 ```

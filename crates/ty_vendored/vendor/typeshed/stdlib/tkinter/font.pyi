@@ -1,3 +1,5 @@
+"""Utilities to help work with fonts in Tkinter."""
+
 import _tkinter
 import itertools
 import tkinter
@@ -125,6 +127,7 @@ class Font:
         overstrike: bool = ...,
     ) -> _FontDict | None:
         """Modify font attributes"""
+
     configure = config
     def copy(self) -> Font:
         """Return a distinct copy of the current font"""

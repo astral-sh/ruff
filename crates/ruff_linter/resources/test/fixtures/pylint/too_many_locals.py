@@ -11,7 +11,7 @@ def func() -> None:  # OK
     ninth = 9
     tenth = 10
     eleventh = 11
-    twelveth = 12
+    twelfth = 12
     thirteenth = 13
     fourteenth = 14
     fifteenth = 15

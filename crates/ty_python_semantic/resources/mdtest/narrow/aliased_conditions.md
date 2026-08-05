@@ -152,8 +152,11 @@ def _(x: int | None):
         # TODO: same as above
         reveal_type(x)  # revealed: int | None
     if y := is_none:
-        # TODO: same as above
-        reveal_type(x)  # revealed: int | None
+        reveal_type(x)  # revealed: None
+        reveal_type(y)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: int
+        reveal_type(y)  # revealed: Literal[False]
     if (lambda: is_none)():
         # TODO: same as above
         reveal_type(x)  # revealed: int | None
@@ -378,11 +381,8 @@ def _(x: int | None):
         if is_none:
             reveal_type(x)  # revealed: Literal[42]
 
-    # TODO: should be `int | None`
-    # We don't yet track that `inner()` can modify `x` via `nonlocal`.
-    # (https://github.com/astral-sh/ty/issues/2731)
     if is_none:
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: int | None
 
 def _(x: int | None):
     is_none = x is None
@@ -440,11 +440,8 @@ def _(x: int | None):
 
     inner()
 
-    # TODO: should be `int | None`
-    # We don't yet track that `inner()` can modify `is_none` via `nonlocal`.
-    # (https://github.com/astral-sh/ty/issues/2731)
     if is_none:
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: int | None
 
 def _(x: int | None):
     is_none = x is None

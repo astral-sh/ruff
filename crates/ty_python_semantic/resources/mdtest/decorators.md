@@ -179,6 +179,30 @@ class Foo:
 reveal_type(Foo().foo)  # revealed: str
 ```
 
+### `functools.cached_property` on a generic class
+
+A cached property must preserve the type variable bound by its enclosing generic class, including
+when the return type is a union:
+
+```py
+from functools import cached_property
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    @cached_property
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @cached_property
+    def values(self) -> list[T] | None:
+        raise NotImplementedError
+
+reveal_type(Box[int]().value)  # revealed: int
+reveal_type(Box[int]().values)  # revealed: list[int] | None
+```
+
 ## Lambdas as decorators
 
 ```py
@@ -595,6 +619,8 @@ class DeprecatedThenUnannotated: ...
 DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
 ```
 
+## Preserving the original class object
+
 If a class decorator returns the original class object, we preserve the class binding so it can
 still be used in annotations and as a base class:
 
@@ -649,6 +675,8 @@ class DerivedFactoryPreservedClass(FactoryPreservedClass):
     value: FactoryPreservedClass
 ```
 
+## Intersection-returning class decorators
+
 Class decorators can return intersections that expose attributes added to the decorated class
 object:
 
@@ -666,6 +694,7 @@ class ResourceEnabled(Protocol):
 SchemaT = TypeVar("SchemaT")
 
 def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
     return cls
 
 @register
@@ -674,6 +703,8 @@ class UserSchema:
 
 reveal_type(UserSchema.resource.fetch())  # revealed: str
 ```
+
+## Metadata decorators above intersection-returning decorators
 
 Metadata decorators stacked above an intersection-returning class decorator still apply to the
 original class object, while preserving the extra intersection members:
@@ -693,6 +724,7 @@ class ResourceEnabled(Protocol):
 SchemaT = TypeVar("SchemaT")
 
 def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
     return cls
 
 @dataclass
@@ -703,6 +735,8 @@ class RegisteredDataclass:
 reveal_type(RegisteredDataclass.resource.fetch())  # revealed: str
 reveal_type(RegisteredDataclass(1))  # revealed: RegisteredDataclass
 ```
+
+## Class-preserving decorators above intersection-returning decorators
 
 Class-preserving decorators stacked above an intersection-returning class decorator preserve the
 existing intersection members:
@@ -721,6 +755,7 @@ class ResourceEnabled(Protocol):
 SchemaT = TypeVar("SchemaT")
 
 def register(cls: type[SchemaT]) -> Intersection[type[SchemaT], ResourceEnabled]:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `type[SchemaT@register] & ResourceEnabled`, found `type[SchemaT@register]`"
     return cls
 
 def identity(cls: type[SchemaT]) -> type[SchemaT]:

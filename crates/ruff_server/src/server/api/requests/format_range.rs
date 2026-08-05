@@ -1,5 +1,5 @@
 use anyhow::Context;
-use lsp_types::{self as types, Range, request as req};
+use lsp_types::{self as types, DocumentRangeFormattingRequest, Range};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
@@ -11,11 +11,11 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) struct FormatRange;
 
 impl super::RequestHandler for FormatRange {
-    type RequestType = req::RangeFormatting;
+    type RequestType = DocumentRangeFormattingRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for FormatRange {
-    super::define_document_url!(params: &types::DocumentRangeFormattingParams);
+    super::define_document_uri!(params: &types::DocumentRangeFormattingParams);
 
     fn run_with_snapshot(
         snapshot: Self::Snapshot,
@@ -24,9 +24,9 @@ impl super::BackgroundDocumentRequestHandler for FormatRange {
     ) -> Result<super::FormatResponse> {
         let snapshot = match snapshot {
             Ok(snapshot) => snapshot,
-            Err(url) => {
+            Err(uri) => {
                 tracing::warn!(
-                    "Returning no range formatting edits because document `{url}` isn't open."
+                    "Returning no range formatting edits because document `{uri}` isn't open."
                 );
                 return Ok(None);
             }

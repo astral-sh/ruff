@@ -4,14 +4,16 @@ use std::fmt;
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use ruff_db::files::{File, FileError, FilePath, system_path_to_file, vendored_path_to_file};
+use ruff_db::files::{
+    File, FilePath, directory_listing, system_path_to_file, vendored_path_to_file,
+};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::resolve::{PyTyped, ResolverContext};
-use crate::typeshed::{TypeshedVersionsQueryResult, typeshed_versions};
+use crate::typeshed::TypeshedVersionsQueryResult;
 
 /// A path that points to a Python module.
 ///
@@ -29,7 +31,7 @@ pub(crate) struct ModulePath {
 
 impl ModulePath {
     #[must_use]
-    pub(crate) fn is_standard_library(&self) -> bool {
+    fn is_standard_library(&self) -> bool {
         matches!(
             &*self.search_path.0,
             SearchPathInner::StandardLibraryCustom(_) | SearchPathInner::StandardLibraryVendored(_)
@@ -97,16 +99,14 @@ impl ModulePath {
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path)
             | SearchPathInner::StandardLibraryReal(search_path) => {
-                system_path_to_file(resolver.db, search_path.join(relative_path))
-                    == Err(FileError::IsADirectory)
+                system_path_is_directory(resolver.db, &search_path.join(relative_path))
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file(resolver.db, stdlib_root.join(relative_path))
-                            == Err(FileError::IsADirectory)
+                        system_path_is_directory(resolver.db, &stdlib_root.join(relative_path))
                     }
                 }
             }
@@ -136,23 +136,26 @@ impl ModulePath {
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
 
-                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
-                    || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
+                directory_contains_file(
+                    resolver.db,
+                    &absolute_path,
+                    &["__init__.py", "__init__.pyi"],
+                )
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
                 let absolute_path = search_path.join(relative_path);
 
-                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
+                directory_contains_file(resolver.db, &absolute_path, &["__init__.py"])
             }
             SearchPathInner::StandardLibraryCustom(search_path) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(
+                    | TypeshedVersionsQueryResult::MaybeExists => directory_contains_file(
                         resolver.db,
-                        search_path.join(relative_path).join("__init__.pyi"),
-                    )
-                    .is_ok(),
+                        &search_path.join(relative_path),
+                        &["__init__.pyi"],
+                    ),
                 }
             }
             SearchPathInner::StandardLibraryVendored(search_path) => {
@@ -170,6 +173,9 @@ impl ModulePath {
     /// Get the `py.typed` info for this package (not considering parent packages)
     pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
         let Some(py_typed_contents) = self.to_system_path().and_then(|path| {
+            if !directory_contains_file(resolver.db, &path, &["py.typed"]) {
+                return None;
+            }
             let py_typed_path = path.join("py.typed");
             let py_typed_file = system_path_to_file(resolver.db, py_typed_path).ok()?;
             // If we fail to read it let's say that's like it doesn't exist
@@ -222,17 +228,17 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
-                system_path_to_file(db, search_path.join(relative_path)).ok()
+                system_path_to_file_if_listed(db, &search_path.join(relative_path))
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
-                system_path_to_file(db, search_path.join(relative_path)).ok()
+                system_path_to_file_if_listed(db, &search_path.join(relative_path))
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file(db, stdlib_root.join(relative_path)).ok()
+                        system_path_to_file_if_listed(db, &stdlib_root.join(relative_path))
                     }
                 }
             }
@@ -369,6 +375,37 @@ impl PartialEq<ModulePath> for VendoredPathBuf {
     }
 }
 
+fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) -> bool {
+    let Ok(listing) = directory_listing(db, directory) else {
+        return false;
+    };
+
+    names
+        .iter()
+        .any(|name| listing.entry_is_file(db, directory, name))
+}
+
+fn system_path_to_file_if_listed(db: &dyn Db, path: &SystemPath) -> Option<File> {
+    let Some((parent, name)) = path.parent().zip(path.file_name()) else {
+        return system_path_to_file(db, path).ok();
+    };
+
+    let listing = directory_listing(db, parent).ok()?;
+    if listing.entry_is_file(db, parent, name) {
+        system_path_to_file(db, path).ok()
+    } else {
+        None
+    }
+}
+
+fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
+    let Some((parent, name)) = path.parent().zip(path.file_name()) else {
+        return db.system().is_directory(path);
+    };
+
+    directory_listing(db, parent).is_ok_and(|listing| listing.entry_is_directory(db, parent, name))
+}
+
 #[must_use]
 fn stdlib_path_to_module_name(relative_path: &Utf8Path) -> Option<ModuleName> {
     let parent_components = relative_path
@@ -391,13 +428,14 @@ fn query_stdlib_version(
     let Some(module_name) = stdlib_path_to_module_name(relative_path) else {
         return TypeshedVersionsQueryResult::DoesNotExist;
     };
-    let ResolverContext {
-        db,
-        python_version,
-        mode: _,
-    } = context;
-
-    typeshed_versions(*db).query_module(&module_name, *python_version)
+    context
+        .resolver_environment
+        .search_paths(context.db)
+        .typeshed_versions()
+        .query_module(
+            &module_name,
+            context.resolver_environment.python_version(context.db),
+        )
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -558,6 +596,11 @@ impl SearchPath {
         )
     }
 
+    /// Is this a user-provided extra search path?
+    pub(crate) fn is_extra(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::Extra(_))
+    }
+
     /// Is this search path in "first party" code? i.e., The
     /// end user's project code.
     pub fn is_first_party(&self) -> bool {
@@ -567,6 +610,19 @@ impl SearchPath {
     /// Is the module in a site-packages directory?
     pub fn is_site_packages(&self) -> bool {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
+    }
+
+    /// Is it plausible that this search path contains third-party code?
+    pub(crate) fn can_contain_third_party_code(&self) -> bool {
+        match &*self.0 {
+            SearchPathInner::SitePackages(_)
+            | SearchPathInner::Editable(_)
+            | SearchPathInner::Extra(_) => true,
+            SearchPathInner::FirstParty(_)
+            | SearchPathInner::StandardLibraryCustom(_)
+            | SearchPathInner::StandardLibraryVendored(_)
+            | SearchPathInner::StandardLibraryReal(_) => false,
+        }
     }
 
     fn is_valid_extension(&self, extension: &str) -> bool {
@@ -651,12 +707,12 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub fn as_system_path(&self) -> Option<&SystemPath> {
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
         self.as_path().as_system_path()
     }
 
     #[must_use]
-    pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
+    fn as_vendored_path(&self) -> Option<&VendoredPath> {
         self.as_path().as_vendored_path()
     }
 
@@ -839,6 +895,7 @@ mod tests {
     use ruff_db::Db;
     use ruff_python_ast::PythonVersion;
 
+    use crate::ResolverEnvironment;
     use crate::db::tests::TestDb;
     use crate::resolve::ModuleResolveMode;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
@@ -1105,8 +1162,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY38, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         let asyncio_regular_package = stdlib_path.join("asyncio");
         assert!(asyncio_regular_package.is_directory(&resolver));
@@ -1136,8 +1196,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY38, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         let xml_namespace_package = stdlib_path.join("xml");
         assert!(xml_namespace_package.is_directory(&resolver));
@@ -1159,8 +1222,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY38, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         let functools_module = stdlib_path.join("functools.pyi");
         assert!(functools_module.to_file(&resolver).is_some());
@@ -1176,8 +1242,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY38, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(collections_regular_package.to_file(&resolver), None);
@@ -1193,8 +1262,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY38, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(importlib_namespace_package.to_file(&resolver), None);
@@ -1215,8 +1287,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py38_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY38, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         let non_existent = stdlib_path.join("doesnt_even_exist");
         assert_eq!(non_existent.to_file(&resolver), None);
@@ -1244,8 +1319,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY39, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY39, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         // Since we've set the target version to Py39,
         // `collections` should now exist as a directory, according to VERSIONS...
@@ -1276,8 +1354,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY39, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY39, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         // The `importlib` directory now also exists
         let importlib_namespace_package = stdlib_path.join("importlib");
@@ -1301,8 +1382,11 @@ mod tests {
         };
 
         let (db, stdlib_path) = py39_typeshed_test_case(TYPESHED);
-        let resolver =
-            ResolverContext::new(&db, PythonVersion::PY39, ModuleResolveMode::StubsAllowed);
+        let resolver = ResolverContext::new(
+            &db,
+            ResolverEnvironment::new(&db, PythonVersion::PY39, db.search_paths()),
+            ModuleResolveMode::Typing,
+        );
 
         // The `xml` package no longer exists on py39:
         let xml_namespace_package = stdlib_path.join("xml");

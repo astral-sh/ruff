@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use lsp_types::request::DocumentSymbolRequest;
-use lsp_types::{DocumentSymbol, DocumentSymbolParams, SymbolInformation, Url};
+use lsp_types::DocumentSymbolRequest;
+use lsp_types::{DocumentSymbol, DocumentSymbolParams, Uri};
 use ruff_db::files::File;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};
@@ -22,7 +22,7 @@ impl RequestHandler for DocumentSymbolRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
-    fn document_url(params: &DocumentSymbolParams) -> Cow<'_, Url> {
+    fn document_uri(params: &DocumentSymbolParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -48,14 +48,14 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             .resolved_client_capabilities()
             .supports_hierarchical_document_symbols();
 
-        let symbols = document_symbols(db, file);
+        let symbols = document_symbols(db, db.program_file(file));
         if symbols.is_empty() {
             return Ok(None);
         }
 
         if supports_hierarchical {
             let symbols = symbols.to_hierarchical();
-            let lsp_symbols: Vec<DocumentSymbol> = symbols
+            let lsp_symbols = symbols
                 .iter()
                 .filter_map(|(id, symbol)| {
                     convert_to_lsp_document_symbol(
@@ -69,17 +69,21 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
                 })
                 .collect();
 
-            Ok(Some(lsp_types::DocumentSymbolResponse::Nested(lsp_symbols)))
+            Ok(Some(lsp_types::DocumentSymbolResponse::DocumentSymbolList(
+                lsp_symbols,
+            )))
         } else {
             // Return flattened symbols as SymbolInformation
-            let lsp_symbols: Vec<SymbolInformation> = symbols
+            let lsp_symbols = symbols
                 .iter()
                 .filter_map(|(_, symbol)| {
                     convert_to_lsp_symbol_information(db, file, symbol, snapshot.encoding())
                 })
                 .collect();
 
-            Ok(Some(lsp_types::DocumentSymbolResponse::Flat(lsp_symbols)))
+            Ok(Some(
+                lsp_types::DocumentSymbolResponse::SymbolInformationList(lsp_symbols),
+            ))
         }
     }
 }

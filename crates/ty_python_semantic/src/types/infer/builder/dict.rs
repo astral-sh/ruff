@@ -14,8 +14,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
+        collection_expr: Option<ast::ExprRef<'_>>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
+        let db = self.db();
         if !arguments.args.is_empty() {
             return None;
         }
@@ -24,9 +26,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
         if let Some(tcx) = call_expression_tcx.annotation
-            && let Some(typed_dict) = tcx
-                .filter_union(self.db(), Type::is_typed_dict)
-                .as_typed_dict()
+            && let Some(typed_dict) = tcx.filter_union(db, Type::is_typed_dict).as_typed_dict()
         {
             // Only speculate the `**kwargs` applicability check. Assignability handles inputs that
             // are already valid for the target, including gradual and bottom types. The additional
@@ -39,20 +39,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // committed with the fast path or left for ordinary `dict(...)` inference when we fall
             // back.
             let supports_typed_dict_context = {
-                let mut speculative_builder = self.speculate();
+                let mut speculative_builder = self.speculate_without_diagnostics();
+                let env = speculative_builder.program_environment();
                 infer_unpacked_keyword_types(arguments, |expr, tcx| {
                     speculative_builder.infer_expression(expr, tcx)
                 })
                 .into_iter()
                 .flatten()
                 .all(|keyword_ty| {
-                    keyword_ty
-                        .is_assignable_to(speculative_builder.db(), Type::TypedDict(typed_dict))
-                        || extract_unpacked_typed_dict_keys_from_value_type(
-                            speculative_builder.db(),
-                            keyword_ty,
-                        )
-                        .is_some()
+                    keyword_ty.is_assignable_to(db, env, Type::TypedDict(typed_dict))
+                        || extract_unpacked_typed_dict_keys_from_value_type(db, env, keyword_ty)
+                            .is_some()
                 })
             };
 
@@ -101,7 +98,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let key = keyword_names
                     .get(&elt.node_index().load())
                     .expect("keyword-only dict() fast-path requires named keywords");
-                Type::string_literal(builder.db(), key.as_str())
+                Type::string_literal(builder.db(), key)
             } else {
                 builder.infer_expression(elt, tcx)
             }
@@ -109,7 +106,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_collection_literal(
             KnownClass::Dict,
-            None,
+            collection_expr,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,

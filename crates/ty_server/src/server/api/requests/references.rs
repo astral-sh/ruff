@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
-use lsp_types::request::References;
-use lsp_types::{Location, ReferenceParams, Url};
+use lsp_types::ReferencesRequest;
+use lsp_types::{Location, ReferenceParams, Uri};
 use ty_ide::find_references;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -15,12 +15,12 @@ use crate::session::client::Client;
 pub(crate) struct ReferencesRequestHandler;
 
 impl RequestHandler for ReferencesRequestHandler {
-    type RequestType = References;
+    type RequestType = ReferencesRequest;
 }
 
 impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
-    fn document_url(params: &ReferenceParams) -> Cow<'_, Url> {
-        Cow::Borrowed(&params.text_document_position.text_document.uri)
+    fn document_uri(params: &ReferenceParams) -> Cow<'_, Uri> {
+        Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
@@ -40,10 +40,10 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
             return Ok(None);
         };
 
-        let Some(offset) = params.text_document_position.position.to_text_size(
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.url(),
+            snapshot.uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
@@ -51,7 +51,9 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
         let include_declaration = params.context.include_declaration;
 
-        let Some(references_result) = find_references(db, file, offset, include_declaration) else {
+        let Some(references_result) =
+            find_references(db, db.program_file(file), offset, include_declaration)
+        else {
             return Ok(None);
         };
 

@@ -292,7 +292,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
 
 /// Formats the content of the passed comment.
 ///
-/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
+/// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, `!`, or `|`
 /// * Replaces non breaking whitespaces with regular whitespaces except if in front of a `types:` comment
 pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment<'_> {
     FormatComment { comment }
@@ -361,7 +361,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
 /// * Black normalization of `SourceComment`.
 /// * Line suffix with reserved width for the final, normalized content.
 /// * Expands parent node.
-pub(crate) const fn trailing_end_of_line_comment(
+const fn trailing_end_of_line_comment(
     comment: &SourceComment,
 ) -> FormatTrailingEndOfLineComment<'_> {
     FormatTrailingEndOfLineComment { comment }
@@ -428,7 +428,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 ///   unnecessary allocations.
 /// * If the content is modified then make as few allocations as possible and use
 ///   a dynamic text element at the original slice's start position.
-pub(crate) const fn format_normalized_comment(
+const fn format_normalized_comment(
     comment: Cow<'_, str>,
     range: TextRange,
 ) -> FormatNormalizedComment<'_> {
@@ -491,7 +491,7 @@ fn normalize_comment<'a>(
     // Fast path for correctly formatted comments: if the comment starts with a space, or any
     // of the allowed characters, then it's included verbatim (apart for trimming any trailing
     // whitespace).
-    if content.starts_with([' ', '!', ':', '#', '\'']) {
+    if content.starts_with([' ', '!', ':', '#', '\'', '|']) {
         return Ok(Cow::Borrowed(trimmed));
     }
 
@@ -509,7 +509,7 @@ fn normalize_comment<'a>(
             Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])))
         }
     } else {
-        Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+        Ok(Cow::Owned(std::format!("# {content}")))
     }
 }
 

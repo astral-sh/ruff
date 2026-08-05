@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -37,7 +37,6 @@ error[invalid-await]: `PossiblyUnbound` is not awaitable
   |
 5 |         def __await__(self):
   |             --------------- method defined here
-  |
 info: `__await__` may be missing
 
 ```

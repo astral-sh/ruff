@@ -2,7 +2,7 @@
 print(("foo"))
 
 # UP034
-print(("hell((goodybe))o"))
+print(("hell((goodbye))o"))
 
 # UP034
 print((("foo")))

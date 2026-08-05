@@ -1,3 +1,4 @@
+use crate::Db;
 /// This module defines a tree structure for collecting contextual information about type relation errors
 /// ("why is this complex type not assignable to that other complex type?").
 use std::cell::{Cell, RefCell};
@@ -7,8 +8,8 @@ use ruff_python_ast::name::Name;
 
 use crate::types::context::LintDiagnosticGuard;
 use crate::types::tuple::TupleLength;
-use crate::types::{Type, TypedDictType};
-use crate::{Db, FxOrderSet};
+use crate::types::{DisplaySettings, Type, TypedDictType};
+use crate::{FxOrderSet, ProgramEnvironment};
 
 /// Identifies a parameter, either by name or by position.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -91,6 +92,10 @@ pub(crate) enum ErrorContext<'db> {
         target_field: Type<'db>,
     },
     TypedDictNotAssignableToDict(TypedDictType<'db>),
+    OpenTypedDictNotAssignableToMapping {
+        source: TypedDictType<'db>,
+        target: Type<'db>,
+    },
     IncompatibleReturnTypes {
         source: Type<'db>,
         target: Type<'db>,
@@ -100,8 +105,23 @@ pub(crate) enum ErrorContext<'db> {
         target: Type<'db>,
         parameter: ParameterDescription,
     },
+    InferredCallableType {
+        source: Type<'db>,
+        callable: Type<'db>,
+    },
     ExtraRequiredParameter {
         parameter: ParameterDescription,
+    },
+    MissingParameter {
+        parameter: ParameterDescription,
+    },
+    RequiredParameterMustHaveDefault {
+        parameter: ParameterDescription,
+    },
+    MissingVariadicPositionalParameter,
+    MissingVariadicKeywordParameter,
+    TopCallableAssignedToNonTop {
+        return_type: Type<'db>,
     },
     ParameterNameMismatch {
         source_name: Name,
@@ -132,8 +152,17 @@ pub(crate) enum ErrorContext<'db> {
         member_name: Name,
         ty: Type<'db>,
     },
+    ProtocolSpecialMethodNotDefinedOnMetaType,
     ProtocolMemberIncompatible {
         member_name: Name,
+    },
+    ProtocolMemberReadTypeIncompatible {
+        source: Type<'db>,
+        target: Type<'db>,
+    },
+    ProtocolMemberNotWritable,
+    ProtocolMemberWriteTypeIncompatible {
+        target: Type<'db>,
     },
 }
 
@@ -141,11 +170,14 @@ impl<'db> ErrorContext<'db> {
     fn render(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         help_messages: &mut FxOrderSet<HelpMessages>,
     ) -> Option<String> {
         let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
             TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
-            TypedDictType::Synthesized(_) => Type::TypedDict(*typed_dict).display(db).to_string(),
+            TypedDictType::Synthesized(_) => {
+                Type::TypedDict(*typed_dict).display(db, env).to_string()
+            }
         };
 
         Some(match self {
@@ -156,17 +188,28 @@ impl<'db> ErrorContext<'db> {
                 element,
                 union,
                 target,
-            } => format!(
-                "element `{}` of union `{}` is not assignable to `{}`",
-                element.display(db),
-                union.display(db),
-                target.display(db),
-            ),
-            Self::NotAssignableToAnyUnionElement { source, union } => format!(
-                "type `{}` is not assignable to any element of the union `{}`",
-                source.display(db),
-                union.display(db),
-            ),
+            } => {
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    db,
+                    env,
+                    [*element, *union, *target],
+                );
+                format!(
+                    "element `{}` of union `{}` is not assignable to `{}`",
+                    element.display_with(db, env, settings.clone()),
+                    union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                    target.display_with(db, env, settings),
+                )
+            }
+            Self::NotAssignableToAnyUnionElement { source, union } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*source, *union]);
+                format!(
+                    "type `{}` is not assignable to any element of the union `{}`",
+                    source.display_with(db, env, settings.clone()),
+                    union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                )
+            }
             Self::NotAssignableToNOtherUnionElements { n } => format!(
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }
@@ -177,17 +220,17 @@ impl<'db> ErrorContext<'db> {
                 intersection,
             } => format!(
                 "type `{}` is not assignable to element `{}` of intersection `{}`",
-                source.display(db),
-                element.display(db),
-                intersection.display(db),
+                source.display(db, env),
+                element.display(db, env),
+                intersection.display(db, env),
             ),
             Self::NoIntersectionElementAssignableToTarget {
                 intersection,
                 target,
             } => format!(
                 "no element of intersection `{}` is assignable to `{}`",
-                intersection.display(db),
-                target.display(db),
+                intersection.display(db, env),
+                target.display(db, env),
             ),
             Self::TypedDictFieldMissing { field_name, source } => {
                 format!(
@@ -239,8 +282,8 @@ impl<'db> ErrorContext<'db> {
                 "field \"{field_name}\" on {source} has type `{source_field}` which is not assignable to type `{target_field}` expected by {target}",
                 source = typed_dict_name(source),
                 target = typed_dict_name(target),
-                source_field = source_field.display(db),
-                target_field = target_field.display(db),
+                source_field = source_field.display(db, env),
+                target_field = target_field.display(db, env),
             ),
             Self::TypedDictNotAssignableToDict(typed_dict) => {
                 help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);
@@ -251,27 +294,74 @@ impl<'db> ErrorContext<'db> {
                     source = typed_dict_name(typed_dict)
                 )
             }
+            Self::OpenTypedDictNotAssignableToMapping { source, target } => {
+                let name = source.defining_class().map(|class| class.name(db));
+                help_messages.insert(HelpMessages::OpenTypedDictNotAssignableToMapping {
+                    typed_dict_name: name.cloned(),
+                });
+                help_messages.insert(HelpMessages::ExplainOpenTypedDictUnsoundness {
+                    typed_dict_name: name.cloned(),
+                });
+
+                format!(
+                    "{source} is not assignable to `{target}`",
+                    source = typed_dict_name(source),
+                    target = target.display(db, env)
+                )
+            }
             Self::IncompatibleReturnTypes { source, target } => format!(
                 "incompatible return types: `{source}` is not assignable to `{target}`",
-                source = source.display(db),
-                target = target.display(db),
+                source = source.display(db, env),
+                target = target.display(db, env),
             ),
             Self::IncompatibleParameterTypes {
                 source,
                 target,
                 parameter,
             } => {
-                // reversed order due to covariance
+                // reversed order due to contravariance of parameter types
                 format!(
                     "{parameter} has an incompatible type: `{target}` is not assignable to `{source}`",
-                    source = source.display(db),
-                    target = target.display(db),
+                    source = source.display(db, env),
+                    target = target.display(db, env),
                 )
             }
+            Self::InferredCallableType { source, callable } => format!(
+                "type `{}` has inferred callable type `{}`",
+                source.display(db, env),
+                callable.display(db, env),
+            ),
             Self::ExtraRequiredParameter { parameter } => match parameter {
-                ParameterDescription::Named(name) => format!("unexpected extra parameter `{name}`"),
-                ParameterDescription::Index(_) => "unexpected extra parameter".to_string(),
+                ParameterDescription::Named(name) => {
+                    help_messages.insert(HelpMessages::ConsiderAddingADefaultValue {
+                        parameter_name: Some(name.clone()),
+                    });
+                    format!("unexpected extra parameter `{name}`")
+                }
+                ParameterDescription::Index(_) => {
+                    help_messages.insert(HelpMessages::ConsiderAddingADefaultValue {
+                        parameter_name: None,
+                    });
+                    "unexpected extra parameter".to_string()
+                }
             },
+            Self::MissingParameter { parameter } => format!("{parameter} is missing"),
+            Self::RequiredParameterMustHaveDefault { parameter } => {
+                format!("{parameter} must have a default value")
+            }
+            Self::MissingVariadicPositionalParameter => {
+                "the signature must accept arbitrary positional arguments".to_string()
+            }
+            Self::MissingVariadicKeywordParameter => {
+                "the signature must accept arbitrary keyword arguments".to_string()
+            }
+            Self::TopCallableAssignedToNonTop { return_type } => {
+                help_messages.insert(HelpMessages::TopCallableExplanation);
+                format!(
+                    "Object of type `Top[(...) -> {}]` is not safe to call; its signature is not known",
+                    return_type.display(db, env)
+                )
+            }
             Self::ParameterNameMismatch {
                 source_name,
                 target_name,
@@ -315,32 +405,46 @@ impl<'db> ErrorContext<'db> {
                 };
                 format!(
                     "{which} is not compatible: `{source}` is not assignable to `{target}`",
-                    source = source.display(db),
-                    target = target.display(db)
+                    source = source.display(db, env),
+                    target = target.display(db, env)
                 )
             }
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
                 if let Type::ProtocolInstance(_) = ty {
                     format!(
                         "protocol `{}` is not assignable to protocol `{}`",
-                        ty.display(db),
-                        protocol.display(db),
+                        ty.display(db, env),
+                        protocol.display(db, env),
                     )
                 } else {
                     format!(
                         "type `{}` is not assignable to protocol `{}`",
-                        ty.display(db),
-                        protocol.display(db),
+                        ty.display(db, env),
+                        protocol.display(db, env),
                     )
                 }
             }
             Self::ProtocolMemberNotDefined { member_name, ty } => format!(
                 "protocol member `{member_name}` is not defined on type `{}`",
-                ty.display(db),
+                ty.display(db, env),
             ),
+            Self::ProtocolSpecialMethodNotDefinedOnMetaType => {
+                "special methods must be defined on the meta-type when matching a protocol"
+                    .to_string()
+            }
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }
+            Self::ProtocolMemberReadTypeIncompatible { source, target } => format!(
+                "read type `{source}` is not assignable to `{target}`",
+                source = source.display(db, env),
+                target = target.display(db, env),
+            ),
+            Self::ProtocolMemberNotWritable => "the member is not writable".to_string(),
+            Self::ProtocolMemberWriteTypeIncompatible { target } => format!(
+                "the member does not accept writes of type `{}`",
+                target.display(db, env),
+            ),
         })
     }
 }
@@ -350,6 +454,10 @@ enum HelpMessages {
     RequiredFieldCouldBeRemoved,
     TypedDictNotAssignableToDict,
     ConsiderUsingMappingInsteadOfDict,
+    TopCallableExplanation,
+    ConsiderAddingADefaultValue { parameter_name: Option<Name> },
+    OpenTypedDictNotAssignableToMapping { typed_dict_name: Option<Name> },
+    ExplainOpenTypedDictUnsoundness { typed_dict_name: Option<Name> },
 }
 
 impl std::fmt::Display for HelpMessages {
@@ -364,6 +472,30 @@ impl std::fmt::Display for HelpMessages {
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
             }
+            HelpMessages::OpenTypedDictNotAssignableToMapping {typed_dict_name} => {
+                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+                write!(
+                    f,
+                    "{name} would be assignable to this `Mapping` type \
+                    if it were declared with `closed=True`, but TypedDicts are open by default."
+                )
+            }
+            HelpMessages::ExplainOpenTypedDictUnsoundness {typed_dict_name} => {
+                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+                write!(
+                    f,
+                    "A subclass of {name} could validly add a new field of an arbitrary type, \
+                    violating subtyping with the `Mapping` type"
+                )
+            }
+            HelpMessages::TopCallableExplanation => f.write_str(
+                "This type includes all possible parameter sets, \
+                so it cannot safely be called because there is no valid set of arguments for it",
+            ),
+            HelpMessages::ConsiderAddingADefaultValue { parameter_name } => match parameter_name {
+                Some(name) => write!(f, "Parameter `{name}` must have a default value"),
+                None => f.write_str("The parameter must have a default value"),
+            },
         }
     }
 }
@@ -392,12 +524,13 @@ impl<'db> ErrorContextNode<'db> {
     fn render_tree(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         output_lines: &mut Vec<String>,
         help_messages: &mut FxOrderSet<HelpMessages>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(line) = self.context.render(db, help_messages) {
+        if let Some(line) = self.context.render(db, env, help_messages) {
             output_lines.push(format!("{prefix}{line}"));
         }
 
@@ -411,6 +544,7 @@ impl<'db> ErrorContextNode<'db> {
             };
             child.render_tree(
                 db,
+                env,
                 output_lines,
                 help_messages,
                 &child_prefix,
@@ -447,16 +581,8 @@ impl<'db> From<ErrorContext<'db>> for ErrorContextTree<'db> {
 }
 
 impl<'db> ErrorContextTree<'db> {
-    /// Create a new, empty error context tree with collection disabled.
-    pub(crate) fn disabled() -> Self {
-        Self {
-            root: Rc::default(),
-            enabled: Cell::new(false),
-        }
-    }
-
     /// Create a new, empty error context tree with collection enabled.
-    pub(crate) fn enabled() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             root: Rc::default(),
             enabled: Cell::new(true),
@@ -477,11 +603,10 @@ impl<'db> ErrorContextTree<'db> {
     }
 
     /// Push a new error context node, making the existing tree a child of the new context.
-    pub(crate) fn push(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
+    pub(crate) fn push(&self, context: ErrorContext<'db>) {
         if !self.is_enabled() {
             return;
         }
-        let context = get_context();
         let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
         *self.root.borrow_mut() = ErrorContextNode { context, children };
@@ -518,13 +643,14 @@ impl<'db> ErrorContextTree<'db> {
     pub(in crate::types) fn attach_to(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         diag: &mut LintDiagnosticGuard<'_, '_>,
     ) {
         let mut output_lines = Vec::new();
         let mut help_messages = FxOrderSet::default();
         self.root
             .borrow()
-            .render_tree(db, &mut output_lines, &mut help_messages, "", "");
+            .render_tree(db, env, &mut output_lines, &mut help_messages, "", "");
         for line in output_lines {
             diag.info(line);
         }

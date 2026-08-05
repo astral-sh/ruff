@@ -22,7 +22,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             # Case-sensitive
             pyright
         |   pyrefly
-        |   ruff\s*:\s*(disable|enable)
+        |   ruff\s*:\s*(disable|enable|ignore|file-ignore)
         |   mypy:
         |   type:\s*ignore
         |   ty:\s*ignore
@@ -67,9 +67,9 @@ static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
         // Partial dictionary
         r#"^['"]\w+['"]\s*:.+[,{]\s*(#.*)?$"#,
         // Multiline assignment
-        r"^(?:[(\[]\s*)?(?:\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]$",
+        r"^(?:[(\[]\s*)?(?:\w+\s*,\s*)*\w+\s*([)\]]\s*)?=.*[(\[{]\s*(#.*)?$",
         // Brackets,
-        r"^[()\[\]{}\s]+$",
+        r"^[()\[\]{}\s]+\s*(#.*)?$",
     ])
     .unwrap()
 });
@@ -155,6 +155,9 @@ mod tests {
         assert!(!comment_contains_code("\t# testing: Foo Bar Baz", &[]));
         assert!(!comment_contains_code("# ruff: disable[E501]", &[]));
         assert!(!comment_contains_code("#ruff:enable[E501, F84]", &[]));
+        assert!(!comment_contains_code("# ruff: ignore[ARG001]", &[]));
+        assert!(!comment_contains_code("#ruff:ignore[ARG001]", &[]));
+        assert!(!comment_contains_code("#ruff:file-ignore[ARG001]", &[]));
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]
@@ -222,6 +225,9 @@ mod tests {
         assert!(comment_contains_code("# case 1:", &[]));
         assert!(comment_contains_code("#case 1:", &[]));
         assert!(comment_contains_code("# try:", &[]));
+        assert!(comment_contains_code("# )  # noqa: ERA001", &[]));
+        assert!(comment_contains_code("# \t(  # noqa: ERA001", &[]));
+        assert!(comment_contains_code("# x = [  # noqa: ERA001", &[]));
 
         assert!(!comment_contains_code("# this is = to that :(", &[]));
         assert!(!comment_contains_code("#else", &[]));

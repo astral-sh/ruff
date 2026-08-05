@@ -7,8 +7,9 @@ I001 [*] Import block is un-sorted or un-formatted
 1 | / import __future__
 2 | | from __future__ import annotations
   | |__________________________________^
-  |
 help: Organize imports
+  |
 1 + from __future__ import annotations
 2 | import __future__
   - from __future__ import annotations
+  |

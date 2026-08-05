@@ -14,7 +14,7 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
-use ruff_linter::preview::is_warning_severity_enabled;
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, PreviewMode, UnsafeFixes};
 
@@ -210,6 +210,7 @@ impl Printer {
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
         preview: PreviewMode,
+        prefer_rule_codes: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -223,7 +224,7 @@ impl Printer {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
+                        print_fix_summary(writer, &diagnostics.fixed, preview, prefer_rule_codes)?;
                         writeln!(writer)?;
                     }
                 }
@@ -237,11 +238,11 @@ impl Printer {
 
         let config = DisplayDiagnosticConfig::new("ruff")
             .preview(preview.is_enabled())
-            .hide_severity(!is_warning_severity_enabled(preview))
+            .prefer_rule_codes(prefer_rule_codes)
+            .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-            .with_fix_applicability(self.unsafe_fixes.required_applicability())
-            .show_fix_diff(preview.is_enabled());
+            .with_fix_applicability(self.unsafe_fixes.required_applicability());
 
         render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
 
@@ -252,7 +253,7 @@ impl Printer {
             if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                 if !diagnostics.fixed.is_empty() {
                     writeln!(writer)?;
-                    print_fix_summary(writer, &diagnostics.fixed)?;
+                    print_fix_summary(writer, &diagnostics.fixed, preview, prefer_rule_codes)?;
                     writeln!(writer)?;
                 }
             }
@@ -384,6 +385,7 @@ impl Printer {
         writer: &mut dyn Write,
         diagnostics: &Diagnostics,
         preview: PreviewMode,
+        prefer_rule_codes: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -411,11 +413,11 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview.is_enabled())
-                .hide_severity(!is_warning_severity_enabled(preview))
+                .prefer_rule_codes(prefer_rule_codes)
+                .hide_severity(true)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                .show_fix_diff(preview.is_enabled());
+                .with_fix_applicability(self.unsafe_fixes.required_applicability());
             render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
@@ -447,7 +449,12 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
     (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
-fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
+fn print_fix_summary(
+    writer: &mut dyn Write,
+    fixed: &FixMap,
+    preview: PreviewMode,
+    prefer_rule_codes: bool,
+) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.counts().sum::<usize>())
@@ -477,11 +484,19 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
             ":".cyan()
         )?;
         for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
-            writeln!(
-                writer,
-                "    {count:>num_digits$} × {code} ({name})",
-                code = code.to_string().red().bold(),
-            )?;
+            if is_human_readable_names_enabled(preview) && !prefer_rule_codes {
+                writeln!(
+                    writer,
+                    "    {count:>num_digits$} × {name} ({code})",
+                    name = name.to_string().red().bold(),
+                )?;
+            } else {
+                writeln!(
+                    writer,
+                    "    {count:>num_digits$} × {code} ({name})",
+                    code = code.to_string().red().bold(),
+                )?;
+            }
         }
     }
     Ok(())

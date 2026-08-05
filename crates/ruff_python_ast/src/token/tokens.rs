@@ -1,8 +1,9 @@
 use std::{iter::FusedIterator, ops::Deref};
 
 use super::{Token, TokenKind};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, ParenthesizedExpressions, TriviaRanges};
 use ruff_text_size::{Ranged as _, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 /// Tokens represents a vector of lexed [`Token`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,7 +27,7 @@ impl Tokens {
     /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens start at the same offset,
     /// it returns the index of the first one. Multiple tokens can start at the same offset in cases where
     /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
-    pub fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
+    fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
         let partition_point = self.partition_point(|token| token.start() < offset);
 
         let after = &self[partition_point..];
@@ -212,6 +213,26 @@ impl Tokens {
         }
         (before, after)
     }
+
+    /// Return the range of the token at the given offset.
+    ///
+    /// Returns an empty range at the given offset if there's no token at the offset,
+    /// or if the offset is between two tokens.
+    pub fn token_range(&self, offset: TextSize) -> TextRange {
+        match self.at_offset(offset) {
+            TokenAt::Single(token) => token.range(),
+            TokenAt::None | TokenAt::Between(..) => TextRange::empty(offset),
+        }
+    }
+}
+
+impl IntoIterator for Tokens {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.raw.into_iter()
+    }
 }
 
 impl<'a> IntoIterator for &'a Tokens {
@@ -268,12 +289,59 @@ impl FusedIterator for TokenAt {}
 impl From<&Tokens> for CommentRanges {
     fn from(tokens: &Tokens) -> Self {
         let mut ranges = vec![];
+
         for token in tokens {
             if token.kind() == TokenKind::Comment {
                 ranges.push(token.range());
             }
         }
+
         CommentRanges::new(ranges)
+    }
+}
+
+impl From<&Tokens> for TriviaRanges {
+    fn from(tokens: &Tokens) -> Self {
+        let mut comments = vec![];
+        let mut parenthesized = FxHashSet::default();
+        let mut stack = Vec::<Option<TextSize>>::new();
+        let mut previous_end = None;
+
+        for token in tokens {
+            if token.kind() == TokenKind::Comment {
+                comments.push(token.range());
+            }
+
+            if token.kind().is_trivia() {
+                continue;
+            }
+
+            match token.kind() {
+                TokenKind::Lpar => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                    stack.push(None);
+                }
+                TokenKind::Rpar => {
+                    if let (Some(Some(start)), Some(end)) = (stack.pop(), previous_end) {
+                        parenthesized.insert(TextRange::new(start, end));
+                    }
+                }
+                _ => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                }
+            }
+
+            previous_end = Some(token.end());
+        }
+
+        TriviaRanges::new(
+            CommentRanges::new(comments),
+            ParenthesizedExpressions::new(parenthesized),
+        )
     }
 }
 

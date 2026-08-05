@@ -21,12 +21,13 @@ A bare `Callable` without any type arguments:
 
 ```py
 from typing import Callable, Any
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
-def _(c: Callable):
+def _(c: Callable):  # error: [missing-type-argument]
     reveal_type(c)  # revealed: (...) -> Unknown
 
-static_assert(is_equivalent_to(Callable, Callable[..., Any]))
+static_assert(is_equivalent_to(Callable, Callable[..., Any]))  # error: [missing-type-argument]
 ```
 
 ### Invalid parameter type argument
@@ -81,7 +82,7 @@ Using a parameter list:
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int, str]]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -89,7 +90,7 @@ def _(c: Callable[[int, str]]):
 Or, an ellipsis:
 
 ```py
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[...]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -99,7 +100,7 @@ Or something else that's invalid in a type expression generally:
 ```py
 # fmt: off
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
@@ -129,7 +130,7 @@ which argument corresponds to either the parameters or the return type.
 ```py
 from typing import Callable
 
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[[int], str, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -182,7 +183,7 @@ from typing import Callable
 # fmt: off
 
 
-def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+def _(c: Callable[  # error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
             [int],
             [str],  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
             [bytes]  # error: [invalid-type-form] "List literals are not allowed in this context in a parameter annotation"
@@ -435,9 +436,8 @@ from typing_extensions import Callable, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
-def _(c: Callable[[int, *Ts], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def unpack_operator(c: Callable[[int, *Ts], int]):
+    reveal_type(c)  # revealed: (int, /, *Ts@unpack_operator) -> int
 ```
 
 And, using the legacy syntax using `Unpack`:
@@ -445,9 +445,8 @@ And, using the legacy syntax using `Unpack`:
 ```py
 from typing_extensions import Unpack
 
-def _(c: Callable[[int, Unpack[Ts]], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def unpack_special_form(c: Callable[[int, Unpack[Ts]], int]):
+    reveal_type(c)  # revealed: (int, /, *Ts@unpack_special_form) -> int
 ```
 
 ## Member lookup
@@ -488,8 +487,6 @@ If users want to read/write to attributes such as `__qualname__`, they need to c
 of the attribute first:
 
 ```py
-from inspect import getattr_static
-
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
@@ -503,10 +500,14 @@ def f_okay(c: Callable[[], None]):
         # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
-        result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: property
-        if isinstance(result, property) and result.fset:
-            c.__qualname__ = "my_callable"  # okay
+        # TODO: should we have some way for users to narrow a read-only attribute
+        # into a writable attribute...? What would that look like? Something like this?
+        if (
+            hasattr(type(c), "__qualname__")
+            and isinstance(type(c).__qualname__, property)
+            and type(c).__qualname__.fset is not None
+        ):
+            c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
 
 ## From a class
@@ -514,7 +515,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -532,7 +533,8 @@ reveal_type(into_regular_callable(A))
 ```py
 from typing import Callable
 
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(
     not is_assignable_to(
@@ -540,6 +542,69 @@ static_assert(
         Callable[[], Callable[[], str]],
     )
 )
+```
+
+## `typing.Callable` and `collections.abc.Callable` parity
+
+`typing.Callable` is a deprecated alias for `collections.abc.Callable`. Internally we model them as
+distinct `SpecialFormType` variants so that we can support usage of the latter in `match`
+statements, while disallowing the former, but otherwise they should be interchangeable in type
+expressions.
+
+### Bare form
+
+```py
+from typing import Any
+import typing
+import collections.abc
+
+# error: [missing-type-argument]
+def _(c1: typing.Callable, c2: collections.abc.Callable):  # error: [missing-type-argument]
+    reveal_type(c1)  # revealed: (...) -> Unknown
+    reveal_type(c2)  # revealed: (...) -> Unknown
+```
+
+### Parameterized form
+
+```py
+import typing
+import collections.abc
+
+def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str]):
+    reveal_type(c1)  # revealed: (int, /) -> str
+    reveal_type(c2)  # revealed: (int, /) -> str
+```
+
+### Equivalence
+
+```py
+import typing
+import collections.abc
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
+# error: [missing-type-argument]
+static_assert(is_equivalent_to(typing.Callable, collections.abc.Callable))  # error: [missing-type-argument]
+```
+
+### Inside `type[...]`
+
+`type[Callable[...]]` is not a valid type expression (the argument to `type[...]` must be a class
+object), but both modules' `Callable` should produce the same diagnostic and resolved type.
+
+```py
+import typing
+import collections.abc
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c1: type[typing.Callable[[int], str]],
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    c2: type[collections.abc.Callable[[int], str]],
+):
+    reveal_type(c1)  # revealed: type[Unknown]
+    reveal_type(c2)  # revealed: type[Unknown]
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

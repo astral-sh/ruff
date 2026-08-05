@@ -8,7 +8,7 @@
     {
       "name": "ty-skills",
       "source": "./",
-      "description": "Local skills for ty diagnostics and ecosystem workflows"
+      "description": "Local skills for working on ty in the Ruff repository"
     }
   ]
 }

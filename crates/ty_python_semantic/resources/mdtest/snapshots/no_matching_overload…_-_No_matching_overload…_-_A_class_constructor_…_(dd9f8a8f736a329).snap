@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -24,7 +24,6 @@ error[no-matching-overload]: No overload of class `type` matches arguments
   |
 1 | type()  # error: [no-matching-overload]
   | ^^^^^^
-  |
 help: `builtins.type()` can either be called with one or three positional arguments (got 0)
 
 ```

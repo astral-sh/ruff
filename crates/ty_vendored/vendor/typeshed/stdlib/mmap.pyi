@@ -2,8 +2,8 @@ import os
 import sys
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterator
-from typing import Final, Literal, NoReturn, SupportsIndex, overload
-from typing_extensions import Self, disjoint_base
+from typing import Final, Literal, SupportsIndex, overload
+from typing_extensions import Never, Self, disjoint_base
 
 ACCESS_DEFAULT: Final = 0
 ACCESS_READ: Final = 1
@@ -36,7 +36,7 @@ PAGESIZE: Final[int]
 
 @disjoint_base
 class mmap:
-    """Windows: mmap(fileno, length[, tagname[, access[, offset]]])
+    """Windows: mmap(fileno, length[, tagname[, access[, offset[, trackfd]]]])
 
     Maps length bytes from the file specified by the file handle fileno,
     and returns a mmap object.  If length is larger than the current size
@@ -112,6 +112,7 @@ class mmap:
     def write_byte(self, byte: int, /) -> None: ...
     def __len__(self) -> int:
         """Return len(self)."""
+
     closed: bool
     if sys.platform != "win32":
         if sys.version_info >= (3, 15):
@@ -138,7 +139,7 @@ class mmap:
     @overload
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytes: ...
 
-    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> NoReturn:
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> Never:
         """Delete self[key]."""
 
     @overload
@@ -160,6 +161,7 @@ class mmap:
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
+
     if sys.version_info >= (3, 13):
         def seekable(self) -> Literal[True]: ...
 

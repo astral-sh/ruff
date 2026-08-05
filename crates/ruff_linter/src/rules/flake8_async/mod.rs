@@ -19,6 +19,7 @@ mod tests {
     #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
+    #[test_case(Rule::YieldInContextManagerInAsyncGenerator, Path::new("ASYNC119.py"))]
     #[test_case(Rule::AsyncBusyWait, Path::new("ASYNC110.py"))]
     #[test_case(Rule::AsyncZeroSleep, Path::new("ASYNC115.py"))]
     #[test_case(Rule::LongSleepNotForever, Path::new("ASYNC116.py"))]
@@ -46,10 +47,8 @@ mod tests {
     fn async109_python_310_or_older(path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
-            },
+            &LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
+                .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
         Ok(())

@@ -1,4 +1,3 @@
-use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
@@ -10,12 +9,12 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
-use crate::parser::expression::{EXPR_SET, ParsedExpr};
+use crate::parser::expression::{ArgumentsContext, EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
+    FunctionKind, IpyEscapeContext, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
+    helpers,
 };
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -195,13 +194,14 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_statements(&mut self) -> Suite {
-        let mut stmts = Suite::new();
+        let stmts_snapshot = self.stmt_scratch.snapshot();
         let mut progress = ParserProgress::default();
 
         loop {
             progress.assert_progressing(self);
 
-            stmts.push(self.parse_simple_statement());
+            let stmt = self.parse_simple_statement();
+            self.stmt_scratch.push(stmt);
 
             if !self.eat(TokenKind::Semi) {
                 if self.at_simple_stmt() {
@@ -258,7 +258,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
-        stmts
+        self.stmt_scratch.take_thin_vec(stmts_snapshot)
     }
 
     /// Parses a simple statement.
@@ -353,6 +353,12 @@ impl<'src> Parser<'src> {
                 }
 
                 let start = self.node_start();
+
+                // test_err yield_after_comma
+                // def f(): 1, yield 1
+
+                // test_ok yield_after_comma_parenthesized
+                // def f(): 1, (yield 1)
 
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
                 let parsed_expr =
@@ -613,10 +619,12 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let names = self
-            .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
-                p.parse_alias(ImportStyle::Import)
-            });
+        let names_snapshot = self.alias_scratch.snapshot();
+        self.parse_comma_separated_list(RecoveryContextKind::ImportNames, |parser| {
+            let alias = parser.parse_alias(ImportStyle::Import);
+            parser.alias_scratch.push(alias);
+        });
+        let names: Vec<_> = self.alias_scratch.take(names_snapshot);
 
         if names.is_empty() {
             // test_err import_stmt_empty
@@ -688,7 +696,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let names_start = self.node_start();
-        let mut names = vec![];
+        let names_snapshot = self.alias_scratch.snapshot();
         let mut seen_star_import = false;
 
         let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
@@ -706,9 +714,10 @@ impl<'src> Parser<'src> {
                 // from x import a, b.c, d, e.f, g
                 let alias = parser.parse_alias(ImportStyle::ImportFrom);
                 seen_star_import |= alias.name.id == "*";
-                names.push(alias);
+                parser.alias_scratch.push(alias);
             },
         );
+        let names: Vec<_> = self.alias_scratch.take(names_snapshot);
 
         if names.is_empty() {
             // test_err from_import_empty_names
@@ -716,6 +725,15 @@ impl<'src> Parser<'src> {
             // from x import ()
             // from x import ,,
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
+        }
+
+        if seen_star_import && parenthesized.is_yes() {
+            // test_err from_import_parenthesized_star
+            // from x import (*)
+            self.add_error(
+                ParseErrorType::OtherError("Star import cannot be parenthesized".to_string()),
+                self.node_range(names_start),
+            );
         }
 
         if seen_star_import && names.len() > 1 {
@@ -810,7 +828,13 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut dotted_name: CompactString = self.parse_identifier().id.into();
+        let first = self.parse_identifier();
+        if !self.at(TokenKind::Dot) {
+            return first;
+        }
+
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.push_str(&first.id);
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -819,15 +843,19 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            dotted_name.push('.');
-            dotted_name.push_str(&self.parse_identifier());
+            self.name_buffer.push('.');
+            let identifier = self.parse_identifier();
+            self.name_buffer.push_str(&identifier.id);
         }
+
+        let id = self.name_interner.intern(&self.name_buffer[snapshot..]);
+        self.name_buffer.truncate(snapshot);
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: Name::from(dotted_name),
+            id,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1077,11 +1105,7 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
 
-        let TokenValue::IpyEscapeCommand { value, kind } =
-            self.bump_value(TokenKind::IpyEscapeCommand)
-        else {
-            unreachable!()
-        };
+        let (value, kind) = self.bump_ipython_escape_command(IpyEscapeContext::LogicalLineStart);
 
         let range = self.node_range(start);
         if self.options.mode != Mode::Ipython {
@@ -1435,18 +1459,21 @@ impl<'src> Parser<'src> {
         //     pass
         // else:
         //     pass
-        let mut elif_else_clauses = self.parse_clauses(Clause::ElIf, |p| {
-            p.parse_elif_or_else_clause(ElifOrElse::Elif)
+        let elif_else_snapshot = self.elif_else_scratch.snapshot();
+        self.parse_clauses(Clause::ElIf, |parser| {
+            let clause = parser.parse_elif_or_else_clause(ElifOrElse::Elif);
+            parser.elif_else_scratch.push(clause);
         });
 
         if self.at(TokenKind::Else) {
-            elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
+            let clause = self.parse_elif_or_else_clause(ElifOrElse::Else);
+            self.elif_else_scratch.push(clause);
         }
 
         ast::StmtIf {
             test: Box::new(test.expr),
             body,
-            elif_else_clauses,
+            elif_else_clauses: self.elif_else_scratch.take(elif_else_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1538,7 +1565,8 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let handlers = self.parse_clauses(Clause::Except, |p| {
+        let mut handlers = Vec::new();
+        self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
                 p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
@@ -1548,8 +1576,13 @@ impl<'src> Parser<'src> {
             } else if is_star != Some(kind.is_star()) {
                 mixed_except_ranges.push(handler.range());
             }
-            handler
+            if handlers.is_empty() {
+                handlers.reserve_exact(1);
+            }
+            handlers.push(handler);
         });
+        handlers.shrink_to_fit();
+
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
         for handler_err_range in mixed_except_ranges {
@@ -2133,9 +2166,14 @@ impl<'src> Parser<'src> {
         // test_ok class_def_arguments
         // class Foo: ...
         // class Foo(): ...
+        // class Foo((base for base in bases)): ...
+        // class Foo(*(base for base in bases)): ...
+
+        // test_err class_def_unparenthesized_generator_argument
+        // class Foo(base for base in bases): ...
         let arguments = self
             .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments()));
+            .then(|| Box::new(self.parse_arguments(ArgumentsContext::ClassDefinition)));
 
         self.expect(TokenKind::Colon);
 
@@ -2169,7 +2207,9 @@ impl<'src> Parser<'src> {
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
-        let items = self.parse_with_items();
+        let mut items = self.parse_with_items();
+        items.shrink_to_fit();
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::With);
@@ -2267,15 +2307,17 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_comma_separated_list_into_vec(
+                self.parse_comma_separated_list_into_vec_with_capacity(
                     RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
                     |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                    1,
                 )
             }
         } else {
-            self.parse_comma_separated_list_into_vec(
+            self.parse_comma_separated_list_into_vec_with_capacity(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                1,
             )
         }
     }
@@ -2313,7 +2355,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut parsed_with_items = vec![];
+        let mut parsed_with_items = Vec::with_capacity(1);
         let mut has_optional_vars = false;
 
         // test_err with_items_parenthesized_missing_comma
@@ -2984,6 +3026,8 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
+        decorators.shrink_to_fit();
+
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
             TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
@@ -3090,10 +3134,13 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Indent);
 
         let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_list_into_thin_vec(
-                RecoveryContextKind::BlockStatements,
-                Parser::parse_statement,
-            )
+            let snapshot = parser.stmt_scratch.snapshot();
+            parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
+                let statement = parser.parse_statement();
+                parser.stmt_scratch.push(statement);
+            });
+
+            parser.stmt_scratch.take_thin_vec(snapshot)
         }) {
             statements
         } else {
@@ -3273,6 +3320,9 @@ impl<'src> Parser<'src> {
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
         let mut parameters = ast::Parameters::default();
+        let parameters_snapshot = self.parameter_scratch.snapshot();
+        let mut args_snapshot = None;
+        let mut kwonlyargs_snapshot = None;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3298,6 +3348,9 @@ impl<'src> Parser<'src> {
                 TokenKind::Star => {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
+
+                    kwonlyargs_snapshot
+                        .get_or_insert_with(|| parser.parameter_scratch.snapshot());
 
                     if parser.at_name_or_soft_keyword() {
                         let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
@@ -3410,7 +3463,10 @@ impl<'src> Parser<'src> {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parameters.is_empty() {
+                    if parser.parameter_scratch.is_empty(&parameters_snapshot)
+                        && parameters.vararg.is_none()
+                        && parameters.kwarg.is_none()
+                    {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
                         // def foo(/, a): ...
@@ -3450,9 +3506,11 @@ impl<'src> Parser<'src> {
                     }
 
                     if !seen_positional_only_separator {
-                        // We should only swap if we're seeing the separator for the
+                        // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                        if kwonlyargs_snapshot.is_none() {
+                            args_snapshot = Some(parser.parameter_scratch.snapshot());
+                        }
                         seen_positional_only_separator = true;
 
                         // test_ok pos_only_py38
@@ -3499,11 +3557,7 @@ impl<'src> Parser<'src> {
                         seen_keyword_only_param_after_separator = true;
                     }
 
-                    if seen_keyword_only_separator || parameters.vararg.is_some() {
-                        parameters.kwonlyargs.push(param);
-                    } else {
-                        parameters.args.push(param);
-                    }
+                    parser.parameter_scratch.push(param);
                     last_keyword_only_separator_range = None;
                 }
                 _ => {
@@ -3525,6 +3579,18 @@ impl<'src> Parser<'src> {
 
         if matches!(function_kind, FunctionKind::FunctionDef) {
             self.expect(TokenKind::Rpar);
+        }
+
+        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
+            parameters.kwonlyargs = self.parameter_scratch.take_thin_vec(kwonlyargs_snapshot);
+        }
+        if let Some(args_snapshot) = args_snapshot {
+            parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
+            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        } else if seen_positional_only_separator {
+            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        } else {
+            parameters.args = self.parameter_scratch.take_thin_vec(parameters_snapshot);
         }
 
         parameters.range = self.node_range(start);
@@ -3961,12 +4027,7 @@ impl<'src> Parser<'src> {
     /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g.
     /// `Else`) to the recovery context so that expression recovery stops when it encounters an
     /// `else` token.
-    fn parse_clauses<T>(
-        &mut self,
-        clause: Clause,
-        mut parse_clause: impl FnMut(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        let mut clauses = Vec::new();
+    fn parse_clauses(&mut self, clause: Clause, mut parse_clause: impl FnMut(&mut Parser<'src>)) {
         let mut progress = ParserProgress::default();
 
         let recovery_kind = match clause {
@@ -3983,12 +4044,10 @@ impl<'src> Parser<'src> {
         while recovery_kind.is_list_element(self) {
             progress.assert_progressing(self);
 
-            clauses.push(parse_clause(self));
+            parse_clause(self);
         }
 
         self.recovery_context = saved_context;
-
-        clauses
     }
 }
 

@@ -4,12 +4,17 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
+use crate::types::infer::nearest_enclosing_function;
 use crate::{
     TypeQualifiers,
-    types::{Type, diagnostic::INVALID_ASSIGNMENT, infer::TypeInferenceBuilder},
+    types::{
+        Type, attribute_write::assignment_attribute_members, diagnostic::INVALID_ASSIGNMENT,
+        infer::TypeInferenceBuilder,
+    },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
+use ty_python_core::scope::FileScopeId;
 use ty_python_core::semantic_index;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -21,7 +26,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let file = declaration.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, declaration.python_file(db)).load(db);
         let range = match declaration.kind(db) {
             DefinitionKind::AnnotatedAssignment(assignment) => {
                 assignment.annotation(&module).range()
@@ -45,7 +50,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> Option<Definition<'db>> {
         let db = self.db();
-        let class_ty = object_ty.nominal_class(db)?;
+        let env = self.program_environment();
+        let class_ty = object_ty.nominal_class(db, env)?;
 
         for base in class_ty.iter_mro(db) {
             let Some(class) = base.into_class() else {
@@ -57,16 +63,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.file(db));
+            let class_index = semantic_index(db, class_body_scope.program_file(db));
             let place_table = class_index.place_table(class_scope_id);
             let Some(symbol_id) = place_table.symbol_id(attribute) else {
                 continue;
             };
 
             let use_def = class_index.use_def_map(class_scope_id);
-
-            let place_and_quals_result =
-                place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+            let place_and_quals_result = place_from_declarations(
+                db,
+                env,
+                use_def.end_of_scope_symbol_declarations(symbol_id),
+            );
 
             let Some(declaration) = place_and_quals_result.first_declaration else {
                 continue;
@@ -91,16 +99,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// The `is_instance_attribute` flag computed during semantic indexing checks that the object
     /// expression refers to the first parameter of the enclosing method and has not been shadowed
-    /// in intermediate scopes. We additionally check that the enclosing function has an implicit
-    /// receiver, since static methods still have a first parameter.
-    pub(super) fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
-        if self
-            .current_function_type()
-            .is_none_or(|function| !function.has_implicit_receiver(self.db()))
-        {
-            return false;
-        }
-
+    /// in intermediate scopes. We additionally check that the nearest enclosing function has an
+    /// implicit receiver, since static methods also have a first parameter.
+    fn is_instance_attribute_assignment(&self, target: &ast::ExprAttribute) -> bool {
         let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
             return false;
         };
@@ -110,6 +111,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         place_table.member(member_id).is_instance_attribute()
+            && nearest_enclosing_function(self.db(), self.index, self.scope())
+                .is_some_and(|function| function.has_implicit_receiver(self.db()))
     }
 
     /// Check whether an annotated attribute target uses an implicit receiver.
@@ -127,9 +130,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let Some(receiver) = target.value.as_name_expr() else {
             return false;
         };
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        self.receiver_method_scope(receiver)
+            .is_some_and(|receiver_scope_id| receiver_scope_id != current_scope_id)
+    }
+
+    /// Resolve the method scope that defines an implicit receiver referenced by the current scope.
+    ///
+    /// Returns `None` if the name is shadowed, resolves globally, or belongs to a function that is
+    /// not a method with an implicit receiver.
+    ///
+    /// ```python
+    /// class C:
+    ///     def method(self):
+    ///         def inner():
+    ///             self.attribute = 1
+    /// ```
+    pub(super) fn receiver_method_scope(&self, receiver: &ast::ExprName) -> Option<FileScopeId> {
         let receiver_name = receiver.id.as_str();
         let current_scope_id = self.scope().file_scope_id(self.db());
-        let Some((receiver_scope_id, receiver_scope, receiver_symbol)) = self
+        let (receiver_scope_id, receiver_scope, receiver_symbol) = self
             .index
             .visible_ancestor_scopes(current_scope_id)
             .find_map(|(scope_id, scope)| {
@@ -138,32 +158,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .symbol_by_name(receiver_name)
                     .filter(|symbol| symbol.is_local() || symbol.is_global())
                     .map(|symbol| (scope_id, scope, symbol))
-            })
-        else {
-            return false;
-        };
-        if receiver_symbol.is_global() || receiver_scope_id == current_scope_id {
-            return false;
+            })?;
+        if receiver_symbol.is_global() {
+            return None;
         }
-        let Some(function) = receiver_scope
+        let function = receiver_scope
             .node()
             .as_function()
-            .map(|node| node.node(self.module()))
-        else {
-            return false;
-        };
+            .map(|node| node.node(self.module()))?;
+        self.index.class_definition_of_method(receiver_scope_id)?;
 
-        self.index
-            .class_definition_of_method(receiver_scope_id)
-            .is_some()
-            && function
-                .parameters
-                .iter_non_variadic_params()
-                .next()
-                .is_some_and(|parameter| parameter.name() == receiver_name)
+        (function
+            .parameters
+            .iter_non_variadic_params()
+            .next()
+            .is_some_and(|parameter| parameter.name() == receiver_name)
             && self
                 .function_type(function)
-                .is_some_and(|function| function.has_implicit_receiver(self.db()))
+                .is_some_and(|function| function.has_implicit_receiver(self.db())))
+        .then_some(receiver_scope_id)
     }
 
     pub(super) fn invalid_assignment_to_final_attribute(
@@ -173,11 +186,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         qualifiers: TypeQualifiers,
     ) -> bool {
+        let env = self.program_environment();
+        let db = self.db();
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             return false;
         }
-
-        let db = self.db();
         let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
 
         // TODO: Use the full assignment statement range for these diagnostics instead of
@@ -189,10 +202,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
-                .nominal_class(db)
+                .nominal_class(db, env)
                 .or_else(|| object_ty.to_class_type(db))
                 .and_then(|cls| cls.static_class_literal(db))
-                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
+                .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(self.db()));
             let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ASSIGNMENT, target.range())
@@ -201,9 +214,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Cannot assign to final attribute `{attribute}` on type `{}`",
-                object_ty.display(db)
+                object_ty.display(db, env)
             ));
-            diagnostic.set_primary_message(if is_dataclass_like {
+            diagnostic.set_primary_annotation_message(if is_dataclass_like {
                 "`Final` attributes can only be assigned in the class body, `__init__`, or `__post_init__` on dataclass-like classes"
             } else {
                 "`Final` attributes can only be assigned in the class body or `__init__`"
@@ -228,10 +241,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db);
-        let object_instance_ty = object_ty.bind_self_typevars(db, class_instance_ty);
-        let is_current_class_instance =
-            is_self_parameter && object_instance_ty.is_subtype_of(db, class_instance_ty);
+        // Final ownership is nominal: checking structural protocol requirements can
+        // incorrectly reject the declaring class's own receiver.
+        let is_current_class_instance = is_self_parameter
+            && object_ty
+                .nominal_class(db, env)
+                .is_some_and(|object_class| {
+                    object_class.is_subtype_of_class_literal(db, class_ty.class_literal(db))
+                });
         if !is_current_class_instance {
             report_not_in_init();
             return true;
@@ -240,7 +257,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((class_literal, _)) = class_ty.static_class_literal(db) {
             let class_body_scope = class_literal.body_scope(db);
             let class_scope_id = class_body_scope.file_scope_id(db);
-            let class_index = semantic_index(db, class_body_scope.file(db));
+            let class_index = semantic_index(db, class_body_scope.program_file(db));
             let pt = class_index.place_table(class_scope_id);
 
             if let Some(symbol) = pt.symbol_by_name(attribute)
@@ -252,7 +269,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     let mut diagnostic =
                         diag_builder.into_diagnostic("Invalid assignment to final attribute");
-                    diagnostic.set_primary_message(format_args!(
+                    diagnostic.set_primary_annotation_message(format_args!(
                         "`{attribute}` already has a value in the class body"
                     ));
                     if let Some(final_declaration) = final_declaration {
@@ -275,12 +292,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         qualifiers: TypeQualifiers,
         emit_diagnostics: bool,
     ) -> bool {
+        let db = self.db();
         if !qualifiers.contains(TypeQualifiers::FINAL) {
             return false;
         }
 
         if emit_diagnostics {
-            let db = self.db();
             let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
 
             if let Some(builder) = self
@@ -289,9 +306,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(db)
+                    object_ty.display(db, self.program_environment())
                 ));
-                diagnostic.set_primary_message("`Final` attributes cannot be deleted");
+                diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
                 if let Some(final_declaration) = final_declaration {
                     self.annotate_final_declaration(&mut diagnostic, final_declaration);
                 }
@@ -307,25 +324,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         object_ty: Type<'db>,
         attribute: &str,
     ) {
-        let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
+        let db = self.db();
+        let Some(members) =
+            assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
         else {
             return;
         };
 
-        if !self.invalid_assignment_to_final_attribute(
-            object_ty,
-            target,
-            attribute,
-            meta_attr.qualifiers,
-        ) && let Some(fallback_attr) = fallback_attr
-        {
-            self.invalid_assignment_to_final_attribute(
+        for member in members.effective_members() {
+            if self.invalid_assignment_to_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
-            );
+                member.qualifiers,
+            ) {
+                break;
+            }
         }
     }
 
@@ -336,24 +350,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
         emit_diagnostics: bool,
     ) -> bool {
-        let Some((meta_attr, fallback_attr)) =
-            self.assignment_attribute_members(object_ty, attribute)
+        let db = self.db();
+        let Some(members) =
+            assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
         else {
             return false;
         };
 
-        self.invalid_deletion_of_final_attribute(
-            object_ty,
-            target,
-            attribute,
-            meta_attr.qualifiers,
-            emit_diagnostics,
-        ) || fallback_attr.is_some_and(|fallback_attr| {
+        members.effective_members().any(|member| {
             self.invalid_deletion_of_final_attribute(
                 object_ty,
                 target,
                 attribute,
-                fallback_attr.qualifiers,
+                member.qualifiers,
                 emit_diagnostics,
             )
         })

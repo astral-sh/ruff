@@ -10,7 +10,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
-use ty_python_core::{SemanticIndex, get_loop_header, semantic_index};
+use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
 /// unused-binding diagnostics.
@@ -40,7 +40,38 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::ParamSpec(_)
         | DefinitionKind::TypeVarTuple(_)
         | DefinitionKind::LoopHeader(_) => false,
+        DefinitionKind::NestedBindings(_) => false,
     }
+}
+
+/// Returns whether a comprehension walrus belongs to an enclosing function or lambda.
+///
+/// ```python
+/// def last_item(items):
+///     [(last := item) for item in items]
+///     return last
+/// ```
+///
+/// A module-level walrus, or one declared `global` or `nonlocal` in its containing
+/// function, is not a local binding and must not receive an unused-binding diagnostic.
+fn comprehension_named_expression_is_local(
+    index: &SemanticIndex<'_>,
+    comprehension_scope: FileScopeId,
+    name: &str,
+) -> bool {
+    index
+        .ancestor_scopes(comprehension_scope)
+        .skip(1)
+        .find(|(_, scope)| scope.kind() != ScopeKind::Comprehension)
+        .is_some_and(|(scope_id, scope)| {
+            matches!(scope.kind(), ScopeKind::Function | ScopeKind::Lambda)
+                && index
+                    .place_table(scope_id)
+                    .symbol_id(name)
+                    .is_some_and(|symbol_id| {
+                        index.place_table(scope_id).symbol(symbol_id).is_local()
+                    })
+        })
 }
 
 fn function_scope_is_overload_declaration(
@@ -71,11 +102,20 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
-    let parsed = parsed_module(db, file).load(db);
-    let is_stub_file = file.is_stub(db);
+pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding]> {
+    let source_file = file.file(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let is_stub_file = source_file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
+    // A used synthetic definition counts as a use of the user-visible definitions it represents.
+    let used_definitions = index.scope_ids().flat_map(|scope_id| {
+        index
+            .use_def_map(scope_id.file_scope_id(db))
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
+    });
+    let used_user_visible_definitions = super::user_visible_definitions(db, used_definitions);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -106,13 +146,14 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
+            let is_used = is_used || used_user_visible_definitions.contains(&definition);
 
             if is_used {
                 let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
                     continue;
                 };
 
-                let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+                let loop_header = use_def_map.loop_header(loop_header_definition.loop_header_id());
                 for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
                     if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());
@@ -157,7 +198,12 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
 
             // Global and nonlocal assignments target bindings from outer scopes.
             // Treat them as externally managed to avoid false positives here.
-            if symbol.is_global() || symbol.is_nonlocal() {
+            let is_local_comprehension_named_expression = scope_kind == ScopeKind::Comprehension
+                && matches!(kind, DefinitionKind::NamedExpression(_))
+                && comprehension_named_expression_is_local(index, file_scope_id, name);
+            if (symbol.is_global() || symbol.is_nonlocal())
+                && !is_local_comprehension_named_expression
+            {
                 continue;
             }
 
@@ -180,7 +226,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
     unused.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
     unused.dedup_by_key(|binding| binding.range);
 
-    unused
+    unused.into_boxed_slice()
 }
 
 #[cfg(test)]
@@ -191,6 +237,7 @@ mod tests {
     use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
+    use ty_python_core::ProgramFile;
 
     fn collect_unused_bindings_in_file(
         path: &str,
@@ -198,7 +245,8 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).to_vec();
+        let program = db.program_environment().program(&db);
+        let mut bindings = unused_bindings(&db, ProgramFile::new(&db, file, program)).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }
@@ -273,10 +321,63 @@ mod tests {
     }
 
     #[test]
+    fn or_pattern_captures_used_in_body_are_not_reported() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                match subject:
+                    case [first, second] | {\"first\": first, \"second\": second} | (first, second):
+                        print(first, second)
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn nested_or_pattern_capture_used_in_guard_is_not_reported() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                match subject:
+                    case [[value] | {\"item\": value}] if value:
+                        pass
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn or_pattern_captures_do_not_hide_other_unused_bindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                value = 0
+                match subject:
+                    case [value] | {\"used\": value}:
+                        print(value)
+                    case {\"unused\": value} | {\"also_unused\": value}:
+                        pass
+            ",
+        );
+
+        assert_eq!(
+            collect_unused_names(&source)?,
+            vec!["value", "value", "value"]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn skips_module_and_class_scope_bindings() -> anyhow::Result<()> {
         let source = dedent(
             "
             module_dead = 1
+            [(module_walrus := item) for item in [1]]
+            [[(nested_module_walrus := item) for item in [1]] for _ in [1]]
 
             class C:
                 class_dead = 1
@@ -319,6 +420,7 @@ mod tests {
             def mutate_global():
                 global global_value
                 global_value = 1
+                [(global_value := item) for item in [1]]
                 local_dead = 1
 
             def outer():
@@ -327,6 +429,7 @@ mod tests {
                 def inner():
                     nonlocal captured
                     captured = 1
+                    [(captured := item) for item in [1]]
 
                 inner()
                 return captured
@@ -335,6 +438,44 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, vec!["local_dead"]);
+        Ok(())
+    }
+
+    #[test]
+    fn tracks_comprehension_walruses_in_local_scopes() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def used(items):
+                [(used_walrus := item) for item in items]
+                return used_walrus
+
+            def unused(items):
+                [(unused_walrus := item) for item in items]
+
+            def nested_used(items):
+                [[(nested_used_walrus := item) for item in items] for _ in [1]]
+                return nested_used_walrus
+
+            def nested_unused(items):
+                [[(nested_unused_walrus := item) for item in items] for _ in [1]]
+
+            used_lambda = lambda items: (
+                [(used_lambda_walrus := item) for item in items],
+                used_lambda_walrus,
+            )
+            unused_lambda = lambda items: [(unused_lambda_walrus := item) for item in items]
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(
+            names,
+            vec![
+                "nested_unused_walrus",
+                "unused_lambda_walrus",
+                "unused_walrus",
+            ]
+        );
         Ok(())
     }
 
@@ -558,6 +699,69 @@ mod tests {
     }
 
     #[test]
+    fn closure_use_does_not_mark_shadowed_binding_used() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 1
+                x = 2
+
+                def inner():
+                    return x
+
+                return inner
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let first_x_start = TextSize::try_from(source.find("x = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(first_x_start, first_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn skips_binding_captured_by_comprehension_in_nested_function() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer() -> None:
+                a = 1
+
+                def inner() -> list[int]:
+                    return [a + x for x in [1, 2, 3]]
+
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_parameter_captured_by_nested_comprehension() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def foo(i: int):
+                def bar():
+                    return [[k for k in range(i)] for _ in range(2)]
+
+                return bar
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn closure_uses_nearest_shadowed_binding() -> anyhow::Result<()> {
         let source = dedent(
             "
@@ -585,6 +789,58 @@ mod tests {
                 name: Name::new("x"),
             }]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn closure_uses_later_shadowing_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 0
+
+                def mid():
+                    def inner():
+                        return x
+
+                    x = 1
+                    return inner
+
+                return mid
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let outer_x_start = TextSize::try_from(source.find("x = 0").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(outer_x_start, outer_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn nested_comprehension_capture_uses_intermediate_rebindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                a = 1
+
+                def inner():
+                    return [a for _ in range(1)]
+
+                a = 2
+                inner()
+                a = 3
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 

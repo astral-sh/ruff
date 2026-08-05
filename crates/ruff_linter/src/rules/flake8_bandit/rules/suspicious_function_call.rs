@@ -10,10 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_s310_resolve_string_literal_bindings_enabled, is_suspicious_function_reference_enabled,
-};
-use crate::settings::LinterSettings;
+use crate::preview::is_suspicious_function_reference_enabled;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1021,13 +1018,8 @@ fn suspicious_function(
     }
 
     /// Resolves `expr` to its binding and checks if the resolved expression starts with an HTTP or HTTPS prefix.
-    fn expression_starts_with_http_prefix(
-        expr: &Expr,
-        semantic: &SemanticModel,
-        settings: &LinterSettings,
-    ) -> bool {
-        let resolved_expression = if is_s310_resolve_string_literal_bindings_enabled(settings)
-            && let Some(name_expr) = expr.as_name_expr()
+    fn expression_starts_with_http_prefix(expr: &Expr, semantic: &SemanticModel) -> bool {
+        let resolved_expression = if let Some(name_expr) = expr.as_name_expr()
             && let Some(binding_id) = semantic.only_binding(name_expr)
             && let Some(value) = find_binding_value(semantic.binding(binding_id), semantic)
         {
@@ -1170,11 +1162,7 @@ fn suspicious_function(
                         .all(|keyword| keyword.arg.is_some())
                 {
                     if let Some(url_expr) = arguments.find_argument_value("url", 0)
-                        && expression_starts_with_http_prefix(
-                            url_expr,
-                            checker.semantic(),
-                            checker.settings(),
-                        )
+                        && expression_starts_with_http_prefix(url_expr, checker.semantic())
                     {
                         return;
                     }
@@ -1211,11 +1199,7 @@ fn suspicious_function(
                             }) =>
                         {
                             if let Some(url_expr) = arguments.find_argument_value("url", 0)
-                                && expression_starts_with_http_prefix(
-                                    url_expr,
-                                    checker.semantic(),
-                                    checker.settings(),
-                                )
+                                && expression_starts_with_http_prefix(url_expr, checker.semantic())
                             {
                                 return;
                             }
@@ -1223,11 +1207,7 @@ fn suspicious_function(
 
                         // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                         Some(expr)
-                            if expression_starts_with_http_prefix(
-                                expr,
-                                checker.semantic(),
-                                checker.settings(),
-                            ) =>
+                            if expression_starts_with_http_prefix(expr, checker.semantic()) =>
                         {
                             return;
                         }

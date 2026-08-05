@@ -11,7 +11,8 @@ UP009 [*] UTF-8 encoding declaration is unnecessary
 4 | print('Hello world')
   |
 help: Remove unnecessary coding comment
+  |
 1 | #!/usr/bin/python
   - # -*- coding: utf-8 -*-
 2 |
-3 | print('Hello world')
+  |

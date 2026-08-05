@@ -28,6 +28,7 @@ if sys.platform != "win32":
 
     def setcbreak(fd: _FD, when: int = 2) -> _ModeSetterReturn:
         """Put terminal into cbreak mode."""
+
     if sys.version_info >= (3, 12):
         def cfmakeraw(mode: termios._Attr) -> None:
             """Make termios mode raw."""

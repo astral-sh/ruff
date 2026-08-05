@@ -352,7 +352,7 @@ impl<'a> ReFunc<'a> {
             func: Box::new(method),
             arguments: Arguments {
                 args: args.into_boxed_slice(),
-                keywords: Box::new([]),
+                keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

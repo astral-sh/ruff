@@ -1,12 +1,12 @@
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex};
+use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex, PythonVersion};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 
-use super::TypeInferenceBuilder;
-use crate::TypeQualifiers;
+use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
@@ -14,18 +14,45 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
-    TypedDictSchema, collect_guaranteed_keyword_keys, functional_typed_dict_field,
-    infer_unpacked_keyword_types, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
-    validate_typed_dict_dict_literal,
+    TypedDictOpenness, TypedDictSchema, collect_guaranteed_keyword_keys,
+    functional_typed_dict_field, infer_unpacked_keyword_types, typed_dict_with_relaxed_keys,
+    validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
+    TypedDictType, any_over_type,
 };
+use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
+
+/// Returns whether a field type contains a `TypedDict` with unresolved type variables.
+///
+/// Structural wrappers and type aliases are traversed. Revisiting an alias definition counts as a
+/// match so aliases that grow with every specialization cannot recurse indefinitely:
+///
+/// ```python
+/// type Growing[T] = T | Growing[list[T]]
+/// ```
+fn contains_generic_typed_dict<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    active_aliases: &ActiveRecursionDetector<Definition<'db>>,
+) -> bool {
+    any_over_type(db, env, ty, false, |nested| match nested {
+        Type::TypedDict(_) => nested.has_typevar(db, env),
+        Type::TypeAlias(alias) => active_aliases.visit(
+            &alias.definition(db),
+            || true,
+            || contains_generic_typed_dict(db, env, alias.value_type(db), active_aliases),
+        ),
+        _ => false,
+    })
+}
 
 /// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
 #[derive(Debug, Clone, Copy)]
-pub(super) enum TypedDictConstructorForm<'expr> {
+enum TypedDictConstructorForm<'expr> {
     /// // Ex) `TD(x=1)`
     KeywordOnly,
     /// // Ex) `TD({"x": 1})`
@@ -44,7 +71,7 @@ pub(super) enum TypedDictConstructorForm<'expr> {
 
 impl<'expr> TypedDictConstructorForm<'expr> {
     /// Return the constructor form for `arguments`.
-    pub(super) fn from_arguments(arguments: &'expr ast::Arguments) -> Self {
+    fn from_arguments(arguments: &'expr ast::Arguments) -> Self {
         let [argument] = &arguments.args[..] else {
             return if arguments.args.is_empty() {
                 Self::KeywordOnly
@@ -72,9 +99,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
+        typed_dict_module: TypedDictModule,
     ) -> Type<'db> {
+        let env = self.program_environment();
         let db = self.db();
-
         let ast::Arguments {
             args,
             keywords,
@@ -91,9 +119,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // it would return a class that is a subclass of `Mapping[str, object]`
         // with an unknown set of fields.
         let fallback = || {
-            let spec = &[KnownClass::Str.to_instance(db), Type::object()];
-            let str_object_map = KnownClass::Mapping.to_specialized_subclass_of(db, spec);
-            IntersectionType::from_two_elements(db, str_object_map, Type::unknown())
+            let spec = &[KnownClass::Str.to_instance(db, env), Type::object()];
+            let str_object_map = KnownClass::Mapping.to_specialized_subclass_of(db, env, spec);
+            IntersectionType::from_two_elements(db, env, str_object_map, Type::unknown())
         };
 
         // Emit diagnostic for unsupported variadic arguments.
@@ -142,41 +170,60 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let mut total = true;
+        let mut closed = false;
+        let mut extra_items = None;
+        let supports_pep_728 = self.in_stub()
+            || typed_dict_module == TypedDictModule::TypingExtensions
+            || self.program_environment().python_version(db) >= PythonVersion::PY315;
 
         for kw in keywords {
             let Some(arg) = &kw.arg else {
                 continue;
             };
 
+            if !supports_pep_728
+                && matches!(&**arg, "closed" | "extra_items")
+                && let Some(builder) = self.context.report_lint(&UNKNOWN_ARGUMENT, kw)
+            {
+                builder.into_diagnostic(format_args!(
+                    "The `{arg}` parameter of `typing.TypedDict` was added in Python 3.15"
+                ));
+            }
+
             match &**arg {
                 arg_name @ ("total" | "closed") => {
                     let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    if kw_type
-                        .as_literal_value()
-                        .is_none_or(|literal| !literal.is_bool())
+                    if !kw.value.is_boolean_literal_expr()
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid argument to parameter `{arg_name}` of `TypedDict()`"
                         ));
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Expected either `True` or `False`, got object of type `{}`",
-                            kw_type.display(db)
+                            kw_type.display(db, env)
                         ));
                     }
 
                     if arg_name == "total" {
-                        if kw_type.bool(db).is_always_false() {
+                        if kw_type.bool(db, env).is_always_false() {
                             total = false;
-                        } else if !kw_type.bool(db).is_always_true() {
+                        } else if !kw_type.bool(db, env).is_always_true() {
                             total = true;
                         }
+                    } else {
+                        closed = kw_type.bool(db, env).is_always_true();
                     }
                 }
                 "extra_items" => {
                     if definition.is_none() {
-                        self.infer_extra_items_kwarg(&kw.value);
+                        let annotation = self.infer_extra_items_kwarg(&kw.value);
+                        extra_items = Some(TypedDictOpenness::extra(
+                            db,
+                            annotation.inner_type(),
+                            annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
+                        ));
                     }
                 }
                 unknown_kwarg => {
@@ -188,6 +235,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
+        }
+
+        if let Some(extra_items_kwarg) = call_expr.arguments.find_keyword("extra_items")
+            && call_expr.arguments.find_keyword("closed").is_some()
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, extra_items_kwarg)
+        {
+            builder.into_diagnostic("`closed` and `extra_items` cannot both be specified");
         }
 
         if !starred_arguments.is_empty() || !double_starred_arguments.is_empty() {
@@ -236,34 +292,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let name = name_type
             .as_string_literal()
-            .map(|literal| Name::new(literal.value(db)));
+            .map(|literal| literal.value(db));
 
         if name.is_none()
-            && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+            && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_arg)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter `typename` of `TypedDict()`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `str`, found `{}`",
-                name_type.display(db)
+                name_type.display(db, env)
             ));
         } else if let Some(definition) = definition
             && let Some(assigned_name) = definition.name(db)
-            && Some(assigned_name.as_str()) != name.as_deref()
+            && Some(assigned_name.as_str()) != name
         {
             report_mismatched_type_name(
                 &self.context,
                 name_arg,
                 "TypedDict",
                 &assigned_name,
-                name.as_deref(),
+                name,
                 name_type,
             );
         }
 
-        let name = name.unwrap_or_else(|| Name::new_static("<unknown>"));
+        let name = name.unwrap_or("<unknown>");
 
         self.validate_fields_arg(fields_arg);
 
@@ -289,11 +345,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     scope,
                     offset: call_u32 - anchor_u32,
                     schema,
+                    openness: extra_items.unwrap_or(if closed {
+                        TypedDictOpenness::Closed
+                    } else {
+                        TypedDictOpenness::ImplicitlyOpen
+                    }),
                 }
             }
         };
 
-        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor);
+        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor, typed_dict_module);
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 
@@ -303,13 +364,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         typed_dict: TypedDictType<'db>,
         item_types: &mut FxHashMap<NodeIndex, Type<'db>>,
     ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
         let ast::ExprDict {
             range: _,
             node_index: _,
             items,
         } = dict;
 
-        let typed_dict_items = typed_dict.items(self.db());
         let key_tcx =
             TypeContext::new(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
@@ -321,9 +383,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let value_ty = if let Some(key_ty) = key_ty
                 && let Some(key) = key_ty.as_string_literal()
-                && let Some(field) = typed_dict_items.get(key.value(self.db()))
+                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
+            } else if let Some(key_ty) = key_ty {
+                if key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+                    && let Some(value_ty) = typed_dict.arbitrary_key_initialization_type(db, env)
+                {
+                    self.infer_expression(&item.value, TypeContext::new(Some(value_ty)))
+                } else {
+                    self.infer_expression(&item.value, TypeContext::default())
+                }
             } else {
                 self.infer_expression(&item.value, TypeContext::default())
             };
@@ -350,6 +420,178 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         .map(|_| Type::TypedDict(typed_dict))
     }
 
+    /// Infers and validates a `TypedDict` constructor through one call-binding pipeline.
+    ///
+    /// Bare generic constructors infer from direct keyword arguments. Other forms use the existing
+    /// field-directed validation and bind against the class's default specialization:
+    ///
+    /// ```python
+    /// Box(value=1)        # Box[int]
+    /// Box({"value": 1})   # Box[Unknown]
+    /// ```
+    pub(super) fn infer_typed_dict_constructor<'expr>(
+        &mut self,
+        callable_type: Type<'db>,
+        class: ClassType<'db>,
+        call_expression: &'expr ast::ExprCall,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        let typed_dict = TypedDictType::new(class);
+        let arguments = &call_expression.arguments;
+        let form = TypedDictConstructorForm::from_arguments(arguments);
+        let error_node: AnyNodeRef = call_expression.func.as_ref().into();
+        let fallback_ty = callable_type
+            .to_instance_approximation(db, env)
+            .unwrap_or_else(Type::unknown);
+        let is_generic = matches!(
+            callable_type,
+            Type::ClassLiteral(class_literal) if class_literal.generic_context(db).is_some()
+        );
+        if is_generic && arguments.args.is_empty() {
+            for keyword in &arguments.keywords {
+                if keyword.arg.is_none() && !keyword.value.is_dict_expr() {
+                    self.get_or_infer_expression(&keyword.value, TypeContext::default());
+                }
+            }
+        }
+        let can_infer = is_generic
+            && self.can_infer_generic_typed_dict_constructor(class, arguments, call_expression_tcx);
+
+        if !can_infer {
+            self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);
+        }
+
+        let mut call_arguments = self.prepare_call_arguments(arguments);
+        let binding_callable = if is_generic && !can_infer {
+            class.class_literal(db).default_specialization(db).into()
+        } else {
+            callable_type
+        };
+        let mut bindings =
+            self.bindings_for_call(binding_callable)
+                .match_parameters(db, env, &call_arguments);
+
+        if can_infer && !bindings.satisfies(|_| true) {
+            self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);
+            return fallback_ty;
+        }
+
+        let result = self.infer_and_check_argument_types(
+            ArgumentsIter::from_ast(arguments),
+            &mut call_arguments,
+            &mut |builder, (_, expr, tcx)| {
+                if can_infer {
+                    builder.infer_expression(expr, tcx)
+                } else {
+                    builder.get_or_infer_expression(expr, tcx)
+                }
+            },
+            &mut bindings,
+            call_expression_tcx,
+        );
+
+        if result.is_err() {
+            if can_infer
+                && arguments.keywords.iter().any(|keyword| {
+                    keyword
+                        .arg
+                        .as_ref()
+                        .and_then(|name| typed_dict.item(db, name.id.as_str()))
+                        .is_some_and(|field| {
+                            !self.expression_type(&keyword.value).is_assignable_to(
+                                db,
+                                env,
+                                field.declared_ty,
+                            )
+                        })
+                })
+            {
+                validate_typed_dict_constructor(
+                    &self.context,
+                    typed_dict,
+                    arguments,
+                    error_node,
+                    |expr, _| self.expression_type(expr),
+                );
+                return fallback_ty;
+            }
+
+            bindings.report_diagnostics(&self.context, call_expression.into());
+        }
+
+        bindings.return_type(db, env)
+    }
+
+    /// Returns whether constructor arguments can safely constrain a generic `TypedDict`.
+    ///
+    /// Mapping arguments, unresolved nested `TypedDict` fields, and gradual expected types remain
+    /// on the field-directed path so sibling arguments cannot force an unsound specialization:
+    ///
+    /// ```python
+    /// Outer(inner=Inner(value=1), marker="x")  # Outer[Unknown]
+    /// ```
+    ///
+    /// TODO: Remove this gate once ordinary generic call inference can safely handle mapping
+    /// arguments, nested `TypedDict` fields, and unresolved contextual type arguments.
+    fn can_infer_generic_typed_dict_constructor(
+        &self,
+        class: ClassType<'db>,
+        arguments: &ast::Arguments,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        let class_literal = class.class_literal(db);
+
+        // An inner `Node(value=1)` must retain `Node[Unknown]` when its enclosing
+        // `Node(child=...)` cannot infer through the recursive field.
+        let has_gradual_class_context = class_literal
+            .as_static()
+            .zip(call_expression_tcx.annotation)
+            .is_some_and(|(class_literal, annotation)| {
+                any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
+                    ty.resolve_type_alias(db)
+                        .specialization_of(db, env, class_literal)
+                        .is_some_and(|specialization| {
+                            specialization
+                                .types(db)
+                                .iter()
+                                .any(|ty| ty.is_unknown() || ty.has_typevar(db, env))
+                        })
+                })
+            });
+        let typed_dict = TypedDictType::new(class_literal.identity_specialization(db));
+
+        arguments.args.is_empty()
+            && !has_gradual_class_context
+            && arguments.keywords.iter().all(|keyword| {
+                let permits_field_inference = |name: &str| {
+                    typed_dict.item(db, name).is_none_or(|field| {
+                        !contains_generic_typed_dict(
+                            db,
+                            env,
+                            field.declared_ty,
+                            &ActiveRecursionDetector::default(),
+                        )
+                    })
+                };
+
+                if let Some(name) = keyword.arg.as_ref() {
+                    return permits_field_inference(name.id.as_str());
+                }
+
+                self.try_expression_type(&keyword.value)
+                    .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
+                    .is_some_and(|unpacked| {
+                        unpacked.items(db).iter().all(|(name, field)| {
+                            field.is_required() && permits_field_inference(name.as_str())
+                        })
+                    })
+            })
+    }
+
     /// Prepare a `TypedDict` constructor call before general argument inference.
     ///
     /// This gives constructor values the declared field type as context, then validates the full
@@ -357,13 +599,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// expression directly, while mixed dict-literal and keyword calls infer the nested key and
     /// value expressions without re-inferring the outer dict literal later during argument
     /// binding.
-    pub(super) fn prepare_typed_dict_constructor<'expr>(
+    fn prepare_typed_dict_constructor<'expr>(
         &mut self,
         typed_dict: TypedDictType<'db>,
         form: TypedDictConstructorForm<'expr>,
         arguments: &'expr ast::Arguments,
         error_node: AnyNodeRef<'expr>,
     ) {
+        let db = self.db();
         match form {
             TypedDictConstructorForm::LiteralOnly(argument) => {
                 let target_ty = Type::TypedDict(typed_dict);
@@ -380,14 +623,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.get_or_infer_expression(expr, tcx)
                     });
                 let keyword_keys = collect_guaranteed_keyword_keys(
-                    self.db(),
+                    db,
+                    self.program_environment(),
                     typed_dict,
                     arguments,
                     &unpacked_keyword_types,
                     &mut |expr, tcx| self.get_or_infer_expression(expr, tcx),
                 );
-                let positional_target =
-                    typed_dict_with_relaxed_keys(self.db(), typed_dict, &keyword_keys);
+                let positional_target = typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
                 let target_ty = Type::TypedDict(positional_target);
                 self.get_or_infer_expression(&arguments.args[0], TypeContext::new(Some(target_ty)));
             }
@@ -423,12 +666,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         typed_dict: TypedDictType<'db>,
         arguments: &ast::Arguments,
     ) {
-        let items = typed_dict.items(self.db());
         for keyword in &arguments.keywords {
             let value_tcx = keyword
                 .arg
                 .as_ref()
-                .and_then(|arg_name| items.get(arg_name.id.as_str()))
+                .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id.as_str()))
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
                 .unwrap_or_default();
             self.get_or_infer_expression(&keyword.value, value_tcx);
@@ -446,19 +688,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         typed_dict: TypedDictType<'db>,
         dict_expr: &ast::ExprDict,
     ) {
-        let items = typed_dict.items(self.db());
+        let db = self.db();
+        let env = self.program_environment();
         let key_tcx =
             TypeContext::new(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in &dict_expr.items {
-            let value_tcx = item
+            let key_ty = item
                 .key
                 .as_ref()
-                .map(|key| self.get_or_infer_expression(key, key_tcx))
-                .and_then(Type::as_string_literal)
-                .and_then(|key| items.get(key.value(self.db())))
-                .map(|field| TypeContext::new(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map(|key| self.get_or_infer_expression(key, key_tcx));
+            let value_tcx = if let Some(key) = key_ty.and_then(Type::as_string_literal)
+                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
+            {
+                TypeContext::new(Some(field.declared_ty))
+            } else if let Some(key_ty) = key_ty {
+                if key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env)) {
+                    TypeContext::new(typed_dict.arbitrary_key_initialization_type(db, env))
+                } else {
+                    TypeContext::default()
+                }
+            } else {
+                TypeContext::default()
+            };
             self.get_or_infer_expression(&item.value, value_tcx);
         }
     }
@@ -593,7 +845,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// themselves.
     fn validate_fields_arg(&mut self, fields_arg: &ast::Expr) {
         let db = self.db();
-
         if let ast::Expr::Dict(dict_expr) = fields_arg {
             for ast::DictItem { key, value } in dict_expr {
                 if let Some(key) = key {
@@ -605,8 +856,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             "Expected a string-literal key \
                                 in the `fields` dict of `TypedDict()`",
                         );
-                        diagnostic
-                            .set_primary_message(format_args!("Found `{}`", key_type.display(db)));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Found `{}`",
+                            key_type.display(db, self.program_environment())
+                        ));
                     }
                 } else {
                     self.infer_expression(value, TypeContext::default());

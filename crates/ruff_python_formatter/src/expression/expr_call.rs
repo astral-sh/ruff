@@ -4,9 +4,7 @@ use ruff_python_ast::{Expr, ExprCall};
 
 use crate::comments::dangling_comments;
 use crate::expression::CallChainLayout;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -39,11 +37,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 
         let fmt_func = format_with(|f: &mut PyFormatter| {
             // Format the function expression.
-            if is_expression_parenthesized(
-                func.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            ) {
+            if f.context().is_expression_parenthesized(func.into()) {
                 func.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match func.as_ref() {
@@ -84,21 +78,11 @@ impl NeedsParentheses for ExprCall {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if CallChainLayout::from_expression(
-            self.into(),
-            context.comments().ranges(),
-            context.source(),
-        )
-        .is_fluent()
-        {
+        if CallChainLayout::from_expression(self.into(), context).is_fluent() {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if is_expression_parenthesized(
-            self.func.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        ) {
+        } else if context.is_expression_parenthesized(self.func.as_ref().into()) {
             OptionalParentheses::Never
         } else {
             self.func.needs_parentheses(self.into(), context)

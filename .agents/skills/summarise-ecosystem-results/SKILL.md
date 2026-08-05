@@ -1,62 +1,29 @@
 ---
 name: summarise-ecosystem-results
-description: Use when asked to summarise or summarize ty ecosystem results for a Ruff PR, including from a PR number, PR URL, GitHub ecosystem-results comment, or full detailed HTML report.
+description: Use when a user says "summarise ecosystem results", "summarize this ty ecosystem report", "what changed in this ecosystem run?", or asks to summarise or summarize ty ecosystem results for a Ruff PR from a PR number, PR URL, GitHub ecosystem-results comment, or detailed HTML report.
 ---
 
 # Summarise Ecosystem Results
 
-Use this skill when asked to summarise ecosystem results for a Ruff PR with the `ty` label.
+## Priorities
 
-## Find the Report
+1. Reproduce every retained behavior with the exact environment used by the Actions run.
+2. Lead the report with analysis of diagnostic changes and clear minimized examples.
+3. Keep execution, audit, and traceability bookkeeping out of the report.
 
-Accept any of these inputs:
+## Deliverable
 
-- A PR number.
-- A GitHub PR URL.
-- A GitHub comment URL on a PR, such as `https://github.com/astral-sh/ruff/pull/25342#issuecomment-4525002693`.
-- A full detailed HTML ecosystem report URL.
+Create `PR_<number>_ECOSYSTEM_SUMMARY.md` at the repository root by adapting [assets/report-template.md](assets/report-template.md). The finished artifact must be GitHub-flavored Markdown suitable for a GitHub comment, with each prose paragraph and list item on one source line.
 
-Determine the PR number first. If the user gave only a PR number, open `https://github.com/astral-sh/ruff/pull/<number>`.
+Use the template's structure and omissions as the report contract. Remove all placeholders and HTML comments. Link external source locations with permalinks such as `[project file.py:123](permalink)`; never emit raw URLs.
 
-Find the ty ecosystem-results comment on the PR. Search PR comments for terms such as "ecosystem", "full report", "HTML report", and "detailed report". From that comment, open the linked full detailed HTML report.
+If summarising an ecosystem report is the only thing you're asked to do in a Codex App thread, you should rename that thread to "PR <number> ecosystem summary".
 
-Use the PR comment as the change list and the full detailed HTML report as the source of detailed evidence. When the report includes exact project revisions, use those revisions rather than current upstream checkouts.
+## Workflow
 
-## Minimize in Parallel
+1. **Locate the evidence.** Normalize the input to a PR number, find the ty ecosystem-results comment, open the linked detailed HTML report, and identify the exact Actions run that produced it. Use the comment as the change list and the detailed report as evidence.
+2. **Reproduce from scratch.** Ignore retained memories and previous local artifacts. Load the `minimizing-ty-ecosystem-changes` skill, use its metadata helper and exact-run workflow, and reproduce each report entry before explaining or minimizing it.
+3. **Minimize and curate.** Retain the smallest clear reproducer for each distinct behavior change. Group entries only when the same base-to-PR behavior, explanation, and reproducer account for every entry in the group.
+4. **Write and verify.** Fill the report template, check every link and diagnostic, then run `uvx prek run --files PR_<number>_ECOSYSTEM_SUMMARY.md`. Present the Markdown file as the finished product.
 
-Before minimizing, load and apply the `minimizing-ty-ecosystem-changes` skill to each ecosystem change.
-
-If possible, use subagents to parallelize this work. Decide how to batch changes so the overall task finishes as quickly as possible while still allowing each subagent to work methodically. Reasonable batching strategies include grouping related changes by project, diagnostic code, suspected cause, or report section, while keeping large groups split enough to avoid one slow subagent blocking the whole task.
-
-If subagents are not available, batch the minimization work manually and minimize the batches sequentially. Keep batches small enough that each pass can still be checked carefully.
-
-Give each subagent a self-contained assignment:
-
-- The PR number, PR URL, ecosystem comment URL, and detailed HTML report URL.
-- The exact ecosystem changes assigned to that subagent.
-- The requirement to use the `minimizing-ty-ecosystem-changes` process rigorously.
-- The expected Markdown output format for each minimized change.
-
-Each subagent should proceed methodically through all assigned changes. If a subagent moves on to a new change and that change appears very similar to one it has already minimized, it may skip the new change, but it must record why the skipped change appears to demonstrate the same behavior.
-
-## Collect Results
-
-After all subagents finish, collect their minimizations into one Markdown file at the repository root:
-
-```text
-PR_<number>_ECOSYSTEM_SUMMARY.md
-```
-
-Remove minimizations that appear to demonstrate the same behavior change. Prefer the smallest and clearest minimized reproducer, especially one that is single-file and has fewer imports.
-
-At the top of the file, add prose summarising the distinct behavior changes demonstrated by the retained minimizations. Then include the retained minimizations with enough detail for a reader to understand and reproduce them.
-
-For each retained minimization, include:
-
-- The original project and report entry.
-- The diagnostic or behavior change on `main` versus the PR.
-- The minimized code.
-- The commands or comparison method used to verify the minimization.
-- Any source links needed to trace the example back to the PR comment or full report.
-
-Present `PR_<number>_ECOSYSTEM_SUMMARY.md` as the finished product.
+When parallelizing step 2, read [references/subagent-handoff.md](references/subagent-handoff.md). Otherwise, keep batches small and work through them sequentially.

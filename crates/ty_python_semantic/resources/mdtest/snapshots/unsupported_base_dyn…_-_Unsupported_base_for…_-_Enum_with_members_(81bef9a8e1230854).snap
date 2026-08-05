@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -30,6 +30,5 @@ error[subclass-of-final-class]: Class `X` cannot inherit from final class `Color
   |
 7 | X = type("X", (Color,), {})  # error: [subclass-of-final-class]
   |                ^^^^^
-  |
 
 ```

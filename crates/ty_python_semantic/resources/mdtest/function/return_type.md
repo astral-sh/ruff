@@ -515,19 +515,19 @@ statements.
 import types
 import typing
 
-def f() -> types.GeneratorType:
+def f() -> types.GeneratorType[int, None, None]:
     yield 42
 
-def g() -> typing.Generator:
+def g() -> typing.Generator[int]:
     yield 42
 
-def h() -> typing.Iterator:
+def h() -> typing.Iterator[int]:
     yield 42
 
-def i() -> typing.Iterable:
+def i() -> typing.Iterable[int]:
     yield 42
 
-def i2() -> typing.Generator:
+def i2() -> typing.Generator[int]:
     yield from i()
 
 def j() -> str:  # error: [invalid-return-type]
@@ -577,22 +577,22 @@ if it does not contain any `return` statements.
 import types
 import typing
 
-async def f() -> types.AsyncGeneratorType:
+async def f() -> types.AsyncGeneratorType[int, None]:
     yield 42
 
-async def g() -> typing.AsyncGenerator:
+async def g() -> typing.AsyncGenerator[int]:
     yield 42
 
-async def h() -> typing.AsyncIterator:
+async def h() -> typing.AsyncIterator[int]:
     yield 42
 
-async def i() -> typing.AsyncIterable:
+async def i() -> typing.AsyncIterable[int]:
     yield 42
 
 async def j() -> str:  # error: [invalid-return-type]
     yield 42
 
-async def k() -> typing.AsyncGenerator:
+async def k() -> typing.AsyncGenerator[int]:
     yield 42
     return 2  # error: [invalid-syntax] "`return` with value in async generator"
 ```

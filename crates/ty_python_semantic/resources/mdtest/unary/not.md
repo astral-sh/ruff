@@ -34,6 +34,17 @@ reveal_type(not warnings)  # revealed: Literal[False]
 y = 1
 ```
 
+## Dynamic
+
+```py
+from typing import Any
+
+def _(value: Any) -> None:
+    result = not value
+    reveal_type(result)  # revealed: bool
+    result.nonexistent()  # error: [unresolved-attribute] "Object of type `bool` has no attribute `nonexistent`"
+```
+
 ## Union
 
 ```py
@@ -220,6 +231,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
   |
 5 | not NotBoolable()
   | ^^^^^^^^^^^^^^^^^
-  |
 info: `__bool__` on `NotBoolable` must be callable
 ```

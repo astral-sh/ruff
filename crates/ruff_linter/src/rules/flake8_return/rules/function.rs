@@ -568,7 +568,7 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
     };
-    for (assign, return_, stmt) in &stack.assignment_return {
+    for (assign, return_, stmt, enclosing_finally) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
             continue;
@@ -617,6 +617,22 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         else {
             continue;
         };
+        // Ignore assignments whose name is read or deleted in an enclosing `finally`, which runs
+        // after the `return`. A reference resolving to a later rebinding in the `finally` counts
+        // too, so check every binding of the name.
+        if !enclosing_finally.is_empty()
+            && function_scope
+                .get_all(assigned_id)
+                .flat_map(|binding_id| checker.semantic().binding(binding_id).references())
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .any(|reference| {
+                    enclosing_finally
+                        .iter()
+                        .any(|finally_range| finally_range.contains_range(reference.range()))
+                })
+        {
+            continue;
+        }
         // Check if there's any reference made to `assigned_binding` in another scope, e.g, nested
         // functions. If there is, ignore them.
         if assigned_binding

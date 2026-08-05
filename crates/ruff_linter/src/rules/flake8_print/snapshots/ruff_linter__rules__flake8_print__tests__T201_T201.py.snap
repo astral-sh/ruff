@@ -12,13 +12,11 @@ T201 [*] `print` found
 6 | print("Hello, world!", file=sys.stdout)  # T201
   |
 help: Remove `print`
-1 | import sys
-2 | import tempfile
+  |
 3 |
   - print("Hello, world!")  # T201
 4 | print("Hello, world!", file=None)  # T201
-5 | print("Hello, world!", file=sys.stdout)  # T201
-6 | print("Hello, world!", file=sys.stderr)  # T201
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T201 [*] `print` found
@@ -31,13 +29,11 @@ T201 [*] `print` found
 7 | print("Hello, world!", file=sys.stderr)  # T201
   |
 help: Remove `print`
-2 | import tempfile
-3 |
+  |
 4 | print("Hello, world!")  # T201
   - print("Hello, world!", file=None)  # T201
 5 | print("Hello, world!", file=sys.stdout)  # T201
-6 | print("Hello, world!", file=sys.stderr)  # T201
-7 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T201 [*] `print` found
@@ -50,13 +46,11 @@ T201 [*] `print` found
 7 | print("Hello, world!", file=sys.stderr)  # T201
   |
 help: Remove `print`
-3 |
-4 | print("Hello, world!")  # T201
+  |
 5 | print("Hello, world!", file=None)  # T201
   - print("Hello, world!", file=sys.stdout)  # T201
 6 | print("Hello, world!", file=sys.stderr)  # T201
-7 |
-8 | with tempfile.NamedTemporaryFile() as fp:
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 T201 [*] `print` found
@@ -70,11 +64,9 @@ T201 [*] `print` found
 9 | with tempfile.NamedTemporaryFile() as fp:
   |
 help: Remove `print`
-4 | print("Hello, world!")  # T201
-5 | print("Hello, world!", file=None)  # T201
+  |
 6 | print("Hello, world!", file=sys.stdout)  # T201
   - print("Hello, world!", file=sys.stderr)  # T201
 7 |
-8 | with tempfile.NamedTemporaryFile() as fp:
-9 |     print("Hello, world!", file=fp)  # OK
+  |
 note: This is an unsafe fix and may change runtime behavior

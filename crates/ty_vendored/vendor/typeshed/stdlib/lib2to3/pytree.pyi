@@ -7,7 +7,7 @@ even the comments and whitespace between tokens.
 There's also a pattern matching implementation here.
 """
 
-from _typeshed import Incomplete, SupportsGetItem, SupportsLenAndGetItem, Unused
+from _typeshed import SupportsGetItem, SupportsLenAndGetItem, Unused
 from abc import abstractmethod
 from collections.abc import Iterable, Iterator, MutableSequence
 from typing import ClassVar, Final, TypeAlias
@@ -47,6 +47,7 @@ class Base:
 
         This calls the method _eq().
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @abstractmethod
     def _eq(self, other: Base) -> bool:
@@ -123,7 +124,7 @@ class Node(Base):
 
     fixers_applied: MutableSequence[BaseFix] | None
     # Is Unbound until set in refactor.RefactoringTool
-    future_features: frozenset[Incomplete]
+    future_features: frozenset[str]
     # Is Unbound until set in pgen2.parse.Parser.pop
     used_names: set[str]
     def __init__(

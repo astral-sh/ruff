@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -26,7 +26,6 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
   |
 2 | def f() -> int:
   |            ^^^
-  |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```

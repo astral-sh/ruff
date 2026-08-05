@@ -7,6 +7,8 @@ semantics are the same.
 
 For a complete enumeration of the available configuration options, see [_Settings_](settings.md).
 
+For the complete list of enabled rules, see [_Default Rules_](default-rules.md).
+
 If left unspecified, Ruff's default configuration is equivalent to:
 
 === "pyproject.toml"
@@ -51,10 +53,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py310"
 
     [tool.ruff.lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-    # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-    # McCabe complexity (`C901`) by default.
-    select = ["E4", "E7", "E9", "F"]
+    # select = [...]  # See the Default Rules page for the full listing.
     ignore = []
 
     # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -133,10 +132,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     target-version = "py310"
 
     [lint]
-    # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-    # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-    # McCabe complexity (`C901`) by default.
-    select = ["E4", "E7", "E9", "F"]
+    # select = [...]  # See the Default Rules page for the full listing.
     ignore = []
 
     # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -180,8 +176,8 @@ As an example, the following would configure Ruff to:
 
     ```toml
     [tool.ruff.lint]
-    # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-    select = ["E4", "E7", "E9", "F", "B"]
+    # 1. Enable all flake8-bugbear (`B`) rules, in addition to the defaults.
+    extend-select = ["B"]
 
     # 2. Avoid enforcing line-length violations (`E501`)
     ignore = ["E501"]
@@ -203,8 +199,8 @@ As an example, the following would configure Ruff to:
 
     ```toml
     [lint]
-    # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-    select = ["E4", "E7", "E9", "F", "B"]
+    # 1. Enable all flake8-bugbear (`B`) rules, in addition to the defaults.
+    extend-select = ["B"]
 
     # 2. Avoid enforcing line-length violations (`E501`)
     ignore = ["E501"]
@@ -229,7 +225,7 @@ Linter plugin configurations are expressed as subsections, e.g.:
     ```toml
     [tool.ruff.lint]
     # Add "Q" to the list of enabled codes.
-    select = ["E4", "E7", "E9", "F", "Q"]
+    extend-select = ["Q"]
 
     [tool.ruff.lint.flake8-quotes]
     docstring-quotes = "double"
@@ -240,7 +236,7 @@ Linter plugin configurations are expressed as subsections, e.g.:
     ```toml
     [lint]
     # Add "Q" to the list of enabled codes.
-    select = ["E4", "E7", "E9", "F", "Q"]
+    extend-select = ["Q"]
 
     [lint.flake8-quotes]
     docstring-quotes = "double"
@@ -516,6 +512,24 @@ which will similarly override the `line-length` setting from
 all configuration files detected by Ruff, regardless of where
 a specific configuration file is located.
 
+### Argfile support
+
+Ruff supports reading command-line arguments from a file, which is especially useful when passing a large number of file paths that might exceed your shell's command-line length limit. To use an argfile, prefix the file path with an `@` symbol:
+
+```console
+$ ruff check @path/to/args.txt
+```
+
+The arguments in the file must all be written on their own line. For example, `args.txt` might contain:
+
+```text
+--select
+F401
+--quiet
+path/to/code1/
+path/to/code2/
+```
+
 ### Full command-line interface
 
 See `ruff help` for the full list of Ruff's top-level commands:
@@ -629,6 +643,10 @@ Options:
       --add-noqa[=<REASON>]
           Enable automatic additions of `noqa` directives to failing lines.
           Optionally provide a reason to append after the codes
+      --add-ignore[=<REASON>]
+          Enable automatic additions of `ruff: ignore` comments to failing
+          lines. Optionally provide a reason to append after the codes. In
+          preview, add suppression comments with rule names instead
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -767,6 +785,9 @@ File selection:
           files. Use `--no-respect-gitignore` to disable
       --exclude <FILE_PATTERN>
           List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>
+          Like --exclude, but adds additional files and directories on top of
+          those already excluded
       --force-exclude
           Enforce exclusions, even for paths passed to Ruff directly on the
           command-line. Use `--no-force-exclude` to disable

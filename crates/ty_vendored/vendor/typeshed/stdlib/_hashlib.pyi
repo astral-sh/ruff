@@ -115,8 +115,8 @@ class HMAC:
     def hexdigest(self) -> str:
         """Return hexadecimal digest of the bytes passed to the update() method so far.
 
-        This may be used to exchange the value safely in email or other non-binary
-        environments.
+        This may be used to exchange the value safely in email or other
+        non-binary environments.
         """
 
     def update(self, msg: ReadableBuffer) -> None:
@@ -143,8 +143,8 @@ def get_fips_mode() -> int:
     """Determine the OpenSSL FIPS mode of operation.
 
     For OpenSSL 3.0.0 and newer it returns the state of the default provider
-    in the default OSSL context. It's not quite the same as FIPS_mode() but good
-    enough for unittests.
+    in the default OSSL context. It's not quite the same as FIPS_mode() but
+    good enough for unittests.
 
     Effectively any non-zero return value indicates FIPS mode;
     values other than 1 may have additional significance.

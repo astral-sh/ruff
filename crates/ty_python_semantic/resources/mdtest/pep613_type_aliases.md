@@ -80,7 +80,8 @@ def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
 
 ```py
 from typing import TypeAlias
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 MyList: TypeAlias = list["int"]
 
@@ -152,6 +153,8 @@ def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
 
 ### Stringified generic alias
 
+#### Explicitly specialized
+
 ```py
 from typing import TypeAlias, TypeVar
 
@@ -162,7 +165,22 @@ TotallyStringifiedPEP613: TypeAlias = "dict[T, U]"
 TotallyStringifiedPartiallySpecialized: TypeAlias = "TotallyStringifiedPEP613[U, int]"
 
 def f(x: "TotallyStringifiedPartiallySpecialized[str]"):
-    reveal_type(x)  # revealed: @Todo(Generic stringified PEP-613 type alias)
+    reveal_type(x)  # revealed: dict[str, int]
+```
+
+#### Unsubscripted
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+ListAlias: TypeAlias = "list[T]"
+
+def takes_list(value: ListAlias) -> None:
+    reveal_type(value)  # revealed: list[Unknown]
+
+takes_list([1])
 ```
 
 ## Subscripted generic alias in union
@@ -238,6 +256,13 @@ MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
 def _(c: MyAlias4[int, str]):
     reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
+```
+
+## Explicit aliases using `TypeAliasType`
+
+```py
+from typing import TypeAlias, TypeVar
+from typing_extensions import Callable, Concatenate, TypeAliasType
 
 T = TypeVar("T")
 
@@ -246,8 +271,7 @@ MyList = TypeAliasType("MyList", list[T], type_params=(T,))
 MyAlias5 = Callable[[MyList[T]], int]
 
 def _(c: MyAlias5[int]):
-    # TODO: should be (list[int], /) -> int
-    reveal_type(c)  # revealed: (Unknown, /) -> int
+    reveal_type(c)  # revealed: (MyList[int], /) -> int
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -257,14 +281,12 @@ MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
 MyAlias6 = Callable[[MyDict[K, V]], int]
 
 def _(c: MyAlias6[str, bytes]):
-    # TODO: should be (dict[str, bytes], /) -> int
-    reveal_type(c)  # revealed: (Unknown, /) -> int
+    reveal_type(c)  # revealed: (MyDict[str, bytes], /) -> int
 
 ListOrDict: TypeAlias = MyList[T] | dict[str, T]
 
 def _(x: ListOrDict[int]):
-    # TODO: should be list[int] | dict[str, int]
-    reveal_type(x)  # revealed: Unknown | dict[str, int]
+    reveal_type(x)  # revealed: list[int] | dict[str, int]
 
 MyAlias7: TypeAlias = Callable[Concatenate[T, ...], None]
 
@@ -351,7 +373,8 @@ my_isinstance(1, (int, (str, 1)))
 
 ```py
 from typing import TypeAlias, TypeVar, Union
-from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -510,9 +533,65 @@ error[invalid-type-form]: `Unpack` is not allowed in type alias values
    |
 14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
    |                              ^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing_extensions import Annotated, Self, TypeAlias, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Alias: TypeAlias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Simplified: TypeAlias = object | Self
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Stringified: TypeAlias = "tuple[Self]"
+
+    Metadata: TypeAlias = Annotated[int, cast(Self, object())]
+```
+
+## Disabled `invalid-type-form` `Self` fallback
+
+Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+
+```toml
+[rules]
+invalid-type-form = "ignore"
+```
+
+```py
+from typing_extensions import Self, TypeAlias
+
+class C:
+    Inner: TypeAlias = Self
+    Tuple: TypeAlias = tuple[Self]
+    Stringified: TypeAlias = "tuple[Self, int]"
+
+    def takes(self, value: Inner) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+    def takes_tuple(self, value: Tuple) -> None:
+        reveal_type(value)  # revealed: tuple[Unknown]
+
+    def takes_stringified(self, value: Stringified) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+    def invalid_attribute(self) -> Self:
+        self.attribute: TypeAlias = Self
+        return self.attribute  # error: [invalid-return-type]
+
+C().takes(1)
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

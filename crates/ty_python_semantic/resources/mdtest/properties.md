@@ -248,6 +248,24 @@ c.attr = 1
 reveal_type(c.attr)  # revealed: Never
 ```
 
+### Attempting to call a getter with an incompatible instance
+
+Explicit bound and unbound `property.__get__` calls preserve the getter's receiver error and return
+type. For the unbound call, the reported argument is the instance rather than the property itself.
+
+```py
+class C:
+    @property
+    def attr(self) -> int:
+        return 1
+
+# error: [invalid-argument-type] "Argument to function `C.attr` is incorrect: Expected `C`"
+reveal_type(C.attr.__get__("wrong", C))  # revealed: int
+
+# error: [invalid-argument-type] "Argument to function `C.attr` is incorrect: Expected `C`"
+reveal_type(property.__get__(C.attr, "wrong", C))  # revealed: int
+```
+
 ### Non-returning setter
 
 ```py
@@ -313,7 +331,6 @@ error[invalid-assignment]: Cannot delete read-only property `attr` on object of 
   |
 3 |     def attr(self) -> int:
   |         ---- Property `C.attr` defined here with no deleter
-  |
 ```
 
 ## Limitations
@@ -449,19 +466,32 @@ This attribute access desugars to
 ```py
 type(attr_property).__set__(attr_property, c, "a")
 
-# error: [call-non-callable] "Call of wrapper descriptor `property.__set__` failed: calling the setter failed"
+# snapshot: invalid-argument-type
 type(attr_property).__set__(attr_property, c, 1)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `C.attr` is incorrect
+  --> src/mdtest_snippet.py:31:47
+   |
+31 | type(attr_property).__set__(attr_property, c, 1)
+   |                                               ^ Expected `str`, found `Literal[1]`
+info: Function defined here
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |     def attr(self, value: str) -> None:
+   |         ^^^^       ---------- Parameter declared here
 ```
 
 which is also equivalent to the following expressions:
 
 ```py
 attr_property.__set__(c, "a")
-# error: [call-non-callable]
+# error: [invalid-argument-type]
 attr_property.__set__(c, 1)
 
 C.attr.__set__(c, "a")
-# error: [call-non-callable]
+# error: [invalid-argument-type]
 C.attr.__set__(c, 1)
 ```
 
@@ -484,7 +514,8 @@ At runtime, `attr_property.__get__` and `attr_property.__set__` are both instanc
 
 ```py
 import types
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 static_assert(is_subtype_of(TypeOf[attr_property.__get__], types.MethodWrapperType))
 static_assert(is_subtype_of(TypeOf[attr_property.__set__], types.MethodWrapperType))
@@ -504,14 +535,14 @@ structural rather than exact function literals:
 
 ```py
 from typing import Callable
-from ty_extensions import (
+from ty_extensions import static_assert
+from ty_extensions._internal import (
     CallableTypeOf,
     TypeOf,
     is_assignable_to,
     is_disjoint_from,
     is_equivalent_to,
     is_subtype_of,
-    static_assert,
 )
 
 def get_int(self) -> int:

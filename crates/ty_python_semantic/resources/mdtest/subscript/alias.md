@@ -25,19 +25,23 @@ def f(
     implicit_zero: ImplicitZero,
     pep_613_zero: PEP613Zero,
     pep_695_zero: PEP695Zero,
+    invalid_bound: float,
 ):
     reveal_type(implicit_tuple[:2])  # revealed: tuple[str, int]
     reveal_type(implicit_tuple[implicit_zero])  # revealed: str
     reveal_type(implicit_tuple[pep_613_zero])  # revealed: str
     reveal_type(implicit_tuple[pep_695_zero])  # revealed: str
+    implicit_tuple[invalid_bound:]  # error: [invalid-argument-type]
 
     reveal_type(pep_613_tuple[:2])  # revealed: tuple[str, int]
     reveal_type(pep_613_tuple[implicit_zero])  # revealed: str
     reveal_type(pep_613_tuple[pep_613_zero])  # revealed: str
     reveal_type(pep_613_tuple[pep_695_zero])  # revealed: str
+    pep_613_tuple[invalid_bound:]  # error: [invalid-argument-type]
 
     reveal_type(pep_695_tuple[:2])  # revealed: tuple[str, int]
     reveal_type(pep_695_tuple[implicit_zero])  # revealed: str
     reveal_type(pep_695_tuple[pep_613_zero])  # revealed: str
     reveal_type(pep_695_tuple[pep_695_zero])  # revealed: str
+    pep_695_tuple[invalid_bound:]  # error: [invalid-argument-type]
 ```

@@ -33,7 +33,6 @@ position. The parser could do a better job in recovering from these errors.
 # error: [invalid-syntax]
 def foo[**P: int]() -> None:
     # error: [invalid-syntax]
-    # error: [invalid-syntax]
     pass
 ```
 
@@ -827,9 +826,8 @@ def overloaded_put_object(*, TagSet: object, func: object = None) -> None: ...
 to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=overloaded_put_object)  # revealed: list[Tag]
 ```
 
-ParamSpec forwarding should not use raw unspecialized parameter types from a wrapped generic
-callable as argument context. The forwarded list literals should be inferred the same way as in the
-equivalent direct generic call, not with a raw `list[T]` context from the wrapped callable.
+Generic callable arguments participate in fixpoint inference, allowing the inferred type of sibling
+`ParamSpec` arguments to constrain the type of the callable.
 
 ```py
 from typing import Callable
@@ -845,14 +843,22 @@ def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.k
 # TODO: This should not error once the call-expression type context specializes the generic
 # wrapped callable before we infer forwarded `ParamSpec` arguments.
 # error: [invalid-assignment]
-union_list_result: list[int | str] = to_thread_like(generic_identity_list, reveal_type([1]))  # revealed: list[int]
+union_list_result: list[int | str] = to_thread_like(
+    generic_identity_list,
+    reveal_type([1]),  # revealed: list[int]
+)
 
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-to_thread_like(generic_pair, [1], reveal_type([""]))  # revealed: list[str]
+to_thread_like(
+    generic_pair,
+    reveal_type([1]),  # revealed: list[str | int]
+    reveal_type([""]),  # revealed: list[int | str]
+)
 
-# error: [invalid-argument-type]
-to_thread_like(generic_pair_with_container, 1, reveal_type([""]))  # revealed: list[str]
+to_thread_like(
+    generic_pair_with_container,
+    1,
+    reveal_type([""]),  # revealed: list[Literal[1] | str]
+)
 ```
 
 ### Specializing `ParamSpec` with another `ParamSpec`
@@ -918,11 +924,256 @@ def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
 
 @callable_identity
-def f(env: dict) -> None:
+def f(env: dict[str, int]) -> None:
     pass
 
-# revealed: (env: dict[Unknown, Unknown]) -> None
+# revealed: (env: dict[str, int]) -> None
 reveal_type(f)
+```
+
+### Transparent decorator passthrough
+
+A decorator typed as `Callable[P, R] -> Callable[P, R]` preserves overload signatures.
+
+```py
+from typing import Callable, overload
+
+def transparent[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(*, y: str) -> str: ...
+@transparent
+def test(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(test)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(test(1))  # revealed: int
+reveal_type(test(y="x"))  # revealed: str
+
+# error: [no-matching-overload]
+reveal_type(test(1, y="x"))  # revealed: Unknown
+
+@transparent
+def increment(value: int) -> int:
+    return value + 1
+
+reveal_type(increment)  # revealed: (value: int) -> int
+reveal_type(increment(1))  # revealed: int
+```
+
+A type alias for `Callable[P, R]` can also be used to type a transparent decorator.
+
+```py
+type Fn[**P, R] = Callable[P, R]
+
+def transparent[**P, R](func: Fn[P, R]) -> Fn[P, R]:
+    return func
+
+@overload
+def alias_decorated(x: int) -> int: ...
+@overload
+def alias_decorated(*, y: str) -> str: ...
+@transparent
+def alias_decorated(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(alias_decorated)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(alias_decorated(1))  # revealed: int
+reveal_type(alias_decorated(y="x"))  # revealed: str
+```
+
+A transparent decorator returned by a decorator factory also preserves overload signatures.
+
+```py
+def transparent_factory[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        return func
+
+    return decorator
+
+@overload
+def decorated_factory(x: int) -> int: ...
+@overload
+def decorated_factory(*, y: str) -> str: ...
+@transparent_factory()
+def decorated_factory(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(decorated_factory)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(decorated_factory(1))  # revealed: int
+reveal_type(decorated_factory(y="x"))  # revealed: str
+```
+
+A callable protocol can also describe a transparent decorator returned by a factory. Stacked
+decorators of this form preserve overload signatures independently.
+
+```py
+from typing import Callable, Literal, ParamSpec, Protocol, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+class IdentityFunction(Protocol):
+    def __call__(self, func: Callable[P, R], /) -> Callable[P, R]: ...
+
+def deprecate_streaming_parameter() -> IdentityFunction:
+    raise NotImplementedError
+
+def forward_old_opt_flags() -> IdentityFunction:
+    raise NotImplementedError
+
+class DataFrame: ...
+class InProcessQuery: ...
+
+class LazyFrame:
+    @overload
+    def collect(self, *, background: Literal[True]) -> InProcessQuery: ...
+    @overload
+    def collect(self, *, background: Literal[False] = False) -> DataFrame: ...
+    @deprecate_streaming_parameter()
+    @forward_old_opt_flags()
+    def collect(self, *, background: bool = False) -> DataFrame | InProcessQuery:
+        raise NotImplementedError
+
+lazy_frame = LazyFrame()
+reveal_type(lazy_frame.collect())  # revealed: DataFrame
+reveal_type(lazy_frame.collect(background=False))  # revealed: DataFrame
+reveal_type(lazy_frame.collect(background=True))  # revealed: InProcessQuery
+```
+
+The transparent decorator can be one overload among several. The workaround only inspects the
+overload selected by the decorator call.
+
+```py
+from typing import Any, Callable, overload, reveal_type
+
+@overload
+def select_transparent(function: Callable[P, R], /) -> Callable[P, R]: ...
+@overload
+def select_transparent(*, value: int | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+def select_transparent(function: Callable[P, R] | None = None, *, value: int | None = None) -> Any:
+    raise NotImplementedError
+
+@overload
+def selected(value: int) -> int: ...
+@overload
+def selected(value: str) -> str: ...
+@select_transparent
+def selected(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(selected)  # revealed: Overload[(value: int) -> int, (value: str) -> str]
+reveal_type(selected(1))  # revealed: int
+reveal_type(selected("one"))  # revealed: str
+```
+
+A transparent decorator can preserve a return type variable wrapped in `Awaitable`.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import overload
+
+def awaitable_transparent(function: Callable[P, Awaitable[R]], /) -> Callable[P, Awaitable[R]]:
+    raise NotImplementedError
+
+@overload
+async def awaitable(value: int) -> int: ...
+@overload
+async def awaitable(value: str) -> str: ...
+@awaitable_transparent
+async def awaitable(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(
+    awaitable  # revealed: Overload[(value: int) -> CoroutineType[Any, Any, int], (value: str) -> CoroutineType[Any, Any, str]]
+)
+
+async def check_awaitable() -> None:
+    reveal_type(await awaitable(1))  # revealed: int
+    reveal_type(await awaitable("one"))  # revealed: str
+
+def unwrap_awaitable(function: Callable[P, Awaitable[R]], /) -> Callable[P, R]:
+    raise NotImplementedError
+
+@overload
+async def unwrapped(value: int) -> int: ...
+@overload
+async def unwrapped(value: str) -> str: ...
+async def unwrapped(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(unwrap_awaitable(unwrapped)(1))  # revealed: int | str
+```
+
+The selected decorator overload can use an `Awaitable` return type.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import overload
+
+@overload
+def select_awaitable_transparent(function: Callable[P, Awaitable[R]], /) -> Callable[P, Awaitable[R]]: ...
+@overload
+def select_awaitable_transparent(
+    *, value: int | None = None
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]: ...
+def select_awaitable_transparent(
+    function: Callable[P, Awaitable[R]] | None = None,
+    *,
+    value: int | None = None,
+) -> Any:
+    raise NotImplementedError
+
+@overload
+async def selected_awaitable(value: int) -> int: ...
+@overload
+async def selected_awaitable(value: str) -> str: ...
+@select_awaitable_transparent
+async def selected_awaitable(value: int | str) -> int | str:
+    raise NotImplementedError
+
+reveal_type(
+    selected_awaitable  # revealed: Overload[(value: int) -> CoroutineType[Any, Any, int], (value: str) -> CoroutineType[Any, Any, str]]
+)
+
+async def check_selected_awaitable() -> None:
+    reveal_type(await selected_awaitable(1))  # revealed: int
+    reveal_type(await selected_awaitable("one"))  # revealed: str
+```
+
+An overload whose type-variable bound is not met must be skipped. A synchronous function returns
+`str` rather than `Awaitable[Any]`, so only the second overload applies and wraps the return type in
+`Awaitable`. An asynchronous function satisfies the bound, so the first overload applies and
+preserves its return type.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import Any, overload
+
+@overload
+def make_awaitable[**P, T: Awaitable[Any]](f: Callable[P, T]) -> Callable[P, T]: ...
+@overload
+def make_awaitable[**P, T](f: Callable[P, T]) -> Callable[P, Awaitable[T]]: ...
+def make_awaitable(f: Callable[..., Any]) -> Callable[..., Awaitable[Any]]:
+    raise NotImplementedError
+
+@make_awaitable
+def synchronous() -> str:
+    return ""
+
+reveal_type(synchronous())  # revealed: Awaitable[str]
+
+@make_awaitable
+async def asynchronous() -> str:
+    return ""
+
+reveal_type(asynchronous())  # revealed: CoroutineType[Any, Any, str]
+
+async def check_asynchronous() -> None:
+    reveal_type(await asynchronous())  # revealed: str
 ```
 
 ### Overloads
@@ -1061,7 +1312,7 @@ reveal_type(run(multi, x=1, y=2))  # revealed: int | str
 reveal_type(run(multi, 1, "b"))  # revealed: int | str
 ```
 
-### Overloads with subtitution of `P.args` and `P.kwargs`
+### Overloads with substitution of `P.args` and `P.kwargs`
 
 This is regression test for <https://github.com/astral-sh/ty/issues/2027>
 
@@ -1095,10 +1346,8 @@ reveal_type(t1("a"))  # revealed: Unknown
 reveal_type(t1(y=1))  # revealed: Unknown
 
 t2 = Task(never_returns)
-# TODO: This should be `Task[(x: int), Never]`
-reveal_type(t2)  # revealed: Task[(x: int), Unknown]
-# TODO: This should be `Never`
-reveal_type(t2(1))  # revealed: Unknown
+reveal_type(t2)  # revealed: Task[(x: int), Never]
+reveal_type(t2(1))  # revealed: Never
 ```
 
 ## ParamSpec attribute assignability
@@ -1186,7 +1435,7 @@ Regression test for <https://github.com/astral-sh/ty/issues/2336>
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def decorator[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     return func
@@ -1199,16 +1448,16 @@ def identity[T](value: T) -> T:
 def pair[T, U](first: T, second: U) -> tuple[T, U]:
     return (first, second)
 
-# revealed: ty_extensions.GenericContext[T@identity]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
 reveal_type(generic_context(identity))
-# revealed: ty_extensions.GenericContext[T@pair, U@pair]
+# revealed: ty_extensions._internal.GenericContext[T@pair, U@pair]
 reveal_type(generic_context(pair))
 
 reveal_type(identity(1))  # revealed: Literal[1]
 reveal_type(identity("hello"))  # revealed: Literal["hello"]
 
 reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
-reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float]
+reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float*]
 ```
 
 ### Chained decorators with generic functions
@@ -1235,7 +1484,7 @@ reveal_type(chained_generic("test"))  # revealed: Literal["test"]
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def method_decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
@@ -1247,7 +1496,7 @@ class Container:
 
 c = Container()
 
-# revealed: ty_extensions.GenericContext[T@generic_method]
+# revealed: ty_extensions._internal.GenericContext[T@generic_method]
 reveal_type(generic_context(c.generic_method))
 
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T

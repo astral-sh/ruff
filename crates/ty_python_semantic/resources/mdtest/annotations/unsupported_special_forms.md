@@ -13,7 +13,7 @@ Ts = TypeVarTuple("Ts")
 R_co = TypeVar("R_co", covariant=True)
 
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[*Ts@f]
     return args
 
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
@@ -74,10 +74,10 @@ class Pair(Generic[T, U]): ...
 class Triple(Generic[T, U, Unpack[Us]]): ...
 
 def variadic_typevartuple(*args: Unpack[Ts]) -> None:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[*Ts@variadic_typevartuple]
 
 def variadic_tuple(*args: Unpack[tuple[int, str]]) -> None:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[int, str]
 
 def allowed(
     tuple_fixed: tuple[int, Unpack[tuple[str, bytes]]],
@@ -95,8 +95,8 @@ def allowed(
 ) -> None:
     reveal_type(tuple_fixed)  # revealed: tuple[int, str, bytes]
     reveal_type(tuple_variadic)  # revealed: tuple[int, *tuple[str, ...], bytes]
-    reveal_type(callable_typevartuple)  # revealed: (...) -> None
-    reveal_type(callable_tuple)  # revealed: (tuple[int, str], /) -> None
+    reveal_type(callable_typevartuple)  # revealed: (int, /, *Ts@allowed) -> None
+    reveal_type(callable_tuple)  # revealed: (*tuple[int, str]) -> None
     reveal_type(pair)  # revealed: Pair[int, str]
     reveal_type(quoted_pair_argument)  # revealed: Pair[int, str]
     reveal_type(quoted_tuple)  # revealed: tuple[int, str, bytes]
@@ -146,14 +146,14 @@ You can't inherit from most of these. `typing.Callable` is an exception.
 ```py
 from typing import Callable
 from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate, Generic
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Self): ...  # error: [invalid-base]
 class B(Unpack): ...  # error: [invalid-base]
 class C(TypeGuard): ...  # error: [invalid-base]
 class D(TypeIs): ...  # error: [invalid-base]
 class E(Concatenate): ...  # error: [invalid-base]
-class F(Callable): ...
+class F(Callable): ...  # error: [missing-type-argument]
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
 reveal_mro(F)  # revealed: (<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>)

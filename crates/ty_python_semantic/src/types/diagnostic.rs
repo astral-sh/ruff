@@ -5,12 +5,11 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
     StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
-use crate::diagnostic::did_you_mean;
-use crate::diagnostic::format_enumeration;
+use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, place_from_bindings};
 use crate::suppression::FileSuppressionId;
-use crate::types::call::CallError;
+use crate::types::call::{CallDiagnosticOverride, CallError};
 use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
@@ -18,6 +17,7 @@ use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, Ov
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
+use crate::types::special_form::TypeQualifier;
 use crate::types::string_annotation::{
     ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
     INVALID_SYNTAX_IN_FORWARD_ANNOTATION, RAW_STRING_TYPE_ANNOTATION,
@@ -26,16 +26,17 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
-    binding_type, protocol_class::ProtocolClass,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
+    SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
+    protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, TypedDictType, UnionType};
-use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
+use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
+    files::File,
     parsed::parsed_module,
 };
 use ruff_diagnostics::{Edit, Fix, IsolationLevel};
@@ -49,7 +50,7 @@ use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
-use ty_python_core::{global_scope, place_table, use_def_map};
+use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -62,7 +63,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&INVALID_DATACLASS);
-    registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
@@ -73,6 +73,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
     registry.register_lint(&EMPTY_BODY);
+    registry.register_lint(&EXPERIMENTAL_SYNTAX);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -116,6 +117,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -133,6 +135,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_ON_NON_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
+    registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
@@ -141,6 +144,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
+    registry.register_lint(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
@@ -162,6 +166,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_OVERRIDE);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
+    registry.register_lint(&MISSING_OVERRIDE_DECORATOR);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
@@ -176,16 +181,16 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to non-callable objects.
-    ///
-    /// ## Why is this bad?
-    /// Calling a non-callable object will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// 4()  # TypeError: 'int' object is not callable
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/experimental-syntax.md")]
+    pub(crate) static EXPERIMENTAL_SYNTAX = {
+        summary: "detects experimental syntax",
+        status: LintStatus::stable("0.0.50"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/call-non-callable.md")]
     pub(crate) static CALL_NON_CALLABLE = {
         summary: "detects calls to non-callable objects",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -194,23 +199,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all
-    /// callable types with return type `T`).
-    ///
-    /// ## Why is this bad?
-    /// When an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)` or
-    /// `isinstance(x, Callable)`), we know the object is callable, but we don't know its
-    /// precise signature. This type represents the set of all possible callable types
-    /// (including, e.g., functions that take no arguments and functions that require arguments),
-    /// so no specific set of arguments can be guaranteed to be valid.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def f(x: object):
-    ///     if callable(x):
-    ///         x()  # error: We know `x` is callable, but not what arguments it accepts
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/call-top-callable.md")]
     pub(crate) static CALL_TOP_CALLABLE = {
         summary: "detects calls to the top callable type",
         status: LintStatus::stable("0.0.7"),
@@ -219,24 +208,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for implicit calls to possibly missing methods.
-    ///
-    /// ## Why is this bad?
-    /// Expressions such as `x[y]` and `x * y` call methods
-    /// under the hood (`__getitem__` and `__mul__` respectively).
-    /// Calling a missing method will raise an `AttributeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import datetime
-    ///
-    /// class A:
-    ///     if datetime.date.today().weekday() != 6:
-    ///         def __getitem__(self, v): ...
-    ///
-    /// A()[0]  # TypeError: 'A' object is not subscriptable
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/possibly-missing-implicit-call.md")]
     pub(crate) static POSSIBLY_MISSING_IMPLICIT_CALL = {
         summary: "detects implicit calls to possibly missing methods",
         status: LintStatus::stable("0.0.1-alpha.22"),
@@ -245,49 +217,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks whether an argument is used as both a value and a type form in a call.
-    ///
-    /// ## Why is this bad?
-    /// Such calls have confusing semantics and often indicate a logic error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import reveal_type
-    /// from ty_extensions import is_singleton
-    ///
-    /// if flag:
-    ///     f = repr  # Expects a value
-    /// else:
-    ///     f = is_singleton  # Expects a type form
-    ///
-    /// f(int)  # error
-    /// ```
-    pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
-        summary: "detects when an argument is used as both a value and a type form in a call",
-        status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks whether a variable has been declared as two conflicting types.
-    ///
-    /// ## Why is this bad
-    /// A variable with two conflicting declarations likely indicates a mistake.
-    /// Moreover, it could lead to incorrect or ill-defined type inference for
-    /// other code that relies on these variables.
-    ///
-    /// ## Examples
-    /// ```python
-    /// if b:
-    ///     a: int
-    /// else:
-    ///     a: str
-    ///
-    /// a = 1
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/conflicting-declarations.md")]
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -296,24 +226,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions where the metaclass of the class
-    /// being created would not be a subclass of the metaclasses of
-    /// all the class's bases.
-    ///
-    /// ## Why is it bad?
-    /// Such a class definition raises a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class M1(type): ...
-    /// class M2(type): ...
-    /// class A(metaclass=M1): ...
-    /// class B(metaclass=M2): ...
-    ///
-    /// # TypeError: metaclass conflict
-    /// class C(A, B): ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/conflicting-metaclass.md")]
     pub(crate) static CONFLICTING_METACLASS = {
         summary: "detects conflicting metaclasses",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -322,24 +235,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions in stub files that inherit
-    /// (directly or indirectly) from themselves.
-    ///
-    /// ## Why is it bad?
-    /// Although forward references are natively supported in stub files,
-    /// inheritance cycles are still disallowed, as it is impossible to
-    /// resolve a consistent [method resolution order] for a class that
-    /// inherits from itself.
-    ///
-    /// ## Examples
-    /// ```python
-    /// # foo.pyi
-    /// class A(B): ...
-    /// class B(A): ...
-    /// ```
-    ///
-    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[doc = include_str!("../../resources/lint_docs/cyclic-class-definition.md")]
     pub(crate) static CYCLIC_CLASS_DEFINITION = {
         summary: "detects cyclic class definitions",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -348,20 +244,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for type alias definitions that (directly or mutually) refer to themselves.
-    ///
-    /// ## Why is it bad?
-    /// Although it is permitted to define a recursive type alias, it is not meaningful
-    /// to have a type alias whose expansion can only result in itself, and is therefore not allowed.
-    ///
-    /// ## Examples
-    /// ```python
-    /// type Itself = Itself
-    ///
-    /// type A = B
-    /// type B = A
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/cyclic-type-alias-definition.md")]
     pub(crate) static CYCLIC_TYPE_ALIAS_DEFINITION = {
         summary: "detects cyclic type alias definitions",
         status: LintStatus::stable("0.0.1-alpha.29"),
@@ -370,20 +253,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// It detects division by zero.
-    ///
-    /// ## Why is this bad?
-    /// Dividing by zero raises a `ZeroDivisionError` at runtime.
-    ///
-    /// ## Rule status
-    /// This rule is currently disabled by default because of the number of
-    /// false positives it can produce.
-    ///
-    /// ## Examples
-    /// ```python
-    /// 5 / 0
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/division-by-zero.md")]
     pub(crate) static DIVISION_BY_ZERO = {
         summary: "detects division by zero",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -392,19 +262,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for uses of deprecated items
-    ///
-    /// ## Why is this bad?
-    /// Deprecated items should no longer be used.
-    ///
-    /// ## Examples
-    /// ```python
-    /// @warnings.deprecated("use new_func instead")
-    /// def old_func(): ...
-    ///
-    /// old_func()  # emits [deprecated] diagnostic
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/deprecated.md")]
     pub(crate) static DEPRECATED = {
         summary: "detects uses of deprecated items",
         status: LintStatus::stable("0.0.1-alpha.16"),
@@ -413,19 +271,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions with duplicate bases.
-    ///
-    /// ## Why is this bad?
-    /// Class definitions with duplicate bases raise `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A: ...
-    ///
-    /// # TypeError: duplicate base class
-    /// class B(A, A): ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/duplicate-base.md")]
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -434,30 +280,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for dataclass definitions with more than one field
-    /// annotated with `KW_ONLY`.
-    ///
-    /// ## Why is this bad?
-    /// `dataclasses.KW_ONLY` is a special marker used to
-    /// emulate the `*` syntax in normal signatures.
-    /// It can only be used once per dataclass.
-    ///
-    /// Attempting to annotate two different fields with
-    /// it will lead to a runtime error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from dataclasses import dataclass, KW_ONLY
-    ///
-    /// @dataclass
-    /// class A:  # Crash at runtime
-    ///     b: int
-    ///     _1: KW_ONLY
-    ///     c: str
-    ///     _2: KW_ONLY
-    ///     d: bytes
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/duplicate-kw-only.md")]
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
         status: LintStatus::stable("0.0.1-alpha.12"),
@@ -466,24 +289,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for dataclass definitions where required fields are defined after
-    /// fields with default values.
-    ///
-    /// ## Why is this bad?
-    /// In dataclasses, all required fields (fields without default values) must be
-    /// defined before fields with default values. This is a Python requirement that
-    /// will raise a `TypeError` at runtime if violated.
-    ///
-    /// ## Example
-    /// ```python
-    /// from dataclasses import dataclass
-    ///
-    /// @dataclass
-    /// class Example:
-    ///     x: int = 1    # Field with default value
-    ///     y: str        # Error: Required field after field with default
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/dataclass-field-order.md")]
     pub(crate) static DATACLASS_FIELD_ORDER = {
         summary: "detects dataclass definitions with required fields after fields with default values",
         status: LintStatus::stable("0.0.15"),
@@ -492,24 +298,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or
-    /// `__delattr__` method defined.
-    ///
-    /// ## Why is this bad?
-    /// Frozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a
-    /// `FrozenInstanceError` to emulate immutability.
-    ///
-    /// Overriding either of these methods raises a runtime error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from dataclasses import dataclass
-    ///
-    /// @dataclass(frozen=True)
-    /// class A:
-    ///     def __setattr__(self, name: str, value: object) -> None: ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-dataclass-override.md")]
     pub(crate) static INVALID_DATACLASS_OVERRIDE = {
         summary: "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
         status: LintStatus::stable("0.0.13"),
@@ -518,29 +307,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for invalid applications of the `@dataclass` decorator.
-    ///
-    /// ## Why is this bad?
-    /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
-    /// `Enum`, or `Protocol` is invalid:
-    ///
-    /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
-    ///   instantiating the class.
-    /// - `Enum` classes with `@dataclass` are [explicitly not supported].
-    /// - `Protocol` classes define interfaces and cannot be instantiated.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from dataclasses import dataclass
-    /// from typing import NamedTuple
-    ///
-    /// @dataclass  # error: [invalid-dataclass]
-    /// class Foo(NamedTuple):
-    ///     x: int
-    /// ```
-    ///
-    /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
+    #[expect(clippy::doc_overindented_list_items)]
+    #[doc = include_str!("../../resources/lint_docs/invalid-dataclass.md")]
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
         status: LintStatus::stable("0.0.12"),
@@ -549,80 +317,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for classes definitions which will fail at runtime due to
-    /// "instance memory layout conflicts".
-    ///
-    /// This error is usually caused by attempting to combine multiple classes
-    /// that define non-empty `__slots__` in a class's [Method Resolution Order]
-    /// (MRO), or by attempting to combine multiple builtin classes in a class's
-    /// MRO.
-    ///
-    /// ## Why is this bad?
-    /// Inheriting from bases with conflicting instance memory layouts
-    /// will lead to a `TypeError` at runtime.
-    ///
-    /// An instance memory layout conflict occurs when CPython cannot determine
-    /// the memory layout instances of a class should have, because the instance
-    /// memory layout of one of its bases conflicts with the instance memory layout
-    /// of one or more of its other bases.
-    ///
-    /// For example, if a Python class defines non-empty `__slots__`, this will
-    /// impact the memory layout of instances of that class. Multiple inheritance
-    /// from more than one different class defining non-empty `__slots__` is not
-    /// allowed:
-    ///
-    /// ```python
-    /// class A:
-    ///     __slots__ = ("a", "b")
-    ///
-    /// class B:
-    ///     __slots__ = ("a", "b")  # Even if the values are the same
-    ///
-    /// # TypeError: multiple bases have instance lay-out conflict
-    /// class C(A, B): ...
-    /// ```
-    ///
-    /// An instance layout conflict can also be caused by attempting to use
-    /// multiple inheritance with two builtin classes, due to the way that these
-    /// classes are implemented in a CPython C extension:
-    ///
-    /// ```python
-    /// class A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict
-    /// ```
-    ///
-    /// Note that pure-Python classes with no `__slots__`, or pure-Python classes
-    /// with empty `__slots__`, are always compatible:
-    ///
-    /// ```python
-    /// class A: ...
-    /// class B:
-    ///     __slots__ = ()
-    /// class C:
-    ///     __slots__ = ("a", "b")
-    ///
-    /// # fine
-    /// class D(A, B, C): ...
-    /// ```
-    ///
-    /// ## Known problems
-    /// Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
-    /// of string literals, or tuples of string literals) are not currently considered disjoint
-    /// bases by ty.
-    ///
-    /// Additionally, this check is not exhaustive: many C extensions (including several in
-    /// the standard library) define classes that use extended memory layouts and thus cannot
-    /// coexist in a single MRO. Since it is currently not possible to represent this fact in
-    /// stub files, having a full knowledge of these classes is also impossible. When it comes
-    /// to classes that do not define `__slots__` at the Python level, therefore, ty, currently
-    /// only hard-codes a number of cases where it knows that a class will produce instances with
-    /// an atypical memory layout.
-    ///
-    /// ## Further reading
-    /// - [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
-    /// - [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)
-    ///
-    /// [Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[doc = include_str!("../../resources/lint_docs/instance-layout-conflict.md")]
     pub(crate) static INSTANCE_LAYOUT_CONFLICT = {
         summary: "detects class definitions that raise `TypeError` due to instance layout conflict",
         status: LintStatus::stable("0.0.1-alpha.12"),
@@ -631,26 +326,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for protocol classes that will raise `TypeError` at runtime.
-    ///
-    /// ## Why is this bad?
-    /// An invalidly defined protocol class may lead to the type checker inferring
-    /// unexpected things. It may also lead to `TypeError`s at runtime.
-    ///
-    /// ## Examples
-    /// A `Protocol` class cannot inherit from a non-`Protocol` class;
-    /// this raises a `TypeError` at runtime:
-    ///
-    /// ```pycon
-    /// >>> from typing import Protocol
-    /// >>> class Foo(int, Protocol): ...
-    /// ...
-    /// Traceback (most recent call last):
-    ///   File "<python-input-1>", line 1, in <module>
-    ///     class Foo(int, Protocol): ...
-    /// TypeError: Protocols can only inherit from other protocols, got <class 'int'>
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-protocol.md")]
     pub(crate) static INVALID_PROTOCOL = {
         summary: "detects invalid protocol class definitions",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -660,33 +336,7 @@ declare_lint! {
 
 // Added in #17750.
 declare_lint! {
-    /// ## What it does
-    /// Checks for protocol classes with members that will lead to ambiguous interfaces.
-    ///
-    /// ## Why is this bad?
-    /// Assigning to an undeclared variable in a protocol class leads to an ambiguous
-    /// interface which may lead to the type checker inferring unexpected things. It's
-    /// recommended to ensure that all members of a protocol class are explicitly declared.
-    ///
-    /// ## Examples
-    ///
-    /// ```py
-    /// from typing import Protocol
-    ///
-    /// class BaseProto(Protocol):
-    ///     a: int                               # fine (explicitly declared as `int`)
-    ///     def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration
-    ///     c = "some variable"                  # error: no explicit declaration, leading to ambiguity
-    ///     b = method_member                    # error: no explicit declaration, leading to ambiguity
-    ///
-    ///     # error: this creates implicit assignments of `d` and `e` in the protocol class body.
-    ///     # Were they really meant to be considered protocol members?
-    ///     for d, e in enumerate(range(42)):
-    ///         pass
-    ///
-    /// class SubProto(BaseProto, Protocol):
-    ///     a = 42  # fine (declared in superclass)
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/ambiguous-protocol-member.md")]
     pub(crate) static AMBIGUOUS_PROTOCOL_MEMBER = {
         summary: "detects protocol classes with ambiguous interfaces",
         status: LintStatus::stable("0.0.1-alpha.20"),
@@ -695,46 +345,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for invalidly defined `NamedTuple` classes.
-    ///
-    /// ## Why is this bad?
-    /// An invalidly defined `NamedTuple` class may lead to the type checker
-    /// drawing incorrect conclusions. It may also lead to `TypeError`s or
-    /// `AttributeError`s at runtime.
-    ///
-    /// ## Examples
-    /// A class definition cannot combine `NamedTuple` with other base classes
-    /// in multiple inheritance; doing so raises a `TypeError` at runtime. The sole
-    /// exception to this rule is `Generic[]`, which can be used alongside `NamedTuple`
-    /// in a class's bases list.
-    ///
-    /// ```pycon
-    /// >>> from typing import NamedTuple
-    /// >>> class Foo(NamedTuple, object): ...
-    /// TypeError: can only inherit from a NamedTuple type and Generic
-    /// ```
-    ///
-    /// Further, `NamedTuple` field names cannot start with an underscore:
-    ///
-    /// ```pycon
-    /// >>> from typing import NamedTuple
-    /// >>> class Foo(NamedTuple):
-    /// ...     _bar: int
-    /// ValueError: Field names cannot start with an underscore: '_bar'
-    /// ```
-    ///
-    /// `NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,
-    /// `_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes
-    /// without a type annotation will raise an `AttributeError` at runtime.
-    ///
-    /// ```pycon
-    /// >>> from typing import NamedTuple
-    /// >>> class Foo(NamedTuple):
-    /// ...     x: int
-    /// ...     _asdict = 42
-    /// AttributeError: Cannot overwrite NamedTuple attribute _asdict
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-named-tuple.md")]
     pub(crate) static INVALID_NAMED_TUPLE = {
         summary: "detects invalid `NamedTuple` class definitions",
         status: LintStatus::stable("0.0.1-alpha.19"),
@@ -743,32 +354,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for subclass members that override inherited `NamedTuple` fields.
-    ///
-    /// ## Why is this bad?
-    /// Reusing an inherited `NamedTuple` field name in a subclass creates a
-    /// class where tuple indexing and `repr()` still reflect the original
-    /// field, while attribute access follows the subclass member.
-    ///
-    /// ## Default level
-    /// This rule is a warning by default because these overrides do not make
-    /// the class invalid at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import NamedTuple
-    ///
-    /// class User(NamedTuple):
-    ///     name: str
-    ///
-    /// class Admin(User):
-    ///     name = "shadowed"  # error: [invalid-named-tuple-override]
-    ///
-    /// admin = Admin("Alice")
-    /// admin.name  # "shadowed"
-    /// admin[0]  # "Alice"
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-named-tuple-override.md")]
     pub(crate) static INVALID_NAMED_TUPLE_OVERRIDE = {
         summary: "detects subclass members that override inherited `NamedTuple` fields",
         status: LintStatus::stable("0.0.31"),
@@ -777,22 +363,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for classes with an inconsistent [method resolution order] (MRO).
-    ///
-    /// ## Why is this bad?
-    /// Classes with an inconsistent MRO will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A: ...
-    /// class B(A): ...
-    ///
-    /// # TypeError: Cannot create a consistent method resolution order
-    /// class C(A, B): ...
-    /// ```
-    ///
-    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[doc = include_str!("../../resources/lint_docs/inconsistent-mro.md")]
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -801,18 +372,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for attempts to use an out of bounds index to get an item from
-    /// a container.
-    ///
-    /// ## Why is this bad?
-    /// Using an out of bounds index will raise an `IndexError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// t = (0, 1, 2)
-    /// t[3]  # IndexError: tuple index out of range
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/index-out-of-bounds.md")]
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -822,31 +382,7 @@ declare_lint! {
 
 // Added in #19763.
 declare_lint! {
-    /// ## What it does
-    /// Checks for subscript accesses with invalid keys and `TypedDict` construction with an
-    /// unknown key.
-    ///
-    /// ## Why is this bad?
-    /// Subscripting with an invalid key will raise a `KeyError` at runtime.
-    ///
-    /// Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is
-    /// `closed=true` it also violates the expectations of the type.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import TypedDict
-    ///
-    /// class Person(TypedDict):
-    ///     name: str
-    ///     age: int
-    ///
-    /// alice = Person(name="Alice", age=30)
-    /// alice["height"]  # KeyError: 'height'
-    ///
-    /// bob: Person = { "nickname": "Bob", "age": 30 }  # typo!
-    ///
-    /// carol = Person(name="Carol", aeg=25)  # typo!
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-key.md")]
     pub(crate) static INVALID_KEY = {
         summary: "detects invalid subscript accesses or TypedDict literal keys",
         status: LintStatus::stable("0.0.1-alpha.17"),
@@ -855,46 +391,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Reports invalid runtime checks against `Protocol` classes.
-    /// This includes explicit calls `isinstance()`/`issubclass()` against
-    /// non-runtime-checkable protocols, `issubclass()` calls against protocols
-    /// that have non-method members, and implicit `isinstance()` checks against
-    /// non-runtime-checkable protocols via pattern matching.
-    ///
-    /// ## Why is this bad?
-    /// These calls (implicit or explicit) raise `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing_extensions import Protocol, runtime_checkable
-    ///
-    /// class HasX(Protocol):
-    ///     x: int
-    ///
-    /// @runtime_checkable
-    /// class HasY(Protocol):
-    ///     y: int
-    ///
-    /// def f(arg: object, arg2: type):
-    ///     isinstance(arg, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)
-    ///     issubclass(arg2, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)
-    ///
-    /// def g(arg: object):
-    ///     match arg:
-    ///         case HasX():  # error: [isinstance-against-protocol] (not runtime-checkable)
-    ///             pass
-    ///
-    /// def h(arg2: type):
-    ///     isinstance(arg2, HasY)  # fine (runtime-checkable)
-    ///
-    ///     # `HasY` is runtime-checkable, but has non-method members,
-    ///     # so it still can't be used in `issubclass` checks)
-    ///     issubclass(arg2, HasY)  # error: [isinstance-against-protocol]
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)
+    #[doc = include_str!("../../resources/lint_docs/isinstance-against-protocol.md")]
     pub(crate) static ISINSTANCE_AGAINST_PROTOCOL = {
         summary: "reports invalid runtime checks against protocol classes",
         status: LintStatus::stable("0.0.14"),
@@ -903,34 +400,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Reports runtime checks against `TypedDict` classes.
-    /// This includes explicit calls to `isinstance()`/`issubclass()` and implicit
-    /// checks performed by `match` class patterns.
-    ///
-    /// ## Why is this bad?
-    /// Using a `TypedDict` class in these contexts raises `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing_extensions import TypedDict
-    ///
-    /// class Movie(TypedDict):
-    ///     name: str
-    ///     director: str
-    ///
-    /// def f(arg: object, arg2: type):
-    ///     isinstance(arg, Movie)  # error: [isinstance-against-typed-dict]
-    ///     issubclass(arg2, Movie)  # error: [isinstance-against-typed-dict]
-    ///
-    /// def g(arg: object):
-    ///     match arg:
-    ///         case Movie():  # error: [isinstance-against-typed-dict]
-    ///             pass
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing specification: `TypedDict`](https://typing.python.org/en/latest/spec/typeddict.html)
+    #[doc = include_str!("../../resources/lint_docs/isinstance-against-typed-dict.md")]
     pub(crate) static ISINSTANCE_AGAINST_TYPED_DICT = {
         summary: "reports runtime checks against `TypedDict` classes",
         status: LintStatus::stable("0.0.15"),
@@ -939,19 +409,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects call arguments whose type is not assignable to the corresponding typed parameter.
-    ///
-    /// ## Why is this bad?
-    /// Passing an argument of a type the function (or callable object) does not accept violates
-    /// the expectations of the function author and may cause unexpected runtime errors within the
-    /// body of the function.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def func(x: int): ...
-    /// func("foo")  # error: [invalid-argument-type]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-argument-type.md")]
     pub(crate) static INVALID_ARGUMENT_TYPE = {
         summary: "detects call arguments whose type is not assignable to the corresponding typed parameter",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -960,21 +418,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects returned values that can't be assigned to the function's annotated return type.
-    ///
-    /// Note that the special case of a function with a non-`None` return type and an empty body
-    /// is handled by the separate `empty-body` error code.
-    ///
-    /// ## Why is this bad?
-    /// Returning an object of a type incompatible with the annotated return type
-    /// is unsound, and will lead to ty inferring incorrect types elsewhere.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def func() -> int:
-    ///     return "a"  # error: [invalid-return-type]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-return-type.md")]
     pub(crate) static INVALID_RETURN_TYPE = {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -983,23 +427,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects `yield` and `yield from` expressions where the "yield" or "send" type
-    /// is incompatible with the generator function's annotated return type.
-    ///
-    /// ## Why is this bad?
-    /// Yielding a value of a type that doesn't match the generator's declared yield type,
-    /// or using `yield from` with a sub-iterator whose yield or send type is incompatible,
-    /// is a type error that may cause downstream consumers of the generator to receive
-    /// values of an unexpected type.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import Iterator
-    ///
-    /// def gen() -> Iterator[int]:
-    ///     yield "not an int"  # error: [invalid-yield]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-yield.md")]
     pub(crate) static INVALID_YIELD = {
         summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
         status: LintStatus::stable("0.0.25"),
@@ -1008,38 +436,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects functions with empty bodies that have a non-`None` return type annotation.
-    ///
-    /// The errors reported by this rule have the same motivation as the `invalid-return-type`
-    /// rule. The diagnostic exists as a separate error code to allow users to disable this
-    /// rule while prototyping code. While we strongly recommend enabling this rule if
-    /// possible, users migrating from other type checkers may also find it useful to
-    /// temporarily disable this rule on some or all of their codebase if they find it
-    /// results in a large number of diagnostics.
-    ///
-    /// ## Why is this bad?
-    /// A function with an empty body (containing only `...`, `pass`, or a docstring) will
-    /// implicitly return `None` at runtime. Returning `None` when the return type is non-`None`
-    /// is unsound, and will lead to ty inferring incorrect types elsewhere.
-    ///
-    /// Functions with empty bodies are permitted in certain contexts where they serve as
-    /// declarations rather than implementations:
-    ///
-    /// - Functions in stub files (`.pyi`)
-    /// - Methods in Protocol classes
-    /// - Abstract methods decorated with `@abstractmethod`
-    /// - Overload declarations decorated with `@overload`
-    /// - Functions in `if TYPE_CHECKING` blocks
-    ///
-    /// ## Examples
-    /// ```python
-    /// def foo() -> int: ...  # error: [empty-body]
-    ///
-    /// def bar() -> str:
-    ///     """A function that does nothing."""
-    ///     pass  # error: [empty-body]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/empty-body.md")]
     pub(crate) static EMPTY_BODY = {
         summary: "detects functions with empty bodies that have a non-`None` return type annotation",
         status: LintStatus::stable("0.0.14"),
@@ -1048,20 +445,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for assignments where the type of the value
-    /// is not [assignable to] the type of the assignee.
-    ///
-    /// ## Why is this bad?
-    /// Such assignments break the rules of the type system and
-    /// weaken a type checker's ability to accurately reason about your code.
-    ///
-    /// ## Examples
-    /// ```python
-    /// a: int = ''
-    /// ```
-    ///
-    /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
+    #[doc = include_str!("../../resources/lint_docs/invalid-assignment.md")]
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1070,28 +454,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `await` being used with types that are not [Awaitable].
-    ///
-    /// ## Why is this bad?
-    /// Such expressions will lead to `TypeError` being raised at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import asyncio
-    ///
-    /// class InvalidAwait:
-    ///     def __await__(self) -> int:
-    ///         return 5
-    ///
-    /// async def main() -> None:
-    ///     await InvalidAwait()  # error: [invalid-await]
-    ///     await 42  # error: [invalid-await]
-    ///
-    /// asyncio.run(main())
-    /// ```
-    ///
-    /// [Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable
+    #[doc = include_str!("../../resources/lint_docs/invalid-await.md")]
     pub(crate) static INVALID_AWAIT = {
         summary: "detects awaiting on types that don't support it",
         status: LintStatus::stable("0.0.1-alpha.19"),
@@ -1100,16 +463,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions that have bases which are not instances of `type`.
-    ///
-    /// ## Why is this bad?
-    /// Class definitions with bases like this will lead to `TypeError` being raised at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A(42): ...  # error: [invalid-base]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-base.md")]
     pub(crate) static INVALID_BASE = {
         summary: "detects class bases that will cause the class definition to raise an exception at runtime",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1118,31 +472,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions that have bases which are unsupported by ty.
-    ///
-    /// ## Why is this bad?
-    /// If a class has a base that is an instance of a complex type such as a union type,
-    /// ty will not be able to resolve the [method resolution order] (MRO) for the class.
-    /// This will lead to an inferior understanding of your codebase and unpredictable
-    /// type-checking behavior.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import datetime
-    ///
-    /// class A: ...
-    /// class B: ...
-    ///
-    /// if datetime.date.today().weekday() != 6:
-    ///     C = A
-    /// else:
-    ///     C = B
-    ///
-    /// class D(C): ...  # error: [unsupported-base]
-    /// ```
-    ///
-    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[doc = include_str!("../../resources/lint_docs/unsupported-base.md")]
     pub(crate) static UNSUPPORTED_BASE = {
         summary: "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.1-alpha.7"),
@@ -1151,31 +481,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for dynamic class definitions (using `type()`) that have bases
-    /// which are unsupported by ty.
-    ///
-    /// This is equivalent to `unsupported-base` but applies to classes created
-    /// via `type()` rather than `class` statements.
-    ///
-    /// ## Why is this bad?
-    /// If a dynamically created class has a base that is an unsupported type
-    /// such as `type[T]`, ty will not be able to resolve the
-    /// [method resolution order] (MRO) for the class. This may lead to an inferior
-    /// understanding of your codebase and unpredictable type-checking behavior.
-    ///
-    /// ## Default level
-    /// This rule is disabled by default because it will not cause a runtime error,
-    /// and may be noisy on codebases that use `type()` in highly dynamic ways.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def factory(base: type[Base]) -> type:
-    ///     # `base` has type `type[Base]`, not `type[Base]` itself
-    ///     return type("Dynamic", (base,), {})  # error: [unsupported-dynamic-base]
-    /// ```
-    ///
-    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    #[doc = include_str!("../../resources/lint_docs/unsupported-dynamic-base.md")]
     pub(crate) static UNSUPPORTED_DYNAMIC_BASE = {
         summary: "detects dynamic class bases that are unsupported as ty could not feasibly calculate the class's MRO",
         status: LintStatus::stable("0.0.12"),
@@ -1184,19 +490,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for expressions used in `with` statements
-    /// that do not implement the context manager protocol.
-    ///
-    /// ## Why is this bad?
-    /// Such a statement will raise `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// # TypeError: 'int' object does not support the context manager protocol
-    /// with 1:
-    ///     print(2)
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-context-manager.md")]
     pub(crate) static INVALID_CONTEXT_MANAGER = {
         summary: "detects expressions used in with statements that don't implement the context manager protocol",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1205,21 +499,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for declarations where the inferred type of an existing symbol
-    /// is not [assignable to] its post-hoc declared type.
-    ///
-    /// ## Why is this bad?
-    /// Such declarations break the rules of the type system and
-    /// weaken a type checker's ability to accurately reason about your code.
-    ///
-    /// ## Examples
-    /// ```python
-    /// a = 1
-    /// a: str
-    /// ```
-    ///
-    /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
+    #[doc = include_str!("../../resources/lint_docs/invalid-declaration.md")]
     pub(crate) static INVALID_DECLARATION = {
         summary: "detects invalid declarations",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1228,34 +508,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for exception handlers that catch non-exception classes.
-    ///
-    /// ## Why is this bad?
-    /// Catching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.
-    ///
-    /// ## Example
-    /// ```python
-    /// try:
-    ///     1 / 0
-    /// except 1:
-    ///     ...
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// try:
-    ///     1 / 0
-    /// except ZeroDivisionError:
-    ///     ...
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
-    /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
-    ///
-    /// ## Ruff rule
-    ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
+    #[doc = include_str!("../../resources/lint_docs/invalid-exception-caught.md")]
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1264,40 +517,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for enum members that have explicit type annotations.
-    ///
-    /// ## Why is this bad?
-    /// The [typing spec] states that type checkers should infer a literal type
-    /// for all enum members. An explicit type annotation on an enum member is
-    /// misleading because the annotated type will be incorrect — the actual
-    /// runtime type is the enum class itself, not the annotated type.
-    ///
-    /// In CPython's `enum` module, annotated assignments with values are still
-    /// treated as members at runtime, but the annotation will confuse readers of the code.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Pet(Enum):
-    ///     CAT = 1       # OK
-    ///     DOG: int = 2  # Error: enum members should not be annotated
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from enum import Enum
-    ///
-    /// class Pet(Enum):
-    ///     CAT = 1
-    ///     DOG = 2
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing spec: Enum members](https://typing.python.org/en/latest/spec/enums.html#enum-members)
-    ///
-    /// [typing spec]: https://typing.python.org/en/latest/spec/enums.html#enum-members
+    #[doc = include_str!("../../resources/lint_docs/invalid-enum-member-annotation.md")]
     pub(crate) static INVALID_ENUM_MEMBER_ANNOTATION = {
         summary: "detects type annotations on enum members",
         status: LintStatus::stable("0.0.20"),
@@ -1306,40 +526,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for enum classes that are also generic.
-    ///
-    /// ## Why is this bad?
-    /// Enum classes cannot be generic. Python does not support generic enums:
-    /// attempting to create one will either result in an immediate `TypeError`
-    /// at runtime, or will create a class that cannot be specialized in the way
-    /// that a normal generic class can.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from enum import Enum
-    /// from typing import Generic, TypeVar
-    ///
-    /// T = TypeVar("T")
-    ///
-    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
-    /// class E[T](Enum):
-    ///     A = 1
-    ///
-    /// # error: enum class cannot be generic (class creation fails with `TypeError`)
-    /// class F(Enum, Generic[T]):
-    ///     A = 1
-    ///
-    /// # error: enum class cannot be generic -- the class creation does not immediately fail...
-    /// class G(Generic[T], Enum):
-    ///     A = 1
-    ///
-    /// # ...but this raises `KeyError`:
-    /// x: G[int]
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: Enum](https://docs.python.org/3/library/enum.html)
+    #[doc = include_str!("../../resources/lint_docs/invalid-generic-enum.md")]
     pub(crate) static INVALID_GENERIC_ENUM = {
         summary: "detects generic enum classes",
         status: LintStatus::stable("0.0.12"),
@@ -1348,29 +535,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for the creation of invalid generic classes
-    ///
-    /// ## Why is this bad?
-    /// There are several requirements that you must follow when defining a generic class.
-    /// Many of these result in `TypeError` being raised at runtime if they are violated.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing_extensions import Generic, TypeVar
-    ///
-    /// T = TypeVar("T")
-    /// U = TypeVar("U", default=int)
-    ///
-    /// # error: class uses both PEP-695 syntax and legacy syntax
-    /// class C[U](Generic[T]): ...
-    ///
-    /// # error: type parameter with default comes before type parameter without default
-    /// class D(Generic[U, T]): ...
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    #[doc = include_str!("../../resources/lint_docs/invalid-generic-class.md")]
     pub(crate) static INVALID_GENERIC_CLASS = {
         summary: "detects invalid generic classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1379,24 +544,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class definitions that will fail due to non-callable `__init_subclass__`
-    /// methods.
-    ///
-    /// ## Why is this bad?
-    /// If a class defines a non-callable `__init_subclass__` method/attribute, any attempt
-    /// to subclass that class will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class Super:
-    ///     __init_subclass__ = None
-    ///
-    /// class Sub(Super): ...  # error: [non-callable-init-subclass]
-    /// ```
-    ///
-    /// ## References
-    /// - [Python data model: Customizing class creation](https://docs.python.org/3/reference/datamodel.html#customizing-class-creation)
+    #[doc = include_str!("../../resources/lint_docs/non-callable-init-subclass.md")]
     pub(crate) static NON_CALLABLE_INIT_SUBCLASS = {
         summary: "detects class definitions that will fail due to non-callable `__init_subclass__`",
         status: LintStatus::stable("0.0.30"),
@@ -1405,26 +553,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for the creation of invalid legacy `TypeVar`s
-    ///
-    /// ## Why is this bad?
-    /// There are several requirements that you must follow when creating a legacy `TypeVar`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// T = TypeVar("T")  # okay
-    /// Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
-    /// T = TypeVar("T")  # error: TypeVars should not be redefined
-    ///
-    /// # error: TypeVar must be immediately assigned to a variable
-    /// def f(t: TypeVar("U")): ...
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    #[doc = include_str!("../../resources/lint_docs/invalid-legacy-type-variable.md")]
     pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
         summary: "detects invalid legacy type variables",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1433,22 +562,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for the creation of invalid `ParamSpec`s
-    ///
-    /// ## Why is this bad?
-    /// There are several requirements that you must follow when creating a `ParamSpec`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import ParamSpec
-    ///
-    /// P1 = ParamSpec("P1")  # okay
-    /// P2 = ParamSpec("S2")  # error: ParamSpec name must match the variable it's assigned to
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)
+    #[doc = include_str!("../../resources/lint_docs/invalid-paramspec.md")]
     pub(crate) static INVALID_PARAMSPEC = {
         summary: "detects invalid ParamSpec usage",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1457,19 +571,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for the creation of invalid `TypeAliasType`s
-    ///
-    /// ## Why is this bad?
-    /// There are several requirements that you must follow when creating a `TypeAliasType`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import TypeAliasType
-    ///
-    /// IntOrStr = TypeAliasType("IntOrStr", int | str)  # okay
-    /// NewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-alias-type.md")]
     pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
         summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::stable("0.0.1-alpha.6"),
@@ -1478,22 +580,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for the creation of invalid `NewType`s
-    ///
-    /// ## Why is this bad?
-    /// There are several requirements that you must follow when creating a `NewType`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import NewType
-    ///
-    /// def get_name() -> str: ...
-    ///
-    /// Foo = NewType("Foo", int)        # okay
-    /// Bar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal
-    /// Baz = NewType("Baz", int | str)  # error: invalid base for `typing.NewType`
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-newtype.md")]
     pub(crate) static INVALID_NEWTYPE = {
         summary: "detects invalid NewType definitions",
         status: LintStatus::stable("0.0.1-alpha.27"),
@@ -1502,29 +589,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for functional typing definitions whose declared name does not match
-    /// the variable they are assigned to.
-    ///
-    /// ## Why is this bad?
-    /// Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,
-    /// `TypedDict`, and `TypeAliasType` all take a name argument that is
-    /// normally expected to match the assigned variable. A mismatch is usually a
-    /// typo and makes later diagnostics harder to understand.
-    ///
-    /// ## Default level
-    /// This rule is a warning by default because ty can usually recover and
-    /// continue understanding the resulting type.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import NewType, TypeVar
-    /// from typing_extensions import TypedDict
-    ///
-    /// T = TypeVar("U")  # error: [mismatched-type-name]
-    /// UserId = NewType("Id", int)  # error: [mismatched-type-name]
-    /// Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/mismatched-type-name.md")]
     pub(crate) static MISMATCHED_TYPE_NAME = {
         summary: "detects functional typing definitions whose declared name does not match the assigned variable",
         status: LintStatus::stable("0.0.30"),
@@ -1533,25 +598,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for arguments to `metaclass=` that are invalid.
-    ///
-    /// ## Why is this bad?
-    /// Python allows arbitrary expressions to be used as the argument to `metaclass=`.
-    /// These expressions, however, need to be callable and accept the same arguments
-    /// as `type.__new__`.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def f(): ...
-    ///
-    /// # TypeError: f() takes 0 positional arguments but 3 were given
-    /// class B(metaclass=f): ...
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)
+    #[doc = include_str!("../../resources/lint_docs/invalid-metaclass.md")]
     pub(crate) static INVALID_METACLASS = {
         summary: "detects invalid `metaclass=` arguments",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1560,41 +607,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for various invalid `@overload` usages.
-    ///
-    /// ## Why is this bad?
-    /// The `@overload` decorator is used to define functions and methods that accepts different
-    /// combinations of arguments and return different types based on the arguments passed. This is
-    /// mainly beneficial for type checkers. But, if the `@overload` usage is invalid, the type
-    /// checker may not be able to provide correct type information.
-    ///
-    /// ## Example
-    ///
-    /// Defining only one overload:
-    ///
-    /// ```py
-    /// from typing import overload
-    ///
-    /// @overload
-    /// def foo(x: int) -> int: ...
-    /// def foo(x: int | None) -> int | None:
-    ///     return x
-    /// ```
-    ///
-    /// Or, not providing an implementation for the overloaded definition:
-    ///
-    /// ```py
-    /// from typing import overload
-    ///
-    /// @overload
-    /// def foo() -> None: ...
-    /// @overload
-    /// def foo(x: int) -> int: ...
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)
+    #[doc = include_str!("../../resources/lint_docs/invalid-overload.md")]
     pub(crate) static INVALID_OVERLOAD = {
         summary: "detects invalid `@overload` usages",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1603,54 +616,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for various `@overload`-decorated functions that have non-stub bodies.
-    ///
-    /// ## Why is this bad?
-    /// Functions decorated with `@overload` are ignored at runtime; they are overridden
-    /// by the implementation function that follows the series of overloads. While it is
-    /// not illegal to provide a body for an `@overload`-decorated function, it may indicate
-    /// a misunderstanding of how the `@overload` decorator works.
-    ///
-    /// ## Example
-    ///
-    /// ```py
-    /// from typing import overload
-    ///
-    /// @overload
-    /// def foo(x: int) -> int:
-    ///     return x + 1  # will never be executed
-    ///
-    /// @overload
-    /// def foo(x: str) -> str:
-    ///     return "Oh no, got a string"  # will never be executed
-    ///
-    /// def foo(x: int | str) -> int | str:
-    ///     raise Exception("unexpected type encountered")
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```py
-    /// from typing import assert_never, overload
-    ///
-    /// @overload
-    /// def foo(x: int) -> int: ...
-    ///
-    /// @overload
-    /// def foo(x: str) -> str: ...
-    ///
-    /// def foo(x: int | str) -> int | str:
-    ///     if isinstance(x, int):
-    ///         return x + 1
-    ///     elif isinstance(x, str):
-    ///         return "Oh no, got a string"
-    ///     else:
-    ///         assert_never(x)
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)
+    #[doc = include_str!("../../resources/lint_docs/useless-overload-body.md")]
     pub(crate) static USELESS_OVERLOAD_BODY = {
         summary: "detects `@overload`-decorated functions with non-stub bodies",
         status: LintStatus::stable("0.0.1-alpha.22"),
@@ -1659,18 +625,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for default values that can't be
-    /// assigned to the parameter's annotated type.
-    ///
-    /// ## Why is this bad?
-    /// This breaks the rules of the type system and
-    /// weakens a type checker's ability to accurately reason about your code.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def f(a: int = ''): ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-parameter-default.md")]
     pub(crate) static INVALID_PARAMETER_DEFAULT = {
         summary: "detects default values that can't be assigned to the parameter's annotated type",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1679,41 +634,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// Checks for `raise` statements that raise non-exceptions or use invalid
-    /// causes for their raised exceptions.
-    ///
-    /// ## Why is this bad?
-    /// Only subclasses or instances of `BaseException` can be raised.
-    /// For an exception's cause, the same rules apply, except that `None` is also
-    /// permitted. Violating these rules results in a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def f():
-    ///     try:
-    ///         something()
-    ///     except NameError:
-    ///         raise "oops!" from f
-    ///
-    /// def g():
-    ///     raise NotImplemented from 42
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def f():
-    ///     try:
-    ///         something()
-    ///     except NameError as e:
-    ///         raise RuntimeError("oops!") from e
-    ///
-    /// def g():
-    ///     raise NotImplementedError from None
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#raise)
-    /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
+    #[doc = include_str!("../../resources/lint_docs/invalid-raise.md")]
     pub(crate) static INVALID_RAISE = {
         summary: "detects `raise` statements that raise invalid exceptions or use invalid causes",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1722,37 +643,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects `super()` calls where:
-    /// - the first argument is not a valid class literal, or
-    /// - the second argument is not an instance or subclass of the first argument.
-    ///
-    /// ## Why is this bad?
-    /// `super(type, obj)` expects:
-    /// - the first argument to be a class,
-    /// - and the second argument to satisfy one of the following:
-    ///   - `isinstance(obj, type)` is `True`
-    ///   - `issubclass(obj, type)` is `True`
-    ///
-    /// Violating this relationship will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A:
-    ///     ...
-    /// class B(A):
-    ///     ...
-    ///
-    /// super(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`
-    ///
-    /// super(A(), B()) # error: `A()` is not a class
-    ///
-    /// super(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`
-    /// super(B, A)  # error: `A` does not satisfy `issubclass(A, B)`
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    #[doc = include_str!("../../resources/lint_docs/invalid-super-argument.md")]
     pub(crate) static INVALID_SUPER_ARGUMENT = {
         summary: "detects invalid arguments for `super()`",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1761,22 +652,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an
-    /// annotation not assignable from `bool`.
-    ///
-    /// ## Why is this bad?
-    /// The name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional
-    /// code seen only by the type checker, and not at runtime. Normally this flag is imported from
-    /// `typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it
-    /// must be assigned the value `False` at runtime; the type checker will consider its value to
-    /// be `True`. If annotated, it must be annotated as a type that can accept `bool` values.
-    ///
-    /// ## Examples
-    /// ```python
-    /// TYPE_CHECKING: str
-    /// TYPE_CHECKING = ''
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-checking-constant.md")]
     pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
         summary: "detects invalid `TYPE_CHECKING` constant assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1785,22 +661,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for expressions that are used as [type expressions]
-    /// but cannot validly be interpreted as such.
-    ///
-    /// ## Why is this bad?
-    /// Such expressions cannot be understood by ty.
-    /// In some cases, they might raise errors at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import Annotated
-    ///
-    /// a: type[1]  # `1` is not a type
-    /// b: Annotated[int]  # `Annotated` expects at least two arguments
-    /// ```
-    /// [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-form.md")]
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1809,20 +670,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for invalid match patterns.
-    ///
-    /// ## Why is this bad?
-    /// Matching on invalid patterns will lead to a runtime error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// NotAClass = 42
-    ///
-    /// match x:
-    ///     case NotAClass():    # TypeError at runtime: must be a class
-    ///         ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-match-pattern.md")]
     pub(crate) static INVALID_MATCH_PATTERN = {
         summary: "detect invalid match patterns",
         status: LintStatus::stable("0.0.18"),
@@ -1831,26 +679,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for type guard functions without
-    /// a first non-self-like non-keyword-only non-variadic parameter.
-    ///
-    /// ## Why is this bad?
-    /// Type narrowing functions must accept at least one positional argument
-    /// (non-static methods must accept another in addition to `self`/`cls`).
-    ///
-    /// Extra parameters/arguments are allowed but do not affect narrowing.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import TypeIs
-    ///
-    /// def f() -> TypeIs[int]: ...  # Error, no parameter
-    /// def f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed
-    /// def f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments
-    /// class C:
-    ///     def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-guard-definition.md")]
     pub(crate) static INVALID_TYPE_GUARD_DEFINITION = {
         summary: "detects malformed type guard functions",
         status: LintStatus::stable("0.0.1-alpha.11"),
@@ -1859,67 +688,19 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for type guard function calls without a valid target.
-    ///
-    /// ## Why is this bad?
-    /// The first non-keyword non-variadic argument to a type guard function
-    /// is its target and must map to a symbol.
-    ///
-    /// Starred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like
-    /// expressions are invalid as narrowing targets.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import TypeIs
-    ///
-    /// def f(v: object) -> TypeIs[int]: ...
-    ///
-    /// f()  # Error
-    /// f(*a)  # Error
-    /// f(10)  # Error
-    /// ```
+    /// Type guard calls without a narrowing target are valid and have no narrowing effect.
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
-        summary: "detects type guard function calls that has no narrowing effect",
-        status: LintStatus::stable("0.0.1-alpha.11"),
+        summary: "detects type guard function calls that have no narrowing effect",
+        status: LintStatus::removed(
+            "0.0.60",
+            "Type guard calls without a narrowing target are valid and have no narrowing effect.",
+        ),
         default_level: Level::Error,
     }
 }
 
 declare_lint! {
-    /// ## What it does
-    ///
-    /// Checks for constrained [type variables] with only one constraint,
-    /// or that those constraints reference type variables.
-    ///
-    /// ## Why is this bad?
-    ///
-    /// A constrained type variable must have at least two constraints.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// T = TypeVar('T', str)  # invalid constrained TypeVar
-    ///
-    /// I = TypeVar('I', bound=int)
-    /// U = TypeVar('U', list[I], int)  # invalid constrained TypeVar
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```python
-    /// T = TypeVar('T', str, int)  # valid constrained TypeVar
-    ///
-    /// # or
-    ///
-    /// T = TypeVar('T', bound=str)  # valid bound TypeVar
-    ///
-    /// U = TypeVar('U', list[int], int)  # valid constrained Type
-    /// ```
-    ///
-    /// [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-variable-constraints.md")]
     pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
         summary: "detects invalid type variable constraints",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -1928,23 +709,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for [type variables] whose bounds reference type variables.
-    ///
-    /// ## Why is this bad?
-    /// The bound of a type variable must be a concrete type.
-    ///
-    /// ## Examples
-    /// ```python
-    /// T = TypeVar('T', bound=list['T'])  # error: [invalid-type-variable-bound]
-    /// U = TypeVar('U')
-    /// T = TypeVar('T', bound=U)  # error: [invalid-type-variable-bound]
-    ///
-    /// def f[T: list[T]](): ...  # error: [invalid-type-variable-bound]
-    /// def g[U, T: U](): ...  # error: [invalid-type-variable-bound]
-    /// ```
-    ///
-    /// [type variable]: https://docs.python.org/3/library/typing.html#typing.TypeVar
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-variable-bound.md")]
     pub(crate) static INVALID_TYPE_VARIABLE_BOUND = {
         summary: "detects invalid type variable bounds",
         status: LintStatus::stable("0.0.15"),
@@ -1953,24 +718,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for [type variables] whose default type is not compatible with
-    /// the type variable's bound or constraints.
-    ///
-    /// ## Why is this bad?
-    /// If a type variable has a bound, the default must be assignable to that
-    /// bound (see: [bound rules]). If a type variable has constraints, the default
-    /// must be one of the constraints (see: [constraint rules]).
-    ///
-    /// ## Examples
-    /// ```python
-    /// T = TypeVar("T", bound=str, default=int)  # error: [invalid-type-variable-default]
-    /// U = TypeVar("U", int, str, default=bytes)  # error: [invalid-type-variable-default]
-    /// ```
-    ///
-    /// [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
-    /// [bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules
-    /// [constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-variable-default.md")]
     pub(crate) static INVALID_TYPE_VARIABLE_DEFAULT = {
         summary: "detects invalid type variable defaults",
         status: LintStatus::stable("0.0.16"),
@@ -1979,28 +727,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for type variables that are used in a scope where they are not bound
-    /// to any enclosing generic context.
-    ///
-    /// ## Why is this bad?
-    /// Using a type variable outside of a scope that binds it has no well-defined meaning.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import TypeVar, Generic
-    ///
-    /// T = TypeVar("T")
-    /// S = TypeVar("S")
-    ///
-    /// x: T  # error: unbound type variable in module scope
-    ///
-    /// class C(Generic[T]):
-    ///     x: list[S] = []  # error: S is not in this class's generic context
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing spec: Scoping rules for type variables](https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables)
+    #[doc = include_str!("../../resources/lint_docs/unbound-type-variable.md")]
     pub(crate) static UNBOUND_TYPE_VARIABLE = {
         summary: "detects type variables used outside of their bound scope",
         status: LintStatus::stable("0.0.20"),
@@ -2009,17 +736,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for missing required arguments in a call.
-    ///
-    /// ## Why is this bad?
-    /// Failing to provide a required argument will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// def func(x: int): ...
-    /// func()  # TypeError: func() missing 1 required positional argument: 'x'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/missing-argument.md")]
     pub(crate) static MISSING_ARGUMENT = {
         summary: "detects missing required arguments in a call",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2028,21 +745,71 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to an overloaded function that do not match any of the overloads.
-    ///
-    /// ## Why is this bad?
-    /// Failing to provide the correct arguments to one of the overloads will raise a `TypeError`
-    /// at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// @overload
-    /// def func(x: int): ...
-    /// @overload
-    /// def func(x: bool): ...
-    /// func("string")  # error: [no-matching-overload]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/missing-type-argument.md")]
+    pub(crate) static MISSING_TYPE_ARGUMENT = {
+        summary: "detects generic types used without explicit type parameters in type expressions",
+        status: LintStatus::stable("0.0.45"),
+        default_level: Level::Ignore,
+    }
+}
+
+pub(super) fn report_missing_type_arguments<'db>(
+    context: &InferContext<'db, '_>,
+    ty: Type<'db>,
+    annotation: &ast::Expr,
+) {
+    match ty {
+        Type::ClassLiteral(class) => {
+            let db = context.db();
+
+            let Some(generic_context) = class.generic_context(db) else {
+                return;
+            };
+
+            // Don't warn if all type parameters have defaults (PEP 696).
+            if generic_context
+                .variables(db)
+                .all(|tv| tv.default_type(db).is_some())
+            {
+                return;
+            }
+
+            let required_count = generic_context
+                .variables(db)
+                .filter(|tv| tv.default_type(db).is_none())
+                .count();
+
+            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+                let class_name = class.name(db);
+                if required_count == 1 {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type argument for generic class `{class_name}` \
+                         (expected 1 type argument)"
+                    ));
+                } else {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type arguments for generic class `{class_name}` \
+                         (expected {required_count} type arguments)"
+                    ));
+                }
+            }
+        }
+        Type::SpecialForm(
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
+        ) => {
+            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+                builder.into_diagnostic(format_args!(
+                    "Missing type arguments for generic type `Callable` \
+                     (expected 2 type arguments)"
+                ));
+            }
+        }
+        _ => {}
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/no-matching-overload.md")]
     pub(crate) static NO_MATCHING_OVERLOAD = {
         summary: "detects calls that do not match any overload",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2051,16 +818,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for subscripting objects that do not support subscripting.
-    ///
-    /// ## Why is this bad?
-    /// Subscripting an object that does not support it will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// 4[1]  # TypeError: 'int' object is not subscriptable
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/not-subscriptable.md")]
     pub(crate) static NOT_SUBSCRIPTABLE = {
         summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2069,39 +827,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for invalid type arguments in explicit type specialization.
-    ///
-    /// ## Why is this bad?
-    /// Providing the wrong number of type arguments or type arguments that don't
-    /// satisfy the type variable's bounds or constraints will lead to incorrect
-    /// type inference and may indicate a misunderstanding of the generic type's
-    /// interface.
-    ///
-    /// ## Examples
-    ///
-    /// Using legacy type variables:
-    /// ```python
-    /// from typing import Generic, TypeVar
-    ///
-    /// T1 = TypeVar('T1', int, str)
-    /// T2 = TypeVar('T2', bound=int)
-    ///
-    /// class Foo1(Generic[T1]): ...
-    /// class Foo2(Generic[T2]): ...
-    ///
-    /// Foo1[bytes]  # error: bytes does not satisfy T1's constraints
-    /// Foo2[str]  # error: str does not satisfy T2's bound
-    /// ```
-    ///
-    /// Using PEP 695 type variables:
-    /// ```python
-    /// class Foo[T]: ...
-    /// class Bar[T, U]: ...
-    ///
-    /// Foo[int, str]  # error: too many arguments
-    /// Bar[int]  # error: too few arguments
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-type-arguments.md")]
     pub(crate) static INVALID_TYPE_ARGUMENTS = {
         summary: "detects invalid type arguments in generic specialization",
         status: LintStatus::stable("0.0.1-alpha.29"),
@@ -2110,18 +836,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for objects that are not iterable but are used in a context that requires them to be.
-    ///
-    /// ## Why is this bad?
-    /// Iterating over an object that is not iterable will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// for i in 34:  # TypeError: 'int' object is not iterable
-    ///     pass
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/not-iterable.md")]
     pub(crate) static NOT_ITERABLE = {
         summary: "detects iteration over an object that is not iterable",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2130,29 +845,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for bool conversions where the object doesn't correctly implement `__bool__`.
-    ///
-    /// ## Why is this bad?
-    /// If an exception is raised when you attempt to evaluate the truthiness of an object,
-    /// using the object in a boolean context will fail at runtime.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// class NotBoolable:
-    ///     __bool__ = None
-    ///
-    /// b1 = NotBoolable()
-    /// b2 = NotBoolable()
-    ///
-    /// if b1:  # exception raised here
-    ///     pass
-    ///
-    /// b1 and b2  # exception raised here
-    /// not b1  # exception raised here
-    /// b1 < b2 < b1  # exception raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unsupported-bool-conversion.md")]
     pub(crate) static UNSUPPORTED_BOOL_CONVERSION = {
         summary: "detects boolean conversion where the object incorrectly implements `__bool__`",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2161,19 +854,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls which provide more than one argument for a single parameter.
-    ///
-    /// ## Why is this bad?
-    /// Providing multiple values for a single parameter will raise a `TypeError` at runtime.
-    ///
-    /// ## Examples
-    ///
-    /// ```python
-    /// def f(x: int) -> int: ...
-    ///
-    /// f(1, x=2)  # Error raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/parameter-already-assigned.md")]
     pub(crate) static PARAMETER_ALREADY_ASSIGNED = {
         summary: "detects multiple arguments for the same parameter",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2182,24 +863,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for possibly missing attributes.
-    ///
-    /// ## Why is this bad?
-    /// Attempting to access a missing attribute will raise an `AttributeError` at runtime.
-    ///
-    /// ## Rule status
-    /// This rule is currently disabled by default because of the number of
-    /// false positives it can produce.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A:
-    ///     if b:
-    ///         c = 0
-    ///
-    /// A.c  # AttributeError: type object 'A' has no attribute 'c'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/possibly-missing-attribute.md")]
     pub(crate) static POSSIBLY_MISSING_ATTRIBUTE = {
         summary: "detects references to possibly missing attributes",
         status: LintStatus::stable("0.0.1-alpha.22"),
@@ -2208,19 +872,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for accesses of submodules that might not've been imported.
-    ///
-    /// ## Why is this bad?
-    /// When module `a` has a submodule `b`, `import a` isn't generally enough to let you access
-    /// `a.b.` You either need to explicitly `import a.b`, or else you need the `__init__.py` file
-    /// of `a` to include `from . import b`. Without one of those, `a.b` is an `AttributeError`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import html
-    /// html.parser  # AttributeError: module 'html' has no attribute 'parser'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/possibly-missing-submodule.md")]
     pub(crate) static POSSIBLY_MISSING_SUBMODULE = {
         summary: "detects accesses of submodules that may not be available as attributes on their parent module",
         status: LintStatus::stable("0.0.23"),
@@ -2229,28 +881,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for imports of symbols that may be missing.
-    ///
-    /// ## Why is this bad?
-    /// Importing a missing module or name will raise a `ModuleNotFoundError`
-    /// or `ImportError` at runtime.
-    ///
-    /// ## Rule status
-    /// This rule is currently disabled by default because of the number of
-    /// false positives it can produce.
-    ///
-    /// ## Examples
-    /// ```python
-    /// # module.py
-    /// import datetime
-    ///
-    /// if datetime.date.today().weekday() != 6:
-    ///     a = 1
-    ///
-    /// # main.py
-    /// from module import a  # ImportError: cannot import name 'a' from 'module'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/possibly-missing-import.md")]
     pub(crate) static POSSIBLY_MISSING_IMPORT = {
         summary: "detects possibly missing imports",
         status: LintStatus::stable("0.0.1-alpha.22"),
@@ -2259,24 +890,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for references to names that are possibly not defined.
-    ///
-    /// ## Why is this bad?
-    /// Using an undefined variable will raise a `NameError` at runtime.
-    ///
-    /// ## Rule status
-    /// This rule is currently disabled by default because of the number of
-    /// false positives it can produce.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// for i in range(0):
-    ///     x = i
-    ///
-    /// print(x)  # NameError: name 'x' is not defined
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/possibly-unresolved-reference.md")]
     pub(crate) static POSSIBLY_UNRESOLVED_REFERENCE = {
         summary: "detects references to possibly undefined names",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2285,21 +899,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for classes that subclass final classes.
-    ///
-    /// ## Why is this bad?
-    /// Decorating a class with `@final` declares to the type checker that it should not be subclassed.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import final
-    ///
-    /// @final
-    /// class A: ...
-    /// class B(A): ...  # Error raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/subclass-of-final-class.md")]
     pub(crate) static SUBCLASS_OF_FINAL_CLASS = {
         summary: "detects subclasses of final classes",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2308,38 +908,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for classes that inherit from a dataclass with `order=True`.
-    ///
-    /// ## Why is this bad?
-    /// When a dataclass has `order=True`, comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`)
-    /// are generated that compare instances as tuples of their fields. These methods raise a
-    /// `TypeError` at runtime when comparing instances of different classes in the inheritance
-    /// hierarchy, even if one is a subclass of the other.
-    ///
-    /// This violates the [Liskov Substitution Principle] because child class instances cannot be
-    /// used in all contexts where parent class instances are expected.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from dataclasses import dataclass
-    ///
-    /// @dataclass(order=True)
-    /// class Parent:
-    ///     value: int
-    ///
-    /// class Child(Parent):  # Ty emits a warning here
-    ///     pass
-    ///
-    /// # At runtime, this raises TypeError:
-    /// # Child(1) < Parent(2)
-    /// ```
-    ///
-    /// Consider using [`functools.total_ordering`][total_ordering] instead, which does not have this limitation.
-    ///
-    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
-    /// [total_ordering]: https://docs.python.org/3/library/functools.html#functools.total_ordering
+    #[doc = include_str!("../../resources/lint_docs/subclass-of-dataclass-with-order.md")]
     pub(crate) static SUBCLASS_OF_DATACLASS_WITH_ORDER = {
         summary: "detects subclasses of dataclasses with `order=True`",
         status: LintStatus::stable("0.0.39"),
@@ -2348,25 +917,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for methods on subclasses that override superclass methods decorated with `@final`.
-    ///
-    /// ## Why is this bad?
-    /// Decorating a method with `@final` declares to the type checker that it should not be
-    /// overridden on any subclass.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import final
-    ///
-    /// class A:
-    ///     @final
-    ///     def foo(self): ...
-    ///
-    /// class B(A):
-    ///     def foo(self): ...  # Error raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/override-of-final-method.md")]
     pub(crate) static OVERRIDE_OF_FINAL_METHOD = {
         summary: "detects overrides of final methods",
         status: LintStatus::stable("0.0.1-alpha.29"),
@@ -2375,25 +926,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for class variables on subclasses that override a superclass variable
-    /// that has been declared as `Final`.
-    ///
-    /// ## Why is this bad?
-    /// Declaring a variable as `Final` indicates to the type checker that it should not be
-    /// overridden on any subclass.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import Final
-    ///
-    /// class A:
-    ///     X: Final[int] = 1
-    ///
-    /// class B(A):
-    ///     X = 2  # Error raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/override-of-final-variable.md")]
     pub(crate) static OVERRIDE_OF_FINAL_VARIABLE = {
         summary: "detects overrides of Final class variables",
         status: LintStatus::stable("0.0.16"),
@@ -2402,26 +935,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to `final()` that type checkers cannot interpret.
-    ///
-    /// ## Why is this bad?
-    /// The `final()` function is designed to be used as a decorator. When called directly
-    /// as a function (e.g., `final(type(...))`), type checkers will not understand the
-    /// application of `final` and will not prevent subclassing.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import final
-    ///
-    /// # Incorrect: type checkers will not prevent subclassing
-    /// MyClass = final(type("MyClass", (), {}))
-    ///
-    /// # Correct: use `final` as a decorator
-    /// @final
-    /// class MyClass: ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/ineffective-final.md")]
     pub(crate) static INEFFECTIVE_FINAL = {
         summary: "detects calls to `final()` that type checkers cannot interpret",
         status: LintStatus::stable("0.0.1-alpha.33"),
@@ -2430,24 +944,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `@final` decorators applied to non-method functions.
-    ///
-    /// ## Why is this bad?
-    /// The `@final` decorator is only meaningful on methods and classes.
-    /// Applying it to a module-level function or a nested function has no
-    /// effect and is likely a mistake.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import final
-    ///
-    /// # Error: @final is not allowed on non-method functions
-    /// @final
-    /// def my_function() -> int:
-    ///     return 0
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/final-on-non-method.md")]
     pub(crate) static FINAL_ON_NON_METHOD = {
         summary: "detects `@final` applied to non-method functions",
         status: LintStatus::stable("0.0.20"),
@@ -2456,25 +953,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `Final` symbols that are declared without a value and are never
-    /// assigned a value in their scope.
-    ///
-    /// ## Why is this bad?
-    /// A `Final` symbol must be initialized with a value at the time of declaration
-    /// or in a subsequent assignment. At module or function scope, the assignment must
-    /// occur in the same scope. In a class body, the assignment may occur in `__init__`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import Final
-    ///
-    /// # Error: `Final` symbol without a value
-    /// MY_CONSTANT: Final[int]
-    ///
-    /// # OK: `Final` symbol with a value
-    /// MY_CONSTANT: Final[int] = 1
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/final-without-value.md")]
     pub(crate) static FINAL_WITHOUT_VALUE = {
         summary: "detects `Final` declarations without a value",
         status: LintStatus::stable("0.0.15"),
@@ -2483,33 +962,16 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `@final` classes that have unimplemented abstract methods.
-    ///
-    /// ## Why is this bad?
-    /// A class decorated with `@final` cannot be subclassed. If such a class has abstract
-    /// methods that are not implemented, the class can never be properly instantiated, as
-    /// the abstract methods can never be implemented (since subclassing is prohibited).
-    ///
-    /// At runtime, instantiation of classes with unimplemented abstract methods is only
-    /// prevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.
-    /// However, type checkers also enforce this for classes that do not use `ABCMeta`, since
-    /// the intent for the class to be abstract is clear from the use of `@abstractmethod`.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from abc import ABC, abstractmethod
-    /// from typing import final
-    ///
-    /// class Base(ABC):
-    ///     @abstractmethod
-    ///     def method(self) -> int: ...
-    ///
-    /// @final
-    /// class Derived(Base):  # Error: `Derived` does not implement `method`
-    ///     pass
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/abstract-and-final-method.md")]
+    pub(crate) static ABSTRACT_AND_FINAL_METHOD = {
+        summary: "detects methods that are both abstract and final",
+        status: LintStatus::stable("0.0.64"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/abstract-method-in-final-class.md")]
     pub(crate) static ABSTRACT_METHOD_IN_FINAL_CLASS = {
         summary: "detects `@final` classes with unimplemented abstract methods",
         status: LintStatus::stable("0.0.13"),
@@ -2518,77 +980,16 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to abstract `@classmethod`s or `@staticmethod`s
-    /// with "trivial bodies" when accessed on the class object itself.
-    ///
-    /// "Trivial bodies" are bodies that solely consist of `...`, `pass`,
-    /// a docstring, and/or `raise NotImplementedError`.
-    ///
-    /// ## Why is this bad?
-    /// An abstract method with a trivial body has no concrete implementation
-    /// to execute, so calling such a method directly on the class will probably
-    /// not have the desired effect.
-    ///
-    /// It is also unsound to call these methods directly on the class. Unlike
-    /// other methods, ty permits abstract methods with trivial bodies to have
-    /// non-`None` return types even though they always return `None` at runtime.
-    /// This is because it is expected that these methods will always be
-    /// overridden rather than being called directly. As a result of this
-    /// exception to the normal rule, ty may infer an incorrect type if one of
-    /// these methods is called directly, which may then mean that type errors
-    /// elsewhere in your code go undetected by ty.
-    ///
-    /// Calling abstract classmethods or staticmethods via `type[X]` is allowed,
-    /// since the actual runtime type could be a concrete subclass with an implementation.
-    ///
-    /// ## Example
-    /// ```python
-    /// from abc import ABC, abstractmethod
-    ///
-    /// class Foo(ABC):
-    ///     @classmethod
-    ///     @abstractmethod
-    ///     def method(cls) -> int: ...
-    ///
-    /// Foo.method()  # Error: cannot call abstract classmethod
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/call-abstract-method.md")]
     pub(crate) static CALL_ABSTRACT_METHOD = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
-        status: LintStatus::preview("0.0.16"),
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
-    ///
-    /// ## Why is this bad?
-    /// Decorating a method with `@override` declares to the type checker that the intention is that it should
-    /// override a method from a superclass.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import override
-    ///
-    /// class A:
-    ///     @override
-    ///     def foo(self): ...  # Error raised here
-    ///
-    /// class B(A):
-    ///     @override
-    ///     def ffooo(self): ...  # Error raised here
-    ///
-    /// class C:
-    ///     @override
-    ///     def __repr__(self): ...  # fine: overrides `object.__repr__`
-    ///
-    /// class D(A):
-    ///     @override
-    ///     def foo(self): ...  # fine: overrides `A.foo`
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-explicit-override.md")]
     pub(crate) static INVALID_EXPLICIT_OVERRIDE = {
         summary: "detects methods that are decorated with `@override` but do not override any method in a superclass",
         status: LintStatus::stable("0.0.1-alpha.28"),
@@ -2597,20 +998,16 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `assert_type()` and `assert_never()` calls where the actual type
-    /// is not the same as the asserted type.
-    ///
-    /// ## Why is this bad?
-    /// `assert_type()` allows confirming the inferred type of a certain value.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def _(x: int):
-    ///     assert_type(x, int)  # fine
-    ///     assert_type(x, str)  # error: Actual type does not match asserted type
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/missing-override-decorator.md")]
+    pub(crate) static MISSING_OVERRIDE_DECORATOR = {
+        summary: "detects methods that override a superclass member without an `@override` annotation",
+        status: LintStatus::stable("0.0.41"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/type-assertion-failure.md")]
     pub(crate) static TYPE_ASSERTION_FAILURE = {
         summary: "detects failed type assertions",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2619,28 +1016,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for `assert_type()` calls where the actual type
-    /// is an unspellable subtype of the asserted type.
-    ///
-    /// ## Why is this bad?
-    /// `assert_type()` is intended to ensure that the inferred type of a value
-    /// is exactly the same as the asserted type. But in some situations, ty
-    /// has nonstandard extensions to the type system that allow it to infer
-    /// more precise types than can be expressed in user annotations. ty emits a
-    /// different error code to `type-assertion-failure` in these situations so
-    /// that users can easily differentiate between the two cases.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def _(x: int):
-    ///     assert_type(x, int)  # fine
-    ///     if x:
-    ///         assert_type(x, int)  # error: [assert-type-unspellable-subtype]
-    ///                              # the actual type is `int & ~AlwaysFalsy`,
-    ///                              # which excludes types like `Literal[0]`
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/assert-type-unspellable-subtype.md")]
     pub(crate) static ASSERT_TYPE_UNSPELLABLE_SUBTYPE = {
         summary: "detects failed type assertions",
         status: LintStatus::stable("0.0.14"),
@@ -2649,19 +1025,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls that pass more positional arguments than the callable can accept.
-    ///
-    /// ## Why is this bad?
-    /// Passing too many positional arguments will raise `TypeError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def f(): ...
-    ///
-    /// f("foo")  # Error raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/too-many-positional-arguments.md")]
     pub(crate) static TOO_MANY_POSITIONAL_ARGUMENTS = {
         summary: "detects calls passing too many positional arguments",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2670,37 +1034,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.
-    ///
-    /// ## Why is this bad?
-    /// When `super()` is used without arguments, Python tries to find two things:
-    /// the nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).
-    /// If either of these is missing, the call will fail at runtime with a `RuntimeError`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// super()  # error: no enclosing class or function found
-    ///
-    /// def func():
-    ///     super()  # error: no enclosing class or first argument exists
-    ///
-    /// class A:
-    ///     f = super()  # error: no enclosing function to provide the first argument
-    ///
-    ///     def method(self):
-    ///         def nested():
-    ///             super()  # error: first argument does not exist in this nested function
-    ///
-    ///         lambda: super()  # error: first argument does not exist in this lambda
-    ///
-    ///         (super() for _ in range(10))  # error: argument is not available in generator expression
-    ///
-    ///         super()  # okay! both enclosing class and first argument are available
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    #[doc = include_str!("../../resources/lint_docs/unavailable-implicit-super-arguments.md")]
     pub(crate) static UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS = {
         summary: "detects invalid `super()` calls where implicit arguments are unavailable.",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2709,25 +1043,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to `super()` inside methods of `NamedTuple` classes.
-    ///
-    /// ## Why is this bad?
-    /// Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import NamedTuple
-    ///
-    /// class F(NamedTuple):
-    ///     x: int
-    ///
-    ///     def method(self):
-    ///         super()  # error: super() is not supported in methods of NamedTuple classes
-    /// ```
-    ///
-    /// ## References
-    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    #[doc = include_str!("../../resources/lint_docs/super-call-in-named-tuple-method.md")]
     pub(crate) static SUPER_CALL_IN_NAMED_TUPLE_METHOD = {
         summary: "detects `super()` calls in methods of `NamedTuple` classes",
         status: LintStatus::stable("0.0.1-alpha.30"),
@@ -2736,16 +1052,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for calls to `reveal_type` without importing it.
-    ///
-    /// ## Why is this bad?
-    /// Using `reveal_type` without importing it will raise a `NameError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// reveal_type(1)  # NameError: name 'reveal_type' is not defined
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/undefined-reveal.md")]
     pub static UNDEFINED_REVEAL = {
         summary: "detects usages of `reveal_type` without importing it",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2754,19 +1061,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for keyword arguments in calls that don't match any parameter of the callable.
-    ///
-    /// ## Why is this bad?
-    /// Providing an unknown keyword argument will raise `TypeError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def f(x: int) -> int: ...
-    ///
-    /// f(x=1, y=2)  # Error raised here
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unknown-argument.md")]
     pub(crate) static UNKNOWN_ARGUMENT = {
         summary: "detects unknown keyword arguments in calls",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2775,19 +1070,20 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for keyword arguments in calls that match positional-only parameters of the callable.
-    ///
-    /// ## Why is this bad?
-    /// Providing a positional-only parameter as a keyword argument will raise `TypeError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def f(x: int, /) -> int: ...
-    ///
-    /// f(x=1)  # Error raised here
-    /// ```
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/pydantic-discarded-extra-argument.md")]
+    pub(crate) static PYDANTIC_DISCARDED_EXTRA_ARGUMENT = {
+        summary: "detects extra constructor arguments that Pydantic silently discards",
+        status: LintStatus::stable("0.0.60"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/positional-only-parameter-as-kwarg.md")]
     pub(crate) static POSITIONAL_ONLY_PARAMETER_AS_KWARG = {
         summary: "detects positional-only parameters passed as keyword arguments",
         status: LintStatus::stable("0.0.1-alpha.22"),
@@ -2796,20 +1092,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for unresolved attributes.
-    ///
-    /// ## Why is this bad?
-    /// Accessing an unbound attribute will raise an `AttributeError` at runtime.
-    /// An unresolved attribute is not guaranteed to exist from the type alone,
-    /// so this could also indicate that the object is not of the type that the user expects.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A: ...
-    ///
-    /// A().foo  # AttributeError: 'A' object has no attribute 'foo'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unresolved-attribute.md")]
     pub(crate) static UNRESOLVED_ATTRIBUTE = {
         summary: "detects references to unresolved attributes",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2818,17 +1101,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for import statements for which the module cannot be resolved.
-    ///
-    /// ## Why is this bad?
-    /// Importing a module that cannot be resolved will raise a `ModuleNotFoundError`
-    /// at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import foo  # ModuleNotFoundError: No module named 'foo'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unresolved-import.md")]
     pub(crate) static UNRESOLVED_IMPORT = {
         summary: "detects unresolved imports",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2837,17 +1110,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for references to names that are not defined.
-    ///
-    /// ## Why is this bad?
-    /// Using an undefined variable will raise a `NameError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// print(x)  # NameError: name 'x' is not defined
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unresolved-reference.md")]
     pub static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2856,20 +1119,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for binary expressions, comparisons, and unary expressions where
-    /// the operands don't support the operator.
-    ///
-    /// ## Why is this bad?
-    /// Attempting to use an unsupported operator will raise a `TypeError` at
-    /// runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class A: ...
-    ///
-    /// A() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unsupported-operator.md")]
     pub(crate) static UNSUPPORTED_OPERATOR = {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2878,44 +1128,16 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for awaitable objects (such as coroutines) used as expression
-    /// statements without being awaited.
-    ///
-    /// ## Why is this bad?
-    /// Calling an `async def` function returns a coroutine object. If the
-    /// coroutine is never awaited, the body of the async function will never
-    /// execute, which is almost always a bug. Python emits a
-    /// `RuntimeWarning: coroutine was never awaited` at runtime in this case.
-    ///
-    /// ## Examples
-    /// ```python
-    /// async def fetch_data() -> str:
-    ///     return "data"
-    ///
-    /// async def main() -> None:
-    ///     fetch_data()  # Warning: coroutine is not awaited
-    ///     await fetch_data()  # OK
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unused-awaitable.md")]
     pub(crate) static UNUSED_AWAITABLE = {
         summary: "detects awaitable objects that are used as expression statements without being awaited",
-        status: LintStatus::preview("0.0.21"),
+        status: LintStatus::stable("0.0.21"),
         default_level: Level::Warn,
     }
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for step size 0 in slices.
-    ///
-    /// ## Why is this bad?
-    /// A slice with a step size of zero will raise a `ValueError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// l = list(range(10))
-    /// l[1:10:0]  # ValueError: slice step cannot be zero
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/zero-stepsize-in-slice.md")]
     pub(crate) static ZERO_STEPSIZE_IN_SLICE = {
         summary: "detects a slice step size of zero",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2924,22 +1146,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Makes sure that the argument of `static_assert` is statically known to be true.
-    ///
-    /// ## Why is this bad?
-    /// A `static_assert` call represents an explicit request from the user
-    /// for the type checker to emit an error if the argument cannot be verified
-    /// to evaluate to `True` in a boolean context.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from ty_extensions import static_assert
-    ///
-    /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
-    ///
-    /// static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/static-assert-error.md")]
     pub(crate) static STATIC_ASSERT_ERROR = {
         summary: "Failed static assertion",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2948,26 +1155,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for assignments to class variables from instances
-    /// and assignments to instance variables from its class.
-    ///
-    /// ## Why is this bad?
-    /// Incorrect assignments break the rules of the type system and
-    /// weaken a type checker's ability to accurately reason about your code.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class C:
-    ///     class_var: ClassVar[int] = 1
-    ///     instance_var: int
-    ///
-    /// C.class_var = 3  # okay
-    /// C().class_var = 3  # error: Cannot assign to class variable
-    ///
-    /// C().instance_var = 3  # okay
-    /// C.instance_var = 3  # error: Cannot assign to instance variable
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-attribute-access.md")]
     pub(crate) static INVALID_ATTRIBUTE_ACCESS = {
         summary: "Invalid attribute access",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2976,19 +1164,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects redundant `cast` calls where the value already has the target type.
-    ///
-    /// ## Why is this bad?
-    /// These casts have no effect and can be removed.
-    ///
-    /// ## Example
-    /// ```python
-    /// def f() -> int:
-    ///     return 10
-    ///
-    /// cast(int, f())  # Redundant
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/redundant-cast.md")]
     pub(crate) static REDUNDANT_CAST = {
         summary: "detects redundant `cast` calls",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -2997,24 +1173,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for redundant combinations of the `ClassVar` and `Final` type qualifiers.
-    ///
-    /// ## Why is this bad?
-    /// An attribute that is marked `Final` in a class body is implicitly a class variable.
-    /// Marking it as `ClassVar` is therefore redundant.
-    ///
-    /// Note that this diagnostic is not emitted for dataclass fields, where
-    /// `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import ClassVar, Final
-    ///
-    /// class C:
-    ///     x: ClassVar[Final[int]] = 1  # redundant
-    ///     y: Final[ClassVar[int]] = 1  # redundant
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/redundant-final-classvar.md")]
     pub(crate) static REDUNDANT_FINAL_CLASSVAR = {
         summary: "detects redundant combinations of `ClassVar` and `Final`",
         status: LintStatus::stable("0.0.18"),
@@ -3023,25 +1182,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for type variables in nested generic classes or functions that shadow type variables
-    /// from an enclosing scope.
-    ///
-    /// ## Why is this bad?
-    /// Shadowing type variables makes the code confusing and is disallowed by the typing spec.
-    ///
-    /// ## Examples
-    /// ```python
-    /// class Outer[T]:
-    ///     # Error: `T` is already used by `Outer`
-    ///     class Inner[T]: ...
-    ///
-    ///     # Error: `T` is already used by `Outer`
-    ///     def method[T](self, x: T) -> T: ...
-    /// ```
-    ///
-    /// ## References
-    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    #[doc = include_str!("../../resources/lint_docs/shadowed-type-variable.md")]
     pub(crate) static SHADOWED_TYPE_VARIABLE = {
         summary: "detects type variables that shadow type variables from outer scopes",
         status: LintStatus::stable("0.0.20"),
@@ -3050,50 +1191,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects variables declared as `global` in an inner scope that have no explicit
-    /// bindings or declarations in the global scope.
-    ///
-    /// ## Why is this bad?
-    /// Function bodies with `global` statements can run in any order (or not at all), which makes
-    /// it hard for static analysis tools to infer the types of globals without
-    /// explicit definitions or declarations.
-    ///
-    /// ## Example
-    /// ```python
-    /// def f():
-    ///     global x  # unresolved global
-    ///     x = 42
-    ///
-    /// def g():
-    ///     print(x)  # unresolved reference
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```python
-    /// x: int
-    ///
-    /// def f():
-    ///     global x
-    ///     x = 42
-    ///
-    /// def g():
-    ///     print(x)
-    /// ```
-    ///
-    /// Or:
-    ///
-    /// ```python
-    /// x: int | None = None
-    ///
-    /// def f():
-    ///     global x
-    ///     x = 42
-    ///
-    /// def g():
-    ///     print(x)
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/unresolved-global.md")]
     pub(crate) static UNRESOLVED_GLOBAL = {
         summary: "detects `global` statements with no definition in the global scope",
         status: LintStatus::stable("0.0.1-alpha.15"),
@@ -3102,25 +1200,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects missing required keys in `TypedDict` constructor calls.
-    ///
-    /// ## Why is this bad?
-    /// `TypedDict` requires all non-optional keys to be provided during construction.
-    /// Missing items can lead to a `KeyError` at runtime.
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import TypedDict
-    ///
-    /// class Person(TypedDict):
-    ///     name: str
-    ///     age: int
-    ///
-    /// alice: Person = {"name": "Alice"}  # missing required key 'age'
-    ///
-    /// alice["age"]  # KeyError
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/missing-typed-dict-key.md")]
     pub(crate) static MISSING_TYPED_DICT_KEY = {
         summary: "detects missing required keys in `TypedDict` constructors",
         status: LintStatus::stable("0.0.1-alpha.20"),
@@ -3129,23 +1209,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects statements other than annotated declarations in `TypedDict` class bodies.
-    ///
-    /// ## Why is this bad?
-    /// `TypedDict` class bodies aren't allowed to contain any other types of statements. For
-    /// example, method definitions and field values aren't allowed. None of these will be
-    /// available on "instances of the `TypedDict`" at runtime (as `dict` is the runtime class of
-    /// all "`TypedDict` instances").
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import TypedDict
-    ///
-    /// class Foo(TypedDict):
-    ///     def bar(self):  # error: [invalid-typed-dict-statement]
-    ///         pass
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-statement.md")]
     pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
         summary: "detects invalid statements in `TypedDict` class bodies",
         status: LintStatus::stable("0.0.9"),
@@ -3154,23 +1218,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects invalid `TypedDict` field declarations.
-    ///
-    /// ## Why is this bad?
-    /// `TypedDict` subclasses cannot redefine inherited fields incompatibly. Doing so breaks the
-    /// subtype guarantees that `TypedDict` inheritance is meant to preserve.
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import TypedDict
-    ///
-    /// class Base(TypedDict):
-    ///     x: int
-    ///
-    /// class Child(Base):
-    ///     x: str  # error: [invalid-typed-dict-field]
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-field.md")]
     pub(crate) static INVALID_TYPED_DICT_FIELD = {
         summary: "detects invalid `TypedDict` field declarations",
         status: LintStatus::stable("0.0.28"),
@@ -3179,27 +1227,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects errors in `TypedDict` class headers, such as unexpected arguments
-    /// or invalid base classes.
-    ///
-    /// ## Why is this bad?
-    /// The typing spec states that `TypedDict`s are not permitted to have
-    /// custom metaclasses. Using `**` unpacking in a `TypedDict` header
-    /// is also prohibited by ty, as it means that ty cannot statically determine
-    /// whether keys in the `TypedDict` are intended to be required or optional.
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import TypedDict
-    ///
-    /// class Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]
-    ///     ...
-    ///
-    /// def f(x: dict):
-    ///     class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]
-    ///         ...
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-typed-dict-header.md")]
     pub(crate) static INVALID_TYPED_DICT_HEADER = {
         summary: "detects invalid statements in `TypedDict` class headers",
         status: LintStatus::stable("0.0.14"),
@@ -3208,33 +1236,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects attribute overrides that change whether an inherited attribute
-    /// is a class variable or an instance variable.
-    ///
-    /// This rule currently only covers class-variable and instance-variable
-    /// category changes.
-    ///
-    /// ## Why is this bad?
-    /// Pure class variables and instance variables have different access and
-    /// assignment behavior. Overriding one with the other violates the
-    /// [Liskov Substitution Principle] ("LSP"), because code that is valid for
-    /// the superclass may no longer be valid for the subclass.
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import ClassVar
-    ///
-    /// class Base:
-    ///     instance_attr: int
-    ///     class_attr: ClassVar[int]
-    ///
-    /// class Sub(Base):
-    ///     instance_attr: ClassVar[int]  # error: [invalid-attribute-override]
-    ///     class_attr: int  # error: [invalid-attribute-override]
-    /// ```
-    ///
-    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+    #[doc = include_str!("../../resources/lint_docs/invalid-attribute-override.md")]
     pub(crate) static INVALID_ATTRIBUTE_OVERRIDE = {
         summary: "detects attribute overrides that change class-variable or instance-variable behavior",
         status: LintStatus::stable("0.0.33"),
@@ -3243,96 +1245,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
-    ///
-    /// The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
-    /// Applied to Python, this means:
-    /// 1. All argument combinations a superclass method accepts
-    ///    must also be accepted by an overriding subclass method.
-    /// 2. The return type of an overriding subclass method must be a subtype
-    ///    of the return type of the superclass method.
-    ///
-    /// ## Why is this bad?
-    /// Violating the Liskov Substitution Principle will lead to many of ty's assumptions and
-    /// inferences being incorrect, which will mean that it will fail to catch many possible
-    /// type errors in your code.
-    ///
-    /// ## Example
-    /// ```python
-    /// class Super:
-    ///     def method(self, x) -> int:
-    ///         return 42
-    ///
-    /// class Sub(Super):
-    ///     # Liskov violation: `str` is not a subtype of `int`,
-    ///     # but the supertype method promises to return an `int`.
-    ///     def method(self, x) -> str:  # error: [invalid-override]
-    ///         return "foo"
-    ///
-    /// def accepts_super(s: Super) -> int:
-    ///     return s.method(x=42)
-    ///
-    /// accepts_super(Sub())  # The result of this call is a string, but ty will infer
-    ///                       # it to be an `int` due to the violation of the Liskov Substitution Principle.
-    ///
-    /// class Sub2(Super):
-    ///     # Liskov violation: the superclass method can be called with a `x=`
-    ///     # keyword argument, but the subclass method does not accept it.
-    ///     def method(self, y) -> int:  # error: [invalid-override]
-    ///        return 42
-    ///
-    /// accepts_super(Sub2())  # TypeError at runtime: method() got an unexpected keyword argument 'x'
-    ///                        # ty cannot catch this error due to the violation of the Liskov Substitution Principle.
-    /// ```
-    ///
-    /// ## Common issues
-    ///
-    /// ### Why does ty complain about my `__eq__` method?
-    ///
-    /// `__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary
-    /// objects as their second argument, for example:
-    ///
-    /// ```python
-    /// class A:
-    ///     x: int
-    ///
-    ///     def __eq__(self, other: object) -> bool:
-    ///         # gracefully handle an object of an unexpected type
-    ///         # without raising an exception
-    ///         if not isinstance(other, A):
-    ///             return False
-    ///         return self.x == other.x
-    /// ```
-    ///
-    /// If `A.__eq__` here were annotated as only accepting `A` instances for its second argument,
-    /// it would imply that you wouldn't be able to use `==` between instances of `A` and
-    /// instances of unrelated classes without an exception possibly being raised. While some
-    /// classes in Python do indeed behave this way, the strongly held convention is that it should
-    /// be avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`
-    /// and `__ne__` methods accept `object` as their second argument.
-    ///
-    /// ### Why does ty disagree with Ruff about how to write my method?
-    ///
-    /// Ruff has several rules that will encourage you to rename a parameter, or change its type
-    /// signature, if it thinks you're falling into a certain anti-pattern. For example, Ruff's
-    /// [ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an
-    /// unused parameter should either be removed or renamed to start with `_`. Applying either of
-    /// these suggestions can cause ty to start reporting an `invalid-method-override` error if
-    /// the function in question is a method on a subclass that overrides a method on a superclass,
-    /// and the change would cause the subclass method to no longer accept all argument combinations
-    /// that the superclass method accepts.
-    ///
-    /// This can usually be resolved by adding [`@typing.override`][override] to your method
-    /// definition. Ruff knows that a method decorated with `@typing.override` is intended to
-    /// override a method by the same name on a superclass, and avoids reporting rules like ARG002
-    /// for such methods; it knows that the changes recommended by ARG002 would violate the Liskov
-    /// Substitution Principle.
-    ///
-    /// Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
-    ///
-    /// [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
-    /// [override]: https://docs.python.org/3/library/typing.html#typing.override
+    #[expect(clippy::doc_overindented_list_items)]
+    #[doc = include_str!("../../resources/lint_docs/invalid-method-override.md")]
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
@@ -3341,36 +1255,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for dataclasses with invalid frozen inheritance:
-    /// - A frozen dataclass cannot inherit from a non-frozen dataclass.
-    /// - A non-frozen dataclass cannot inherit from a frozen dataclass.
-    ///
-    /// ## Why is this bad?
-    /// Python raises a `TypeError` at runtime when either of these inheritance
-    /// patterns occurs.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from dataclasses import dataclass
-    ///
-    /// @dataclass
-    /// class Base:
-    ///     x: int
-    ///
-    /// @dataclass(frozen=True)
-    /// class Child(Base):  # Error raised here
-    ///     y: int
-    ///
-    /// @dataclass(frozen=True)
-    /// class FrozenBase:
-    ///     x: int
-    ///
-    /// @dataclass
-    /// class NonFrozenChild(FrozenBase):  # Error raised here
-    ///     y: int
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-frozen-dataclass-subclass.md")]
     pub(crate) static INVALID_FROZEN_DATACLASS_SUBCLASS = {
         summary: "detects dataclasses with invalid frozen/non-frozen subclassing",
         status: LintStatus::stable("0.0.1-alpha.35"),
@@ -3379,38 +1264,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    /// Checks for classes decorated with `@functools.total_ordering` that don't
-    /// define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
-    ///
-    /// ## Why is this bad?
-    /// The `@total_ordering` decorator requires the class to define at least one
-    /// ordering method. If none is defined, Python raises a `ValueError` at runtime.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from functools import total_ordering
-    ///
-    /// @total_ordering
-    /// class MyClass:  # Error: no ordering method defined
-    ///     def __eq__(self, other: object) -> bool:
-    ///         return True
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```python
-    /// from functools import total_ordering
-    ///
-    /// @total_ordering
-    /// class MyClass:
-    ///     def __eq__(self, other: object) -> bool:
-    ///         return True
-    ///
-    ///     def __lt__(self, other: "MyClass") -> bool:
-    ///         return True
-    /// ```
+    #[doc = include_str!("../../resources/lint_docs/invalid-total-ordering.md")]
     pub(crate) static INVALID_TOTAL_ORDERING = {
         summary: "detects `@total_ordering` classes without an ordering method",
         status: LintStatus::stable("0.0.10"),
@@ -3419,52 +1273,7 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// ## What it does
-    ///
-    /// Checks for parameters that appear to be attempting to use the legacy convention
-    /// to specify that a parameter is positional-only, but do so incorrectly.
-    ///
-    /// The "legacy convention" for specifying positional-only parameters was
-    /// specified in [PEP 484]. It states that parameters with names starting with
-    /// `__` should be considered positional-only by type checkers. [PEP 570], introduced
-    /// in Python 3.8, added dedicated syntax for specifying positional-only parameters,
-    /// rendering the legacy convention obsolete. However, some codebases may still
-    /// use the legacy convention for compatibility with older Python versions.
-    ///
-    /// ## Why is this bad?
-    ///
-    /// In most cases, a type checker will not consider a parameter to be positional-only
-    /// if it comes after a positional-or-keyword parameter, even if its name starts with
-    /// `__`. This may be unexpected to the author of the code.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// def f(x, __y):  # Error: `__y` is not considered positional-only
-    ///     pass
-    /// ```
-    ///
-    /// Use instead:
-    ///
-    /// ```python
-    /// def f(__x, __y):  # If you need compatibility with Python <=3.7
-    ///     pass
-    /// ```
-    ///
-    /// or:
-    ///
-    /// ```python
-    /// def f(x, y, /):  # Python 3.8+ syntax
-    ///     pass
-    /// ```
-    ///
-    /// ## References
-    ///
-    /// - [Typing spec: positional-only parameters (legacy syntax)](https://typing.python.org/en/latest/spec/historical.html#pos-only-double-underscore)
-    /// - [Python glossary: parameters](https://docs.python.org/3/glossary.html#term-parameter)
-    ///
-    /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
-    /// [PEP 570]: https://peps.python.org/pep-0570/
+    #[doc = include_str!("../../resources/lint_docs/invalid-legacy-positional-parameter.md")]
     pub(crate) static INVALID_LEGACY_POSITIONAL_PARAMETER = {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
@@ -3487,18 +1296,20 @@ pub(crate) fn report_mismatched_type_name<'db>(
     actual_name: Option<&str>,
     actual_name_ty: Type<'db>,
 ) {
+    let db = context.db();
     if let Some(builder) = context.report_lint(&MISMATCHED_TYPE_NAME, node) {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "The name passed to `{constructor}` must match the variable it is assigned to"
         ));
         if let Some(actual_name) = actual_name {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected \"{expected_name}\", got \"{actual_name}\""
             ));
         } else {
-            diagnostic.set_primary_message(format_args!(
+            let env = context.program_environment();
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected \"{expected_name}\", got variable of type `{}`",
-                actual_name_ty.display(context.db())
+                actual_name_ty.display(db, env)
             ));
         }
     }
@@ -3543,7 +1354,7 @@ impl TypeCheckDiagnostics {
         self.diagnostics.is_empty() && self.used_suppressions.is_empty()
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+    fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics().iter()
     }
 
@@ -3586,12 +1397,14 @@ pub(super) fn report_index_out_of_bounds(
     length: impl std::fmt::Display,
     index: i64,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {
         return;
     };
+    let env = &context.program_environment();
     builder.into_diagnostic(format_args!(
         "Index {index} is out of bounds for {kind} `{}` with length {length}",
-        tuple_ty.display(context.db())
+        tuple_ty.display(db, env)
     ));
 }
 
@@ -3602,18 +1415,20 @@ pub(super) fn report_not_subscriptable(
     not_subscriptable_ty: Type,
     method: &str,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, node) else {
         return;
     };
+    let env = &context.program_environment();
     if method == "__delitem__" {
         builder.into_diagnostic(format_args!(
             "Cannot delete subscript on object of type `{}` with no `{method}` method",
-            not_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(db, env)
         ));
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot subscript object of type `{}` with no `{method}` method",
-            not_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(db, env)
         ));
     }
 }
@@ -3639,36 +1454,18 @@ pub(crate) fn is_invalid_typed_dict_literal(
         && matches!(source, AnyNodeRef::ExprDict(_))
 }
 
-fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
-    context: &'ctx InferContext,
+fn report_invalid_assignment_with_message<'db, 'env: 'db, T: Ranged>(
+    context: &'env InferContext,
     node: T,
-    target_ty: Type<'db>,
     message: std::fmt::Arguments,
-) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
+) -> Option<LintDiagnosticGuard<'db, 'env>> {
     let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
-
-    let mut diag = builder.into_diagnostic(message);
-
-    match target_ty {
-        Type::ClassLiteral(class) => {
-            diag.info(format_args!(
-                "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
-                class.name(context.db()),
-            ));
-        }
-        Type::FunctionLiteral(function) => {
-            diag.info(format_args!(
-                "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
-                function.name(context.db()),
-            ));
-        }
-        _ => {}
-    }
-    Some(diag)
+    Some(builder.into_diagnostic(message))
 }
 
 pub(super) fn note_numbers_module_not_supported<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     diag: &mut Diagnostic,
     target_ty: Type<'db>,
     value_ty: Type<'db>,
@@ -3677,13 +1474,21 @@ pub(super) fn note_numbers_module_not_supported<'db>(
         [KnownClass::Int, KnownClass::Float, KnownClass::Complex];
 
     if let Type::NominalInstance(target_instance) = target_ty {
-        let file = target_instance.class(db).class_literal(db).file(db);
-        if let Some(module) = file_to_module(db, file)
+        let file = target_instance
+            .class(db, env)
+            .class_literal(db)
+            .program_file(db);
+        if let Some(module) = file_to_module(db, file.resolver_file(db))
             && module.is_known(db, KnownModule::Numbers)
         {
             let is_numeric = value_ty.is_subtype_of(
                 db,
-                UnionType::from_elements(db, BUILTIN_NUMBERS.iter().map(|cls| cls.to_instance(db))),
+                env,
+                UnionType::from_elements(
+                    db,
+                    env,
+                    BUILTIN_NUMBERS.iter().map(|cls| cls.to_instance(db, env)),
+                ),
             );
 
             if is_numeric {
@@ -3727,15 +1532,16 @@ fn covariant_supertype_hint<'db>(
 /// that fails due to invariance.
 pub(super) fn add_invariant_generic_hints<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     diag: &mut Diagnostic,
     expected_ty: Type<'db>,
     provided_ty: Type<'db>,
 ) {
-    let Some((expected_class, expected_specialization)) = expected_ty.class_specialization(db)
+    let Some((expected_class, expected_specialization)) = expected_ty.class_specialization(db, env)
     else {
         return;
     };
-    let Some((provided_class, provided_specialization)) = provided_ty.class_specialization(db)
+    let Some((provided_class, provided_specialization)) = provided_ty.class_specialization(db, env)
     else {
         return;
     };
@@ -3756,13 +1562,13 @@ pub(super) fn add_invariant_generic_hints<'db>(
         .enumerate()
         .filter_map(|(index, ((bound_typevar, expected_arg), provided_arg))| {
             (bound_typevar.variance(db) == TypeVarVariance::Invariant
-                && !expected_arg.is_equivalent_to(db, *provided_arg))
+                && !expected_arg.is_equivalent_to(db, env, *provided_arg))
             .then_some((index, expected_arg, provided_arg))
         });
 
     let mut mismatch_indices = Vec::new();
     for (index, expected_arg, provided_arg) in mismatched_invariant_arguments {
-        if !provided_arg.is_assignable_to(db, *expected_arg) {
+        if !provided_arg.is_assignable_to(db, env, *expected_arg) {
             return;
         }
         mismatch_indices.push(index);
@@ -3802,6 +1608,7 @@ pub(super) fn report_invalid_assignment<'db>(
     target_ty: Type,
     value_ty: Type<'db>,
 ) {
+    let db = context.db();
     let definition_kind = definition.kind(context.db());
     let value_node = match definition_kind {
         DefinitionKind::Assignment(def) => Some(def.value(context.module())),
@@ -3811,13 +1618,13 @@ pub(super) fn report_invalid_assignment<'db>(
     };
 
     if let Some(value_node) = value_node
-        && is_invalid_typed_dict_literal(context.db(), target_ty, value_node.into())
+        && is_invalid_typed_dict_literal(db, target_ty, value_node.into())
     {
         return;
     }
 
-    let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context.db(), [target_ty, value_ty]);
+    let env = &context.program_environment();
+    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, [target_ty, value_ty]);
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -3838,15 +1645,32 @@ pub(super) fn report_invalid_assignment<'db>(
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
-        target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
-            value_ty.display_with(context.db(), settings.clone()),
-            target_ty.display_with(context.db(), settings)
+            value_ty.display_with(db, env, settings.clone()),
+            target_ty.display_with(db, env, settings)
         ),
     ) else {
         return;
     };
+
+    if matches!(target_node, AnyNodeRef::ExprName(_)) {
+        match target_ty {
+            Type::ClassLiteral(class) => {
+                diag.info(format_args!(
+                    "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
+                    class.name(context.db()),
+                ));
+            }
+            Type::FunctionLiteral(function) => {
+                diag.info(format_args!(
+                    "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
+                    function.name(context.db()),
+                ));
+            }
+            _ => {}
+        }
+    }
 
     if value_node.is_some() {
         match definition_kind {
@@ -3862,27 +1686,27 @@ pub(super) fn report_invalid_assignment<'db>(
                 // Otherwise, annotate the target with its declared type.
                 diag.annotate(context.secondary(target_node).message(format_args!(
                     "Declared type `{}`",
-                    target_ty.display(context.db()),
+                    target_ty.display(db, env)
                 )));
             }
         }
 
-        diag.set_primary_message(format_args!(
+        diag.set_primary_annotation_message(format_args!(
             "Incompatible value of type `{}`",
-            value_ty.display(context.db()),
+            value_ty.display(db, env),
         ));
 
-        let error_context = value_ty.assignability_error_context(context.db(), target_ty);
-        error_context.attach_to(context.db(), &mut diag);
+        let error_context = value_ty.assignability_error_context(db, env, target_ty);
+        error_context.attach_to(db, env, &mut diag);
 
         // Overwrite the concise message to avoid showing the value type twice
-        let message = diag.primary_message().to_string();
+        let message = diag.headline_message().to_string();
         diag.set_concise_message(message);
     }
 
     // special case message
-    note_numbers_module_not_supported(context.db(), &mut diag, target_ty, value_ty);
-    add_invariant_generic_hints(context.db(), &mut diag, target_ty, value_ty);
+    note_numbers_module_not_supported(db, env, &mut diag, target_ty, value_ty);
+    add_invariant_generic_hints(db, env, &mut diag, target_ty, value_ty);
 }
 
 pub(super) fn report_invalid_attribute_assignment(
@@ -3892,64 +1716,83 @@ pub(super) fn report_invalid_attribute_assignment(
     source_ty: Type,
     attribute_name: &'_ str,
 ) {
+    let db = context.db();
     // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
     // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
     // silenced diagnostics during attribute resolution, and rely on the assignability
     // diagnostic being emitted here.
 
+    let env = &context.program_environment();
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
-        target_ty,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db()),
+            source_ty.display(db, env),
+            target_ty.display(db, env),
         ),
     ) else {
         return;
     };
 
-    let error_context = source_ty.assignability_error_context(context.db(), target_ty);
-    error_context.attach_to(context.db(), &mut diag);
+    let error_context = source_ty.assignability_error_context(db, env, target_ty);
+    error_context.attach_to(db, env, &mut diag);
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
-    attribute: &str,
     object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    includes_descriptor_argument: bool,
     target: &ast::ExprAttribute,
+    value: &ast::Expr,
 ) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
-        return;
-    };
     let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
     if let Some(property) = dunder_set_failure.as_attempt_to_set_property_with_no_setter() {
-        let object_type = object_type.display(db);
+        let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
+            return;
+        };
+        let object_type = object_type.display(db, env);
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot assign to read-only property `{attribute}` on object of type `{object_type}`",
         ));
         if let Some(file_range) = property
             .getter(db)
-            .and_then(|getter| getter.definition(db))
+            .and_then(|getter| getter.definition(db, env))
             .and_then(|definition| definition.focus_range(db))
         {
             diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
                 format_args!("Property `{object_type}.{attribute}` defined here with no setter"),
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Attempted assignment to `{object_type}.{attribute}` here"
             ));
         }
     } else {
-        // TODO: Here, it would be nice to emit an additional diagnostic
-        // that explains why the call failed
-        builder.into_diagnostic(format_args!(
-            "Invalid assignment to data descriptor attribute \
-            `{attribute}` on type `{}` with custom `__set__` method",
-            object_type.display(db)
-        ));
+        let argument_ranges = if includes_descriptor_argument {
+            &[target.range(), target.value.range(), value.range()][..]
+        } else {
+            &[target.value.range(), value.range()][..]
+        };
+        dunder_set_failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ASSIGNMENT,
+                message: format!(
+                    "Invalid assignment to data descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db, env)
+                ),
+                info: &format!(
+                    "This assignment implicitly calls `__set__` on a descriptor of type `{}`",
+                    descriptor_type.display(db, env)
+                ),
+                argument_ranges,
+            },
+        );
     }
 }
 
@@ -3964,21 +1807,26 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
         return;
     };
     let db = context.db();
+    let env = &context.program_environment();
     if let Some(property) = dunder_delete_failure.as_attempt_to_delete_property_with_no_deleter() {
-        let object_type = object_type.display(db);
+        let object_type = object_type.display(db, env);
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot delete read-only property `{attribute}` on object of type `{object_type}`",
         ));
         if let Some(file_range) = property
             .getter(db)
-            .and_then(|getter| getter.definition(db))
-            .or_else(|| property.setter(db).and_then(|setter| setter.definition(db)))
+            .and_then(|getter| getter.definition(db, env))
+            .or_else(|| {
+                property
+                    .setter(db)
+                    .and_then(|setter| setter.definition(db, env))
+            })
             .and_then(|definition| definition.focus_range(db))
         {
             diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
                 format_args!("Property `{object_type}.{attribute}` defined here with no deleter"),
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Attempted deletion of `{object_type}.{attribute}` here"
             ));
         }
@@ -3986,7 +1834,7 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
         builder.into_diagnostic(format_args!(
             "Invalid deletion of data descriptor attribute \
             `{attribute}` on type `{}` with custom `__delete__` method",
-            object_type.display(db)
+            object_type.display(db, env)
         ));
     }
 }
@@ -3998,18 +1846,19 @@ pub(super) fn report_bad_dunder_delattr_call(
     target: &ast::ExprAttribute,
     binding_error: bool,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, target) else {
         return;
     };
-    let db = context.db();
+    let env = &context.program_environment();
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Cannot delete attribute `{attribute}` on type `{}` with custom `__delattr__` method",
-        object_type.display(db),
+        object_type.display(db, env),
     ));
     if binding_error {
         diagnostic.info(format_args!(
             "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
-            object_type.display(db)
+            object_type.display(db, env)
         ));
         diagnostic.info(
             "Expected a signature at least as permissive as \
@@ -4025,29 +1874,31 @@ pub(super) fn report_invalid_return_type(
     expected_ty: Type,
     actual_ty: Type,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, object_range) else {
         return;
     };
 
+    let env = &context.program_environment();
     let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
-    diag.set_primary_message(format_args!(
+    diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{actual_ty}`",
-        expected_ty = expected_ty.display_with(context.db(), settings.clone()),
-        actual_ty = actual_ty.display_with(context.db(), settings.clone()),
+        expected_ty = expected_ty.display_with(db, env, settings.clone()),
+        actual_ty = actual_ty.display_with(db, env, settings.clone()),
     ));
     diag.annotate(
         Annotation::secondary(return_type_span).message(format_args!(
             "Expected `{expected_ty}` because of return type",
-            expected_ty = expected_ty.display_with(context.db(), settings),
+            expected_ty = expected_ty.display_with(db, env, settings),
         )),
     );
 
-    let error_context = actual_ty.assignability_error_context(context.db(), expected_ty);
-    error_context.attach_to(context.db(), &mut diag);
+    let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diag);
 }
 
 pub(super) fn report_invalid_generator_function_return_type(
@@ -4056,15 +1907,17 @@ pub(super) fn report_invalid_generator_function_return_type(
     inferred_return: KnownClass,
     expected_ty: Type,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, return_type_range) else {
         return;
     };
 
+    let env = &context.program_environment();
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
-    let inferred_ty = inferred_return.display(context.db());
-    diag.set_primary_message(format_args!(
+    let inferred_ty = inferred_return.display(env.python_version(db));
+    diag.set_primary_annotation_message(format_args!(
         "expected `{expected_ty}`, found `{inferred_ty}`",
-        expected_ty = expected_ty.display(context.db()),
+        expected_ty = expected_ty.display(db, env),
     ));
 
     let (description, link) = if inferred_return == KnownClass::AsyncGeneratorType {
@@ -4099,14 +1952,16 @@ pub(super) fn report_invalid_generator_yield_type(
     actual_ty: Type,
     kind: GeneratorMismatchKind,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_YIELD, object_range) else {
         return;
     };
 
+    let env = &context.program_environment();
     let settings =
-        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
-    let expected_display = expected_ty.display_with(context.db(), settings.clone());
-    let actual_display = actual_ty.display_with(context.db(), settings);
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+    let expected_display = expected_ty.display_with(db, env, settings.clone());
+    let actual_display = actual_ty.display_with(db, env, settings);
 
     let (kind_name, title, concise) = match kind {
         GeneratorMismatchKind::YieldType => (
@@ -4135,7 +1990,7 @@ pub(super) fn report_invalid_generator_yield_type(
             format!("generator with send type `{actual_display}`, expected `{expected_display}`")
         }
     };
-    diag.set_primary_message(primary);
+    diag.set_primary_annotation_message(primary);
 
     if let Some(return_type_span) = return_type_span {
         diag.annotate(Annotation::secondary(return_type_span).message(format!(
@@ -4143,8 +1998,8 @@ pub(super) fn report_invalid_generator_yield_type(
         )));
     }
 
-    let error_context = actual_ty.assignability_error_context(context.db(), expected_ty);
-    error_context.attach_to(context.db(), &mut diag);
+    let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diag);
 }
 
 pub(super) fn report_implicit_return_type(
@@ -4167,12 +2022,13 @@ pub(super) fn report_implicit_return_type(
     let Some(builder) = context.report_lint(lint_to_use, range) else {
         return;
     };
+    let env = &context.program_environment();
 
     // If no return statement is defined in the function, then the function always returns `None`
     let mut diagnostic = if no_return {
         let mut diag = builder.into_diagnostic(format_args!(
             "Function always implicitly returns `None`, which is not assignable to return type `{}`",
-            expected_ty.display(db),
+            expected_ty.display(db, env),
         ));
         diag.info(
             "Consider changing the return annotation to `-> None` or adding a `return` statement",
@@ -4181,7 +2037,7 @@ pub(super) fn report_implicit_return_type(
     } else {
         builder.into_diagnostic(format_args!(
             "Function can implicitly return `None`, which is not assignable to return type `{}`",
-            expected_ty.display(db),
+            expected_ty.display(db, env),
         ))
     };
     if !has_empty_body {
@@ -4249,6 +2105,7 @@ pub(super) fn report_possibly_missing_attribute(
         return;
     };
     let db = context.db();
+    let env = &context.program_environment();
     match object_ty {
         Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
             "Member `{attribute}` may be missing on module `{}`",
@@ -4260,11 +2117,11 @@ pub(super) fn report_possibly_missing_attribute(
         )),
         Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
-            alias.display(db),
+            alias.display(db, env),
         )),
         _ => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on object of type `{}`",
-            object_ty.display(db),
+            object_ty.display(db, env),
         )),
     };
 }
@@ -4275,21 +2132,23 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     node_type: Type<'db>,
     invalid_tuple_nodes: impl IntoIterator<Item = (&'ast ast::Expr, Type<'db>)>,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
     };
 
+    let env = &context.program_environment();
     let mut diagnostic = builder.into_diagnostic("Invalid tuple caught in an exception handler");
     diagnostic.set_concise_message(format_args!(
         "Cannot catch object of type `{}` in an exception handler",
-        node_type.display(context.db())
+        node_type.display(db, env)
     ));
 
     for (sub_node, ty) in invalid_tuple_nodes {
         let span = context.span(sub_node);
         diagnostic.annotate(Annotation::secondary(span.clone()).message(format_args!(
             "Invalid element of type `{}`",
-            ty.display(context.db())
+            ty.display(db, env)
         )));
         if ty.is_notimplemented(context.db()) {
             diagnostic.annotate(
@@ -4304,27 +2163,29 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
     };
 
+    let env = &context.program_environment();
     let mut diagnostic = if ty.is_notimplemented(context.db()) {
         let mut diag =
             builder.into_diagnostic("Cannot catch `NotImplemented` in an exception handler");
-        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diag
     } else {
         let mut diag = builder.into_diagnostic(format_args!(
             "Invalid {thing} caught in an exception handler",
-            thing = if ty.tuple_instance_spec(context.db()).is_some() {
+            thing = if ty.tuple_instance_spec(db, env).is_some() {
                 "tuple"
             } else {
                 "object"
             },
         ));
-        diag.set_primary_message(format_args!(
+        diag.set_primary_annotation_message(format_args!(
             "Object has type `{}`",
-            ty.display(context.db())
+            ty.display(db, env)
         ));
         diag
     };
@@ -4339,36 +2200,40 @@ pub(crate) fn report_invalid_exception_raised(
     raised_node: &ast::Expr,
     raise_type: Type,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RAISE, raised_node) else {
         return;
     };
+    let env = &context.program_environment();
     if raise_type.is_notimplemented(context.db()) {
         let mut diagnostic = builder.into_diagnostic(format_args!("Cannot raise `NotImplemented`"));
-        diagnostic.set_primary_message("Did you mean `NotImplementedError`?");
+        diagnostic.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diagnostic.info("Can only raise an instance or subclass of `BaseException`");
     } else {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Cannot raise object of type `{}`",
-            raise_type.display(context.db())
+            raise_type.display(db, env)
         ));
-        diagnostic.set_primary_message("Not an instance or subclass of `BaseException`");
+        diagnostic.set_primary_annotation_message("Not an instance or subclass of `BaseException`");
     }
 }
 
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
         return;
     };
+    let env = &context.program_environment();
     let mut diagnostic = if ty.is_notimplemented(context.db()) {
         let mut diag = builder.into_diagnostic(format_args!(
             "Cannot use `NotImplemented` as an exception cause",
         ));
-        diag.set_primary_message("Did you mean `NotImplementedError`?");
+        diag.set_primary_annotation_message("Did you mean `NotImplementedError`?");
         diag
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot use object of type `{}` as an exception cause",
-            ty.display(context.db())
+            ty.display(db, env)
         ))
     };
     diagnostic.info(
@@ -4394,7 +2259,7 @@ pub(crate) fn report_instance_layout_conflict(
     let mut diagnostic = builder
         .into_diagnostic("Class will raise `TypeError` at runtime due to incompatible bases");
 
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Bases {} cannot be combined in multiple inheritance",
         disjoint_bases.describe_problematic_class_bases(db)
     ));
@@ -4624,7 +2489,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     };
     let db = context.db();
     let mut diagnostic = builder.into_diagnostic("Invalid argument to `get_protocol_members`");
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
@@ -4659,10 +2524,11 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
     };
     let db = context.db();
     let mut diagnostic = builder.into_diagnostic("Invalid argument to `reveal_protocol_interface`");
-    diagnostic
-        .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
+    diagnostic.set_primary_annotation_message(
+        "Only protocol classes can be passed to `reveal_protocol_interface`",
+    );
 
-    if let Some(class) = param_type.to_class_type(context.db()) {
+    if let Some(class) = param_type.to_class_type(db) {
         let mut class_def_diagnostic = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
@@ -4692,7 +2558,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
+        "Special form `Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
@@ -4701,20 +2567,54 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     pattern_cls: T,
     cls_ty: Type,
 ) {
+    let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern_cls) else {
         return;
     };
-    let db = context.db();
-    let class_display = cls_ty.display(db);
+    let env = &context.program_environment();
+    let class_display = cls_ty.display(db, env);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "`{class_display}` cannot be used in a class pattern because it is not a type"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
-    mut diag: LintDiagnosticGuard<'db, 'ctx>,
-) -> LintDiagnosticGuard<'db, 'ctx> {
+pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
+    context: &InferContext,
+    first_excess_pattern: T,
+    positional_limit: usize,
+    positional_count: usize,
+    class_display: impl std::fmt::Display,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
+    ));
+}
+
+pub(crate) fn report_invalid_match_args_type<T: Ranged>(
+    context: &InferContext,
+    pattern: T,
+    match_args_ty: Type,
+    cls_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
+        return;
+    };
+    let env = &context.program_environment();
+    let class_display = cls_ty.display(db, env);
+    let match_args_display = match_args_ty.display(db, env);
+    builder.into_diagnostic(format_args!(
+        "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
+    ));
+}
+
+pub(crate) fn add_type_expression_reference_link<'db, 'env>(
+    mut diag: LintDiagnosticGuard<'db, 'env>,
+) -> LintDiagnosticGuard<'db, 'env> {
     diag.info("See the following page for a reference on valid type expressions:");
     diag.info(
         "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
@@ -4737,7 +2637,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
     ));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(format_args!(
         "A protocol class can only be used in `{function_name}` checks if it is decorated \
@@ -4764,7 +2664,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
         "`{class_name}` cannot be used as the second argument to `issubclass` \
         as it is a protocol with non-method members"
     ));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     if let [single_member] = non_method_members {
         let mut sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -4772,8 +2672,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
             if it has non-method members",
         );
         if let Some(definition) = single_member.definition() {
-            let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module = parsed_module(db, definition.python_file(db)).load(db);
             let span = Span::from(definition.focus_range(db, &module));
             sub.annotate(Annotation::primary(span).message(format_args!(
                 "Non-method member `{}` declared here",
@@ -4797,8 +2696,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
             .iter()
             .find_map(|member| Some((member.name(), member.definition()?)))
         {
-            let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let module = parsed_module(db, definition.python_file(db)).load(db);
             let span = Span::from(definition.focus_range(db, &module));
             sub.annotate(
                 Annotation::primary(span)
@@ -4823,7 +2721,7 @@ pub(crate) fn report_runtime_check_against_typed_dict(
         "`TypedDict` class `{class_name}` cannot be used as the second argument to `{function_name}`",
         function_name = function.name()
     ));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
 }
 
 pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ranged>(
@@ -4839,7 +2737,7 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Class `{class_name}` cannot be used in a class pattern",
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(
         "A protocol class can only be used in a match class pattern if it is decorated \
@@ -4861,7 +2759,7 @@ pub(crate) fn report_match_pattern_against_typed_dict<T: Ranged>(
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "`TypedDict` class `{class_name}` cannot be used in a class pattern",
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
 }
 
 fn add_non_runtime_checkable_protocol_context<'db>(
@@ -4896,7 +2794,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     let class_name = protocol.name(db);
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`"));
-    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
         SubDiagnosticSeverity::Info,
@@ -4921,7 +2819,7 @@ pub(crate) fn report_call_to_abstract_method(
     let db = context.db();
     let name = function.name(db);
     let mut diag = builder.into_diagnostic(format_args!("Cannot call `{name}` on class object"));
-    diag.set_primary_message(format_args!(
+    diag.set_primary_annotation_message(format_args!(
         "`{name}` is an abstract {method_kind} with a trivial body"
     ));
     let span = abstract_method_span(
@@ -4946,7 +2844,7 @@ pub(super) fn abstract_method_span<'db>(
     };
 
     let file = function.file(db);
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, function.python_file(db)).load(db);
     let node = implementation.node(db, file, &module);
     let source_text = source_text(db, file);
 
@@ -4980,23 +2878,25 @@ pub(crate) fn report_undeclared_protocol_member(
     /// We want to avoid suggesting an annotation for e.g. `x = None`,
     /// because the user almost certainly doesn't want to write `x: None = None`.
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
-    fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    fn should_give_hint<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
         let class = match ty {
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(_),
-                ..
-            }) => return true,
+            Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
+                SubclassOfInner::Protocol(_) => return true,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
-            Type::NominalInstance(instance) => instance.class(db),
+            Type::NominalInstance(instance) => instance.class(db, env),
             Type::Union(union) => {
                 return union
                     .elements(db)
                     .iter()
-                    .all(|elem| should_give_hint(db, *elem));
+                    .all(|elem| should_give_hint(db, env, *elem));
             }
             _ => return false,
         };
@@ -5021,37 +2921,77 @@ pub(crate) fn report_undeclared_protocol_member(
     };
 
     let symbol_name = class_symbol_table.symbol(symbol_id).name();
-    let class_name = protocol_class.name(db);
 
     let mut diagnostic = builder
         .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
 
     if definition.kind(db).is_unannotated_assignment() {
+        let env = &context.program_environment();
         let binding_type = binding_type(db, definition);
+        let suggestion = binding_type.promote(db, env);
 
-        let suggestion = binding_type.promote(db);
-
-        if should_give_hint(db, suggestion) {
-            diagnostic.set_primary_message(format_args!(
+        if should_give_hint(db, env, suggestion) {
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
-                suggestion.display(db)
+                suggestion.display(db, env)
             ));
         } else {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Consider adding an annotation for `{symbol_name}`"
             ));
         }
     } else {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "`{symbol_name}` is not declared as a protocol member"
         ));
     }
 
-    let mut class_def_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        "Assigning to an undeclared variable in a protocol class \
-    leads to an ambiguous interface",
+    add_undeclared_protocol_member_context(
+        &mut diagnostic,
+        db,
+        protocol_class,
+        symbol_name,
+        "Assigning to an undeclared variable in a protocol class leads to an ambiguous interface",
     );
+}
+
+pub(crate) fn report_undeclared_protocol_attribute(
+    context: &InferContext,
+    target: &ast::ExprAttribute,
+    protocol_class: ProtocolClass,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&AMBIGUOUS_PROTOCOL_MEMBER, target) else {
+        return;
+    };
+
+    let symbol_name = target.attr.as_str();
+    let mut diagnostic =
+        builder.into_diagnostic("Cannot assign to an undeclared attribute in a protocol method");
+    diagnostic.set_primary_annotation_message(format_args!(
+        "`{symbol_name}` is not declared as a protocol member"
+    ));
+
+    add_undeclared_protocol_member_context(
+        &mut diagnostic,
+        db,
+        protocol_class,
+        symbol_name,
+        "Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface",
+    );
+}
+
+fn add_undeclared_protocol_member_context(
+    diagnostic: &mut Diagnostic,
+    db: &dyn Db,
+    protocol_class: ProtocolClass,
+    symbol_name: &str,
+    ambiguity_message: &'static str,
+) {
+    let class_name = protocol_class.name(db);
+
+    let mut class_def_diagnostic =
+        SubDiagnostic::new(SubDiagnosticSeverity::Info, ambiguity_message);
     class_def_diagnostic.annotate(
         Annotation::primary(protocol_class.definition_span(db))
             .message(format_args!("`{class_name}` declared as a protocol here")),
@@ -5072,7 +3012,7 @@ pub(crate) fn report_duplicate_bases(
 ) {
     let db = context.db();
 
-    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.focus_range(db)) else {
         return;
     };
 
@@ -5087,28 +3027,23 @@ pub(crate) fn report_duplicate_bases(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`"));
 
-    let mut sub_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!(
-            "The definition of class `{}` will raise `TypeError` at runtime",
-            class.name(db)
-        ),
-    );
-    if let Some(first_base) = bases_list[*first_index].source_node() {
-        sub_diagnostic.annotate(Annotation::secondary(context.span(first_base)).message(
-            format_args!("Class `{duplicate_name}` first included in bases list here"),
-        ));
-    }
-    for index in later_indices {
-        if let Some(repeated_base) = bases_list[*index].source_node() {
-            sub_diagnostic.annotate(
-                Annotation::primary(context.span(repeated_base))
-                    .message(format_args!("Class `{duplicate_name}` later repeated here")),
-            );
-        }
-    }
+    diagnostic.info(format_args!(
+        "Definition of class `{}` will raise `TypeError` at runtime",
+        class.name(db)
+    ));
 
-    diagnostic.sub(sub_diagnostic);
+    let first_base = bases_list[*first_index].source_node();
+    diagnostic.annotate(context.secondary(first_base).message(format_args!(
+        "Class `{duplicate_name}` first included in bases list here"
+    )));
+
+    for index in later_indices {
+        let repeated_base = bases_list[*index].source_node();
+        diagnostic.annotate(
+            Annotation::primary(context.span(repeated_base))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
+    }
 }
 
 pub(crate) fn report_invalid_or_unsupported_base(
@@ -5118,9 +3053,10 @@ pub(crate) fn report_invalid_or_unsupported_base(
     class: StaticClassLiteral,
 ) {
     let db = context.db();
-    let instance_of_type = KnownClass::Type.to_instance(db);
+    let env = &context.program_environment();
+    let instance_of_type = KnownClass::Type.to_instance(db, env);
 
-    if base_type.is_assignable_to(db, instance_of_type) {
+    if base_type.is_assignable_to(db, env, instance_of_type) {
         report_unsupported_base(context, base_node, base_type, class);
         return;
     }
@@ -5143,7 +3079,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = Type::homogeneous_tuple(db, instance_of_type);
+    let tuple_of_types = Type::homogeneous_tuple(db, env, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(
@@ -5152,14 +3088,19 @@ pub(crate) fn report_invalid_or_unsupported_base(
         );
     };
 
+    let env = &context.program_environment();
     match base_type.try_call_dunder(
         db,
+        env,
         "__mro_entries__",
         CallArguments::positional([tuple_of_types]),
         TypeContext::default(),
     ) {
         Ok(ret) => {
-            if ret.return_type(db).is_assignable_to(db, tuple_of_types) {
+            if ret
+                .return_type(db, env)
+                .is_assignable_to(db, env, tuple_of_types)
+            {
                 report_unsupported_base(context, base_node, base_type, class);
             } else {
                 let Some(mut diagnostic) =
@@ -5170,7 +3111,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 explain_mro_entries(&mut diagnostic);
                 diagnostic.info(format_args!(
                     "Type `{}` has an `__mro_entries__` method, but it does not return a tuple of types",
-                    base_type.display(db)
+                    base_type.display(db, env)
                 ));
             }
         }
@@ -5186,42 +3127,42 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
-                        base_type.display(db)
+                        base_type.display(db, env)
                     ));
                     if let Some(unbound_on) = unbound_on {
                         for ty in unbound_on {
                             diagnostic.info(format_args!(
                                 "`{}` does not implement `__mro_entries__`",
-                                ty.display(db)
+                                ty.display(db, env)
                             ));
                         }
                     }
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
-                        base_type.display(db)
+                        base_type.display(db, env)
                     ));
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it cannot be called with the expected arguments",
-                        base_type.display(db)
+                        base_type.display(db, env)
                     ));
                     diagnostic.info(
                         "Expected a signature at least as permissive as \
                         `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`"
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it may not be callable",
-                        base_type.display(db)
+                        base_type.display(db, env)
                     ));
                 }
             }
@@ -5239,11 +3180,13 @@ pub(crate) fn report_unsupported_base(
         return;
     };
     let db = context.db();
+    let env = &context.program_environment();
     let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
+    diagnostic
+        .set_primary_annotation_message(format_args!("Has type `{}`", base_type.display(db, env)));
     diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
-        base_type.display(db)
+        base_type.display(db, env)
     ));
     diagnostic.info(format_args!(
         "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
@@ -5252,16 +3195,18 @@ pub(crate) fn report_unsupported_base(
     diagnostic.info("Only class objects or `Any` are supported as class bases");
 }
 
-fn report_invalid_base<'ctx, 'db>(
-    context: &'ctx InferContext<'db, '_>,
+fn report_invalid_base<'env, 'db>(
+    context: &'env InferContext<'db, '_>,
     base_node: &ast::Expr,
     base_type: Type<'db>,
     class: StaticClassLiteral<'db>,
-) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
+) -> Option<LintDiagnosticGuard<'env, 'db>> {
+    let db = context.db();
     let builder = context.report_lint(&INVALID_BASE, base_node)?;
+    let env = &context.program_environment();
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Invalid class base with type `{}`",
-        base_type.display(context.db())
+        base_type.display(db, env)
     ));
     diagnostic.info(format_args!(
         "Definition of class `{}` will raise `TypeError` at runtime",
@@ -5281,10 +3226,11 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+        let env = &context.program_environment();
         match key_ty.as_string_literal() {
             Some(key) => {
                 let key = key.value(db);
-                let typed_dict_name = typed_dict_ty.display(db);
+                let typed_dict_name = typed_dict_ty.display(db, env);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Unknown key \"{key}\" for TypedDict `{typed_dict_name}`",
@@ -5298,7 +3244,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         } else {
                             "intersection"
                         },
-                        full_object_ty = full_object_ty.display(db)
+                        full_object_ty = full_object_ty.display(db, env)
                     ))
                 } else {
                     context
@@ -5316,14 +3262,15 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                             "{quote}{suggestion}{quote}",
                             quote = literal.value.first_literal_flags().quote_str()
                         );
-                        diagnostic
-                            .set_primary_message(format_args!("Did you mean {quoted_suggestion}?"));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Did you mean {quoted_suggestion}?"
+                        ));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             quoted_suggestion,
                             key_node.range(),
                         )));
                     } else {
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Unknown key \"{key}\" - did you mean \"{suggestion}\"?",
                         ));
                     }
@@ -5331,11 +3278,12 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
                     ));
                 } else {
-                    diagnostic.set_primary_message(format_args!("Unknown key \"{key}\""));
+                    diagnostic
+                        .set_primary_annotation_message(format_args!("Unknown key \"{key}\""));
                     if let Some(full_ty) = full_object_ty {
                         diagnostic.set_concise_message(format_args!(
                             "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
-                            full_ty = full_ty.display(db),
+                            full_ty = full_ty.display(db, env),
                         ));
                     } else {
                         diagnostic.set_concise_message(format_args!(
@@ -5348,14 +3296,14 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "TypedDict `{}` can only be subscripted with a string literal key, \
                      got key of type `{}`",
-                    typed_dict_ty.display(db),
-                    key_ty.display(db),
+                    typed_dict_ty.display(db, env),
+                    key_ty.display(db, env),
                 ));
 
                 if let Some(full_object_ty) = full_object_ty {
                     diagnostic.info(format_args!(
                         "The full type of the subscripted object is `{}`",
-                        full_object_ty.display(db)
+                        full_object_ty.display(db, env)
                     ));
                 }
             }
@@ -5383,7 +3331,7 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
         "NamedTuple field without default value cannot follow field(s) with default value(s)",
     );
 
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Field `{field}` defined here without a default value",
     ));
 
@@ -5432,17 +3380,43 @@ pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
         builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
 
     if field_definition.is_some() {
-        diagnostic.set_primary_message(
+        diagnostic.set_primary_annotation_message(
             "Class definition will raise `TypeError` at runtime due to this field",
         );
     } else {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Class definition will raise `TypeError` at runtime due to field `{field_name}`",
         ));
     }
 
     diagnostic.set_concise_message(format_args!(
         "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
+}
+
+/// Report a `NamedTuple` field annotated with a type qualifier that `NamedTuple` does not accept.
+///
+/// The diagnostic is anchored to the annotated assignment that introduced the qualifier. It does
+/// not claim that class creation fails at runtime because deferred and wrapped annotations can
+/// preserve the qualifier without passing it directly to `typing._type_check`.
+pub(super) fn report_invalid_named_tuple_field_qualifier<'db>(
+    context: &InferContext<'db, '_>,
+    field_name: &str,
+    qualifier: TypeQualifier,
+    field_definition: Definition<'db>,
+) {
+    let db = context.db();
+    let module = context.module();
+    let qualifier = qualifier.name();
+    let diagnostic_range = field_definition.kind(db).full_range(module);
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Type qualifier `{qualifier}` is not allowed in a NamedTuple field"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Type qualifier `{qualifier}` is not allowed on NamedTuple field `{field_name}`"
     ));
 }
 
@@ -5454,7 +3428,8 @@ pub(crate) fn report_missing_typed_dict_key<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_KEY, constructor_node) {
-        let typed_dict_name = typed_dict_ty.display(db);
+        let env = &context.program_environment();
+        let typed_dict_name = typed_dict_ty.display(db, env);
         builder.into_diagnostic(format_args!(
             "Missing required key '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
         ));
@@ -5469,7 +3444,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) {
-        let typed_dict_name = typed_dict_ty.display(db);
+        let env = &context.program_environment();
+        let typed_dict_name = typed_dict_ty.display(db, env);
         builder.into_diagnostic(format_args!(
             "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
@@ -5481,6 +3457,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) enum TypedDictDeleteErrorKind {
     /// The key exists but is required (not `NotRequired`)
     RequiredKey,
+    /// The key refers to a read-only extra item.
+    ReadOnlyExtraItem,
     /// The key does not exist in the `TypedDict`
     UnknownKey,
 }
@@ -5497,12 +3475,16 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
         return;
     };
+    let env = &context.program_environment();
 
-    let typed_dict_name = Type::TypedDict(typed_dict_ty).display(db);
+    let typed_dict_name = Type::TypedDict(typed_dict_ty).display(db, env);
 
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+        TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
+            "Cannot delete read-only extra item \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
             "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
@@ -5514,7 +3496,7 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         && let Some(declaration) = field.first_declaration()
     {
         let file = declaration.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, declaration.python_file(db)).load(db);
 
         let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field defined here");
         for message in [
@@ -5559,7 +3541,7 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     let db = context.db();
 
     let base_index = class
-        .explicit_bases(db)
+        .explicit_bases(context.db())
         .iter()
         .position(|base| {
             matches!(
@@ -5599,14 +3581,14 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     ));
 
     if let [single_typevar] = invalid_later_typevars {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variable `{}` does not have a default",
             single_typevar.name(db),
         ));
     } else {
         let later_typevars =
             format_enumeration(invalid_later_typevars.iter().map(|tv| tv.name(db)));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variables {later_typevars} do not have defaults",
         ));
     }
@@ -5623,10 +3605,9 @@ pub(crate) fn report_invalid_type_param_order<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
+                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
             ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
@@ -5670,10 +3651,9 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
+                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
             ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
@@ -5691,20 +3671,24 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
 /// class Parent(Grandparent[T1, T2]): ...
 /// class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
 /// ```
+///
+/// Returns `true` if an inconsistency was found, even when it is inherited or the diagnostic is
+/// disabled.
 pub(crate) fn report_inconsistent_generic_bases<'db>(
     context: &InferContext<'db, '_>,
     header_range: TextRange,
     explicit_bases: &[Type<'db>],
     base_nodes: Option<&[ast::Expr]>,
-) {
+) -> bool {
     let db = context.db();
+    let env = &context.program_environment();
     // Maps each generic ancestor's class literal to the first
     // specialization seen and the index of the explicit base it
     // came from.
     let mut ancestor_specs =
         FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
 
-    'outer: for (i, base) in explicit_bases.iter().enumerate() {
+    for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
             Type::GenericAlias(alias) => ClassType::Generic(*alias),
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
@@ -5720,17 +3704,19 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             let origin = supercls_alias.origin(db);
 
             if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                if earlier_idx != i
-                    && earlier_alias
-                        .specialization(db)
-                        .types(db)
-                        .iter()
-                        .zip(supercls_alias.specialization(db).types(db))
-                        .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
+                if earlier_alias
+                    .specialization(db)
+                    .types(db)
+                    .iter()
+                    .zip(supercls_alias.specialization(db).types(db))
+                    .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
                 {
+                    if earlier_idx == i {
+                        return true;
+                    }
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
                     else {
-                        break 'outer;
+                        return true;
                     };
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Inconsistent type arguments for `{}` among class bases",
@@ -5747,43 +3733,43 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ) {
                         diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db)
+                            earlier_alias.display(db, env)
                         )));
                         let later_annotation = context.secondary(later_base);
                         diagnostic.annotate(if later_is_direct {
                             later_annotation.message(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(db, env)
                             ))
                         } else {
                             later_annotation.message(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(db, env)
                             ))
                         });
                     } else {
                         diagnostic.info(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db)
+                            earlier_alias.display(db, env)
                         ));
                         if later_is_direct {
                             diagnostic.info(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(db, env)
                             ));
                         } else {
                             diagnostic.info(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db)
+                                supercls_alias.display(db, env)
                             ));
                         }
                     }
                     diagnostic.set_concise_message(format_args!(
                         "Inconsistent type arguments: class cannot inherit from both `{}` and `{}`",
-                        supercls_alias.display(db),
-                        earlier_alias.display(db)
+                        supercls_alias.display(db, env),
+                        earlier_alias.display(db, env)
                     ));
-                    break 'outer;
+                    return true;
                 }
             } else if !supercls_alias
                 .specialization(db)
@@ -5795,6 +3781,8 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             }
         }
     }
+
+    false
 }
 
 pub(crate) fn report_shadowed_type_variable<'db>(
@@ -5803,31 +3791,47 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
+    type_var_kind: TypeVarKind,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
         return;
     };
+    let typevar_kind = match type_var_kind {
+        TypeVarKind::LegacyTypeVar
+        | TypeVarKind::Pep695TypeVar
+        | TypeVarKind::TypingSelf
+        | TypeVarKind::Pep613Alias => "type variable",
+        TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
+        TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
+    };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
     ));
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
         return;
     };
-    let span = match binding_type(db, other_definition) {
+    let span = match binding_type(context.db(), other_definition) {
         Type::ClassLiteral(class) => class.header_span(db),
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
+    let other_typevar_kind = if other_typevar.is_paramspec(db) {
+        "ParamSpec"
+    } else if other_typevar.is_typevartuple(db) {
+        "TypeVarTuple"
+    } else {
+        "Type variable"
+    };
     diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-        "Type variable `{typevar_name}` is bound in this enclosing scope",
+        "{other_typevar_kind} `{typevar_name}` is bound in this enclosing scope"
     )));
 }
 
@@ -5884,12 +3888,13 @@ pub(super) fn report_invalid_method_override<'db>(
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
 
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Definition is incompatible with `{overridden_method}`"
     ));
 
+    let env = &context.program_environment();
     let class_member = |cls: ClassType<'db>| {
-        cls.class_member(db, member, MemberLookupPolicy::default())
+        cls.class_member(db, env, member, MemberLookupPolicy::default())
             .place
     };
 
@@ -5915,7 +3920,7 @@ pub(super) fn report_invalid_method_override<'db>(
         ));
     }
 
-    error_context().attach_to(context.db(), &mut diagnostic);
+    error_context().attach_to(db, env, &mut diagnostic);
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
@@ -5939,10 +3944,10 @@ pub(super) fn report_invalid_method_override<'db>(
                     .next()
                 && let Some(definition) = binding.binding.definition()
             {
-                let definition_span = Span::from(
-                    definition
-                        .full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
-                );
+                let definition_span = Span::from(definition.full_range(
+                    db,
+                    &parsed_module(db, superclass_scope.python_file(db)).load(db),
+                ));
 
                 let superclass_function_span = match superclass_type {
                     Type::FunctionLiteral(function) => Some(signature_span(function)),
@@ -5985,6 +3990,10 @@ pub(super) fn report_invalid_method_override<'db>(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a dataclass"
                 )),
+                CodeGeneratorKind::Pydantic(_) => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a Pydantic model"
+                )),
                 CodeGeneratorKind::NamedTuple => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` inherits from `typing.NamedTuple`"
@@ -6023,6 +4032,63 @@ pub(super) fn report_invalid_method_override<'db>(
     }
 }
 
+/// Reports an incompatible pair of source-defined methods in a resolved MRO.
+pub(super) fn report_incompatible_base_method<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    member: &str,
+    selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    contract: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    error_context: impl FnOnce() -> ErrorContextTree<'db>,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, class.header_range(db))
+    else {
+        return;
+    };
+
+    let (selected_owner, selected_definition, selected_decorator) = selected;
+    let (contract_owner, contract_definition, contract_decorator) = contract;
+    let (selected_name, contract_name) = if selected_owner.name(db) == contract_owner.name(db) {
+        (
+            selected_owner.qualified_name(db).to_string(),
+            contract_owner.qualified_name(db).to_string(),
+        )
+    } else {
+        (
+            selected_owner.name(db).to_string(),
+            contract_owner.name(db).to_string(),
+        )
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Base classes for class `{}` define method `{member}` incompatibly",
+        class.name(db)
+    ));
+    diagnostic.set_primary_annotation_message(format_args!(
+        "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
+    ));
+    if selected_decorator != contract_decorator {
+        diagnostic.info(format_args!(
+            "`{selected_name}.{member}` is {} but `{contract_name}.{member}` is {}",
+            selected_decorator.description(),
+            contract_decorator.description(),
+        ));
+    }
+    error_context().attach_to(db, context.program_environment(), &mut diagnostic);
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    for (definition, owner_name) in [
+        (selected_definition, selected_name),
+        (contract_definition, contract_name),
+    ] {
+        let module = parsed_module(db, definition.python_file(db)).load(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(definition.focus_range(db, &module)))
+                .message(format_args!("`{owner_name}.{member}` defined here")),
+        );
+    }
+}
+
 pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
@@ -6034,7 +4100,6 @@ pub(super) fn report_overridden_final_method<'db>(
     superclass_method_defs: &[FunctionType<'db>],
 ) {
     let db = context.db();
-
     // Some hijinks so that we emit a diagnostic on the property getter rather than the property setter
     let property_getter_definition = if subclass_definition.kind(db).is_function_def()
         && let Type::PropertyInstance(property) = subclass_type
@@ -6067,7 +4132,7 @@ pub(super) fn report_overridden_final_method<'db>(
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Overrides a definition from superclass `{superclass_name}`"
     ));
     diagnostic.set_concise_message(format_args!(
@@ -6099,13 +4164,13 @@ pub(super) fn report_overridden_final_method<'db>(
     sub.annotate(
         Annotation::secondary(Span::from(superclass_function_literal.focus_range(
             db,
-            &parsed_module(db, first_final_superclass_definition.file(db)).load(db),
+            &parsed_module(db, first_final_superclass_definition.python_file(db)).load(db),
         )))
         .message(format_args!("`{superclass_name}.{member}` defined here")),
     );
 
     if let Some(decorator_span) =
-        superclass_function_literal.find_known_decorator_span(db, KnownFunction::Final)
+        superclass_function_literal.find_known_decorator_span(context.db(), KnownFunction::Final)
     {
         sub.annotate(Annotation::secondary(decorator_span));
     }
@@ -6235,7 +4300,7 @@ pub(super) fn report_overridden_final_variable<'db>(
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "Overrides a final variable from superclass `{superclass_name}`"
     ));
     diagnostic.set_concise_message(format_args!(
@@ -6250,10 +4315,10 @@ pub(super) fn report_overridden_final_variable<'db>(
             ),
         );
         sub.annotate(
-            Annotation::secondary(Span::from(
-                superclass_def
-                    .focus_range(db, &parsed_module(db, superclass_def.file(db)).load(db)),
-            ))
+            Annotation::secondary(Span::from(superclass_def.focus_range(
+                db,
+                &parsed_module(db, superclass_def.python_file(db)).load(db),
+            )))
             .message(format_args!("`{superclass_name}.{member}` defined here")),
         );
         diagnostic.sub(sub);
@@ -6274,43 +4339,44 @@ pub(super) fn report_unsupported_comparison<'db>(
     right_ty: Type<'db>,
 ) {
     let db = context.db();
-
     let Some(diagnostic_builder) = context.report_lint(&UNSUPPORTED_OPERATOR, range) else {
         return;
     };
 
+    let env = &context.program_environment();
     let display_settings = DisplaySettings::from_possibly_ambiguous_types(
         db,
+        env,
         [error.left_ty, error.right_ty, left_ty, right_ty],
     );
 
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
 
-    if left_ty.is_equivalent_to(db, right_ty) {
-        diagnostic.set_primary_message(format_args!(
+    if left_ty.is_equivalent_to(db, env, right_ty) {
+        diagnostic.set_primary_annotation_message(format_args!(
             "Both operands have type `{}`",
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(db, env, display_settings.clone())
         ));
         diagnostic.annotate(context.secondary(left));
         diagnostic.annotate(context.secondary(right));
         diagnostic.set_concise_message(format_args!(
             "Operator `{}` is not supported between two objects of type `{}`",
             error.op,
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(db, env, display_settings.clone())
         ));
     } else {
         for (ty, expr) in [(left_ty, left), (right_ty, right)] {
             diagnostic.annotate(context.secondary(expr).message(format_args!(
                 "Has type `{}`",
-                ty.display_with(db, display_settings.clone())
+                ty.display_with(db, env, display_settings.clone())
             )));
         }
         diagnostic.set_concise_message(format_args!(
             "Operator `{}` is not supported between objects of type `{}` and `{}`",
             error.op,
-            left_ty.display_with(db, display_settings.clone()),
-            right_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(db, env, display_settings.clone()),
+            right_ty.display_with(db, env, display_settings.clone())
         ));
     }
 
@@ -6323,8 +4389,9 @@ pub(super) fn report_unsupported_comparison<'db>(
     // - `error.left_ty` is `Literal["foo"]`
     // - `error.right_ty` is `Literal[3]`
     if (error.left_ty, error.right_ty) != (left_ty, right_ty) {
-        if let Some(TupleSpec::Fixed(lhs_spec)) = left_ty.tuple_instance_spec(db).as_deref()
-            && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
+        if let Some(TupleSpec::Fixed(lhs_spec)) = left_ty.tuple_instance_spec(db, env).as_deref()
+            && let Some(TupleSpec::Fixed(rhs_spec)) =
+                right_ty.tuple_instance_spec(db, env).as_deref()
             && lhs_spec.len() == rhs_spec.len()
             && let Some(position) = lhs_spec
                 .all_elements()
@@ -6332,13 +4399,13 @@ pub(super) fn report_unsupported_comparison<'db>(
                 .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
-            if error.left_ty.is_equivalent_to(db, error.right_ty) {
+            if error.left_ty.is_equivalent_to(db, env, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported between \
                     the tuple elements at index {} (both of type `{}`)",
                     error.op,
                     position + 1,
-                    error.left_ty.display_with(db, display_settings),
+                    error.left_ty.display_with(db, env, display_settings),
                 ));
             } else {
                 diagnostic.info(format_args!(
@@ -6346,25 +4413,29 @@ pub(super) fn report_unsupported_comparison<'db>(
                     the tuple elements at index {} (of type `{}` and `{}`)",
                     error.op,
                     position + 1,
-                    error.left_ty.display_with(db, display_settings.clone()),
-                    error.right_ty.display_with(db, display_settings),
+                    error
+                        .left_ty
+                        .display_with(db, env, display_settings.clone()),
+                    error.right_ty.display_with(db, env, display_settings),
                 ));
             }
         } else {
-            if error.left_ty.is_equivalent_to(db, error.right_ty) {
+            if error.left_ty.is_equivalent_to(db, env, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between two objects of type `{}`",
                     error.op,
-                    error.left_ty.display_with(db, display_settings),
+                    error.left_ty.display_with(db, env, display_settings),
                 ));
             } else {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between objects of type `{}` and `{}`",
                     error.op,
-                    error.left_ty.display_with(db, display_settings.clone()),
-                    error.right_ty.display_with(db, display_settings)
+                    error
+                        .left_ty
+                        .display_with(db, env, display_settings.clone()),
+                    error.right_ty.display_with(db, env, display_settings)
                 ));
             }
         }
@@ -6439,33 +4510,35 @@ fn report_unsupported_binary_operation_impl<'a>(
 ) -> Option<LintDiagnosticGuard<'a, 'a>> {
     let db = context.db();
     let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
-    let display_settings = DisplaySettings::from_possibly_ambiguous_types(db, [left_ty, right_ty]);
+    let env = &context.program_environment();
+    let display_settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [left_ty, right_ty]);
 
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
 
-    if left_ty.is_equivalent_to(db, right_ty) {
-        diagnostic.set_primary_message(format_args!(
+    if left_ty.is_equivalent_to(db, env, right_ty) {
+        diagnostic.set_primary_annotation_message(format_args!(
             "Both operands have type `{}`",
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(db, env, display_settings.clone())
         ));
         diagnostic.annotate(context.secondary(left));
         diagnostic.annotate(context.secondary(right));
         diagnostic.set_concise_message(format_args!(
             "Operator `{operator}` is not supported between two objects of type `{}`",
-            left_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(db, env, display_settings.clone())
         ));
     } else {
         for (ty, expr) in [(left_ty, left), (right_ty, right)] {
             diagnostic.annotate(context.secondary(expr).message(format_args!(
                 "Has type `{}`",
-                ty.display_with(db, display_settings.clone())
+                ty.display_with(db, env, display_settings.clone())
             )));
         }
         diagnostic.set_concise_message(format_args!(
             "Operator `{operator}` is not supported between objects of type `{}` and `{}`",
-            left_ty.display_with(db, display_settings.clone()),
-            right_ty.display_with(db, display_settings.clone())
+            left_ty.display_with(db, env, display_settings.clone()),
+            right_ty.display_with(db, env, display_settings.clone())
         ));
     }
 
@@ -6481,7 +4554,6 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     base_is_frozen: bool,
 ) {
     let db = context.db();
-
     let Some(builder) =
         context.report_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS, class.header_range(db))
     else {
@@ -6496,7 +4568,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             class.name(db),
             base_class.name(db)
         ));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Subclass `{}` is not frozen but base class `{}` is",
             class.name(db),
             base_class.name(db)
@@ -6510,7 +4582,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
             class.name(db),
             base_class.name(db)
         ));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Subclass `{}` is frozen but base class `{}` is not",
             class.name(db),
             base_class.name(db)
@@ -6540,7 +4612,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         );
 
         let base_class_file = base_class.file(db);
-        let module = parsed_module(db, base_class_file).load(db);
+        let module = parsed_module(db, base_class.python_file(db)).load(db);
 
         let decorator_range = base_class
             .body_scope(db)
@@ -6574,7 +4646,7 @@ pub(super) fn report_invalid_total_ordering(
     let mut diagnostic = builder.into_diagnostic(
         "Class decorated with `@total_ordering` must define at least one ordering method",
     );
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
         class.name(db)
     ));
@@ -6598,7 +4670,7 @@ pub(super) fn report_invalid_total_ordering_call(
     let mut diagnostic = builder.into_diagnostic(
         "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
     );
-    diagnostic.set_primary_message(format_args!(
+    diagnostic.set_primary_annotation_message(format_args!(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
         class.name(db)
     ));
@@ -6617,6 +4689,8 @@ pub(super) fn report_invalid_total_ordering_call(
 /// The function returns `true` if a hint was added, `false` otherwise.
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
+    file: File,
+    env: &ProgramEnvironment<'_>,
     diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,
@@ -6629,14 +4703,14 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         return false;
     }
 
-    let program = Program::get(db);
+    let program = env.program(db);
     let typeshed_versions = program.search_paths(db).typeshed_versions();
 
     let Some(version_range) = typeshed_versions.exact(full_submodule_name) else {
         return false;
     };
 
-    let python_version = program.python_version(db);
+    let python_version = parent_module.python_version(db);
     if version_range.contains(python_version) {
         return false;
     }
@@ -6645,14 +4719,11 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
         "The stdlib module `{module_name}` only has a `{name}` \
             submodule on Python {version_range}",
         module_name = parent_module.name(db),
-        name = full_submodule_name
-            .components()
-            .next_back()
-            .expect("A `ModuleName` always has at least one component"),
+        name = full_submodule_name.last_component(),
         version_range = version_range.diagnostic_display(),
     ));
 
-    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, "resolving modules");
+    add_inferred_python_version_hint_to_diagnostic(db, file, diagnostic, "resolving modules");
 
     true
 }
@@ -6667,6 +4738,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
+    source_file: ProgramFile<'_>,
     mut diagnostic: LintDiagnosticGuard,
     value_type: Type,
     attr: &str,
@@ -6679,7 +4751,7 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
         return;
     };
     let module = module_ty.module(db);
-    let Some(file) = module.file(db) else {
+    let Some(module_file) = module.file(db) else {
         return;
     };
     let Some(search_path) = module.search_path(db) else {
@@ -6692,7 +4764,8 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // We populate place_table entries for stdlib items across all known versions and platforms,
     // so if this lookup succeeds then we know that this lookup *could* succeed with possible
     // configuration changes.
-    let symbol_table = place_table(db, global_scope(db, file));
+    let program_file = ProgramFile::new(db, module_file, source_file.program(db));
+    let symbol_table = place_table(db, global_scope(db, program_file));
     let Some(symbol) = symbol_table.symbol_by_name(attr) else {
         return;
     };
@@ -6707,7 +4780,12 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
+    add_inferred_python_version_hint_to_diagnostic(
+        db,
+        source_file.file(db),
+        &mut diagnostic,
+        action,
+    );
 }
 
 pub(super) fn report_invalid_concatenate_last_arg<'db>(
@@ -6715,14 +4793,16 @@ pub(super) fn report_invalid_concatenate_last_arg<'db>(
     last_arg: &ast::Expr,
     last_arg_type: Type<'db>,
 ) {
+    let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_TYPE_ARGUMENTS, last_arg) {
+        let env = &context.program_environment();
         let mut diag = builder.into_diagnostic(
             "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` \
                 type variable",
         );
-        diag.set_primary_message(format_args!(
+        diag.set_primary_annotation_message(format_args!(
             "Got `{}`",
-            last_arg_type.display(context.db())
+            last_arg_type.display(db, env)
         ));
     }
 }
@@ -6746,7 +4826,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
             let class_name = class.name(db);
             let mut diagnostic =
                 builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
-
+            let env = &context.program_environment();
             let class_and_def = class
                 .iter_mro(db, None)
                 .filter_map(|base| base.into_class()?.class_literal(db).as_static())
@@ -6756,7 +4836,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     let symbol = place_table.symbol_id("__init_subclass__")?;
                     let use_def = use_def_map(db, scope);
                     let bindings = use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol));
-                    let place_with_def = place_from_bindings(db, bindings);
+                    let place_with_def = place_from_bindings(db, env, bindings);
                     if place_with_def.place.is_undefined() {
                         return None;
                     }
@@ -6765,10 +4845,10 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
 
             if let Some((superclass, definition)) = class_and_def {
                 let superclass_name = superclass.name(db);
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Superclass `{superclass_name}` cannot be subclassed",
                 ));
-                let definition_module = parsed_module(db, definition.file(db));
+                let definition_module = parsed_module(db, definition.python_file(db));
                 let mut annotation = Annotation::secondary(Span::from(
                     definition.focus_range(db, &definition_module.load(db)),
                 ));
@@ -6780,7 +4860,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     annotation = annotation.message(format_args!(
                         "`{superclass_name}.__init_subclass__` has type `{}`, \
                         which is not callable",
-                        bindings.callable_type().display(db)
+                        bindings.callable_type().display(db, env)
                     ));
                 } else {
                     diagnostic.set_concise_message(format_args!(
@@ -6790,12 +4870,12 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     annotation = annotation.message(format_args!(
                         "`{superclass_name}.__init_subclass__` has type `{}`, \
                         which may not be callable",
-                        bindings.callable_type().display(db)
+                        bindings.callable_type().display(db, env)
                     ));
                 }
                 diagnostic.annotate(annotation);
             } else if err_kind == CallErrorKind::NotCallable {
-                diagnostic.set_primary_message(
+                diagnostic.set_primary_annotation_message(
                     "`class` statement will fail because `__init_subclass__` \
                     on a superclass is not callable",
                 );
@@ -6804,7 +4884,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                     `__init_subclass__` definition on a superclass",
                 ));
             } else {
-                diagnostic.set_primary_message(
+                diagnostic.set_primary_annotation_message(
                     "`class` statement may fail because `__init_subclass__` \
                     on a superclass may not be callable",
                 );

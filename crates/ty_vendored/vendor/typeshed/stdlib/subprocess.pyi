@@ -134,7 +134,8 @@ class CompletedProcess(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 if sys.version_info >= (3, 11):
@@ -1698,6 +1699,7 @@ class Popen(Generic[AnyStr]):
 
     def wait(self, timeout: float | None = None) -> int:
         """Wait for child process to terminate; returns self.returncode."""
+
     # morally the members of the returned tuple should be optional
     # TODO: this should allow ReadableBuffer for Popen[bytes], but adding
     # overloads for that runs into a mypy bug (python/mypy#14070).
@@ -1736,7 +1738,8 @@ class Popen(Generic[AnyStr]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 # The result really is always a str.

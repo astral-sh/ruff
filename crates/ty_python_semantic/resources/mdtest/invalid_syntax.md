@@ -41,7 +41,6 @@ type pass = 1
 # error: [invalid-syntax]
 def True(for):
     # error: [invalid-syntax]
-    # error: [invalid-syntax]
     pass
 ```
 
@@ -76,7 +75,6 @@ match while:
     # error: [invalid-syntax]
     # error: [unresolved-reference] "Name `case` used when not defined"
     case in:
-        # error: [invalid-syntax]
         # error: [invalid-syntax]
         pass
 ```
@@ -116,7 +114,7 @@ out = (obj[0] := obj).attr
 from typing import Callable
 
 # error: [invalid-syntax] "Expected index or slice expression"
-# error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+# error: [invalid-type-form] "Special form `Callable` expected exactly two arguments (parameter types and return type)"
 def _(c: Callable[]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -143,6 +141,23 @@ InvalidEmptyUnion = Union[]
 
 def _(u: InvalidEmptyUnion):
     reveal_type(u)  # revealed: Unknown
+```
+
+### `typing.Unpack`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+An empty `Unpack` nested inside a union and a generic specialization should report its syntax error
+without panicking.
+
+```py
+from typing import Union, Unpack
+
+# error: [invalid-syntax] "Expected index or slice expression"
+list[Union[Unpack[], None]]
 ```
 
 ### `typing.Annotated`

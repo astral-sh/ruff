@@ -12,14 +12,12 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   |
 help: Replace with `capture_output` keyword argument
-1 | from subprocess import run
-2 | import subprocess
+  |
 3 |
   - output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 4 + output = run(["foo"], capture_output=True)
 5 |
-6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-7 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
@@ -33,14 +31,12 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
   |
 help: Replace with `capture_output` keyword argument
-3 |
-4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  |
 5 |
   - output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 6 + output = subprocess.run(["foo"], capture_output=True)
 7 |
-8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
-9 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
@@ -54,14 +50,12 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 10 | output = subprocess.run(
    |
 help: Replace with `capture_output` keyword argument
-5  |
-6  | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-7  |
-   - output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
-8  + output = subprocess.run(capture_output=True, args=["foo"])
-9  |
-10 | output = subprocess.run(
-11 |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
+  |
+7 |
+  - output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+8 + output = subprocess.run(capture_output=True, args=["foo"])
+9 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
@@ -78,14 +72,12 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 14 |   output = subprocess.run(
    |
 help: Replace with `capture_output` keyword argument
-8  | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
-9  |
+   |
 10 | output = subprocess.run(
    -     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
 11 +     ["foo"], capture_output=True, check=True
 12 | )
-13 |
-14 | output = subprocess.run(
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
@@ -102,14 +94,12 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 18 |   output = subprocess.run(
    |
 help: Replace with `capture_output` keyword argument
-12 | )
-13 |
+   |
 14 | output = subprocess.run(
    -     ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
 15 +     ["foo"], capture_output=True, check=True
 16 | )
-17 |
-18 | output = subprocess.run(
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
@@ -132,16 +122,14 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 28 |   if output:
    |
 help: Replace with `capture_output` keyword argument
-17 |
-18 | output = subprocess.run(
+   |
 19 |     ["foo"],
    -     stdout=subprocess.PIPE,
 20 +     capture_output=True,
 21 |     check=True,
    -     stderr=subprocess.PIPE,
 22 |     text=True,
-23 |     encoding="utf-8",
-24 |     close_fds=True,
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
@@ -162,16 +150,14 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 38 |   output = subprocess.run(
    |
 help: Replace with `capture_output` keyword argument
-28 | if output:
-29 |     output = subprocess.run(
+   |
 30 |         ["foo"],
    -         stdout=subprocess.PIPE,
 31 +         capture_output=True,
 32 |         check=True,
    -         stderr=subprocess.PIPE,
 33 |         text=True,
-34 |         encoding="utf-8",
-35 |     )
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`

@@ -1,13 +1,14 @@
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
+    DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
@@ -68,7 +69,7 @@ impl TestSystem {
     }
 
     /// Returns the `InMemorySystem` or `None` if the underlying test system isn't the [`InMemorySystem`].
-    pub fn as_in_memory(&self) -> Option<&InMemorySystem> {
+    fn as_in_memory(&self) -> Option<&InMemorySystem> {
         self.system().as_any().downcast_ref::<InMemorySystem>()
     }
 
@@ -87,7 +88,7 @@ impl TestSystem {
         self.inner = Arc::new(system);
     }
 
-    pub fn system(&self) -> &dyn WritableSystem {
+    fn system(&self) -> &dyn WritableSystem {
         &*self.inner
     }
 }
@@ -99,6 +100,10 @@ impl System for TestSystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.system().canonicalize_path(path)
+    }
+
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.system().is_same_file(first, second)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -136,6 +141,15 @@ impl System for TestSystem {
         Err(WhichError::CannotFindBinaryPath)
     }
 
+    fn run_command(
+        &self,
+        program: &str,
+        args: &[&str],
+        current_directory: &SystemPath,
+    ) -> Result<Output> {
+        self.system().run_command(program, args, current_directory)
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -157,14 +171,6 @@ impl System for TestSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.system().path_exists_case_sensitive(path, prefix)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.system().case_sensitivity()
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
@@ -327,13 +333,6 @@ pub struct InMemorySystem {
 }
 
 impl InMemorySystem {
-    pub fn new(cwd: SystemPathBuf) -> Self {
-        Self {
-            user_config_directory: Mutex::new(None).into(),
-            memory_fs: MemoryFileSystem::with_current_directory(cwd),
-        }
-    }
-
     pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
         Self {
             user_config_directory: Mutex::new(None).into(),
@@ -358,6 +357,12 @@ impl System for InMemorySystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.memory_fs.canonicalize(path)
+    }
+
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -418,16 +423,6 @@ impl System for InMemorySystem {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
-    }
-
-    #[inline]
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        // The memory file system is case-sensitive.
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {

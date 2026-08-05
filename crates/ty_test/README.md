@@ -8,8 +8,9 @@ under a certain directory as test suites.
 
 A Markdown test suite can contain any number of tests. A test consists of one or more embedded
 "files", each defined by a triple-backticks fenced code block. The code block must have a tag string
-specifying its language. We currently support `py` (Python files) and `pyi` (type stub files), as
-well as [typeshed `VERSIONS`] files and `toml` for configuration.
+specifying its language. We currently support `py` (Python files), `pyi` (type stub files), and
+`ipynb` (Jupyter notebook files), as well as [typeshed `VERSIONS`] files and `toml` for
+configuration.
 
 The simplest possible test suite consists of just a single test, with a single embedded file:
 
@@ -426,6 +427,15 @@ python-version = "3.13"
 
 ```py
 X = 1
+```
+````
+
+The same placeholder can be used in `environment.extra-paths`:
+
+````markdown
+```toml
+[environment]
+extra-paths = ["/.venv/<path-to-site-packages>"]
 ```
 ````
 

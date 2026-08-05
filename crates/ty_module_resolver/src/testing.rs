@@ -109,15 +109,20 @@ pub(crate) struct TestCaseBuilder<T> {
     site_packages_files: Vec<FileSpec>,
     // Additional file roots (beyond site_packages, src and stdlib)
     // that should be registered with the `Db` abstraction.
-    //
-    // This is necessary to make testing "list modules" work. Namely,
-    // "list modules" relies on caching via a file root's revision,
-    // and if file roots aren't registered, then the implementation
-    // can't access the root's revision.
     roots: Vec<SystemPathBuf>,
 }
 
 impl<T> TestCaseBuilder<T> {
+    fn with_typeshed<U>(self, typeshed_option: U) -> TestCaseBuilder<U> {
+        TestCaseBuilder {
+            typeshed_option,
+            python_version: self.python_version,
+            first_party_files: self.first_party_files,
+            site_packages_files: self.site_packages_files,
+            roots: self.roots,
+        }
+    }
+
     /// Specify files to be created in the `src` mock directory
     pub(crate) fn with_src_files(mut self, files: &[FileSpec]) -> Self {
         self.first_party_files.extend(files.iter().copied());
@@ -173,20 +178,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
 
     /// Use the vendored stdlib stubs included in the Ruff binary for this test case
     pub(crate) fn with_vendored_typeshed(self) -> TestCaseBuilder<VendoredTypeshed> {
-        let TestCaseBuilder {
-            typeshed_option: _,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        } = self;
-        TestCaseBuilder {
-            typeshed_option: VendoredTypeshed,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        }
+        self.with_typeshed(VendoredTypeshed)
     }
 
     /// Use a mock typeshed directory for this test case
@@ -194,21 +186,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         self,
         typeshed: MockedTypeshed,
     ) -> TestCaseBuilder<MockedTypeshed> {
-        let TestCaseBuilder {
-            typeshed_option: _,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        } = self;
-
-        TestCaseBuilder {
-            typeshed_option: typeshed,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        }
+        self.with_typeshed(typeshed)
     }
 
     pub(crate) fn build(self) -> TestCase<()> {
@@ -259,13 +237,6 @@ impl TestCaseBuilder<MockedTypeshed> {
 
         db = db.with_search_paths(search_paths);
 
-        // This root is needed for correct Salsa tracking.
-        // Namely, a `SearchPath` is treated as an input, and
-        // thus the revision number must be bumped accordingly
-        // when the directory tree changes. We rely on detecting
-        // this revision from the file root. If we don't add them
-        // here, they won't get added.
-        //
         // Roots for other search paths are added as part of
         // search path initialization in `SearchPaths::from_settings`,
         // and any remaining are added below.
@@ -273,11 +244,10 @@ impl TestCaseBuilder<MockedTypeshed> {
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
 
         db.files()
-            .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
+            .try_add_root(&db, &stdlib, FileRootKind::SearchPath);
 
         for root in &roots {
-            db.files()
-                .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
         }
 
         TestCase {
@@ -336,8 +306,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
         for root in &roots {
-            db.files()
-                .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
         }
 
         TestCase {

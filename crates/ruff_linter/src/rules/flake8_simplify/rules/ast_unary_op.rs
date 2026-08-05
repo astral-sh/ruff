@@ -293,7 +293,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             func: Box::new(node.into()),
             arguments: Arguments {
                 args: Box::from([*operand.clone()]),
-                keywords: Box::from([]),
+                keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },

@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -28,7 +28,6 @@ error[invalid-base]: Invalid base for class created via `type()`
   |
 5 | X = type("X", (Generic[T],), {})  # error: [invalid-base]
   |                ^^^^^^^^^^ Has type `<special-form 'typing.Generic[T]'>`
-  |
 info: Classes created via `type()` cannot be generic
 info: Consider using `class X(Generic[...]): ...` instead
 

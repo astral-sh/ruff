@@ -70,6 +70,7 @@ if sys.platform != "win32":
         @property
         def sp_flag(self) -> int:
             """reserved"""
+
         # Deprecated aliases below.
         @property
         def sp_nam(self) -> str:

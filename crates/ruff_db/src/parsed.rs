@@ -5,15 +5,16 @@ use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
 use ruff_python_ast::{
     AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, NodeIndexError,
-    StringLiteral,
+    PythonVersion, StringLiteral,
 };
 use ruff_python_parser::{
-    ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+    ParseError, ParseErrorType, ParseOptions, Parsed, parse_cells_unchecked,
+    parse_string_annotation, parse_unchecked,
 };
 
-use crate::Db;
 use crate::files::File;
 use crate::source::source_text;
+use crate::{Db, PythonFile};
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
@@ -31,23 +32,36 @@ use crate::source::source_text;
 /// instead it's a wild guess that it should be unlikely that incremental changes involve
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
-pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", ?file).entered();
+pub fn parsed_module(db: &dyn Db, file: PythonFile<'_>) -> ParsedModule {
+    let source_file = file.file(db);
+    let python_version = file.python_version(db);
+    let _span = tracing::trace_span!("parsed_module", ?source_file, %python_version).entered();
 
-    let parsed = parsed_module_impl(db, file);
+    let parsed = parsed_module_impl(db, source_file, python_version);
 
-    ParsedModule::new(file, parsed)
+    ParsedModule::new(source_file, python_version, parsed)
 }
 
-pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+pub(super) fn disable_lru(db: &mut dyn Db) {
+    parsed_module::set_lru_capacity(db, 0);
+}
+
+fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
-    let target_version = db.python_version();
     let options = ParseOptions::from(ty).with_target_version(target_version);
-    parse_unchecked(&source, options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+
+    // Notebooks parse each cell as an independent module so a syntax error confined to one cell is
+    // surfaced instead of being masked by a later cell's content. Regular files take the existing
+    // single-parse path.
+    if let Some(notebook) = source.as_notebook() {
+        parse_cells_unchecked(&source, notebook.cell_offsets().content_ranges(), &options)
+    } else {
+        parse_unchecked(&source, options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module")
+    }
 }
 
 pub fn parsed_string_annotation(
@@ -60,25 +74,29 @@ pub fn parsed_string_annotation(
     indexed::ensure_indexed(&expr, string.node_index().load()).map_err(|err| {
         let message = match err {
             NodeIndexError::NoParent => {
-                "internal error: string annotation's parent had no NodeIndex".to_owned()
+                "Internal error: string annotation's parent had no NodeIndex"
             }
-            NodeIndexError::TooNested => "too many levels of nested string annotations; remove the redundant nested quotes".to_owned(),
+            NodeIndexError::TooNested => {
+                "Too many levels of nested string annotations; \
+                remove the redundant nested quotes"
+            }
             NodeIndexError::OverflowedIndices => {
-                "file too long for string annotations; either break up the file or don't use string annotations".to_owned()
+                "File too long for string annotations; either break up the file \
+                or don't use string annotations"
             }
             NodeIndexError::OverflowedSubIndices => {
-                "file too long for nested string annotations; remove the redundant nested quotes".to_owned()
+                "File too long for nested string annotations; remove the redundant nested quotes"
             }
             NodeIndexError::ExhaustedSubIndices => {
-                "string annotation is too long; consider introducing type aliases to simplify".to_owned()
+                "String annotation is too long; consider introducing type aliases to simplify"
             }
             NodeIndexError::ExhaustedSubSubIndices => {
-                "nested string annotation is too long; remove the redundant nested quotes".to_owned()
+                "Nested string annotation is too long; remove the redundant nested quotes"
             }
         };
 
         ParseError {
-            error: ParseErrorType::OtherError(message),
+            error: ParseErrorType::StringAnnotationError(message),
             location: string.range,
         }
     })?;
@@ -93,14 +111,16 @@ pub fn parsed_string_annotation(
 #[derive(Clone, get_size2::GetSize)]
 pub struct ParsedModule {
     file: File,
+    python_version: PythonVersion,
     #[get_size(size_fn = arc_swap_size)]
     inner: Arc<ArcSwapOption<indexed::IndexedModule>>,
 }
 
 impl ParsedModule {
-    pub fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    pub fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
+            python_version,
             inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(
                 parsed,
             )))),
@@ -115,7 +135,11 @@ impl ParsedModule {
             Some(parsed) => parsed,
             None => {
                 // Re-parse the file.
-                let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
+                let parsed = indexed::IndexedModule::new(parsed_module_impl(
+                    db,
+                    self.file,
+                    self.python_version,
+                ));
                 tracing::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
@@ -140,6 +164,11 @@ impl ParsedModule {
     /// Returns the file to which this module belongs.
     pub fn file(&self) -> File {
         self.file
+    }
+
+    /// Returns the Python version used to parse this module.
+    pub fn python_version(&self) -> PythonVersion {
+        self.python_version
     }
 }
 
@@ -206,9 +235,299 @@ mod indexed {
     /// A wrapper around the AST that allows access to AST nodes by index.
     #[derive(Debug, get_size2::GetSize)]
     pub struct IndexedModule {
-        index: Box<[AnyRootNodeRef<'static>]>,
+        index: IndexedNodes,
         pub parsed: Parsed<ModModule>,
     }
+
+    /// Compact storage for the address and [`RootNodeKind`] of every indexed AST node.
+    ///
+    /// This stores the information needed to reconstruct an [`AnyRootNodeRef`] without retaining
+    /// a fat pointer per node. Entries are divided into fixed-size chunks so that unrelated AST
+    /// allocations do not force every node into a wider representation. Each chunk starts on a
+    /// word boundary in `words`.
+    ///
+    /// # Safety invariant
+    ///
+    /// Every entry preserves the exact exposed address and [`RootNodeKind`] obtained from the same
+    /// [`AnyRootNodeRef`]. Relative entries use lossless address arithmetic and wide entries store
+    /// the full address. The parsed AST is placed in its final [`Arc`] before those addresses are
+    /// collected. Installing the completed index does not move or mutate the parsed AST, and no
+    /// API moves, replaces, or mutably exposes it while the index exists. Lookups pair each stored
+    /// address with `NonNull::with_exposed_provenance` and its original kind.
+    ///
+    /// # Memory reporting
+    ///
+    /// The actual number of words used by the index depends on the relative addresses of the AST
+    /// nodes. Allocator placement can vary between processes, which makes exact accounting noisy
+    /// in CI memory comparisons even when the indexed AST is unchanged. Memory reports normalize
+    /// the payload to a fixed 32 bits per entry. This conservatively covers 99% of entries in the
+    /// measured Ruff corpus while preserving the size reduction over storing a full
+    /// [`AnyRootNodeRef`] per node. The actual encoding is often narrower than 32 bits. This only
+    /// affects memory reporting; the index itself continues to use the narrowest lossless
+    /// representation for each chunk.
+    #[derive(Debug, Default)]
+    struct IndexedNodes {
+        chunks: Box<[IndexChunk]>,
+        words: Box<[u64]>,
+    }
+
+    /// Describes the entries for one consecutive group of node indices.
+    #[derive(Debug, get_size2::GetSize)]
+    struct IndexChunk {
+        /// Minimum node address in a relative chunk; unused for a wide chunk.
+        base: usize,
+        /// Index of this chunk's first word in [`IndexedNodes::words`].
+        word_start: u32,
+        /// Number of bits per packed entry.
+        entry_bits: u8,
+        /// Number of entries, which is only less than [`IndexedNodes::CHUNK_LEN`] in the last
+        /// chunk.
+        entry_count: u8,
+        layout: IndexChunkLayout,
+    }
+
+    impl get_size2::GetSize for IndexedNodes {
+        fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(
+            &self,
+            tracker: T,
+        ) -> (usize, T) {
+            let (chunks_size, tracker) =
+                get_size2::GetSize::get_heap_size_with_tracker(&self.chunks, tracker);
+            let words = self
+                .chunks
+                .iter()
+                .map(|chunk| {
+                    (usize::from(chunk.entry_count) * Self::REPORTED_ENTRY_BITS)
+                        .div_ceil(u64::BITS as usize)
+                })
+                .sum::<usize>();
+
+            (chunks_size + words * size_of::<u64>(), tracker)
+        }
+    }
+
+    #[derive(Copy, Clone, Debug, get_size2::GetSize)]
+    #[repr(u8)]
+    enum IndexChunkLayout {
+        /// Packs each scaled address offset together with its root-node kind:
+        ///
+        /// ```text
+        /// | address offset | root-node kind |
+        ///   entry_bits - 5       5 bits
+        /// ```
+        ///
+        /// The original address is `base + address_offset * ALIGNMENT`. Entries may cross `u64`
+        /// boundaries and the unused bits at the end of the chunk are padding.
+        Relative,
+        /// Stores full addresses followed by a packed stream of root-node kinds:
+        ///
+        /// ```text
+        /// | address 0 | ... | address n - 1 | kind 0 | ... | kind n - 1 |
+        ///     64 bits           64 bits        5 bits          5 bits
+        /// ```
+        Wide,
+    }
+
+    #[derive(Default)]
+    struct IndexedNodesBuilder<'ast> {
+        chunks: Vec<IndexChunk>,
+        words: Vec<u64>,
+        pending: Vec<AnyRootNodeRef<'ast>>,
+        #[cfg(test)]
+        all_nodes: Vec<AnyRootNodeRef<'ast>>,
+    }
+
+    impl<'ast> IndexedNodesBuilder<'ast> {
+        fn new() -> Self {
+            Self {
+                pending: Vec::with_capacity(IndexedNodes::CHUNK_LEN),
+                ..Self::default()
+            }
+        }
+
+        fn push(&mut self, node: AnyRootNodeRef<'ast>) {
+            #[cfg(test)]
+            self.all_nodes.push(node);
+
+            self.pending.push(node);
+
+            if self.pending.len() == IndexedNodes::CHUNK_LEN {
+                self.flush();
+            }
+        }
+
+        fn finish(mut self) -> IndexedNodes {
+            self.flush();
+
+            IndexedNodes {
+                chunks: self.chunks.into_boxed_slice(),
+                words: self.words.into_boxed_slice(),
+            }
+        }
+
+        fn flush(&mut self) {
+            IndexedNodes::extend_from_nodes(&mut self.chunks, &mut self.words, &self.pending);
+            self.pending.clear();
+        }
+    }
+
+    impl IndexedNodes {
+        const ALIGNMENT: usize = std::mem::align_of::<AtomicNodeIndex>();
+        const CHUNK_LEN: usize = 64;
+        const KIND_BITS: u8 = 5;
+        const KIND_MASK: u64 = (1 << Self::KIND_BITS) - 1;
+        const REPORTED_ENTRY_BITS: usize = 32;
+
+        fn extend_from_nodes(
+            chunks: &mut Vec<IndexChunk>,
+            words: &mut Vec<u64>,
+            nodes: &[AnyRootNodeRef<'_>],
+        ) {
+            for node_chunk in nodes.chunks(Self::CHUNK_LEN) {
+                let (base, max, aligned) =
+                    node_chunk
+                        .iter()
+                        .fold((usize::MAX, 0, true), |(base, max, aligned), node| {
+                            let (_, pointer) = node.into_raw_parts();
+                            let address = pointer.as_ptr().expose_provenance();
+                            (
+                                base.min(address),
+                                max.max(address),
+                                aligned && address.is_multiple_of(Self::ALIGNMENT),
+                            )
+                        });
+                let offset_bits = usize::BITS - ((max - base) / Self::ALIGNMENT).leading_zeros();
+                let relative_bits = u8::try_from(offset_bits)
+                    .expect("an address offset cannot require more than u8::MAX bits")
+                    + Self::KIND_BITS;
+                let word_start = u32::try_from(words.len())
+                    .expect("indexed AST bitstream should fit in u32 words");
+
+                if aligned && relative_bits <= 64 {
+                    let entry_count = u8::try_from(node_chunk.len())
+                        .expect("an index chunk contains at most 64 entries");
+                    chunks.push(IndexChunk {
+                        base,
+                        word_start,
+                        entry_bits: relative_bits,
+                        entry_count,
+                        layout: IndexChunkLayout::Relative,
+                    });
+                    for (entry, node) in node_chunk.iter().enumerate() {
+                        let (kind, pointer) = node.into_raw_parts();
+                        let address = pointer.as_ptr().expose_provenance();
+                        let offset = (address - base) / Self::ALIGNMENT;
+                        let offset = u64::try_from(offset)
+                            .expect("relative address offset was checked to fit in 64 bits");
+                        Self::write_bits(
+                            words,
+                            word_start as usize * 64 + entry * usize::from(relative_bits),
+                            (offset << Self::KIND_BITS) | u64::from(kind as u8),
+                            relative_bits,
+                        );
+                    }
+                } else {
+                    // Wide chunks store one address word per entry followed by packed node kinds.
+                    let entry_count = u8::try_from(node_chunk.len())
+                        .expect("an index chunk contains at most 64 entries");
+                    chunks.push(IndexChunk {
+                        base: 0,
+                        word_start,
+                        entry_bits: Self::KIND_BITS,
+                        entry_count,
+                        layout: IndexChunkLayout::Wide,
+                    });
+                    words.extend(node_chunk.iter().map(|node| {
+                        let (_, pointer) = node.into_raw_parts();
+                        u64::try_from(pointer.as_ptr().expose_provenance())
+                            .expect("AST node addresses should fit in a bitstream word")
+                    }));
+                    for (entry, node) in node_chunk.iter().enumerate() {
+                        let (kind, _) = node.into_raw_parts();
+                        Self::write_bits(
+                            words,
+                            (word_start as usize + node_chunk.len()) * 64
+                                + entry * usize::from(Self::KIND_BITS),
+                            u64::from(kind as u8),
+                            Self::KIND_BITS,
+                        );
+                    }
+                }
+            }
+        }
+
+        fn write_bits(words: &mut Vec<u64>, bit: usize, value: u64, bits: u8) {
+            debug_assert!((1..=64).contains(&bits));
+            let word = bit / 64;
+            let shift = bit % 64;
+            let end = bit + usize::from(bits);
+            words.resize(words.len().max(end.div_ceil(64)), 0);
+            words[word] |= value << shift;
+            if end > (word + 1) * 64 {
+                words[word + 1] |= value >> (64 - shift);
+            }
+        }
+
+        fn read_bits(words: &[u64], bit: usize, bits: u8) -> u64 {
+            debug_assert!((1..=64).contains(&bits));
+            let word = bit / 64;
+            let shift = bit % 64;
+            let low = words[word] >> shift;
+            let value = if shift + usize::from(bits) <= 64 {
+                low
+            } else {
+                low | (words[word + 1] << (64 - shift))
+            };
+            if bits == 64 {
+                value
+            } else {
+                value & ((1 << bits) - 1)
+            }
+        }
+
+        #[cfg(test)]
+        fn len(&self) -> usize {
+            self.chunks
+                .iter()
+                .map(|chunk| usize::from(chunk.entry_count))
+                .sum()
+        }
+
+        fn get(&self, index: usize) -> (usize, RootNodeKind) {
+            let chunk_index = index / Self::CHUNK_LEN;
+            let entry_index = index % Self::CHUNK_LEN;
+            let chunk = &self.chunks[chunk_index];
+            let words = &self.words[chunk.word_start as usize..];
+
+            match chunk.layout {
+                IndexChunkLayout::Relative => {
+                    let entry = Self::read_bits(
+                        words,
+                        entry_index * usize::from(chunk.entry_bits),
+                        chunk.entry_bits,
+                    );
+                    let offset = (entry >> Self::KIND_BITS) as usize;
+                    let kind = RootNodeKind::from_u8((entry & Self::KIND_MASK) as u8)
+                        .expect("packed node kind should be valid");
+                    (chunk.base + offset * Self::ALIGNMENT, kind)
+                }
+                IndexChunkLayout::Wide => {
+                    let address = usize::try_from(words[entry_index])
+                        .expect("stored AST node address should fit in usize");
+                    let kind_bit = usize::from(chunk.entry_count) * 64
+                        + entry_index * usize::from(Self::KIND_BITS);
+                    let kind =
+                        RootNodeKind::from_u8(
+                            Self::read_bits(words, kind_bit, Self::KIND_BITS) as u8
+                        )
+                        .expect("packed node kind should be valid");
+                    (address, kind)
+                }
+            }
+        }
+    }
+
+    const _: () = assert!(RootNodeKind::ALL.len() <= 1 << IndexedNodes::KIND_BITS);
 
     /// Ensure the following sub-AST is indexed, using the parent node's index
     /// as a basis for unambiguous AST node indices.
@@ -241,10 +560,9 @@ mod indexed {
 
     impl IndexedModule {
         /// Create a new [`IndexedModule`] from the given AST.
-        #[expect(clippy::unnecessary_cast)]
         pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
             let mut visitor = Visitor {
-                nodes: Some(Vec::new()),
+                nodes: Some(IndexedNodesBuilder::new()),
                 index: 0,
                 max_index: MAX_REAL_INDEX,
                 overflowed: false,
@@ -252,21 +570,18 @@ mod indexed {
 
             let mut inner = Arc::new(IndexedModule {
                 parsed,
-                index: Box::new([]),
+                index: IndexedNodes::default(),
             });
 
             AnyNodeRef::from(inner.parsed.syntax()).visit_source_order(&mut visitor);
 
-            let index: Box<[AnyRootNodeRef<'_>]> = visitor.nodes.unwrap().into_boxed_slice();
-
-            // SAFETY: We cast from `Box<[AnyRootNodeRef<'_>]>` to `Box<[AnyRootNodeRef<'static>]>`,
-            // faking the 'static lifetime to create the self-referential struct. The node references
-            // are into the `Arc<Parsed<ModModule>>`, so are valid for as long as the `IndexedModule`
-            // is alive. We make sure to restore the correct lifetime in `get_by_index`.
-            //
-            // Note that we can never move the data within the `Arc` after this point.
-            Arc::get_mut(&mut inner).unwrap().index =
-                unsafe { Box::from_raw(Box::into_raw(index) as *mut [AnyRootNodeRef<'static>]) };
+            let index = visitor
+                .nodes
+                .expect("top-level AST visitor should collect indexed nodes")
+                .finish();
+            Arc::get_mut(&mut inner)
+                .expect("newly created indexed module should have a unique Arc")
+                .index = index;
 
             inner
         }
@@ -277,25 +592,37 @@ mod indexed {
                 .as_u32()
                 .expect("attempted to access uninitialized `NodeIndex`");
 
-            // Note that this method restores the correct lifetime: the nodes are valid for as
-            // long as the reference to `IndexedModule` is alive.
-            self.index[index as usize]
+            let index = index as usize;
+            let (address, kind) = self.index.get(index);
+
+            // SAFETY: By the `IndexedNodes` safety invariant, this is the exact exposed address and
+            // root-node kind recorded from the same node after `parsed` reached its stable address.
+            // `self` keeps the AST alive and immutable for the returned reference's lifetime.
+            unsafe {
+                AnyRootNodeRef::from_raw_parts(
+                    kind,
+                    std::ptr::NonNull::with_exposed_provenance(
+                        std::num::NonZeroUsize::new(address)
+                            .expect("recorded AST node address should be non-null"),
+                    ),
+                )
+            }
         }
     }
 
-    /// A visitor that collects nodes in source order.
-    pub struct Visitor<'a> {
-        pub index: u32,
-        pub max_index: u32,
-        pub nodes: Option<Vec<AnyRootNodeRef<'a>>>,
-        pub overflowed: bool,
+    /// A visitor that indexes nodes in source order.
+    struct Visitor<'ast> {
+        index: u32,
+        max_index: u32,
+        nodes: Option<IndexedNodesBuilder<'ast>>,
+        overflowed: bool,
     }
 
-    impl<'a> Visitor<'a> {
-        fn visit_node<T>(&mut self, node: &'a T)
+    impl<'ast> Visitor<'ast> {
+        fn visit_node<T>(&mut self, node: &'ast T)
         where
-            T: HasNodeIndex + std::fmt::Debug,
-            AnyRootNodeRef<'a>: From<&'a T>,
+            T: HasNodeIndex,
+            AnyRootNodeRef<'ast>: From<&'ast T>,
         {
             // Only check on write (the maximum is orders of magnitude less than u32::MAX)
             if self.index > self.max_index {
@@ -313,12 +640,6 @@ mod indexed {
 
     impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
         #[inline]
-        fn visit_mod(&mut self, module: &'a Mod) {
-            self.visit_node(module);
-            walk_module(self, module);
-        }
-
-        #[inline]
         fn visit_stmt(&mut self, stmt: &'a Stmt) {
             self.visit_node(stmt);
             walk_stmt(self, stmt);
@@ -326,7 +647,7 @@ mod indexed {
 
         #[inline]
         fn visit_annotation(&mut self, expr: &'a Expr) {
-            self.visit_node(expr);
+            // `walk_annotation` delegates to `visit_expr`, which indexes the expression once.
             walk_annotation(self, expr);
         }
 
@@ -479,11 +800,83 @@ mod indexed {
             walk_identifier(self, identifier);
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn indexed_nodes_round_trip() {
+            let parsed = ruff_python_parser::parse_module(
+                r#"
+import os as imported_os
+
+@decorator
+class C[T](Base, metaclass=Meta):
+    def method(self, value: int = 1, *args, keyword=2, **kwargs):
+        try:
+            with context() as items:
+                return [item for item in items if item]
+        except Error as error:
+            match error:
+                case Error(code=code):
+                    if code:
+                        return f"{code!r}"
+                    elif code is None:
+                        return t"{code}"
+                    else:
+                        return "string"
+                case _:
+                    return b"bytes"
+"#,
+            )
+            .expect("test source should parse");
+            let indexed = IndexedModule::new(parsed);
+            let mut visitor = Visitor {
+                nodes: Some(IndexedNodesBuilder::new()),
+                index: 0,
+                max_index: MAX_REAL_INDEX,
+                overflowed: false,
+            };
+            AnyNodeRef::from(indexed.parsed.syntax()).visit_source_order(&mut visitor);
+            let nodes = visitor
+                .nodes
+                .expect("test visitor should collect indexed nodes")
+                .all_nodes;
+
+            assert_eq!(indexed.index.len(), nodes.len());
+            let mut seen_kinds = [false; 1 << IndexedNodes::KIND_BITS];
+
+            for (raw_index, expected_node) in nodes.into_iter().enumerate() {
+                let (kind, pointer) = expected_node.into_raw_parts();
+                let address = pointer.as_ptr().expose_provenance();
+                let index = NodeIndex::from(
+                    u32::try_from(raw_index).expect("node index should fit in u32"),
+                );
+                seen_kinds[usize::from(kind as u8)] = true;
+                assert_eq!(indexed.index.get(raw_index), (address, kind));
+
+                let node = indexed.get_by_index(index);
+                let (actual_kind, actual_pointer) = node.into_raw_parts();
+                assert_eq!(actual_kind, kind);
+                assert_eq!(actual_pointer.as_ptr().expose_provenance(), address);
+                assert_eq!(node.node_index().load(), index);
+            }
+            for kind in RootNodeKind::ALL {
+                let is_indexed = !matches!(
+                    kind,
+                    RootNodeKind::Mod | RootNodeKind::InterpolatedStringFormatSpec
+                );
+                assert_eq!(seen_kinds[usize::from(*kind as u8)], is_indexed);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::Db;
+    use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
     use crate::system::{
@@ -491,6 +884,7 @@ mod tests {
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
+    use ruff_python_ast::PythonVersion;
     use zip::CompressionMethod;
 
     #[test]
@@ -502,6 +896,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
@@ -518,6 +913,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
@@ -534,7 +930,8 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
+        let file = PythonFile::new(&db, virtual_file.file(), PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -550,7 +947,8 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
+        let file = PythonFile::new(&db, virtual_file.file(), PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -581,8 +979,41 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+    }
+
+    #[test]
+    fn same_file_at_different_python_versions() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "type Alias = int")?;
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        let py311 = PythonFile::new(&db, file, PythonVersion::PY311);
+        let py312 = PythonFile::new(&db, file, PythonVersion::PY312);
+        let parsed_py311 = parsed_module(&db, py311);
+        let parsed_py312 = parsed_module(&db, py312);
+
+        for _ in 0..2 {
+            assert!(
+                !parsed_py311
+                    .load(&db)
+                    .unsupported_syntax_errors()
+                    .is_empty()
+            );
+            assert!(
+                parsed_py312
+                    .load(&db)
+                    .unsupported_syntax_errors()
+                    .is_empty()
+            );
+
+            parsed_py311.clear();
+            parsed_py312.clear();
+        }
+
+        Ok(())
     }
 }

@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
-use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
+use ruff_python_semantic::{AnyImport, FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
@@ -79,9 +79,9 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         };
 
         let import_info = match import {
-            import if import.is_import() => ImportInfo::from(import.import().unwrap()),
-            import if import.is_from_import() => ImportInfo::from(import.from_import().unwrap()),
-            _ => continue,
+            AnyImport::Import(import) => ImportInfo::from(import),
+            AnyImport::FromImport(import) => ImportInfo::from(import),
+            AnyImport::SubmoduleImport(_) => continue,
         };
 
         let Some(root_module) = import_info.module_name.first() else {

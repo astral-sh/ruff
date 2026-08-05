@@ -1,15 +1,20 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
+use char_str::{CharStr, CharString, format_char};
 use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
-use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
+
+// Selected using performance and memory profiling across the 162-project ecosystem corpus.
+// Member-expression equality is relatively expensive, and raising the cutoff to 16 regressed
+// performance for comparatively little additional memory savings.
+const LINEAR_SEARCH_THRESHOLD: usize = 8;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -75,7 +80,7 @@ impl Member {
     /// a method context, or whether the `<NAME>` actually refers to the first
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
-    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&str> {
+    fn as_instance_attribute_candidate(&self) -> Option<&str> {
         let mut segments = self.expression().segments();
         let first_segment = segments.next()?;
 
@@ -100,7 +105,7 @@ impl Member {
     }
 
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
-    pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
+    fn is_instance_attribute_named(&self, name: &str) -> bool {
         self.as_instance_attribute() == Some(name)
     }
 
@@ -151,15 +156,15 @@ impl get_size2::GetSize for MemberFlags {}
 /// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
-    /// The entire path as a single Name
-    path: Name,
+    /// The entire path as a single immutable string.
+    path: CharStr,
     /// Metadata for each segment (in forward order)
     segments: Segments,
 }
 
 impl MemberExpr {
     #[cfg(test)]
-    pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
+    fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
     }
 
@@ -182,14 +187,10 @@ impl MemberExpr {
         SegmentsIterator::new(self.path.as_str(), self.segment_infos())
     }
 
-    fn shrink_to_fit(&mut self) {
-        self.path.shrink_to_fit();
-    }
-
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
     ///
     /// This is the symbol on which the member access is performed.
-    pub(crate) fn symbol_name(&self) -> &str {
+    fn symbol_name(&self) -> &str {
         self.as_ref().symbol_name()
     }
 
@@ -206,64 +207,118 @@ impl MemberExpr {
 }
 
 /// A builder for a [`MemberExpr`].
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct MemberExprBuilder {
-    path: Name,
+    path: CharStr,
     segments: SmallVec<[SegmentInfo; 8]>,
 }
 
 impl MemberExprBuilder {
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
-            ast::ExprRef::Name(name) => Some(MemberExprBuilder {
-                path: name.id.clone(),
-                segments: smallvec::SmallVec::new_const(),
-            }),
-            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
-                MemberExprBuilder::visit_expr(ast::ExprRef::from(named.target.as_ref()))
+            ast::ExprRef::Name(name) => {
+                return Some(MemberExprBuilder {
+                    path: CharStr::from(name.id.clone()),
+                    segments: SmallVec::new_const(),
+                });
             }
+            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
+                return Self::visit_expr(ast::ExprRef::from(named.target.as_ref()));
+            }
+            _ => {}
+        }
+
+        let mut parts = SmallVec::new_const();
+        let mut segments = SmallVec::new_const();
+        let mut path_len = TextSize::new(0);
+        Self::collect_expr(expr, &mut parts, &mut segments, &mut path_len)?;
+
+        Some(MemberExprBuilder {
+            path: CharStr::concat(&parts),
+            segments,
+        })
+    }
+
+    fn collect_expr<'a>(
+        expr: ast::ExprRef<'a>,
+        parts: &mut SmallVec<[MemberPathPart<'a>; 8]>,
+        segments: &mut SmallVec<[SegmentInfo; 8]>,
+        path_len: &mut TextSize,
+    ) -> Option<()> {
+        match expr {
+            ast::ExprRef::Name(name) => {
+                let text = name.id.as_str();
+                *path_len += text.text_len();
+                parts.push(MemberPathPart::Borrowed(text));
+                Some(())
+            }
+            ast::ExprRef::Named(named) if named.target.is_name_expr() => Self::collect_expr(
+                ast::ExprRef::from(named.target.as_ref()),
+                parts,
+                segments,
+                path_len,
+            ),
             ast::ExprRef::Named(_) => None,
 
             ast::ExprRef::Attribute(attribute) => {
-                let mut builder =
-                    MemberExprBuilder::visit_expr(ast::ExprRef::from(&attribute.value))?;
+                Self::collect_expr(
+                    ast::ExprRef::from(&attribute.value),
+                    parts,
+                    segments,
+                    path_len,
+                )?;
 
-                let start_offset = builder.path.text_len();
-                let _ = write!(builder.path, "{}", attribute.attr.id);
-                builder
-                    .segments
-                    .push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
+                let start_offset = *path_len;
+                let text = attribute.attr.id.as_str();
+                *path_len += text.text_len();
+                parts.push(MemberPathPart::Borrowed(text));
+                segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
 
-                Some(builder)
+                Some(())
             }
             ast::ExprRef::Subscript(subscript) => {
-                let subscript_value =
-                    MemberExprBuilder::visit_expr(ast::ExprRef::from(&subscript.value))?;
-                MemberExprBuilder::visit_subscript_expr(subscript_value, &subscript.slice)
+                Self::collect_expr(
+                    ast::ExprRef::from(&subscript.value),
+                    parts,
+                    segments,
+                    path_len,
+                )?;
+
+                let start_offset = *path_len;
+                let (kind, part) = Self::subscript_part(&subscript.slice)?;
+                *path_len += part.as_ref().text_len();
+                parts.push(part);
+                segments.push(SegmentInfo::new(kind, start_offset));
+
+                Some(())
             }
             _ => None,
         }
     }
 
     pub(super) fn visit_subscript_expr(
-        subscript_value: MemberExprBuilder,
+        subscript_value: &MemberExprBuilder,
         subscript_slice: &ast::Expr,
     ) -> Option<MemberExprBuilder> {
-        let MemberExprBuilder {
-            mut path,
-            mut segments,
-        } = subscript_value;
-        let start_offset = path.text_len();
+        let start_offset = subscript_value.path.text_len();
+        let (kind, part) = Self::subscript_part(subscript_slice)?;
+        let path = CharStr::concat(&[subscript_value.path.as_str(), part.as_ref()]);
+        let mut segments = subscript_value.segments.clone();
+        segments.push(SegmentInfo::new(kind, start_offset));
 
+        Some(MemberExprBuilder { path, segments })
+    }
+
+    fn subscript_part(subscript_slice: &ast::Expr) -> Option<(SegmentKind, MemberPathPart<'_>)> {
         match subscript_slice {
             // Handle integer subscripts, like `x[0]`.
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(index),
                 ..
-            }) => {
-                let _ = write!(path, "{index}");
-                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-            }
+            }) => Some((
+                SegmentKind::IntSubscript,
+                MemberPathPart::Owned(format_char!("{index}")),
+            )),
             // Handle negative integer subscripts, like `x[-1]`.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::USub,
@@ -273,11 +328,11 @@ impl MemberExprBuilder {
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(index),
                     ..
-                }) => {
-                    let _ = write!(path, "-{index}");
-                    segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-                }
-                _ => return None,
+                }) => Some((
+                    SegmentKind::IntSubscript,
+                    MemberPathPart::Owned(format_char!("-{index}")),
+                )),
+                _ => None,
             },
             // Handle positive integer subscripts with explicit plus, like `x[+1]`.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
@@ -288,34 +343,51 @@ impl MemberExprBuilder {
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(index),
                     ..
-                }) => {
-                    let _ = write!(path, "{index}");
-                    segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-                }
-                _ => return None,
+                }) => Some((
+                    SegmentKind::IntSubscript,
+                    MemberPathPart::Owned(format_char!("{index}")),
+                )),
+                _ => None,
             },
             // Handle boolean subscripts, like `x[True]` or `x[False]`.
             // In Python, `True` and `False` are equivalent to `1` and `0` for indexing.
-            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
-                let _ = write!(path, "{}", u8::from(*value));
-                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-            }
-            ast::Expr::StringLiteral(string) => {
-                let _ = write!(path, "{}", string.value);
-                segments.push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
-            }
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some((
+                SegmentKind::IntSubscript,
+                MemberPathPart::Borrowed(if *value { "1" } else { "0" }),
+            )),
+            ast::Expr::StringLiteral(string) => Some((
+                SegmentKind::StringSubscript,
+                MemberPathPart::Borrowed(string.value.to_str()),
+            )),
             // Handle bytes literal subscripts, like `x[b"key"]`.
             ast::Expr::BytesLiteral(bytes) => {
                 let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
-                let _ = write!(path, "{}", String::from_utf8_lossy(&bytes_vec));
-                segments.push(SegmentInfo::new(SegmentKind::BytesSubscript, start_offset));
+                let text = String::from_utf8_lossy(&bytes_vec);
+                Some((
+                    SegmentKind::BytesSubscript,
+                    MemberPathPart::Owned(CharString::from(text.as_ref())),
+                ))
             }
-            _ => {
-                return None;
-            }
+            _ => None,
         }
+    }
+}
 
-        Some(MemberExprBuilder { path, segments })
+/// A borrowed or owned fragment collected while building an immutable member path.
+///
+/// AST-backed text is borrowed directly, while formatted subscripts use a temporary [`CharString`].
+/// The complete set of fragments is concatenated once into the builder's [`CharStr`].
+enum MemberPathPart<'a> {
+    Borrowed(&'a str),
+    Owned(CharString),
+}
+
+impl AsRef<str> for MemberPathPart<'_> {
+    fn as_ref(&self) -> &str {
+        match self {
+            MemberPathPart::Borrowed(text) => text,
+            MemberPathPart::Owned(text) => text.as_str(),
+        }
     }
 }
 
@@ -416,18 +488,51 @@ impl Hash for MemberExprRef<'_> {
 
 /// Uniquely identifies a member in a scope.
 #[newtype_index]
-#[derive(get_size2::GetSize, salsa::Update)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedMemberId;
+
+/// Map from member path to its ID.
+///
+/// Uses a hash table to avoid storing the path twice.
+#[derive(Debug, Default, get_size2::GetSize)]
+struct MemberReverseTable(hashbrown::HashTable<ScopedMemberId>);
+
+impl MemberReverseTable {
+    fn member_id(
+        &self,
+        members: &IndexVec<ScopedMemberId, Member>,
+        member: &MemberExprRef<'_>,
+    ) -> Option<ScopedMemberId> {
+        self.0
+            .find(hash_single(member), |id| members[*id].expression == *member)
+            .copied()
+    }
+
+    fn entry<'a>(
+        &'a mut self,
+        members: &IndexVec<ScopedMemberId, Member>,
+        member: &Member,
+    ) -> Entry<'a, ScopedMemberId> {
+        let member = member.expression.as_ref();
+        self.0.entry(
+            hash_single(&member),
+            |id| members[*id].expression.as_ref() == member,
+            |id| hash_single(&members[*id].expression.as_ref()),
+        )
+    }
+
+    fn shrink_to_fit(&mut self, members: &IndexVec<ScopedMemberId, Member>) {
+        self.0
+            .shrink_to_fit(|id| hash_single(&members[*id].expression.as_ref()));
+    }
+}
 
 /// The members of a scope. Allows lookup by member path and [`ScopedMemberId`].
 #[derive(Default, get_size2::GetSize)]
 pub(super) struct MemberTable {
     members: IndexVec<ScopedMemberId, Member>,
-
-    /// Map from member path to its ID.
-    ///
-    /// Uses a hash table to avoid storing the path twice.
-    map: hashbrown::HashTable<ScopedMemberId>,
+    /// Reverse lookup retained only when linear search would be expensive.
+    reverse: Option<Box<MemberReverseTable>>,
 }
 
 impl MemberTable {
@@ -454,20 +559,20 @@ impl MemberTable {
         self.members.iter()
     }
 
-    fn hash_member_expression_ref(member: &MemberExprRef) -> u64 {
-        hash_single(member)
-    }
-
     /// Returns the ID of the member with the given expression, if it exists.
     pub(crate) fn member_id<'a>(
         &self,
         member: impl Into<MemberExprRef<'a>>,
     ) -> Option<ScopedMemberId> {
         let member = member.into();
-        let hash = Self::hash_member_expression_ref(&member);
-        self.map
-            .find(hash, |id| self.members[*id].expression == member)
-            .copied()
+
+        if let Some(reverse) = self.reverse.as_deref() {
+            return reverse.member_id(&self.members, &member);
+        }
+
+        self.members
+            .iter_enumerated()
+            .find_map(|(id, candidate)| (candidate.expression == member).then_some(id))
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
@@ -499,23 +604,23 @@ impl std::fmt::Debug for MemberTable {
 #[derive(Debug, Default)]
 pub(super) struct MemberTableBuilder {
     table: MemberTable,
+    reverse: MemberReverseTable,
 }
 
 impl MemberTableBuilder {
+    pub(super) fn member_id<'a>(
+        &self,
+        member: impl Into<MemberExprRef<'a>>,
+    ) -> Option<ScopedMemberId> {
+        let member = member.into();
+        self.reverse.member_id(&self.table.members, &member)
+    }
+
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
-    pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
-        let member_ref = member.expression.as_ref();
-        let hash = MemberTable::hash_member_expression_ref(&member_ref);
-        let entry = self.table.map.entry(
-            hash,
-            |id| self.table.members[*id].expression.as_ref() == member.expression.as_ref(),
-            |id| {
-                let ref_expr = self.table.members[*id].expression.as_ref();
-                MemberTable::hash_member_expression_ref(&ref_expr)
-            },
-        );
+    pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
+        let entry = self.reverse.entry(&self.table.members, &member);
 
         match entry {
             Entry::Occupied(entry) => {
@@ -528,8 +633,6 @@ impl MemberTableBuilder {
                 (id, false)
             }
             Entry::Vacant(entry) => {
-                member.expression.shrink_to_fit();
-
                 let id = self.table.members.push(member);
                 entry.insert(id);
                 (id, true)
@@ -538,12 +641,17 @@ impl MemberTableBuilder {
     }
 
     pub(super) fn build(self) -> MemberTable {
-        let mut table = self.table;
+        let Self {
+            mut table,
+            mut reverse,
+        } = self;
         table.members.shrink_to_fit();
-        table.map.shrink_to_fit(|id| {
-            let ref_expr = table.members[*id].expression.as_ref();
-            MemberTable::hash_member_expression_ref(&ref_expr)
-        });
+
+        if table.members.len() > LINEAR_SEARCH_THRESHOLD {
+            reverse.shrink_to_fit(&table.members);
+            table.reverse = Some(Box::new(reverse));
+        }
+
         table
     }
 }

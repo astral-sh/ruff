@@ -156,8 +156,7 @@ if sys.platform != "win32":
 
         If arg is given as a bytes-like object, the return value of fcntl() is a
         bytes object of that length, containing the resulting value put in the
-        arg buffer by the operating system.  The length of the arg buffer is not
-        allowed to exceed 1024 bytes.
+        arg buffer by the operating system.
         """
     @overload
     def fcntl(fd: FileDescriptorLike, cmd: int, arg: str | ReadOnlyBuffer, /) -> bytes: ...
@@ -191,8 +190,7 @@ if sys.platform != "win32":
         If the argument is an immutable buffer then a copy of the buffer is
         passed to the operating system and the return value is a bytes object of
         the same length containing whatever the operating system put in the
-        buffer.  The length of the arg buffer in this case is not allowed to
-        exceed 1024 bytes.
+        buffer.
         """
     # The return type works as follows:
     # - If arg is a read-write buffer, return int if mutate_flag is True, otherwise bytes

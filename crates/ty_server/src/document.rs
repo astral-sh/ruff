@@ -5,13 +5,15 @@ mod notebook;
 mod range;
 mod text_document;
 
-use lsp_types::{PositionEncodingKind, Url};
+use lsp_types::{PositionEncodingKind, Uri};
 use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 
 use crate::system::AnySystemPath;
 pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
-pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
+pub(crate) use range::{
+    FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt, resolve_file_uri_range,
+};
 pub use text_document::TextDocument;
 pub(crate) use text_document::{DocumentVersion, LanguageId};
 
@@ -40,7 +42,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
     }
 }
 
-/// A unique document ID, derived from a URL passed as part of an LSP request.
+/// A unique document ID, derived from a URI passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 ///
 /// The `DocumentKey` is very similar to `AnySystemPath`. The important distinction is that
@@ -63,24 +65,24 @@ pub(super) enum DocumentKey {
 }
 
 impl DocumentKey {
-    /// Converts the given [`Url`] to an [`DocumentKey`].
+    /// Converts the given [`Uri`] to an [`DocumentKey`].
     ///
-    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
-    /// the url isn't a valid file path.
+    /// If the URI scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
+    /// the uri isn't a valid file path.
     ///
-    /// In all other cases, the URL is kept as an opaque identifier ([`Self::Opaque`]).
-    pub(crate) fn from_url(url: &Url) -> Self {
-        if url.scheme() == "file" {
-            if let Ok(path) = url.to_file_path() {
-                Self::File(SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8"))
+    /// In all other cases, the URI is kept as an opaque identifier ([`Self::Opaque`]).
+    pub(crate) fn from_uri(uri: &Uri) -> Self {
+        if uri.scheme() == "file" {
+            if let Ok(path) = uri.to_file_path() {
+                Self::File(SystemPathBuf::from_path_buf(path).expect("URI to be valid UTF-8"))
             } else {
                 tracing::warn!(
-                    "Treating `file:` url `{url}` as opaque URL as it isn't a valid file path"
+                    "Treating `file:` uri `{uri}` as opaque URI as it isn't a valid file path"
                 );
-                Self::Opaque(url.to_string())
+                Self::Opaque(uri.to_string())
             }
         } else {
-            Self::Opaque(url.to_string())
+            Self::Opaque(uri.to_string())
         }
     }
 

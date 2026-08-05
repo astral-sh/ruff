@@ -3,8 +3,12 @@ use crate::{
     types::{
         KnownInstanceType, Signature, Type, TypeVarKind,
         context::InferContext,
-        diagnostic::{INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT},
-        function::OverloadLiteral,
+        diagnostic::{
+            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT,
+            UNBOUND_TYPE_VARIABLE,
+        },
+        function::{FunctionDecorators, OverloadLiteral},
+        generics::GenericContext,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -27,17 +31,97 @@ pub(crate) fn check_function_definition<'db>(
 ) {
     let db = context.db();
 
-    let Some(function_type) = infer_definition_types(db, definition).function_type(definition)
+    let Some(function_type) =
+        infer_definition_types(context.db(), definition).function_type(definition)
     else {
         return;
     };
 
     let last_definition = function_type.literal(db).last_definition;
+    if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
+        return;
+    }
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);
+    check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+}
+
+/// Check that a function using PEP 695 syntax does not also introduce legacy type variables.
+fn check_pep695_function_legacy_typevars<'db>(
+    context: &InferContext<'db, '_>,
+    last_definition: OverloadLiteral<'db>,
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+) {
+    let db = context.db();
+    let node = last_definition.node(db, context.file(), context.module());
+    let Some(type_params) = node.type_params.as_deref() else {
+        return;
+    };
+    let env = context.program_environment();
+    let mut has_legacy_default = false;
+    for default in type_params.iter().filter_map(ast::TypeParam::default) {
+        let Some(typevar) = find_over_type(db, env, file_expression_type(default), false, |ty| {
+            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                && matches!(
+                    typevar.kind(db),
+                    TypeVarKind::LegacyTypeVar
+                        | TypeVarKind::Pep613Alias
+                        | TypeVarKind::LegacyParamSpec
+                )
+            {
+                Some(typevar)
+            } else {
+                None
+            }
+        }) else {
+            continue;
+        };
+
+        report_pep695_function_legacy_typevar(context, typevar, default.range());
+        has_legacy_default = true;
+    }
+    if has_legacy_default {
+        return;
+    }
+
+    let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+    let Some(definition) = signature.definition() else {
+        return;
+    };
+    let Some(legacy_context) = GenericContext::from_function_params(
+        db,
+        definition,
+        signature.parameters(),
+        signature.return_ty,
+    ) else {
+        return;
+    };
+
+    for typevar in legacy_context
+        .variables(db)
+        .map(|typevar| typevar.typevar(db))
+        .filter(|typevar| !typevar.is_self(db))
+    {
+        let range = find_typevar_annotation_range(context, node, typevar, file_expression_type);
+        report_pep695_function_legacy_typevar(context, typevar, range);
+    }
+}
+
+fn report_pep695_function_legacy_typevar<'db>(
+    context: &InferContext<'db, '_>,
+    typevar: TypeVarInstance<'db>,
+    range: TextRange,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&UNBOUND_TYPE_VARIABLE, range) {
+        builder.into_diagnostic(format_args!(
+            "Legacy type variable `{}` cannot be used in a function with PEP 695 type parameters",
+            typevar.name(db),
+        ));
+    }
 }
 
 /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
@@ -79,7 +163,7 @@ fn check_legacy_positional_only_convention<'db>(
                 "Invalid use of the legacy convention \
                     for positional-only parameters",
             );
-            diagnostic.set_primary_message(
+            diagnostic.set_primary_annotation_message(
                 "Parameter name begins with `__` but will not be treated as positional-only",
             );
             diagnostic.info(
@@ -116,6 +200,8 @@ fn check_legacy_typevar_defaults<'db>(
         return;
     };
 
+    let env = context.program_environment();
+
     let typevars = generic_context
         .variables(db)
         .map(|bound_tvar| bound_tvar.typevar(db));
@@ -125,16 +211,19 @@ fn check_legacy_typevar_defaults<'db>(
         // by `check_default_for_outer_scope_typevars` in the type parameter scope.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::LegacyTypeVar
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::LegacyParamSpec
+                | TypeVarKind::LegacyTypeVarTuple
         ) {
             continue;
         }
 
-        let Some(default_ty) = typevar.default_type(db) else {
+        let Some(default_ty) = typevar.default_type(db, env) else {
             continue;
         };
 
-        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+        let first_bad_tvar = find_over_type(db, env, default_ty, false, |t| {
             let tvar = match t {
                 Type::TypeVar(tvar) => tvar.typevar(db),
                 Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
@@ -167,7 +256,7 @@ fn check_legacy_typevar_defaults<'db>(
         ));
 
         if is_later_in_list {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Default of `{typevar_name}` references later type parameter `{}`",
                 bad_typevar.name(db),
             ));
@@ -177,7 +266,7 @@ fn check_legacy_typevar_defaults<'db>(
                 bad_typevar.name(db)
             ));
         } else {
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Default of `{typevar_name}` references out-of-scope type variable `{}`",
                 bad_typevar.name(db),
             ));
@@ -189,11 +278,11 @@ fn check_legacy_typevar_defaults<'db>(
         }
 
         if let Some(typevar_definition) = typevar.definition(db) {
-            let file = typevar_definition.file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(typevar_definition.full_range(
+                    db,
+                    &parsed_module(db, typevar_definition.python_file(db)).load(db),
+                )))
                 .message(format_args!("`{typevar_name}` defined here")),
             );
         }
@@ -209,13 +298,14 @@ fn find_typevar_annotation_range<'db>(
     file_expression_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> TextRange {
     let db = context.db();
+    let env = context.program_environment();
     let typevar_id = typevar.identity(db);
 
     node.parameters
         .iter()
         .filter_map(ast::AnyParameterRef::annotation)
         .chain(node.returns.as_deref())
-        .find(|ann| file_expression_type(ann).references_typevar(db, typevar_id))
+        .find(|ann| file_expression_type(ann).references_typevar(db, env, typevar_id))
         .map(Ranged::range)
         .unwrap_or_else(|| node.name.range())
 }
@@ -242,6 +332,8 @@ fn check_legacy_typevar_ordering<'db>(
         return;
     };
 
+    let env = context.program_environment();
+
     let mut state: Option<State<'db>> = None;
 
     for bound_typevar in generic_context.variables(db) {
@@ -250,12 +342,15 @@ fn check_legacy_typevar_ordering<'db>(
         // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::LegacyTypeVar
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::LegacyParamSpec
+                | TypeVarKind::LegacyTypeVarTuple
         ) {
             continue;
         }
 
-        let has_default = typevar.default_type(db).is_some();
+        let has_default = typevar.default_type(db, env).is_some();
 
         if let Some(state) = state.as_mut() {
             if !has_default {
@@ -303,14 +398,14 @@ fn check_legacy_typevar_ordering<'db>(
     ));
 
     if let [single_typevar] = &*state.invalid_later_tvars {
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variable `{}` does not have a default",
             single_typevar.name(db),
         ));
     } else {
         let later_typevars =
             format_enumeration(state.invalid_later_tvars.iter().map(|tv| tv.name(db)));
-        diagnostic.set_primary_message(format_args!(
+        diagnostic.set_primary_annotation_message(format_args!(
             "Type variables {later_typevars} do not have defaults",
         ));
     }
@@ -330,10 +425,9 @@ fn check_legacy_typevar_ordering<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
+                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
             ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );

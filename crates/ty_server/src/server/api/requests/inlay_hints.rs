@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 use std::time::Instant;
 
-use lsp_types::request::InlayHintRequest;
-use lsp_types::{InlayHintParams, Url};
+use lsp_types::InlayHintRequest;
+use lsp_types::{InlayHintParams, Uri};
 use ruff_db::files::File;
 use ty_ide::{InlayHintKind, InlayHintLabel, InlayHintTextEdit, inlay_hints};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
 use crate::document::{RangeExt, TextSizeExt, ToLink};
@@ -22,7 +22,7 @@ impl RequestHandler for InlayHintRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
-    fn document_url(params: &InlayHintParams) -> Cow<'_, Url> {
+    fn document_uri(params: &InlayHintParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -46,12 +46,17 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
 
         let Some(range) = params
             .range
-            .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+            .to_text_range(db, file, snapshot.uri(), snapshot.encoding())
         else {
             return Ok(None);
         };
 
-        let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
+        let inlay_hints = inlay_hints(
+            db,
+            db.program_file(file),
+            range,
+            workspace_settings.inlay_hints(),
+        );
 
         let inlay_hints: Vec<lsp_types::InlayHint> = inlay_hints
             .into_iter()
@@ -93,8 +98,8 @@ impl RetriableRequestHandler for InlayHintRequestHandler {}
 
 fn inlay_hint_kind(inlay_hint_kind: &InlayHintKind) -> lsp_types::InlayHintKind {
     match inlay_hint_kind {
-        InlayHintKind::Type => lsp_types::InlayHintKind::TYPE,
-        InlayHintKind::CallArgumentName => lsp_types::InlayHintKind::PARAMETER,
+        InlayHintKind::Type => lsp_types::InlayHintKind::Type,
+        InlayHintKind::CallArgumentName => lsp_types::InlayHintKind::Parameter,
     }
 }
 
@@ -102,7 +107,7 @@ fn inlay_hint_label(
     inlay_hint_label: &InlayHintLabel,
     db: &ProjectDatabase,
     encoding: PositionEncoding,
-) -> lsp_types::InlayHintLabel {
+) -> lsp_types::Label {
     let mut label_parts = Vec::new();
     for part in inlay_hint_label.parts() {
         label_parts.push(lsp_types::InlayHintLabelPart {
@@ -114,7 +119,7 @@ fn inlay_hint_label(
             command: None,
         });
     }
-    lsp_types::InlayHintLabel::LabelParts(label_parts)
+    lsp_types::Label::InlayHintLabelPartList(label_parts)
 }
 
 fn inlay_hint_text_edit(

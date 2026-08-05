@@ -45,4 +45,3 @@ B029 Using `except* ():` with an empty tuple does not catch anything; add except
 23 | / except* () as e:
 24 | |     pass
    | |________^
-   |

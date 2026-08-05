@@ -296,6 +296,26 @@ foo = Foo()
 foo.bar(b"wat")  # error: [no-matching-overload]
 ```
 
+## An explicit `__get__` call on an overloaded function
+
+The overloads used to bind `__get__` are synthesized separately from the declarations of `f`.
+Diagnostics should still show every overload declaration of `f`.
+
+```py
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+@overload
+def f(x: bytes) -> bytes: ...
+def f(x: int | str | bytes) -> int | str | bytes:
+    return x
+
+f.__get__()  # error: [no-matching-overload]
+```
+
 ## A class constructor with unmatched overloads
 
 TODO: At time of writing (2025-05-15), this has non-ideal diagnostics that doesn't show the

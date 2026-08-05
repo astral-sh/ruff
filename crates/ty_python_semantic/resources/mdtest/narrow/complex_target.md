@@ -7,7 +7,7 @@ We support type narrowing for attributes and subscripts.
 ### Basic
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class C:
     x: int | None = None
@@ -363,6 +363,33 @@ def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
         reveal_type(x)  # revealed: tuple[Literal["b"], B]
     else:
         reveal_type(x)  # revealed: tuple[Literal["a"], A]
+```
+
+Enum literals are supported as tuple tags, including `IntEnum` literals:
+
+```py
+from enum import Enum, IntEnum
+from typing import Literal
+
+class Tag(Enum):
+    A = 1
+    B = 2
+
+def _(x: tuple[Literal[Tag.A], int] | tuple[Literal[Tag.B], str]):
+    if x[0] == Tag.A:
+        reveal_type(x)  # revealed: tuple[Literal[Tag.A], int]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[Tag.B], str]
+
+class IntTag(IntEnum):
+    A = 1
+    B = 2
+
+def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[IntTag.B], str]):
+    if x[0] == IntTag.A:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.A], int]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.B], str]
 ```
 
 Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the

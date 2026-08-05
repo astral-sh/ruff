@@ -1,8 +1,6 @@
-/*!
-A simple command line tool for running a completion evaluation.
-
-See `crates/ty_completion_eval/README.md` for examples and more docs.
-*/
+//! A simple command line tool for running a completion evaluation.
+//!
+//! See `crates/ty_completion_eval/README.md` for examples and more docs.
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -14,12 +12,12 @@ use regex::bytes::Regex;
 
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ty_ide::Completion;
+use ty_ide::{Completion, CompletionCapabilities};
 use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -282,14 +280,13 @@ impl Task {
         let system = OsSystem::new(project_path);
         let mut project_metadata = ProjectMetadata::discover(project_path, &system)?;
         // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
-        project_metadata.apply_options(Options {
+        project_metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python: Some(RelativePathBuf::cli(".venv")),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
         });
-        project_metadata.apply_configuration_files(&system)?;
         let db = ProjectDatabase::fallible(project_metadata, system)?;
         Ok(Task {
             db,
@@ -329,7 +326,13 @@ impl Task {
                 self.cursor.offset
             )
         })?;
-        let completions = ty_ide::completion(&self.db, &self.settings, file, offset);
+        let completions = ty_ide::completion(
+            &self.db,
+            &self.settings,
+            CompletionCapabilities::default(),
+            self.db.program_file(file),
+            offset,
+        );
         Ok(completions)
     }
 
@@ -377,6 +380,7 @@ impl From<&CompletionSettings> for ty_ide::CompletionSettings {
     fn from(x: &CompletionSettings) -> ty_ide::CompletionSettings {
         ty_ide::CompletionSettings {
             auto_import: x.auto_import,
+            ..ty_ide::CompletionSettings::default()
         }
     }
 }

@@ -3,60 +3,104 @@ use std::fmt::{Debug, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
+use arrayvec::ArrayVec;
+use char_str::{CharStr, CharString};
+
 use crate::Expr;
 use crate::generated::ExprName;
 
+/// An immutable name.
+///
+/// # Choosing a string representation
+///
+/// On 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer
+/// values use an exactly-sized, reference-counted allocation, so cloning a heap-backed value
+/// reuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes
+/// inline, and remains mutable; cloning a heap-backed value copies its contents into a new
+/// allocation.
+///
+/// Prefer `CharStr` for immutable text that is retained densely or passed between owners, when
+/// either the smaller handle or structural sharing offsets the extra heap allocations for values
+/// between 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is
+/// built incrementally, mutated, or commonly falls in that 17-to-24-byte range.
+///
+/// `Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser
+/// names share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it
+/// builds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses
+/// `CompactString` because module names can be extended in place.
+///
+/// Converting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural
+/// sharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone
+/// the owned value rather than converting it through `&str`. This is especially relevant at Salsa
+/// interning boundaries.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature = "salsa", derive(salsa::SalsaValue))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
-#[cfg_attr(feature = "salsa", derive(salsa::Update))]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[cfg_attr(
     feature = "schemars",
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(compact_str::CompactString);
+pub struct Name(CharStr);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(compact_str::CompactString::default())
+        Self(CharStr::new())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(compact_str::CompactString::new(name))
+        Self(CharStr::from(name.as_ref()))
+    }
+
+    /// Creates an inline name, returning `None` if `name` does not fit inline.
+    #[inline]
+    pub fn new_inline(name: impl AsRef<str>) -> Option<Self> {
+        CharStr::new_inline(name.as_ref()).map(Self)
+    }
+
+    /// Creates an exactly-sized, heap-allocated name.
+    #[inline]
+    pub fn new_heap(name: impl AsRef<str>) -> Self {
+        Self(CharStr::new_heap(name.as_ref()))
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(compact_str::CompactString::const_new(name))
+        Self(CharStr::from_static_str(name))
     }
 
-    pub fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
+    /// Creates an exactly-sized name by concatenating string slices.
+    ///
+    /// The combined length is computed up front, so heap storage is allocated at most once.
+    #[inline]
+    pub fn concat<T: AsRef<str>>(slices: &[T]) -> Self {
+        Self(CharStr::concat(slices))
     }
 
+    /// Creates an exactly-sized name by joining string slices with a separator.
+    ///
+    /// Like [`Name::concat`], this computes the combined length up front, so heap storage is
+    /// allocated at most once. For dynamically formatted names, use [`Name::from`] with
+    /// [`format_char!`](char_str::format_char). If a [`CharStr`] is sufficient, use
+    /// [`format_char_str!`](char_str::format_char_str) instead.
+    #[inline]
+    pub fn join<T: AsRef<str>>(slices: &[T], separator: &str) -> Self {
+        Self(CharStr::join(slices, separator))
+    }
+
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
-    }
-
-    pub fn push_str(&mut self, s: &str) {
-        self.0.push_str(s);
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
-    }
-}
-
-impl std::fmt::Write for Name {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.push_str(s);
-        Ok(())
     }
 }
 
@@ -86,7 +130,7 @@ impl Borrow<str> for Name {
 impl<'a> From<&'a str> for Name {
     #[inline]
     fn from(s: &'a str) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
@@ -100,7 +144,7 @@ impl From<String> for Name {
 impl<'a> From<&'a String> for Name {
     #[inline]
     fn from(s: &'a String) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
@@ -118,24 +162,87 @@ impl From<Box<str>> for Name {
     }
 }
 
-impl From<compact_str::CompactString> for Name {
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<Name> for &str {
     #[inline]
-    fn from(value: compact_str::CompactString) -> Self {
-        Self(value)
+    fn into_owned(self) -> Name {
+        Name::new(self)
     }
 }
 
-impl From<Name> for compact_str::CompactString {
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<&str> for Name {
     #[inline]
-    fn from(name: Name) -> Self {
-        name.0
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &&str) -> bool {
+        self.as_str() == *data
     }
 }
 
 impl From<Name> for String {
     #[inline]
     fn from(name: Name) -> Self {
-        name.as_str().into()
+        name.0.into()
+    }
+}
+
+impl From<Name> for CharStr {
+    #[inline]
+    fn from(name: Name) -> Self {
+        name.0
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<compact_str::CompactString> for Name {
+    #[inline]
+    fn into_owned(self) -> compact_str::CompactString {
+        compact_str::CompactString::new(self.as_str())
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::Lookup<compact_str::CompactString> for &Name {
+    #[inline]
+    fn into_owned(self) -> compact_str::CompactString {
+        compact_str::CompactString::new(self.as_str())
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<Name> for compact_str::CompactString {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(self, state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &Name) -> bool {
+        self.as_str() == data.as_str()
+    }
+}
+
+#[cfg(feature = "salsa")]
+impl salsa::HashEqLike<&Name> for compact_str::CompactString {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(self, state);
+    }
+
+    #[inline]
+    fn eq(&self, data: &&Name) -> bool {
+        self.as_str() == data.as_str()
+    }
+}
+
+impl From<CharString> for Name {
+    #[inline]
+    fn from(name: CharString) -> Self {
+        Self(name.freeze())
     }
 }
 
@@ -241,7 +348,7 @@ impl<'a> QualifiedName<'a> {
     #[inline]
     pub fn builtin(name: &'a str) -> Self {
         debug_assert!(!name.contains('.'));
-        Self(SegmentsVec::Stack(SegmentsStack::from_slice(&["", name])))
+        Self(SegmentsVec::from_slice(&["", name]))
     }
 
     #[inline]
@@ -347,7 +454,7 @@ impl<'a> QualifiedNameBuilder<'a> {
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
 
@@ -357,7 +464,7 @@ impl<'a> QualifiedNameBuilder<'a> {
     }
 
     #[inline]
-    pub fn pop(&mut self) {
+    pub(crate) fn pop(&mut self) {
         self.segments.pop();
     }
 
@@ -367,7 +474,7 @@ impl<'a> QualifiedNameBuilder<'a> {
     }
 
     #[inline]
-    pub fn extend_from_slice(&mut self, segments: &[&'a str]) {
+    pub(crate) fn extend_from_slice(&mut self, segments: &[&'a str]) {
         self.segments.extend_from_slice(segments);
     }
 
@@ -531,7 +638,7 @@ impl<'a> UnqualifiedName<'a> {
     }
 
     #[inline]
-    pub fn from_slice(segments: &[&'a str]) -> Self {
+    fn from_slice(segments: &[&'a str]) -> Self {
         Self(SegmentsVec::from_slice(segments))
     }
 
@@ -568,9 +675,9 @@ impl<'a> FromIterator<&'a str> for UnqualifiedName<'a> {
 /// Stores up to 8 segments inline, and falls back to a heap-allocated vector for names with more segments.
 ///
 /// ## Note
-/// The implementation doesn't use `SmallVec` v1 because its type definition has a variance problem.
-/// The incorrect variance leads the lifetime inference in the `SemanticModel` astray, causing
-/// all sort of "strange" lifetime errors. We can switch back to `SmallVec` when v2 is released.
+/// The inline variant uses `ArrayVec` rather than `SmallVec` v1 because `SmallVec`'s type
+/// definition has a variance problem. The incorrect variance leads lifetime inference in the
+/// `SemanticModel` astray, causing all sorts of "strange" lifetime errors.
 #[derive(Clone)]
 enum SegmentsVec<'a> {
     Stack(SegmentsStack<'a>),
@@ -600,10 +707,9 @@ impl<'a> SegmentsVec<'a> {
     /// Initializes the segments from a slice.
     #[inline]
     fn from_slice(slice: &[&'a str]) -> Self {
-        if slice.len() <= SMALL_LEN {
-            SegmentsVec::Stack(SegmentsStack::from_slice(slice))
-        } else {
-            SegmentsVec::Heap(slice.to_vec())
+        match SegmentsStack::try_from(slice) {
+            Ok(stack) => SegmentsVec::Stack(stack),
+            Err(_) => SegmentsVec::Heap(slice.to_vec()),
         }
     }
 
@@ -623,7 +729,10 @@ impl<'a> SegmentsVec<'a> {
     fn push(&mut self, name: &'a str) {
         match self {
             SegmentsVec::Stack(stack) => {
-                if let Err(segments) = stack.push(name) {
+                if let Err(error) = stack.try_push(name) {
+                    let mut segments = Vec::with_capacity(stack.len() * 2);
+                    segments.extend(stack.iter().copied());
+                    segments.push(error.element());
                     *self = SegmentsVec::Heap(segments);
                 }
             }
@@ -648,7 +757,10 @@ impl<'a> SegmentsVec<'a> {
     fn extend_from_slice(&mut self, slice: &[&'a str]) {
         match self {
             SegmentsVec::Stack(stack) => {
-                if let Err(segments) = stack.extend_from_slice(slice) {
+                if stack.try_extend_from_slice(slice).is_err() {
+                    let mut segments = Vec::with_capacity(stack.len() + slice.len());
+                    segments.extend(stack.iter().copied());
+                    segments.extend_from_slice(slice);
                     *self = SegmentsVec::Heap(segments);
                 }
             }
@@ -702,10 +814,7 @@ impl<'a> FromIterator<&'a str> for SegmentsVec<'a> {
 impl<'a> From<[&'a str; 8]> for SegmentsVec<'a> {
     #[inline]
     fn from(segments: [&'a str; 8]) -> Self {
-        SegmentsVec::Stack(SegmentsStack {
-            segments,
-            len: segments.len(),
-        })
+        SegmentsVec::Stack(SegmentsStack::from(segments))
     }
 }
 
@@ -721,8 +830,26 @@ impl<'a> Extend<&'a str> for SegmentsVec<'a> {
     fn extend<T: IntoIterator<Item = &'a str>>(&mut self, iter: T) {
         match self {
             SegmentsVec::Stack(stack) => {
-                if let Err(segments) = stack.extend(iter) {
+                let mut iter = iter.into_iter();
+                let (lower, _) = iter.size_hint();
+
+                if lower > stack.remaining_capacity() {
+                    let mut segments = Vec::with_capacity(stack.len() + lower);
+                    segments.extend(stack.iter().copied());
+                    segments.extend(iter);
                     *self = SegmentsVec::Heap(segments);
+                    return;
+                }
+
+                while let Some(name) = iter.next() {
+                    if let Err(error) = stack.try_push(name) {
+                        let mut segments = Vec::with_capacity(stack.len() * 2);
+                        segments.extend(stack.iter().copied());
+                        segments.push(error.element());
+                        segments.extend(iter);
+                        *self = SegmentsVec::Heap(segments);
+                        return;
+                    }
                 }
             }
             SegmentsVec::Heap(heap) => {
@@ -733,133 +860,32 @@ impl<'a> Extend<&'a str> for SegmentsVec<'a> {
 }
 
 const SMALL_LEN: usize = 8;
-
-#[derive(Debug, Clone, Default)]
-struct SegmentsStack<'a> {
-    segments: [&'a str; SMALL_LEN],
-    len: usize,
-}
-
-impl<'a> SegmentsStack<'a> {
-    #[inline]
-    fn from_slice(slice: &[&'a str]) -> Self {
-        assert!(slice.len() <= SMALL_LEN);
-
-        let mut segments: [&'a str; SMALL_LEN] = Default::default();
-        segments[..slice.len()].copy_from_slice(slice);
-        SegmentsStack {
-            segments,
-            len: slice.len(),
-        }
-    }
-
-    const fn capacity(&self) -> usize {
-        SMALL_LEN - self.len
-    }
-
-    #[inline]
-    fn as_slice(&self) -> &[&'a str] {
-        &self.segments[..self.len]
-    }
-
-    /// Pushes `name` to the end of the segments.
-    ///
-    /// Returns `Err` with a `Vec` containing all items (including `name`) if there's not enough capacity to push the name.
-    #[inline]
-    fn push(&mut self, name: &'a str) -> Result<(), Vec<&'a str>> {
-        if self.len < self.segments.len() {
-            self.segments[self.len] = name;
-            self.len += 1;
-            Ok(())
-        } else {
-            let mut segments = Vec::with_capacity(self.len * 2);
-            segments.extend_from_slice(&self.segments);
-            segments.push(name);
-            Err(segments)
-        }
-    }
-
-    /// Reserves spaces for `additional` segments.
-    ///
-    /// Returns `Err` with a `Vec` containing all segments and a capacity to store `additional` segments if
-    /// the stack needs to spill over to the heap to store `additional` segments.
-    #[inline]
-    fn reserve(&mut self, additional: usize) -> Result<(), Vec<&'a str>> {
-        if self.capacity() >= additional {
-            Ok(())
-        } else {
-            let mut segments = Vec::with_capacity(self.len + additional);
-            segments.extend_from_slice(self.as_slice());
-            Err(segments)
-        }
-    }
-
-    #[inline]
-    fn pop(&mut self) -> Option<&'a str> {
-        if self.len > 0 {
-            self.len -= 1;
-            Some(self.segments[self.len])
-        } else {
-            None
-        }
-    }
-
-    /// Extends the segments by appending `slice` to the end.
-    ///
-    /// Returns `Err` with a `Vec` containing all segments and the segments in `slice` if there's not enough capacity to append the names.
-    #[inline]
-    fn extend_from_slice(&mut self, slice: &[&'a str]) -> Result<(), Vec<&'a str>> {
-        let new_len = self.len + slice.len();
-        if slice.len() <= self.capacity() {
-            self.segments[self.len..new_len].copy_from_slice(slice);
-            self.len = new_len;
-            Ok(())
-        } else {
-            let mut segments = Vec::with_capacity(new_len);
-            segments.extend_from_slice(self.as_slice());
-            segments.extend_from_slice(slice);
-            Err(segments)
-        }
-    }
-
-    #[inline]
-    fn extend<I>(&mut self, iter: I) -> Result<(), Vec<&'a str>>
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        let mut iter = iter.into_iter();
-        let (lower, _) = iter.size_hint();
-
-        // There's not enough space to store the lower bound of items. Spill to the heap.
-        if let Err(mut segments) = self.reserve(lower) {
-            segments.extend(iter);
-            return Err(segments);
-        }
-
-        // Copy over up to capacity items
-        for name in iter.by_ref().take(self.capacity()) {
-            self.segments[self.len] = name;
-            self.len += 1;
-        }
-
-        let Some(item) = iter.next() else {
-            // There are no more items to copy over and they all fit into capacity.
-            return Ok(());
-        };
-
-        // There are more items and there's not enough capacity to store them on the stack.
-        // Spill over to the heap and append the remaining items.
-        let mut segments = Vec::with_capacity(self.len * 2);
-        segments.extend_from_slice(self.as_slice());
-        segments.push(item);
-        segments.extend(iter);
-        Err(segments)
-    }
-}
+type SegmentsStack<'a> = ArrayVec<&'a str, SMALL_LEN>;
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "salsa")]
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
+    #[cfg(feature = "salsa")]
+    use crate::name::Name;
     use crate::name::SegmentsVec;
+
+    #[cfg(feature = "salsa")]
+    #[test]
+    fn salsa_lookup_name_from_str() {
+        let name = Name::new("member");
+        let lookup = "member";
+
+        let mut name_hasher = DefaultHasher::new();
+        salsa::HashEqLike::<&str>::hash(&name, &mut name_hasher);
+        let mut lookup_hasher = DefaultHasher::new();
+        lookup.hash(&mut lookup_hasher);
+
+        assert_eq!(name_hasher.finish(), lookup_hasher.finish());
+        assert!(salsa::HashEqLike::<&str>::eq(&name, &lookup));
+        assert_eq!(salsa::Lookup::<Name>::into_owned(lookup), name);
+    }
 
     #[test]
     fn empty_vec() {

@@ -50,7 +50,8 @@ pub(crate) fn check(
         if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
             matches!(
                 SourceType::from(path),
-                SourceType::Python(_) | SourceType::Toml(TomlSourceType::Pyproject)
+                SourceType::Python(_)
+                    | SourceType::Toml(TomlSourceType::Pyproject | TomlSourceType::Ruff)
             )
         } else {
             true

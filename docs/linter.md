@@ -141,6 +141,9 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
+When [preview mode](preview.md) is enabled, rule selectors also accept the human-readable name of a
+rule (e.g., `unused-import`).
+
 ## Fixes
 
 Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused
@@ -289,8 +292,12 @@ see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting.
 
 ### Comments
 
-Ruff supports multiple forms of suppression comments, including inline and file-level `noqa`
-comments, and range suppressions.
+Ruff supports multiple forms of suppression comments, including inline and file-level `noqa` and
+`ruff: ignore` comments, and range suppressions.
+
+In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in `ruff: ignore`,
+`ruff: file-ignore`, `ruff: disable`, and `ruff: enable` comments instead of rule codes (e.g.
+`F401`).
 
 #### Line-level
 
@@ -340,8 +347,6 @@ The full inline comment specification is as follows:
   list ends at the last valid code. We will attempt to interpret rules with a
   missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
   case.
-
-*The following is currently only available in [preview mode](`preview.md`).*
 
 To cover an entire "logical" line (a multi-line statement or suite header),
 an "ignore" comment may be placed above the first line:
@@ -393,10 +398,10 @@ The full line-level suppression comment specification is as follows:
 
 - An own-line or trailing comment starting with case sensitive `#ruff:`, with
   optional whitespace after the `#` symbol and `:` symbol, followed by `ignore[`,
-  any codes to be suppressed, and ending with `]`.
-- Codes to be suppressed must be separated by commas, with optional whitespace
-  before or after each code, and may be followed by an optional trailing comma
-  after the last code.
+  any rules to be suppressed, and ending with `]`.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
 
 
 #### Block-level
@@ -490,9 +495,8 @@ The file-level suppression comment specification is as follows:
   optional whitespace and a case-insensitive match for `noqa`. After this, the
   specification is as in the inline `noqa` suppressions above.
 
-In [`preview`](preview.md) mode, one or more rules can be ignored across an
-entire file with a `file-ignore` comment on its own line, at global module scope,
-and preferably near the top of the file:
+One or more rules can also be ignored across an entire file with a `file-ignore` comment on its own
+line, at global module scope, and preferably near the top of the file:
 
 ```python
 # ruff: file-ignore[F401, ARG001]
@@ -501,11 +505,11 @@ and preferably near the top of the file:
 The full-level suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
-  after the `#` symbol and `:` symbol, followed by `file-ignore[`, any codes to
+  after the `#` symbol and `:` symbol, followed by `file-ignore[`, any rules to
   be suppressed, and ending with `]`.
-- Codes to be suppressed must be separated by commas, with optional whitespace
-  before or after each code, and may be followed by an optional trailing comma
-  after the last code.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
 
 ### Detecting unused suppressions
 
@@ -527,13 +531,18 @@ $ ruff check /path/to/file.py --extend-select RUF100 --fix
 
 ### Inserting necessary suppression comments
 
-Ruff can _automatically add_ `noqa` directives to all lines that contain violations, which is
-useful when migrating a new codebase to Ruff. To automatically add `noqa` directives to all
-relevant lines (with the appropriate rule codes), run Ruff with `--add-noqa`, like so:
+Ruff can _automatically add_ suppression comments to all lines that contain violations, which is
+useful when migrating a new codebase to Ruff. To add the appropriate comments to all relevant lines,
+run Ruff with `--add-noqa` to add `noqa` comments or with `--add-ignore` to add `ruff: ignore`
+comments:
 
 ```shell-session
 $ ruff check /path/to/file.py --add-noqa
+$ ruff check /path/to/file.py --add-ignore
 ```
+
+Both of these flags use rule codes on stable. To add `ruff: ignore` comments with human-readable
+rule names instead, use `--add-ignore` with preview mode enabled.
 
 ### isort action comments
 

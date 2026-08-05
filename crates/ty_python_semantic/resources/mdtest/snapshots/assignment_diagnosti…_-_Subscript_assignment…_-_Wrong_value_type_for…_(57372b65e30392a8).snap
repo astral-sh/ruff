@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -27,7 +27,6 @@ error[invalid-assignment]: Invalid subscript assignment with key of type `Litera
   |     ^^^^^^^^^^^^^^^^^^^^-
   |                         |
   |                         Expected value of type `str`, got `Literal[3]`
-  |
 info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
 
 ```

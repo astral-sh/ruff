@@ -4,9 +4,7 @@ use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
-use crate::metadata::value::{
-    RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
-};
+use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use anyhow::Context;
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
@@ -20,6 +18,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -78,7 +77,9 @@ pub struct Options {
     /// * `ignore`: Disable the rule.
     /// * `warn`: Enable the rule and create a warning diagnostic.
     /// * `error`: Enable the rule and create an error diagnostic.
-    ///   ty will exit with a non-zero code if any error diagnostics are emitted.
+    ///
+    /// By default, ty exits with code 1 if it emits any warning or error diagnostics.
+    /// Set `terminal.error-on-warning` to `false` to exit with code 0 if all diagnostics have `warning` severity.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
@@ -110,6 +111,13 @@ pub struct Options {
 }
 
 impl Options {
+    pub(super) fn file_options(&self) -> FileOptions {
+        FileOptions {
+            rules: self.rules.clone(),
+            analysis: self.analysis.clone(),
+        }
+    }
+
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
@@ -189,6 +197,7 @@ impl Options {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
                 ValueSource::Editor => SysPrefixPathOrigin::Editor,
+                ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
             };
 
             PythonEnvironment::new(python_path.absolute(project_root, system), origin, system)
@@ -298,14 +307,8 @@ impl Options {
         strategy: &Strategy,
     ) -> Result<SearchPaths, Strategy::Error<SearchPathSettingsError>> {
         let environment = self.environment.or_default();
-        let src = self.src.or_default();
 
-        #[allow(deprecated)]
-        let src_roots = if let Some(roots) = environment
-            .root
-            .as_deref()
-            .or_else(|| Some(std::slice::from_ref(src.root.as_ref()?)))
-        {
+        let environment_roots = if let Some(roots) = environment.root.as_deref() {
             roots
                 .iter()
                 .map(|root| root.absolute(project_root, system))
@@ -401,7 +404,7 @@ impl Options {
 
         let settings = SearchPathSettings {
             extra_paths,
-            src_roots,
+            src_roots: environment_roots,
             custom_typeshed: environment
                 .typeshed
                 .as_ref()
@@ -429,38 +432,10 @@ impl Options {
                 .as_deref()
                 .copied()
                 .unwrap_or_default(),
-            error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
+            error_on_warning: terminal_options.error_on_warning.unwrap_or(true),
         };
 
         let src_options = self.src.or_default();
-
-        #[allow(deprecated)]
-        if let Some(src_root) = src_options.root.as_ref() {
-            let mut diagnostic = OptionDiagnostic::new(
-                DiagnosticId::DeprecatedSetting,
-                "The `src.root` setting is deprecated. Use `environment.root` instead.".to_string(),
-                Severity::Warning,
-            );
-
-            if let Some(file) = src_root
-                .source()
-                .file()
-                .and_then(|path| system_path_to_file(db, path).ok())
-            {
-                diagnostic = diagnostic.with_annotation(Some(Annotation::primary(
-                    Span::from(file).with_optional_range(src_root.range()),
-                )));
-            }
-
-            if self.environment.or_default().root.is_some() {
-                diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    "The `src.root` setting was ignored in favor of the `environment.root` setting",
-                ));
-            }
-
-            diagnostics.push(diagnostic);
-        }
 
         let src = src_options
             .to_settings(db, project_root, &mut diagnostics)
@@ -557,6 +532,7 @@ fn python_version_from_config(
                 PythonVersionFileSource::new(path.clone(), ranged_version.range()),
             ),
             ValueSource::Editor => PythonVersionSource::Editor,
+            ValueSource::UvWorkspace => PythonVersionSource::UvWorkspace,
         },
     }
 }
@@ -603,7 +579,7 @@ pub enum ProgramSettingsDiagnostic {
 
 impl ProgramSettingsDiagnostic {
     /// Convert this program-settings diagnostic into a diagnostic that can be stored on a project.
-    pub(crate) fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
+    pub fn into_diagnostic(self, db: &dyn Db) -> OptionDiagnostic {
         match self {
             Self::UnsupportedInferredPythonVersion(python_version) => {
                 unsupported_inferred_python_version_diagnostic(db, &python_version)
@@ -677,6 +653,10 @@ fn unsupported_inferred_python_version_diagnostic(
         PythonVersionSource::Editor => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
+        )),
+        PythonVersionSource::UvWorkspace => diagnostic.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "The version was provided by uv workspace metadata.",
         )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -772,6 +752,10 @@ pub struct EnvironmentOptions {
     /// and `m` is the minor (e.g. `"3.7"` or `"3.12"`).
     /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
+    ///
+    /// ty officially supports type checking code that targets Python 3.10 and later. Python 3.7
+    /// through 3.9 can still be selected, but ty may produce false positives or false negatives for
+    /// standard-library APIs because its bundled stubs do not fully describe those versions.
     ///
     /// If a version is not specified, ty will try the following techniques in order of preference
     /// to determine a value:
@@ -892,26 +876,6 @@ pub struct EnvironmentOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SrcOptions {
-    /// The root of the project, used for finding first-party modules.
-    ///
-    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
-    /// The project root (`.`) is always included. Additionally, the following directories are included
-    /// if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
-    ///
-    /// * `./src`
-    /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
-    /// * `./python`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[option(
-        default = r#"null"#,
-        value_type = "str",
-        example = r#"
-            root = "./app"
-        "#
-    )]
-    #[deprecated(note = "Use `environment.root` instead.")]
-    pub root: Option<RelativePathBuf>,
-
     /// Whether to automatically exclude files that are ignored by `.ignore`,
     /// `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
     /// Enabled by default.
@@ -924,6 +888,18 @@ pub struct SrcOptions {
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
+
+    /// Whether to exclude files containing PEP 723 inline script metadata unless they are
+    /// explicitly passed on the command line.
+    #[option(
+        default = r#"false"#,
+        value_type = r#"bool"#,
+        example = r#"
+            exclude-scripts = true
+        "#
+    )]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude_scripts: Option<bool>,
 
     /// A list of files and directories to check. The `include` option
     /// follows a similar syntax to `.gitignore` but reversed:
@@ -1044,6 +1020,7 @@ impl SrcOptions {
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
+            exclude_scripts: self.exclude_scripts.unwrap_or(false),
             files,
         })
     }
@@ -1073,7 +1050,7 @@ impl FromIterator<(RangedValue<String>, RangedValue<Level>)> for Rules {
 
 impl Rules {
     /// Convert the rules to a `RuleSelection` with diagnostics.
-    pub fn to_rule_selection(
+    pub(crate) fn to_rule_selection(
         &self,
         db: &dyn Db,
         diagnostics: &mut Vec<OptionDiagnostic>,
@@ -1089,6 +1066,7 @@ impl Rules {
                 ValueSource::File(_) => LintSource::File,
                 ValueSource::Cli => LintSource::Cli,
                 ValueSource::Editor => LintSource::Editor,
+                ValueSource::UvWorkspace => LintSource::UvWorkspace,
             };
 
             let mut set_lint_level = |lint| {
@@ -1137,7 +1115,7 @@ impl Rules {
         selection
     }
 
-    pub(super) fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 }
@@ -1430,15 +1408,15 @@ pub struct TerminalOptions {
         "#
     )]
     pub output_format: Option<RangedValue<OutputFormat>>,
-    /// Use exit code 1 if there are any warning-level diagnostics.
+    /// Use exit code 1, even if all diagnostics only had `warning` severity.
     ///
-    /// Defaults to `false`.
+    /// Defaults to `true`.
     #[option(
-        default = r#"false"#,
+        default = r#"true"#,
         value_type = "bool",
         example = r#"
-        # Error if ty emits any warning-level diagnostics.
-        error-on-warning = true
+        # Exit with code 0 if all diagnostics had `warning` severity.
+        error-on-warning = false
         "#
     )]
     pub error_on_warning: Option<bool>,
@@ -1460,6 +1438,96 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// Configure ty's behavior regarding type inference and narrowing of equality
+    /// checks. Defaults to `false`.
+    ///
+    /// By default, ty makes various assumptions about equality checks that match the
+    /// intuitions of most Python programmers, but may not be fully sound in all situations.
+    /// Enabling this option makes ty more conservative about these assumptions, making it
+    /// less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+    /// equality check. This has various effects on type checking, including fewer type
+    /// narrowing opportunities and more conservative assumptions regarding control flow.
+    ///
+    /// One way in which ty will by default make unsound assumptions is by narrowing an
+    /// object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+    /// unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+    /// to `"a"`, but will not be of type `Literal["a"]`:
+    ///
+    /// ```pycon
+    /// >>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+    /// >>> # subclasses, but str subclasses compare equal by default:
+    /// >>> class StringSubclass(str): ...
+    /// ...
+    /// >>> StringSubclass("a") == "a"
+    /// True
+    /// >>>
+    /// >>> # This also applies to `StrEnum`s:
+    /// >>> from enum import StrEnum
+    /// >>> class MyEnum(StrEnum):
+    /// ...     A = "a"
+    /// ...
+    /// >>> MyEnum.A == "a"
+    /// True
+    /// ```
+    ///
+    /// Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+    /// and instead keeps it as `str`:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def parse(value: str) -> Literal["a"] | None:
+    ///     # with `strict-equality-semantics = true`, no narrowing will occur here,
+    ///     # and an error will be emitted on the `return` statement.
+    ///     if value == "a":
+    ///         return value
+    ///     return None
+    /// ```
+    ///
+    /// Another assumption ty makes by default is that subclasses will never override `__eq__` or
+    /// `__ne__`. This allows ty to narrow the following union based on an equality check, despite
+    /// the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+    /// perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
+    ///
+    /// ```python
+    /// def narrow(x: Foo | None, other: Foo) -> None:
+    ///     if x == other:
+    ///         # with this option enabled, `x` will still have type `Foo | None` here,
+    ///         # since it is legal to subclass `Foo` and override its `__eq__` method.
+    ///         reveal_type(x)
+    /// ```
+    ///
+    /// Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+    /// will also impact those operations. For example, this option will also impact narrowing from
+    /// `in` checks, and narrowing in `match` statements that use value patterns:
+    ///
+    /// ```python
+    /// def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    ///     if x in other:
+    ///         # with this option enabled, `x` will still have type `Foo | None` here,
+    ///         # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+    ///         reveal_type(x)
+    ///
+    ///
+    /// def narrow_match(x: str) -> None:
+    ///     match x:
+    ///         case "a":
+    ///             # with this option enabled, `x` will still have type `str` here,
+    ///             # since this `case` branch will be taken by any object that compares
+    ///             # equal to `"a"`, including subclasses of `str`.
+    ///             reveal_type(x)
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve broad builtin types instead of narrowing them to literals
+        strict-equality-semantics = true
+        "#
+    )]
+    #[serde(alias = "strict-literal-narrowing")]
+    pub strict_equality_semantics: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1536,12 +1604,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            strict_equality_semantics,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
+            strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1570,6 +1640,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            strict_equality_semantics: strict_equality_semantics
+                .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
@@ -1708,7 +1780,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    include: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// A list of file and directory patterns to exclude from this override.
     ///
@@ -1730,7 +1802,7 @@ pub struct OverrideOptions {
             ]
         "#
     )]
-    pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
+    exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 
     /// Rule overrides for files matching the include/exclude patterns.
     ///
@@ -1749,14 +1821,25 @@ pub struct OverrideOptions {
             possibly-unresolved-reference = "ignore"
         "#
     )]
-    pub rules: Option<Rules>,
+    rules: Option<Rules>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
-    pub analysis: Option<AnalysisOptions>,
+    analysis: Option<AnalysisOptions>,
 }
 
-impl RangedValue<OverrideOptions> {
+trait ToOverride {
+    fn to_override(
+        &self,
+        db: &dyn Db,
+        project_root: &SystemPath,
+        global_rules: Option<&Rules>,
+        global_analysis: Option<&AnalysisOptions>,
+        diagnostics: &mut Vec<OptionDiagnostic>,
+    ) -> Result<Option<Override>, Box<OptionDiagnostic>>;
+}
+
+impl ToOverride for RangedValue<OverrideOptions> {
     fn to_override(
         &self,
         db: &dyn Db,
@@ -1940,6 +2023,15 @@ pub(super) struct InnerOverrideOptions {
     pub(super) analysis: Option<AnalysisOptions>,
 }
 
+/// The settings that can vary between individual files.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
+pub(super) struct FileOptions {
+    /// Raw rule options, preserved so multiple configuration layers can be merged.
+    pub(super) rules: Option<Rules>,
+
+    pub(super) analysis: Option<AnalysisOptions>,
+}
+
 /// Error returned when the settings can't be resolved because of a hard error.
 #[derive(Debug)]
 pub struct ToSettingsError {
@@ -1949,33 +2041,25 @@ pub struct ToSettingsError {
 }
 
 impl ToSettingsError {
-    pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
-        struct DisplayPretty<'a> {
-            db: &'a dyn ruff_db::Db,
-            error: &'a ToSettingsError,
-        }
+    pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
+        let db: &dyn ruff_db::Db = db;
 
-        impl fmt::Display for DisplayPretty<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::new("ty")
-                    .format(self.error.output_format.into())
-                    .color(self.error.color);
+        fmt::from_fn(move |f| {
+            let display_config = DisplayDiagnosticConfig::new("ty")
+                .format(self.output_format.into())
+                .color(self.color);
 
-                write!(
-                    f,
-                    "{}",
-                    self.error
-                        .diagnostic
-                        .to_diagnostic()
-                        .display(&self.db, &display_config)
-                )
-            }
-        }
-
-        DisplayPretty { db, error: self }
+            write!(
+                f,
+                "{}",
+                self.diagnostic
+                    .to_diagnostic()
+                    .display(&db, &display_config)
+            )
+        })
     }
 
-    pub fn into_diagnostic(self) -> OptionDiagnostic {
+    pub(crate) fn into_diagnostic(self) -> OptionDiagnostic {
         *self.diagnostic
     }
 }
@@ -2080,7 +2164,7 @@ pub struct OptionDiagnostic {
 }
 
 impl OptionDiagnostic {
-    pub fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
+    fn new(id: DiagnosticId, message: String, severity: Severity) -> Self {
         Self {
             id,
             message,
@@ -2150,6 +2234,10 @@ impl OptionDiagnostic {
                 SubDiagnosticSeverity::Info,
                 "The {value_label} was specified in the editor settings.",
             )),
+            ValueSource::UvWorkspace => self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("The {value_label} was provided by uv workspace metadata."),
+            )),
         }
     }
 
@@ -2175,40 +2263,6 @@ impl OptionDiagnostic {
         }
 
         diag
-    }
-}
-
-/// This is a wrapper for options that actually get loaded from configuration files
-/// and the CLI, which also includes a `config_file_override` option that overrides
-/// default configuration discovery with an explicitly-provided path to a configuration file
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ProjectOptionsOverrides {
-    pub config_file_override: Option<SystemPathBuf>,
-    pub fallback_python_version: Option<RangedValue<SupportedPythonVersion>>,
-    pub fallback_python: Option<RelativePathBuf>,
-    pub options: Options,
-}
-
-impl ProjectOptionsOverrides {
-    pub fn new(config_file_override: Option<SystemPathBuf>, options: Options) -> Self {
-        Self {
-            config_file_override,
-            options,
-            ..Self::default()
-        }
-    }
-
-    pub fn apply_to(&self, options: Options) -> Options {
-        let mut combined = self.options.clone().combine(options);
-
-        // Set the fallback python version and path if set
-        combined.environment.combine_with(Some(EnvironmentOptions {
-            python_version: self.fallback_python_version.clone(),
-            python: self.fallback_python.clone(),
-            ..EnvironmentOptions::default()
-        }));
-
-        combined
     }
 }
 

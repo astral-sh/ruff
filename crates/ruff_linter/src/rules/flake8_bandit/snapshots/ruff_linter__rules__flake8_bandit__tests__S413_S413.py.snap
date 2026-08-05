@@ -37,4 +37,3 @@ S413 `pycrypto` library is known to have publicly disclosed buffer overflow vuln
 3 | import Crypto.PublicKey  # S413
 4 | from Crypto.PublicKey import RSA  # S413
   |      ^^^^^^^^^^^^^^^^
-  |

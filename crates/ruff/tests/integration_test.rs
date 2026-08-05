@@ -120,8 +120,10 @@ fn stdin_error() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -145,8 +147,10 @@ fn stdin_filename() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -181,16 +185,22 @@ import bar   # unused import
       |
     2 | import bar   # unused import
       |        ^^^
-      |
     help: Remove unused import: `bar`
+      |
+    1 |
+      - import bar   # unused import
+      |
 
     F401 [*] `foo` imported but unused
      --> foo.py:2:8
       |
     2 | import foo   # unused import
       |        ^^^
-      |
     help: Remove unused import: `foo`
+      |
+    1 |
+      - import foo   # unused import
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -217,8 +227,10 @@ fn check_warn_stdin_filename_with_files() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -244,8 +256,10 @@ fn stdin_source_type_py() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -482,7 +496,6 @@ fn stdin_fix_jupyter() {
       |
     1 | print(x)
       |       ^
-      |
 
     Found 3 errors (2 fixed, 1 remaining).
     "#);
@@ -581,16 +594,22 @@ fn stdin_override_parser_ipynb() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+     ::: cell 1
+      |
+      - import os
+      |
 
     F401 [*] `sys` imported but unused
      --> Jupyter.py:cell 3:1:8
       |
     1 | import sys
       |        ^^^
-      |
     help: Remove unused import: `sys`
+     ::: cell 3
+      |
+      - import sys
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -619,8 +638,10 @@ fn stdin_override_parser_py() {
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -654,8 +675,10 @@ extension = {ipynb="python"}
       |
     1 | import os
       |        ^^
-      |
     help: Remove unused import: `os`
+      |
+      - import os
+      |
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -850,7 +873,6 @@ fn stdin_parse_error() {
       |
     1 | from foo import
       |                ^
-      |
 
     Found 1 error.
 
@@ -880,7 +902,6 @@ fn stdin_multiple_parse_error() {
     1 | from foo import
     2 | bar =
       |      ^
-      |
 
     Found 2 errors.
 
@@ -902,7 +923,6 @@ fn parse_error_not_included() {
       |
     1 | foo =
       |      ^
-      |
 
     Found 1 error.
 
@@ -920,12 +940,11 @@ fn full_output_preview() {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[E741]: Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -949,12 +968,11 @@ preview = true
     success: false
     exit_code: 1
     ----- stdout -----
-    error[E741]: Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -965,7 +983,10 @@ preview = true
 
 #[test]
 fn full_output_format() {
-    let mut cmd = RuffCheck::default().output_format("full").build();
+    let mut cmd = RuffCheck::default()
+        .output_format("full")
+        .args(["--select=E741"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @"
     success: false
@@ -976,7 +997,6 @@ fn full_output_format() {
       |
     1 | l = 1
       | ^
-      |
 
     Found 1 error.
 
@@ -987,6 +1007,29 @@ fn full_output_format() {
 #[test]
 fn rule_f401() {
     assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401"]));
+}
+
+#[test]
+fn rule_unused_import() {
+    insta::with_settings!({filters => vec![
+        (r#"(?s)## What it does.*"#, "<truncated>"),
+    ]}, {
+        assert_cmd_snapshot!(
+            ruff_cmd().args(["rule", "unused-import"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        # unused-import (F401)
+
+        Derived from the **Pyflakes** linter.
+
+        Fix is sometimes available.
+
+        <truncated>
+        ",
+        );
+    });
 }
 
 #[test]
@@ -1005,13 +1048,15 @@ fn rule_f401_output_text() {
 
 #[test]
 fn rule_invalid_rule_name() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @"
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "unused-imports"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'RUF404' for '[RULE]'
+    error: invalid value 'unused-imports' for '[RULE]'
+
+      tip: a similar value exists: 'unused-import'
 
     For more information, try '--help'.
     ");
@@ -1027,6 +1072,8 @@ fn rule_invalid_rule_name_output_json() {
     ----- stderr -----
     error: invalid value 'RUF404' for '[RULE]'
 
+      tip: a similar value exists: 'RUF940'
+
     For more information, try '--help'.
     ");
 }
@@ -1040,6 +1087,8 @@ fn rule_invalid_rule_name_output_text() {
 
     ----- stderr -----
     error: invalid value 'RUF404' for '[RULE]'
+
+      tip: a similar value exists: 'RUF940'
 
     For more information, try '--help'.
     ");
@@ -1258,12 +1307,12 @@ fn preview_enabled_prefix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
-    -:1:1: error[RUF911] Hey this is a preview test rule.
-    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1280,14 +1329,14 @@ fn preview_enabled_all() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[D100] Missing docstring in public module
-    -:1:1: error[CPY001] Missing copyright notice at top of file
-    -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
-    -:1:1: error[RUF911] Hey this is a preview test rule.
-    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    -:1:1: undocumented-public-module: Missing docstring in public module
+    -:1:1: missing-copyright-notice: Missing copyright notice at top of file
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1307,7 +1356,7 @@ fn preview_enabled_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[RUF911] Hey this is a preview test rule.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
     Found 1 error.
 
     ----- stderr -----
@@ -1382,7 +1431,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 
 #[test]
 fn preview_group_selector() {
-    // `--select PREVIEW` should error (selector was removed)
+    // `--select PREVIEW` should warn (selector was removed)
     let mut cmd = RuffCheck::default()
         .args([
             "--select",
@@ -1393,14 +1442,13 @@ fn preview_group_selector() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    error: invalid value 'PREVIEW' for '--select <RULE_CODE>'
-
-    For more information, try '--help'.
+    warning: Removed selector `PREVIEW` in `select` from the CLI
     ");
 }
 
@@ -1421,12 +1469,12 @@ fn preview_enabled_group_ignore() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: error[RUF900] Hey this is a stable test rule.
-    -:1:1: error[RUF901] [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: error[RUF902] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: error[RUF903] Hey this is a stable test rule with a display only fix.
-    -:1:1: error[RUF911] Hey this is a preview test rule.
-    -:1:1: error[RUF950] Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: preview-test-rule: Hey this is a preview test rule.
+    -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1790,7 +1838,7 @@ fn check_input_from_argfile() -> Result<()> {
     )?;
 
     // Generate the args with the argfile notation
-    let argfile = format!("@{}", &input_file_path.display());
+    let argfile = format!("@{}", input_file_path.display());
     let mut cmd = RuffCheck::default().filename(argfile.as_ref()).build();
     insta::with_settings!({filters => vec![
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
@@ -1805,8 +1853,10 @@ fn check_input_from_argfile() -> Result<()> {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
+          |
+          - import os
+          |
 
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
@@ -1850,6 +1900,9 @@ fn check_hints_hidden_unsafe_fixes() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -1892,6 +1945,9 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -1935,9 +1991,16 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+      |
+    note: This is an unsafe fix and may change runtime behavior
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -2213,9 +2276,15 @@ extend-safe-fixes = ["RUF902"]
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+      |
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -2251,6 +2320,9 @@ extend-safe-fixes = ["RUF902"]
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-safe-fix
+      |
 
     RUF902 Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
@@ -2297,6 +2369,10 @@ extend-safe-fixes = ["RUF9"]
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
     --> -:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+    2 | x = {'a': 1, 'a': 1}
+      |
 
     RUF903 Hey this is a stable test rule with a display only fix.
     --> -:1:1
@@ -2401,14 +2477,13 @@ select = ["RUF017"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[RUF017]: Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
-      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2442,14 +2517,13 @@ unfixable = ["RUF"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[RUF017]: Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
-      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2477,7 +2551,6 @@ fn pyproject_toml_stdin_syntax_error() {
       |
     1 | [project
       |         ^
-      |
 
     Found 1 error.
 
@@ -2504,7 +2577,6 @@ fn pyproject_toml_stdin_schema_error() {
     1 | [project]
     2 | name = 1
       |        ^
-      |
 
     Found 1 error.
 
@@ -2516,7 +2588,7 @@ fn pyproject_toml_stdin_schema_error() {
 #[test]
 fn pyproject_toml_stdin_no_applicable_rules_selected() {
     let mut cmd = RuffCheck::default()
-        .args(["--stdin-filename", "pyproject.toml"])
+        .args(["--stdin-filename", "pyproject.toml", "--ignore=RUF200"])
         .build();
 
     assert_cmd_snapshot!(
@@ -2558,7 +2630,7 @@ fn pyproject_toml_stdin_no_errors() {
         .build();
 
     assert_cmd_snapshot!(
-        cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
+        cmd.pass_stdin("[project]\nname = 'ruff'\nversion = '0.0.0'"),
         @"
     success: true
     exit_code: 0
@@ -2597,7 +2669,6 @@ fn pyproject_toml_stdin_schema_error_fix() {
     1 | [project]
     2 | name = 1
       |        ^
-      |
 
     Found 1 error.
     "

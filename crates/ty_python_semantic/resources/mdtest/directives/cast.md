@@ -63,7 +63,7 @@ the gradual guarantee and leads to cascading errors when an object is inferred a
 `Unknown` due to a missing import or similar.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)
@@ -113,16 +113,13 @@ warning[redundant-cast]: Value is already of type `int`
   |
 5 | cast(int, secrets.randbelow(10))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the redundant `cast`
-2 | from typing import cast
-3 |
+  |
 4 | # snapshot: redundant-cast
   - cast(int, secrets.randbelow(10))
 5 + secrets.randbelow(10)
 6 | # snapshot: redundant-cast
-7 | cast(val=secrets.randbelow(10), typ=int)
-8 | def f(x: int, y: int, z: int) -> int:
+  |
 ```
 
 ```py
@@ -136,16 +133,13 @@ warning[redundant-cast]: Value is already of type `int`
   |
 7 | cast(val=secrets.randbelow(10), typ=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the redundant `cast`
-4  | # snapshot: redundant-cast
-5  | cast(int, secrets.randbelow(10))
-6  | # snapshot: redundant-cast
-   - cast(val=secrets.randbelow(10), typ=int)
-7  + secrets.randbelow(10)
-8  | def f(x: int, y: int, z: int) -> int:
-9  |     # snapshot: redundant-cast
-10 |     return cast(int, x + y) * z
+  |
+6 | # snapshot: redundant-cast
+  - cast(val=secrets.randbelow(10), typ=int)
+7 + secrets.randbelow(10)
+8 | def f(x: int, y: int, z: int) -> int:
+  |
 ```
 
 ```py
@@ -160,16 +154,13 @@ warning[redundant-cast]: Value is already of type `int`
    |
 10 |     return cast(int, x + y) * z
    |            ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
-7  | cast(val=secrets.randbelow(10), typ=int)
-8  | def f(x: int, y: int, z: int) -> int:
+   |
 9  |     # snapshot: redundant-cast
    -     return cast(int, x + y) * z
 10 +     return (x + y) * z
 11 | def g(x: int, y: int) -> int:
-12 |     # snapshot: redundant-cast
-13 |     return -cast(int, x + y)
+   |
 ```
 
 ```py
@@ -184,16 +175,13 @@ warning[redundant-cast]: Value is already of type `int`
    |
 13 |     return -cast(int, x + y)
    |             ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
-10 |     return cast(int, x + y) * z
-11 | def g(x: int, y: int) -> int:
+   |
 12 |     # snapshot: redundant-cast
    -     return -cast(int, x + y)
 13 +     return -(x + y)
 14 | def h(x: int, y: int) -> None:
-15 |     # snapshot: redundant-cast
-16 |     print(cast(int, x + y))
+   |
 ```
 
 ```py
@@ -208,11 +196,10 @@ warning[redundant-cast]: Value is already of type `int`
    |
 16 |     print(cast(int, x + y))
    |           ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
-13 |     return -cast(int, x + y)
-14 | def h(x: int, y: int) -> None:
+   |
 15 |     # snapshot: redundant-cast
    -     print(cast(int, x + y))
 16 +     print(x + y)
+   |
 ```

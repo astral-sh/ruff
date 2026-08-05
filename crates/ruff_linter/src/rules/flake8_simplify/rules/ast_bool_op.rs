@@ -291,7 +291,7 @@ impl AlwaysFixableViolation for ExprAndFalse {
 }
 
 /// Return `true` if two `Expr` instances are equivalent names.
-pub(crate) fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
+fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
     if let (Expr::Name(ast::ExprName { id: a, .. }), Expr::Name(ast::ExprName { id: b, .. })) =
         (&a, &b)
     {

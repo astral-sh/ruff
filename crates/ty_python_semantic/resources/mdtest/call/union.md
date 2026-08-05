@@ -100,6 +100,25 @@ def _(flag: bool):
     reveal_type(x)  # revealed: int | str
 ```
 
+## Assigning function-literal unions to callables
+
+A union of function literals must satisfy the target callable with every element.
+
+```py
+from collections.abc import Callable
+
+def accepts_int(callback: Callable[[int], int]) -> None: ...
+def int_callback(value: int) -> int:
+    return value
+
+def str_callback(value: str) -> str:
+    return value
+
+def _(flag: bool) -> None:
+    callback = int_callback if flag else str_callback
+    accepts_int(callback)  # error: [invalid-argument-type]
+```
+
 ## Union of class constructors uses strict checking
 
 A call on a union of class objects must satisfy every constructor.
@@ -155,8 +174,8 @@ class IntDiag(DeferredDiagBase[int]): ...
 class StrDiag(DeferredDiagBase[str]): ...
 
 def _(factory: type[IntDiag] | type[StrDiag]):
-    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `int`, found `float`"
-    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `str`, found `float`"
+    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `int`, found `float*`"
+    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `str`, found `float*`"
     factory(1.2)
 ```
 
@@ -235,7 +254,8 @@ def _(flag: bool):
 
 ```py
 from typing import Literal
-from ty_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import Not, AlwaysFalsy, static_assert
+from ty_extensions._internal import is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(Literal["a", ""], Literal["a", ""] | Not[AlwaysFalsy]))
 static_assert(is_subtype_of(Not[AlwaysFalsy], Literal["", "a"] | Not[AlwaysFalsy]))
@@ -269,17 +289,17 @@ def _(
     reveal_type(i)  # revealed: object
 ```
 
-## Cannot use an argument as both a value and a type form
+## A `TypeForm` parameter is a value parameter
 
 ```py
-from ty_extensions import is_singleton
+from ty_extensions._internal import is_singleton
 
 def _(flag: bool):
     if flag:
         f = repr
     else:
         f = is_singleton
-    # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
+    # `int` is both a regular value for `repr` and a valid `TypeForm` value for `is_singleton`.
     reveal_type(f(int))  # revealed: str | Literal[False]
 ```
 
@@ -293,24 +313,30 @@ from typing import Literal
 
 def _(literals_2: Literal[0, 1], b: bool, flag: bool):
     literals_4 = 2 * literals_2 + literals_2  # Literal[0, 1, 2, 3]
-    literals_16 = 4 * literals_4 + literals_4  # Literal[0, 1, .., 15]
+    literals_8 = 2 * literals_4 + literals_2  # Literal[0, 1, .., 7]
+    literals_16 = 2 * literals_8 + literals_2  # Literal[0, 1, .., 15]
     literals_64 = 4 * literals_16 + literals_4  # Literal[0, 1, .., 63]
     literals_128 = 2 * literals_64 + literals_2  # Literal[0, 1, .., 127]
     literals_256 = 2 * literals_128 + literals_2  # Literal[0, 1, .., 255]
+    literals_512 = 2 * literals_256 + literals_2  # Literal[0, 1, .., 511]
+    literals_1024 = 2 * literals_512 + literals_2  # Literal[0, 1, .., 1023]
+    literals_2048 = 2 * literals_1024 + literals_2  # Literal[0, 1, .., 2047]
+    literals_4096 = 2 * literals_2048 + literals_2  # Literal[0, 1, .., 4095]
+    literals_8192 = 2 * literals_4096 + literals_2  # Literal[0, 1, .., 8191]
 
-    # Going beyond the MAX_NON_RECURSIVE_UNION_LITERALS limit (currently 256):
-    reveal_type(literals_256 if flag else 256)  # revealed: int
+    # Going beyond the MAX_NON_RECURSIVE_UNION_LITERALS limit (currently 8192):
+    reveal_type(literals_8192 if flag else 8192)  # revealed: int
 
     # Going beyond the limit when another type is already part of the union
     bool_and_literals_128 = b if flag else literals_128  # bool | Literal[0, 1, ..., 127]
     literals_128_shifted = literals_128 + 128  # Literal[128, 129, ..., 255]
-    literals_256_shifted = literals_256 + 256  # Literal[256, 257, ..., 511]
+    literals_8192_shifted = literals_8192 + 8192  # Literal[8192, 8193, ..., 16383]
 
     # Now union the two:
     two = bool_and_literals_128 if flag else literals_128_shifted
     # revealed: bool | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
     reveal_type(two)
-    reveal_type(two if flag else literals_256_shifted)  # revealed: int
+    reveal_type(two if flag else literals_8192_shifted)  # revealed: int
 ```
 
 Recursively defined literal union types are widened earlier than non-recursively defined types for
@@ -935,36 +961,32 @@ def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
 ```
 
 ```snapshot
-error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
-  --> src/mdtest_snippet.py:21:7
-   |
-21 |     f(None)
-   |       ^^^^ Expected `int`, found `None`
-   |
-info: Method defined here
- --> src/mdtest_snippet.py:5:9
-  |
-5 |     def __call__(self, x: int) -> int:
-  |         ^^^^^^^^       ------ Parameter declared here
-  |
-info: Intersection element `IntCaller` is incompatible with this call site
-info: Attempted to call intersection type `IntCaller & StrCaller`
-info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
-
-
 error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is incorrect
   --> src/mdtest_snippet.py:21:7
    |
 21 |     f(None)
    |       ^^^^ Expected `bytes`, found `None`
-   |
 info: Method defined here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __call__(self, x: bytes) -> bytes:
    |         ^^^^^^^^       -------- Parameter declared here
-   |
 info: Union variant `BytesCaller` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+
+
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+21 |     f(None)
+   |       ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self, x: int) -> int:
+  |         ^^^^^^^^       ------ Parameter declared here
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 
 
@@ -973,16 +995,132 @@ error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is i
    |
 21 |     f(None)
    |       ^^^^ Expected `str`, found `None`
-   |
 info: Method defined here
  --> src/mdtest_snippet.py:9:9
   |
 9 |     def __call__(self, x: str) -> str:
   |         ^^^^^^^^       ------ Parameter declared here
-  |
 info: Intersection element `StrCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+```
+
+## Union of intersected constructors retains the called class types
+
+When one union variant is an intersection of class objects, its constructor diagnostics should
+describe that original intersection instead of intersecting the underlying constructor methods.
+
+```py
+from typing_extensions import Self
+
+class UsesInit:
+    def __init__(self, value: int) -> None: ...
+
+class UsesNew:
+    def __new__(cls, value: str) -> Self:
+        return object.__new__(cls)
+
+class UsesBytes:
+    def __init__(self, value: bytes) -> None: ...
+
+def _(cls: type[UsesInit], other: type[UsesBytes], condition: bool) -> None:
+    if issubclass(cls, UsesNew):
+        constructor = cls if condition else other
+        reveal_type(constructor)  # revealed: (type[UsesInit] & type[UsesNew]) | type[UsesBytes]
+        # error: [invalid-argument-type] "UsesBytes.__init__"
+        # error: [invalid-argument-type] "UsesNew.__new__"
+        # snapshot: invalid-argument-type
+        constructor(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
+  --> src/mdtest_snippet.py:20:21
+   |
+20 |         constructor(None)
+   |                     ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
+info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
+info: Attempted to call union type `(type[UsesInit] & type[UsesNew]) | type[UsesBytes]`
+```
+
+## Union intersection diagnostics retain excluded types
+
+A failing intersection inside a union should keep its excluded type in the intersection-specific
+diagnostic, even though the exclusion does not contribute a callable binding.
+
+```py
+from ty_extensions import Intersection, Not
+
+class IntCaller:
+    def __call__(self, value: int) -> None: ...
+
+class Required: ...
+class Excluded: ...
+
+class AcceptsNone:
+    def __call__(self, value: None) -> None: ...
+
+def _(value: Intersection[IntCaller, Required, Not[Excluded]] | AcceptsNone) -> None:
+    # snapshot: invalid-argument-type
+    value(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:14:11
+   |
+14 |     value(None)
+   |           ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & Required & ~Excluded`
+info: Attempted to call union type `(IntCaller & Required & ~Excluded) | AcceptsNone`
+```
+
+## Union variants retain excluded types with one callable
+
+An intersection with only one positive callable is still a distinct union variant, so its excluded
+type should remain visible in the variant-specific diagnostic.
+
+```py
+from ty_extensions import Intersection, Not
+
+class IntCaller:
+    def __call__(self, value: int) -> None: ...
+
+class Excluded: ...
+
+class AcceptsNone:
+    def __call__(self, value: None) -> None: ...
+
+def _(value: Intersection[IntCaller, Not[Excluded]] | AcceptsNone) -> None:
+    # snapshot: invalid-argument-type
+    value(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:13:11
+   |
+13 |     value(None)
+   |           ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Union variant `IntCaller & ~Excluded` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & ~Excluded) | AcceptsNone`
 ```
 
 ## Union semantics with constrained callable typevars

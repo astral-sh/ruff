@@ -31,6 +31,28 @@ The inferred `Callable` type is function-like, i.e. we can still access attribut
 reveal_type(x[0].__name__)  # revealed: str
 ```
 
+## Generic functions appended to lists
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def int_identity(value: int) -> int:
+    return value
+
+def identity[T](value: T) -> T:
+    return value
+
+functions = []
+functions.append(int_identity)
+functions.append(identity)
+
+reveal_type(functions)  # revealed: list[(value: int) -> int]
+reveal_type(functions[0](1))  # revealed: int
+```
+
 ## Mixed list
 
 ```py
@@ -67,7 +89,7 @@ yy = reveal_type([None])  # revealed: list[None | Unknown]
 reveal_type(yy)  # revealed: list[None | Unknown]
 
 # Bare `list` in a type expression is equivalent to `list[Unknown]`
-zz: list = [None]
+zz: list = [None]  # error: [missing-type-argument]
 reveal_type(zz)  # revealed: list[Unknown]
 
 # Promotion only happens if we're in invariant contexts,

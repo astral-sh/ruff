@@ -299,7 +299,7 @@ this:
 
 ```py
 try:
-    import optional_dependency  # ty: ignore
+    import optional_dependency  # ty: ignore[unresolved-import]
 except ImportError:
     optional_dependency = None
 
@@ -341,25 +341,6 @@ def f(x: A):
     # TODO: no error
     # error: [invalid-assignment] "Object of type `mdtest_snippet.A @ src/mdtest_snippet.py:12:7 | mdtest_snippet.A @ src/mdtest_snippet.py:13:7` is not assignable to `mdtest_snippet.A @ src/mdtest_snippet.py:13:7`"
     x = A()
-```
-
-### Assignments to nonlocal variables
-
-Writes to the outer-scope variable are currently not detected:
-
-```py
-def outer() -> None:
-    x = None
-
-    def set_x() -> None:
-        nonlocal x
-        x = 1
-    set_x()
-
-    def inner() -> None:
-        # TODO: this should ideally be `None | Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: None
-    inner()
 ```
 
 ## Handling of overloads

@@ -84,4 +84,3 @@ PLC2701 Private name import `_bar` from external module `foo`
 51 |
 52 | from foo.    _bar import baz
    |              ^^^^
-   |

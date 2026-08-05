@@ -4,6 +4,9 @@ use lsp_server::Connection;
 use lsp_types as types;
 use lsp_types::InitializeParams;
 use lsp_types::MessageType;
+use lsp_types::NotebookCellLanguage;
+use lsp_types::NotebookDocumentFilterWithCells;
+use lsp_types::WorkspaceFoldersInitializeParams;
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
 use std::str::FromStr;
@@ -12,11 +15,7 @@ use types::ClientCapabilities;
 use types::CodeActionKind;
 use types::CodeActionOptions;
 use types::DiagnosticOptions;
-use types::NotebookCellSelector;
 use types::NotebookDocumentSyncOptions;
-use types::NotebookSelector;
-use types::OneOf;
-use types::TextDocumentSyncCapability;
 use types::TextDocumentSyncKind;
 use types::TextDocumentSyncOptions;
 use types::WorkDoneProgressOptions;
@@ -60,7 +59,8 @@ impl Server {
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
 
-        let server_capabilities = Self::server_capabilities(position_encoding);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, &client_capabilities);
 
         let connection = connection.initialize_finish(
             id,
@@ -73,7 +73,8 @@ impl Server {
 
         let InitializeParams {
             initialization_options,
-            workspace_folders,
+            workspace_folders_initialize_params:
+                WorkspaceFoldersInitializeParams { workspace_folders },
             ..
         } = init_params;
 
@@ -150,10 +151,44 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> types::ServerCapabilities {
+    fn supports_dynamic_formatting(client_capabilities: &ClientCapabilities) -> bool {
+        client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.formatting)
+            .and_then(|formatting| formatting.dynamic_registration)
+            .unwrap_or_default()
+    }
+
+    fn supports_dynamic_range_formatting(client_capabilities: &ClientCapabilities) -> bool {
+        client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.range_formatting)
+            .and_then(|range_formatting| range_formatting.dynamic_registration)
+            .unwrap_or_default()
+    }
+
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        client_capabilities: &ClientCapabilities,
+    ) -> types::ServerCapabilities {
+        let document_formatting_provider = if Self::supports_dynamic_formatting(client_capabilities)
+        {
+            None
+        } else {
+            Some(true.into())
+        };
+        let document_range_formatting_provider =
+            if Self::supports_dynamic_range_formatting(client_capabilities) {
+                None
+            } else {
+                Some(true.into())
+            };
+
         types::ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
-            code_action_provider: Some(types::CodeActionProviderCapability::Options(
+            code_action_provider: Some(
                 CodeActionOptions {
                     code_action_kinds: Some(
                         SupportedCodeAction::all()
@@ -164,18 +199,21 @@ impl Server {
                         work_done_progress: Some(true),
                     },
                     resolve_provider: Some(true),
-                },
-            )),
-            workspace: Some(types::WorkspaceServerCapabilities {
+                    documentation: None,
+                }
+                .into(),
+            ),
+            workspace: Some(types::WorkspaceOptions {
                 workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                     supported: Some(true),
-                    change_notifications: Some(OneOf::Left(true)),
+                    change_notifications: Some(true.into()),
                 }),
                 file_operations: None,
+                text_document_content: None,
             }),
-            document_formatting_provider: Some(OneOf::Left(true)),
-            document_range_formatting_provider: Some(OneOf::Left(true)),
-            diagnostic_provider: Some(types::DiagnosticServerCapabilities::Options(
+            document_formatting_provider,
+            document_range_formatting_provider,
+            diagnostic_provider: Some(
                 DiagnosticOptions {
                     identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                     // multi-file analysis could change this
@@ -184,8 +222,9 @@ impl Server {
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: Some(true),
                     },
-                },
-            )),
+                }
+                .into(),
+            ),
             execute_command_provider: Some(types::ExecuteCommandOptions {
                 commands: SupportedCommand::all()
                     .map(|command| command.identifier().to_string())
@@ -194,26 +233,32 @@ impl Server {
                     work_done_progress: Some(false),
                 },
             }),
-            hover_provider: Some(types::HoverProviderCapability::Simple(true)),
-            notebook_document_sync: Some(types::OneOf::Left(NotebookDocumentSyncOptions {
-                save: Some(false),
-                notebook_selector: [NotebookSelector::ByCells {
-                    notebook: None,
-                    cells: vec![NotebookCellSelector {
-                        language: "python".to_string(),
-                    }],
-                }]
-                .to_vec(),
-            })),
-            text_document_sync: Some(TextDocumentSyncCapability::Options(
+            hover_provider: Some(true.into()),
+            notebook_document_sync: Some(
+                NotebookDocumentSyncOptions {
+                    save: Some(false),
+                    notebook_selector: vec![
+                        NotebookDocumentFilterWithCells {
+                            notebook: None,
+                            cells: vec![NotebookCellLanguage {
+                                language: "python".to_string(),
+                            }],
+                        }
+                        .into(),
+                    ],
+                }
+                .into(),
+            ),
+            text_document_sync: Some(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
-                    change: Some(TextDocumentSyncKind::INCREMENTAL),
+                    change: Some(TextDocumentSyncKind::Incremental),
                     will_save: Some(false),
                     will_save_wait_until: Some(false),
-                    ..Default::default()
-                },
-            )),
+                    save: None,
+                }
+                .into(),
+            ),
             ..Default::default()
         }
     }
@@ -246,7 +291,7 @@ impl SupportedCodeAction {
     /// Returns the LSP code action kind that map to this code action.
     fn to_kind(self) -> CodeActionKind {
         match self {
-            Self::QuickFix => CodeActionKind::QUICKFIX,
+            Self::QuickFix => CodeActionKind::QuickFix,
             Self::SourceFixAll => crate::SOURCE_FIX_ALL_RUFF,
             Self::SourceOrganizeImports => crate::SOURCE_ORGANIZE_IMPORTS_RUFF,
             Self::NotebookSourceFixAll => crate::NOTEBOOK_SOURCE_FIX_ALL_RUFF,
@@ -360,7 +405,7 @@ impl ServerPanicHookHandler {
                 client
                     .show_message(
                         "The Ruff language server exited with a panic. See the logs for more details.",
-                        MessageType::ERROR,
+                        MessageType::Error,
                     )
                     .ok();
             }

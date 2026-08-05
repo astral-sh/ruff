@@ -1,5 +1,4 @@
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidChangeWorkspaceFoldersNotification};
 
 use crate::server::Result;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
@@ -9,7 +8,7 @@ use crate::session::client::Client;
 pub(crate) struct DidChangeWorkspaceFoldersHandler;
 
 impl NotificationHandler for DidChangeWorkspaceFoldersHandler {
-    type NotificationType = notif::DidChangeWorkspaceFolders;
+    type NotificationType = DidChangeWorkspaceFoldersNotification;
 }
 
 impl SyncNotificationHandler for DidChangeWorkspaceFoldersHandler {

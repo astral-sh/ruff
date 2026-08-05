@@ -124,6 +124,22 @@ cn = compose(fn, fn, fn, fn, fn, fn, fn)
 reveal_type(cn)  # revealed: (int, /) -> int
 ```
 
+## Recursive callable constraints in constructors
+
+When inferring the generic constructor for `map`, an overloaded callable together with a gradual
+iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
+substituting those constraints.
+
+```py
+import operator
+from typing import Any
+
+ints: list[int] = []
+dynamic: Any = []
+
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
+```
+
 ## Decorated
 
 ```py
@@ -1007,7 +1023,7 @@ def _(args: tuple[str, str]) -> None:
 
 # But, with a fixed-length tuple that is too long, we get the expected error.
 def _(args: tuple[str, str, str]) -> None:
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int | float`, found `str`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `float`, found `str`"
     # error: [parameter-already-assigned] "Multiple values provided for parameter `c` of function `f`"
     f(*args, c=1.0)
 ```
@@ -1286,7 +1302,7 @@ len([], 1)
 ### Type property predicates
 
 ```py
-from ty_extensions import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # error: [missing-argument]
 is_subtype_of()
@@ -1334,6 +1350,7 @@ def _(kwargs: dict[str, int]) -> None:
 
 f(**{"foo": 1})
 f(**dict(foo=1))
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
 f(**Foo(a=1, b=2))
 ```
 
@@ -1390,13 +1407,13 @@ f(**Foo(a=1, b=2))
 
 ```py
 def f(**kwargs: int) -> None: ...
-def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list]) -> None:
+def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list[int]]) -> None:
     f(**kwargs1, **kwargs2)
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
     f(**kwargs1, **kwargs3)
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
     # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[Unknown]`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[int]`"
     f(**kwargs3, **kwargs4)
 ```
 
@@ -1440,10 +1457,37 @@ class Foo2(TypedDict):
 
 def f(**kwargs: int) -> None: ...
 
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+# snapshot: invalid-argument-type
+# snapshot: invalid-argument-type
 f(**Foo1(a=1, b="b"))
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
 f(**Foo2(a=1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:3
+   |
+15 | f(**Foo1(a=1, b="b"))
+   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
+info: Function defined here
+  --> src/mdtest_snippet.py:11:5
+   |
+11 | def f(**kwargs: int) -> None: ...
+   |     ^ ------------- Parameter declared here
+
+
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:3
+   |
+15 | f(**Foo1(a=1, b="b"))
+   |   ^^^^^^^^^^^^^^^^^^ Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`
+info: Function defined here
+  --> src/mdtest_snippet.py:11:5
+   |
+11 | def f(**kwargs: int) -> None: ...
+   |     ^ ------------- Parameter declared here
 ```
 
 ### TypedDict union
@@ -1474,6 +1518,7 @@ def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
     needs_known_keys(**good)
 
     # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
     takes_int_kwargs(**bad)
 ```
 
@@ -1528,7 +1573,7 @@ Or, it can be a type that is assignable to `str`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(kwargs1: dict[Any, int], kwargs2: dict[Unknown, int]) -> None:
     f(**kwargs1)
@@ -1571,7 +1616,7 @@ def _(kwargs: dict[str, int]) -> None:
 ### `Unknown` type
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(**kwargs: int) -> None: ...
 def _(kwargs: Unknown):
@@ -1634,16 +1679,16 @@ mapping.
 ```py
 from typing import TypeVar
 
-_T = TypeVar("_T")
+_MappingT = TypeVar("_MappingT")
 
-def f(**kwargs: _T) -> _T:
+def f(**kwargs: _MappingT) -> _MappingT:
     return kwargs["a"]
 
 def _(kwargs: dict[str, int]) -> None:
     reveal_type(f(**kwargs))  # revealed: int
 ```
 
-For a `TypedDict`, the type variable should be specialized to the union of all value types.
+For an open `TypedDict`, the type variable must also account for hidden values of type `object`.
 
 ```py
 from typing import TypeVar
@@ -1658,7 +1703,7 @@ class Foo(TypedDict):
 def f(**kwargs: _T) -> _T:
     return kwargs["a"]
 
-reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
+reveal_type(f(**Foo(a=1, b="b")))  # revealed: object
 ```
 
 ## Non-iterable variadic argument
@@ -1715,7 +1760,7 @@ variadic expansion should not greedily consume optional positional parameters th
 as explicit keyword arguments.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
 def _(args: "Unknown | tuple[int, int, int]"):

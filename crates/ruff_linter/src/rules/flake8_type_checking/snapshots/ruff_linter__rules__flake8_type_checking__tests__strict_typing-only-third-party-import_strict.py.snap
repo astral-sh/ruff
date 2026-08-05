@@ -12,22 +12,18 @@ TC002 [*] Move third-party import `pkg.A` into a type-checking block
 29 |     def test(value: A):
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pkg import A
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-28 | def f():
-29 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 30 |     import pkg
    -     from pkg import A
 31 |
-32 |     def test(value: A):
-33 |         return pkg.B()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.A` into a type-checking block
@@ -41,23 +37,19 @@ TC002 [*] Move third-party import `pkg.A` into a type-checking block
 37 |     def test(value: A):
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pkg import A
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-36 |
-37 | def f():
 38 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
    -     from pkg import A, B
 39 +     from pkg import B
 40 |
-41 |     def test(value: A):
-42 |         return B()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
@@ -71,22 +63,18 @@ TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
 56 |     def test(value: A):
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     from pkg.bar import A
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-55 | def f():
-56 |     # In un-strict mode, this _should_ raise an error, since `pkg.bar` isn't used at runtime
 57 |     import pkg
    -     from pkg.bar import A
 58 |
-59 |     def test(value: A):
-60 |         return pkg.B()
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
@@ -99,22 +87,18 @@ TC002 [*] Move third-party import `pkg` into a type-checking block
 63 |     import pkg.bar as B
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pkg
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-63 |
-64 | def f():
 65 |     # In un-strict mode, this shouldn't raise an error, since `pkg.bar` is used at runtime.
    -     import pkg
 66 |     import pkg.bar as B
-67 |
-68 |     def test(value: pkg.A):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.foo` into a type-checking block
@@ -127,22 +111,18 @@ TC002 [*] Move third-party import `pkg.foo` into a type-checking block
 72 |     import pkg.foo.bar as B
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pkg.foo as F
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-72 |
-73 | def f():
 74 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
    -     import pkg.foo as F
 75 |     import pkg.foo.bar as B
-76 |
-77 |     def test(value: F.Foo):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
@@ -155,22 +135,18 @@ TC002 [*] Move third-party import `pkg` into a type-checking block
 81 |     import pkg.foo.bar as B
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pkg
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-81 |
-82 | def f():
 83 |     # In un-strict mode, this shouldn't raise an error, since `pkg.foo.bar` is used at runtime.
    -     import pkg
 84 |     import pkg.foo.bar as B
-85 |
-86 |     def test(value: pkg.A):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg` into a type-checking block
@@ -183,22 +159,18 @@ TC002 [*] Move third-party import `pkg` into a type-checking block
 92 |     import pkgfoo.bar as B
    |
 help: Move into type-checking block
+   |
 1  | from __future__ import annotations
 2  + from typing import TYPE_CHECKING
 3  +
 4  + if TYPE_CHECKING:
 5  +     import pkg
 6  |
-7  |
-8  | def f():
 --------------------------------------------------------------------------------
-92 |     # In un-strict mode, this _should_ raise an error, since `pkg` isn't used at runtime.
-93 |     # Note that `pkg` is a prefix of `pkgfoo` which are both different modules. This is
 94 |     # testing the implementation.
    -     import pkg
 95 |     import pkgfoo.bar as B
-96 |
-97 |     def test(value: pkg.A):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pkg.foo` into a type-checking block
@@ -212,20 +184,16 @@ TC002 [*] Move third-party import `pkg.foo` into a type-checking block
 103 |     def test(value: F.Foo):
     |
 help: Move into type-checking block
+    |
 1   | from __future__ import annotations
 2   + from typing import TYPE_CHECKING
 3   +
 4   + if TYPE_CHECKING:
 5   +     import pkg.foo as F
 6   |
-7   |
-8   | def f():
 --------------------------------------------------------------------------------
-102 | def f():
-103 |     # In un-strict mode, this shouldn't raise an error, since `pkg` is used at runtime.
 104 |     import pkg.bar as B
     -     import pkg.foo as F
 105 |
-106 |     def test(value: F.Foo):
-107 |         return B.Bar()
+    |
 note: This is an unsafe fix and may change runtime behavior

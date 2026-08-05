@@ -64,6 +64,9 @@ uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_incremen
 
 The tested type checkers implement Python's type system to varying degrees and
 some projects only successfully pass type checking using a specific type checker.
+We benchmark against the latest version of each type checker, but some projects
+may use another version in practice, leading to different diagnostic results
+between benchmarking and reality.
 
 ## Updating the benchmark
 

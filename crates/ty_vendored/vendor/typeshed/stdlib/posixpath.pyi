@@ -106,12 +106,14 @@ def abspath(path: AnyStr) -> AnyStr: ...
 
 if sys.version_info >= (3, 15):
     @overload
-    def basename(p: PathLike[AnyStr], /) -> AnyStr: ...
+    def basename(p: PathLike[AnyStr], /) -> AnyStr:
+        """Returns the final component of a pathname"""
     @overload
     def basename(p: AnyOrLiteralStr, /) -> AnyOrLiteralStr: ...
 
     @overload
-    def dirname(p: PathLike[AnyStr], /) -> AnyStr: ...
+    def dirname(p: PathLike[AnyStr], /) -> AnyStr:
+        """Returns the directory component of a pathname"""
     @overload
     def dirname(p: AnyOrLiteralStr, /) -> AnyOrLiteralStr: ...
 else:
@@ -145,7 +147,8 @@ def expandvars(path: AnyStr) -> AnyStr: ...
 
 if sys.version_info >= (3, 15):
     @overload
-    def normcase(s: PathLike[AnyStr], /) -> AnyStr: ...
+    def normcase(s: PathLike[AnyStr], /) -> AnyStr:
+        """Normalize case of pathname.  Has no effect under Posix"""
     @overload
     def normcase(s: AnyOrLiteralStr, /) -> AnyOrLiteralStr: ...
 else:
@@ -186,7 +189,10 @@ def join(a: BytesPath, /, *paths: BytesPath) -> bytes: ...
 
 if sys.version_info >= (3, 15):
     @overload
-    def realpath(filename: PathLike[AnyStr], /, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
+    def realpath(filename: PathLike[AnyStr], /, *, strict: bool | _AllowMissingType = False) -> AnyStr:
+        """Return the canonical path of the specified filename, eliminating any
+        symbolic links encountered in the path.
+        """
     @overload
     def realpath(filename: AnyStr, /, *, strict: bool | _AllowMissingType = False) -> AnyStr: ...
 else:
@@ -208,12 +214,18 @@ def relpath(path: StrPath, start: StrPath | None = None) -> str: ...
 
 if sys.version_info >= (3, 15):
     @overload
-    def split(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]: ...
+    def split(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]:
+        """Split a pathname.  Returns tuple "(head, tail)" where "tail" is
+        everything after the final slash.  Either part may be empty.
+        """
     @overload
     def split(p: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
 
     @overload
-    def splitdrive(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]: ...
+    def splitdrive(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]:
+        """Split a pathname into drive and path. On Posix, drive is always
+        empty.
+        """
     @overload
     def splitdrive(p: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
 else:
@@ -235,7 +247,12 @@ else:
 
 if sys.version_info >= (3, 15):
     @overload
-    def splitext(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]: ...
+    def splitext(p: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr]:
+        """Split the extension from a pathname.
+
+        Extension is everything from the last dot to the end, ignoring
+        leading dots.  Returns "(root, ext)"; ext may be empty.
+        """
     @overload
     def splitext(p: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
 else:
@@ -250,7 +267,8 @@ else:
     def splitext(p: AnyOrLiteralStr) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr]: ...
 
 if sys.version_info >= (3, 15):
-    def isabs(s: StrOrBytesPath, /) -> bool: ...
+    def isabs(s: StrOrBytesPath, /) -> bool:
+        """Test whether a path is absolute"""
 
 else:
     def isabs(s: StrOrBytesPath) -> bool:
@@ -270,9 +288,14 @@ if sys.version_info >= (3, 12):
         """Test whether a path is a junction
         Junctions are not supported on the current platform
         """
+
     if sys.version_info >= (3, 15):
         @overload
-        def splitroot(path: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr, AnyOrLiteralStr]: ...
+        def splitroot(path: AnyOrLiteralStr, /) -> tuple[AnyOrLiteralStr, AnyOrLiteralStr, AnyOrLiteralStr]:
+            """Split a pathname into drive, root and tail.
+
+            The tail contains anything after the root.
+            """
         @overload
         def splitroot(path: PathLike[AnyStr], /) -> tuple[AnyStr, AnyStr, AnyStr]: ...
     else:

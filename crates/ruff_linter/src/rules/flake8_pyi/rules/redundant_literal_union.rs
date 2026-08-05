@@ -36,6 +36,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// x: Literal[b"B"] | str
 /// ```
+///
+/// ## Known issues
+/// This rule is opinionated and may not be appropriate for projects that keep
+/// literal members for editor suggestions, generated documentation, or another
+/// non-type-checking purpose. In those cases, disabling this rule for the
+/// affected annotations may be reasonable.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct RedundantLiteralUnion {

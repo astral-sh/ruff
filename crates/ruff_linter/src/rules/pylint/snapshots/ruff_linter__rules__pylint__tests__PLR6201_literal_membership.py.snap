@@ -11,12 +11,12 @@ PLR6201 [*] Use a set literal when testing for membership
 4 | 1 in (
   |
 help: Convert to `set`
+  |
 1 | # Errors
   - 1 in [1, 2, 3]
 2 + 1 in {1, 2, 3}
 3 | 1 in (1, 2, 3)
-4 | 1 in (
-5 |     1, 2, 3
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
@@ -30,13 +30,12 @@ PLR6201 [*] Use a set literal when testing for membership
 5 |     1, 2, 3
   |
 help: Convert to `set`
-1 | # Errors
+  |
 2 | 1 in [1, 2, 3]
   - 1 in (1, 2, 3)
 3 + 1 in {1, 2, 3}
 4 | 1 in (
-5 |     1, 2, 3
-6 | )
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
@@ -53,8 +52,7 @@ PLR6201 [*] Use a set literal when testing for membership
 8 |   "cherry" in fruits
   |
 help: Convert to `set`
-1 | # Errors
-2 | 1 in [1, 2, 3]
+  |
 3 | 1 in (1, 2, 3)
   - 1 in (
 4 + 1 in {
@@ -62,8 +60,7 @@ help: Convert to `set`
   - )
 6 + }
 7 | fruits = ["cherry", "grapes"]
-8 | "cherry" in fruits
-9 | _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6201 [*] Use a set literal when testing for membership
@@ -77,12 +74,10 @@ PLR6201 [*] Use a set literal when testing for membership
 11 | # OK
    |
 help: Convert to `set`
-6  | )
-7  | fruits = ["cherry", "grapes"]
+   |
 8  | "cherry" in fruits
    - _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in ("a", "b")}
 9  + _ = {key: value for key, value in {"a": 1, "b": 2}.items() if key in {"a", "b"}}
 10 |
-11 | # OK
-12 | fruits in [[1, 2, 3], [4, 5, 6]]
+   |
 note: This is an unsafe fix and may change runtime behavior

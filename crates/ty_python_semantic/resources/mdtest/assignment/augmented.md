@@ -9,7 +9,7 @@ reveal_type(x)  # revealed: Literal[2]
 
 x = 1.0
 x /= 2
-reveal_type(x)  # revealed: int | float
+reveal_type(x)  # revealed: float
 
 x = (1, 2)
 x += (3, 4)
@@ -68,7 +68,6 @@ error[unsupported-operator]: Unsupported `-=` operation
   | |    |
   | |    Has type `Literal[1]`
   | Has type `C`
-  |
 ```
 
 ## Method union
@@ -141,7 +140,7 @@ def _(flag1: bool, flag2: bool):
         f = 42.0
     f += 12
 
-    reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: float | str
 ```
 
 ## Target union
@@ -185,7 +184,7 @@ def f(flag: bool, flag2: bool):
         f = Bar()
     f += 12
 
-    reveal_type(f)  # revealed: int | str | float
+    reveal_type(f)  # revealed: float | str
 ```
 
 ## Implicit dunder calls on class objects

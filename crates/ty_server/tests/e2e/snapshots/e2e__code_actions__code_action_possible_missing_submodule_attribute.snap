@@ -27,6 +27,7 @@ expression: code_actions
         "message": "Submodule `parser` might not have been imported\n\nhelp: Consider explicitly importing `html.parser`"
       }
     ],
+    "isPreferred": false,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -41,11 +42,10 @@ expression: code_actions
                 "character": 11
               }
             },
-            "newText": "  # ty:ignore[possibly-missing-submodule]"
+            "newText": "  # ty: ignore[possibly-missing-submodule]"
           }
         ]
       }
-    },
-    "isPreferred": false
+    }
   }
 ]

@@ -106,7 +106,8 @@ python-version = "3.12"
 import types
 import typing
 import sys
-from ty_extensions import AlwaysTruthy, static_assert, is_subtype_of
+from ty_extensions import AlwaysTruthy, static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import _NoDefaultType
 
 static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))
@@ -124,14 +125,14 @@ static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ### `Callable` types always have ambiguous truthiness
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def f(x: Callable, y: Callable[[int], str]):
+def f(x: Callable[..., Any], y: Callable[[int], str]):
     reveal_type(bool(x))  # revealed: bool
     reveal_type(bool(y))  # revealed: bool
 ```
 
-But certain callable single-valued types are known to be always truthy:
+But certain callable objects are known to be always truthy:
 
 ```py
 from types import FunctionType
