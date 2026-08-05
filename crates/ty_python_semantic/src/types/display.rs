@@ -2380,7 +2380,7 @@ pub(crate) struct DisplaySignature<'a, 'db> {
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> DisplaySignature<'_, 'db> {
+impl DisplaySignature<'_, '_> {
     #[must_use]
     pub(crate) fn multiline(self) -> Self {
         Self {
