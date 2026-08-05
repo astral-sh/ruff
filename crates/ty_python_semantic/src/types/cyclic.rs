@@ -20,7 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::cmp::Eq;
 use std::fmt;
 use std::hash::Hash;
@@ -52,6 +52,28 @@ impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::Other(self))
+    }
+
+    /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
+    ///
+    /// A `true` result is only a candidate match and must be confirmed with
+    /// [`Type::to_type_identity`].
+    pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+        match (self, other) {
+            (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
+            (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
+            (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
+                a.definition(db) == b.definition(db)
+            }
+            (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
+            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            _ => false,
+        }
     }
 
     #[allow(clippy::inline_always)]
@@ -92,12 +114,24 @@ impl<'db> ProtocolInstanceType<'db> {
 pub trait HasIdentity<'db> {
     type Id: PartialEq;
 
+    /// Returns `false` if `self` and `other` cannot have the same identity.
+    ///
+    /// Implementations can use this to avoid constructing an expensive identity. Returning
+    /// `true` does not imply that the identities match; [`HasIdentity::to_identity`] confirms it.
+    fn may_share_identity(&self, _db: &'db dyn Db, _other: &Self) -> bool {
+        true
+    }
+
     /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
     type Id = TypeIdentity<'db>;
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.may_share_type_identity(db, *other)
+    }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         Type::to_type_identity(*self, db)
@@ -109,6 +143,10 @@ pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, T
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
 
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0) && self.1.may_share_type_identity(db, other.1)
+    }
+
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_type_identity(db), self.1.to_type_identity(db))
     }
@@ -119,6 +157,12 @@ where
     Context: Copy + PartialEq,
 {
     type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.0.may_share_type_identity(db, other.0)
+            && self.1 == other.1
+            && self.2.may_share_type_identity(db, other.2)
+    }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (
@@ -228,15 +272,27 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        let identity = item.to_identity(db);
-        if seen
+        let mut candidates = seen
             .iter()
-            .filter(|active| active.identity == identity)
-            .count()
-            > MAX_RECURSIVE_TYPE_EXPANSIONS
-        {
-            return CycleDetectorVisit::Cycle(item);
-        }
+            .filter(|active| item.may_share_identity(db, &active.item))
+            .peekable();
+        let identity = if candidates.peek().is_none() {
+            OnceCell::new()
+        } else {
+            // Deriving an identity can require a structural definition walk. Defer it until a
+            // cheap candidate match shows that another active item could form a cycle.
+            let identity = item.to_identity(db);
+            if candidates
+                .filter(|active| {
+                    active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
+                })
+                .count()
+                > MAX_RECURSIVE_TYPE_EXPANSIONS
+            {
+                return CycleDetectorVisit::Cycle(item);
+            }
+            OnceCell::from(identity)
+        };
         drop(seen);
 
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
@@ -259,7 +315,7 @@ where
 
 struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
     item: T,
-    identity: T::Id,
+    identity: OnceCell<T::Id>,
 }
 
 impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVisit<'db, T> {
@@ -541,6 +597,10 @@ mod tests {
     impl<'db> HasIdentity<'db> for CountingIdentityItem<'_> {
         type Id = u8;
 
+        fn may_share_identity(&self, _db: &'db dyn Db, other: &Self) -> bool {
+            self.value % 2 == other.value % 2
+        }
+
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             self.identity_calls.set(self.identity_calls.get() + 1);
             self.value
@@ -599,6 +659,40 @@ mod tests {
             1
         );
         assert_eq!(identity_calls.get(), 2);
+    }
+
+    #[test]
+    fn skips_identity_for_distinct_candidates() {
+        let db = setup_db();
+        let db = &db;
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || {
+                detector.visit(db, CountingIdentityItem::new(2, &identity_calls), || 1)
+            }),
+            1
+        );
+        assert_eq!(identity_calls.get(), 0);
+    }
+
+    #[test]
+    fn skips_identity_without_a_distinct_active_item() {
+        let db = setup_db();
+        let db = &db;
+        let identity_calls = Cell::new(0);
+        let detector = CycleDetector::<TestVisit, CountingIdentityItem<'_>, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || 1),
+            1
+        );
+        assert_eq!(
+            detector.visit(db, CountingIdentityItem::new(1, &identity_calls), || 2),
+            1
+        );
+        assert_eq!(identity_calls.get(), 0);
     }
 
     #[test]
