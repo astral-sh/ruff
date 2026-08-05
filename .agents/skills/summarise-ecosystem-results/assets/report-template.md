@@ -14,9 +14,26 @@
 
 <Explain the exact behavior on the merge base and PR. Group additional entries here only when the same explanation and minimized reproducer account for all of them.>
 
+<!--
+A minimal reproducer should annotate every line with a new, changed, or removed diagnostic using comments immediately above that line. Include the full error messages and error codes from both revisions, including duplicates.
+
+For example:
+
 ```python
-# Merge base: <every full diagnostic message and error code, including duplicates, or no diagnostic>
-# PR: <every full diagnostic message and error code, including duplicates, or no diagnostic>
+from typing import Final
+
+# Merge base: `[error-code-1] "Some error message"`
+# PR: no diagnostic
+x: Final = 42
+
+if x:
+    # Merge base: `[error-code-2] "Some error message"`
+    # PR: `[error-code-2] "Some other error message"`
+    Y = 56
+```
+-->
+
+```python
 <minimal reproducer>
 ```
 
