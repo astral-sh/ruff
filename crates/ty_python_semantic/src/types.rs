@@ -9026,9 +9026,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypingSelfInMetaclass => {
                         f.write_str("`Self` cannot be used in a metaclass")
                     }
-                    InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(_) => {
-                        f.write_str("`Self` is incompatible with this receiver annotation")
-                    }
+                    InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(_) => f.write_str(
+                        "`Self` requires `self: Self` or `cls: type[Self]` for annotated receivers",
+                    ),
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,

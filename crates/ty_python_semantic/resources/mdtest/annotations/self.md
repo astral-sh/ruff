@@ -835,6 +835,14 @@ class Valid:
         return self
 ```
 
+A different receiver annotation is valid when the method's signature does not use `Self`:
+
+```py
+class WithoutSelf:
+    def method(self: T) -> T:
+        return self
+```
+
 Any other annotation for the first parameter is incompatible with `Self`, even an annotation that
 names the class itself:
 
@@ -878,6 +886,15 @@ class Valid:
 
     @classmethod
     def explicit(cls: type[Self]) -> Self:
+        return cls()
+```
+
+A class method can also use a different receiver annotation when its signature does not use `Self`:
+
+```py
+class WithoutSelf:
+    @classmethod
+    def method(cls: type[T]) -> T:
         return cls()
 ```
 
@@ -954,14 +971,14 @@ class Repeated:
 ```
 
 ```snapshot
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for annotated receivers
   --> src/mdtest_snippet.py:12:43
    |
 12 |     def method(self: object, other: Union[Self, Self]) -> None: ...
    |                                           ^^^^
 
 
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for annotated receivers
   --> src/mdtest_snippet.py:12:49
    |
 12 |     def method(self: object, other: Union[Self, Self]) -> None: ...
@@ -1038,7 +1055,7 @@ class InvalidReturn:
 ```
 
 ```snapshot
-error[invalid-type-form]: `Self` is incompatible with this receiver annotation
+error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for annotated receivers
   --> src/mdtest_snippet.py:15:33
    |
 15 |     def union(self: object) -> "Self | object": ...
