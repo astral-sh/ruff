@@ -3645,6 +3645,93 @@ reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[Unknown]
 reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[Unknown]
 ```
 
+### Constructor inference from unpacked TypedDicts
+
+Unpacking a `TypedDict` with required keys contributes each field's type to constructor inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NotRequired, TypedDict
+
+class Source(TypedDict):
+    value: int
+
+class Box[T](TypedDict):
+    value: T
+
+def unpack(source: Source):
+    reveal_type(Box(**source))  # revealed: Box[int]
+```
+
+A type alias to a single `TypedDict` contributes the same field information.
+
+```py
+type SourceAlias = Source
+
+def unpack_alias(source: SourceAlias):
+    reveal_type(Box(**source))  # revealed: Box[int]
+```
+
+Different unpacked `TypedDict` arguments retain their separate field types.
+
+```py
+class First(TypedDict):
+    first: int
+
+class Second(TypedDict):
+    second: str
+
+class Pair[T](TypedDict):
+    first: T
+    second: str
+
+def unpack_multiple(first: First, second: Second):
+    reveal_type(Pair(**first, **second))  # revealed: Pair[int]
+```
+
+An optional source key does not satisfy a required constructor field.
+
+```py
+class MaybeSource(TypedDict):
+    value: NotRequired[int]
+
+def unpack_optional(source: MaybeSource):
+    Box(**source)  # error: [missing-typed-dict-key]
+```
+
+### Constructor inference from unpacked TypedDict unions
+
+A union can associate different value types with different callbacks. Inference remains gradual
+because combining those fields independently would reject a valid constructor call.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class IntSource(TypedDict):
+    value: int
+    callback: Callable[[int], None]
+
+class StrSource(TypedDict):
+    value: str
+    callback: Callable[[str], None]
+
+class Box[T](TypedDict):
+    value: T
+    callback: Callable[[T], None]
+
+def unpack(source: IntSource | StrSource):
+    reveal_type(Box(**source))  # revealed: Box[Unknown]
+```
+
 ### Constructor inference from recursive fields
 
 Recursive construction remains valid even though the outer constructor cannot yet infer its type
