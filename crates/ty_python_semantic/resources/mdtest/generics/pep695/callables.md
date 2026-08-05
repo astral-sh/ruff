@@ -630,6 +630,25 @@ redundant elements as we use for unions in general.
 ```py
 from typing import Any, Callable, final
 
+def infer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+def callback(value: A | Any) -> None: ...
+
+reveal_type(infer(callback))  # revealed: A | Any
+```
+
+## Combining gradual and static inferred upper bounds
+
+A gradual upper bound and a static upper bound should both be preserved, regardless of the order of
+the callable arguments.
+
+```py
+from typing import Any, Callable, final
+
 def infer[T](
     first: Callable[[T], None],
     second: Callable[[T], None],
