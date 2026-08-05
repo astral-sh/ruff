@@ -42,7 +42,7 @@ impl HintKind {
 
 pub fn hints(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Hint> {
     let source_file = file.file(db);
-    if !db.should_check_file(source_file) {
+    if !ty_project::should_check_semantics(db, source_file) {
         return Vec::new();
     }
 
