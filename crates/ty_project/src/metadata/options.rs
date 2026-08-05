@@ -19,6 +19,7 @@ use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -2158,6 +2159,46 @@ pub enum ToProgramSettingsError {
     /// One of the configured Python module search paths could not be resolved.
     #[error(transparent)]
     SearchPaths(#[from] SearchPathSettingsError),
+}
+
+impl ToProgramSettingsError {
+    /// Returns the program-settings error without its optional diagnostic detail.
+    pub(crate) fn message(&self) -> String {
+        self.to_string()
+    }
+
+    /// Returns details for failures whose message only identifies the failed operation.
+    pub(crate) fn hint(&self) -> Option<String> {
+        match self {
+            Self::PythonEnvironmentDiscovery(error) | Self::SitePackagesDiscovery(error) => {
+                Some(error.to_string())
+            }
+            Self::PythonEnvironment(_) | Self::SearchPaths(_) => None,
+        }
+    }
+
+    pub(crate) fn setting_source<'a>(
+        &self,
+        options: &'a Options,
+    ) -> Option<(&'a ValueSource, Option<TextRange>)> {
+        let environment = options.environment.as_ref()?;
+
+        match self {
+            Self::PythonEnvironment(_) | Self::SitePackagesDiscovery(_) => environment
+                .python
+                .as_ref()
+                .map(|setting| (setting.source(), setting.range())),
+            Self::SearchPaths(
+                SearchPathSettingsError::FailedToReadVersionsFile { .. }
+                | SearchPathSettingsError::VersionsParseError(_),
+            ) => environment
+                .typeshed
+                .as_ref()
+                .map(|setting| (setting.source(), setting.range())),
+            Self::PythonEnvironmentDiscovery(_)
+            | Self::SearchPaths(SearchPathSettingsError::InvalidSearchPath(_)) => None,
+        }
+    }
 }
 
 /// Error returned when the settings can't be resolved because of a hard error.
