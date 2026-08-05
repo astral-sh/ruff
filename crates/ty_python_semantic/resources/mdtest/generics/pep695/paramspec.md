@@ -1457,7 +1457,7 @@ reveal_type(identity(1))  # revealed: Literal[1]
 reveal_type(identity("hello"))  # revealed: Literal["hello"]
 
 reveal_type(pair(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
-reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float]
+reveal_type(pair("x", 2.5))  # revealed: tuple[Literal["x"], float*]
 ```
 
 ### Chained decorators with generic functions

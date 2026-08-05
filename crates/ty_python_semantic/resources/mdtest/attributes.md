@@ -4021,8 +4021,8 @@ reveal_type(C.a_int)  # revealed: int
 reveal_type(C.a_str)  # revealed: str
 reveal_type(C.a_bytes)  # revealed: bytes
 reveal_type(C.a_bool)  # revealed: bool
-reveal_type(C.a_float)  # revealed: int | float
-reveal_type(C.a_complex)  # revealed: int | float | complex
+reveal_type(C.a_float)  # revealed: float
+reveal_type(C.a_complex)  # revealed: complex
 reveal_type(C.a_tuple)  # revealed: tuple[int]
 reveal_type(C.a_range)  # revealed: range
 # TODO: revealed: slice[Any, Literal[1], Any]

@@ -2434,7 +2434,7 @@ class ReadClass(Protocol[JustT_co]):
     def __class__(self, /) -> type[JustT_co]: ...
 
 def takes_read_class(value: ReadClass[float]) -> None:
-    reveal_type(value)  # revealed: ReadClass[int | float]
+    reveal_type(value)  # revealed: ReadClass[float]
 
 takes_read_class(1)
 takes_read_class(1.0)
@@ -2446,7 +2446,7 @@ class WritableValue(Protocol[JustT]):
     def value(self, value: type[JustT], /) -> None: ...
 
 def takes_writable_value(value: WritableValue[float]) -> None:
-    reveal_type(value)  # revealed: WritableValue[int | float]
+    reveal_type(value)  # revealed: WritableValue[float]
 ```
 
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the

@@ -771,7 +771,7 @@ class Derived(Base):
 
     @other.setter
     def other(self, v: float) -> None:
-        reveal_type(self.value)  # revealed: int | float
+        reveal_type(self.value)  # revealed: float
         self.value = v
 ```
 

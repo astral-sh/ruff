@@ -87,19 +87,19 @@ info:   (a: str, b: str, c: int) -> Unknown
 info:   (a: int, b: str, c: str) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
 info:   (a: int, b: int, c: int) -> Unknown
-info:   (a: int | float, b: int, c: int) -> Unknown
-info:   (a: int, b: int | float, c: int) -> Unknown
-info:   (a: int, b: int, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int) -> Unknown
-info:   (a: int, b: int | float, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: float, b: int, c: int) -> Unknown
+info:   (a: int, b: float, c: int) -> Unknown
+info:   (a: int, b: int, c: float) -> Unknown
+info:   (a: float, b: float, c: int) -> Unknown
+info:   (a: int, b: float, c: float) -> Unknown
+info:   (a: float, b: float, c: float) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
-info:   (a: int | float, b: str, c: str) -> Unknown
-info:   (a: str, b: int | float, c: str) -> Unknown
-info:   (a: str, b: str, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: str) -> Unknown
-info:   (a: str, b: int | float, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: float, b: str, c: str) -> Unknown
+info:   (a: str, b: float, c: str) -> Unknown
+info:   (a: str, b: str, c: float) -> Unknown
+info:   (a: float, b: float, c: str) -> Unknown
+info:   (a: str, b: float, c: float) -> Unknown
+info:   (a: float, b: float, c: float) -> Unknown
 info: Overload implementation defined here
   --> src/mdtest_snippet.py:47:5
    |

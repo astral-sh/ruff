@@ -174,7 +174,7 @@ takes_float_sequence([1])
 
 mutable_floats = [1.0]
 mutable_floats.append(1)
-reveal_type(mutable_floats)  # revealed: list[int | float]
+reveal_type(mutable_floats)  # revealed: list[float]
 ```
 
 ### Exact complex types in covariant contexts
@@ -1906,7 +1906,7 @@ def overloaded_call(data: object, dtype: object) -> object:
 
 def _(dtype: FloatDtype):
     x = overloaded_call([1.0], dtype)
-    reveal_type(x)  # revealed: int | float
+    reveal_type(x)  # revealed: float
 ```
 
 ```py
@@ -2278,7 +2278,7 @@ def _() -> int:
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]
-reveal_type(x7)  # revealed: list[int | str | float]
+reveal_type(x7)  # revealed: list[float | str]
 ```
 
 ```py
@@ -2415,7 +2415,7 @@ x23 = [None, None, None]
 x23[0] = 1
 x23[1] = "2"
 x23[2] = 3.0
-reveal_type(x23)  # revealed: list[int | str | float | None]
+reveal_type(x23)  # revealed: list[float | str | None]
 ```
 
 ```py

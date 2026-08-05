@@ -211,7 +211,7 @@ class Point(NamedTuple("Point", [("x", int), ("y", int)])):
 p = Point(3, 4)
 reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
-reveal_type(p.magnitude())  # revealed: int | float
+reveal_type(p.magnitude())  # revealed: float
 ```
 
 String annotations in dangling calls work correctly for forward references to classes defined in the
@@ -1197,11 +1197,11 @@ class Property[T](NamedTuple):
     name: str
     value: T
 
-reveal_type(Property("height", 3.4))  # revealed: Property[float]
+reveal_type(Property("height", 3.4))  # revealed: Property[float*]
 reveal_type(Property.value)  # revealed: property
 reveal_type(Property.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(Property[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(Property("height", 3.4).value)  # revealed: float
+reveal_type(Property("height", 3.4).value)  # revealed: float*
 
 T = TypeVar("T")
 
@@ -1213,7 +1213,7 @@ reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
 reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
 ### Functional syntax with generics
@@ -2030,5 +2030,5 @@ class GenericChild(GenericBase[T]):
         reveal_type(instance)  # revealed: Self@__new__
         return instance
 
-reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[float]
 ```
