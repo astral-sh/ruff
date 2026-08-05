@@ -4126,7 +4126,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }));
 
                     self.try_node_context_stack_manager
-                        .push_context(true, false);
+                        .push_context(ExceptionHandlers::propagating());
                     suppression_contexts.push(suppression_predicate);
                 }
 
