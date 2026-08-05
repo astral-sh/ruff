@@ -3665,7 +3665,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
                 nontrivial_check(self, || {
-                    self.check_type_pair(db, newtype.concrete_base_type(db), other)
+                    let base = newtype.concrete_base_type(db);
+                    if let Type::NominalInstance(instance) = other
+                        && let ClassType::NonGeneric(class) = instance.class(db, env)
+                        && class.is_final(db)
+                        && base != other
+                    {
+                        // Unlike a final generic class, a non-generic final class cannot share a
+                        // narrower subtype with a NewType based on a different class.
+                        self.always()
+                    } else {
+                        self.check_type_pair(db, base, other)
+                    }
                 })
             }
 

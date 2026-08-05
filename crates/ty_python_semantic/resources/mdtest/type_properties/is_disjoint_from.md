@@ -23,6 +23,74 @@ static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
+## NewTypes and boolean types
+
+An integer-based `NewType` is disjoint from both boolean literals, their union, and `bool` itself.
+
+```py
+from typing import Literal, NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+UserId = NewType("UserId", int)
+
+static_assert(is_disjoint_from(UserId, Literal[True]))
+static_assert(is_disjoint_from(UserId, Literal[False]))
+static_assert(is_disjoint_from(UserId, Literal[True, False]))
+static_assert(is_disjoint_from(UserId, bool))
+static_assert(is_disjoint_from(bool, UserId))
+static_assert(not is_disjoint_from(UserId, int))
+```
+
+Nested and float-based NewTypes retain the distinction, while a NewType based directly on `bool`
+still overlaps with its base.
+
+```py
+NestedUserId = NewType("NestedUserId", UserId)
+FloatId = NewType("FloatId", float)
+BoolId = NewType("BoolId", bool)
+
+static_assert(is_disjoint_from(NestedUserId, bool))
+static_assert(is_disjoint_from(FloatId, bool))
+static_assert(not is_disjoint_from(BoolId, bool))
+```
+
+## NewTypes and final classes
+
+A NewType and a final subclass of its base cannot overlap unless the NewType itself is based on that
+final class. Non-final subclasses may still overlap with the NewType.
+
+```py
+from typing import NewType, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+UserId = NewType("UserId", int)
+
+@final
+class FinalInt(int): ...
+
+class OrdinaryInt(int): ...
+
+FinalIntId = NewType("FinalIntId", FinalInt)
+
+static_assert(is_disjoint_from(UserId, FinalInt))
+static_assert(not is_disjoint_from(UserId, OrdinaryInt))
+static_assert(not is_disjoint_from(FinalIntId, FinalInt))
+```
+
+An `IntEnum` with members is also final and disjoint from an integer-based NewType.
+
+```py
+from enum import IntEnum
+
+class Choice(IntEnum):
+    FIRST = 1
+    SECOND = 2
+
+static_assert(is_disjoint_from(UserId, Choice))
+```
+
 ## Statically empty and non-empty ranges
 
 ```py
@@ -156,6 +224,27 @@ static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 
 # `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
+```
+
+A covariant final generic specialization can overlap with a NewType without being its supertype:
+`FinalChild[int]` is a subtype of both the NewType's base, `Base[int]`, and `FinalChild[object]`.
+
+```py
+from typing import NewType
+from ty_extensions._internal import is_subtype_of
+
+class Base[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+@final
+class FinalChild[T](Base[T]): ...
+
+BaseId = NewType("BaseId", Base[int])
+
+static_assert(is_subtype_of(FinalChild[int], FinalChild[object]))
+static_assert(not is_subtype_of(BaseId, FinalChild[object]))
+static_assert(not is_disjoint_from(BaseId, FinalChild[object]))
 ```
 
 ## Invariant generic specializations and bases

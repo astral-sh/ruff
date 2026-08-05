@@ -449,6 +449,21 @@ def example_type_bool_type_str(
     reveal_type(i)  # revealed: Never
 ```
 
+An integer-based `NewType` is disjoint from `bool`, regardless of the intersection element order.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+
+def newtype_intersections(
+    user_bool: UserId & bool,
+    bool_user: bool & UserId,
+) -> None:
+    reveal_type(user_bool)  # revealed: Never
+    reveal_type(bool_user)  # revealed: Never
+```
+
 #### Positive and negative contributions
 
 If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can remove the negative
