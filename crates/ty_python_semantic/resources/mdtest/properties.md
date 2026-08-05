@@ -248,6 +248,24 @@ c.attr = 1
 reveal_type(c.attr)  # revealed: Never
 ```
 
+### Attempting to call a getter with an incompatible instance
+
+Explicit bound and unbound `property.__get__` calls preserve the getter's receiver error and return
+type. For the unbound call, the reported argument is the instance rather than the property itself.
+
+```py
+class C:
+    @property
+    def attr(self) -> int:
+        return 1
+
+# error: [invalid-argument-type] "Argument to function `C.attr` is incorrect: Expected `C`"
+reveal_type(C.attr.__get__("wrong", C))  # revealed: int
+
+# error: [invalid-argument-type] "Argument to function `C.attr` is incorrect: Expected `C`"
+reveal_type(property.__get__(C.attr, "wrong", C))  # revealed: int
+```
+
 ### Non-returning setter
 
 ```py
