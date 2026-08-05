@@ -20,7 +20,7 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{OnceCell, RefCell};
 use std::cmp::Eq;
 use std::fmt;
 use std::hash::Hash;
@@ -31,11 +31,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
+use crate::Db;
 use crate::types::function::FunctionLiteral;
-use crate::types::generics::Specialization;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
-use crate::types::{ClassType, ProtocolInstanceType, Type, TypeAliasType, TypedDictType};
-use crate::{Db, ProgramEnvironment};
+use crate::types::{ProtocolInstanceType, Type};
 
 const MAX_RECURSIVE_TYPE_EXPANSIONS: usize = 10;
 
@@ -44,16 +42,16 @@ const MAX_RECURSIVE_TYPE_EXPANSIONS: usize = 10;
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
-    RecursiveProtocol(Definition<'db>),
-    RecursiveTypeAlias(Definition<'db>),
-    RecursiveTypedDict(Definition<'db>),
-    NonRecursive(Type<'db>),
+    Protocol(Definition<'db>),
+    TypeAlias(Definition<'db>),
+    TypedDict(Definition<'db>),
+    Other(Type<'db>),
 }
 
 impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
-            .unwrap_or(TypeIdentity::NonRecursive(self))
+            .unwrap_or(TypeIdentity::Other(self))
     }
 
     /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
@@ -92,148 +90,16 @@ impl<'db> Type<'db> {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
             // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) if alias.is_recursive(db) => {
-                Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
+            Type::TypeAlias(alias) => Some(TypeIdentity::TypeAlias(alias.definition(db))),
+            Type::ProtocolInstance(protocol) => {
+                Some(TypeIdentity::Protocol(protocol.definition(db)?))
             }
-            Type::ProtocolInstance(protocol) if protocol.is_recursive(db) => {
-                Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
-            }
-            Type::TypedDict(typed_dict) if typed_dict.is_recursive(db) => {
+            Type::TypedDict(typed_dict) => {
                 let definition = typed_dict.definition(db)?;
-                Some(TypeIdentity::RecursiveTypedDict(definition))
+                Some(TypeIdentity::TypedDict(definition))
             }
             _ => None,
         }
-    }
-}
-
-struct DefinitionReferenceVisitor<'db> {
-    env: ProgramEnvironment<'db>,
-    target: Definition<'db>,
-    active_definitions: ActiveRecursionDetector<Definition<'db>>,
-    visited_types: TypeCollector<'db>,
-    found: Cell<bool>,
-}
-
-impl<'db> DefinitionReferenceVisitor<'db> {
-    /// Returns whether the definition represented by `ty` references `target`.
-    fn references(db: &'db dyn Db, ty: Type<'db>, target: Definition<'db>) -> bool {
-        let visitor = Self::new(target);
-        visitor.visit_definition_body(db, ty);
-        visitor.found.get()
-    }
-
-    fn new(target: Definition<'db>) -> Self {
-        Self {
-            env: ProgramEnvironment::from_definition(target),
-            target,
-            active_definitions: ActiveRecursionDetector::default(),
-            visited_types: TypeCollector::default(),
-            found: Cell::new(false),
-        }
-    }
-
-    fn definition_and_specialization(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> Option<(Definition<'db>, Option<Specialization<'db>>)> {
-        if let Type::TypeAlias(alias) = ty {
-            return Some((alias.definition(db), alias.specialization(db)));
-        }
-
-        let class = match ty {
-            Type::ProtocolInstance(protocol) => *protocol.class_origin(db)?,
-            Type::TypedDict(typed_dict) => typed_dict.defining_class()?,
-            _ => return None,
-        };
-        let definition = class.definition(db)?;
-        let specialization = class
-            .into_generic_alias()
-            .map(|generic| generic.specialization(db));
-        Some((definition, specialization))
-    }
-
-    fn visit_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) {
-        for ty in specialization.types(db) {
-            self.visit_type(db, *ty);
-        }
-    }
-
-    fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
-        match ty {
-            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
-            Type::ProtocolInstance(protocol) => {
-                self.visit_protocol_instance_type(db, protocol);
-            }
-            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
-            _ => {}
-        }
-    }
-}
-
-impl<'db> TypeVisitor<'db> for DefinitionReferenceVisitor<'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        &self.env
-    }
-
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if self.found.get() {
-            return;
-        }
-
-        if let Some((definition, specialization)) = Self::definition_and_specialization(db, ty) {
-            if definition == self.target {
-                self.found.set(true);
-                return;
-            }
-
-            if let Some(specialization) = specialization {
-                self.visit_specialization(db, specialization);
-            }
-
-            if !self.found.get() {
-                self.active_definitions.visit(
-                    &definition,
-                    || {},
-                    || self.visit_definition_body(db, ty),
-                );
-            }
-        } else {
-            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
-        }
-    }
-
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some(class) = protocol.class_origin(db) {
-            class.walk_recursive_member_types(db, self);
-        }
-    }
-
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        self.visit_type(db, alias.raw_value_type(db));
-    }
-
-    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
-        for field in typed_dict.items(db).values() {
-            self.visit_type(db, field.declared_ty);
-        }
-        if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
-            self.visit_type(db, extra_items.declared_ty);
-        }
-    }
-}
-
-impl<'db> TypeAliasType<'db> {
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
-        DefinitionReferenceVisitor::references(
-            db,
-            Type::TypeAlias(self.unspecialized(db)),
-            self.definition(db),
-        )
     }
 }
 
@@ -241,37 +107,6 @@ impl<'db> ProtocolInstanceType<'db> {
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
         Some(origin.definition(db))
-    }
-
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
-        let Some(class) = self.class_origin(db) else {
-            return false;
-        };
-        let Some((origin, _)) = class.static_class_literal(db) else {
-            return false;
-        };
-        let definition = origin.definition(db);
-        let env = ProgramEnvironment::from_definition(definition);
-        // Inspect the definition without its current specialization. Otherwise, a finite
-        // type such as `Protocol[Protocol[int]]` would appear recursive.
-        let unspecialized = Type::instance(db, &env, ClassType::NonGeneric(origin.into()));
-        DefinitionReferenceVisitor::references(db, unspecialized, definition)
-    }
-}
-
-impl<'db> TypedDictType<'db> {
-    fn is_recursive(self, db: &'db dyn Db) -> bool {
-        let Some(class) = self.defining_class() else {
-            return false;
-        };
-        let Some((origin, _)) = class.static_class_literal(db) else {
-            return false;
-        };
-        let definition = origin.definition(db);
-        // Inspect the definition without its current specialization for the same reason as
-        // protocols above.
-        let unspecialized = Type::typed_dict(ClassType::NonGeneric(origin.into()));
-        DefinitionReferenceVisitor::references(db, unspecialized, definition)
     }
 }
 
@@ -396,7 +231,7 @@ where
         item: T,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        match self.begin_visit_with_expansion_limit(db, item, MAX_RECURSIVE_TYPE_EXPANSIONS) {
+        match self.begin_visit(db, item) {
             CycleDetectorVisit::Ready(result) => Ok(result),
             CycleDetectorVisit::Cycle(item) => Err(item),
             CycleDetectorVisit::Pending(item) => {
@@ -406,14 +241,9 @@ where
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
-        self.begin_visit_with_expansion_limit(db, item, 0)
-    }
-
-    /// Starts a visit while allowing `expansion_limit` different items with the same identity
-    /// after the first active item. A limit of zero therefore stops at the first different item,
-    /// while a limit of `N` permits `N` further expansions. Exact item recurrence is handled
-    /// before this limit and returns the configured fallback at any depth.
+    /// Starts a visit while allowing `MAX_RECURSIVE_TYPE_EXPANSIONS` different items
+    /// with the same identity after the first active item.
+    /// Exact item recurrence is handled before this limit and returns the configured fallback at any depth.
     ///
     /// This is necessary because there are recursive aliases that require several expansions to reach a "stable point", such as:
     ///
@@ -432,12 +262,7 @@ where
     /// A growing specialization chain may never reach such an exact recurrence. The finite limit
     /// guarantees that it eventually produces [`CycleDetectorVisit::Cycle`], allowing the caller
     /// to return a conservative result.
-    fn begin_visit_with_expansion_limit(
-        &self,
-        db: &'db dyn Db,
-        item: T,
-        expansion_limit: usize,
-    ) -> CycleDetectorVisit<T, R> {
+    fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         if let Some(result) = self.cache.borrow().get(&item) {
             return CycleDetectorVisit::Ready(result.clone());
         }
@@ -462,7 +287,7 @@ where
                     active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
                 })
                 .count()
-                > expansion_limit
+                > MAX_RECURSIVE_TYPE_EXPANSIONS
             {
                 return CycleDetectorVisit::Cycle(item);
             }
@@ -722,16 +547,11 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
-    use crate::ProgramEnvironment;
+    use super::MAX_RECURSIVE_TYPE_EXPANSIONS;
+    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity};
     use crate::db::tests::setup_db;
-    use crate::place::global_symbol;
-    use crate::types::Type;
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithWritableSystem;
     use std::cell::Cell;
     use std::hash::{Hash, Hasher};
-    use ty_python_core::ProgramFile;
 
     struct TestVisit;
 
@@ -794,63 +614,6 @@ mod tests {
         type Id = ();
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {}
-    }
-
-    fn global_instance_type<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-    ) -> Type<'db> {
-        let file = system_path_to_file(db, "/src/a.py").unwrap();
-        let file = ProgramFile::new(db, file, env.program(db));
-        global_symbol(db, file, name)
-            .place
-            .expect_type()
-            .to_instance_approximation(db, env)
-            .unwrap()
-    }
-
-    #[test]
-    fn property_receiver_does_not_make_protocol_recursive() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-from __future__ import annotations
-
-from typing import Protocol
-
-class GenericProperty[T](Protocol):
-    @property
-    def value(self) -> T: ...
-
-class RecursiveProperty[T](Protocol):
-    @property
-    def child(self) -> RecursiveProperty[list[T]]: ...
-
-class RecursivePropertySetter[T](Protocol):
-    @property
-    def child(self) -> int: ...
-
-    @child.setter
-    def child(self, value: RecursivePropertySetter[list[T]]) -> None: ...
-"#,
-        )
-        .unwrap();
-
-        let env = db.program_environment();
-        assert_eq!(
-            global_instance_type(&db, &env, "GenericProperty").recursive_identity(&db),
-            None
-        );
-        assert!(matches!(
-            global_instance_type(&db, &env, "RecursiveProperty").recursive_identity(&db),
-            Some(TypeIdentity::RecursiveProtocol(_))
-        ));
-        assert!(matches!(
-            global_instance_type(&db, &env, "RecursivePropertySetter").recursive_identity(&db),
-            Some(TypeIdentity::RecursiveProtocol(_))
-        ));
     }
 
     #[test]
@@ -933,22 +696,32 @@ class RecursivePropertySetter[T](Protocol):
     }
 
     #[test]
-    fn different_items_with_same_identity_form_cycle() {
+    fn different_items_with_same_identity_hit_expansion_limit() {
         let db = setup_db();
         let db = &db;
         let detector = CycleDetector::<TestVisit, ConstantIdentityItem, u8, 1>::new(0);
 
-        let CycleDetectorVisit::Pending(pending) =
-            detector.begin_visit(db, ConstantIdentityItem(1))
+        let mut pending = Vec::new();
+        #[allow(clippy::cast_possible_truncation)]
+        for value in 1..=(MAX_RECURSIVE_TYPE_EXPANSIONS as u8 + 1) {
+            let CycleDetectorVisit::Pending(item) =
+                detector.begin_visit(db, ConstantIdentityItem(value))
+            else {
+                panic!("items within the recursive expansion limit should be pending");
+            };
+            pending.push(item);
+        }
+
+        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(db, ConstantIdentityItem(12))
         else {
-            panic!("the first identity should be pending");
+            panic!("the first item beyond the recursive expansion limit should form a cycle");
         };
-        let CycleDetectorVisit::Cycle(item) = detector.begin_visit(db, ConstantIdentityItem(2))
-        else {
-            panic!("a different item with the same identity should form a cycle");
-        };
-        assert_eq!(item.0, 2);
-        detector.finish_visit(pending, 1);
+        assert_eq!(item.0, 12);
+
+        for item in pending.into_iter().rev() {
+            let result = item.0;
+            detector.finish_visit(item, result);
+        }
 
         let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(1))
         else {
@@ -956,15 +729,15 @@ class RecursivePropertySetter[T](Protocol):
         };
         assert_eq!(seen, 1);
         let CycleDetectorVisit::Pending(pending) =
-            detector.begin_visit(db, ConstantIdentityItem(2))
+            detector.begin_visit(db, ConstantIdentityItem(12))
         else {
-            panic!("the second identity should be pending after the first is finished");
+            panic!("the item beyond the limit should be pending after the active visits finish");
         };
-        detector.finish_visit(pending, 2);
-        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(2))
+        detector.finish_visit(pending, 12);
+        let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(12))
         else {
-            panic!("the second identity should be ready after the pending visit is finished");
+            panic!("the item should be ready after the pending visit is finished");
         };
-        assert_eq!(seen, 2);
+        assert_eq!(seen, 12);
     }
 }

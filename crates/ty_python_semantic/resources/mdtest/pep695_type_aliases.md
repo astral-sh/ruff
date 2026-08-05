@@ -1080,9 +1080,9 @@ type StableWrapped[T] = list[StableWrapped[T]]
 def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     reveal_type(x)  # revealed: list[StableWrapped[int]]
     reveal_type(y)  # revealed: list[StableWrapped[str]]
-    # error: [invalid-assignment] "Object of type `StableWrapped[str]` is not assignable to `StableWrapped[int]`"
+    # We can assume that `StableWrapped[int]` is assignable to `StableWrapped[str]`.
+    # This is because differences in type variables do not make a difference in type structure.
     x = y
-    # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
     y = x
 ```
 

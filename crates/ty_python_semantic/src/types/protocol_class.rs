@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
@@ -99,31 +99,6 @@ impl<'db> ProtocolClass<'db> {
             specialization.with_materialization_kind(db, None),
         );
         ProtocolClass(ClassType::Generic(alias)).interface(db)
-    }
-
-    /// Walk the effective non-method member types declared by this protocol.
-    ///
-    /// Method relations have their own declaration-based recursion guard. Keeping them out of this
-    /// walk also avoids requesting a method signature while one of its annotations is being
-    /// inferred.
-    pub(super) fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
-        self,
-        db: &'db dyn Db,
-        visitor: &V,
-    ) {
-        let mut seen_members = FxHashSet::default();
-
-        self.for_each_member_candidate(
-            db,
-            visitor.program_environment(),
-            |name, candidate, specialization| {
-                if !seen_members.insert(name.clone()) {
-                    return;
-                }
-                let candidate = candidate.apply_specialization(db, specialization);
-                candidate.walk_recursive_member_types(db, visitor);
-            },
-        );
     }
 
     /// Visits protocol member candidates in MRO order after applying declaration precedence.
@@ -3443,42 +3418,6 @@ impl<'db> ProtocolMemberCandidate<'db> {
     ) -> Self {
         self.ty = self.ty.apply_optional_specialization(db, specialization);
         self
-    }
-
-    fn is_bound_method_like(self, db: &'db dyn Db) -> bool {
-        self.bound_on_class.is_yes()
-            && match self.ty {
-                Type::FunctionLiteral(_) => true,
-                Type::Callable(callable) => callable.is_method_like(db),
-                _ => false,
-            }
-    }
-
-    fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
-        self,
-        db: &'db dyn Db,
-        visitor: &V,
-    ) {
-        match self.ty {
-            Type::PropertyInstance(property) => {
-                // A property exposes its getter return and setter value types. Walking the
-                // accessor callables themselves would also visit their receiver and make every
-                // generic protocol property appear recursive.
-                for member in [
-                    property.getter(db).map(ProtocolMemberType::property_getter),
-                    property.setter(db).map(ProtocolMemberType::property_setter),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    if let Some(member) = member.resolve(db, visitor.program_environment()) {
-                        visitor.visit_type(db, member.ty());
-                    }
-                }
-            }
-            _ if self.is_bound_method_like(db) => {}
-            _ => visitor.visit_type(db, self.ty),
-        }
     }
 }
 
