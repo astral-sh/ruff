@@ -1056,7 +1056,7 @@ fn method_override_types<'db>(
 
 /// Whether an attribute declaration is a class variable or an instance variable.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
-enum VariableKind {
+pub(super) enum VariableKind {
     /// A variable annotated with `ClassVar`.
     Class,
     /// An instance variable, including an unannotated class-body assignment.
@@ -1121,7 +1121,7 @@ fn superclass_variable_kind<'db>(
 /// ```
 #[allow(clippy::needless_pass_by_value)]
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn effective_superclass_variable_kind<'db>(
+pub(super) fn effective_superclass_variable_kind<'db>(
     db: &'db dyn Db,
     superclass: ClassType<'db>,
     name: Name,

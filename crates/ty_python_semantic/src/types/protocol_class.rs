@@ -13,6 +13,7 @@ use crate::types::attribute_write::{
     ProtocolMemberWriteRequirement, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
+use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
@@ -1860,6 +1861,73 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.qualifiers
     }
 
+    /// Returns whether a writable class variable conflicts with an instance declaration.
+    ///
+    /// Descriptor lookup can discard declaration qualifiers, and an unannotated override inherits
+    /// the variable kind of its superclass declaration. Inspect the effective declaration before
+    /// applying descriptors so both cases retain the original `ClassVar` status.
+    pub(super) fn has_incompatible_class_variable_declaration(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        let qualifiers = self.qualifiers();
+        if !qualifiers.contains(TypeQualifiers::CLASS_VAR)
+            || qualifiers.contains(TypeQualifiers::FINAL)
+        {
+            return false;
+        }
+
+        let class = ty.nominal_class(db, env).or_else(|| {
+            if is_class_object_type(ty) {
+                ty.to_meta_type(db, env)
+                    .to_instance_approximation(db, env)?
+                    .nominal_class(db, env)
+            } else {
+                None
+            }
+        });
+        let Some(class) = class else {
+            return false;
+        };
+
+        let class_declaration =
+            class.class_member(db, env, self.name, MemberLookupPolicy::default());
+        if class_declaration.is_class_var()
+            && class
+                .own_class_member(db, env, None, self.name)
+                .inner
+                .is_class_var()
+        {
+            return false;
+        }
+
+        let has_declaration = |place| {
+            matches!(
+                place,
+                Place::Defined(DefinedPlace {
+                    provenance: Provenance::SingleDefinition(_) | Provenance::MultipleDefinitions,
+                    ..
+                })
+            )
+        };
+        if !has_declaration(class_declaration.place)
+            && !has_declaration(
+                Type::instance(db, env, class)
+                    .member(db, env, self.name)
+                    .place,
+            )
+        {
+            // Synthesized members and dynamic fallbacks have no declaration whose variable kind
+            // can establish a structural incompatibility.
+            return false;
+        }
+
+        effective_superclass_variable_kind(db, class, Name::new(self.name))
+            == Some(VariableKind::Instance)
+    }
+
     fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
@@ -2449,25 +2517,6 @@ fn protocol_member_read_type<'db>(
         receiver_ty.member(db, env, member.name)
     };
 
-    // An instance declaration can be readable through its class when it has a default, but that
-    // does not make it a class variable. A writable class-variable requirement must preserve the
-    // qualifier of an actual declaration. Synthesized members and dynamic implementations have no
-    // declaration to inspect; read-only requirements do not permit writes through either path.
-    if access == ProtocolMemberAccessMode::Class
-        && member.data.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-        && !member.data.qualifiers.contains(TypeQualifiers::FINAL)
-        && !member_place.is_class_var()
-        && matches!(
-            member_place.place,
-            Place::Defined(DefinedPlace {
-                provenance: Provenance::SingleDefinition(_) | Provenance::MultipleDefinitions,
-                ..
-            })
-        )
-    {
-        return None;
-    }
-
     match member_place.place {
         Place::Defined(DefinedPlace {
             ty: attribute_type,
@@ -2942,6 +2991,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         if access == ProtocolMemberAccessMode::Class
+            && member.has_incompatible_class_variable_declaration(db, self.env, ty)
+        {
+            if let Some(context) = self.report_context() {
+                context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                    member_name: member.name.into(),
+                    ty,
+                });
+            }
+            return self.never();
+        }
+
+        if access == ProtocolMemberAccessMode::Class
             && member.is_instance_method()
             && required.read.is_some()
         {
@@ -3014,6 +3075,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let instance_access =
             member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
+            if member.has_incompatible_class_variable_declaration(db, env, ty) {
+                context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                    member_name: member.name.into(),
+                    ty,
+                });
+                context.push(ErrorContext::ProtocolMemberIncompatible {
+                    member_name: member.name.into(),
+                });
+                return self.never();
+            }
+
             let instance_read_missing = instance_access.read.is_some()
                 && protocol_member_read_type(
                     db,

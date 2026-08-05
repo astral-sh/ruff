@@ -2145,6 +2145,239 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Inherited `ClassVar` protocol members
+
+An unannotated assignment in a subclass does not change an inherited `ClassVar` into an instance
+variable. The inherited declaration must remain effective for both structural instance checks and
+`type[Protocol]` assignments.
+
+```py
+from typing import ClassVar, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+class HasClassValue(Protocol):
+    value: ClassVar[int]
+
+class Base:
+    value: ClassVar[int] = 0
+
+class Child(Base):
+    value = 1
+
+class Grandchild(Child): ...
+
+class Augmented(Base):
+    value = 1
+    value += 1
+
+static_assert(is_assignable_to(Child, HasClassValue))
+static_assert(is_subtype_of(Child, HasClassValue))
+static_assert(is_assignable_to(Grandchild, HasClassValue))
+static_assert(is_subtype_of(Grandchild, HasClassValue))
+static_assert(is_assignable_to(Augmented, HasClassValue))
+static_assert(is_subtype_of(Augmented, HasClassValue))
+
+static_assert(is_assignable_to(TypeOf[Child], type[HasClassValue]))
+static_assert(is_subtype_of(TypeOf[Child], type[HasClassValue]))
+
+implementation: HasClassValue = Child()
+implementation_type: type[HasClassValue] = Child
+```
+
+An explicit instance annotation does change the declaration and remains incompatible with the
+protocol, even though the override itself is also invalid.
+
+```py
+class ExplicitInstance(Base):
+    value: int = 1  # error: [invalid-attribute-override]
+
+class ExplicitAnnotationOnly(Base):
+    value: int  # error: [invalid-attribute-override]
+
+class InheritsExplicitAnnotation(ExplicitAnnotationOnly): ...
+
+static_assert(not is_assignable_to(ExplicitInstance, HasClassValue))
+static_assert(not is_subtype_of(ExplicitInstance, HasClassValue))
+static_assert(not is_assignable_to(ExplicitAnnotationOnly, HasClassValue))
+static_assert(not is_subtype_of(ExplicitAnnotationOnly, HasClassValue))
+static_assert(not is_assignable_to(InheritsExplicitAnnotation, HasClassValue))
+static_assert(not is_subtype_of(InheritsExplicitAnnotation, HasClassValue))
+static_assert(not is_assignable_to(TypeOf[ExplicitAnnotationOnly], type[HasClassValue]))
+static_assert(not is_subtype_of(TypeOf[ExplicitAnnotationOnly], type[HasClassValue]))
+```
+
+## `ClassVar` protocol members and descriptors
+
+A writable metaclass descriptor can change the result of class attribute lookup without changing the
+original class-variable declaration.
+
+```py
+from typing import ClassVar, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class HasClassValue(Protocol):
+    value: ClassVar[int]
+
+class Metaclass(type):
+    @property
+    def value(cls) -> int:
+        return 1
+
+    @value.setter
+    def value(cls, value: int) -> None: ...
+
+class Implementation(metaclass=Metaclass):
+    value: ClassVar[int] = 1
+
+static_assert(is_assignable_to(Implementation, HasClassValue))
+static_assert(is_subtype_of(Implementation, HasClassValue))
+```
+
+A custom descriptor that returns itself also retains the `ClassVar` status of its declaration after
+descriptor-bound lookup.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> "Descriptor":
+        return self
+
+    def __set__(self, instance: object, value: "Descriptor") -> None: ...
+
+class HasClassDescriptor(Protocol):
+    descriptor: ClassVar[Descriptor]
+
+class DescriptorImplementation:
+    descriptor: ClassVar[Descriptor] = Descriptor()
+
+static_assert(is_assignable_to(DescriptorImplementation, HasClassDescriptor))
+static_assert(is_subtype_of(DescriptorImplementation, HasClassDescriptor))
+```
+
+## `ClassVar` protocol disjointness
+
+A final class with an instance-variable declaration can never satisfy a protocol requiring the same
+member to be a class variable. An open class is not disjoint because a subclass could satisfy the
+protocol, and a final class with a matching `ClassVar` remains compatible.
+
+```py
+from typing import ClassVar, Protocol, final
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
+
+class HasClassValue(Protocol):
+    value: ClassVar[int]
+
+@final
+class FinalInstance:
+    value: int = 1
+
+@final
+class AnnotationOnly:
+    value: int
+
+class OpenInstance:
+    value: int = 1
+
+@final
+class FinalClassValue:
+    value: ClassVar[int] = 1
+
+class BaseClassValue:
+    value: ClassVar[int] = 1
+
+@final
+class FinalInheritedClassValue(BaseClassValue):
+    value = 2
+
+@final
+class FinalAnnotationOverride(BaseClassValue):
+    value: int  # error: [invalid-attribute-override]
+
+class InstanceMetaclass(type):
+    value: int = 1
+
+class InstanceClass(metaclass=InstanceMetaclass): ...
+
+class ClassMetaclass(type):
+    value: ClassVar[int] = 1
+
+class ClassValueClass(metaclass=ClassMetaclass): ...
+
+static_assert(not is_assignable_to(FinalInstance, HasClassValue))
+static_assert(not is_subtype_of(FinalInstance, HasClassValue))
+static_assert(is_disjoint_from(FinalInstance, HasClassValue))
+static_assert(not is_assignable_to(AnnotationOnly, HasClassValue))
+static_assert(not is_subtype_of(AnnotationOnly, HasClassValue))
+static_assert(is_disjoint_from(AnnotationOnly, HasClassValue))
+static_assert(not is_disjoint_from(OpenInstance, HasClassValue))
+static_assert(not is_disjoint_from(FinalClassValue, HasClassValue))
+static_assert(not is_disjoint_from(FinalInheritedClassValue, HasClassValue))
+static_assert(is_disjoint_from(FinalAnnotationOverride, HasClassValue))
+static_assert(is_disjoint_from(TypeOf[InstanceClass], HasClassValue))
+static_assert(not is_disjoint_from(TypeOf[ClassValueClass], HasClassValue))
+
+def impossible(value: Intersection[FinalInstance, HasClassValue]) -> None:
+    reveal_type(value)  # revealed: Never
+
+def impossible_without_default(value: Intersection[AnnotationOnly, HasClassValue]) -> None:
+    reveal_type(value)  # revealed: Never
+```
+
+## `ClassVar` protocol assignment diagnostics
+
+An assignment rejected because a declared member is an instance variable should explain the
+qualifier mismatch rather than incorrectly claiming that the member is missing.
+
+```py
+from typing import ClassVar, Protocol
+
+class HasClassValue(Protocol):
+    value: ClassVar[int]
+
+class InstanceValue:
+    value: int = 1
+
+implementation: HasClassValue = InstanceValue()  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `InstanceValue` is not assignable to `HasClassValue`
+ --> src/mdtest_snippet.py:9:33
+  |
+9 | implementation: HasClassValue = InstanceValue()  # snapshot: invalid-assignment
+  |                 -------------   ^^^^^^^^^^^^^^^ Incompatible value of type `InstanceValue`
+  |                 |
+  |                 Declared type
+info: type `InstanceValue` is not assignable to protocol `HasClassValue`
+info: └── protocol member `value` is incompatible
+info:     └── protocol member `value` is an instance variable on type `InstanceValue`, but a class variable is required
+```
+
+The explanation is the same when the instance variable has no class-level default, even though class
+attribute lookup itself does not find a value.
+
+```py
+class AnnotationOnly:
+    value: int
+
+implementation_without_default: HasClassValue = AnnotationOnly()  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `AnnotationOnly` is not assignable to `HasClassValue`
+  --> src/mdtest_snippet.py:13:49
+   |
+13 | implementation_without_default: HasClassValue = AnnotationOnly()  # snapshot: invalid-assignment
+   |                                 -------------   ^^^^^^^^^^^^^^^^ Incompatible value of type `AnnotationOnly`
+   |                                 |
+   |                                 Declared type
+info: type `AnnotationOnly` is not assignable to protocol `HasClassValue`
+info: └── protocol member `value` is incompatible
+info:     └── protocol member `value` is an instance variable on type `AnnotationOnly`, but a class variable is required
+```
+
 ## Declared instance attribute members
 
 Declared protocol instance attributes should be available both on protocol-typed values and through
