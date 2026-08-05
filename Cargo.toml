@@ -300,6 +300,9 @@ inherits = "release"
 opt-level = "z"
 codegen-units = 1
 
+[profile.dev]
+lto = "off"
+
 [profile.dev.package.insta]
 opt-level = 3
 
