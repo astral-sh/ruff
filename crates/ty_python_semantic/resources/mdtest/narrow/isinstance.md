@@ -967,11 +967,11 @@ class Item: ...
 
 class OpenItem: ...
 
-def narrow_union_with_unrelated_classes(value: Item | OpenItem | Sequence[int]) -> None:
+def _(value: Item | OpenItem | Sequence[int]) -> None:
     if isinstance(value, list):
         reveal_type(value)  # revealed: (OpenItem & list[Unknown]) | list[int]
 
-def narrow_intersection_with_unrelated_class(
+def _(
     value: Intersection[OpenItem, Sequence[int]],
 ) -> None:
     if isinstance(value, list):
@@ -998,6 +998,20 @@ class PartiallyInferredChild[Extra1, T, Extra2](Sequence[T]): ...
 def _(value: Sequence[int]) -> None:
     if isinstance(value, PartiallyInferredChild):
         reveal_type(value)  # revealed: PartiallyInferredChild[Unknown, int, Unknown]
+```
+
+If we're "narrowing" in the opposite direction, we retain the existing subclass specialization:
+
+```py
+def _(covariant: SubOfCovariant[P], contravariant: SubOfContravariant[P], invariant: SubOfInvariant[P]) -> None:
+    if isinstance(covariant, Covariant):
+        reveal_type(covariant)  # revealed: SubOfCovariant[P]
+
+    if isinstance(contravariant, Contravariant):
+        reveal_type(contravariant)  # revealed: SubOfContravariant[P]
+
+    if isinstance(invariant, Invariant):
+        reveal_type(invariant)  # revealed: SubOfInvariant[P]
 ```
 
 ## Use cases: `isinstance` narrowing and generics

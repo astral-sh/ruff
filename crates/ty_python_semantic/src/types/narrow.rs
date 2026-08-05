@@ -869,16 +869,17 @@ fn specialize_narrowing_target<'db>(
     // An unspecialized class cannot contribute type arguments to the narrowing target.
     subject_class.static_class_literal(db)?.1?;
 
-    let target_class = if target_class.class_literal(db) == subject_class.class_literal(db) {
-        subject_class
-    } else {
-        specialize_generic_class_for_subject(
-            db,
-            env,
-            target_class.class_literal(db),
-            subject_class,
-        )?
-    };
+    let target_class =
+        if subject_class.is_subtype_of_class_literal(db, target_class.class_literal(db)) {
+            subject_class
+        } else {
+            specialize_generic_class_for_subject(
+                db,
+                env,
+                target_class.class_literal(db),
+                subject_class,
+            )?
+        };
 
     Some(if is_subclass {
         SubclassOfType::from(db, env, target_class)
