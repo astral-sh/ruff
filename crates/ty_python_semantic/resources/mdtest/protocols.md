@@ -6039,7 +6039,7 @@ y: A | Foo[A]
 
 # The same thing, but using the legacy syntax:
 
-S = TypeVar("S")
+S = TypeVar("S", covariant=True)
 
 class Bar(Protocol[S]):
     def x(self) -> "S | Bar[S]": ...
