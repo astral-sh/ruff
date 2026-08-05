@@ -2706,6 +2706,35 @@ accessed on the class itself:
 CustomGetAttr.whatever
 ```
 
+### Invalid `__getattr__` calls
+
+If `__getattr__` cannot accept the attribute name that Python passes to it, the access is invalid.
+The method's return type remains available for error recovery, while defined attributes do not
+invoke the fallback.
+
+```py
+class InvalidGetAttr:
+    defined: bool = True
+
+    def __getattr__(self) -> str:
+        return "fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidGetAttr`"
+reveal_type(InvalidGetAttr().missing)  # revealed: str
+reveal_type(InvalidGetAttr().defined)  # revealed: bool
+```
+
+An incompatible type for the attribute name is also an invalid fallback call.
+
+```py
+class InvalidNameType:
+    def __getattr__(self, name: int) -> bytes:
+        return b"fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidNameType`"
+reveal_type(InvalidNameType().missing)  # revealed: bytes
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
@@ -2815,6 +2844,22 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Invalid `__getattr__` calls
+
+Invalid metaclass `__getattr__` calls are reported on class attribute access while preserving the
+method's return type for error recovery.
+
+```py
+class Meta(type):
+    def __getattr__(cls) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<class 'Foo'>`"
+reveal_type(Foo.missing)  # revealed: int
 ```
 
 ### Class attributes take precedence

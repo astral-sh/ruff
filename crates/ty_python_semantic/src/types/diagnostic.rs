@@ -1795,6 +1795,32 @@ pub(super) fn report_bad_dunder_get_call<'db>(
     }
 }
 
+/// Reports an invalid implicit call to an object's `__getattr__` method.
+pub(super) fn report_bad_dunder_getattr_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_ATTRIBUTE_ACCESS,
+            message: format!(
+                "Invalid access to attribute `{attribute}` on type `{}`",
+                object_type.display(db, env),
+            ),
+            info: "This access implicitly calls `__getattr__`",
+            argument_ranges: &[target.range()],
+        },
+    );
+}
+
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
