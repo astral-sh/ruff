@@ -1851,16 +1851,16 @@ pub(super) fn report_bad_attribute_access_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &CallError<'db>,
     object_type: Type<'db>,
-    target: &ast::ExprAttribute,
+    target: ast::AnyNodeRef<'_>,
+    attribute: &str,
     method: AttributeAccessMethod,
 ) {
     let db = context.db();
     let env = &context.program_environment();
-    let attribute = target.attr.as_str();
 
     failure.report_diagnostics_with_override(
         context,
-        target.into(),
+        target,
         &CallDiagnosticOverride {
             lint: &INVALID_ATTRIBUTE_ACCESS,
             message: format!(
