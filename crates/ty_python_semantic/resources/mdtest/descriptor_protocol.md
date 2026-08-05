@@ -1055,6 +1055,24 @@ def access(value: Callback | Command[Callback]) -> None:
         value.callback
 ```
 
+### Property getter failures preserve their underlying error and return type
+
+A property inherited from an unrelated class rejects the instance passed to its getter. The
+diagnostic reports the getter's actual receiver mismatch and preserves its return type.
+
+```py
+class Owner:
+    @property
+    def value(self) -> int:
+        return 1
+
+class Other:
+    value = Owner.value
+
+# error: [invalid-attribute-access] "Expected `Owner`, found `Other`"
+reveal_type(Other().value)  # revealed: int
+```
+
 ### Every descriptor alternative must accept the call
 
 As with other operations on a union, an attribute access is invalid if any possible descriptor
@@ -1221,10 +1239,30 @@ class C:
 C.value
 ```
 
-### An instance `__getattribute__` runs before descriptors
+### An instance `__getattribute__` can bypass descriptors
 
 A custom `__getattribute__` can return without invoking the malformed descriptor. The ordinary
-member type remains unchanged.
+member type remains unchanged, even when the override has the same return type as the descriptor.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+    def __getattribute__(self, name: str) -> int:
+        return 42
+
+reveal_type(C().value)  # revealed: int
+```
+
+### An instance `__getattribute__` may delegate to descriptor lookup
+
+The return annotation of an override does not establish whether it delegates to the default
+attribute lookup. Since ty does not inspect the implementation, it cannot conclude that the
+descriptor is invoked.
 
 ```py
 class Descriptor:
@@ -1235,27 +1273,8 @@ class C:
     value = Descriptor()
 
     def __getattribute__(self, name: str) -> str:
-        return name
-
-reveal_type(C().value)  # revealed: int
-```
-
-### A delegating `__getattribute__` does not hide an invalid descriptor
-
-An override that delegates to the default attribute lookup still invokes the descriptor.
-
-```py
-class Descriptor:
-    def __get__(self) -> int:
-        return 1
-
-class C:
-    value = Descriptor()
-
-    def __getattribute__(self, name: str) -> object:
         return super().__getattribute__(name)
 
-# error: [invalid-attribute-access]
 C().value
 ```
 

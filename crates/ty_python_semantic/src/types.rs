@@ -6545,25 +6545,12 @@ impl<'db> Type<'db> {
             })
         };
 
-        // An override returning a type disjoint from the descriptor result must bypass that
-        // descriptor. An invalid override also fails before the descriptor can run.
+        // A custom override runs before the descriptor and might return without invoking it.
         let result = if matches!(
             result.err().map(|error| error.kind(db)),
             Some(MemberLookupErrorKind::DescriptorGet(_))
-        ) && let (override_result, true) = custom_getattribute()
-            && override_result
-                .unwrap_or_else(|error| error.fallback_member(db))
-                .place
-                .ignore_possibly_undefined()
-                .is_none_or(|override_type| {
-                    result
-                        .unwrap_or_else(|error| error.fallback_member(db))
-                        .place
-                        .ignore_possibly_undefined()
-                        .is_some_and(|member_type| {
-                            override_type.is_disjoint_from(db, env, member_type)
-                        })
-                }) {
+        ) && custom_getattribute().1
+        {
             Ok(result.unwrap_or_else(|error| error.fallback_member(db)))
         } else {
             result
