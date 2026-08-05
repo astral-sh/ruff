@@ -113,12 +113,12 @@ use crate::types::{
     CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LiteralValueType, LiteralValueTypeKind, MemberLookupErrorKind, MemberLookupPolicy,
-    MemberLookupResultExt, ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment,
-    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
-    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
-    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -10320,7 +10320,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let fallback = value_type.try_member_lookup(db, env, &attr.id);
         if !matches!(attribute.ctx, ExprContext::Del)
-            && let Some(MemberLookupErrorKind::DescriptorGet(context)) = fallback.error_kind(db)
+            && let Some(MemberLookupErrorKind::DescriptorGet(context)) =
+                fallback.err().map(|error| error.kind(db))
             && (assigned_type.is_none() || context.descriptor_type(db).is_data_descriptor(db, env))
             && let Some(failure) = context.into_error(db, env)
         {
@@ -10332,9 +10333,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 attribute,
             );
         }
-        let fallback_place = fallback.member(db).map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        });
+        let fallback_place = fallback
+            .unwrap_or_else(|error| error.member(db))
+            .map_type(|ty| {
+                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            });
 
         let attr_name = &attr.id;
         let resolved_type =

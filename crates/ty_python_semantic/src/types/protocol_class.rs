@@ -27,10 +27,9 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
         GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, MemberLookupResultExt, Parameter,
-        PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
-        Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
-        VarianceInferable,
+        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
+        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -2506,7 +2505,7 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
-        .member(db)
+        .unwrap_or_else(|error| error.member(db))
         .place
     } else {
         receiver_ty.member(db, env, member.name).place

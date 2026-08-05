@@ -11,11 +11,12 @@ use crate::{
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
         IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
-        MemberLookupResult, MemberLookupResultExt, SpecialFormType, SubclassOfInner,
-        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
+        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
+        TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
+        member_lookup_result,
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
@@ -945,7 +946,7 @@ impl<'db> BoundSuperType<'db> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
         let (member, _, descriptor_error) =
             Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
-        Some(MemberLookupResult::from_error(
+        Some(member_lookup_result(
             db,
             member,
             descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
