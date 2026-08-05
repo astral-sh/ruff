@@ -2430,8 +2430,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        let source_parameters = source.parameters.expand_starred_variadic_annotations(db);
-        let target_parameters = target.parameters.expand_starred_variadic_annotations(db);
+        let mut source_parameters = source.parameters.expand_starred_variadic_annotations(db);
+        let mut target_parameters = target.parameters.expand_starred_variadic_annotations(db);
+
+        // Gradual variadics and TypeVarTuples need their original suffix boundaries for
+        // materialization and inference. Named source prefixes must also remain visible when a
+        // target keyword could fill the same parameter.
+        if let (Some((_, source_variadic)), Some((_, target_variadic))) =
+            (source_parameters.variadic(), target_parameters.variadic())
+            && !source_variadic.has_starred_annotation()
+            && !target_variadic.has_starred_annotation()
+            && source_variadic.annotated_type().resolve_type_alias(db)
+                == target_variadic.annotated_type().resolve_type_alias(db)
+            && !source_variadic
+                .annotated_type()
+                .resolve_type_alias(db)
+                .is_dynamic()
+            && source_parameters.positional().all(|source_parameter| {
+                source_parameter.is_positional_only()
+                    || source_parameter.name().is_none_or(|name| {
+                        match target_parameters.keyword_by_name(name) {
+                            Some((_, parameter)) => {
+                                !parameter.is_keyword_only()
+                                    || parameter.annotated_type().resolve_type_alias(db).is_never()
+                            }
+                            None => {
+                                target_parameters
+                                    .keyword_variadic()
+                                    .is_none_or(|(_, parameter)| {
+                                        parameter.annotated_type().resolve_type_alias(db).is_never()
+                                    })
+                            }
+                        }
+                    })
+            })
+        {
+            source_parameters = source_parameters.with_homogeneous_variadic_suffix_in_prefix(db);
+            target_parameters = target_parameters.with_homogeneous_variadic_suffix_in_prefix(db);
+        }
 
         let target_typevartuple = if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             target_parameters.variadic().and_then(|(index, parameter)| {
@@ -3571,23 +3607,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     {
                         let error_context = match target_parameter.kind() {
                             ParameterKind::PositionalOnly { .. }
-                            | ParameterKind::PositionalOrKeyword { .. } => unreachable!(
-                                "unmatched target positional parameters \
-                                are rejected by the positional fast path"
-                            ),
-                            ParameterKind::Variadic { .. } => {
-                                unreachable!(
-                                    "an unmatched target `*args` is impossible: \
-                                    a source without `*args` is rejected by the positional fast path, \
-                                    while a source with `*args` consumes the target during matching"
-                                )
-                            }
-                            ParameterKind::KeywordOnly { .. } => ErrorContext::MissingParameter {
+                            | ParameterKind::PositionalOrKeyword { .. }
+                            | ParameterKind::KeywordOnly { .. } => ErrorContext::MissingParameter {
                                 parameter: ParameterDescription::new(
                                     target_index,
                                     target_parameter.name(),
                                 ),
                             },
+                            ParameterKind::Variadic { .. } => {
+                                ErrorContext::MissingVariadicPositionalParameter
+                            }
                             ParameterKind::KeywordVariadic { .. } => {
                                 ErrorContext::MissingVariadicKeywordParameter
                             }
@@ -3828,17 +3857,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 return result;
                             }
 
-                            // An unpacked target tuple can have a fixed positional suffix. Reuse
-                            // the source variadic parameter unless the source has its own fixed
-                            // suffix to match against it.
-                            reuse_current_source = parameters
-                                .peek_target()
-                                .is_some_and(Parameter::is_positional)
-                                && !parameters
-                                    .source_iter
-                                    .as_slice()
-                                    .first()
-                                    .is_some_and(Parameter::is_positional);
+                            // Align fixed suffixes from the end, reusing the source variadic for
+                            // any additional target suffix elements.
+                            let source_suffix_len = parameters
+                                .source_iter
+                                .as_slice()
+                                .iter()
+                                .take_while(|parameter| parameter.is_positional())
+                                .count();
+                            let target_suffix_len = parameters
+                                .target_iter
+                                .as_slice()
+                                .iter()
+                                .take_while(|parameter| parameter.is_positional())
+                                .count();
+                            for _ in source_suffix_len..target_suffix_len {
+                                let Some(target_parameter) = parameters.peek_target() else {
+                                    break;
+                                };
+                                target_index += 1;
+                                if !check_types(
+                                    &mut result,
+                                    target_parameter.annotated_type(),
+                                    source_param.annotated_type(),
+                                    target_parameter.name(),
+                                    target_index,
+                                ) {
+                                    return result;
+                                }
+                                parameters.next_target();
+                            }
                         }
 
                         (
@@ -4835,6 +4883,35 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    /// Moves required suffix elements that match a homogeneous variadic into its prefix.
+    fn with_homogeneous_variadic_suffix_in_prefix(self, db: &'db dyn Db) -> Self {
+        let Some((variadic_index, variadic)) = self.variadic() else {
+            return self;
+        };
+
+        let matching_suffix_len = self.as_slice()[variadic_index + 1..]
+            .iter()
+            .take_while(|parameter| {
+                parameter.is_positional_only()
+                    && parameter.annotated_type().resolve_type_alias(db)
+                        == variadic.annotated_type().resolve_type_alias(db)
+            })
+            .count();
+
+        if matching_suffix_len == 0
+            || self
+                .as_slice()
+                .get(variadic_index + matching_suffix_len + 1)
+                .is_some_and(Parameter::is_positional)
+        {
+            return self;
+        }
+
+        let mut parameters = self.as_slice().to_vec();
+        parameters[variadic_index..=variadic_index + matching_suffix_len].rotate_left(1);
+        self.with_transformed_parameters(parameters)
     }
 
     /// Expands an unpacked `*args` annotation into its logical callable parameters.
