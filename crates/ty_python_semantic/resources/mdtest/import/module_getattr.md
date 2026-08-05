@@ -16,6 +16,62 @@ def __getattr__(name: str) -> str:
     return "hi"
 ```
 
+## Invalid `__getattr__` calls
+
+A module-level `__getattr__` must accept the attribute name passed by Python. If the call fails, the
+access is invalid, but the function's return type remains available for error recovery.
+
+```py
+import invalid_getattr_module
+
+invalid_getattr_module.missing  # snapshot: invalid-attribute-access
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<module 'invalid_getattr_module'>`"
+reveal_type(invalid_getattr_module.missing)  # revealed: str
+
+reveal_type(invalid_getattr_module.defined)  # revealed: Literal[1]
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `<module 'invalid_getattr_module'>`
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | invalid_getattr_module.missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to function `__getattr__`: expected 0, got 1
+info: This access implicitly calls `__getattr__`
+ --> src/invalid_getattr_module.py:3:5
+  |
+3 | def __getattr__() -> str:
+  |     ^^^^^^^^^^^^^^^^^^^^
+```
+
+`invalid_getattr_module.py`:
+
+```py
+defined = 1
+
+def __getattr__() -> str:
+    return "fallback"
+```
+
+## Invalid `__getattr__` attribute-name types
+
+An incompatible attribute-name parameter also makes a module-level fallback call invalid.
+
+```py
+import invalid_getattr_name
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<module 'invalid_getattr_name'>`"
+reveal_type(invalid_getattr_name.missing)  # revealed: bytes
+```
+
+`invalid_getattr_name.py`:
+
+```py
+def __getattr__(name: int) -> bytes:
+    return b"fallback"
+```
+
 ## `from import` with `__getattr__`
 
 At runtime, if `module` has a `__getattr__` implementation, you can do `from module import whatever`
@@ -112,9 +168,9 @@ reveal_type(sub)  # revealed: <module 'mod.sub'>
 
 ## Limiting names handled by `__getattr__`
 
-If a module `__getattr__` is annotated to only accept certain string literals, then the module
-`__getattr__` will be ignored for other names. (In principle this could be a more explicit way to
-handle the precedence issues discussed above, but it's not currently used in the ecosystem.)
+If a module `__getattr__` is annotated to accept only certain string literals, unsupported names are
+reported as unresolved imports in `from ... import` statements. Direct attribute access instead
+reports the invalid call and retains the fallback return type.
 
 ```py
 from limited_getattr_module import known_attr
@@ -124,6 +180,11 @@ from limited_getattr_module import unknown_attr
 
 reveal_type(known_attr)  # revealed: int
 reveal_type(unknown_attr)  # revealed: Unknown
+
+import limited_getattr_module
+
+# error: [invalid-attribute-access] "Invalid access to attribute `unknown_attr` on type `<module 'limited_getattr_module'>`"
+reveal_type(limited_getattr_module.unknown_attr)  # revealed: int
 ```
 
 `limited_getattr_module.py`:
