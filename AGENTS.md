@@ -18,8 +18,6 @@ instructions to PR authors or flag unrelated pre-existing issues.
 
 ## Running Tests
 
-For every Cargo command that compiles Rust, including tests, Clippy, `cargo check`, debug builds, and code generation, use `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_LTO=off CARGO_PROFILE_DEV_DEBUG="line-tables-only"`. Keeping these settings consistent enables optimizations, avoids local ThinLTO, preserves useful debug information, and avoids unnecessary profile-related cache churn.
-
 Run all tests (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
