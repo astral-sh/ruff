@@ -6,7 +6,6 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext,
         KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        VarianceInferenceMode,
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
@@ -484,14 +483,13 @@ impl<'db> TypeAliasType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar, mode)
+        self.variance_of_owner(db, typevar)
     }
 }
 
@@ -499,20 +497,17 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
 impl<'db> TypeAliasType<'db> {
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of_owner(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         let env = ProgramEnvironment::from_definition(self.definition(db));
         let Some(generic_context) = self.generic_context(db) else {
-            return self
-                .value_type(db)
-                .variance_of_in_mode(db, &env, typevar, mode);
+            return self.value_type(db).variance_of(db, &env, typevar);
         };
 
         // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
@@ -521,9 +516,7 @@ impl<'db> TypeAliasType<'db> {
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
         {
-            return self
-                .raw_value_type(db)
-                .variance_of_in_mode(db, &env, typevar, mode);
+            return self.raw_value_type(db).variance_of(db, &env, typevar);
         }
 
         let raw_value_type = self.raw_value_type(db);
@@ -538,8 +531,8 @@ impl<'db> TypeAliasType<'db> {
             .zip(specialization.types(db))
             .map(|(alias_typevar, argument_ty)| {
                 raw_value_type
-                    .variance_of_in_mode(db, &env, alias_typevar.identity(db), mode)
-                    .compose_thunk(|| argument_ty.variance_of_in_mode(db, &env, typevar, mode))
+                    .variance_of(db, &env, alias_typevar.identity(db))
+                    .compose_thunk(|| argument_ty.variance_of(db, &env, typevar))
             })
             .collect()
     }

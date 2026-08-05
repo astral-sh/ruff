@@ -378,7 +378,12 @@ pub(crate) fn check_static_class_definitions<'db>(
 
                 ClassType::Generic(base_alias)
             }
-            _ => continue,
+            _ => {
+                if is_protocol && base_class.is_unknown() {
+                    protocol_header_is_valid = false;
+                }
+                continue;
+            }
         };
 
         if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
@@ -915,7 +920,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) || is_protocol {
         let scope = class.body_scope(db).scope(db);
         if let Some(parent) = scope.parent() {
             // Check that the class's own type parameters don't shadow
@@ -925,15 +930,18 @@ pub(crate) fn check_static_class_definitions<'db>(
                     let name = self_typevar.typevar(db).name(db);
                     for enclosing in enclosing_generic_contexts(db, index, parent) {
                         if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
-                            report_shadowed_type_variable(
-                                context,
-                                name,
-                                "class",
-                                &class_node.name.id,
-                                class.header_range(db),
-                                self_typevar.kind(db),
-                                other_typevar,
-                            );
+                            protocol_header_is_valid = false;
+                            if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+                                report_shadowed_type_variable(
+                                    context,
+                                    name,
+                                    "class",
+                                    &class_node.name.id,
+                                    class.header_range(db),
+                                    self_typevar.kind(db),
+                                    other_typevar,
+                                );
+                            }
                         }
                     }
                 }
@@ -945,15 +953,18 @@ pub(crate) fn check_static_class_definitions<'db>(
                 let typevar = base_typevar.typevar(db);
                 for enclosing in enclosing_generic_contexts(db, index, parent) {
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
-                        report_shadowed_type_variable(
-                            context,
-                            typevar.name(db),
-                            "class",
-                            &class_node.name.id,
-                            class.header_range(db),
-                            base_typevar.kind(db),
-                            other_typevar,
-                        );
+                        protocol_header_is_valid = false;
+                        if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+                            report_shadowed_type_variable(
+                                context,
+                                typevar.name(db),
+                                "class",
+                                &class_node.name.id,
+                                class.header_range(db),
+                                base_typevar.kind(db),
+                                other_typevar,
+                            );
+                        }
                     }
                 }
             }
