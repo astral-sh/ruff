@@ -313,7 +313,7 @@ impl<'db> ProtocolClass<'db> {
             };
 
             let inferred_variance =
-                match class.variance_of(db, context.program_environment(), typevar.identity(db)) {
+                match inferred_protocol_typevar_variance(db, class, typevar.identity(db)) {
                     TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                     variance => variance,
                 };
@@ -372,6 +372,56 @@ impl<'db> Deref for ProtocolClass<'db> {
 impl<'db> From<ProtocolClass<'db>> for Type<'db> {
     fn from(value: ProtocolClass<'db>) -> Self {
         Self::from(value.0)
+    }
+}
+
+/// Infers the variance of a protocol parameter from its structural interface.
+///
+/// The identity specialization preserves the class-bound type-variable identities used by its
+/// members. Recursive protocol references start at bivariance and converge through Salsa's
+/// existing variance fixed point instead of trusting the declaration being validated.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| TypeVarVariance::Bivariant,
+    heap_size = ruff_memory_usage::heap_size,
+)]
+pub(super) fn inferred_protocol_typevar_variance<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    typevar: BoundTypeVarIdentity<'db>,
+) -> TypeVarVariance {
+    let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
+        return TypeVarVariance::Bivariant;
+    };
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    let interface = protocol.interface(db);
+    let variance = interface.variance_of(db, &env, typevar);
+
+    if variance == TypeVarVariance::Bivariant
+        && !interface.members(db).any(|member| {
+            let capabilities = member.capabilities(db, &env);
+            let class_access = if member.is_instance_method() {
+                ProtocolMemberAccess::NONE
+            } else {
+                capabilities.class
+            };
+
+            [capabilities.instance, class_access]
+                .into_iter()
+                .flat_map(|access| access.variances(db, &env))
+                .any(|(ty, _)| {
+                    any_over_type(db, &env, ty, false, |nested| {
+                        matches!(nested, Type::TypeVar(inner) if inner.identity(db) == typevar)
+                    })
+                })
+        })
+    {
+        // An unused protocol parameter is conventionally covariant. Do not apply this fallback
+        // to parameters present in recursive specializations: their bivariance can be a
+        // temporary fixed-point approximation rather than an unused parameter.
+        TypeVarVariance::Covariant
+    } else {
+        variance
     }
 }
 
@@ -1178,7 +1228,14 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         self.members(db)
             .flat_map(|member| {
                 let capabilities = member.capabilities(db, env);
-                [capabilities.instance, capabilities.class]
+                // The unbound class-side copy of an instance method is checked only for its
+                // presence. Its receiver is not an input to the structural protocol interface.
+                let class_access = if member.is_instance_method() {
+                    ProtocolMemberAccess::NONE
+                } else {
+                    capabilities.class
+                };
+                [capabilities.instance, class_access]
                     .into_iter()
                     .flat_map(|access| access.variances(db, env))
             })
@@ -3497,7 +3554,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// especially for dunders, but it probably doesn't matter *too* much if this
 /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
 /// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1814>)
-pub(super) fn excluded_from_proto_members(member: &str) -> bool {
+fn excluded_from_proto_members(member: &str) -> bool {
     matches!(
         member,
         "_is_protocol"

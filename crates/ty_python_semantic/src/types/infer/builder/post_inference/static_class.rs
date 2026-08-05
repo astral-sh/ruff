@@ -344,6 +344,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         let base_class = match base_class {
             Type::SpecialForm(SpecialFormType::Generic) => {
+                protocol_header_is_valid = false;
                 if let Some(builder) = context.report_lint(&INVALID_BASE, source_node) {
                     // Unsubscripted `Generic` can appear in the MRO of many classes,
                     // but it is never valid as an explicit base class in user code.
@@ -941,7 +942,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) || is_protocol {
         // Check that type variable defaults only reference type variables
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
@@ -970,6 +971,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     }
                 });
                 if let Some(bad_typevar) = first_bad_tvar {
+                    protocol_header_is_valid = false;
                     let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
                     report_invalid_typevar_default_reference(
                         context,
@@ -981,7 +983,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
         }
+    }
 
+    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
         let scope = class.body_scope(db).scope(db);
         if let Some(parent) = scope.parent() {
             // Check that the class's own type parameters don't shadow
