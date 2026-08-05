@@ -32,7 +32,7 @@ use crate::{
         TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
-        diagnostic::report_undeclared_protocol_member,
+        diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
         signatures::walk_signature,
     },
@@ -283,6 +283,54 @@ impl<'db> ProtocolClass<'db> {
             };
 
             report_undeclared_protocol_member(context, first_definition, self, class_place_table);
+        }
+    }
+
+    /// Validate explicitly declared type-variable variance against this protocol's interface.
+    pub(super) fn validate_type_parameter_variance(self, context: &InferContext) {
+        if !context.is_lint_enabled(&INVALID_PROTOCOL) {
+            return;
+        }
+
+        let db = context.db();
+        let Some((class, _)) = self.static_class_literal(db) else {
+            return;
+        };
+        if class.try_mro(db, None).is_err() {
+            return;
+        }
+        let Some(generic_context) = class.generic_context(db) else {
+            return;
+        };
+
+        for typevar in generic_context.variables(db) {
+            if typevar.is_paramspec(db) || typevar.is_typevartuple(db) {
+                continue;
+            }
+
+            let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
+                continue;
+            };
+
+            let inferred_variance =
+                match class.variance_of(db, context.program_environment(), typevar.identity(db)) {
+                    TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                    variance => variance,
+                };
+
+            if inferred_variance == declared_variance {
+                continue;
+            }
+
+            if let Some(builder) = context.report_lint(&INVALID_PROTOCOL, class.header_range(db)) {
+                builder.into_diagnostic(format_args!(
+                    "Type variable `{}` in protocol `{}` should be {}, but is {}",
+                    typevar.typevar(db).name(db),
+                    self.name(db),
+                    inferred_variance.as_str(),
+                    declared_variance.as_str(),
+                ));
+            }
         }
     }
 
@@ -3466,7 +3514,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// especially for dunders, but it probably doesn't matter *too* much if this
 /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
 /// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1814>)
-fn excluded_from_proto_members(member: &str) -> bool {
+pub(super) fn excluded_from_proto_members(member: &str) -> bool {
     matches!(
         member,
         "_is_protocol"

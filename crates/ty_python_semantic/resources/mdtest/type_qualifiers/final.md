@@ -864,7 +864,7 @@ class Owned(Protocol[T]):
             other.owner = owner  # error: [invalid-assignment]
 
     def progress(self: Owned[int]) -> None: ...
-    def replace(self, owner: T) -> None:
+    def replace(self: Owned[int], owner: int) -> None:
         self.owner = owner  # error: [invalid-assignment]
 ```
 
