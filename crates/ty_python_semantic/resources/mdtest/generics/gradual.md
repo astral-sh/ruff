@@ -29,11 +29,12 @@ reveal_type(takes_callable(accepts_any))  # revealed: Any
 
 ## Bounded gradual constraints
 
-When a gradual type is assigned to an inferable type variable `T` in covariant position, the lower
-bound of the gradual type contributes a lower-bound constraint on `T`.
+When a gradual type is assigned to an inferable type variable `T` in covariant position, the
+complete gradual type contributes a lower-bound constraint on `T`, preserving its gradual bounds.
 
 ```py
 from typing import Any
+from ty_extensions._internal import Unknown
 
 def takes_bare[T](value: T) -> T:
     raise NotImplementedError
@@ -43,17 +44,19 @@ def _(
     lower_bounded: str | Any,
     upper_bounded: Any & int,
     bounded: bool | (Any & int),
+    unknown_upper_bounded: Unknown & int,
+    unknown_bounded: bool | (Unknown & int),
 ):
     reveal_type(takes_bare(unbounded))  # revealed: Any
     reveal_type(takes_bare(lower_bounded))  # revealed: str | Any
-    # TODO: This should reveal `Any & int`.
-    reveal_type(takes_bare(upper_bounded))  # revealed: Any
-    # TODO: This should reveal `bool | (Any & int)`.
-    reveal_type(takes_bare(bounded))  # revealed: bool | Any
+    reveal_type(takes_bare(upper_bounded))  # revealed: Any & int
+    reveal_type(takes_bare(bounded))  # revealed: bool | (Any & int)
+    reveal_type(takes_bare(unknown_upper_bounded))  # revealed: Unknown & int
+    reveal_type(takes_bare(unknown_bounded))  # revealed: bool | (Unknown & int)
 ```
 
 Conversely, when an inferable type variable `T` is assigned to a gradual type in contravariant
-position, the upper bound of the gradual type contributes an upper-bound constraint on `T`.
+position, the complete gradual type contributes an upper-bound constraint on `T`.
 
 ```py
 from typing import Any, Callable, final
@@ -65,11 +68,15 @@ def accepts_unbounded(value: Any): ...
 def accepts_lower_bounded(value: str | Any): ...
 def accepts_upper_bounded(value: Any & int): ...
 def accepts_bounded(value: bool | (Any & int)): ...
+def accepts_unknown_lower_bounded(value: str | Unknown): ...
+def accepts_unknown_bounded(value: bool | (Unknown & int)): ...
 def _():
     reveal_type(takes_callable(accepts_unbounded))  # revealed: Any
-    reveal_type(takes_callable(accepts_lower_bounded))  # revealed: Any
+    reveal_type(takes_callable(accepts_lower_bounded))  # revealed: str | Any
     reveal_type(takes_callable(accepts_upper_bounded))  # revealed: Any & int
-    reveal_type(takes_callable(accepts_bounded))  # revealed: Any & int
+    reveal_type(takes_callable(accepts_bounded))  # revealed: bool | (Any & int)
+    reveal_type(takes_callable(accepts_unknown_lower_bounded))  # revealed: str | Unknown
+    reveal_type(takes_callable(accepts_unknown_bounded))  # revealed: bool | (Unknown & int)
 ```
 
 ## Complex gradual constraints
@@ -419,14 +426,12 @@ def _(
     stable: tuple[int, str] | (Any & tuple[int, object]),
 ):
     reveal_type(takes_iterable(lower_bounded))  # revealed: str | Any
-    # TODO: This should reveal `Any & int`.
-    reveal_type(takes_iterable(upper_bounded))  # revealed: Any
-    # TODO: This should reveal `bool | (Any & int)`.
-    reveal_type(takes_iterable(bounded))  # revealed: bool | Any
+    reveal_type(takes_iterable(upper_bounded))  # revealed: Any & int
+    reveal_type(takes_iterable(bounded))  # revealed: bool | (Any & int)
 
-    reveal_type(takes_iterable_callable(accepts_lower_bounded_iterable))  # revealed: Any
+    reveal_type(takes_iterable_callable(accepts_lower_bounded_iterable))  # revealed: str | Any
     reveal_type(takes_iterable_callable(accepts_upper_bounded_iterable))  # revealed: Any & int
-    reveal_type(takes_iterable_callable(accepts_bounded_iterable))  # revealed: Any & int
+    reveal_type(takes_iterable_callable(accepts_bounded_iterable))  # revealed: bool | (Any & int)
 
     reveal_type(takes_stable_source(stable))  # revealed: int
     reveal_type(takes_stable_target(accepts_stable_target))  # revealed: int
@@ -437,14 +442,12 @@ def _(
     bounded: Callable[[int], None] | (Any & Callable[[bool], None]),
 ):
     reveal_type(takes_callable(lower_bounded))  # revealed: Any & str
-    # TODO: This should reveal `int | Any`.
-    reveal_type(takes_callable(upper_bounded))  # revealed: Any
-    reveal_type(takes_callable(bounded))  # revealed: Any & int
+    reveal_type(takes_callable(upper_bounded))  # revealed: int | Any
+    reveal_type(takes_callable(bounded))  # revealed: bool | (Any & int)
 
-    reveal_type(takes_consumer_callable(accepts_lower_bounded_callable))  # revealed: Any
+    reveal_type(takes_consumer_callable(accepts_lower_bounded_callable))  # revealed: Any & str
     reveal_type(takes_consumer_callable(accepts_upper_bounded_callable))  # revealed: int | Any
-    # TODO: This should reveal `bool | (Any & int)`.
-    reveal_type(takes_consumer_callable(accepts_bounded_callable))  # revealed: bool | Any
+    reveal_type(takes_consumer_callable(accepts_bounded_callable))  # revealed: bool | (Any & int)
 
 def _(
     value: Any & Top[list[Unknown]],
@@ -480,9 +483,8 @@ def _(
     consumer_upper: Consumer[str & Any],
 ):
     reveal_type(takes_producer(producer_lower))  # revealed: str | Any
-    # TODO: This should reveal `str & Any`.
-    reveal_type(takes_producer(producer_upper))  # revealed: Any
-    reveal_type(takes_consumer(consumer_lower))  # revealed: Any
+    reveal_type(takes_producer(producer_upper))  # revealed: str & Any
+    reveal_type(takes_consumer(consumer_lower))  # revealed: str | Any
     reveal_type(takes_consumer(consumer_upper))  # revealed: str & Any
 ```
 
@@ -495,6 +497,9 @@ from typing import Any, Callable
 from ty_extensions._internal import Unknown
 
 def takes_pair[T, U](value: tuple[T, U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def takes_optional_pair[T, U](value: tuple[T, U] | None) -> tuple[T, U]:
     raise NotImplementedError
 
 def takes_union[T](value: T | int) -> T:
@@ -533,21 +538,25 @@ def _(
     lower_bounded: int | Any,
     unknown_lower_bounded: int | Unknown,
     upper_bounded: int & Any,
+    bounded_pair: tuple[str, bool] | (Any & tuple[str, int]),
+    optional_bounded_pair: tuple[str, bool] | (Any & tuple[str, int]) | None,
+    unknown_bounded_pair: tuple[str, bool] | (Unknown & tuple[str, int]) | None,
 ):
     reveal_type(takes_pair(pair))  # revealed: tuple[str | Any, int | Any]
+    reveal_type(takes_pair(bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
+    reveal_type(takes_optional_pair(bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
+    reveal_type(takes_optional_pair(optional_bounded_pair))  # revealed: tuple[str, bool | (Any & int)]
+    reveal_type(takes_optional_pair(unknown_bounded_pair))  # revealed: tuple[str, bool | (Unknown & int)]
     reveal_type(takes_union(fixed_point))  # revealed: str | Any
     reveal_type(takes_union(lower_bounded))  # revealed: Any
     reveal_type(takes_union(unknown_lower_bounded))  # revealed: Unknown
     reveal_type(takes_nested_union(nested))  # revealed: str | Any
-    # TODO: This should reveal `Any & list[int]`.
-    reveal_type(takes_recursive_union(recursive))  # revealed: Any
+    reveal_type(takes_recursive_union(recursive))  # revealed: Any & list[int]
     reveal_type(takes_union_arms(lower_bounded))  # revealed: tuple[int | Any, Any]
-    # TODO: This should reveal `tuple[Any & int, Unknown]`.
-    reveal_type(takes_union_arms(upper_bounded))  # revealed: tuple[Any, Unknown]
-    reveal_type(takes_union_arms_callable(accepts_lower_bounded))  # revealed: tuple[Any, Any]
-    # TODO: This should reveal `tuple[Any & int, Unknown]`.
-    reveal_type(takes_intersection_arms(upper_bounded))  # revealed: tuple[Any, Unknown]
-    reveal_type(takes_intersection_arms_callable(accepts_lower_bounded))  # revealed: tuple[Any, Any]
+    reveal_type(takes_union_arms(upper_bounded))  # revealed: tuple[int & Any, Unknown]
+    reveal_type(takes_union_arms_callable(accepts_lower_bounded))  # revealed: tuple[int | Any, Any]
+    reveal_type(takes_intersection_arms(upper_bounded))  # revealed: tuple[int & Any, Unknown]
+    reveal_type(takes_intersection_arms_callable(accepts_lower_bounded))  # revealed: tuple[int | Any, Any]
 ```
 
 ```py
@@ -575,8 +584,7 @@ def takes_ambiguous_source[T](value: Left[T] | Right[T]) -> T:
     raise NotImplementedError
 
 def _(value: Any & Left[int] & Right[str]):
-    # TODO: This should reveal `(Any & int) | (Any & str)`.
-    reveal_type(takes_ambiguous_source(value))  # revealed: Any
+    reveal_type(takes_ambiguous_source(value))  # revealed: (Any & int) | (Any & str)
 
 def takes_ambiguous_invariant[T](callback: Callable[[list[T]], None]) -> T:
     raise NotImplementedError
