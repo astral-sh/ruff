@@ -112,9 +112,9 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
-## Relaxed generic class patterns
+## Gradual generic class patterns
 
-Generic class patterns follow the same relaxed filtering as `isinstance()` checks. Unknown type
+Generic class patterns follow the same gradual filtering as `isinstance()` checks. Unknown type
 arguments remain gradual, while specialized base classes determine the arguments of matching
 subclasses.
 
@@ -1608,7 +1608,7 @@ Two unrelated non-final classes can have a common subclass through multiple inhe
 successful pattern therefore preserves both class types. Attributes defined on both classes use the
 intersection of their declared types, consistent with ordinary attribute access on an intersection.
 For a generic pattern class whose type arguments are not known from the subject, its attributes use
-`Unknown`. Iterating over a generic attribute likewise produces an unknown element type in relaxed
+`Unknown`. Iterating over a generic attribute likewise produces an unknown element type in gradual
 mode.
 
 ```py

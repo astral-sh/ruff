@@ -1446,11 +1446,12 @@ pub struct AnalysisOptions {
     /// representing the (infinite) union of all possible `list` specializations. Iterating
     /// over the list would yield values of type `object`.
     ///
-    /// When disabled, ty preserves compatible type arguments from the original type where
-    /// possible. For example, `isinstance(value, list)` narrows a value of type
-    /// `Sequence[int]` to `list[int]`. If no specialization is available, the same check
-    /// narrows a value of type `object` to `list[Unknown]`; items of any type can then be
-    /// appended to the list. Class patterns such as `case list():` follow the same behavior.
+    /// When disabled, ty uses gradual generic narrowing, preserving compatible type
+    /// arguments from the original type where possible. For example,
+    /// `isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.
+    /// If no specialization is available, the same check narrows a value of type `object`
+    /// to `list[Unknown]`; items of any type can then be appended to the list. Class
+    /// patterns such as `case list():` follow the same behavior.
     ///
     /// Defaults to `false`.
     #[option(

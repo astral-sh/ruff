@@ -613,7 +613,7 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-In `strict` mode, narrowing to a generic class using `isinstance()` uses the top materialization of
+In strict mode, narrowing to a generic class using `isinstance()` uses the top materialization of
 the generic. With a covariant generic, this is equivalent to using the upper bound of the type
 parameter (by default, `object`):
 
@@ -846,7 +846,7 @@ def excludes_bounded_generic_subclass(
     return cls
 ```
 
-### Relaxed mode
+### Gradual mode
 
 ```toml
 [environment]
@@ -856,10 +856,10 @@ python-version = "3.12"
 strict-generic-narrowing = false
 ```
 
-In `relaxed` mode, narrowing to a generic class using `isinstance()` preserves any compatible
-specialization from the original type. If the original type does not provide a specialization, the
-type parameters remain `Unknown`. For example, `object & Covariant[Unknown]` simplifies to
-`Covariant[Unknown]`:
+In gradual mode, narrowing to a generic class using `isinstance()` preserves any compatible
+specialization from the original type. If the original type does not provide a specialization, we
+intersect with the `Unknown` specialization. The negative branch still excludes the top
+materialization because a failed `isinstance()` check rules out every specialization of the class.
 
 ```py
 class Covariant[T]:
@@ -868,44 +868,14 @@ class Covariant[T]:
 
 def _(x: object):
     if isinstance(x, Covariant):
+        # `object & Covariant[Unknown]` simplifies to `Covariant[Unknown]`.
         reveal_type(x)  # revealed: Covariant[Unknown]
         reveal_type(x.get())  # revealed: Unknown
     else:
         reveal_type(x)  # revealed: ~Covariant[object]
 ```
 
-A covariant type argument remains `Unknown` when its specialization cannot be inferred. Neither an
-upper bound nor a narrower default identifies which specialization passed `isinstance()`:
-
-```py
-from typing import Generic
-from typing_extensions import TypeVar
-
-BoundedT = TypeVar("BoundedT", bound=int, covariant=True)
-DefaultedBoundedT = TypeVar("DefaultedBoundedT", bound=int, default=bool, covariant=True)
-
-class BoundedCovariant(Generic[BoundedT]):
-    def get(self) -> BoundedT:
-        raise NotImplementedError
-
-class DefaultedBoundedCovariant(Generic[DefaultedBoundedT]):
-    def get(self) -> DefaultedBoundedT:
-        raise NotImplementedError
-
-def bounded_covariant_narrowing(value: object) -> None:
-    if isinstance(value, BoundedCovariant):
-        reveal_type(value)  # revealed: BoundedCovariant[Unknown]
-        reveal_type(value.get())  # revealed: Unknown
-        value.get().bit_count()
-
-    if isinstance(value, DefaultedBoundedCovariant):
-        reveal_type(value)  # revealed: DefaultedBoundedCovariant[Unknown]
-        reveal_type(value.get())  # revealed: Unknown
-        value.get().bit_count()
-```
-
-For contravariant generics, an uninferred parameter remains `Unknown`, so arguments of any type can
-be passed:
+For contravariant generics, we similarly intersect with the `Unknown` specialization:
 
 ```py
 class Contravariant[T]:
@@ -916,9 +886,11 @@ def _(x: object):
         reveal_type(x)  # revealed: Contravariant[Unknown]
         x.push(42)
         x.push("foo")
+    else:
+        reveal_type(x)  # revealed: ~Contravariant[Never]
 ```
 
-For invariant generics, the uninferred parameter likewise remains `Unknown`. Reading produces
+Similarly, for invariant generics we intersect with the `Unknown` specialization. Reading produces
 `Unknown`, while writing accepts arguments of any type:
 
 ```py
@@ -937,60 +909,73 @@ def _(x: object):
         x.push("foo")
 ```
 
-The behavior of `issubclass()` is similar.
+Narrowing already specialized generics preserves their concrete type arguments:
 
 ```py
-def _(x: type[object], y: type[object], z: type[object]):
-    if issubclass(x, Covariant):
-        reveal_type(x)  # revealed: type[Covariant[Unknown]]
-    if issubclass(y, Contravariant):
-        reveal_type(y)  # revealed: type[Contravariant[Unknown]]
-    if issubclass(z, Invariant):
-        reveal_type(z)  # revealed: type[Invariant[Unknown]]
+class P: ...
 
-def preserve_subclass_specialization(cls: type[Covariant[int]]) -> None:
-    if issubclass(cls, Covariant):
-        reveal_type(cls)  # revealed: type[Covariant[int]]
-
-from typing import Sequence
-
-def infer_subclass_specialization(cls: type[Sequence[int]]) -> None:
-    if issubclass(cls, list):
-        reveal_type(cls)  # revealed: type[list[int]]
-
-def infer_tuple_subclass_specialization(cls: type[Sequence[int]]) -> None:
-    if issubclass(cls, tuple):
-        reveal_type(cls)  # revealed: type[tuple[int, ...]]
+def _(x: Covariant[P], y: Contravariant[P], z: Invariant[P]):
+    if isinstance(x, Covariant):
+        reveal_type(x)  # revealed: Covariant[P]
+    if isinstance(y, Contravariant):
+        reveal_type(y)  # revealed: Contravariant[P]
+    if isinstance(z, Invariant):
+        reveal_type(z)  # revealed: Invariant[P]
 ```
 
-Narrowing already specialized generics preserves their concrete type arguments and, for invariant
-generics, their method signatures:
+Specialized base classes also determine the type arguments of matching subclasses, including
+subclasses with a stricter variance:
 
 ```py
-from typing import Never
+class SubOfCovariant[T](Covariant[T]): ...
+class SubOfContravariant[T](Contravariant[T]): ...
+class SubOfInvariant[T](Invariant[T]): ...
 
-def _(x: Covariant[object], y: Contravariant[Never], z: Invariant[object]):
-    if isinstance(x, Covariant):
-        reveal_type(x)  # revealed: Covariant[object]
-    if isinstance(y, Contravariant):
-        reveal_type(y)  # revealed: Contravariant[Never]
-    if isinstance(z, Invariant):
-        reveal_type(z)  # revealed: Invariant[object]
+class InvariantSubOfCovariant[T](Covariant[T]):
+    def push(self, value: T) -> None: ...
 
-def preserve_invariant_bounds(value: Invariant[object], bottom: Invariant[Never]) -> None:
-    if isinstance(value, Invariant):
-        reveal_type(value)  # revealed: Invariant[object]
-        reveal_type(value.get)  # revealed: bound method Invariant[object].get() -> object
-        reveal_type(value.get())  # revealed: object
-        reveal_type(value.push)  # revealed: bound method Invariant[object].push(x: object) -> None
-        value.push(42)
+class InvariantSubOfContravariant[T](Contravariant[T]):
+    def get(self) -> T:
+        raise NotImplementedError
 
-    if isinstance(bottom, Invariant):
-        reveal_type(bottom)  # revealed: Invariant[Never]
-        reveal_type(bottom.get)  # revealed: bound method Invariant[Never].get() -> Never
-        reveal_type(bottom.push)  # revealed: bound method Invariant[Never].push(x: Never) -> None
-        # error: [invalid-argument-type] "Argument to bound method `Invariant.push` is incorrect: Expected `Never`, found `Literal[42]`"
-        bottom.push(42)
+def narrow_generic_subclasses(covariant: Covariant[P], contravariant: Contravariant[P], invariant: Invariant[P]) -> None:
+    if isinstance(covariant, SubOfCovariant):
+        reveal_type(covariant)  # revealed: SubOfCovariant[P]
+
+    if isinstance(contravariant, SubOfContravariant):
+        reveal_type(contravariant)  # revealed: SubOfContravariant[P]
+
+    if isinstance(invariant, SubOfInvariant):
+        reveal_type(invariant)  # revealed: SubOfInvariant[P]
+
+    if isinstance(covariant, InvariantSubOfCovariant):
+        reveal_type(covariant)  # revealed: InvariantSubOfCovariant[P]
+
+    if isinstance(contravariant, InvariantSubOfContravariant):
+        reveal_type(contravariant)  # revealed: InvariantSubOfContravariant[P]
+```
+
+Narrowing unions and intersections preserves unrelated types when they can overlap with the checked
+class, while excluding unrelated final classes:
+
+```py
+from typing import Sequence, final
+from ty_extensions import Intersection
+
+@final
+class Item: ...
+
+class OpenItem: ...
+
+def narrow_union_with_unrelated_classes(value: Item | OpenItem | Sequence[int]) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: (OpenItem & list[Unknown]) | list[int]
+
+def narrow_intersection_with_unrelated_class(
+    value: Intersection[OpenItem, Sequence[int]],
+) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: OpenItem & list[int]
 ```
 
 ## Use cases: `isinstance` narrowing and generics
@@ -1107,12 +1092,7 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a set!"
 ```
 
-### Relaxed mode
-
-With `analysis.strict-generic-narrowing` disabled, the positive branch preserves compatible generic
-specializations from the original type and otherwise uses an `Unknown` specialization. The negative
-branch still excludes the ordinary top materialization because a negative `isinstance` result
-excludes every specialization of the class:
+### Gradual mode
 
 ```toml
 [environment]
@@ -1175,7 +1155,6 @@ Narrowing from `object` via `isinstance(.., list)`:
 def _(xs: object):
     if isinstance(xs, list):
         reveal_type(xs)  # revealed: list[Unknown]
-        reveal_type(xs.append)  # revealed: bound method list[Unknown].append(object: Unknown, /) -> None
         for x in xs:
             reveal_type(x)  # revealed: Unknown
 
@@ -1203,18 +1182,6 @@ def _(xs: Item | list[Item]):
         reveal_type(xs)  # revealed: Item
 ```
 
-A known invariant specialization also remains precise when narrowing a union:
-
-```py
-def preserve_known_list(xs: list[int] | set[str]) -> None:
-    if isinstance(xs, list):
-        reveal_type(xs)  # revealed: list[int]
-        reveal_type(xs.pop())  # revealed: int
-        xs.append(1)
-    else:
-        reveal_type(xs)  # revealed: set[str]
-```
-
 Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
 
 ```py
@@ -1229,76 +1196,6 @@ def _(xs: OpenItem | list[OpenItem]):
         reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
 ```
 
-Narrowing a specialized base class to a generic subclass preserves the base-class specialization:
-
-```py
-from typing import Sequence
-
-def narrow_sequence_to_list(xs: Sequence[int]) -> None:
-    if isinstance(xs, list):
-        reveal_type(xs)  # revealed: list[int]
-        reveal_type(xs.pop())  # revealed: int
-        xs.append(1)
-        # error: [invalid-argument-type] "Expected `int`, found `Literal["wrong"]`"
-        xs.append("wrong")
-
-def narrow_sequence_to_tuple(xs: Sequence[int]) -> None:
-    if isinstance(xs, tuple):
-        reveal_type(xs)  # revealed: tuple[int, ...]
-        for item in xs:
-            reveal_type(item)  # revealed: int
-```
-
-Type arguments are inferred through the actual inheritance relationship, including reordered
-parameters. Parameters that cannot be inferred remain `Unknown`:
-
-```py
-class ReorderedBase[Left, Right]: ...
-class ReorderedChild[Left, Right](ReorderedBase[Right, Left]): ...
-class PartiallyInferredChild[Item, Extra](Sequence[Item]): ...
-class VariadicChild[Item, *Ts](Sequence[Item]): ...
-
-def infer_reordered_parameters(value: ReorderedBase[int, str]) -> None:
-    if isinstance(value, ReorderedChild):
-        reveal_type(value)  # revealed: ReorderedChild[str, int]
-
-def infer_partial_specialization(value: Sequence[int]) -> None:
-    if isinstance(value, PartiallyInferredChild):
-        reveal_type(value)  # revealed: PartiallyInferredChild[int, Unknown]
-
-def infer_partial_variadic_specialization(value: Sequence[int]) -> None:
-    if isinstance(value, VariadicChild):
-        reveal_type(value)  # revealed: VariadicChild[int, *tuple[Unknown, ...]]
-```
-
-Each union member is narrowed independently. A specialized base contributes its type arguments,
-while an unrelated open class is intersected with the `Unknown` specialization:
-
-```py
-def narrow_union_to_list(xs: OpenItem | Sequence[OpenItem]) -> None:
-    if isinstance(xs, list):
-        reveal_type(xs)  # revealed: (OpenItem & list[Unknown]) | list[OpenItem]
-```
-
-When a specialized base is part of an intersection, unrelated elements of the intersection are
-preserved while the base is replaced by the inferred subclass specialization:
-
-```py
-from ty_extensions import Intersection
-
-class Whatever: ...
-
-def narrow_intersection_to_list(xs: Intersection[Whatever, Sequence[int]]) -> None:
-    if isinstance(xs, list):
-        reveal_type(xs)  # revealed: Whatever & list[int]
-        reveal_type(xs.pop())  # revealed: int
-
-def narrow_nested_intersection_to_list(xs: Sequence[int]) -> None:
-    if isinstance(xs, Whatever) and isinstance(xs, list):
-        reveal_type(xs)  # revealed: Whatever & list[int]
-        reveal_type(xs.pop())  # revealed: int
-```
-
 #### Exhaustiveness checking
 
 ```py
@@ -1309,7 +1206,7 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a set!"
 ```
 
-## Narrowing recursively bounded generics
+## Narrowing recursively bounded generics (strict mode)
 
 An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
 
@@ -1357,10 +1254,58 @@ def narrow_mutual(value: object) -> None:
         reveal_type(value)  # revealed: Right[object]
 ```
 
+## Narrowing recursively bounded generics (gradual mode)
+
+An `isinstance()` check must not recurse indefinitely when a generic bound refers to its own class.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from typing import Any
+
+class Recursive[T: "Recursive[Any]"]: ...
+
+def narrow(value: object) -> None:
+    if isinstance(value, Recursive):
+        reveal_type(value)  # revealed: Recursive[Unknown]
+```
+
+A self-referential bound must also be safe when its recursion is hidden behind a type alias.
+
+```py
+class AliasedRecursive[T: "RecursiveAlias"]: ...
+
+type RecursiveAlias = AliasedRecursive[Any]
+
+def narrow_alias(value: object) -> None:
+    if isinstance(value, AliasedRecursive):
+        reveal_type(value)  # revealed: AliasedRecursive[Unknown]
+```
+
+The same cycle recovery must handle bounds shared by mutually recursive generic classes.
+
+```py
+class Left[T: "Right[Any]"]: ...
+class Right[U: Left[Any]]: ...
+
+def narrow_mutual(value: object) -> None:
+    if isinstance(value, Left):
+        reveal_type(value)  # revealed: Left[Unknown]
+
+    if isinstance(value, Right):
+        reveal_type(value)  # revealed: Right[Unknown]
+```
+
 ## Narrowing generic defaults in Python 3.13
 
-When a type parameter has a bare `Any` default, the default is not used during `isinstance`
-narrowing. Its uninferred type argument remains `Unknown`, while an unrelated `Any` is unchanged:
+When a type parameter has a bare `Any` default, its uninferred type argument remains `Unknown`,
+while an unrelated `Any` is unchanged:
 
 ```toml
 [environment]
@@ -1378,7 +1323,7 @@ def _(x: object):
         reveal_type(x.y)  # revealed: tuple[Any, Unknown]
 ```
 
-Type alias defaults are also ignored when inferring a specialization from an `isinstance` check:
+This also works with type aliases:
 
 ```py
 from typing import Any
@@ -1395,29 +1340,32 @@ def _(x: object):
 
 `isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
 Narrowing must therefore preserve the original type argument instead of substituting `Box`'s
-default. In relaxed mode, the other union member can also intersect with the unknown specialization.
+default.
 
 ```py
-from typing import assert_never
+from typing import assert_never, final
 
-class Box[T: str = str]:
+@final
+class Item: ...
+
+class Box[T: Item = Item]:
     value: T
 
     def __init__(self, value: T) -> None: ...
 
-def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+def box_with_default[T: Item = Item](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
-        reveal_type(value)  # revealed: Box[T@box_with_default] | (T@box_with_default & Box[Unknown])
+        reveal_type(value)  # revealed: Box[T@box_with_default]
         return value
 
     if not isinstance(value, Box):
-        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        reveal_type(value)  # revealed: T@box_with_default
         return Box[T](value)
 
     assert_never(value)
 ```
 
-When relaxed `isinstance()` narrowing encounters an unknown value, a tuple subclass's uninferred
+When gradual `isinstance()` narrowing encounters an unknown value, a tuple subclass's uninferred
 type argument remains `Unknown`, regardless of its bound or default. Its element types are inherited
 from the specialized base.
 
@@ -1434,57 +1382,6 @@ def narrow_defaulted_tuple(value: object) -> None:
 Negative narrowing also excludes gradual specializations of the defaulted tuple subclass.
 
 ```py
-def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
-    if isinstance(value, DefaultedTuple):
-        reveal_type(value)  # revealed: DefaultedTuple[Any]
-        reveal_type(value[0])  # revealed: Any
-        reveal_type(value[1])  # revealed: str
-        return False
-
-    reveal_type(value)  # revealed: bool
-    return value
-```
-
-## Narrowing bounded generic defaults in strict mode
-
-In strict mode, narrowing to a tuple subclass materializes its declared upper bound rather than its
-narrower default, while preserving the tuple shape inherited from its specialized base.
-
-```toml
-[environment]
-python-version = "3.13"
-
-[analysis]
-strict-generic-narrowing = true
-```
-
-```py
-from typing import Any, assert_never
-
-class Box[T: str = str]:
-    value: T
-
-    def __init__(self, value: T) -> None: ...
-
-def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
-    if isinstance(value, Box):
-        reveal_type(value)  # revealed: Box[T@box_with_default]
-        return value
-
-    if not isinstance(value, Box):
-        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
-        return Box[T](value)
-
-    assert_never(value)
-
-class DefaultedTuple[T: int = bool](tuple[T, str]): ...
-
-def narrow_defaulted_tuple(value: object) -> None:
-    if isinstance(value, DefaultedTuple):
-        reveal_type(value)  # revealed: DefaultedTuple[int]
-        reveal_type(value[0])  # revealed: int
-        reveal_type(value[1])  # revealed: str
-
 def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
     if isinstance(value, DefaultedTuple):
         reveal_type(value)  # revealed: DefaultedTuple[Any]
@@ -1555,17 +1452,11 @@ A `TypedDict` is always a dictionary at runtime, but its static interface delibe
 operations that could remove required keys or introduce undeclared ones. Narrowing to `dict`,
 `Mapping`, or `MutableMapping` must not discard these restrictions.
 
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
-
 Use a `TypedDict` with one required key and one optional key to distinguish safe operations from
 those that could invalidate its declared shape.
 
 ```py
-from collections.abc import Mapping, MutableMapping
-from typing import TypedDict
+from typing import TypedDict, Mapping, MutableMapping
 from typing_extensions import NotRequired
 
 class Payload(TypedDict):
@@ -1577,7 +1468,7 @@ Narrowing directly to `dict` preserves both the required-key restrictions and th
 known type.
 
 ```py
-def narrow_typed_dict_to_dict(value: Payload) -> None:
+def narrow_typed_dict_to_dict(value: int | Payload) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload
         reveal_type(value["key"])  # revealed: int
@@ -1595,6 +1486,26 @@ def narrow_typed_dict_to_dict(value: Payload) -> None:
         del value["key"]
 ```
 
+Same for `MutableMapping`:
+
+```py
+def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
+    if isinstance(value, MutableMapping):
+        reveal_type(value)  # revealed: Payload
+        # error: [unresolved-attribute]
+        value.clear()
+```
+
+And for `Mapping`:
+
+```py
+def narrow_typed_dict_to_mapping(value: Payload) -> None:
+    if isinstance(value, Mapping):
+        reveal_type(value)  # revealed: Payload
+        # error: [unresolved-attribute]
+        value.clear()
+```
+
 A type alias must retain the same `TypedDict` interface.
 
 ```py
@@ -1605,213 +1516,4 @@ def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
         reveal_type(value)  # revealed: Payload
         # error: [unresolved-attribute]
         value.clear()
-```
-
-Narrowing to `MutableMapping` must not expose dictionary operations that violate the `TypedDict`.
-
-```py
-def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
-    if isinstance(value, MutableMapping):
-        reveal_type(value)  # revealed: Payload
-        reveal_type(value["key"])  # revealed: int
-        value["key"] = 1
-
-        # error: [unresolved-attribute]
-        value.clear()
-        # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
-        value.pop("key")
-        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
-        value["unexpected"] = 1
-        # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
-        del value["key"]
-```
-
-A `Mapping` check likewise preserves the original `TypedDict`, including its mutation restrictions.
-
-```py
-def narrow_typed_dict_to_mapping(value: Payload) -> None:
-    if isinstance(value, Mapping):
-        reveal_type(value)  # revealed: Payload
-        reveal_type(value["key"])  # revealed: int
-        value["key"] = 1
-
-        # error: [unresolved-attribute]
-        value.clear()
-        # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
-        value.pop("key")
-        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
-        value["unexpected"] = 1
-        # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
-        del value["key"]
-```
-
-## Preserving TypedDict interfaces when narrowing mapping unions
-
-A union containing a `TypedDict` must preserve its restrictions even when another union member can
-also satisfy the mapping check.
-
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
-
-Use an unrelated open class to retain a second possible mapping specialization alongside the
-`TypedDict`.
-
-```py
-from collections.abc import Mapping, MutableMapping
-from typing import TypedDict
-from typing_extensions import NotRequired
-
-class Payload(TypedDict):
-    key: int
-    optional: NotRequired[str]
-
-class Unrelated: ...
-```
-
-An unrelated union member may be a dictionary, but the `TypedDict` member still restricts all
-operations on the narrowed union.
-
-```py
-def narrow_typed_dict_or_unrelated_to_dict(value: Payload | Unrelated) -> None:
-    if isinstance(value, dict):
-        reveal_type(value)  # revealed: Payload | (Unrelated & dict[Unknown, Unknown])
-
-        # error: [unresolved-attribute]
-        value.clear()
-        # error: [invalid-argument-type]
-        value.pop("key")
-        # error: [invalid-key]
-        value["unexpected"] = 1
-        # error: [invalid-argument-type]
-        del value["key"]
-```
-
-The same restrictions apply when the unrelated union member is narrowed to `MutableMapping`.
-
-```py
-def narrow_typed_dict_or_unrelated_to_mutable_mapping(value: Payload | Unrelated) -> None:
-    if isinstance(value, MutableMapping):
-        reveal_type(value)  # revealed: Payload | (Unrelated & MutableMapping[Unknown, Unknown])
-
-        # error: [unresolved-attribute]
-        value.clear()
-        # error: [invalid-argument-type]
-        value.pop("key")
-        # error: [invalid-key]
-        value["unexpected"] = 1
-        # error: [invalid-argument-type]
-        del value["key"]
-```
-
-Narrowing to `Mapping` additionally preserves both union members' possible value types.
-
-```py
-def narrow_typed_dict_or_unrelated_to_mapping(value: Payload | Unrelated) -> None:
-    if isinstance(value, Mapping):
-        reveal_type(value)  # revealed: Payload | (Unrelated & Mapping[Unknown, Unknown])
-        reveal_type(value["key"])  # revealed: int | Unknown
-
-        # error: [unresolved-attribute]
-        value.clear()
-        # error: [invalid-key]
-        # error: [invalid-assignment]
-        value["unexpected"] = 1
-        # error: [invalid-argument-type]
-        # error: [not-subscriptable]
-        del value["key"]
-```
-
-An already-specialized dictionary remains precise without weakening the `TypedDict` union member.
-
-```py
-def narrow_typed_dict_or_dict(value: Payload | dict[str, int]) -> None:
-    if isinstance(value, dict):
-        reveal_type(value)  # revealed: Payload | dict[str, int]
-        reveal_type(value["key"])  # revealed: int
-        value["key"] = 1
-
-        # error: [unresolved-attribute]
-        value.clear()
-        # error: [invalid-argument-type]
-        value.pop("key")
-        # error: [invalid-key]
-        value["unexpected"] = 1
-        # error: [invalid-argument-type]
-        del value["key"]
-```
-
-## Narrowing TypedDicts to custom dictionary subclasses
-
-A `TypedDict` represents an exact dictionary at runtime, so it cannot also be an instance of a
-custom dictionary subclass.
-
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
-
-```py
-from typing import TypedDict
-
-class Payload(TypedDict):
-    key: int
-
-class CustomDict(dict[str, int]): ...
-
-def narrow_typed_dict_to_custom_dict(value: Payload) -> None:
-    if isinstance(value, CustomDict):
-        reveal_type(value)  # revealed: Never
-```
-
-## Narrowing TypedDicts to runtime-checkable protocols
-
-A runtime-checkable protocol may deliberately expose an operation that is not part of the
-`TypedDict` interface.
-
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
-
-```py
-from typing import Protocol, TypedDict, runtime_checkable
-
-class Payload(TypedDict):
-    key: int
-
-@runtime_checkable
-class Clearable(Protocol):
-    def clear(self) -> None: ...
-
-def narrow_typed_dict_to_clearable_protocol(value: Payload) -> None:
-    if isinstance(value, Clearable):
-        reveal_type(value)  # revealed: Payload & Clearable
-        value.clear()
-```
-
-## Narrowing with named expressions (walrus operator)
-
-When `isinstance()` is used with a named expression, the target of the named expression should be
-narrowed. When the `isinstance()` check is the value of a named expression, its argument should also
-be narrowed.
-
-```py
-def get_value() -> int | str:
-    return 1
-
-def f():
-    if isinstance(x := get_value(), int):
-        reveal_type(x)  # revealed: int
-    else:
-        reveal_type(x)  # revealed: str
-
-    value = get_value()
-    if result := isinstance(value, int):
-        reveal_type(value)  # revealed: int
-        reveal_type(result)  # revealed: Literal[True]
-    else:
-        reveal_type(value)  # revealed: str
-        reveal_type(result)  # revealed: Literal[False]
 ```

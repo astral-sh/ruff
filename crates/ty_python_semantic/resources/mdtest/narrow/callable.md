@@ -88,14 +88,14 @@ def resolve(value: str):
         reveal_type(value())  # revealed: object
 ```
 
-### Relaxed generic narrowing mode
+### Gradual generic narrowing mode
 
 ```toml
 [analysis]
 strict-generic-narrowing = false
 ```
 
-In relaxed generic narrowing mode, an `isinstance(.., Callable)` check narrows to a gradual
+In gradual generic narrowing mode, an `isinstance(.., Callable)` check narrows to a gradual
 callable. Its parameters accept arbitrary arguments, and its return type is `Unknown`:
 
 ```py

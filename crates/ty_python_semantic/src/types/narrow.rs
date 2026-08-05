@@ -876,7 +876,7 @@ fn specialize_narrowing_target<'db>(
             env,
             target_class.class_literal(db),
             subject_class,
-            GenericClassSpecializationPolicy::Relaxed,
+            GenericClassSpecializationPolicy::Gradual,
         )?
     };
 
@@ -892,13 +892,13 @@ enum GenericClassSpecializationPolicy {
     /// Require one exact invariant solution for every type variable.
     Exact,
     /// Retain inferred arguments and use `Unknown` for unsolved type variables.
-    Relaxed,
+    Gradual,
 }
 
 /// Infer a generic subclass specialization from a specialized base class.
 ///
-/// Class-pattern arguments require exact invariant solutions for every type variable, while
-/// relaxed `isinstance()` narrowing accepts partial and variant solutions.
+/// Strict class-pattern arguments require exact invariant solutions for every type variable,
+/// while gradual generic narrowing accepts partial and variant solutions.
 fn specialize_generic_class_for_subject<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -934,7 +934,7 @@ fn specialize_generic_class_for_subject<'db>(
                 PathBounds::default_solve(db, env, &constraints, path_bound)
             })
         }
-        GenericClassSpecializationPolicy::Relaxed => path_bounds.solve(db, env, &constraints),
+        GenericClassSpecializationPolicy::Gradual => path_bounds.solve(db, env, &constraints),
     };
     let Solutions::Constrained(solutions) = solutions else {
         return None;
@@ -944,7 +944,7 @@ fn specialize_generic_class_for_subject<'db>(
     };
 
     let typevars = generic_context.variables(db);
-    let unknown_specialization = (policy == GenericClassSpecializationPolicy::Relaxed)
+    let unknown_specialization = (policy == GenericClassSpecializationPolicy::Gradual)
         .then(|| generic_context.unknown_specialization(db, target_class.known(db)));
     let types = typevars
         .clone()
@@ -967,7 +967,7 @@ fn specialize_generic_class_for_subject<'db>(
         return None;
     }
 
-    let specialization = if policy == GenericClassSpecializationPolicy::Relaxed
+    let specialization = if policy == GenericClassSpecializationPolicy::Gradual
         && target_class.is_known(db, KnownClass::Tuple)
         && let [element] = types.as_slice()
     {
