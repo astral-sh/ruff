@@ -853,7 +853,7 @@ from __future__ import annotations
 
 from typing import Final, Protocol, TypeVar
 
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
 
 class Owned(Protocol[T]):
     owner: Final[T]
@@ -864,7 +864,7 @@ class Owned(Protocol[T]):
             other.owner = owner  # error: [invalid-assignment]
 
     def progress(self: Owned[int]) -> None: ...
-    def replace(self: Owned[int], owner: int) -> None:
+    def replace(self, owner: T) -> None:
         self.owner = owner  # error: [invalid-assignment]
 ```
 

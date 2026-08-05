@@ -35,6 +35,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
+use crate::types::protocol_class::inferred_protocol_typevar_variance;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -513,7 +514,9 @@ impl<'db> GenericAlias<'db> {
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
+                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db)
+                    && !origin.is_protocol(db)
+                {
                     ty.with_polarity(explicit_variance)
                         .variance_of(db, &env, typevar)
                 } else {
@@ -529,9 +532,19 @@ impl<'db> GenericAlias<'db> {
                     // to see if the class literal query was already run.
 
                     let typevar_variance_in_substituted_type = ty.variance_of(db, &env, typevar);
-                    origin
-                        .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, &env, generic_typevar.identity(db))
+                    if origin.is_protocol(db) {
+                        typevar_variance_in_substituted_type.compose_thunk(|| {
+                            inferred_protocol_typevar_variance(
+                                db,
+                                origin,
+                                generic_typevar.identity(db),
+                            )
+                        })
+                    } else {
+                        origin
+                            .with_polarity(typevar_variance_in_substituted_type)
+                            .variance_of(db, &env, generic_typevar.identity(db))
+                    }
                 }
             })
             .collect()

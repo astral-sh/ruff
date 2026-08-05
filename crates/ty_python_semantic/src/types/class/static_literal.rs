@@ -53,7 +53,6 @@ use crate::{
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
-        protocol_class::excluded_from_proto_members,
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
@@ -3740,7 +3739,6 @@ impl<'db> StaticClassLiteral<'db> {
         if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
-        let is_protocol = self.is_protocol(db);
         let class_body_scope = self.body_scope(db);
         let program_file = class_body_scope.program_file(db);
         let python_version = env.python_version(db);
@@ -3824,7 +3822,6 @@ impl<'db> StaticClassLiteral<'db> {
             })
             .chain(attribute_places_and_qualifiers)
             .dedup()
-            .filter(|(name, _)| !is_protocol || !excluded_from_proto_members(name))
             .filter_map(|(name, place_and_qual)| {
                 place_and_qual.ignore_possibly_undefined().map(|ty| {
                     let variance = if place_and_qual
@@ -3838,10 +3835,8 @@ impl<'db> StaticClassLiteral<'db> {
                         // We don't allow mutation of methods or properties
                         || ty.is_function_literal()
                         || ty.is_property_instance()
-                        // Private attributes are assumed not to be externally mutated, but public
-                        // protocol dunder attributes such as an annotated `__call__` are writable.
-                        || (name.starts_with('_')
-                            && (!is_protocol || !ast::helpers::is_dunder(&name)))
+                        // Underscore-prefixed attributes are assumed not to be externally mutated
+                        || name.starts_with('_')
                     {
                         // CLASS_VAR: class vars generally shouldn't contain the
                         // type variable, but they could if it's a
@@ -3852,37 +3847,7 @@ impl<'db> StaticClassLiteral<'db> {
                     } else {
                         default_attribute_variance
                     };
-                    let variance_of_member = |member_ty| {
-                        // Receivers describe how protocol methods are bound, not values accepted
-                        // by the resulting bound method.
-                        let member_ty = match member_ty {
-                            Type::FunctionLiteral(function)
-                                if is_protocol && function.has_implicit_receiver(db) =>
-                            {
-                                Type::Callable(
-                                    function.into_callable_type(db).bind_self(db, &env, None),
-                                )
-                            }
-                            _ => member_ty,
-                        };
-                        member_ty
-                            .with_polarity(variance)
-                            .variance_of(db, &env, typevar)
-                    };
-
-                    if let Type::PropertyInstance(property) = ty
-                        && is_protocol
-                    {
-                        property
-                            .getter(db)
-                            .into_iter()
-                            .chain(property.setter(db))
-                            .chain(property.deleter(db))
-                            .map(variance_of_member)
-                            .collect()
-                    } else {
-                        variance_of_member(ty)
-                    }
+                    ty.with_polarity(variance).variance_of(db, &env, typevar)
                 })
             });
 

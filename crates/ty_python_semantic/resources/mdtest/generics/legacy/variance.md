@@ -336,13 +336,13 @@ class InvariantReadWrite(Protocol[T]):
     def write(self, value: T) -> None: ...
 ```
 
-## Generic protocol variance follows properties and mutable attributes
+## Protocol property variance
 
-A read-only property uses its type variable covariantly. A writable property or mutable attribute
-uses the same variable both covariantly and contravariantly, so it requires invariance.
+A read-only property uses its type variable covariantly. A writable property uses the same variable
+for both reads and writes, so it requires invariance.
 
 ```py
-from typing import Callable, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
@@ -356,38 +356,10 @@ class WritableProperty(Protocol[T]):
     def value(self) -> T: ...
     @value.setter
     def value(self, value: T) -> None: ...
-
-class MutableAttribute(Protocol[T]):
-    value: T
-
-class MutableDunderAttribute(Protocol[T]):
-    __call__: Callable[..., T]
-
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantDunderAttribute` should be invariant, but is covariant"
-class CovariantDunderAttribute(Protocol[T_co]):
-    __call__: Callable[..., T_co]
-
-class CovariantDunderMethod(Protocol[T_co]):
-    def __call__(self) -> T_co: ...
-
-class WritableClassValue(Protocol[T]):
-    @property
-    def value(self) -> type[T]: ...
-    @value.setter
-    def value(self, value: type[T]) -> None: ...
-
-class WritableClassAttribute(Protocol[T]):
-    @property
-    def __class__(self) -> type[T]: ...
-    @__class__.setter
-    def __class__(self, value: type[T]) -> None: ...
-
-class InvariantReturn(Protocol[T]):
-    def read(self) -> list[T]: ...
 ```
 
-Explicit receiver annotations on property accessors do not influence the variance of the values that
-the property accepts.
+Explicit receiver annotations on property accessors identify the object whose property is accessed;
+they do not change the variance of the values accepted by the property.
 
 ```py
 T_contra = TypeVar("T_contra", contravariant=True)
@@ -399,7 +371,125 @@ class ContravariantProperty(Protocol[T_contra]):
     def value(self: "ContravariantProperty[T_contra]", value: T_contra) -> None: ...
 ```
 
-## Generic protocol variance ignores constructors and receiver annotations
+## Writable protocol attribute variance
+
+Protocol attributes are writable unless declared otherwise, including attributes whose names begin
+with an underscore. Both public and underscore-prefixed writable attributes require invariance.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class MutableAttribute(Protocol[T]):
+    value: T
+
+class UnderscoreAttribute(Protocol[T]):
+    _value: T
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantUnderscoreAttribute` should be invariant, but is covariant"
+class CovariantUnderscoreAttribute(Protocol[T_co]):
+    _value: T_co
+
+static_assert(not is_subtype_of(UnderscoreAttribute[int], UnderscoreAttribute[object]))
+static_assert(not is_assignable_to(UnderscoreAttribute[int], UnderscoreAttribute[object]))
+
+def overwrite(value: UnderscoreAttribute[object]) -> None:
+    value._value = object()
+
+def unsound(value: UnderscoreAttribute[int]) -> None:
+    overwrite(value)  # error: [invalid-argument-type]
+```
+
+## Protocol callable attributes and methods
+
+An annotated `__call__` attribute is writable and therefore invariant, while a `__call__` method
+cannot be reassigned through the protocol interface and can return a covariant type variable.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class MutableDunderAttribute(Protocol[T]):
+    __call__: Callable[..., T]
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantDunderAttribute` should be invariant, but is covariant"
+class CovariantDunderAttribute(Protocol[T_co]):
+    __call__: Callable[..., T_co]
+
+class CovariantDunderMethod(Protocol[T_co]):
+    def __call__(self) -> T_co: ...
+```
+
+## Protocol members involving class-object types
+
+The class-object type `type[T]` is covariant in `T`, but a property accepting and returning
+`type[T]` is invariant because the property is writable.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class WritableClassValue(Protocol[T]):
+    @property
+    def value(self) -> type[T]: ...
+    @value.setter
+    def value(self, value: type[T]) -> None: ...
+```
+
+Unlike protocol implementation details such as `__class_getitem__`, an explicitly declared
+`__class__` property remains part of the protocol interface and has the same write requirement.
+
+```py
+class WritableClassAttribute(Protocol[T]):
+    @property
+    def __class__(self) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T]) -> None: ...
+```
+
+## Nested invariant protocol return types
+
+A method return position is covariant, but returning a mutable `list[T]` still requires `T` to be
+invariant because the list itself is invariant in its element type.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class InvariantReturn(Protocol[T]):
+    def read(self) -> list[T]: ...
+```
+
+## Descriptor-decorated protocol member variance
+
+A descriptor determines the types exposed by its protocol member. A descriptor that reads `T_co` but
+accepts arbitrary objects for writes exposes its type variable only in a covariant position.
+
+```py
+from typing import Callable, Generic, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Descriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: object) -> None: ...
+
+class DescriptorProtocol(Protocol[T_co]):
+    @Descriptor
+    def value(self) -> T_co: ...
+```
+
+## Protocol variance ignores constructors and undeclared instance attributes
 
 Constructors do not belong to a protocol's structural interface. If a type variable appears only in
 a constructor, its inferred variance therefore falls back to covariance.
@@ -416,22 +506,112 @@ class ConstructorOnly(Protocol[T]):
 
 class CovariantConstructorOnly(Protocol[T_co]):
     def __init__(self, value: T_co) -> None: ...
+```
 
+Assigning an undeclared attribute inside a constructor does not add that attribute to the protocol
+interface. The assignment is diagnosed separately and does not make the type variable invariant.
+
+```py
+class UndeclaredConstructorAttribute(Protocol[T_co]):
+    def __init__(self, value: T_co) -> None:
+        self.value = value  # error: [ambiguous-protocol-member]
+```
+
+Excluded protocol implementation methods such as `__class_getitem__` likewise do not contribute
+their parameter positions to structural variance.
+
+```py
 class ExcludedClassGetitem(Protocol[T_co]):
     @classmethod
     def __class_getitem__(cls, value: T_co) -> object: ...
 ```
 
+## Protocol variance ignores explicit receiver annotations
+
 Explicit instance and class receivers identify where a method is bound; they do not make a
 contravariant protocol type variable appear covariantly.
 
 ```py
+from typing import Protocol, TypeVar
+
 T_contra = TypeVar("T_contra", contravariant=True)
 
 class ExplicitReceivers(Protocol[T_contra]):
     def send(self: "ExplicitReceivers[T_contra]", value: T_contra) -> None: ...
     @classmethod
     def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
+```
+
+## Recursive protocol variance
+
+A recursively specialized protocol must infer its variance from its actual members, not from the
+declared variance that is being checked. Output-only and input-only recursive protocols therefore
+require covariance and contravariance, respectively.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+# error: [invalid-protocol] "Type variable `T` in protocol `RecursiveSource` should be covariant, but is invariant"
+class RecursiveSource(Protocol[T]):
+    def read(self) -> T: ...
+    def next(self) -> RecursiveSource[T]: ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `RecursiveSink` should be contravariant, but is invariant"
+class RecursiveSink(Protocol[T]):
+    def write(self, value: T) -> None: ...
+    def next(self) -> RecursiveSink[T]: ...
+
+class CovariantRecursiveSource(Protocol[T_co]):
+    def read(self) -> T_co: ...
+    def next(self) -> CovariantRecursiveSource[T_co]: ...
+
+class ContravariantRecursiveSink(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+    def next(self) -> ContravariantRecursiveSink[T_contra]: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantRecursiveSink` should be contravariant, but is covariant"
+class CovariantRecursiveSink(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> CovariantRecursiveSink[T_co]: ...
+
+# error: [invalid-protocol] "Type variable `T_contra` in protocol `ContravariantRecursiveSource` should be covariant, but is contravariant"
+class ContravariantRecursiveSource(Protocol[T_contra]):
+    def read(self) -> T_contra: ...
+    def next(self) -> ContravariantRecursiveSource[T_contra]: ...
+```
+
+Variance also propagates around a cycle containing more than one protocol before it reaches its
+least restrictive fixed point.
+
+```py
+# error: [invalid-protocol] "Type variable `T` in protocol `MutualSource` should be covariant, but is invariant"
+class MutualSource(Protocol[T]):
+    def read(self) -> T: ...
+    def next(self) -> MutualFollower[T]: ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `MutualFollower` should be covariant, but is invariant"
+class MutualFollower(Protocol[T]):
+    def next(self) -> MutualSource[T]: ...
+```
+
+An input-only cycle must remain contravariant even when its first protocol references the type
+variable only through another protocol in the same cycle.
+
+```py
+# error: [invalid-protocol] "Type variable `T` in protocol `MutualSinkFollower` should be contravariant, but is invariant"
+class MutualSinkFollower(Protocol[T]):
+    def next(self) -> MutualSink[T]: ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `MutualSink` should be contravariant, but is invariant"
+class MutualSink(Protocol[T]):
+    def write(self, value: T) -> None: ...
+    def next(self) -> MutualSinkFollower[T]: ...
 ```
 
 ## Parameter specifications and inferred protocol variance
@@ -460,8 +640,8 @@ class InferredSource(Protocol[T_infer]):
 
 ## Invalid protocol headers do not cause cascading variance diagnostics
 
-Malformed generic parameter ordering and duplicate generic bases are diagnosed separately. Ignoring
-those diagnostics does not turn them into protocol-variance errors.
+Malformed generic parameter ordering, invalid default references, and invalid generic bases are
+diagnosed separately. Ignoring those diagnostics does not turn them into protocol-variance errors.
 
 ```toml
 [environment]
@@ -469,6 +649,7 @@ python-version = "3.13"
 
 [rules]
 invalid-generic-class = "ignore"
+invalid-base = "ignore"
 ```
 
 ```py
@@ -476,9 +657,13 @@ from typing import Generic, Protocol, TypeVar
 
 DefaultT = TypeVar("DefaultT", default=int)
 T = TypeVar("T")
+A = TypeVar("A", default="B")
+B = TypeVar("B", default=int)
 
 class InvalidParameterOrder(Protocol[DefaultT, T]): ...
 class DuplicateGenericBase(Protocol[T], Generic[T]): ...
+class InvalidDefaultReference(Protocol[A, B]): ...
+class UnsubscriptedGeneric(Protocol[T], Generic): ...
 ```
 
 ## Inheriting from generic classes with explicit variance
