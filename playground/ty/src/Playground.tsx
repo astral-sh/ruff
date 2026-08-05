@@ -125,6 +125,12 @@ export default function Playground() {
 
   const handleFileAdded = useCallback(
     (session: PlaygroundSession, name: string) => {
+      const addError = validatePlaygroundFileName(name);
+      if (addError != null) {
+        setError(addError);
+        return;
+      }
+
       const workspace = session.workspace;
       let handle = null;
 
@@ -147,12 +153,9 @@ export default function Playground() {
 
   const handleFileRenamed = useCallback(
     (session: PlaygroundSession, file: FileId, newName: string) => {
-      if (newName.startsWith("/")) {
-        setError("File names cannot start with '/'.");
-        return;
-      }
-      if (newName.startsWith("vendored:")) {
-        setError("File names cannot start with 'vendored:'.");
+      const renameError = validatePlaygroundFileName(newName);
+      if (renameError != null) {
+        setError(renameError);
         return;
       }
 
@@ -746,6 +749,29 @@ function languageForFile(file: FileHandle | string): string | undefined {
   }
 
   return isPythonFile(file) ? "python" : undefined;
+}
+
+/**
+ * Reject names that would crash the in-memory FS / WASM layer
+ * (empty, `.` / `..` segments, absolute / vendored paths).
+ */
+export function validatePlaygroundFileName(name: string): string | null {
+  if (name.trim() === "") {
+    return "File name cannot be empty.";
+  }
+  if (name.startsWith("/")) {
+    return "File names cannot start with '/'.";
+  }
+  if (name.startsWith("vendored:")) {
+    return "File names cannot start with 'vendored:'.";
+  }
+  // Split keeps empty segments for trailing/double slashes; treat those as invalid too.
+  for (const segment of name.split("/")) {
+    if (segment === "" || segment === "." || segment === "..") {
+      return "File names cannot contain empty, '.' or '..' path segments.";
+    }
+  }
+  return null;
 }
 
 function Loading() {
