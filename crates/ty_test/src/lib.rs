@@ -14,17 +14,19 @@ use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
+use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
     fix_all_diagnostics,
 };
 
@@ -188,24 +190,10 @@ fn run_test(
                 {
                     typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
-            } else if let Some(component_index) = full_path
-                .components()
-                .position(|c| c.as_str() == "<path-to-site-packages>")
+            } else if let Some(site_packages_path) =
+                expand_site_packages_placeholder(&full_path, python_version)
             {
-                // If the path contains `<path-to-site-packages>`, we need to replace it with the
-                // actual site-packages directory based on the Python platform and version.
-                let mut components = full_path.components();
-                let mut new_path: SystemPathBuf =
-                    components.by_ref().take(component_index).collect();
-                if cfg!(target_os = "windows") {
-                    new_path.extend(["Lib", "site-packages"]);
-                } else {
-                    new_path.push("lib");
-                    new_path.push(format!("python{python_version}"));
-                    new_path.push("site-packages");
-                }
-                new_path.extend(components.skip(1));
-                full_path = new_path;
+                full_path = site_packages_path;
             }
 
             let temp_string;
@@ -289,11 +277,12 @@ fn run_test(
         .unwrap_or_default()
         .iter()
         .map(|path| {
-            if path.is_absolute() {
+            let path = if path.is_absolute() {
                 path.clone()
             } else {
                 src_path.join(path)
-            }
+            };
+            expand_site_packages_placeholder(&path, python_version).unwrap_or(path)
         })
         .collect();
 
@@ -316,7 +305,7 @@ fn run_test(
         .expect("Failed to resolve search path settings"),
     };
 
-    Program::init_or_update(db, settings);
+    db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
@@ -348,16 +337,22 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
-                .and_then(|inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                }) {
+            let failure = match matcher::match_file(
+                db,
+                test_file.file,
+                python_version,
+                &diagnostics,
+                options,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
@@ -367,7 +362,8 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(|file| pull_types(db, file), test_file);
+            let pull_types_result =
+                attempt_test(|file| pull_types(db, db.program_file(file)), test_file);
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {
@@ -498,22 +494,25 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    for from_list in list_modules(db).iter().copied() {
+    let environment = db.program().resolver_environment(db);
+    for from_list in list_modules(db, environment).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
-        errs.push(match resolve_module_confident(db, from_list.name(db)) {
-            None => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: None,
+        errs.push(
+            match resolve_module_confident(db, environment, from_list.name(db)) {
+                None => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: None,
+                },
+                Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: Some(from_resolve),
+                },
+                _ => continue,
             },
-            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: Some(from_resolve),
-            },
-            _ => continue,
-        });
+        );
     }
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }
@@ -564,6 +563,28 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
         }
         Ok(())
     }
+}
+
+fn expand_site_packages_placeholder(
+    path: &SystemPath,
+    python_version: PythonVersion,
+) -> Option<SystemPathBuf> {
+    let component_index = path
+        .components()
+        .position(|component| component.as_str() == "<path-to-site-packages>")?;
+
+    let mut components = path.components();
+    let mut expanded: SystemPathBuf = components.by_ref().take(component_index).collect();
+    if cfg!(target_os = "windows") {
+        expanded.extend(["Lib", "site-packages"]);
+    } else {
+        expanded.push("lib");
+        expanded.push(format!("python{python_version}"));
+        expanded.push("site-packages");
+    }
+    expanded.extend(components.skip(1));
+
+    Some(expanded)
 }
 
 fn parse<'s>(

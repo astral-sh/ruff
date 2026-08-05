@@ -8,7 +8,6 @@ E402 [*] Module level import not at top of file
 4 |
 5 | import os
   | ^^^^^^^^^
-  |
 help: Move module level imports to top of file
   |
 2 |

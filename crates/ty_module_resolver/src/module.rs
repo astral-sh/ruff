@@ -5,12 +5,13 @@ use std::str::FromStr;
 use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::SystemPath;
 use ruff_db::vendored::VendoredPath;
+use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
-use crate::Db;
 use crate::module_name::ModuleName;
 use crate::path::{SearchPath, SystemOrVendoredPathRef};
+use crate::{Db, ResolverEnvironment};
 
 /// Representation of a Python module.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
@@ -26,18 +27,39 @@ impl get_size2::GetSize for Module<'_> {}
 impl<'db> Module<'db> {
     pub(crate) fn file_module(
         db: &'db dyn Db,
+        file: File,
+        resolver_environment: ResolverEnvironment<'db>,
         name: Cow<'_, ModuleName>,
         kind: ModuleKind,
         search_path: SearchPath,
-        file: File,
     ) -> Self {
         let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
 
-        Self::File(FileModule::new(db, name, kind, search_path, file, known))
+        Self::File(FileModule::new(
+            db,
+            name,
+            kind,
+            search_path,
+            file,
+            resolver_environment,
+            known,
+        ))
     }
 
-    pub(crate) fn namespace_package(db: &'db dyn Db, name: Cow<'_, ModuleName>) -> Self {
-        Self::Namespace(NamespacePackage::new(db, name))
+    pub(crate) fn namespace_package(
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+        name: Cow<'_, ModuleName>,
+    ) -> Self {
+        Self::Namespace(NamespacePackage::new(db, resolver_environment, name))
+    }
+
+    /// The resolver environment used to resolve this module.
+    pub fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
+        match self {
+            Module::File(module) => module.resolver_environment(db),
+            Module::Namespace(module) => module.resolver_environment(db),
+        }
     }
 
     /// The absolute name of the module (e.g. `foo.bar`)
@@ -56,6 +78,11 @@ impl<'db> Module<'db> {
             Module::File(module) => Some(module.file(db)),
             Module::Namespace(_) => None,
         }
+    }
+
+    /// The Python version used to resolve this module.
+    pub fn python_version(self, db: &'db dyn Database) -> PythonVersion {
+        self.resolver_environment(db).python_version(db)
     }
 
     /// Is this a module that we special-case somehow? If so, which one?
@@ -170,6 +197,7 @@ fn all_submodule_names_for_package<'db>(
         path.file_name(),
     );
 
+    let resolver_environment = module.resolver_environment(db);
     Some(match path.parent()? {
         SystemOrVendoredPathRef::System(parent_directory) => {
             directory_listing(db, parent_directory)
@@ -205,10 +233,11 @@ fn all_submodule_names_for_package<'db>(
                     };
                     Some(Module::file_module(
                         db,
+                        file,
+                        resolver_environment,
                         Cow::Owned(name),
                         kind,
                         module.search_path(db).clone(),
-                        file,
                     ))
                 })
                 .collect()
@@ -242,17 +271,18 @@ fn all_submodule_names_for_package<'db>(
                 };
                 Some(Module::file_module(
                     db,
+                    file,
+                    resolver_environment,
                     Cow::Owned(name),
                     kind,
                     module.search_path(db).clone(),
-                    file,
                 ))
             })
             .collect(),
     })
 }
 
-/// A module that resolves to a file (`lib.py` or `package/__init__.py`)
+/// A module that resolves to a file (`lib.py` or `package/__init__.py`).
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
@@ -264,6 +294,8 @@ pub struct FileModule<'db> {
     #[returns(copy)]
     pub(super) file: File,
     #[returns(copy)]
+    pub(super) resolver_environment: ResolverEnvironment<'db>,
+    #[returns(copy)]
     pub(super) known: Option<KnownModule>,
 }
 
@@ -273,6 +305,8 @@ pub struct FileModule<'db> {
 /// multiple possible paths and they have no corresponding code file.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
+    #[returns(copy)]
+    pub(super) resolver_environment: ResolverEnvironment<'db>,
     #[returns(ref)]
     pub(super) name: ModuleName,
 }
@@ -413,7 +447,7 @@ impl KnownModule {
         let known_module = Self::from_str(name.as_str()).ok()?;
 
         let is_expected_search_path = if known_module.is_third_party() {
-            search_path.is_third_party()
+            search_path.can_contain_third_party_code()
         } else {
             search_path.is_standard_library()
         };

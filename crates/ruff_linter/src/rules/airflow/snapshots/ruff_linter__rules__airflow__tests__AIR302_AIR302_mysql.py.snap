@@ -50,7 +50,6 @@ AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved in
 10 | PrestoToMySqlOperator()
 11 | PrestoToMySqlTransfer()
    | ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOperator` from `airflow.providers.mysql.transfers.presto_to_mysql` instead.
   |
 4 | from airflow.operators.presto_to_mysql import (

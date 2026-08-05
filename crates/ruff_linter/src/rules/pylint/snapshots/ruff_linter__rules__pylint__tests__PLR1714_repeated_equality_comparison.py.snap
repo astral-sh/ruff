@@ -425,7 +425,6 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"bar", "bar", "buzz"
 78 |
 79 | foo == "bar" or foo == "bar" or foo == "buzz" # All but one members identical
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Merge multiple comparisons
    |
 78 |

@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
+use ty_python_semantic::ProgramEnvironment;
 
 use compact_str::{CompactString, CompactStringExt};
-use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
@@ -15,7 +15,8 @@ use ruff_python_codegen::Stylist;
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{KnownModule, Module, ModuleName};
+use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
@@ -33,24 +34,30 @@ pub fn completion<'db>(
     db: &'db dyn Db,
     settings: &CompletionSettings,
     capabilities: CompletionCapabilities,
-    file: File,
+    file: ProgramFile<'db>,
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
-    let parsed = parsed_module(db, file).load(db);
+    let program_file = file;
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let file = file.file(db);
     let source = source_text(db, file);
 
-    let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
+    let Some(context) = Context::new(db, program_file, &parsed, &source, offset) else {
         return vec![];
     };
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, program_file);
 
     if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
         let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
             return vec![];
         };
 
-        let mut completions =
-            Completions::new(db, CollectionContext::none(), UserQuery::fuzzy(None));
+        let mut completions = Completions::new(
+            db,
+            program_file,
+            CollectionContext::none(),
+            UserQuery::fuzzy(None),
+        );
 
         add_string_literal_completions(
             &model,
@@ -65,6 +72,7 @@ pub fn completion<'db>(
     let query = UserQuery::fuzzy(context.cursor.typed);
     let mut completions = Completions::new(
         db,
+        program_file,
         context.collection_context(db, &model, settings, capabilities),
         query,
     );
@@ -76,13 +84,14 @@ pub fn completion<'db>(
             }
         }
         ContextKind::Import(ref import) => {
-            import.add_completions(db, file, &mut completions);
+            import.add_completions(db, program_file, &mut completions);
         }
         ContextKind::NonImport(ref non_import) => match non_import.target {
             CompletionTargetAst::ObjectDot { expr } => {
                 completions.extend(model.attribute_completions(expr));
             }
             CompletionTargetAst::Scoped(scoped) => {
+                let env = model.program_environment();
                 for semantic_completion in model.scoped_completions(scoped.node) {
                     let module_dependency_kind = if semantic_completion.builtin {
                         ModuleDependencyKind::Builtin
@@ -90,16 +99,22 @@ pub fn completion<'db>(
                         ModuleDependencyKind::Current
                     };
                     completions.add(
-                        CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                        CompletionBuilder::from_semantic_completion(db, &env, semantic_completion)
                             .module_dependency_kind(module_dependency_kind),
                     );
                 }
-                add_keyword_completions(db, &mut completions);
-                add_argument_completions(db, &model, &context.cursor, &mut completions);
+                add_keyword_completions(db, &env, &mut completions);
+                add_argument_completions(
+                    db,
+                    program_file,
+                    &model,
+                    &context.cursor,
+                    &mut completions,
+                );
                 if settings.auto_import {
                     add_unimported_completions(
                         db,
-                        file,
+                        program_file,
                         &parsed,
                         scoped,
                         |module_name: &ModuleName, symbol: &str| {
@@ -131,6 +146,7 @@ impl CompletionCapabilities {
 /// A collection of completions built up from various sources.
 struct Completions<'db> {
     db: &'db dyn Db,
+    program_file: ProgramFile<'db>,
     context: CollectionContext<'db>,
     items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
@@ -154,9 +170,15 @@ impl<'db> Completions<'db> {
     /// the user has typed as part of the next symbol they are writing.
     /// This collection will treat it as a query when present, and only
     /// add completions that match it.
-    fn new(db: &'db dyn Db, context: CollectionContext<'db>, query: UserQuery) -> Completions<'db> {
+    fn new(
+        db: &'db dyn Db,
+        program_file: ProgramFile<'db>,
+        context: CollectionContext<'db>,
+        query: UserQuery,
+    ) -> Completions<'db> {
         Completions {
             db,
+            program_file,
             context,
             items: BinaryHeap::new(),
             query,
@@ -226,9 +248,14 @@ impl<'db> Completions<'db> {
     /// Attempts to add the given semantic completion to this collection.
     ///
     /// When added, `true` is returned.
-    fn add_semantic(&mut self, completion: SemanticCompletion<'db>) -> bool {
+    fn add_semantic(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        completion: SemanticCompletion<'db>,
+    ) -> bool {
         self.add(CompletionBuilder::from_semantic_completion(
-            self.db, completion,
+            db, env, completion,
         ))
     }
 
@@ -246,7 +273,8 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        let completion =
+            CompletionRanker(builder.build(self.db, self.program_file, &self.context, &self.query));
         if self.items.len() >= Completions::LIMIT {
             // OK because `self.items` is guaranteed to be non-empty here.
             let worst = self.items.peek_mut().unwrap();
@@ -265,8 +293,10 @@ impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
     where
         T: IntoIterator<Item = SemanticCompletion<'db>>,
     {
+        let db = self.db;
+        let env = ProgramEnvironment::from_file(self.program_file);
         for c in it {
-            self.add_semantic(c);
+            self.add_semantic(db, &env, c);
         }
     }
 }
@@ -301,6 +331,9 @@ pub struct Completion<'db> {
     pub insert: Option<CompactString>,
     /// The format of [`Self::insert`].
     pub insert_text_format: CompletionInsertTextFormat,
+    /// An editor action the client should perform after applying this
+    /// completion, if any. See [`CompletionCommand`].
+    pub command: Option<CompletionCommand>,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available
@@ -412,13 +445,15 @@ impl<'db> CompletionBuilder<'db> {
 
     fn from_semantic_completion(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         semantic: SemanticCompletion<'db>,
     ) -> CompletionBuilder<'db> {
-        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
+        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, env, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
         Completion::builder(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
+            .type_check_only(semantic.is_type_check_only)
             .docstring(documentation)
     }
 
@@ -444,7 +479,7 @@ impl<'db> CompletionBuilder<'db> {
 
     /// Use this builder to construct a `Completion`.
     ///
-    /// `ctx` is any information about the position of the
+    /// `env` is any information about the position of the
     /// cursor in the source code that could impact the relevance
     /// ranking of the completion.
     ///
@@ -453,11 +488,12 @@ impl<'db> CompletionBuilder<'db> {
     fn build(
         mut self,
         db: &'db dyn Db,
-        ctx: &CollectionContext<'db>,
+        program_file: ProgramFile<'db>,
+        collection_context: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
         if let Some(ty) = self.ty {
-            self.is_type_check_only = ty.is_type_check_only(db);
+            self.is_type_check_only |= ty.is_type_check_only(db);
             // Tags completions with context-specific if they are
             // known to be usable in an exception context and we have
             // determined an `exception_ty`.
@@ -465,10 +501,11 @@ impl<'db> CompletionBuilder<'db> {
             // It's possible that some completions are usable in an exception
             // but aren't marked here. That is, false negatives are
             // possible but false positives are not.
-            if let Some(exception_ty) = ctx.exception_ty {
-                self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
+            if let Some(exception_ty) = collection_context.exception_ty {
+                let env = ProgramEnvironment::from_file(program_file);
+                self.is_context_specific |= ty.is_assignable_to(db, &env, exception_ty);
             }
-            if ctx.is_in_class_def() {
+            if collection_context.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
                     || matches!(
                         ty,
@@ -486,34 +523,42 @@ impl<'db> CompletionBuilder<'db> {
         let kind = self
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
-        let relevance = Relevance::new(ctx, query, &self);
-        let (label, insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind)
-        {
-            let label = self.insert.unwrap_or_else(|| self.name.clone());
-            if ctx.capabilities.snippets {
-                let insert = compact_str::format_compact!("{label}($0)");
-                (
-                    Some(label),
-                    Some(insert),
-                    CompletionInsertTextFormat::Snippet,
-                )
+        let relevance = Relevance::new(collection_context, query, &self);
+        let (label, insert, insert_text_format, command) =
+            if collection_context.should_complete_callable_parentheses(kind) {
+                let label = self.insert.unwrap_or_else(|| self.name.clone());
+                if collection_context.capabilities.snippets {
+                    let insert = compact_str::format_compact!("{label}($0)");
+                    (
+                        Some(label),
+                        Some(insert),
+                        CompletionInsertTextFormat::Snippet,
+                        Some(CompletionCommand::TriggerSignatureHelp),
+                    )
+                } else {
+                    let insert = compact_str::format_compact!("{label}()");
+                    (
+                        Some(label),
+                        Some(insert),
+                        CompletionInsertTextFormat::PlainText,
+                        None,
+                    )
+                }
             } else {
-                let insert = compact_str::format_compact!("{label}()");
                 (
-                    Some(label),
-                    Some(insert),
+                    None,
+                    self.insert,
                     CompletionInsertTextFormat::PlainText,
+                    None,
                 )
-            }
-        } else {
-            (None, self.insert, CompletionInsertTextFormat::PlainText)
-        };
+            };
         Completion {
             name: self.name,
             label,
             qualified: self.qualified,
             insert,
             insert_text_format,
+            command,
             ty: self.ty,
             kind,
             module_name: self.module_name,
@@ -564,6 +609,11 @@ impl<'db> CompletionBuilder<'db> {
 
     fn builtin(mut self, yes: bool) -> CompletionBuilder<'db> {
         self.builtin = yes;
+        self
+    }
+
+    fn type_check_only(mut self, yes: bool) -> CompletionBuilder<'db> {
+        self.is_type_check_only = yes;
         self
     }
 
@@ -630,6 +680,22 @@ pub enum CompletionKind {
     Event,
     Operator,
     TypeParameter,
+}
+
+/// An editor action the client should perform after applying this completion.
+///
+/// This is an editor-neutral *intent* produced by the analysis layer. The
+/// language server maps it to a concrete command (for example
+/// `ty.triggerParameterHints`) when building the LSP response, and only
+/// attaches it when the client advertised support for that command, so this
+/// enum never names a particular editor.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompletionCommand {
+    /// The completion inserts an opening parenthesis with the cursor placed
+    /// inside it (e.g. `foo($0)`). Because that parenthesis is inserted
+    /// programmatically rather than typed, the client will not auto-trigger
+    /// signature help, so it should be asked to open it explicitly.
+    TriggerSignatureHelp,
 }
 
 /// The format of a completion's insertion text.
@@ -728,7 +794,7 @@ impl<'m> Context<'m> {
     /// Create a new context for finding completions.
     fn new(
         db: &'_ dyn Db,
-        file: File,
+        file: ProgramFile<'_>,
         parsed: &'m ParsedModuleRef,
         source: &'m SourceText,
         offset: TextSize,
@@ -742,7 +808,11 @@ impl<'m> Context<'m> {
             ContextKind::Keywords(keywords)
         } else if cursor.is_in_definition_place() {
             return None;
-        } else if let Some(import) = ImportStatement::detect(db, file, &cursor) {
+        } else if let Some(import) = ImportStatement::detect(
+            db,
+            ImportingFile::File(file.file(db), file.resolver_environment(db)),
+            &cursor,
+        ) {
             ContextKind::Import(import)
         } else {
             let target_token = CompletionTargetTokens::find(&cursor)?;
@@ -764,7 +834,8 @@ impl<'m> Context<'m> {
         match self.kind {
             ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let exception_ty = self.cursor.exception_ty(db);
+                let env = model.program_environment();
+                let exception_ty = self.cursor.exception_ty(db, &env);
                 let complete_callable_parentheses = settings.complete_function_parentheses
                     && !self.cursor.suppress_callable_parentheses();
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
@@ -1299,16 +1370,22 @@ impl<'m> ContextCursor<'m> {
     ///
     /// The return value is always `None` if the cursor is not
     /// inside a `raise` or `except` context.
-    fn exception_ty<'db>(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db);
-        let base_exception_instance = KnownClass::BaseException.to_instance(db);
-        let raise_ty = UnionType::from_elements(db, [base_exception_ty, base_exception_instance]);
-        let cause_ty = UnionType::from_elements(db, [raise_ty, Type::none(db)]);
+    fn exception_ty<'db>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db, env);
+        let base_exception_instance = KnownClass::BaseException.to_instance(db, env);
+        let raise_ty =
+            UnionType::from_elements(db, env, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(db, env, [raise_ty, Type::none(db, env)]);
         let except_ty = UnionType::from_elements(
             db,
+            env,
             [
                 base_exception_ty,
-                Type::homogeneous_tuple(db, base_exception_ty),
+                Type::homogeneous_tuple(db, env, base_exception_ty),
             ],
         );
 
@@ -1897,6 +1974,7 @@ enum Sort {
 /// Detect and add completions for unset arguments.
 fn add_argument_completions<'db>(
     db: &'db dyn Db,
+    file: ProgramFile<'db>,
     model: &SemanticModel<'db>,
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
@@ -1916,7 +1994,7 @@ fn add_argument_completions<'db>(
             }
             ast::AnyNodeRef::ExprCall(_) => {
                 if in_arguments {
-                    add_function_arg_completions(db, model.file(), cursor, completions);
+                    add_function_arg_completions(db, file, cursor, completions);
                 }
                 return;
             }
@@ -1948,29 +2026,31 @@ fn add_class_arg_completions<'db>(
     class_def: &ast::StmtClassDef,
     completions: &mut Completions<'db>,
 ) {
+    let db = model.db();
     let is_set = |name| {
         class_def
             .arguments
             .as_ref()
             .is_some_and(|args| args.find_keyword(name).is_some())
     };
+    let env = model.program_environment();
 
     if !is_set("metaclass") {
-        let ty = KnownClass::Type.to_subclass_of(model.db());
+        let ty = KnownClass::Type.to_subclass_of(db, &env);
         completions.add(CompletionBuilder::argument("metaclass").ty(ty));
     }
 
     let is_typed_dict = class_def
         .inferred_type(model)
         .and_then(Type::as_class_literal)
-        .is_some_and(|t| t.is_typed_dict(model.db()));
+        .is_some_and(|t| t.is_typed_dict(db));
 
     // TODO: Handle PEP 728 that adds two extra keywords,
     // closed and extra_items.
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = KnownClass::Bool.to_instance(model.db());
+        let ty = KnownClass::Bool.to_instance(db, &env);
         completions.add(CompletionBuilder::argument("total").ty(ty));
     }
 }
@@ -1982,7 +2062,7 @@ fn add_class_arg_completions<'db>(
 /// set and 2) been defined as positional-only.
 fn add_function_arg_completions<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: ProgramFile<'db>,
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
@@ -2061,9 +2141,9 @@ pub(crate) struct ImportEdit {
 }
 
 /// Get fixes that would resolve an unresolved reference
-pub(crate) fn unresolved_fixes(
-    db: &dyn Db,
-    file: File,
+pub(crate) fn unresolved_fixes<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
     parsed: &ParsedModuleRef,
     symbol: &str,
     node: AnyNodeRef,
@@ -2074,7 +2154,7 @@ pub(crate) fn unresolved_fixes(
     let ctx = CollectionContext::none();
 
     // Request imports we could add to put the symbol in scope
-    let mut completions = Completions::new(db, ctx.clone(), query.clone());
+    let mut completions = Completions::new(db, file, ctx.clone(), query.clone());
     add_unimported_completions(
         db,
         file,
@@ -2088,7 +2168,7 @@ pub(crate) fn unresolved_fixes(
     results.extend(completions.into_imports());
 
     // Request qualifications we could apply to the symbol to make it resolve
-    let mut completions = Completions::new(db, ctx, query);
+    let mut completions = Completions::new(db, file, ctx, query);
     add_unimported_completions(
         db,
         file,
@@ -2109,9 +2189,13 @@ pub(crate) fn unresolved_fixes(
 /// This should generally only be used when offering "scoped" completions.
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
-fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
+fn add_keyword_completions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    completions: &mut Completions<'db>,
+) {
     let keyword_values = [
-        ("None", Type::none(db)),
+        ("None", Type::none(db, env)),
         ("True", Type::bool_literal(true)),
         ("False", Type::bool_literal(false)),
     ];
@@ -2202,7 +2286,7 @@ fn add_string_literal_completions<'db>(
 /// when selected into `File`.
 fn add_unimported_completions<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: ProgramFile<'db>,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
     create_import_request: impl for<'a> Fn(&'a ModuleName, &'a str) -> ImportRequest<'a>,
@@ -2216,13 +2300,15 @@ fn add_unimported_completions<'db>(
         return;
     }
 
-    let source = source_text(db, file);
+    let source_file = file.file(db);
+    let source = source_text(db, source_file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
+    let importing_file = ImportingFile::File(source_file, file.resolver_environment(db));
 
     for symbol in all_symbols(db, file, &completions.query.pattern) {
-        if symbol.file() == file || symbol.module().is_known(db, KnownModule::Builtins) {
+        if symbol.file() == source_file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
 
@@ -2236,7 +2322,7 @@ fn add_unimported_completions<'db>(
             });
 
         // Don't suggest symbols that are already imported.
-        if members.satisfies(db, file, &request) {
+        if members.satisfies(db, importing_file, &request) {
             continue;
         }
 
@@ -2501,7 +2587,7 @@ impl<'a> ImportStatement<'a> {
     /// `tokens`.
     fn detect(
         db: &'_ dyn Db,
-        file: File,
+        file: ImportingFile<'_>,
         cursor: &ContextCursor<'a>,
     ) -> Option<ImportStatement<'a>> {
         use TokenKind as TK;
@@ -2899,7 +2985,7 @@ impl<'a> ImportStatement<'a> {
     fn add_completions<'db>(
         &self,
         db: &'db dyn Db,
-        file: File,
+        file: ProgramFile<'db>,
         completions: &mut Completions<'db>,
     ) {
         let model = SemanticModel::new(db, file);
@@ -2996,9 +3082,10 @@ fn add_import_completions_impl<'db>(
     semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
     module_dependency_kind: impl Fn(&SemanticCompletion<'db>) -> Option<ModuleDependencyKind>,
 ) {
+    let env = ProgramEnvironment::from_file(completions.program_file);
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
-        let mut builder = CompletionBuilder::from_semantic_completion(db, semantic);
+        let mut builder = CompletionBuilder::from_semantic_completion(db, &env, semantic);
         if let Some(module_dependency_kind) = module_dependency_kind {
             builder = builder.module_dependency_kind(module_dependency_kind);
         }
@@ -3465,7 +3552,8 @@ re.<CURSOR>
             .source(
                 "package/__init__.pyi",
                 r#"\
-from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
+from types import UnionType
+from typing import TYPE_CHECKING, Literal, ParamSpec, Protocol, TypeAlias, TypeVar, TypeVarTuple, type_check_only
 
 public_name = 1
 _private_name = 1
@@ -3488,11 +3576,34 @@ _private_explicit_type_alias: TypeAlias = Literal[1]
 public_implicit_union_alias = int | str
 _private_implicit_union_alias = int | str
 
+def make_union() -> UnionType: ...
+def make_typevar() -> TypeVar: ...
+def identity[T](value: T) -> T: ...
+
+_private_runtime_union = make_union()
+_private_runtime_typevar = make_typevar()
+_private_precise_runtime_union = identity(int | str)
+
 class PublicProtocol(Protocol):
     def method(self) -> None: ...
 
 class _PrivateProtocol(Protocol):
     def method(self) -> None: ...
+
+@type_check_only
+class PublicTypeOnlyProtocol(Protocol):
+    def method(self) -> None: ...
+
+@type_check_only
+class _PrivateTypeOnlyProtocol(Protocol):
+    def method(self) -> None: ...
+
+if TYPE_CHECKING:
+    class PublicTypeCheckingProtocol(Protocol):
+        def method(self) -> None: ...
+
+    class _PrivateTypeCheckingProtocol(Protocol):
+        def method(self) -> None: ...
 "#,
             )
             .source("main.py", "import package; package.<CURSOR>")
@@ -3504,18 +3615,95 @@ class _PrivateProtocol(Protocol):
         test.contains("__mangled_name");
         test.contains("__dunder_name__");
         test.contains("public_type_var");
-        test.not_contains("_private_type_var");
-        test.not_contains("__mangled_type_var");
         test.contains("public_param_spec");
-        test.not_contains("_private_param_spec");
         test.contains("public_type_var_tuple");
-        test.not_contains("_private_type_var_tuple");
         test.contains("public_explicit_type_alias");
-        test.not_contains("_private_explicit_type_alias");
         test.contains("public_implicit_union_alias");
-        test.not_contains("_private_implicit_union_alias");
+        test.contains("_private_runtime_union");
+        test.contains("_private_runtime_typevar");
+        test.contains("_private_precise_runtime_union");
         test.contains("PublicProtocol");
-        test.not_contains("_PrivateProtocol");
+        test.contains("_PrivateProtocol");
+
+        for name in [
+            "_private_type_var",
+            "__mangled_type_var",
+            "_private_param_spec",
+            "_private_type_var_tuple",
+            "_private_explicit_type_alias",
+            "_private_implicit_union_alias",
+            "PublicTypeOnlyProtocol",
+            "_PrivateTypeOnlyProtocol",
+            "PublicTypeCheckingProtocol",
+            "_PrivateTypeCheckingProtocol",
+        ] {
+            assert!(
+                test.completions()
+                    .iter()
+                    .any(|completion| completion.name == name && completion.is_type_check_only),
+                "Expected `{name}` to be marked as typing-only",
+            );
+        }
+    }
+
+    #[test]
+    fn private_stub_symbols_rank_below_runtime_values() {
+        let builder = CursorTest::builder()
+            .source(
+                "package/__init__.pyi",
+                "from typing import TypeVar\n_Alpha = TypeVar(\"_Alpha\")\n_Zeta = 1",
+            )
+            .source("main.py", "import package; package._<CURSOR>")
+            .completion_test_builder()
+            .filter(|completion| matches!(completion.name.as_str(), "_Alpha" | "_Zeta"));
+
+        let test = builder.build();
+        let completions = test
+            .completions()
+            .iter()
+            .map(|completion| (completion.name.as_str(), completion.is_type_check_only))
+            .collect::<Vec<_>>();
+
+        assert_eq!(completions, [("_Zeta", false), ("_Alpha", true)]);
+    }
+
+    #[test]
+    fn type_checking_import_includes_private_stub_symbols() {
+        let builder = CursorTest::builder()
+            .source(
+                "package/__init__.pyi",
+                "from typing import TypeAlias, TypeVar\n_Alias: TypeAlias = int\n_T = TypeVar(\"_T\")",
+            )
+            .source(
+                "main.py",
+                "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from package import _<CURSOR>",
+            )
+            .completion_test_builder();
+
+        let test = builder.build();
+        for name in ["_Alias", "_T"] {
+            assert!(
+                test.completions()
+                    .iter()
+                    .any(|completion| completion.name == name && completion.is_type_check_only),
+                "Expected `{name}` to be available as a typing-only completion",
+            );
+        }
+    }
+
+    #[test]
+    fn typing_only_project_builtins_not_suggested_implicitly() {
+        let builder = CursorTest::builder()
+            .source(
+                "__builtins__.pyi",
+                "from typing import TypeVar\n_typing_only = TypeVar(\"_typing_only\")\n_runtime: int",
+            )
+            .source("main.py", "_<CURSOR>")
+            .completion_test_builder()
+            .skip_auto_import();
+
+        let test = builder.build();
+        test.contains("_runtime").not_contains("_typing_only");
     }
 
     /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names
@@ -10770,7 +10958,7 @@ raise <CURSOR>
                 &self.cursor_test.db,
                 &self.settings,
                 self.capabilities,
-                self.cursor_test.cursor.file,
+                self.cursor_test.program_file(self.cursor_test.cursor.file),
                 self.cursor_test.cursor.offset,
             );
             let filtered = original
@@ -10926,6 +11114,7 @@ raise <CURSOR>
 
     impl<'db> CompletionTest<'db> {
         fn snapshot(&self) -> String {
+            let db = self.db;
             if self.original.is_empty() {
                 return "<No completions found>".to_string();
             } else if self.filtered.is_empty() {
@@ -10937,13 +11126,14 @@ raise <CURSOR>
                 // ---AG
                 return "<No completions found after filtering out completions>".to_string();
             }
+            let env = self.db.program_environment();
             self.filtered
                 .iter()
                 .map(|c| {
                     let mut snapshot = c.insert.as_deref().unwrap_or(c.label()).to_string();
                     if self.type_signatures {
                         let ty =
-                            c.ty.map(|ty| ty.display(self.db).to_string())
+                            c.ty.map(|ty| ty.display(db, &env).to_string())
                                 .unwrap_or_else(|| "Unavailable".to_string());
                         snapshot = format!("{snapshot} :: {ty}");
                     }

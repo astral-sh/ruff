@@ -890,8 +890,8 @@ of the first type represent sets of values that are a subset of every possible s
 represented by a materialization of the second type.
 
 ```pyi
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
 from typing_extensions import Any
 
 static_assert(not is_subtype_of(Any, Any))
@@ -1873,7 +1873,7 @@ class MetaWithIntReturn(type):
 
 class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
-        return super().__new__(cls)
+        return ""
 
 class Returns[T](Protocol):
     def __call__(self) -> T: ...
@@ -1952,7 +1952,7 @@ static_assert(not is_subtype_of(TypeOf[A], Returns[A]))
 
 class B:
     def __new__(cls, a: int) -> int:
-        return super().__new__(cls)
+        return 0
 
     def __init__(self, a: str) -> None: ...
 
@@ -2023,7 +2023,7 @@ class MetaWithIntReturn(type):
 
 class F(metaclass=MetaWithIntReturn):
     def __new__(cls) -> str:
-        return super().__new__(cls)
+        return ""
 
     def __init__(self, x: int) -> None: ...
 

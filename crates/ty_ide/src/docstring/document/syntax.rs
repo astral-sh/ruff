@@ -58,11 +58,11 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
         && matches!(bytes.get(digits + 1), Some(b' ' | b'\t'))
 }
 
-/// Returns whether `text` consists of a complete Markdown code span.
+/// Returns whether `text` is wrapped in a Markdown code span.
 ///
 /// For example, this returns `true` for ``"`value`"`` and `false` for
 /// ``"`value` trailing"``.
-pub(crate) fn is_markdown_code_span(text: &str) -> bool {
+pub(crate) fn is_wrapped_in_markdown_code_span(text: &str) -> bool {
     let mut tokens = InlineMarkupScanner::new(text);
     let Some(InlineMarkupToken::Code(_)) = tokens.next() else {
         return false;
@@ -530,8 +530,9 @@ pub(super) fn indentation(line: &str) -> TextSize {
 #[cfg(test)]
 mod tests {
     use super::{
-        BacktickScanner, InlineMarkupScanner, InlineMarkupToken, TextSize, is_markdown_code_span,
-        split_once_at_top_level_colon, split_trailing_parenthetical,
+        BacktickScanner, InlineMarkupScanner, InlineMarkupToken, TextSize,
+        is_wrapped_in_markdown_code_span, split_once_at_top_level_colon,
+        split_trailing_parenthetical,
     };
 
     #[test]
@@ -581,7 +582,7 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_complete_markdown_code_spans() {
+    fn recognizes_wrapped_markdown_code_spans() {
         for (text, expected) in [
             ("`value`", true),
             ("``value`with:ticks``", true),
@@ -592,7 +593,7 @@ mod tests {
             ("``", false),
             ("value", false),
         ] {
-            assert_eq!(is_markdown_code_span(text), expected, "{text:?}");
+            assert_eq!(is_wrapped_in_markdown_code_span(text), expected, "{text:?}");
         }
     }
 

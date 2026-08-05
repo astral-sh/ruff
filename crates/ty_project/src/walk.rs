@@ -36,7 +36,7 @@ impl<'a> ProjectFilesFilter<'a> {
         }
     }
 
-    pub(crate) fn force_exclude(&self) -> bool {
+    fn force_exclude(&self) -> bool {
         self.force_exclude
     }
 

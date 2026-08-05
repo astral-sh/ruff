@@ -56,6 +56,11 @@ pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/27201
+pub(crate) const fn is_fix_pytest_composite_assertion_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/16719
 pub(crate) const fn is_fix_manual_dict_comprehension_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()

@@ -18,6 +18,7 @@ cache_dir = "[TMP]/.ruff_cache"
 fix = false
 fix_only = false
 output_format = full
+output_prefer_rule_codes = false
 show_fixes = false
 unsafe_fixes = hint
 

@@ -727,7 +727,8 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -826,7 +827,8 @@ This slightly strange-looking test is a regression test for a mistake that was n
 <https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
 
 ```py
-from ty_extensions import AlwaysFalsy, Unknown
+from ty_extensions import AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import Literal
 
 def _(x: str & Unknown & AlwaysFalsy & Literal[""]):
@@ -842,7 +844,7 @@ is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We 
 simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any, Never
 
 class P: ...
@@ -872,7 +874,7 @@ The intersection of an unknown set of runtime values with (another) unknown set 
 still an unknown set of runtime values:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any
 
 class P: ...
@@ -907,7 +909,7 @@ of another unknown set of values is not necessarily empty, so we keep the positi
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def any(
     i1: Any & ~Any,
@@ -930,7 +932,7 @@ Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def mixed(
     i1: Any & Unknown,
@@ -1003,6 +1005,45 @@ def _(
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     x(1.0)
+```
+
+### Constructor intersection diagnostics retain the called class types
+
+When an intersection of class objects rejects a constructor call, the diagnostic should describe the
+original class types instead of reconstructing an intersection from their `__init__` and `__new__`
+methods.
+
+```py
+from typing import Self
+
+class UsesInit:
+    def __init__(self, value: int) -> None: ...
+
+class UsesNew:
+    def __new__(cls, value: str) -> Self:
+        return object.__new__(cls)
+
+def _(cls: type[UsesInit]) -> None:
+    if issubclass(cls, UsesNew):
+        reveal_type(cls)  # revealed: type[UsesInit] & type[UsesNew]
+        # error: [invalid-argument-type] "UsesNew.__new__"
+        # snapshot: invalid-argument-type
+        cls(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
+  --> src/mdtest_snippet.py:15:13
+   |
+15 |         cls(None)
+   |             ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
+info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
 ```
 
 ### Error priority: binding error over top-callable
@@ -1349,7 +1390,7 @@ For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class P: ...
 class Q: ...

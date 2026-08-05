@@ -91,8 +91,8 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -111,7 +111,7 @@ class C(Unknown): ...
 # revealed: (<class 'C'>, Unknown, <class 'object'>)
 reveal_mro(C)
 
-# error: "Special form `ty_extensions.Unknown` expected no type parameter"
+# error: "Special form `ty_extensions._internal.Unknown` expected no type parameter"
 u: Unknown[str]
 ```
 
@@ -293,7 +293,6 @@ error[static-assert-error]: Static assertion error: argument evaluates to `False
   | ^^^^^^^^^^^^^^-----^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 With a custom message:
@@ -311,7 +310,6 @@ error[static-assert-error]: Static assertion error: with a message
   | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 When it evaluates to something falsy:
@@ -329,7 +327,6 @@ error[static-assert-error]: Static assertion error: argument of type `Literal[""
    | ^^^^^^^^^^^^^^--^
    |               |
    |               Inferred type of argument is `Literal[""]`
-   |
 ```
 
 When it evaluates to something that is not statically known to be truthy or falsy:
@@ -347,7 +344,6 @@ error[static-assert-error]: Static assertion error: argument of type `int` has a
    | ^^^^^^^^^^^^^^--------------------^
    |               |
    |               Inferred type of argument is `int`
-   |
 ```
 
 ## Type predicates
@@ -431,21 +427,6 @@ static_assert(is_singleton(Literal[True]))
 
 static_assert(not is_singleton(int))
 static_assert(not is_singleton(Literal["a"]))
-```
-
-### Single-valued types
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_single_valued
-from typing import Literal
-
-static_assert(is_single_valued(None))
-static_assert(is_single_valued(Literal[True]))
-static_assert(is_single_valued(Literal["a"]))
-
-static_assert(not is_single_valued(int))
-static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
 ## `TypeOf`

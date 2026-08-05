@@ -112,6 +112,63 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+## Generic patterns ignore type parameter defaults
+
+A generic class pattern matches every runtime specialization, not only the specialization described
+by its type parameter's default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+
+class Box[T: str = str]:
+    value: T
+
+    def __init__(self, value: T) -> None: ...
+
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
+    match value:
+        case Box():
+            reveal_type(value)  # revealed: Box[T@box_with_default]
+            return value
+        case remaining:
+            reveal_type(remaining)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+            return Box[T](remaining)
+```
+
+When a class pattern matches a tuple subclass, its type argument comes from the declared upper
+bound, not the default. Its element types are inherited from the specialized base.
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def match_defaulted_tuple(value: object) -> None:
+    match value:
+        case DefaultedTuple():
+            reveal_type(value)  # revealed: DefaultedTuple[int]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+```
+
+The same pattern excludes gradual specializations from the remaining match arms.
+
+```py
+def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
+    match value:
+        case DefaultedTuple():
+            reveal_type(value)  # revealed: DefaultedTuple[Any]
+            reveal_type(value[0])  # revealed: Any
+            reveal_type(value[1])  # revealed: str
+            return False
+        case remaining:
+            reveal_type(remaining)  # revealed: bool
+            return remaining
+```
+
 ## Class patterns with generic `@final` classes
 
 These work the same as non-`@final` classes.
@@ -308,7 +365,7 @@ a fixed-length tuple, we can determine exactly which elements appear in that lis
 
 ```py
 from typing import Any, Literal, TypeVar
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 BoundTupleT = TypeVar("BoundTupleT", bound=tuple[int] | tuple[str])
 
@@ -1387,7 +1444,7 @@ declared by the pattern class.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class GradualPatternBox:
     value: int
@@ -1556,7 +1613,7 @@ keep the same uncertainty as the subject.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def test_match_gradual_mapping_captures(any_value: Any, unknown_value: Unknown) -> None:
     match any_value:
@@ -1679,7 +1736,7 @@ also keeps the uncertainty of an `Any` or `Unknown` subject.
 ```py
 from typing import Any, Generic, Literal, TypeVar, final
 from typing_extensions import TypedDict
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 TagT = TypeVar("TagT")
 PayloadT = TypeVar("PayloadT")
@@ -1891,7 +1948,8 @@ exercise three separate checks: an optional field, an unknown key, and a non-str
 
 ```py
 from typing import Any, Literal, Protocol, TypeVar, TypedDict
-from ty_extensions import Intersection, Unknown
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
 
 class RequiredPayload(TypedDict):
     tag: Literal["int"]
@@ -2932,31 +2990,57 @@ def _(value: FinalPatternInt):
             reveal_type(value)  # revealed: FinalPatternInt
 ```
 
-Some precisely modeled objects compare equal to themselves, so an equivalent value pattern is
-exhaustive:
+We don't attempt to precisely model equality behaviour between special-cased typing-API objects. As
+described in `narrow/conditionals/eq.md`, doing so would be possible in some cases, but it would be
+error-prone, and there are few known use cases for doing this.
 
 ```py
+from functools import partial
 from types import FunctionType
-from typing import NewType, TypeVar
+from typing import List, Literal, NewType, Optional, TypeVar
+from typing_extensions import Literal as ExtensionsLiteral
 
 T = TypeVar("T")
 UserId = NewType("UserId", int)
 
 class ReflexivePatternValues:
     LIST_INT = list[int]
+    LEGACY_LIST_INT = List[int]
+    EXTENSIONS_LITERAL = ExtensionsLiteral
+    OPTIONAL = Optional
     TYPE_VAR = T
     NEW_TYPE = UserId
 
+# error: [invalid-return-type]
 def generic_alias_value_pattern() -> int:
     match list[int]:
         case ReflexivePatternValues.LIST_INT:
             return 1
 
+# error: [invalid-return-type]
+def cross_origin_generic_alias_value_pattern() -> int:
+    match list[int]:
+        case ReflexivePatternValues.LEGACY_LIST_INT:
+            return 1
+
+# error: [invalid-return-type]
+def cross_origin_special_form_value_pattern() -> int:
+    match Literal:
+        case ReflexivePatternValues.EXTENSIONS_LITERAL:
+            return 1
+
+def singleton_special_form_value_pattern() -> int:
+    match Optional:
+        case ReflexivePatternValues.OPTIONAL:
+            return 1
+
+# error: [invalid-return-type]
 def type_var_value_pattern() -> int:
     match T:
         case ReflexivePatternValues.TYPE_VAR:
             return 1
 
+# error: [invalid-return-type]
 def new_type_value_pattern() -> int:
     match UserId:
         case ReflexivePatternValues.NEW_TYPE:
@@ -2972,13 +3056,6 @@ def bound_method_value_pattern() -> int:
     match helper.__get__:
         case helper.__get__:
             return 1
-```
-
-Two calls that construct equivalent objects need not produce equal values. For example, separate
-`partial` objects do not compare equal, so this match is not exhaustive:
-
-```py
-from functools import partial
 
 def target(value: int) -> int:
     return value
@@ -3040,7 +3117,7 @@ python-version = "3.11"
 ```py
 from enum import Enum, IntEnum, StrEnum, auto
 from typing import Literal, assert_never
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class Color(StrEnum):
     RED = "r"
@@ -3100,6 +3177,13 @@ def cross_int_enum_members(value: First | Second) -> None:
             reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
         case _:
             reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO]
+
+def optional_cross_int_enum_members(value: First | Second | None) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: Literal[First.ONE, Second.ONE]
+        case _:
+            reveal_type(value)  # revealed: Literal[First.TWO, Second.TWO] | None
 
 class Warning(Enum):
     W1 = auto()

@@ -229,13 +229,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 11 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound `int` of type variable `T`
-   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
 3 | T = TypeVar("T", bound=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 A bound can also be a union of protocols. If inference produces a union for the type variable, each
@@ -282,13 +280,11 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 12 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
-   |
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
 3 | T = TypeVar("T", int, None)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Typevar constraints
@@ -440,10 +436,10 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
-## Gradual constraints can obscure a more specific constraint
+## Prefer specific compatible constraints over gradual constraints
 
-A gradual constraint that is compatible with a concrete argument can be selected before a more
-specific constraint. This makes inference depend on the order in which the constraints are declared.
+A gradual constraint can be compatible with a concrete argument and a more specific declared
+constraint. We prefer the more specific constraint regardless of declaration order.
 
 ```py
 from typing import Any, TypeVar
@@ -454,6 +450,8 @@ class Row(tuple[Any, ...]):
 
 GradualFirst = TypeVar("GradualFirst", list[Any], tuple[Any, ...], Row)
 RowFirst = TypeVar("RowFirst", Row, tuple[Any, ...], list[Any])
+AnyFirst = TypeVar("AnyFirst", Any, int)
+IntFirst = TypeVar("IntFirst", int, Any)
 
 def gradual_first(row: GradualFirst) -> GradualFirst:
     return row
@@ -461,15 +459,22 @@ def gradual_first(row: GradualFirst) -> GradualFirst:
 def row_first(row: RowFirst) -> RowFirst:
     return row
 
+def any_first(value: AnyFirst) -> AnyFirst:
+    return value
+
+def int_first(value: IntFirst) -> IntFirst:
+    return value
+
 gradual = gradual_first(Row())
-# TODO: revealed: Row
-reveal_type(gradual)  # revealed: tuple[Any, ...]
-# error: [unresolved-attribute] "Object of type `tuple[Any, ...]` has no attribute `asDict`"
+reveal_type(gradual)  # revealed: Row
 gradual.asDict()
 
 specific = row_first(Row())
 reveal_type(specific)  # revealed: Row
 specific.asDict()
+
+reveal_type(any_first(1))  # revealed: int
+reveal_type(int_first(1))  # revealed: int
 ```
 
 ## Typevar inference is a unification problem
@@ -1190,6 +1195,68 @@ class MyCallable:
 reveal_type(call(MyCallable()))  # revealed: int
 ```
 
+## Callable return union order does not affect inference
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Box(Generic[T_co]): ...
+
+def ensure_tuple(func: Callable[[], tuple[T, ...] | T]) -> tuple[T, ...]:
+    raise NotImplementedError
+
+def ensure_tuple_reversed(func: Callable[[], T | tuple[T, ...]]) -> tuple[T, ...]:
+    raise NotImplementedError
+
+def ensure_box(func: Callable[[], Box[T] | T]) -> Box[T]:
+    raise NotImplementedError
+
+def ensure_box_reversed(func: Callable[[], T | Box[T]]) -> Box[T]:
+    raise NotImplementedError
+
+def check(
+    scalar_first: Callable[[], str | tuple[str, ...]],
+    tuple_first: Callable[[], tuple[str, ...] | str],
+    nested_member_first: Callable[[], Box[str] | tuple[Box[str], ...]],
+    nested_tuple_first: Callable[[], tuple[Box[str], ...] | Box[str]],
+    box_scalar_first: Callable[[], str | Box[str]],
+    box_first: Callable[[], Box[str] | str],
+) -> None:
+    reveal_type(ensure_tuple(scalar_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple(tuple_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple_reversed(scalar_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple_reversed(tuple_first))  # revealed: tuple[str, ...]
+    reveal_type(ensure_tuple(nested_member_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_tuple(nested_tuple_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_tuple_reversed(nested_member_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_tuple_reversed(nested_tuple_first))  # revealed: tuple[Box[str], ...]
+    reveal_type(ensure_box(box_scalar_first))  # revealed: Box[str]
+    reveal_type(ensure_box(box_first))  # revealed: Box[str]
+    reveal_type(ensure_box_reversed(box_scalar_first))  # revealed: Box[str]
+    reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
+```
+
+## Gradual container constraints preserve inference evidence
+
+`Collection` inherits from `Container[Any]`, so inferring a type variable from a collection passed
+to a contravariant `Container` must preserve the gradual constraint.
+
+```py
+from collections.abc import Container
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def value(items: Container[T]) -> T:
+    raise NotImplementedError
+
+items: list[str] = []
+reveal_type(value(items))  # revealed: Any
+```
+
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
 
 A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
@@ -1231,6 +1298,73 @@ def narrow(x: Narrow) -> Narrow:
 
 reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
+```
+
+## Redundant callback bounds preserve constrained type-variable relationships
+
+A contravariant callback can contribute both another constrained type variable and a redundant
+`object` upper bound. The inferred result must retain the other type variable in either callback
+order.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", int, str)
+
+def select(first: Callable[[T], None], second: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def forward_object(specific: Callable[[S], None], redundant: Callable[[object], None]) -> S:
+    result = select(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_object
+    return result
+
+def forward_object_reversed(specific: Callable[[S], None], redundant: Callable[[object], None]) -> S:
+    result = select(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_object_reversed
+    return result
+```
+
+A union of the type variable's constraints is also a redundant upper bound, even though it is not
+`object`.
+
+```py
+def forward_union(specific: Callable[[S], None], redundant: Callable[[int | str], None]) -> S:
+    result = select(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_union
+    return result
+
+def forward_union_reversed(specific: Callable[[S], None], redundant: Callable[[int | str], None]) -> S:
+    result = select(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_union_reversed
+    return result
+```
+
+The same relationship must survive a redundant, non-`object` nominal superclass shared by both
+constraints.
+
+```py
+class Base: ...
+class Left(Base): ...
+class Right(Base): ...
+
+TNominal = TypeVar("TNominal", Left, Right)
+SNominal = TypeVar("SNominal", Left, Right)
+
+def select_nominal(first: Callable[[TNominal], None], second: Callable[[TNominal], None]) -> TNominal:
+    raise NotImplementedError
+
+def forward_nominal(specific: Callable[[SNominal], None], redundant: Callable[[Base], None]) -> SNominal:
+    result = select_nominal(specific, redundant)
+    reveal_type(result)  # revealed: SNominal@forward_nominal
+    return result
+
+def forward_nominal_reversed(specific: Callable[[SNominal], None], redundant: Callable[[Base], None]) -> SNominal:
+    result = select_nominal(redundant, specific)
+    reveal_type(result)  # revealed: SNominal@forward_nominal_reversed
+    return result
 ```
 
 ## Incompatible constraint sets

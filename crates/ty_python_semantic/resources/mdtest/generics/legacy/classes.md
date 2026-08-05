@@ -117,14 +117,23 @@ class ParamSpecOuterClass(Generic[P]):
 
 ```snapshot
 error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` already bound by an enclosing scope
-  --> src/mdtest_snippet.py:70:7
+  --> src/mdtest_snippet.py:72:11
    |
 70 | class ParamSpecOuterClass(Generic[P]):
    |       ------------------------------- ParamSpec `P` is bound in this enclosing scope
 71 |     # snapshot: shadowed-type-variable
 72 |     class InnerClass(SingleParamSpec[P]): ...
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
-   |
+```
+
+A `TypeVarTuple` must be unpacked when used as an argument to `Generic`. Even though the base is
+invalid, ty still treats the `TypeVarTuple` as a type parameter of the class during error recovery,
+so correctly unpacked uses within the class do not produce cascading errors.
+
+```py
+# error: [invalid-generic-class] "`TypeVarTuple` must be unpacked"
+class BareTypeVarTuple(Generic[Ts]):
+    values: tuple[*Ts]
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -157,6 +166,116 @@ reveal_type(generic_context(ExplicitInheritedGeneric))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
+```
+
+## Specializing classes with unavailable generic context
+
+When an earlier error prevents ty from determining a class's generic context, specializing the class
+can emit a cascading `not-subscriptable` diagnostic.
+
+### Conditional typing compatibility imports
+
+Libraries support multiple Python versions by importing generic machinery from either
+`typing_extensions` or `typing`. ty does not yet recognize the resulting union as the corresponding
+typing special form.
+
+```py
+try:
+    import typing_extensions as typing
+except ImportError:
+    import typing
+
+T = typing.TypeVar("T")
+
+# TODO: Fix the conditional typing import in https://github.com/astral-sh/ty/issues/1585.
+# error: [invalid-argument-type] "`typing_extensions.TypeVar | typing.TypeVar` is not a valid argument to `Generic`"
+class Parser(typing.Generic[T]): ...
+
+# TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
+parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
+```
+
+### Decorated generic bases
+
+A decorator that ty cannot fully understand can obscure the generic context of a base class. A
+subclass that forwards type variables to that base remains possibly generic.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
+@collections.abc.Mapping.register
+class Mapping(Generic[K, V]): ...
+
+# TODO: Invalid decorator causes us to lose the generic context from the class...
+reveal_type(generic_context(Mapping))  # revealed: None
+
+class FrozenDict(Mapping[K, V]): ...
+
+# TODO: ...which then causes us to emit this
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
+mapping: FrozenDict[str, int]
+```
+
+### Unresolved generic bases
+
+```py
+from typing import TypeVar
+
+from missing import Base  # error: [unresolved-import]
+
+reveal_type(Base)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class Child(Base[T]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+child: Child[int]
+```
+
+### Conditional generic bases
+
+`base1.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+`base2.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+```py
+from typing import TypeVar
+
+try:
+    from base1 import Base
+except ImportError:
+    from base2 import Base
+
+T = TypeVar("T")
+
+# error: [unsupported-base]
+class Child(Base[T]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+child: Child[int]
 ```
 
 ## Errors for inconsistent type arguments
@@ -353,6 +472,28 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## A subclass of a fully specialized generic is not generic
+
+A subclass is generic only if its bases leave at least one type variable unspecialized. Omitting a
+type variable that has a default fully specializes the base, so the subclass cannot be specialized
+again.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+DefaultT = TypeVar("DefaultT", default=str)
+
+class Base(Generic[T, DefaultT]): ...
+class GenericSubclass(Base[int, DefaultT]): ...
+class NonGenericSubclass(Base[int]): ...
+
+reveal_type(GenericSubclass[bytes]())  # revealed: GenericSubclass[bytes]
+
+# error: [not-subscriptable] "Cannot specialize non-generic class `NonGenericSubclass`"
+NonGenericSubclass[bytes]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't
@@ -472,6 +613,53 @@ reveal_type(C(1))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+### Constructing the class from its own type variable
+
+A constructor call inside a generic class can use a value whose type is one of the class's type
+variables. The constructed instance keeps that type variable instead of falling back to `Unknown`,
+so an incompatible type context is rejected.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def __init__(self, value: T) -> None:
+        reveal_type(C(value))  # revealed: C[T@C]
+
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        invalid: C[int] = C(value)
+```
+
+### Constructing through a classmethod receiver
+
+A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking
+the constructor arguments. In particular, freshening the constructor must not replace the
+`TypeVarTuple` in the receiver with `Unknown`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Thunk(Generic[*Ts]):
+    def __init__(self, state: Unresolved[*Ts] | None) -> None: ...
+    @classmethod
+    def make(cls, *values: *Ts) -> Thunk[*Ts]:
+        return cls(Unresolved(values))
+
+class Unresolved(Generic[*Ts]):
+    def __init__(self, values: tuple[*Ts]) -> None: ...
 ```
 
 ### Many invariant parameters with dynamic bounds

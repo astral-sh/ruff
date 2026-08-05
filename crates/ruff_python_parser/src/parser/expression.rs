@@ -67,7 +67,7 @@ pub(super) const EXPR_SET: TokenSet = TokenSet::new([
 .union(LITERAL_SET);
 
 /// Tokens that can appear after an expression.
-pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
+const END_EXPR_SET: TokenSet = TokenSet::new([
     // Ex) `expr` (without a newline)
     TokenKind::EndOfFile,
     // Ex) `expr`
@@ -253,7 +253,7 @@ impl<'src> Parser<'src> {
         self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
     }
 
-    pub(super) fn parse_binary_expression_or_higher_recursive(
+    fn parse_binary_expression_or_higher_recursive(
         &mut self,
         mut left: ParsedExpr,
         left_precedence: OperatorPrecedence,
@@ -746,7 +746,7 @@ impl<'src> Parser<'src> {
     /// expression, `[` for a subscript expression, or `.` for an attribute expression.
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
-    pub(super) fn parse_postfix_expression(
+    fn parse_postfix_expression(
         &mut self,
         mut lhs: Expr,
         start: TextSize,
@@ -786,7 +786,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
 
         ast::ExprCall {
@@ -2675,7 +2675,7 @@ impl<'src> Parser<'src> {
     /// parenthesized or the first token of the expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
-    pub(super) fn parse_generator_expression(
+    fn parse_generator_expression(
         &mut self,
         element: Expr,
         start: TextSize,
@@ -2919,11 +2919,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `:=` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
-    pub(super) fn parse_named_expression(
-        &mut self,
-        mut target: Expr,
-        start: TextSize,
-    ) -> ast::ExprNamed {
+    fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
         if !target.is_name_expr() {
@@ -3017,7 +3013,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
@@ -3159,7 +3155,7 @@ impl ParsedExpr {
     }
 
     #[inline]
-    pub(super) const fn is_unparenthesized_named_expr(&self) -> bool {
+    const fn is_unparenthesized_named_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_named_expr()
     }
 }
@@ -3283,7 +3279,7 @@ impl ExpressionContext {
         ExpressionContext::starred_bitwise_or().with_yield_expression_allowed()
     }
 
-    pub(super) fn disallow_starred_expressions(self) -> Self {
+    fn disallow_starred_expressions(self) -> Self {
         let flags = self.0 & !ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
         ExpressionContext(flags)
     }

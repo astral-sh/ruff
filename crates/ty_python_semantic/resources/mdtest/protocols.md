@@ -1066,13 +1066,11 @@ warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in 
     |
 326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
-    |
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
     |
 318 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
-    |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
 ```
 
@@ -2017,7 +2015,7 @@ read/write property, a `Final` attribute, or a `ClassVar` attribute:
 ```py
 from typing import ClassVar, Final, Protocol, final
 from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of, is_assignable_to, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_subtype_of, is_assignable_to, is_disjoint_from
 
 class HasXProperty(Protocol):
     @property
@@ -2086,6 +2084,18 @@ class HasStrXProperty(Protocol):
 static_assert(not is_assignable_to(XAttrBad, HasXProperty))
 static_assert(not is_assignable_to(HasStrXProperty, HasXProperty))
 static_assert(not is_assignable_to(HasXProperty, HasStrXProperty))
+```
+
+Accessing an instance property on the class object exposes the property descriptor, not the value
+returned by its getter. A class object with only an instance property is therefore disjoint from the
+protocol:
+
+```py
+static_assert(not is_subtype_of(TypeOf[XReadProperty], HasXProperty))
+static_assert(not is_assignable_to(TypeOf[XReadProperty], HasXProperty))
+static_assert(is_disjoint_from(TypeOf[XReadProperty], HasXProperty))
+
+x_class: HasXProperty = XReadProperty  # error: [invalid-assignment]
 ```
 
 A read-only property on a protocol, unlike a mutable attribute, is covariant: `XSub` in the below
@@ -2758,9 +2768,8 @@ has_name: HasCachedName = WithCachedName()
 
 ### Generic descriptor result types
 
-Applying a generic descriptor decorator to a generic protocol method currently loses the protocol's
-type variable and produces `cached_property[Unknown]`. The protocol must preserve that descriptor
-type instead of reducing it to a bare `Unknown`, which would allow an incompatible implementation.
+Applying a generic descriptor decorator to a generic protocol method must preserve the protocol's
+type variable and expose the specialized descriptor's readable and writable member types.
 
 ```py
 from functools import cached_property
@@ -2781,9 +2790,7 @@ class StrValue:
 
 static_assert(not is_assignable_to(StrValue, HasValue[int]))
 
-# TODO: This should be a property with an `int` read type once decorator calls preserve enclosing
-# type variables.
-# revealed: {"value": AttributeMember(`cached_property[Unknown]`)}
+# revealed: {"value": PropertyMember { read: `int`, write: `int` }}
 reveal_protocol_interface(HasValue[int])
 ```
 
@@ -3773,6 +3780,34 @@ static_assert(is_subtype_of(Text, ConsoleRenderable))
 static_assert(is_assignable_to(Text, ConsoleRenderable))
 ```
 
+## Recursive protocol receiver binding
+
+A classmethod on a generic protocol can cause receiver binding for another method to depend on
+itself. The cached receiver-binding query must reach a fixed point and report the ordinary
+return-type error instead of panicking.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from datetime import datetime, timedelta, tzinfo
+from typing import ClassVar, Optional, Protocol, TypeVar
+
+T = TypeVar("T", bound=Optional[tzinfo], covariant=True)
+
+class DateTime(Protocol[T]):
+    resolution: ClassVar[timedelta]
+
+    def __sub__(self: DateTime[tzinfo], other: DateTime[tzinfo]) -> timedelta: ...
+    @classmethod
+    def now(cls, tz: Optional[tzinfo] = None) -> DateTime[Optional[tzinfo]]:
+        return datetime.now(tz)  # error: [invalid-return-type]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
@@ -4235,13 +4270,12 @@ iterable: Iterable[int] = DirectIterable  # snapshot
 
 ```snapshot
 error[invalid-assignment]: Object of type `<class 'DirectIterable'>` is not assignable to `Iterable[int]`
-  --> src/mdtest_snippet.py:20:11
+  --> src/mdtest_snippet.py:20:27
    |
 20 | iterable: Iterable[int] = DirectIterable  # snapshot
    |           -------------   ^^^^^^^^^^^^^^ Incompatible value of type `<class 'DirectIterable'>`
    |           |
    |           Declared type
-   |
 info: type `<class 'DirectIterable'>` is not assignable to protocol `Iterable[int]`
 info: └── protocol member `__iter__` is not defined on type `<class 'DirectIterable'>`
 info:     └── special methods must be defined on the meta-type when matching a protocol
@@ -4264,6 +4298,75 @@ class Custom:
         return str(value)
 
 static_assert(is_assignable_to(TypeOf[Custom], CustomProtocol))
+```
+
+## Class objects with explicitly typed special-method receivers
+
+A special method defined on a metaclass receives the class object, not an instance of that class. An
+explicitly annotated metaclass receiver must therefore be checked against the class object when
+matching a collection protocol. Special-method lookup must also ignore conflicting methods defined
+on the class itself.
+
+```py
+from collections.abc import Collection, Container, Iterable, Iterator, Reversible
+from typing import Any, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+class Membership(Protocol):
+    def __contains__(self, value: int, /) -> bool: ...
+
+class CollectionMeta(type):
+    def __contains__(self: type[Any], value: object, /) -> bool:
+        return True
+
+    def __iter__(self: type[Any]) -> Iterator[int]:
+        return iter((1,))
+
+    def __reversed__(self: type[Any]) -> Iterator[int]:
+        return iter((1,))
+
+    def __len__(self: type[Any]) -> int:
+        return 1
+
+class ClassCollection(metaclass=CollectionMeta):
+    def __contains__(self, value: str, /) -> bool:
+        return True
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(("member",))
+
+    def __reversed__(self) -> Iterator[str]:
+        return iter(("member",))
+
+static_assert(is_assignable_to(TypeOf[ClassCollection], Membership))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Container[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Container[str]))
+static_assert(is_subtype_of(TypeOf[ClassCollection], Container[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Iterable[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Reversible[int]))
+static_assert(is_assignable_to(TypeOf[ClassCollection], Collection[int]))
+```
+
+The explicit receiver must not hide an incompatible membership parameter or return type.
+
+```py
+class StringMembershipMeta(type):
+    def __contains__(self: type[Any], value: str, /) -> bool:
+        return True
+
+class StringMembership(metaclass=StringMembershipMeta):
+    pass
+
+class NonBooleanMembershipMeta(type):
+    def __contains__(self: type[Any], value: object, /) -> int:
+        return 1
+
+class NonBooleanMembership(metaclass=NonBooleanMembershipMeta):
+    pass
+
+static_assert(not is_assignable_to(TypeOf[StringMembership], Container[int]))
+static_assert(not is_assignable_to(TypeOf[NonBooleanMembership], Container[int]))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
@@ -5163,7 +5266,7 @@ def _(x: Foo):
         pass
 ```
 
-## Protocols are never singleton types, and are never single-valued types
+## Protocols are never singleton types
 
 It *might* be possible to have a singleton protocol-instance type...?
 
@@ -5173,14 +5276,13 @@ worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
 from typing import Protocol, Callable
-from ty_extensions._internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton
 
 class WeirdAndWacky(Protocol):
     @property
     def __class__(self) -> Callable[[], None]: ...
 
 reveal_type(is_singleton(WeirdAndWacky))  # revealed: Literal[False]
-reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 ```
 
 ## Integration test: `typing.SupportsIndex` and `typing.Sized`
@@ -5592,7 +5694,7 @@ python-version = "3.12"
 ```py
 from typing import Protocol, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class UnknownMethod[T](Protocol):
     def method(self) -> Unknown: ...
@@ -5607,7 +5709,7 @@ checked.
 ```py
 from typing import Protocol, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class IntProperty[T](Protocol):
     @property
@@ -5630,7 +5732,7 @@ has been replaced by `int`, so the cast is redundant.
 ```py
 from typing import Protocol, TypeVar, cast
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 T = TypeVar("T", bound=Unknown)
 
@@ -5683,7 +5785,7 @@ example, descriptor overload resolution exposes `Unknown` only through the neste
 ```py
 from typing import Protocol, cast, overload
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class Descriptor:
     @overload
@@ -6470,7 +6572,7 @@ class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
 
 # TODO should just be `B2[Any]`
-reveal_type(T3.__bound__)  # revealed: B2[Any] | @Todo(specialized non-generic class)
+reveal_type(T3.__bound__)  # revealed: B2[Any] | Unknown
 
 # TODO error: [invalid-type-arguments]
 def f(x: B1[int]):

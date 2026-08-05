@@ -146,6 +146,15 @@ def nonsingleton_newtype_tag(value: Foo | Bar, tag: BoolTag):
         reveal_type(value)  # revealed: Foo | Bar
     else:
         reveal_type(value)  # revealed: Foo | Bar
+
+def boolean_tags_after_truthiness(value: Foo | Bar | None):
+    if not value:
+        return
+
+    if value.tag is True:
+        reveal_type(value)  # revealed: Bar & ~AlwaysFalsy
+    else:
+        reveal_type(value)  # revealed: Foo & ~AlwaysFalsy
 ```
 
 ## `is` in chained comparisons

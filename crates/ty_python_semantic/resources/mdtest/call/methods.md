@@ -616,13 +616,11 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 18 | class MissingArg(RequiresArg): ...
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-   |
 ```
 
 ```py
@@ -637,13 +635,11 @@ error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass_
    |
 20 | class InvalidType(RequiresArg, arg="foo"): ...
    |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
-   |
 ```
 
 ```py
@@ -668,13 +664,11 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-   |
 
 
 error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
@@ -682,13 +676,11 @@ error[unknown-argument]: Argument `not_arg` does not match any known parameter o
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    |                                 ^^^^^^^^^^^^^
-   |
 info: Function signature here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 ```
 
 ```py
@@ -704,7 +696,7 @@ class Bad(NotCallableInitSubclass):
 
 ```snapshot
 error[non-callable-init-subclass]: Invalid definition of class `Bad`
-  --> src/mdtest_snippet.py:36:5
+  --> src/mdtest_snippet.py:39:7
    |
 36 |     __init_subclass__ = None
    |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
@@ -712,7 +704,6 @@ error[non-callable-init-subclass]: Invalid definition of class `Bad`
 38 | # snapshot: non-callable-init-subclass
 39 | class Bad(NotCallableInitSubclass):
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
-   |
 info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
 info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 ```
@@ -1017,6 +1008,48 @@ class X:
     def make_another(self) -> Self:
         reveal_type(self.__new__)  # revealed: def __new__[Self](cls) -> Self
         return self.__new__(type(self))
+```
+
+Calling `object.__new__` from an overriding `__new__` method preserves `Self`, so an invalid
+attribute access on the result is reported:
+
+```py
+class Item:
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
+Explicitly marking `__new__` as a static method does not change the inferred result:
+
+```py
+class StaticItem:
+    @staticmethod
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+`Self` is also preserved through a chain of inherited `__new__` calls:
+
+```py
+class Foo: ...
+
+class Bar(Foo):
+    def __new__(cls) -> Self:
+        return Foo.__new__(cls)
+
+class Baz(Bar):
+    def __new__(cls) -> Self:
+        result = Bar.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
 ```
 
 ## Bound-method attribute fallback

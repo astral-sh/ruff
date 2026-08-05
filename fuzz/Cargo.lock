@@ -115,7 +115,7 @@ dependencies = [
  "manyhow",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -131,7 +131,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "quote-use",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -287,7 +287,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -422,7 +422,7 @@ dependencies = [
  "defmt-parser",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -442,7 +442,7 @@ checksum = "d08b3a0bcc0d079199cd476b2cae8435016ec11d1c0986c6901c5ac223041534"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -453,7 +453,7 @@ checksum = "1ac70aa55017e108007fbaf5aa0f54b021c98f92ff8af59d42eda9da96e3dd4f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -558,7 +558,7 @@ checksum = "c736d226c32e496b8377813b52269e11ad3a48d8373b68862d0364f04fd1229d"
 dependencies = [
  "attribute-derive",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -816,7 +816,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -873,7 +873,7 @@ checksum = "d0879bd39df99c4c5e2c6615ccc026391a423dde10532c573e6086eb94a802cc"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -940,7 +940,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0903173ea316c34a44d0497161e04d9210af44f5f5e89bf2f55d9a254c9a0e8d"
 dependencies = [
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -982,7 +982,7 @@ dependencies = [
  "manyhow-macros",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -1093,21 +1093,18 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "path-absolutize"
-version = "3.1.1"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4af381fe79fa195b4909485d99f73a80792331df0625188e707854f0b3383f5"
+checksum = "f808742975794703469f67a28dd14b1d1009a1743c18b0353b4b951dbb0068ad"
 dependencies = [
  "path-dedot",
 ]
 
 [[package]]
 name = "path-dedot"
-version = "3.1.1"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07ba0ad7e047712414213ff67533e6dd477af0a4e1d14fb52343e53d30ea9397"
-dependencies = [
- "once_cell",
-]
+checksum = "03351d0f1c066c114015408dc6a3e101f080fc03ef9d8d799aa58ec760cac5a6"
 
 [[package]]
 name = "path-slash"
@@ -1371,7 +1368,7 @@ dependencies = [
  "proc-macro-utils",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -1513,7 +1510,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_annotate_snippets"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anstyle",
  "memchr",
@@ -1522,7 +1519,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cache"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "char_str",
  "filetime",
@@ -1535,7 +1532,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_db"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anstyle",
  "arc-swap",
@@ -1573,7 +1570,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_diagnostics"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "get-size2",
  "is-macro",
@@ -1583,7 +1580,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_formatter"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "drop_bomb",
  "ruff_cache",
@@ -1598,7 +1595,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_index"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "get-size2",
  "ruff_macros",
@@ -1607,7 +1604,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.22"
+version = "0.16.1"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -1665,7 +1662,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "heck",
  "itertools 0.15.0",
@@ -1673,19 +1670,19 @@ dependencies = [
  "quote",
  "regex",
  "ruff_python_trivia",
- "syn",
+ "syn 3.0.3",
 ]
 
 [[package]]
 name = "ruff_memory_usage"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "get-size2",
 ]
 
 [[package]]
 name = "ruff_notebook"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "rand 0.10.2",
@@ -1700,7 +1697,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_ast"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "aho-corasick",
  "arrayvec",
@@ -1724,7 +1721,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_codegen"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_literal",
@@ -1735,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_formatter"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -1763,7 +1760,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_importer"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "ruff_diagnostics",
@@ -1776,7 +1773,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_index"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_trivia",
@@ -1786,7 +1783,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_literal"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "bitflags 2.13.0",
  "icu_properties",
@@ -1796,7 +1793,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_parser"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "bitflags 2.13.0",
  "bstr",
@@ -1816,7 +1813,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_semantic"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "bitflags 2.13.0",
  "is-macro",
@@ -1833,7 +1830,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_stdlib"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "bitflags 2.13.0",
  "unicode-ident",
@@ -1841,7 +1838,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python_trivia"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "itertools 0.15.0",
  "ruff_source_file",
@@ -1852,7 +1849,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_ranged_value"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "ruff_db",
  "ruff_text_size",
@@ -1862,7 +1859,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_source_file"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "get-size2",
  "memchr",
@@ -1872,7 +1869,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_text_size"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "get-size2",
  "serde",
@@ -1947,7 +1944,7 @@ checksum = "ec5c48c5a4a53a6e2be9762f56566f1325d4394c011c00b3ea86ba2d13411e71"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -1998,7 +1995,7 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2101,7 +2098,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2122,6 +2119,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2129,7 +2137,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2173,7 +2181,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2184,7 +2192,7 @@ checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2294,7 +2302,7 @@ checksum = "7490cfa5ec963746568740651ac6781f701c9c5ea257c58e057f3ba8cf69e8da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2308,7 +2316,7 @@ dependencies = [
 
 [[package]]
 name = "ty_combine"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "ordermap",
  "ruff_db",
@@ -2318,12 +2326,13 @@ dependencies = [
 
 [[package]]
 name = "ty_module_resolver"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "camino",
  "compact_str",
  "get-size2",
+ "ordermap",
  "regex",
  "regex-syntax",
  "ruff_db",
@@ -2340,7 +2349,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_core"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "bitflags 2.13.0",
  "bitvec",
@@ -2368,7 +2377,7 @@ dependencies = [
 
 [[package]]
 name = "ty_python_semantic"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "bitflags 2.13.0",
  "char_str",
@@ -2408,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "ty_site_packages"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "camino",
  "colored",
@@ -2428,14 +2437,14 @@ dependencies = [
 
 [[package]]
 name = "ty_static"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "ruff_macros",
 ]
 
 [[package]]
 name = "ty_vendored"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "path-slash",
  "ruff_db",
@@ -2618,7 +2627,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
  "wasm-bindgen-shared",
 ]
 
@@ -2711,7 +2720,7 @@ checksum = "de844c262c8848816172cef550288e7dc6c7b7814b4ee56b3e1553f275f1858e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
  "synstructure",
 ]
 
@@ -2732,7 +2741,7 @@ checksum = "e2e817b7b52d0c7358d3246da9d69935ebb18116b2b102b4230dac079b4862f5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2752,7 +2761,7 @@ checksum = "11532158c46691caf0f2593ea8358fed6bbf68a0315e80aae9bd41fbade684a1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
  "synstructure",
 ]
 
@@ -2786,7 +2795,7 @@ checksum = "625dc425cab0dca6dc3c3319506e6593dcb08a9f387ea3b284dbd52a92c40555"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]

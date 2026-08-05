@@ -302,7 +302,6 @@ FURB152 [*] Replace `2.7182000000000001` with `math.e`
 44 |
 45 | e = 2.7182000000000001  # FURB152
    |     ^^^^^^^^^^^^^^^^^^
-   |
 help: Use `math.e`
    |
 1  + import math

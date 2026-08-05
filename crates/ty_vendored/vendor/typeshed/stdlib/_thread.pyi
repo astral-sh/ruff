@@ -8,8 +8,8 @@ from _typeshed import structseq
 from collections.abc import Callable
 from threading import Thread
 from types import TracebackType
-from typing import Any, Final, NoReturn, final, overload
-from typing_extensions import TypeVarTuple, Unpack, deprecated, disjoint_base
+from typing import Any, Final, final, overload
+from typing_extensions import Never, TypeVarTuple, Unpack, deprecated, disjoint_base
 
 _Ts = TypeVarTuple("_Ts")
 
@@ -275,13 +275,13 @@ def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
     Note: the default signal handler for SIGINT raises ``KeyboardInterrupt``.
     """
 
-def exit() -> NoReturn:
+def exit() -> Never:
     """This is synonymous to ``raise SystemExit''.  It will cause the current
     thread to exit silently unless the exception is caught.
     """
 
 @deprecated("Obsolete synonym. Use `exit()` instead.")
-def exit_thread() -> NoReturn:  # undocumented
+def exit_thread() -> Never:  # undocumented
     """An obsolete synonym of exit()."""
 
 def allocate_lock() -> LockType:

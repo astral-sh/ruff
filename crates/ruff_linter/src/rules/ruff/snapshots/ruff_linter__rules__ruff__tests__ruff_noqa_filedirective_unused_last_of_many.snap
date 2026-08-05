@@ -21,7 +21,6 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `E701`)
 1 | # flake8: noqa: F841, E501 -- used followed by unused code
 2 | # ruff: noqa: E701, F541 -- unused followed by used code
   | ^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused `noqa` directive
   |
 1 | # flake8: noqa: F841, E501 -- used followed by unused code

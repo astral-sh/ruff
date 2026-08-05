@@ -18,6 +18,7 @@ use ruff_source_file::find_newline;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     #[cache_key(ignore)]
@@ -30,6 +31,8 @@ pub struct Settings {
     pub unsafe_fixes: UnsafeFixes,
     #[cache_key(ignore)]
     pub output_format: OutputFormat,
+    #[cache_key(ignore)]
+    pub output_prefer_rule_codes: bool,
     #[cache_key(ignore)]
     pub show_fixes: bool,
 
@@ -47,6 +50,7 @@ impl Default for Settings {
             fix: false,
             fix_only: false,
             output_format: OutputFormat::default(),
+            output_prefer_rule_codes: false,
             show_fixes: false,
             unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
@@ -67,6 +71,7 @@ impl fmt::Display for Settings {
                 self.fix,
                 self.fix_only,
                 self.output_format,
+                self.output_prefer_rule_codes,
                 self.show_fixes,
                 self.unsafe_fixes,
                 self.file_resolver | nested,

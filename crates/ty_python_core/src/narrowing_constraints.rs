@@ -303,19 +303,13 @@ impl NarrowingConstraintsBuilder {
                     if_false,
                 })
             }
-            Ordering::Less => {
-                let node = self.interiors[a];
-                let if_uncertain = self.add_or_constraint(node.if_uncertain, b);
-                self.add_interior(InteriorNode {
-                    atom: node.atom,
-                    if_true: node.if_true,
-                    if_uncertain,
-                    if_false: node.if_false,
-                })
-            }
-            Ordering::Greater => {
-                let node = self.interiors[b];
-                let if_uncertain = self.add_or_constraint(a, node.if_uncertain);
+            ordering @ (Ordering::Less | Ordering::Greater) => {
+                let (node, other) = if ordering == Ordering::Less {
+                    (self.interiors[a], b)
+                } else {
+                    (self.interiors[b], a)
+                };
+                let if_uncertain = self.add_or_constraint(node.if_uncertain, other);
                 self.add_interior(InteriorNode {
                     atom: node.atom,
                     if_true: node.if_true,
@@ -380,23 +374,15 @@ impl NarrowingConstraintsBuilder {
                     if_false,
                 })
             }
-            Ordering::Less => {
-                let node = self.interiors[a];
-                let if_true = self.add_and_constraint(node.if_true, b);
-                let if_uncertain = self.add_and_constraint(node.if_uncertain, b);
-                let if_false = self.add_and_constraint(node.if_false, b);
-                self.add_interior(InteriorNode {
-                    atom: node.atom,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                })
-            }
-            Ordering::Greater => {
-                let node = self.interiors[b];
-                let if_true = self.add_and_constraint(a, node.if_true);
-                let if_uncertain = self.add_and_constraint(a, node.if_uncertain);
-                let if_false = self.add_and_constraint(a, node.if_false);
+            ordering @ (Ordering::Less | Ordering::Greater) => {
+                let (node, other) = if ordering == Ordering::Less {
+                    (self.interiors[a], b)
+                } else {
+                    (self.interiors[b], a)
+                };
+                let if_true = self.add_and_constraint(node.if_true, other);
+                let if_uncertain = self.add_and_constraint(node.if_uncertain, other);
+                let if_false = self.add_and_constraint(node.if_false, other);
                 self.add_interior(InteriorNode {
                     atom: node.atom,
                     if_true,

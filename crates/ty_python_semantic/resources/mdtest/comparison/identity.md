@@ -132,7 +132,7 @@ Once `value is None` has succeeded, the value can only be the `None` singleton e
 original type is `Unknown`.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(value: Unknown) -> None:
     if value is None:

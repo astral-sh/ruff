@@ -17,4 +17,3 @@ PLE0604 Invalid object in `__all__`, must contain only strings
 6 |
 7 | __all__ = list([None, "Fruit", "Worm"])  # [invalid-all-object]
   | ^^^^^^^
-  |

@@ -438,7 +438,8 @@ impl RuleSelector {
     }
 
     /// Parse [`RuleSelector`] from a string; but do not follow redirects.
-    pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
+    #[cfg(feature = "schemars")]
+    fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
         // **Changes should be reflected in `from_str` as well**
         match s {
             "ALL" => Ok(Self::All),

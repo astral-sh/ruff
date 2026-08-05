@@ -93,6 +93,8 @@ def decorator_factory() -> IdentityCallable[T]:
         return fn
     # revealed: ty_extensions._internal.GenericContext[T@decorator]
     reveal_type(generic_context(decorator))
+    # revealed: Literal[1]
+    reveal_type(decorator(1))
 
     return decorator
 
@@ -230,6 +232,20 @@ reveal_type(generic_context(decorator_factory()))
 reveal_type(decorator_factory()(identity))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(identity)(1))
+```
+
+A legacy factory's return statements are checked against the lexical form of its return type. This
+also applies when the returned callable accepts and returns another callable:
+
+```py
+from typing import NoReturn
+
+class WrappedCallable:
+    def __call__(self, *args: object, **kwargs: object) -> NoReturn:
+        raise NotImplementedError
+
+def nested_callable_factory() -> Callable[[Callable[P, T]], Callable[P, T]]:
+    return lambda callback: WrappedCallable()
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned

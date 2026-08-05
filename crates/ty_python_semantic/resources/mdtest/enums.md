@@ -527,6 +527,8 @@ to `Any`:
 from enum import Enum
 
 class Connector(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int) -> "Connector":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -546,6 +548,7 @@ from enum import Enum
 
 class AnnotatedConnector(Enum):
     _value_: str
+    connector_id: int
 
     def __new__(cls, value: str, connector_id: int = 0) -> "AnnotatedConnector":
         obj = object.__new__(cls)
@@ -661,6 +664,8 @@ annotation, subclass member values remain dynamic:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -680,6 +685,8 @@ An explicit `_value_` annotation on the subclass still takes precedence:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: str, connector_id: int = 0) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -702,6 +709,8 @@ explicitly annotated:
 from enum import Enum
 
 class Base(Enum):
+    connector_id: int
+
     def __new__(cls, value: int, connector_id: int = 0) -> "Base":
         obj = object.__new__(cls)
         obj._value_ = value
@@ -1986,6 +1995,49 @@ reveal_type(Answer.name)  # revealed: Literal[Answer.name]
 reveal_type(Answer.value)  # revealed: Literal[Answer.value]
 ```
 
+## Enum classes as collection protocols
+
+An enum class is a container because `EnumMeta.__contains__` accepts any object. Consequently, the
+class satisfies `Container[T]` for every `T`, including types unrelated to its members. Its
+metaclass also provides the iteration, reversal, and length methods required by the corresponding
+collection protocols.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Collection, Container, Iterable, Reversible
+from enum import Enum, IntEnum, StrEnum, auto
+from typing import Any
+
+class Color(Enum):
+    RED = auto()
+
+unparameterized_container: Container = Color
+any_container: Container[Any] = Color
+object_container: Container[object] = Color
+member_container: Container[Color] = Color
+integer_container: Container[int] = Color
+string_container: Container[str] = Color
+iterable: Iterable[Color] = Color
+reversible: Reversible[Color] = Color
+collection: Collection[Color] = Color
+
+class Number(IntEnum):
+    ONE = 1
+
+integer_enum_container: Container[int] = Number
+integer_enum_iterable: Iterable[int] = Number
+
+class Word(StrEnum):
+    HELLO = "hello"
+
+string_enum_container: Container[str] = Word
+string_enum_iterable: Iterable[str] = Word
+```
+
 ## Iterating over enum members
 
 ```py
@@ -2443,7 +2495,6 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
   |
 8 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
-  |
 ```
 
 If the name is not a string literal, we also emit a diagnostic:
@@ -2460,7 +2511,6 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
    |
 11 |     DynamicMismatch = Enum(name, "A B")
    |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
-   |
 ```
 
 ### List/tuple of tuples

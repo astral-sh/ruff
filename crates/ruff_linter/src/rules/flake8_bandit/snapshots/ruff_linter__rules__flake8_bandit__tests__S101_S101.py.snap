@@ -6,7 +6,6 @@ S101 Use of `assert` detected
   |
 1 | assert True  # S101
   | ^^^^^^
-  |
 
 S101 Use of `assert` detected
  --> S101.py:6:5
@@ -25,4 +24,3 @@ S101 Use of `assert` detected
 6 |     assert x == 1  # S101
 7 |     assert x == 2  # S101
   |     ^^^^^^
-  |

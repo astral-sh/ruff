@@ -7,7 +7,6 @@ ASYNC222 Async functions should not wait on processes with blocking methods
 19 | async def func():
 20 |     os.wait4(10)  # ASYNC222
    |     ^^^^^^^^
-   |
 
 ASYNC222 Async functions should not wait on processes with blocking methods
   --> ASYNC22x.py:24:5
@@ -15,7 +14,6 @@ ASYNC222 Async functions should not wait on processes with blocking methods
 23 | async def func():
 24 |     os.wait(12)  # ASYNC222
    |     ^^^^^^^
-   |
 
 ASYNC222 Async functions should not wait on processes with blocking methods
   --> ASYNC22x.py:91:5

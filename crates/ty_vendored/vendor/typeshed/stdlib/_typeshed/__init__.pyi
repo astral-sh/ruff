@@ -58,6 +58,14 @@ Unused: TypeAlias = object  # stable
 # for more information.
 MaybeNone: TypeAlias = Any  # stable
 
+# typeshed-internal type aliases to facilitate transition from
+# `float` to either `float | int` or `float` (and similar for `complex`).
+# When you encounter one of these type aliases, you are encouraged to
+# replace them with the correct type. Please don't use them outside typeshed.
+# See https://github.com/python/typeshed/issues/16059 for details.
+FloatInt: TypeAlias = float | int
+ComplexInt: TypeAlias = complex | float | int
+
 # Used to mark arguments that default to a sentinel value. This prevents
 # stubtest from complaining about the default value not matching.
 #

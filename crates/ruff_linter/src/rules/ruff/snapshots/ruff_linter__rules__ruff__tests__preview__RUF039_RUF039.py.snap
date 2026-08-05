@@ -315,7 +315,6 @@ RUF039 [*] First argument to `regex.template()` is not raw string
 28 | |     l(?i:ne)
 29 | | """, flags = regex.X)
    | |___^
-   |
 help: Replace with raw string
    |
 24 |
@@ -435,5 +434,4 @@ RUF039 First argument to `re.compile()` is not raw string
    |  ____________^
 68 | | b")  # without fix
    | |__^
-   |
 help: Replace with raw string

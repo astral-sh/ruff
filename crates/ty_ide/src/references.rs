@@ -13,7 +13,7 @@
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
 use rayon::prelude::*;
-use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
@@ -22,9 +22,12 @@ use ruff_python_ast::{
 };
 use ruff_text_size::Ranged;
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
-use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
+use ty_python_semantic::{
+    ImportAliasResolution, ResolvedDefinition, SemanticModel, contains_identifier,
+};
 
 /// Salsa snapshots coordinate clone and drop through shared state. For cached files that don't
 /// contain the target, that coordination can cost more than the file scan and scales poorly when
@@ -84,10 +87,11 @@ impl ReferencesMode {
 /// Search for references across all files in the project.
 pub(crate) fn references(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
+    let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target.definitions(&model, mode.to_import_alias_resolution())?;
     let is_externally_visible_symbol =
@@ -114,11 +118,12 @@ pub(crate) fn references(
     let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
 
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
+        let program = model.program();
         let files = db.project().files(db);
         let files: Vec<_> = files
             .iter()
             .copied()
-            .filter(|other| *other != file)
+            .filter(|other| *other != source_file)
             .collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
         let other_references = files
@@ -129,6 +134,8 @@ pub(crate) fn references(
                 if !contains_identifier(&source, &target_text) {
                     return Vec::new();
                 }
+
+                let other_file = ProgramFile::new(db, other_file, program);
 
                 if is_externally_visible_symbol {
                     references_for_file(db, other_file, &target_definitions, &target_text, mode)
@@ -157,7 +164,7 @@ pub(crate) fn references(
 
 fn references_for_keyword_arguments_in_file(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
@@ -169,7 +176,7 @@ fn references_for_keyword_arguments_in_file(
         "keyword-label cross-file scan should not run in DocumentHighlights mode"
     );
 
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
@@ -187,36 +194,6 @@ fn references_for_keyword_arguments_in_file(
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
 
     references
-}
-
-/// Cheap text prefilter for identifier references before AST/semantic validation.
-///
-/// Heuristically matches an ASCII approximation of `\b{name}\b`.
-pub(crate) fn contains_identifier(source: &str, name: &str) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-
-    let bytes = source.as_bytes();
-    let needle = name.as_bytes();
-
-    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
-        let after = pos + needle.len();
-
-        // Skip this entry if it is within an identifier. E.g. skip
-        // this entry when searching for `x` and this is a match
-        // within `exclude = 10`
-        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
-        let boundary_after = bytes
-            .get(after)
-            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
-
-        boundary_before && boundary_after
-    })
-}
-
-fn is_ascii_identifier_continue(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 /// Returns whether `node` assigns `value` to the sole target `__slots__`, e.g.
@@ -248,12 +225,12 @@ fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
 /// The behavior depends on the provided mode.
 fn references_for_file(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     target_definitions: &Definitions<'_>,
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
@@ -281,10 +258,16 @@ pub(crate) fn has_any_external_visible_definitions(
     definitions.iter().any(|definition| match definition {
         ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
             ScopeKind::Module | ScopeKind::Class => true,
+            ScopeKind::Comprehension => {
+                matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
+                    && definition.place(db).as_symbol().is_some_and(|symbol_id| {
+                        ty_python_core::semantic_index(db, definition.program_file(db))
+                            .symbol_resolves_to_global_scope(symbol_id, definition.file_scope(db))
+                    })
+            }
             ScopeKind::TypeParams
             | ScopeKind::Function
             | ScopeKind::Lambda
-            | ScopeKind::Comprehension
             | ScopeKind::TypeAlias => false,
         },
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,
@@ -306,11 +289,13 @@ fn parameter_owner_is_externally_visible(
 
 fn parameter_owner_is_externally_visible_for_target(
     db: &dyn Db,
-    definition: &ResolvedDefinition,
+    resolved: &ResolvedDefinition,
 ) -> bool {
-    let target = definition.focus_range(db);
-    let file = target.file();
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let Some(definition) = resolved.definition() else {
+        return false;
+    };
+    let parsed = parsed_module(db, definition.python_file(db));
+    let target = definition.focus_range(db, &parsed.load(db));
     let module = parsed.load(db);
 
     let covering = covering_node(module.syntax().into(), target.range());
@@ -721,8 +706,8 @@ impl<'a> LocalReferencesFinder<'a> {
         let db = self.model.db();
         let file = self.model.file();
         let class_range = class.range();
-        let module = ruff_db::parsed::parsed_module(db, file).load(db);
-        let index = ty_python_core::semantic_index(db, file);
+        let module = ruff_db::parsed::parsed_module(db, self.model.python_file()).load(db);
+        let index = ty_python_core::semantic_index(db, self.model.program_file());
 
         // The nearest class scope lexically enclosing `scope`, if any. `ancestor_scopes` skips
         // class scopes for name resolution, so we walk the lexical parents directly to stop at the
@@ -779,7 +764,7 @@ impl<'a> LocalReferencesFinder<'a> {
         };
 
         let file = local_definition.file(db);
-        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let module = ruff_db::parsed::parsed_module(db, local_definition.python_file(db)).load(db);
         let kind = local_definition.kind(db);
         let category = kind.category(file.is_stub(db), &module);
 
@@ -823,7 +808,7 @@ mod tests {
     use crate::tests::{CursorTest, cursor_test};
 
     fn cursor_target_is_externally_visible(test: &CursorTest) -> bool {
-        let model = SemanticModel::new(&test.db, test.cursor.file);
+        let model = SemanticModel::new(&test.db, test.program_file(test.cursor.file));
         let goto_target =
             find_goto_target(&model, &test.cursor.parsed, test.cursor.offset).unwrap();
         let definitions = goto_target
@@ -840,6 +825,23 @@ mod tests {
     fn externally_visible_definitions_can_have_cross_file_references() {
         for (case, source) in [
             ("module-global", "x<CURSOR> = 1"),
+            (
+                "module comprehension walrus",
+                "[(x<CURSOR> := item) for item in [1]]",
+            ),
+            (
+                "nested module comprehension walrus",
+                "[[(x<CURSOR> := item) for item in [1]] for _ in [1]]",
+            ),
+            (
+                "explicit global comprehension walrus",
+                "
+x = 0
+def f():
+    global x
+    [(x<CURSOR> := item) for item in [1]]
+",
+            ),
             (
                 "class",
                 "
@@ -866,17 +868,42 @@ def f():
             ),
             ("lambda", "f = lambda x<CURSOR>: x"),
             ("comprehension", "xs = [x for x<CURSOR> in range(3)]"),
+            (
+                "function comprehension walrus",
+                "
+def f():
+    [(x<CURSOR> := item) for item in [1]]
+    return x
+",
+            ),
+            (
+                "nested function comprehension walrus",
+                "
+def f():
+    [[(x<CURSOR> := item) for item in [1]] for _ in [1]]
+    return x
+",
+            ),
+            (
+                "lambda comprehension walrus",
+                "f = lambda: [(x<CURSOR> := item) for item in [1]]",
+            ),
+            (
+                "explicit nonlocal comprehension walrus",
+                "
+def outer():
+    x = 0
+    def inner():
+        nonlocal x
+        [(x<CURSOR> := item) for item in [1]]
+    inner()
+    return x
+",
+            ),
             ("type parameters", "type Alias[T<CURSOR>] = list[T]"),
         ] {
             let test = cursor_test(source);
             assert!(!cursor_target_is_externally_visible(&test), "{case}");
-        }
-    }
-
-    #[test]
-    fn source_candidate_prefilters_use_identifier_boundaries() {
-        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
-            assert!(contains_identifier(source, name));
         }
     }
 }

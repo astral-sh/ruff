@@ -436,10 +436,7 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
                 // Handle the `elif` and `else` branches.
                 for clause in elif_else_clauses {
                     self.enter_new_branch();
-                    if let Some(test) = &clause.test {
-                        self.visit_expr(test);
-                    }
-                    self.visit_body(&clause.body);
+                    self.visit_elif_else_clause(clause);
                     self.merge_branch_into(saved_branch);
                 }
             }

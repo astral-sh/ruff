@@ -49,8 +49,8 @@ if sys.version_info >= (3, 11):
         If `dir_fd` is not None, it should be a file descriptor referring to a
         directory, and paths will then be relative to that directory.
 
-        If `include_hidden` is true, the patterns '*', '?', '**'  will match
-        hidden directories.
+        If `include_hidden` is true, wildcards can match path segments beginning
+        with a dot ('.').
 
         If `recursive` is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.
@@ -83,8 +83,8 @@ if sys.version_info >= (3, 11):
         If `dir_fd` is not None, it should be a file descriptor referring to a
         directory, and paths will then be relative to that directory.
 
-        If `include_hidden` is true, the patterns '*', '?', '**'  will match
-        hidden directories.
+        If `include_hidden` is true, wildcards can match path segments beginning
+        with a dot ('.').
 
         If `recursive` is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.

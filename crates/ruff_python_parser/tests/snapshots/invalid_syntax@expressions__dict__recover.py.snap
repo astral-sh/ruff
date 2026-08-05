@@ -558,7 +558,6 @@ Module(
 23 | {*x: y, z: a, *b: c}
 24 | {x: *y, z: *a}
    |     ^^ Syntax Error: Starred expression cannot be used here
-   |
 
 
    |
@@ -566,4 +565,3 @@ Module(
 23 | {*x: y, z: a, *b: c}
 24 | {x: *y, z: *a}
    |            ^^ Syntax Error: Starred expression cannot be used here
-   |
