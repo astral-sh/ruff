@@ -109,7 +109,7 @@ fn typed_dict_pattern_domain_satisfies<'db>(
 }
 
 /// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-pub(crate) fn is_typed_dict_runtime_domain(
+pub(super) fn is_typed_dict_runtime_domain(
     db: &dyn Db,
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,

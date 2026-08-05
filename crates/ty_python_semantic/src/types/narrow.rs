@@ -16,9 +16,9 @@ use crate::types::{
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, is_typed_dict_runtime_domain,
-    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::expression::Expression;
@@ -43,6 +43,7 @@ use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
 };
+use super::match_pattern::is_typed_dict_runtime_domain;
 use super::variance::TypeVarVariance;
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -462,7 +463,7 @@ impl ClassInfoConstraintFunction {
         use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let specialization = if use_generic_filtering && class.generic_context(db).is_some() {
+            let specialization = if use_generic_filtering {
                 class.unknown_specialization(db)
             } else {
                 // A negative result excludes every specialization of the class.
@@ -651,11 +652,10 @@ impl ClassInfoConstraintFunction {
                 // so only apply `isinstance()` narrowing, not `issubclass()`
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     (self == ClassInfoConstraintFunction::IsInstance).then(|| {
-                        let callable = Type::Callable(CallableType::unknown(db));
                         if use_generic_filtering {
-                            callable
+                            Type::Callable(CallableType::unknown(db))
                         } else {
-                            callable.top_materialization(db, env)
+                            callable_pattern_type(db, env)
                         }
                     })
                 }
@@ -827,16 +827,14 @@ fn specialize_narrowing_target<'db>(
         return match bound {
             Type::Union(union) => {
                 let mut candidates = UnionBuilder::new(db, env);
-                let mut found_specialization = false;
                 for element in union.elements(db) {
                     if let Some(specialized) =
                         specialize_narrowing_target(db, env, *element, target)
                     {
                         candidates.add_in_place(specialized);
-                        found_specialization = true;
                     }
                 }
-                found_specialization.then(|| candidates.build())
+                (!candidates.is_empty()).then(|| candidates.build())
             }
             Type::Intersection(intersection) => intersection
                 .positive(db)
@@ -878,6 +876,7 @@ fn specialize_narrowing_target<'db>(
             env,
             target_class.class_literal(db),
             subject_class,
+            GenericClassSpecializationPolicy::Relaxed,
         )?
     };
 
@@ -888,11 +887,24 @@ fn specialize_narrowing_target<'db>(
     })
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GenericClassSpecializationPolicy {
+    /// Require one exact invariant solution for every type variable.
+    Exact,
+    /// Retain inferred arguments and use `Unknown` for unsolved type variables.
+    Relaxed,
+}
+
+/// Infer a generic subclass specialization from a specialized base class.
+///
+/// Class-pattern arguments require exact invariant solutions for every type variable, while
+/// relaxed `isinstance()` narrowing accepts partial and variant solutions.
 fn specialize_generic_class_for_subject<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     target_class: ClassLiteral<'db>,
     subject_class: ClassType<'db>,
+    policy: GenericClassSpecializationPolicy,
 ) -> Option<ClassType<'db>> {
     let generic_context = target_class.generic_context(db)?;
     let target_base = target_class
@@ -902,14 +914,28 @@ fn specialize_generic_class_for_subject<'db>(
         .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
 
     let constraints = ConstraintSetBuilder::new();
-    let solutions = Type::instance(db, env, target_base)
-        .assignable_solutions_with_inferable(
-            db,
-            env,
-            Type::instance(db, env, subject_class),
-            generic_context.inferable_typevars(db),
-        )
-        .solve(db, env, &constraints);
+    let path_bounds = Type::instance(db, env, target_base).assignable_solutions_with_inferable(
+        db,
+        env,
+        Type::instance(db, env, subject_class),
+        generic_context.inferable_typevars(db),
+    );
+    let solutions = match policy {
+        GenericClassSpecializationPolicy::Exact => {
+            path_bounds.solve_with(|variance, path_bound| {
+                let Some(lower) = path_bound.lower else {
+                    return Ok(None);
+                };
+                if variance != TypeVarVariance::Invariant
+                    || path_bound.upper.materialize_exact(db, env) != lower
+                {
+                    return Ok(None);
+                }
+                PathBounds::default_solve(db, env, &constraints, path_bound)
+            })
+        }
+        GenericClassSpecializationPolicy::Relaxed => path_bounds.solve(db, env, &constraints),
+    };
     let Solutions::Constrained(solutions) = solutions else {
         return None;
     };
@@ -918,17 +944,21 @@ fn specialize_generic_class_for_subject<'db>(
     };
 
     let typevars = generic_context.variables(db);
-    let unknown_specialization = generic_context.unknown_specialization(db, target_class.known(db));
+    let unknown_specialization = (policy == GenericClassSpecializationPolicy::Relaxed)
+        .then(|| generic_context.unknown_specialization(db, target_class.known(db)));
     let types = typevars
         .clone()
-        .zip(unknown_specialization.types(db))
-        .map(|(typevar, unknown)| {
+        .map(|typevar| {
             solution
                 .iter()
                 .find(|binding| binding.bound_typevar == typevar)
-                .map_or(*unknown, |binding| binding.solution)
+                .map(|binding| binding.solution)
+                .or_else(|| {
+                    unknown_specialization
+                        .and_then(|specialization| specialization.get(db, typevar))
+                })
         })
-        .collect::<Vec<_>>();
+        .collect::<Option<Vec<_>>>()?;
     if types.iter().any(|ty| {
         typevars
             .clone()
@@ -937,7 +967,8 @@ fn specialize_generic_class_for_subject<'db>(
         return None;
     }
 
-    let specialization = if target_class.is_known(db, KnownClass::Tuple)
+    let specialization = if policy == GenericClassSpecializationPolicy::Relaxed
+        && target_class.is_known(db, KnownClass::Tuple)
         && let [element] = types.as_slice()
     {
         generic_context.specialize_tuple(db, *element, TupleType::homogeneous(db, env, *element))
@@ -2090,7 +2121,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     .class
                     .zip(filtering_subject_ty.nominal_class(db, &self.env))
                     .and_then(|(pattern_class, subject_class)| {
-                        self.specialize_pattern_class_for_subject(pattern_class, subject_class)
+                        specialize_generic_class_for_subject(
+                            db,
+                            &self.env,
+                            pattern_class,
+                            subject_class,
+                            GenericClassSpecializationPolicy::Exact,
+                        )
                     })
             };
         let member_type = |name: &Name| {
@@ -2143,7 +2180,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             )
                     })
                 {
-                    // The pattern class's Unknown-specialization loses type arguments known
+                    // The pattern class's unknown specialization loses type arguments known
                     // through the related subject type. Prefer the subject's member type when it
                     // exists, but retain a member declared only by the pattern class.
                     member_ty = Some(
@@ -2190,83 +2227,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 })
             }))
             .collect()
-    }
-
-    /// Infer an exact specialization of a generic pattern subclass from a specialized base-class
-    /// subject.
-    ///
-    /// This intentionally handles only the case where every pattern-class type variable has one
-    /// exact solution. Variant base classes and pattern classes with unconstrained parameters keep
-    /// the existing conservative member type.
-    ///
-    /// ```python
-    /// class Base[T]: ...
-    ///
-    /// class Child[T](Base[T]):
-    ///     item: T
-    ///
-    /// def f(value: Base[int]) -> None:
-    ///     match value:
-    ///         case Child(item=item):
-    ///             reveal_type(item)  # int
-    /// ```
-    fn specialize_pattern_class_for_subject(
-        &self,
-        pattern_class: ClassLiteral<'db>,
-        subject_class: ClassType<'db>,
-    ) -> Option<ClassType<'db>> {
-        let db = self.db;
-        let generic_context = pattern_class.generic_context(db)?;
-        let pattern_base = pattern_class
-            .identity_specialization(db)
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
-
-        let constraints = ConstraintSetBuilder::new();
-        let solutions = Type::instance(db, &self.env, pattern_base)
-            .assignable_solutions_with_inferable(
-                db,
-                &self.env,
-                Type::instance(db, &self.env, subject_class),
-                generic_context.inferable_typevars(db),
-            )
-            .solve_with(|variance, path_bound| {
-                let Some(lower) = path_bound.lower else {
-                    return Ok(None);
-                };
-                if variance != TypeVarVariance::Invariant
-                    || path_bound.upper.materialize_exact(db, &self.env) != lower
-                {
-                    return Ok(None);
-                }
-                PathBounds::default_solve(db, &self.env, &constraints, path_bound)
-            });
-        let Solutions::Constrained(solutions) = solutions else {
-            return None;
-        };
-        let [solution] = solutions.as_slice() else {
-            return None;
-        };
-
-        let typevars = generic_context.variables(db);
-        let types = typevars
-            .clone()
-            .map(|typevar| {
-                solution
-                    .iter()
-                    .find(|binding| binding.bound_typevar == typevar)
-                    .map(|binding| binding.solution)
-            })
-            .collect::<Option<Vec<_>>>()?;
-        if types.iter().any(|ty| {
-            typevars.clone().any(|typevar| {
-                ty.references_typevar(db, &self.env, typevar.typevar(db).identity(db))
-            })
-        }) {
-            return None;
-        }
-        Some(pattern_class.apply_specialization(db, |_| generic_context.specialize(db, types)))
     }
 
     fn class_pattern_contexts(

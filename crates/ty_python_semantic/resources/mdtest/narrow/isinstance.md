@@ -862,8 +862,6 @@ type parameters remain `Unknown`. For example, `object & Covariant[Unknown]` sim
 `Covariant[Unknown]`:
 
 ```py
-from typing import Self
-
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
@@ -1562,24 +1560,23 @@ operations that could remove required keys or introduce undeclared ones. Narrowi
 strict-generic-narrowing = false
 ```
 
+Use a `TypedDict` with one required key and one optional key to distinguish safe operations from
+those that could invalidate its declared shape.
+
 ```py
 from collections.abc import Mapping, MutableMapping
-from typing import Protocol, TypedDict, runtime_checkable
+from typing import TypedDict
 from typing_extensions import NotRequired
 
 class Payload(TypedDict):
     key: int
     optional: NotRequired[str]
+```
 
-class Unrelated: ...
-class CustomDict(dict[str, int]): ...
+Narrowing directly to `dict` preserves both the required-key restrictions and the optional key's
+known type.
 
-@runtime_checkable
-class Clearable(Protocol):
-    def clear(self) -> None: ...
-
-PayloadAlias = Payload
-
+```py
 def narrow_typed_dict_to_dict(value: Payload) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload
@@ -1596,13 +1593,23 @@ def narrow_typed_dict_to_dict(value: Payload) -> None:
         value["unexpected"] = 1
         # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
         del value["key"]
+```
+
+A type alias must retain the same `TypedDict` interface.
+
+```py
+PayloadAlias = Payload
 
 def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload
         # error: [unresolved-attribute]
         value.clear()
+```
 
+Narrowing to `MutableMapping` must not expose dictionary operations that violate the `TypedDict`.
+
+```py
 def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
     if isinstance(value, MutableMapping):
         reveal_type(value)  # revealed: Payload
@@ -1617,7 +1624,11 @@ def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
         value["unexpected"] = 1
         # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
         del value["key"]
+```
 
+A `Mapping` check likewise preserves the original `TypedDict`, including its mutation restrictions.
+
+```py
 def narrow_typed_dict_to_mapping(value: Payload) -> None:
     if isinstance(value, Mapping):
         reveal_type(value)  # revealed: Payload
@@ -1632,7 +1643,37 @@ def narrow_typed_dict_to_mapping(value: Payload) -> None:
         value["unexpected"] = 1
         # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
         del value["key"]
+```
 
+## Preserving TypedDict interfaces when narrowing mapping unions
+
+A union containing a `TypedDict` must preserve its restrictions even when another union member can
+also satisfy the mapping check.
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+Use an unrelated open class to retain a second possible mapping specialization alongside the
+`TypedDict`.
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+class Payload(TypedDict):
+    key: int
+    optional: NotRequired[str]
+
+class Unrelated: ...
+```
+
+An unrelated union member may be a dictionary, but the `TypedDict` member still restricts all
+operations on the narrowed union.
+
+```py
 def narrow_typed_dict_or_unrelated_to_dict(value: Payload | Unrelated) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload | (Unrelated & dict[Unknown, Unknown])
@@ -1645,7 +1686,11 @@ def narrow_typed_dict_or_unrelated_to_dict(value: Payload | Unrelated) -> None:
         value["unexpected"] = 1
         # error: [invalid-argument-type]
         del value["key"]
+```
 
+The same restrictions apply when the unrelated union member is narrowed to `MutableMapping`.
+
+```py
 def narrow_typed_dict_or_unrelated_to_mutable_mapping(value: Payload | Unrelated) -> None:
     if isinstance(value, MutableMapping):
         reveal_type(value)  # revealed: Payload | (Unrelated & MutableMapping[Unknown, Unknown])
@@ -1658,7 +1703,11 @@ def narrow_typed_dict_or_unrelated_to_mutable_mapping(value: Payload | Unrelated
         value["unexpected"] = 1
         # error: [invalid-argument-type]
         del value["key"]
+```
 
+Narrowing to `Mapping` additionally preserves both union members' possible value types.
+
+```py
 def narrow_typed_dict_or_unrelated_to_mapping(value: Payload | Unrelated) -> None:
     if isinstance(value, Mapping):
         reveal_type(value)  # revealed: Payload | (Unrelated & Mapping[Unknown, Unknown])
@@ -1672,7 +1721,11 @@ def narrow_typed_dict_or_unrelated_to_mapping(value: Payload | Unrelated) -> Non
         # error: [invalid-argument-type]
         # error: [not-subscriptable]
         del value["key"]
+```
 
+An already-specialized dictionary remains precise without weakening the `TypedDict` union member.
+
+```py
 def narrow_typed_dict_or_dict(value: Payload | dict[str, int]) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload | dict[str, int]
@@ -1687,10 +1740,50 @@ def narrow_typed_dict_or_dict(value: Payload | dict[str, int]) -> None:
         value["unexpected"] = 1
         # error: [invalid-argument-type]
         del value["key"]
+```
+
+## Narrowing TypedDicts to custom dictionary subclasses
+
+A `TypedDict` represents an exact dictionary at runtime, so it cannot also be an instance of a
+custom dictionary subclass.
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    key: int
+
+class CustomDict(dict[str, int]): ...
 
 def narrow_typed_dict_to_custom_dict(value: Payload) -> None:
     if isinstance(value, CustomDict):
         reveal_type(value)  # revealed: Never
+```
+
+## Narrowing TypedDicts to runtime-checkable protocols
+
+A runtime-checkable protocol may deliberately expose an operation that is not part of the
+`TypedDict` interface.
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from typing import Protocol, TypedDict, runtime_checkable
+
+class Payload(TypedDict):
+    key: int
+
+@runtime_checkable
+class Clearable(Protocol):
+    def clear(self) -> None: ...
 
 def narrow_typed_dict_to_clearable_protocol(value: Payload) -> None:
     if isinstance(value, Clearable):
