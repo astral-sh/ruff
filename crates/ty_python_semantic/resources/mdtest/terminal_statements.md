@@ -85,7 +85,7 @@ def return_in_try(cond: bool):
     else:
         reveal_type(x)  # revealed: Literal["before"]
     finally:
-        # TODO: should include `Literal["test"]` from the terminal entry state
+        # TODO: should include `Literal["test"]` when the return passes through `finally`
         reveal_type(x)  # revealed: Literal["before"]
     reveal_type(x)  # revealed: Literal["before"]
 
@@ -361,13 +361,11 @@ def break_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
 
 ## `raise`
 
-A `raise` statement is terminal. If it occurs in a lexically containing `try` statement, it jumps to
-a matching `except` clause or propagates out of the statement. We do not yet analyze which typed
-handler matches the raised value, so every handler sees the same checkpoint states.
+A `raise` statement is terminal. Inside a `try` statement, it jumps to a matching `except` clause or
+propagates out of the statement. We do not yet determine which typed handler matches the exception,
+so every handler sees the same possible values.
 
-We record exception checkpoints immediately before operations that may invoke Python protocols or
-otherwise raise. An exception handler sees the union of the flow states at those checkpoints, rather
-than every definition state in the `try` suite.
+When only one branch raises, the exception handler sees only the value assigned in that branch:
 
 ```py
 def raise_in_then_branch(cond: bool):
@@ -375,143 +373,72 @@ def raise_in_then_branch(cond: bool):
     try:
         if cond is True:
             x = "raise"
-            reveal_type(x)  # revealed: Literal["raise"]
             raise ValueError
-        else:
-            x = "else"
-            reveal_type(x)  # revealed: Literal["else"]
-        reveal_type(x)  # revealed: Literal["else"]
+        x = "else"
     except ValueError:
-        reveal_type(x)  # revealed: Literal["raise", "else"]
-    except:
-        reveal_type(x)  # revealed: Literal["raise", "else"]
+        reveal_type(x)  # revealed: Literal["raise"]
     else:
         reveal_type(x)  # revealed: Literal["else"]
-    finally:
-        reveal_type(x)  # revealed: Literal["raise", "else"]
     reveal_type(x)  # revealed: Literal["raise", "else"]
+```
 
-def raise_in_else_branch(cond: bool):
-    x = "before"
-    try:
-        if cond is True:
-            x = "else"
-            reveal_type(x)  # revealed: Literal["else"]
-        else:
-            x = "raise"
-            reveal_type(x)  # revealed: Literal["raise"]
-            raise ValueError
-        reveal_type(x)  # revealed: Literal["else"]
-    except ValueError:
-        reveal_type(x)  # revealed: Literal["else", "raise"]
-    except:
-        reveal_type(x)  # revealed: Literal["else", "raise"]
-    else:
-        reveal_type(x)  # revealed: Literal["else"]
-    finally:
-        reveal_type(x)  # revealed: Literal["else", "raise"]
-    reveal_type(x)  # revealed: Literal["else", "raise"]
+If both branches raise, the handler sees either value and the `else` clause cannot run:
 
+```py
 def raise_in_both_branches(cond: bool):
     x = "before"
     try:
         if cond is True:
             x = "raise1"
-            reveal_type(x)  # revealed: Literal["raise1"]
             raise ValueError
         else:
             x = "raise2"
-            reveal_type(x)  # revealed: Literal["raise2"]
             raise ValueError
     except ValueError:
         reveal_type(x)  # revealed: Literal["raise1", "raise2"]
-    except:
-        reveal_type(x)  # revealed: Literal["raise1", "raise2"]
     else:
-        # This branch is unreachable, since all control flows in the `try` clause raise exceptions.
-        # As a result, this binding should never be reachable, since new bindings are visible only
-        # when they are reachable.
         x = "unreachable"
-    finally:
-        reveal_type(x)  # revealed: Literal["raise1", "raise2"]
     reveal_type(x)  # revealed: Literal["raise1", "raise2"]
+```
 
-def raise_in_nested_then_branch(cond1: bool, cond2: bool):
+Nested conditions do not make values from non-raising branches visible to the exception handler:
+
+```py
+def raise_in_nested_branch(cond1: bool, cond2: bool):
     x = "before"
     try:
         if cond1 is True:
             x = "else1"
-            reveal_type(x)  # revealed: Literal["else1"]
+        elif cond2 is True:
+            x = "raise"
+            raise ValueError
         else:
-            if cond2 is True:
-                x = "raise"
-                reveal_type(x)  # revealed: Literal["raise"]
-                raise ValueError
-            else:
-                x = "else2"
-                reveal_type(x)  # revealed: Literal["else2"]
-            reveal_type(x)  # revealed: Literal["else2"]
-        reveal_type(x)  # revealed: Literal["else1", "else2"]
+            x = "else2"
     except ValueError:
-        reveal_type(x)  # revealed: Literal["else1", "raise", "else2"]
-    except:
-        reveal_type(x)  # revealed: Literal["else1", "raise", "else2"]
+        reveal_type(x)  # revealed: Literal["raise"]
     else:
         reveal_type(x)  # revealed: Literal["else1", "else2"]
-    finally:
-        reveal_type(x)  # revealed: Literal["else1", "raise", "else2"]
     reveal_type(x)  # revealed: Literal["else1", "raise", "else2"]
+```
 
-def raise_in_nested_else_branch(cond1: bool, cond2: bool):
-    x = "before"
-    try:
-        if cond1 is True:
-            x = "else1"
-            reveal_type(x)  # revealed: Literal["else1"]
-        else:
-            if cond2 is True:
-                x = "else2"
-                reveal_type(x)  # revealed: Literal["else2"]
-            else:
-                x = "raise"
-                reveal_type(x)  # revealed: Literal["raise"]
-                raise ValueError
-            reveal_type(x)  # revealed: Literal["else2"]
-        reveal_type(x)  # revealed: Literal["else1", "else2"]
-    except ValueError:
-        reveal_type(x)  # revealed: Literal["else1", "else2", "raise"]
-    except:
-        reveal_type(x)  # revealed: Literal["else1", "else2", "raise"]
-    else:
-        reveal_type(x)  # revealed: Literal["else1", "else2"]
-    finally:
-        reveal_type(x)  # revealed: Literal["else1", "else2", "raise"]
-    reveal_type(x)  # revealed: Literal["else1", "else2", "raise"]
+Multiple raising branches inside a nested condition remain visible to the handler:
 
+```py
 def raise_in_both_nested_branches(cond1: bool, cond2: bool):
     x = "before"
     try:
         if cond1 is True:
             x = "else"
-            reveal_type(x)  # revealed: Literal["else"]
+        elif cond2 is True:
+            x = "raise1"
+            raise ValueError
         else:
-            if cond2 is True:
-                x = "raise1"
-                reveal_type(x)  # revealed: Literal["raise1"]
-                raise ValueError
-            else:
-                x = "raise2"
-                reveal_type(x)  # revealed: Literal["raise2"]
-                raise ValueError
-        reveal_type(x)  # revealed: Literal["else"]
+            x = "raise2"
+            raise ValueError
     except ValueError:
-        reveal_type(x)  # revealed: Literal["else", "raise1", "raise2"]
-    except:
-        reveal_type(x)  # revealed: Literal["else", "raise1", "raise2"]
+        reveal_type(x)  # revealed: Literal["raise1", "raise2"]
     else:
         reveal_type(x)  # revealed: Literal["else"]
-    finally:
-        reveal_type(x)  # revealed: Literal["else", "raise1", "raise2"]
     reveal_type(x)  # revealed: Literal["else", "raise1", "raise2"]
 ```
 
