@@ -2719,9 +2719,25 @@ class InvalidGetAttr:
     def __getattr__(self) -> str:
         return "fallback"
 
+InvalidGetAttr().missing  # snapshot: invalid-attribute-access
+
 # error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidGetAttr`"
 reveal_type(InvalidGetAttr().missing)  # revealed: str
 reveal_type(InvalidGetAttr().defined)  # revealed: bool
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `InvalidGetAttr`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | InvalidGetAttr().missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttr.__getattr__`: expected 1, got 2
+info: This access implicitly calls `__getattr__`
+info: Method signature here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __getattr__(self) -> str:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 An incompatible type for the attribute name is also an invalid fallback call.
