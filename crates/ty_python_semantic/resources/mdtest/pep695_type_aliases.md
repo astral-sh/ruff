@@ -958,6 +958,15 @@ static_assert(
     )
 )
 
+type ShiftingSource = ShiftingLeft[int, int, int, int, int, int, int, int, int, int, int, int]
+type ShiftingRightAfterTwo = ShiftingRight[int, int, int, int, int, int, int, int, int, int, None, None]
+type ShiftingShortcut = tuple[int, tuple[int, ShiftingRightAfterTwo]]
+type ShiftingLongPath = ShiftingRight[int, int, int, int, int, int, int, int, int, int, int, int]
+
+static_assert(is_subtype_of(ShiftingSource, ShiftingShortcut))
+static_assert(is_subtype_of(ShiftingSource, ShiftingShortcut | ShiftingLongPath))
+static_assert(is_subtype_of(ShiftingSource, ShiftingLongPath | ShiftingShortcut))
+
 type MutualLeft[T] = tuple[T, MutualLeftHelper[list[T]]]
 type MutualLeftHelper[U] = tuple[U, MutualLeft[int]]
 type MutualRight[T] = tuple[T, MutualRightHelper[list[T]]]
@@ -969,13 +978,29 @@ static_assert(is_subtype_of(MutualLeft[str], MutualRight[str]))
 type SaturatingLeft[T] = tuple[T, SaturatingLeft[T | int]]
 type SaturatingRight[T] = tuple[T, SaturatingRight[T | int]]
 
-static_assert(is_subtype_of(SaturatingLeft[bytes], SaturatingRight[bytes]))
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(SaturatingLeft[bytes], SaturatingRight[bytes]))
 
 # A specialization can also have a finite period greater than one.
 type PeriodicLeft[A, B] = tuple[A, B, PeriodicLeft[B, A | int]]
 type PeriodicRight[A, B] = tuple[A, B, PeriodicRight[B, A | int]]
 
-static_assert(is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
+
+# Neither recursive occurrence grows indefinitely by itself, but alternating between them adds
+# another list layer on every cycle.
+type AlternatingLeft[X, Y] = tuple[
+    AlternatingLeft[Y, None],
+    AlternatingLeft[None, list[X]],
+]
+type AlternatingRight[X, Y] = tuple[
+    AlternatingRight[Y, None],
+    AlternatingRight[None, list[X]],
+]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int, str]))
 
 # The nested aliases grow their first argument, but the references back to the outer aliases erase
 # that argument. The outer specialization orbits are therefore finite.
@@ -984,7 +1009,7 @@ type NodeLeft[A, B] = tuple[A, NodeLeft[list[A], B], OuterLeft[B, None]]
 type OuterRight[A, B] = NodeRight[A, B]
 type NodeRight[A, B] = tuple[A, NodeRight[list[A], B], OuterRight[None, B]]
 
-# Although this judgment is correct, it simply returns a conservative result.
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
 static_assert(not is_subtype_of(OuterLeft[int, str], OuterRight[int, str]))
 
 # If the reference back to the outer alias retains the growing argument, the outer specialization

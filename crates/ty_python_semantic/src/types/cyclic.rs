@@ -32,10 +32,10 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, GenericAlias, ProtocolInstanceType, Type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, StaticClassLiteral, Type,
     TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
@@ -93,15 +93,13 @@ impl<'db> Type<'db> {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
             // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) if alias.recursive_specializations_may_diverge(db) => {
+            Type::TypeAlias(alias) if alias.may_have_unbounded_specialization(db) => {
                 Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
             }
-            Type::ProtocolInstance(protocol)
-                if protocol.recursive_specializations_may_diverge(db) =>
-            {
+            Type::ProtocolInstance(protocol) if protocol.may_have_unbounded_specialization(db) => {
                 Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
             }
-            Type::TypedDict(typed_dict) if typed_dict.recursive_specializations_may_diverge(db) => {
+            Type::TypedDict(typed_dict) if typed_dict.may_have_unbounded_specialization(db) => {
                 let definition = typed_dict.definition(db)?;
                 Some(TypeIdentity::RecursiveTypedDict(definition))
             }
@@ -110,458 +108,131 @@ impl<'db> Type<'db> {
     }
 }
 
-struct DefinitionRecursionVisitor<'db> {
-    env: ProgramEnvironment<'db>,
-    target: Definition<'db>,
-    active_definitions: RefCell<Vec<ActiveDefinition<'db>>>,
-    may_diverge: Cell<bool>,
+/// A definition whose formal parameters can flow through recursive type references.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum RecursiveDefinition<'db> {
+    TypeAlias(TypeAliasType<'db>),
+    Protocol(StaticClassLiteral<'db>),
+    TypedDict(StaticClassLiteral<'db>),
+}
+
+/// The position of a formal parameter in a recursive definition.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct ParameterSlot<'db> {
+    definition: Definition<'db>,
+    index: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum FlowKind {
+    /// The actual argument is exactly the source parameter.
+    Direct,
+    /// The source parameter occurs inside another type structure.
+    Nested,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct FlowEdge<'db> {
+    from: ParameterSlot<'db>,
+    to: ParameterSlot<'db>,
+    kind: FlowKind,
 }
 
 #[derive(Clone, Copy)]
-struct DefinitionType<'db> {
-    definition: Definition<'db>,
-    identity_type: Type<'db>,
+struct DefinitionUse<'db> {
+    target: RecursiveDefinition<'db>,
     specialization: Option<Specialization<'db>>,
 }
 
-struct ActiveDefinition<'db> {
-    definition: Definition<'db>,
-    specialization: Option<Specialization<'db>>,
-    incoming_specialization: Option<Specialization<'db>>,
-    unbounded_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
-    // Paths to the target are retained because a growing cycle can be visited before or after the
-    // path that leaves it.
-    target_specializations: Vec<Specialization<'db>>,
+/// Parameter flow between all recursive definitions reachable from one root.
+#[derive(Default)]
+struct SpecializationFlowGraph<'db> {
+    edges: FxHashSet<FlowEdge<'db>>,
+    /// Definition references used to decide whether an unresolved flow can return to the root.
+    definition_edges: Vec<(Definition<'db>, Definition<'db>)>,
+    /// Definitions whose captured outer parameters cannot be mapped to their parent specialization.
+    inconclusive_definitions: FxHashSet<Definition<'db>>,
+    /// Whether a definition body or its formal parameters could not be inspected.
+    inconclusive: bool,
 }
 
-struct ActiveDefinitionGuard<'a, 'db> {
-    active_definitions: &'a RefCell<Vec<ActiveDefinition<'db>>>,
-    depth: usize,
+/// Walks one identity-specialized definition body and records references as graph edges.
+///
+/// Referenced definitions are queued for a separate walk instead of being expanded here.
+struct SpecializationFlowVisitor<'db> {
+    source_parameters: FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
+    env: ProgramEnvironment<'db>,
+    visited_types: TypeCollector<'db>,
+    edges: RefCell<Vec<FlowEdge<'db>>>,
+    referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
+    inconclusive: Cell<bool>,
 }
 
-impl Drop for ActiveDefinitionGuard<'_, '_> {
-    fn drop(&mut self) {
-        self.active_definitions.borrow_mut().truncate(self.depth);
-    }
-}
-
-struct DefinitionBodyVisitor<'a, 'db> {
-    recursion: &'a DefinitionRecursionVisitor<'db>,
-    specialization: Option<Specialization<'db>>,
+/// Finds which parameters of the current source definition occur in one actual argument.
+struct SourceParameterCollector<'a, 'db> {
+    source_parameters: &'a FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
+    env: &'a ProgramEnvironment<'db>,
+    found: RefCell<FxHashSet<ParameterSlot<'db>>>,
     visited_types: TypeCollector<'db>,
 }
 
-impl<'db> DefinitionRecursionVisitor<'db> {
-    /// Returns whether recursive specializations of `ty` can fail to reach an exact repetition.
-    fn specializations_may_diverge(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        target: Definition<'db>,
-    ) -> bool {
-        let visitor = Self::new(target);
-        let Some(root) = DefinitionType::from_type(db, &visitor.env, ty) else {
-            return false;
-        };
-        debug_assert_eq!(root.definition, target);
-        visitor.visit_definition(db, root, None, root.specialization);
-        visitor.may_diverge.get()
-    }
-
-    fn new(target: Definition<'db>) -> Self {
-        Self {
-            env: ProgramEnvironment::from_definition(target),
-            target,
-            active_definitions: RefCell::default(),
-            may_diverge: Cell::new(false),
-        }
-    }
-
-    fn visit_reference(&self, db: &'db dyn Db, reference: DefinitionType<'db>) {
-        if reference.definition == self.target {
-            self.record_target_specializations(db, reference.specialization);
-        }
-
-        let current_specialization = self
-            .active_definitions
-            .borrow()
-            .last()
-            .and_then(|active| active.specialization);
-        let specialization = match (reference.specialization, current_specialization) {
-            (Some(reference), Some(current)) => Some(reference.apply_specialization(db, current)),
-            (reference, _) => reference,
-        };
-        self.visit_definition(db, reference, reference.specialization, specialization);
-    }
-
-    fn visit_definition(
-        &self,
-        db: &'db dyn Db,
-        definition_type: DefinitionType<'db>,
-        incoming_specialization: Option<Specialization<'db>>,
-        specialization: Option<Specialization<'db>>,
-    ) {
-        if self.may_diverge.get() {
-            return;
-        }
-
-        let matching_active = {
-            let active_definitions = self.active_definitions.borrow();
-            if active_definitions.iter().any(|active| {
-                active.definition == definition_type.definition
-                    && active.specialization == specialization
-            }) {
-                return;
+impl<'db> RecursiveDefinition<'db> {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<DefinitionUse<'db>> {
+        let (target, specialization) = match ty {
+            Type::TypeAlias(alias) => (
+                Self::TypeAlias(alias.unspecialized(db)),
+                alias.specialization(db),
+            ),
+            Type::ProtocolInstance(protocol) => {
+                let (origin, specialization) =
+                    protocol.class_origin(db)?.static_class_literal(db)?;
+                (Self::Protocol(origin), specialization)
             }
-            active_definitions
-                .iter()
-                .rposition(|active| active.definition == definition_type.definition)
-        };
-
-        if let Some(active_index) = matching_active {
-            let unbounded_parameters =
-                self.cycle_unbounded_parameters(db, active_index, incoming_specialization);
-            if definition_type.definition == self.target {
-                self.may_diverge.set(!unbounded_parameters.is_empty());
-                return;
+            Type::TypedDict(typed_dict) => {
+                let (origin, specialization) =
+                    typed_dict.defining_class()?.static_class_literal(db)?;
+                (Self::TypedDict(origin), specialization)
             }
-            if !unbounded_parameters.is_empty() {
-                let target_specializations = self.active_definitions.borrow()[active_index]
-                    .target_specializations
-                    .clone();
-                if target_specializations
-                    .iter()
-                    .copied()
-                    .any(|specialization| {
-                        specialization.references_any_parameter(
-                            db,
-                            &self.env,
-                            &unbounded_parameters,
-                        )
-                    })
-                {
-                    self.may_diverge.set(true);
-                }
-                self.active_definitions.borrow_mut()[active_index]
-                    .unbounded_parameters
-                    .extend(unbounded_parameters);
-                return;
-            }
-        }
-
-        let depth = self.active_definitions.borrow().len();
-        self.active_definitions.borrow_mut().push(ActiveDefinition {
-            definition: definition_type.definition,
-            specialization,
-            incoming_specialization,
-            unbounded_parameters: FxHashSet::default(),
-            target_specializations: Vec::new(),
-        });
-        let guard = ActiveDefinitionGuard {
-            active_definitions: &self.active_definitions,
-            depth,
-        };
-        let visitor = DefinitionBodyVisitor {
-            recursion: self,
-            specialization,
-            visited_types: TypeCollector::default(),
-        };
-        visitor.visit_definition_body(db, definition_type.identity_type);
-        drop(guard);
-    }
-
-    fn record_target_specializations(
-        &self,
-        db: &'db dyn Db,
-        incoming_specialization: Option<Specialization<'db>>,
-    ) {
-        let active_len = self.active_definitions.borrow().len();
-        let target_specializations: Vec<_> = (0..active_len)
-            .map(|active_index| {
-                self.compose_specializations_from(db, active_index, incoming_specialization)
-            })
-            .collect();
-        let unbounded_parameters: Vec<_> = self
-            .active_definitions
-            .borrow()
-            .iter()
-            .map(|active| active.unbounded_parameters.clone())
-            .collect();
-
-        if target_specializations
-            .iter()
-            .copied()
-            .zip(&unbounded_parameters)
-            .any(|(specialization, parameters)| {
-                specialization.is_some_and(|specialization| {
-                    specialization.references_any_parameter(db, &self.env, parameters)
-                })
-            })
-        {
-            self.may_diverge.set(true);
-        }
-
-        for (active, specialization) in self
-            .active_definitions
-            .borrow_mut()
-            .iter_mut()
-            .zip(target_specializations)
-        {
-            active.target_specializations.extend(specialization);
-        }
-    }
-
-    /// Returns the parameters whose values can grow without bound by repeatedly traversing the
-    /// cycle that returns to `active_index`.
-    fn cycle_unbounded_parameters(
-        &self,
-        db: &'db dyn Db,
-        active_index: usize,
-        incoming_specialization: Option<Specialization<'db>>,
-    ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-        self.compose_specializations_from(db, active_index, incoming_specialization)
-            .map_or_else(FxHashSet::default, |specialization| {
-                specialization.unbounded_parameters(db, &self.env)
-            })
-    }
-
-    fn compose_specializations_from(
-        &self,
-        db: &'db dyn Db,
-        active_index: usize,
-        incoming_specialization: Option<Specialization<'db>>,
-    ) -> Option<Specialization<'db>> {
-        let incoming_specializations: Vec<_> = self.active_definitions.borrow()[active_index + 1..]
-            .iter()
-            .map(|active| active.incoming_specialization)
-            .chain([incoming_specialization])
-            .collect();
-
-        let mut cycle_specialization = None;
-        for incoming in incoming_specializations {
-            cycle_specialization = match (cycle_specialization, incoming) {
-                (Some(current), Some(incoming)) => Some(incoming.apply_specialization(db, current)),
-                (_, incoming) => incoming,
-            };
-        }
-        cycle_specialization
-    }
-}
-
-impl<'db> DefinitionType<'db> {
-    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
-        if let Type::TypeAlias(alias) = ty {
-            let specialization = alias.generic_context(db).map(|generic_context| {
-                alias
-                    .specialization(db)
-                    .unwrap_or_else(|| generic_context.default_specialization(db, None))
-            });
-            let identity_alias = alias
-                .unspecialized(db)
-                .apply_specialization(db, |context| context.identity_specialization(db));
-            return Some(Self {
-                definition: alias.definition(db),
-                identity_type: Type::TypeAlias(identity_alias),
-                specialization,
-            });
-        }
-
-        let (class, is_typed_dict) = match ty {
-            Type::ProtocolInstance(protocol) => (*protocol.class_origin(db)?, false),
-            Type::TypedDict(typed_dict) => (typed_dict.defining_class()?, true),
             _ => return None,
         };
-        let (origin, specialization) = class.static_class_literal(db)?;
-        let specialization = origin.generic_context(db).map(|generic_context| {
-            specialization.unwrap_or_else(|| generic_context.default_specialization(db, None))
-        });
-        let identity_class = origin.identity_specialization(db);
-        Some(Self {
-            definition: origin.definition(db),
-            identity_type: if is_typed_dict {
-                Type::typed_dict(identity_class)
-            } else {
-                Type::instance(db, env, identity_class)
-            },
+
+        let specialization = match target.generic_context(db) {
+            Some(generic_context) => Some(
+                specialization
+                    .unwrap_or_else(|| target.default_specialization(db, generic_context)),
+            ),
+            None => specialization,
+        };
+        Some(DefinitionUse {
+            target,
             specialization,
         })
     }
-}
 
-impl<'db> DefinitionBodyVisitor<'_, 'db> {
-    fn visit_definition_body(&self, db: &'db dyn Db, ty: Type<'db>) {
-        match ty {
-            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
-            Type::ProtocolInstance(protocol) => {
-                self.visit_protocol_instance_type(db, protocol);
-            }
-            Type::TypedDict(typed_dict) => self.visit_typed_dict_type(db, typed_dict),
-            _ => {}
-        }
-    }
-}
-
-impl<'db> TypeVisitor<'db> for DefinitionBodyVisitor<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        &self.recursion.env
-    }
-
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if self.recursion.may_diverge.get() {
-            return;
-        }
-
-        if let Type::TypeVar(typevar) = ty {
-            if let Some(mapped) = self
-                .specialization
-                .and_then(|specialization| specialization.get(db, typevar))
-                && mapped != ty
-            {
-                self.visit_type(db, mapped);
-            }
-            return;
-        }
-
-        if let Some(reference) = DefinitionType::from_type(db, &self.recursion.env, ty) {
-            self.recursion.visit_reference(db, reference);
-        } else {
-            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        match self {
+            Self::TypeAlias(alias) => alias.definition(db),
+            Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
         }
     }
 
-    fn visit_bound_type_var_type(
-        &self,
-        _db: &'db dyn Db,
-        _bound_typevar: BoundTypeVarInstance<'db>,
-    ) {
-    }
-
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some(class) = protocol.class_origin(db) {
-            class.walk_recursive_member_types(db, self);
+    fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        match self {
+            Self::TypeAlias(alias) => alias.generic_context(db),
+            Self::Protocol(origin) | Self::TypedDict(origin) => origin.generic_context(db),
         }
     }
 
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        self.visit_type(db, alias.raw_value_type(db));
-    }
-
-    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
-        for field in typed_dict.items(db).values() {
-            self.visit_type(db, field.declared_ty);
-        }
-        if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
-            self.visit_type(db, extra_items.declared_ty);
-        }
-    }
-}
-
-struct SpecializationParameterVisitor<'a, 'db> {
-    env: &'a ProgramEnvironment<'db>,
-    parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
-    visited_types: TypeCollector<'db>,
-    in_growing_type: Cell<bool>,
-    dependencies: RefCell<FxHashMap<BoundTypeVarIdentity<'db>, bool>>,
-}
-
-impl<'db> Specialization<'db> {
-    /// Returns the parameters whose values can grow without bound as this specialization is
-    /// repeatedly applied to itself.
-    fn unbounded_parameters(
+    fn default_specialization(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-        let generic_context = self.generic_context(db);
-        let parameters: Vec<_> = generic_context
-            .variables(db)
-            .map(|parameter| SpecializationParameterVisitor::parameter_identity(db, parameter))
-            .collect();
-        let parameter_set: FxHashSet<_> = parameters.iter().copied().collect();
-        let mut dependencies = vec![vec![false; parameters.len()]; parameters.len()];
-        let mut growing_edges = Vec::new();
-
-        for (output_index, ty) in self.types(db).iter().copied().enumerate() {
-            let parameter_dependencies =
-                SpecializationParameterVisitor::collect(db, env, &parameter_set, ty);
-            for (input_index, parameter) in parameters.iter().enumerate() {
-                let Some(&is_growing) = parameter_dependencies.get(parameter) else {
-                    continue;
-                };
-                dependencies[output_index][input_index] = true;
-                if is_growing {
-                    growing_edges.push((output_index, input_index));
-                }
-            }
-        }
-
-        for intermediate in 0..parameters.len() {
-            let intermediate_dependencies = dependencies[intermediate].clone();
-            for output_dependencies in &mut dependencies {
-                if output_dependencies[intermediate] {
-                    for (input, is_reachable) in
-                        intermediate_dependencies.iter().copied().enumerate()
-                    {
-                        output_dependencies[input] |= is_reachable;
-                    }
-                }
-            }
-        }
-
-        // A structural wrapper accumulates only when its dependency edge belongs to a cycle. Any
-        // parameter that depends on such a cycle can then grow along with it.
-        let growing_cycles: Vec<_> = growing_edges
-            .into_iter()
-            .filter_map(|(output, input)| {
-                (output == input || dependencies[input][output]).then_some(output)
-            })
-            .collect();
-
-        parameters
-            .iter()
-            .copied()
-            .enumerate()
-            .filter_map(|(output, parameter)| {
-                growing_cycles
-                    .iter()
-                    .any(|&cycle| output == cycle || dependencies[output][cycle])
-                    .then_some(parameter)
-            })
-            .collect()
-    }
-
-    fn references_any_parameter(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        parameters: &FxHashSet<BoundTypeVarIdentity<'db>>,
-    ) -> bool {
-        self.types(db)
-            .iter()
-            .copied()
-            .any(|ty| !SpecializationParameterVisitor::collect(db, env, parameters, ty).is_empty())
-    }
-}
-
-impl<'a, 'db> SpecializationParameterVisitor<'a, 'db> {
-    fn collect(
-        db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
-        parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
-        ty: Type<'db>,
-    ) -> FxHashMap<BoundTypeVarIdentity<'db>, bool> {
-        let visitor = Self {
-            env,
-            parameters,
-            visited_types: TypeCollector::default(),
-            in_growing_type: Cell::new(false),
-            dependencies: RefCell::default(),
+        generic_context: GenericContext<'db>,
+    ) -> Specialization<'db> {
+        let known_class = match self {
+            Self::TypeAlias(_) => None,
+            Self::Protocol(origin) | Self::TypedDict(origin) => origin.known(db),
         };
-        visitor.visit_type(db, ty);
-        visitor.dependencies.into_inner()
+        generic_context.default_specialization(db, known_class)
     }
 
     fn parameter_identity(
@@ -575,9 +246,312 @@ impl<'a, 'db> SpecializationParameterVisitor<'a, 'db> {
             identity
         }
     }
+
+    fn parameter_slots(self, db: &'db dyn Db) -> Vec<ParameterSlot<'db>> {
+        let definition = self.definition(db);
+        self.generic_context(db)
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .enumerate()
+            .map(|(index, _)| ParameterSlot { definition, index })
+            .collect()
+    }
+
+    fn source_parameters(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>> {
+        let definition = self.definition(db);
+        let mut parameters = FxHashMap::default();
+        for (index, parameter) in self
+            .generic_context(db)
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .enumerate()
+        {
+            let identity = Self::parameter_identity(db, parameter);
+            if parameters
+                .insert(identity, ParameterSlot { definition, index })
+                .is_some()
+            {
+                return None;
+            }
+        }
+        Some(parameters)
+    }
+
+    /// Walks the definition with each formal parameter mapped to itself.
+    fn walk_identity_body(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) -> bool {
+        match self {
+            Self::TypeAlias(alias) => {
+                let value = alias.raw_value_type(db);
+                visitor.visit_type(db, value);
+            }
+            Self::Protocol(origin) => {
+                let Some(protocol) = origin.identity_specialization(db).into_protocol_class(db)
+                else {
+                    return false;
+                };
+                protocol.walk_recursive_member_types(db, visitor);
+            }
+            Self::TypedDict(origin) => {
+                let typed_dict = TypedDictType::new(origin.identity_specialization(db));
+                for field in typed_dict.items(db).values() {
+                    visitor.visit_type(db, field.declared_ty);
+                }
+                if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+                    visitor.visit_type(db, extra_items.declared_ty);
+                }
+            }
+        }
+        true
+    }
+
+    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        may_have_unbounded_specialization_query(db, self.definition(db), self)
+    }
 }
 
-impl<'db> TypeVisitor<'db> for SpecializationParameterVisitor<'_, 'db> {
+impl<'db> DefinitionUse<'db> {
+    fn walk_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
+        if let Some(specialization) = self.specialization {
+            for argument in specialization.types(db) {
+                visitor.visit_type(db, *argument);
+            }
+        }
+    }
+}
+
+impl<'db> SpecializationFlowGraph<'db> {
+    fn build(db: &'db dyn Db, root: RecursiveDefinition<'db>) -> Self {
+        let mut graph = Self::default();
+        let mut pending = vec![root];
+        let mut visited = FxHashSet::default();
+
+        while let Some(source) = pending.pop() {
+            let source_definition = source.definition(db);
+            if !visited.insert(source_definition) {
+                continue;
+            }
+            let Some(visitor) = SpecializationFlowVisitor::new(db, source) else {
+                graph.inconclusive = true;
+                continue;
+            };
+            if !source.walk_identity_body(db, &visitor) {
+                graph.inconclusive = true;
+            }
+            let (edges, referenced_definitions, inconclusive) = visitor.finish();
+            graph.edges.extend(edges);
+            if inconclusive {
+                graph.inconclusive_definitions.insert(source_definition);
+            }
+            graph.definition_edges.extend(
+                referenced_definitions
+                    .iter()
+                    .map(|target| (source_definition, target.definition(db))),
+            );
+            pending.extend(referenced_definitions);
+        }
+        graph
+    }
+
+    fn root_may_have_unbounded_specialization(
+        &self,
+        db: &'db dyn Db,
+        root: RecursiveDefinition<'db>,
+    ) -> bool {
+        if self.inconclusive {
+            return true;
+        }
+
+        let root_definition = root.definition(db);
+        if self
+            .inconclusive_definitions
+            .iter()
+            .any(|&source| self.definition_reaches(source, root_definition))
+        {
+            return true;
+        }
+
+        root.parameter_slots(db).into_iter().any(|root_slot| {
+            self.edges.iter().any(|edge| {
+                edge.kind == FlowKind::Nested
+                    && self.reachable(root_slot, edge.from)
+                    && self.reachable(edge.to, root_slot)
+            })
+        })
+    }
+
+    fn reachable(&self, from: ParameterSlot<'db>, to: ParameterSlot<'db>) -> bool {
+        if from == to {
+            return true;
+        }
+        let mut pending = vec![from];
+        let mut visited = FxHashSet::default();
+        while let Some(current) = pending.pop() {
+            if !visited.insert(current) {
+                continue;
+            }
+            for edge in self.edges.iter().filter(|edge| edge.from == current) {
+                if edge.to == to {
+                    return true;
+                }
+                pending.push(edge.to);
+            }
+        }
+        false
+    }
+
+    fn definition_reaches(&self, from: Definition<'db>, to: Definition<'db>) -> bool {
+        let mut pending = vec![from];
+        let mut visited = FxHashSet::default();
+        while let Some(current) = pending.pop() {
+            if !visited.insert(current) {
+                continue;
+            }
+            for &(source, target) in &self.definition_edges {
+                if source != current {
+                    continue;
+                }
+                if target == to {
+                    return true;
+                }
+                pending.push(target);
+            }
+        }
+        false
+    }
+}
+
+impl<'db> SpecializationFlowVisitor<'db> {
+    fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
+        Some(Self {
+            source_parameters: source.source_parameters(db)?,
+            env: ProgramEnvironment::from_definition(source.definition(db)),
+            visited_types: TypeCollector::default(),
+            edges: RefCell::default(),
+            referenced_definitions: RefCell::default(),
+            inconclusive: Cell::default(),
+        })
+    }
+
+    fn finish(self) -> (Vec<FlowEdge<'db>>, Vec<RecursiveDefinition<'db>>, bool) {
+        (
+            self.edges.into_inner(),
+            self.referenced_definitions.into_inner(),
+            self.inconclusive.get(),
+        )
+    }
+
+    fn record_reference(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
+        self.referenced_definitions
+            .borrow_mut()
+            .push(reference.target);
+
+        let Some(target_context) = reference.target.generic_context(db) else {
+            if reference.specialization.is_some() {
+                self.inconclusive.set(true);
+            }
+            return;
+        };
+        let Some(specialization) = reference.specialization else {
+            self.inconclusive.set(true);
+            return;
+        };
+        if specialization.generic_context(db) != target_context {
+            self.inconclusive.set(true);
+            return;
+        }
+
+        let target_slots = reference.target.parameter_slots(db);
+        let arguments = specialization.types(db);
+        if target_slots.len() != arguments.len() {
+            self.inconclusive.set(true);
+            return;
+        }
+
+        for (target, argument) in target_slots.into_iter().zip(arguments.iter().copied()) {
+            for (from, kind) in
+                SourceParameterCollector::classify(db, &self.env, &self.source_parameters, argument)
+            {
+                self.edges.borrow_mut().push(FlowEdge {
+                    from,
+                    to: target,
+                    kind,
+                });
+            }
+        }
+    }
+}
+
+impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        &self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if let Type::TypeVar(typevar) = ty {
+            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            if !self.source_parameters.contains_key(&identity) {
+                // Nested definitions can capture a type variable from an outer generic scope.
+                // Specialization does not yet retain the parent mapping needed to model it.
+                self.inconclusive.set(true);
+            }
+            return;
+        }
+
+        if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
+            self.record_reference(db, reference);
+            reference.walk_arguments(db, self);
+            return;
+        }
+
+        walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+    }
+
+    fn visit_bound_type_var_type(
+        &self,
+        _db: &'db dyn Db,
+        _bound_typevar: BoundTypeVarInstance<'db>,
+    ) {
+    }
+}
+
+impl<'a, 'db> SourceParameterCollector<'a, 'db> {
+    fn classify(
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        source_parameters: &'a FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
+        argument: Type<'db>,
+    ) -> Vec<(ParameterSlot<'db>, FlowKind)> {
+        if let Type::TypeVar(typevar) = argument {
+            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            if let Some(&parameter) = source_parameters.get(&identity) {
+                return vec![(parameter, FlowKind::Direct)];
+            }
+        }
+
+        let collector = Self {
+            source_parameters,
+            env,
+            found: RefCell::default(),
+            visited_types: TypeCollector::default(),
+        };
+        collector.visit_type(db, argument);
+        collector
+            .found
+            .into_inner()
+            .into_iter()
+            .map(|parameter| (parameter, FlowKind::Nested))
+            .collect()
+    }
+}
+
+impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
     fn program_environment(&self) -> &ProgramEnvironment<'db> {
         self.env
     }
@@ -588,36 +562,18 @@ impl<'db> TypeVisitor<'db> for SpecializationParameterVisitor<'_, 'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let parameter = Self::parameter_identity(db, typevar);
-            if self.parameters.contains(&parameter) {
-                self.dependencies
-                    .borrow_mut()
-                    .entry(parameter)
-                    .and_modify(|is_growing| {
-                        *is_growing |= self.in_growing_type.get();
-                    })
-                    .or_insert_with(|| self.in_growing_type.get());
+            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            if let Some(&parameter) = self.source_parameters.get(&identity) {
+                self.found.borrow_mut().insert(parameter);
             }
             return;
         }
 
-        // Unions and intersections are normalized set operations, so nesting a parameter inside
-        // either does not by itself add another structural layer on every substitution.
-        match ty {
-            Type::Union(union) => {
-                self.visit_union_type(db, union);
-                return;
-            }
-            Type::Intersection(intersection) => {
-                self.visit_intersection_type(db, intersection);
-                return;
-            }
-            _ => {}
+        if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
+            reference.walk_arguments(db, self);
+            return;
         }
-
-        let was_in_growing_type = self.in_growing_type.replace(true);
         walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
-        self.in_growing_type.set(was_in_growing_type);
     }
 
     fn visit_bound_type_var_type(
@@ -626,43 +582,27 @@ impl<'db> TypeVisitor<'db> for SpecializationParameterVisitor<'_, 'db> {
         _bound_typevar: BoundTypeVarInstance<'db>,
     ) {
     }
+}
 
-    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-        for ty in alias.specialization(db).types(db) {
-            self.visit_type(db, *ty);
-        }
-    }
-
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some((_, Some(specialization))) = protocol
-            .class_origin(db)
-            .and_then(|class| class.static_class_literal(db))
-        {
-            for ty in specialization.types(db) {
-                self.visit_type(db, *ty);
-            }
-        }
-    }
-
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        if let Some(specialization) = alias.specialization(db) {
-            for ty in specialization.types(db) {
-                self.visit_type(db, *ty);
-            }
-        }
-    }
+// Salsa requires the first query argument to be a Salsa struct. `root` is always constructed from
+// the same definition by `RecursiveDefinition::may_have_unbounded_specialization`.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, _| true,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn may_have_unbounded_specialization_query<'db>(
+    db: &'db dyn Db,
+    _definition: Definition<'db>,
+    root: RecursiveDefinition<'db>,
+) -> bool {
+    let graph = SpecializationFlowGraph::build(db, root);
+    graph.root_may_have_unbounded_specialization(db, root)
 }
 
 impl<'db> TypeAliasType<'db> {
-    fn recursive_specializations_may_diverge(self, db: &'db dyn Db) -> bool {
-        let identity = self
-            .unspecialized(db)
-            .apply_specialization(db, |context| context.identity_specialization(db));
-        DefinitionRecursionVisitor::specializations_may_diverge(
-            db,
-            Type::TypeAlias(identity),
-            self.definition(db),
-        )
+    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        RecursiveDefinition::TypeAlias(self.unspecialized(db)).may_have_unbounded_specialization(db)
     }
 }
 
@@ -672,31 +612,26 @@ impl<'db> ProtocolInstanceType<'db> {
         Some(origin.definition(db))
     }
 
-    fn recursive_specializations_may_diverge(self, db: &'db dyn Db) -> bool {
+    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         let Some(class) = self.class_origin(db) else {
             return false;
         };
         let Some((origin, _)) = class.static_class_literal(db) else {
             return false;
         };
-        let definition = origin.definition(db);
-        let env = ProgramEnvironment::from_definition(definition);
-        let identity = Type::instance(db, &env, origin.identity_specialization(db));
-        DefinitionRecursionVisitor::specializations_may_diverge(db, identity, definition)
+        RecursiveDefinition::Protocol(origin).may_have_unbounded_specialization(db)
     }
 }
 
 impl<'db> TypedDictType<'db> {
-    fn recursive_specializations_may_diverge(self, db: &'db dyn Db) -> bool {
+    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         let Some(class) = self.defining_class() else {
             return false;
         };
         let Some((origin, _)) = class.static_class_literal(db) else {
             return false;
         };
-        let definition = origin.definition(db);
-        let identity = Type::typed_dict(origin.identity_specialization(db));
-        DefinitionRecursionVisitor::specializations_may_diverge(db, identity, definition)
+        RecursiveDefinition::TypedDict(origin).may_have_unbounded_specialization(db)
     }
 }
 
@@ -1112,11 +1047,14 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity, TypeIdentity};
+    use super::{
+        CycleDetector, CycleDetectorVisit, Db, FlowEdge, FlowKind, HasIdentity,
+        RecursiveDefinition, SpecializationFlowGraph, TypeIdentity,
+    };
     use crate::ProgramEnvironment;
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::Type;
+    use crate::types::{KnownInstanceType, Type, TypeAliasType};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use std::cell::Cell;
@@ -1198,6 +1136,257 @@ mod tests {
             .expect_type()
             .to_instance_approximation(db, env)
             .unwrap()
+    }
+
+    fn global_type_alias<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> TypeAliasType<'db> {
+        let file = system_path_to_file(db, "/src/a.py").unwrap();
+        let file = ProgramFile::new(db, file, env.program(db));
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+            global_symbol(db, file, name).place.expect_type()
+        else {
+            panic!("expected `{name}` to be a type alias");
+        };
+        alias
+    }
+
+    #[test]
+    fn combines_flows_from_multiple_recursive_references() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+type Alternating[X, Y] = tuple[
+    Alternating[Y, None],
+    Alternating[None, list[X]],
+]
+"#,
+        )
+        .unwrap();
+        let env = db.program_environment();
+
+        assert!(matches!(
+            Type::TypeAlias(global_type_alias(&db, &env, "Alternating")).recursive_identity(&db),
+            Some(TypeIdentity::RecursiveTypeAlias(_))
+        ));
+    }
+
+    #[test]
+    fn classifies_flow_graph_cycles() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+type One[T] = T
+type Two[X, Y] = tuple[X, Y]
+type Helper[U] = U
+"#,
+        )
+        .unwrap();
+        let env = db.program_environment();
+        let one =
+            RecursiveDefinition::TypeAlias(global_type_alias(&db, &env, "One").unspecialized(&db));
+        let two =
+            RecursiveDefinition::TypeAlias(global_type_alias(&db, &env, "Two").unspecialized(&db));
+        let helper = RecursiveDefinition::TypeAlias(
+            global_type_alias(&db, &env, "Helper").unspecialized(&db),
+        );
+        let one_slots = one.parameter_slots(&db);
+        let [one_t] = one_slots.as_slice() else {
+            panic!("expected one parameter");
+        };
+        let one_t = *one_t;
+        let two_slots = two.parameter_slots(&db);
+        let [two_x, two_y] = two_slots.as_slice() else {
+            panic!("expected two parameters");
+        };
+        let (two_x, two_y) = (*two_x, *two_y);
+        let helper_slots = helper.parameter_slots(&db);
+        let [helper_u] = helper_slots.as_slice() else {
+            panic!("expected one helper parameter");
+        };
+        let helper_u = *helper_u;
+
+        for (root, edges, expected) in [
+            (
+                one,
+                vec![FlowEdge {
+                    from: one_t,
+                    to: one_t,
+                    kind: FlowKind::Direct,
+                }],
+                false,
+            ),
+            (
+                one,
+                vec![FlowEdge {
+                    from: one_t,
+                    to: one_t,
+                    kind: FlowKind::Nested,
+                }],
+                true,
+            ),
+            (
+                two,
+                vec![
+                    FlowEdge {
+                        from: two_x,
+                        to: two_y,
+                        kind: FlowKind::Direct,
+                    },
+                    FlowEdge {
+                        from: two_y,
+                        to: two_x,
+                        kind: FlowKind::Direct,
+                    },
+                ],
+                false,
+            ),
+            (
+                two,
+                vec![FlowEdge {
+                    from: two_y,
+                    to: two_x,
+                    kind: FlowKind::Nested,
+                }],
+                false,
+            ),
+            (
+                two,
+                vec![
+                    FlowEdge {
+                        from: two_y,
+                        to: two_x,
+                        kind: FlowKind::Nested,
+                    },
+                    FlowEdge {
+                        from: two_x,
+                        to: two_y,
+                        kind: FlowKind::Direct,
+                    },
+                ],
+                true,
+            ),
+            (
+                one,
+                vec![FlowEdge {
+                    from: one_t,
+                    to: helper_u,
+                    kind: FlowKind::Nested,
+                }],
+                false,
+            ),
+            (
+                one,
+                vec![
+                    FlowEdge {
+                        from: one_t,
+                        to: helper_u,
+                        kind: FlowKind::Nested,
+                    },
+                    FlowEdge {
+                        from: helper_u,
+                        to: one_t,
+                        kind: FlowKind::Direct,
+                    },
+                ],
+                true,
+            ),
+        ] {
+            let graph = SpecializationFlowGraph {
+                edges: edges.into_iter().collect(),
+                ..SpecializationFlowGraph::default()
+            };
+            assert_eq!(
+                graph.root_may_have_unbounded_specialization(&db, root),
+                expected,
+            );
+        }
+    }
+
+    #[test]
+    fn scopes_inconclusive_parameter_flows_to_recursive_paths() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import Protocol
+
+class Outer[T](Protocol):
+    type Inner = T
+    value: Inner
+
+class RecursiveOuter[T](Protocol):
+    type Inner = tuple[T, RecursiveOuter[list[T]]]
+    value: Inner
+"#,
+        )
+        .unwrap();
+        let env = db.program_environment();
+
+        assert!(
+            global_instance_type(&db, &env, "Outer")
+                .recursive_identity(&db)
+                .is_none()
+        );
+        assert!(matches!(
+            global_instance_type(&db, &env, "RecursiveOuter").recursive_identity(&db),
+            Some(TypeIdentity::RecursiveProtocol(_))
+        ));
+    }
+
+    #[test]
+    fn classifies_recursive_parameter_flows() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+type Stable[T] = tuple[T, Stable[T]]
+type Growing[T] = tuple[T, Growing[list[T]]]
+type Swap[X, Y] = tuple[X, Swap[Y, X]]
+type ShiftReset[X, Y] = tuple[X, ShiftReset[list[Y], None]]
+type ShiftCycle[X, Y] = tuple[X, ShiftCycle[list[Y], X]]
+
+type ResetOuter[T] = tuple[T, ResetHelper[list[T]]]
+type ResetHelper[U] = tuple[U, ResetOuter[int]]
+
+type TransitiveOuter[T] = tuple[T, TransitiveHelper[list[T]]]
+type TransitiveHelper[U] = tuple[U, TransitiveOuter[U]]
+
+type PeriodicOuter[X, Y] = tuple[X, PeriodicHelper[X, Y]]
+type PeriodicHelper[X, Y] = tuple[X, PeriodicHelper[Y, X]]
+
+type Saturating[T] = tuple[T, Saturating[T | int]]
+"#,
+        )
+        .unwrap();
+        let env = db.program_environment();
+
+        for (name, expected) in [
+            ("Stable", false),
+            ("Growing", true),
+            ("Swap", false),
+            ("ShiftReset", false),
+            ("ShiftCycle", true),
+            ("ResetOuter", false),
+            ("ResetHelper", false),
+            ("TransitiveOuter", true),
+            ("TransitiveHelper", true),
+            ("PeriodicOuter", false),
+            ("PeriodicHelper", false),
+            // TODO: Repeated union additions can saturate even though their flow is `Nested`.
+            ("Saturating", true),
+        ] {
+            let alias = global_type_alias(&db, &env, name);
+            assert_eq!(
+                alias.may_have_unbounded_specialization(&db),
+                expected,
+                "unexpected result for {name}",
+            );
+        }
     }
 
     #[test]
