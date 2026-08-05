@@ -5,6 +5,28 @@ use crate::use_def::FlowSnapshot;
 
 use super::SemanticIndexBuilder;
 
+/// Active exception handlers and the flow states from which they can be entered.
+#[derive(Debug, Default)]
+pub(super) enum ExceptionHandlers {
+    /// No handlers are active, including after their snapshots have been taken.
+    #[default]
+    None,
+    /// Handlers may catch the exception, but it can also propagate to an enclosing handler.
+    Propagating(Vec<FlowSnapshot>),
+    /// A bare handler catches every exception and stops outward propagation.
+    CatchAll(Vec<FlowSnapshot>),
+}
+
+impl ExceptionHandlers {
+    pub(super) fn propagating() -> Self {
+        Self::Propagating(Vec::new())
+    }
+
+    pub(super) fn catch_all() -> Self {
+        Self::CatchAll(Vec::new())
+    }
+}
+
 /// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
 #[derive(Debug, Default)]
 pub(super) struct TryNodeContextStackManager(Vec<TryNodeContextStack>);
@@ -34,9 +56,9 @@ impl TryNodeContextStackManager {
     ///
     /// Only suites with handlers collect exception checkpoints; a bare handler prevents those
     /// exceptions from propagating to enclosing suites.
-    pub(super) fn push_context(&mut self, has_handlers: bool, has_bare_handler: bool) {
+    pub(super) fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
         self.current_try_context_stack()
-            .push_context(has_handlers, has_bare_handler);
+            .push_context(exception_handlers);
     }
 
     /// Pop a [`TryNodeContext`] off the [`TryNodeContextStack`] at the top of our stack of stacks.
@@ -120,17 +142,19 @@ struct TryNodeContextStack(Vec<TryNodeContext>);
 impl TryNodeContextStack {
     /// Returns whether a `try` suite in this scope is still collecting exception checkpoints.
     fn has_active_exception_handler(&self) -> bool {
-        self.0
-            .iter()
-            .any(|context| context.try_suite_snapshots.is_some())
+        self.0.iter().any(|context| {
+            matches!(
+                context.exception_handlers,
+                ExceptionHandlers::Propagating(_) | ExceptionHandlers::CatchAll(_)
+            )
+        })
     }
 
     /// Push a new [`TryNodeContext`] for recording exception checkpoints and terminal entries
     /// while visiting a [`ruff_python_ast::StmtTry`] node.
-    fn push_context(&mut self, has_handlers: bool, has_bare_handler: bool) {
+    fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
         self.0.push(TryNodeContext {
-            try_suite_snapshots: has_handlers.then(Vec::new),
-            has_bare_handler,
+            exception_handlers,
             ..TryNodeContext::default()
         });
     }
@@ -148,7 +172,12 @@ impl TryNodeContextStack {
             .0
             .last_mut()
             .expect("Cannot take snapshots from an empty `TryBlockContexts` stack");
-        context.try_suite_snapshots.take().unwrap_or_default()
+        match std::mem::take(&mut context.exception_handlers) {
+            ExceptionHandlers::None => Vec::new(),
+            ExceptionHandlers::Propagating(snapshots) | ExceptionHandlers::CatchAll(snapshots) => {
+                snapshots
+            }
+        }
     }
 
     /// Records the checkpoint for all enclosing active `try` suites in this scope. Returns whether
@@ -157,13 +186,13 @@ impl TryNodeContextStack {
     /// A bare handler consumes the exception, preventing any outer handler from seeing it.
     fn record_exception_checkpoint(&mut self, snapshot: &FlowSnapshot) -> bool {
         for context in self.0.iter_mut().rev() {
-            let Some(try_suite_snapshots) = &mut context.try_suite_snapshots else {
-                continue;
-            };
-
-            try_suite_snapshots.push(snapshot.clone());
-            if context.has_bare_handler {
-                return false;
+            match &mut context.exception_handlers {
+                ExceptionHandlers::None => {}
+                ExceptionHandlers::Propagating(snapshots) => snapshots.push(snapshot.clone()),
+                ExceptionHandlers::CatchAll(snapshots) => {
+                    snapshots.push(snapshot.clone());
+                    return false;
+                }
             }
         }
 
@@ -186,11 +215,8 @@ impl TryNodeContextStack {
 /// when we add more advanced handling of `finally` branches.
 #[derive(Debug, Default)]
 pub(super) struct TryNodeContext {
-    /// Present only while visiting a `try` suite that has exception handlers.
-    try_suite_snapshots: Option<Vec<FlowSnapshot>>,
+    exception_handlers: ExceptionHandlers,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
-    /// Whether an active catch-all handler stops propagation to enclosing suites.
-    has_bare_handler: bool,
 }
 
 impl TryNodeContext {

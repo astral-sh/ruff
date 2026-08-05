@@ -1,7 +1,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
-use except_handlers::TryNodeContextStackManager;
+use except_handlers::{ExceptionHandlers, TryNodeContextStackManager};
 use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -4441,12 +4441,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
                 self.record_ambiguous_reachability();
 
-                let has_bare_handler = handlers.iter().any(|handler| {
+                let exception_handlers = if handlers.is_empty() {
+                    ExceptionHandlers::None
+                } else if handlers.iter().any(|handler| {
                     let ast::ExceptHandler::ExceptHandler(handler) = handler;
                     handler.type_.is_none()
-                });
+                }) {
+                    ExceptionHandlers::catch_all()
+                } else {
+                    ExceptionHandlers::propagating()
+                };
                 self.try_node_context_stack_manager
-                    .push_context(!handlers.is_empty(), has_bare_handler);
+                    .push_context(exception_handlers);
 
                 // Visit the `try` block!
                 self.visit_body(body);
