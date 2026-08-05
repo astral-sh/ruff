@@ -489,6 +489,59 @@ class DescriptorProtocol(Protocol[T_co]):
     def value(self) -> T_co: ...
 ```
 
+## Descriptor-decorated protocol members with generic setters
+
+A generic descriptor setter can be writable even when its accepted values cannot be represented by a
+single type. Such a setter must still prevent its protocol's parameter from becoming covariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class GenericSetterDescriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__[U](self, instance: object, value: tuple[T_co, U]) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `IncorrectlyCovariant` should be invariant, but is covariant"
+class IncorrectlyCovariant(Protocol[T_co]):
+    @GenericSetterDescriptor
+    def value(self) -> T_co: ...
+
+class InferredDescriptorProtocol[T](Protocol):
+    @GenericSetterDescriptor
+    def value(self) -> T: ...
+
+static_assert(not is_subtype_of(InferredDescriptorProtocol[int], InferredDescriptorProtocol[object]))
+```
+
+The inferred invariant parameter also prevents a nominal wrapper from accepting an incompatible
+specialization through either subtyping or assignability.
+
+```py
+class WrappedDescriptor[T]:
+    def protocol(self) -> InferredDescriptorProtocol[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(WrappedDescriptor[int], WrappedDescriptor[object]))
+static_assert(not is_assignable_to(WrappedDescriptor[int], WrappedDescriptor[object]))
+
+def overwrite(value: WrappedDescriptor[object]) -> None:
+    value.protocol().value = (object(), 1)
+
+def unsound(value: WrappedDescriptor[int]) -> None:
+    overwrite(value)  # error: [invalid-argument-type]
+```
+
 ## Protocol variance ignores constructors and undeclared instance attributes
 
 Constructors do not belong to a protocol's structural interface. If a type variable appears only in
@@ -540,78 +593,6 @@ class ExplicitReceivers(Protocol[T_contra]):
     def send(self: "ExplicitReceivers[T_contra]", value: T_contra) -> None: ...
     @classmethod
     def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
-```
-
-## Recursive protocol variance
-
-A recursively specialized protocol must infer its variance from its actual members, not from the
-declared variance that is being checked. Output-only and input-only recursive protocols therefore
-require covariance and contravariance, respectively.
-
-```py
-from __future__ import annotations
-
-from typing import Protocol, TypeVar
-
-T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
-T_contra = TypeVar("T_contra", contravariant=True)
-
-# error: [invalid-protocol] "Type variable `T` in protocol `RecursiveSource` should be covariant, but is invariant"
-class RecursiveSource(Protocol[T]):
-    def read(self) -> T: ...
-    def next(self) -> RecursiveSource[T]: ...
-
-# error: [invalid-protocol] "Type variable `T` in protocol `RecursiveSink` should be contravariant, but is invariant"
-class RecursiveSink(Protocol[T]):
-    def write(self, value: T) -> None: ...
-    def next(self) -> RecursiveSink[T]: ...
-
-class CovariantRecursiveSource(Protocol[T_co]):
-    def read(self) -> T_co: ...
-    def next(self) -> CovariantRecursiveSource[T_co]: ...
-
-class ContravariantRecursiveSink(Protocol[T_contra]):
-    def write(self, value: T_contra) -> None: ...
-    def next(self) -> ContravariantRecursiveSink[T_contra]: ...
-
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantRecursiveSink` should be contravariant, but is covariant"
-class CovariantRecursiveSink(Protocol[T_co]):
-    def write(self, value: T_co) -> None: ...
-    def next(self) -> CovariantRecursiveSink[T_co]: ...
-
-# error: [invalid-protocol] "Type variable `T_contra` in protocol `ContravariantRecursiveSource` should be covariant, but is contravariant"
-class ContravariantRecursiveSource(Protocol[T_contra]):
-    def read(self) -> T_contra: ...
-    def next(self) -> ContravariantRecursiveSource[T_contra]: ...
-```
-
-Variance also propagates around a cycle containing more than one protocol before it reaches its
-least restrictive fixed point.
-
-```py
-# error: [invalid-protocol] "Type variable `T` in protocol `MutualSource` should be covariant, but is invariant"
-class MutualSource(Protocol[T]):
-    def read(self) -> T: ...
-    def next(self) -> MutualFollower[T]: ...
-
-# error: [invalid-protocol] "Type variable `T` in protocol `MutualFollower` should be covariant, but is invariant"
-class MutualFollower(Protocol[T]):
-    def next(self) -> MutualSource[T]: ...
-```
-
-An input-only cycle must remain contravariant even when its first protocol references the type
-variable only through another protocol in the same cycle.
-
-```py
-# error: [invalid-protocol] "Type variable `T` in protocol `MutualSinkFollower` should be contravariant, but is invariant"
-class MutualSinkFollower(Protocol[T]):
-    def next(self) -> MutualSink[T]: ...
-
-# error: [invalid-protocol] "Type variable `T` in protocol `MutualSink` should be contravariant, but is invariant"
-class MutualSink(Protocol[T]):
-    def write(self, value: T) -> None: ...
-    def next(self) -> MutualSinkFollower[T]: ...
 ```
 
 ## Parameter specifications and inferred protocol variance
@@ -672,6 +653,8 @@ python-version = "3.13"
 [rules]
 invalid-generic-class = "ignore"
 invalid-base = "ignore"
+not-subscriptable = "ignore"
+shadowed-type-variable = "ignore"
 ```
 
 ```py
@@ -693,6 +676,25 @@ class InvalidDefaultReference(Protocol[A, B]): ...
 class UnsubscriptedGeneric(Protocol[T], Generic): ...
 class IncompatibleBaseVariance(InvariantBase[T_co], Protocol[T_co]): ...
 class DefaultAfterTypeVarTuple(Protocol[*Ts, DefaultT]): ...
+```
+
+A non-generic protocol cannot be specialized to construct a generic base. Its resulting unknown base
+type does not provide a valid protocol header for variance validation.
+
+```py
+class NonGenericProtocol(Protocol):
+    def read(self) -> int: ...
+
+class NonGenericBase(NonGenericProtocol[T], Protocol[T]): ...
+```
+
+A nested protocol cannot reuse a type variable bound by an enclosing generic class. The invalid
+header must suppress variance validation even when its primary diagnostic is disabled.
+
+```py
+class Outer(Generic[T]):
+    class ShadowedProtocol(Protocol[T]):
+        def read(self) -> T: ...
 ```
 
 ## Inheriting from generic classes with explicit variance

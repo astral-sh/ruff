@@ -5,7 +5,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::class::DynamicClassLiteral;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::variance::{VarianceInferable, VarianceInferenceMode};
+use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
     DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
@@ -368,21 +368,16 @@ impl<'db> SubclassOfType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'_>,
-        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => class.variance_of_in_mode(db, env, typevar, mode),
-            SubclassOfInner::Protocol(protocol) => {
-                protocol.variance_of_in_mode(db, env, typevar, mode)
-            }
-            SubclassOfInner::TypeVar(inner) => {
-                Type::TypeVar(inner).variance_of_in_mode(db, env, typevar, mode)
-            }
+            SubclassOfInner::Class(class) => class.variance_of(db, env, typevar),
+            SubclassOfInner::Protocol(protocol) => protocol.variance_of(db, env, typevar),
+            SubclassOfInner::TypeVar(inner) => Type::TypeVar(inner).variance_of(db, env, typevar),
             SubclassOfInner::Dynamic(_) => TypeVarVariance::Bivariant,
         }
     }
