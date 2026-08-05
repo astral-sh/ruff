@@ -1805,6 +1805,23 @@ impl<'db> Type<'db> {
         ty
     }
 
+    /// Selects the constructor used for a type variable's upper bound.
+    ///
+    /// The meta-type of `object` simplifies to permissive bare `type`, so retain the exact class
+    /// object instead. Resolve aliases first so an alias of `object` cannot bypass that behavior.
+    fn constructor_for_typevar_bound(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let bound = self.resolve_type_alias(db);
+        if bound.is_object() {
+            KnownClass::Object.to_class_literal(db, env)
+        } else {
+            bound.to_meta_type(db, env)
+        }
+    }
+
     /// Returns `Some(UnionType)` if this type behaves like a union. Apart from explicit unions,
     /// this returns `Some` for `TypeAlias`es of unions and `NewType`s of `float` and `complex`.
     fn as_union_like(self, db: &'db dyn Db) -> Option<UnionType<'db>> {
@@ -5149,12 +5166,19 @@ impl<'db> Type<'db> {
                 ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
-                    let bindings = match tvar.typevar(db).bound_or_constraints(db, env) {
-                        None => KnownClass::Type.to_instance(db, env).bindings(db, env),
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            bound.to_meta_type(db, env).bindings(db, env)
+                    let bindings = match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            let constructor = bound.constructor_for_typevar_bound(db, env);
+                            if let Type::ClassLiteral(class) = constructor
+                                && let Some(bindings) =
+                                    self.known_class_literal_bindings(db, env, class)
+                            {
+                                bindings
+                            } else {
+                                constructor.bindings(db, env)
+                            }
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             Bindings::from_union(
                                 self,
                                 constraints
@@ -5164,17 +5188,11 @@ impl<'db> Type<'db> {
                             )
                         }
                     };
-                    // TODO We would ideally be able to just do `into_constructor_bindings` in the
-                    // no-bounds/constraints case above (where we get back the bindings for
-                    // `Type.__call__`), and just do `with_constructed_instance_type` in the
-                    // bound/constrained cases, where we should get back constructor bindings (or
-                    // if we don't, we probably shouldn't return `T` from the call?). But currently
-                    // we can't because we special-case some built-in types to return regular
-                    // (not constructor) bindings from `constructor_bindings()`.
+                    // Some built-in constructors, including `object`, are special-cased as regular
+                    // callable bindings. Wrap them so that every bound or constrained call has
+                    // constructor context and constructs `T`; existing constructor bindings keep
+                    // their original kind.
                     bindings
-                        // `into_constructor_bindings` is a no-op for already-constructor bindings,
-                        // so we are just setting the `MetaclassCall` type for `Type.__call__`, or
-                        // the special-cased builtin classes that return regular bindings.
                         .into_constructor_bindings(
                             constructor_instance_type,
                             ConstructorCallableKind::MetaclassCall,

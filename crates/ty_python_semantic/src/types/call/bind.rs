@@ -531,11 +531,18 @@ impl<'db> BindingsElement<'db> {
     /// `f: KnownCallable & Top[Callable[..., Awaitable[object]]]`, even though the top-callable
     /// call itself is unsafe. (We know that somewhere in the infinite-union of the top callable,
     /// there is a callable with the right parameters to match the call.)
+    ///
+    /// Likewise, a narrowed class can provide a more specific constructor signature than `type[T]`.
+    /// Even when the `type[T]` constructor rejects the arguments, its return type still constrains
+    /// the successful constructor call.
     fn retain_successful(&mut self, db: &'db dyn Db) {
         if self.is_intersection() && self.as_result(db).is_ok() {
             self.items.retain(|item| {
                 item.as_result(db).is_ok()
                     || item.error_priority(db) == CallErrorPriority::TopCallable
+                    || item.as_constructor().is_some_and(|constructor| {
+                        matches!(constructor.constructed_instance_type(), Type::TypeVar(_))
+                    })
             });
         }
     }
@@ -7688,6 +7695,12 @@ impl<'db> CallableDescription<'db> {
                 kind: Some("class"),
                 name: Cow::Borrowed(class_type.name(db)),
             }),
+            Type::SubclassOf(subclass) if let Some(typevar) = subclass.into_type_var() => {
+                Some(CallableDescription {
+                    kind: None,
+                    name: Cow::Owned(format!("type[{}]", typevar.name(db))),
+                })
+            }
             Type::BoundMethod(bound_method) => Some({
                 let function = bound_method.function(db);
                 let kind = if function.name(db) == "__init__" {
