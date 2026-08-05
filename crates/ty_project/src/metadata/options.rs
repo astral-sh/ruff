@@ -112,13 +112,6 @@ pub struct Options {
 }
 
 impl Options {
-    pub(super) fn file_options(&self) -> FileOptions {
-        FileOptions {
-            rules: self.rules.clone(),
-            analysis: self.analysis.clone(),
-        }
-    }
-
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
@@ -187,9 +180,10 @@ impl Options {
         Self::deserialize(deserializer)
     }
 
+    /// Resolve configured paths and discover defaults according to the project or script context.
     pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
-        project_root: &SystemPath,
+        context: OptionsContext<'_>,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
@@ -224,11 +218,15 @@ impl Options {
                 ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
             };
 
-            PythonEnvironment::new(python_path.absolute(project_root, system), origin, system)
-                .map_err(anyhow::Error::from)
-                .map(Some)
+            PythonEnvironment::new(
+                python_path.absolute(context.configuration_root(), system),
+                origin,
+                system,
+            )
+            .map_err(anyhow::Error::from)
+            .map(Some)
         } else {
-            PythonEnvironment::discover(project_root, system)
+            PythonEnvironment::discover(context.project_root(), system)
                 .context("Failed to discover local Python environment")
         };
 
@@ -295,7 +293,7 @@ impl Options {
 
         // Safe mode is handled inside this function, so we just assume this can't fail
         let search_paths = strategy.to_anyhow(self.to_search_paths(
-            project_root,
+            context,
             project_name,
             site_packages_paths,
             real_stdlib_path,
@@ -322,7 +320,7 @@ impl Options {
     #[expect(clippy::too_many_arguments)]
     fn to_search_paths<Strategy: MisconfigurationStrategy>(
         &self,
-        project_root: &SystemPath,
+        context: OptionsContext<'_>,
         project_name: &str,
         site_packages_paths: SitePackagesPaths,
         real_stdlib_path: Option<SystemPathBuf>,
@@ -335,9 +333,10 @@ impl Options {
         let environment_roots = if let Some(roots) = environment.root.as_deref() {
             roots
                 .iter()
-                .map(|root| root.absolute(project_root, system))
+                .map(|root| root.absolute(context.configuration_root(), system))
                 .collect()
         } else {
+            let project_root = context.configuration_root();
             let mut roots = vec![];
             let is_package = |dir: &SystemPath| {
                 system.is_file(&dir.join("__init__.py"))
@@ -389,7 +388,7 @@ impl Options {
             .as_deref()
             .unwrap_or_default()
             .iter()
-            .map(|path| path.absolute(project_root, system))
+            .map(|path| path.absolute(context.configuration_root(), system))
             .collect();
 
         // read all the paths off the PYTHONPATH environment variable, check
@@ -432,7 +431,7 @@ impl Options {
             custom_typeshed: environment
                 .typeshed
                 .as_ref()
-                .map(|path| path.absolute(project_root, system)),
+                .map(|path| path.absolute(context.configuration_root(), system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
         };
@@ -443,7 +442,7 @@ impl Options {
     pub(crate) fn to_settings<Strategy: MisconfigurationStrategy>(
         &self,
         db: &dyn Db,
-        project_root: &SystemPath,
+        context: OptionsContext<'_>,
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
         let mut diagnostics = Vec::new();
@@ -462,7 +461,7 @@ impl Options {
         let src_options = self.src.or_default();
 
         let src = src_options
-            .to_settings(db, project_root, &mut diagnostics)
+            .to_settings(db, context.configuration_root(), &mut diagnostics)
             .map_err(|err| ToSettingsError {
                 diagnostic: err,
                 output_format: terminal.output_format,
@@ -489,7 +488,7 @@ impl Options {
         let analysis = strategy.fallback(analysis_result, |_| AnalysisSettings::default())?;
 
         let overrides = self
-            .to_overrides_settings(db, project_root, &mut diagnostics)
+            .to_overrides_settings(db, context.configuration_root(), &mut diagnostics)
             .map_err(|err| ToSettingsError {
                 diagnostic: err,
                 output_format: terminal.output_format,
@@ -542,6 +541,29 @@ impl Options {
         }
 
         Ok(overrides)
+    }
+}
+
+/// The project or standalone script whose options are being resolved.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum OptionsContext<'a> {
+    Project(&'a SystemPath),
+    /// The directory containing a standalone script, or the working directory for a virtual script.
+    Script(&'a SystemPath),
+}
+
+impl<'a> OptionsContext<'a> {
+    fn configuration_root(self) -> &'a SystemPath {
+        match self {
+            Self::Project(root) | Self::Script(root) => root,
+        }
+    }
+
+    fn project_root(self) -> Option<&'a SystemPath> {
+        match self {
+            Self::Project(root) => Some(root),
+            Self::Script(_) => None,
+        }
     }
 }
 
@@ -2043,15 +2065,6 @@ impl ToOverride for RangedValue<OverrideOptions> {
 pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.
-    pub(super) rules: Option<Rules>,
-
-    pub(super) analysis: Option<AnalysisOptions>,
-}
-
-/// The settings that can vary between individual files.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
-pub(super) struct FileOptions {
-    /// Raw rule options, preserved so multiple configuration layers can be merged.
     pub(super) rules: Option<Rules>,
 
     pub(super) analysis: Option<AnalysisOptions>,
