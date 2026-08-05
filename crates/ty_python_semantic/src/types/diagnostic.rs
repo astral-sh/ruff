@@ -1795,7 +1795,16 @@ pub(super) fn report_bad_dunder_get_call<'db>(
     }
 }
 
-/// Reports an invalid implicit call to an object's `__getattr__` method.
+/// Reports an invalid implicit `__getattr__` call at the original attribute access.
+///
+/// ```python
+/// class C:
+///     def __getattr__(self) -> int: ...
+///
+/// C().missing  # Invalid: Python passes the attribute name to __getattr__.
+/// ```
+///
+/// Preserves the underlying call diagnostic and explains why attribute access invoked the method.
 pub(super) fn report_bad_dunder_getattr_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &CallError<'db>,

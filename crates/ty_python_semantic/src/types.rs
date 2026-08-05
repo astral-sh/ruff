@@ -571,33 +571,6 @@ impl<'db> DescriptorGetCallContext<'db> {
     }
 }
 
-/// An interned description of an invalid implicit `__getattr__` call.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct GetAttrCallContext<'db> {
-    #[returns(copy)]
-    receiver: Type<'db>,
-    #[returns(copy)]
-    name: Type<'db>,
-}
-
-impl get_size2::GetSize for GetAttrCallContext<'_> {}
-
-impl<'db> GetAttrCallContext<'db> {
-    /// Reconstructs the implicit call and returns its error if the call is still invalid.
-    fn into_error(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<CallError<'db>> {
-        match self.receiver(db).try_call_dunder(
-            db,
-            env,
-            "__getattr__",
-            CallArguments::positional([self.name(db)]),
-            TypeContext::default(),
-        ) {
-            Err(CallDunderError::CallError(kind, bindings, _)) => Some(CallError(kind, bindings)),
-            _ => None,
-        }
-    }
-}
-
 /// The type and descriptor kind produced by an implicit `__get__` call.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DescriptorGetResult<'db> {
@@ -638,7 +611,14 @@ fn descriptor_get_result<'db>(
 #[derive(Clone, Debug, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum MemberLookupErrorKind<'db> {
     DescriptorGet(DescriptorGetCallContext<'db>),
-    GetAttr(GetAttrCallContext<'db>),
+
+    /// An invalid fallback call, represented by its receiver and requested attribute name.
+    ///
+    /// Retaining only these arguments avoids storing call bindings in cached lookup results.
+    GetAttr {
+        receiver: Type<'db>,
+        name: Type<'db>,
+    },
 }
 
 /// A failed member lookup together with the member used to recover from the error.
@@ -682,13 +662,21 @@ impl<'db> MemberLookupError<'db> {
                     target,
                 );
             }
-            MemberLookupErrorKind::GetAttr(call_context)
+            MemberLookupErrorKind::GetAttr { receiver, name }
                 if assigned_type.is_none()
-                    && let Some(failure) = call_context.into_error(db, env) =>
+                    && let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
+                        .try_call_dunder(
+                            db,
+                            env,
+                            "__getattr__",
+                            CallArguments::positional([name]),
+                            TypeContext::default(),
+                        ) =>
             {
+                let failure = CallError(kind, bindings);
                 report_bad_dunder_getattr_call(context, &failure, object_type, target);
             }
-            MemberLookupErrorKind::DescriptorGet(_) | MemberLookupErrorKind::GetAttr(_) => {}
+            MemberLookupErrorKind::DescriptorGet(_) | MemberLookupErrorKind::GetAttr { .. } => {}
         }
     }
 }
@@ -6573,37 +6561,34 @@ impl<'db> Type<'db> {
                 TypeContext::default(),
             ) {
                 Ok(outcome) => Place::bound(outcome.return_type(db, env)).into(),
-                Err(CallDunderError::CallError(kind, bindings, _)) => {
-                    // A literal-typed `name` parameter describes which dynamic attributes
-                    // exist. Rejecting this particular name does not make the method invalid.
-                    if kind == CallErrorKind::BindingError
-                        && bindings
-                            .iter_flat()
-                            .flatten()
-                            .flat_map(Binding::errors)
-                            .all(|error| match error {
-                                BindingError::InvalidArgumentType { expected_ty, .. } => {
-                                    match expected_ty {
-                                        Type::Union(union) => {
-                                            union.elements(db).iter().all(Type::is_string_literal)
-                                        }
-                                        _ => expected_ty.is_string_literal(),
-                                    }
-                                }
-                                _ => false,
-                            })
-                    {
-                        return Place::Undefined.into();
-                    }
-
-                    member_lookup_result(
-                        db,
-                        Place::bound(bindings.return_type(db, env)).into(),
-                        Some(MemberLookupErrorKind::GetAttr(GetAttrCallContext::new(
-                            db, self, name_type,
-                        ))),
-                    )
+                // A literal-typed `name` parameter describes which dynamic attributes exist.
+                // Rejecting this particular name does not make the method invalid.
+                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _))
+                    if bindings
+                        .iter_flat()
+                        .flatten()
+                        .flat_map(Binding::errors)
+                        .all(|error| match error {
+                            BindingError::InvalidArgumentType {
+                                expected_ty: Type::Union(union),
+                                ..
+                            } => union.elements(db).iter().all(Type::is_string_literal),
+                            BindingError::InvalidArgumentType { expected_ty, .. } => {
+                                expected_ty.is_string_literal()
+                            }
+                            _ => false,
+                        }) =>
+                {
+                    Place::Undefined.into()
                 }
+                Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
+                    db,
+                    Place::bound(bindings.return_type(db, env)).into(),
+                    Some(MemberLookupErrorKind::GetAttr {
+                        receiver: self,
+                        name: name_type,
+                    }),
+                ),
                 Err(
                     CallDunderError::PossiblyUnbound { .. } | CallDunderError::MethodNotAvailable,
                 ) => Place::Undefined.into(),
