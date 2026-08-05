@@ -79,6 +79,20 @@ with suppress(ValueError):
 value  # error: [possibly-unresolved-reference]
 ```
 
+## Suppressed name lookups can leave later bindings undefined
+
+A potentially unbound name can raise before a later assignment executes.
+
+```py
+from contextlib import suppress
+
+with suppress(NameError):
+    missing  # ty: ignore[unresolved-reference]
+    value = 1
+
+value  # error: [possibly-unresolved-reference]
+```
+
 ## Suppressed exceptions do not terminate control flow
 
 ```py

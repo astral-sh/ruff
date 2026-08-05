@@ -59,6 +59,24 @@ async def main():
     value  # error: [possibly-unresolved-reference]
 ```
 
+## Suppressed async name lookups can leave later bindings undefined
+
+A potentially unbound name can raise before a later assignment executes.
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def main():
+    async with Suppresses():
+        missing  # ty: ignore[unresolved-reference]
+        value = 1
+
+    value  # error: [possibly-unresolved-reference]
+```
+
 ## Asynchronously suppressed exceptions do not terminate control flow
 
 ```py

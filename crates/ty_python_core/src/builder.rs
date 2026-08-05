@@ -2399,7 +2399,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && self.in_try
             && self
                 .try_node_context_stack_manager
                 .has_active_exception_handler()
