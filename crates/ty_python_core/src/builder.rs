@@ -2396,6 +2396,30 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns whether accessing a name, attribute, or subscript can raise.
+    ///
+    /// Only a definitely bound name in the current flow state is known to be safe. In particular,
+    /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
+    fn place_access_can_raise(&mut self, expr: &ast::Expr, is_use: bool) -> bool {
+        let ast::Expr::Name(name) = expr else {
+            return true;
+        };
+
+        is_use
+            && self.in_try
+            && self
+                .try_node_context_stack_manager
+                .has_active_exception_handler()
+            && self
+                .current_place_table()
+                .symbol_id(name.id.as_str())
+                .is_none_or(|symbol| {
+                    self.current_use_def_map_mut()
+                        .symbol_live_binding_status(symbol)
+                        != LiveBindingStatus::Bound
+                })
+    }
+
     /// Returns whether evaluating and truth-testing `expr` cannot invoke Python user code.
     ///
     /// Identity comparisons are safe, but testing an arbitrary value may call `__bool__`:
@@ -5019,7 +5043,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 walk_expr(self, expr);
 
-                self.record_exception_checkpoint_if(!expr.is_name_expr());
+                let is_use = deferred_effects
+                    .as_ref()
+                    .is_some_and(|(_, is_use, _)| *is_use);
+                let can_raise = self.place_access_can_raise(expr, is_use);
+                self.record_exception_checkpoint_if(can_raise);
 
                 if let Some((place_expr, is_use, is_definition)) = deferred_effects {
                     let place_id = self.add_place(place_expr);

@@ -48,6 +48,106 @@ def known_safe_conditions(value: int | None) -> None:
     reveal_type(state)  # revealed: Literal[1]
 ```
 
+## Potentially unbound name lookups can raise
+
+A name lookup can raise `NameError`, so a handler that supplies the missing binding is reachable:
+
+```py
+try:
+    fallback  # ty: ignore[unresolved-reference]
+except NameError:
+    fallback = 1
+
+def use_fallback() -> None:
+    reveal_type(fallback)  # revealed: Literal[1]
+```
+
+A conditionally initialized name can also fail to resolve, while its successful path preserves the
+existing binding:
+
+```py
+def possibly_bound(flag: bool) -> None:
+    if flag:
+        value = 1
+
+    try:
+        value  # ty: ignore[possibly-unresolved-reference]
+    except NameError:
+        value = 2
+
+    def use_value() -> None:
+        reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+Definitely bound names in the current scope cannot make an otherwise safe handler reachable:
+
+```py
+def definitely_bound(local_value: int) -> None:
+    state = 0
+    try:
+        local_value
+    except NameError:
+        state = 1
+
+    reveal_type(state)  # revealed: Literal[0]
+```
+
+Names from enclosing scopes and names that look like builtins are conservatively treated as
+potentially raising because their resolution is not yet known:
+
+```py
+enclosing_value = 1
+
+def conservatively_unbound() -> None:
+    state = 0
+    try:
+        enclosing_value
+        int
+    except NameError:
+        state = 1
+
+    reveal_type(state)  # revealed: Literal[0, 1]
+```
+
+A later local assignment can shadow a builtin-looking name, causing the earlier lookup to raise
+`UnboundLocalError`:
+
+```py
+def shadowed_builtin() -> None:
+    try:
+        int
+    except NameError:
+        int = 1
+
+    def use_shadowed_builtin() -> None:
+        reveal_type(int)  # revealed: Literal[1]
+```
+
+## Name lookups run before attribute and subscript operations
+
+Accessing an attribute first resolves its receiver, which can independently raise `NameError`:
+
+```py
+try:
+    receiver.attribute  # ty: ignore[unresolved-reference]
+except NameError:
+    receiver = object()
+
+def use_receiver() -> None:
+    reveal_type(receiver)  # revealed: object
+```
+
+A missing subscript receiver raises before its index is evaluated, while the subscript operation
+itself can raise after the index has completed:
+
+```py
+state = 0
+try:
+    missing[(state := 1)]  # ty: ignore[unresolved-reference]
+except NameError:
+    reveal_type(state)  # revealed: Literal[0, 1]
+```
+
 ## Calls preserve completed argument evaluation
 
 A checkpoint is recorded immediately before the raising operation, after evaluating its child
