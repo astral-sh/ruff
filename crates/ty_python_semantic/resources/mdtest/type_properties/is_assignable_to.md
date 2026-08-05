@@ -1218,6 +1218,61 @@ static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[rejects_ke
 static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
 ```
 
+A target's variadic keywords can also reach an optional source keyword-only parameter. A named
+target prefix protects that keyword when its required suffix forces the prefix to be positional.
+
+```py
+def optional_keyword_source(*args: object, flag: int = 0, **kwargs: str) -> None: ...
+def unprotected_keyword_target(*args: *tuple[*tuple[int, ...], int], **kwargs: str) -> None: ...
+def protected_keyword_target(flag: int, *args: *tuple[*tuple[int, ...], int], **kwargs: str) -> None: ...
+
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[optional_keyword_source],
+        RegularCallableTypeOf[unprotected_keyword_target],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[optional_keyword_source],
+        RegularCallableTypeOf[protected_keyword_target],
+    )
+)
+```
+
+A positional target argument cannot satisfy a required source keyword-only parameter, but a required
+target keyword-only parameter can.
+
+```py
+def requires_named_keyword(*args: int, a: int) -> None: ...
+def positional_keyword_target(a: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+def required_keyword_target(*args: *tuple[*tuple[int, ...], int], a: int) -> None: ...
+
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[requires_named_keyword],
+        RegularCallableTypeOf[positional_keyword_target],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[requires_named_keyword],
+        RegularCallableTypeOf[required_keyword_target],
+    )
+)
+```
+
+A positional-only target prefix does not protect an occupied source parameter from another keyword
+of the same name; a matching positional-or-keyword target prefix does.
+
+```py
+def unprotected_positional_prefix(a: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+def protected_positional_prefix(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+static_assert(not is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[unprotected_positional_prefix]))
+static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[protected_positional_prefix]))
+```
+
 A suffix cannot be extended with elements that the source variadic parameter rejects.
 
 ```py
