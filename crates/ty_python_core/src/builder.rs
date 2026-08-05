@@ -4124,8 +4124,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             is_positive: true,
                         }));
 
-                    self.try_node_context_stack_manager
-                        .push_context(ExceptionHandlers::propagating());
+                    self.try_node_context_stack_manager.push_with_context();
                     suppression_contexts.push(suppression_predicate);
                 }
 
@@ -4137,19 +4136,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 while let Some(suppression_predicate) = suppression_contexts.pop() {
                     let mut exception_checkpoints = self
                         .try_node_context_stack_manager
-                        .take_try_suite_snapshots()
+                        .take_exception_snapshots()
                         .into_iter();
-                    let terminal_states = self
-                        .try_node_context_stack_manager
-                        .pop_context()
-                        .into_terminal_finally_entry_snapshots();
-
-                    // A `with` context must not intercept terminal entries intended for an
-                    // enclosing `finally` suite.
-                    for terminal_state in terminal_states {
-                        self.flow_restore(terminal_state);
-                        self.record_terminal_finally_entry();
-                    }
+                    self.try_node_context_stack_manager.pop_context();
 
                     let Some(first_checkpoint) = exception_checkpoints.next() else {
                         continue;
@@ -4486,7 +4475,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ExceptionHandlers::propagating()
                 };
                 self.try_node_context_stack_manager
-                    .push_context(exception_handlers);
+                    .push_try_context(exception_handlers);
 
                 // Visit the `try` block!
                 self.visit_body(body);
@@ -4499,7 +4488,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `finally` suite.
                 let try_block_snapshots = self
                     .try_node_context_stack_manager
-                    .take_try_suite_snapshots();
+                    .take_exception_snapshots();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
@@ -4586,10 +4575,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let terminal_finally_entry_snapshots = self
-                    .try_node_context_stack_manager
-                    .pop_context()
-                    .into_terminal_finally_entry_snapshots();
+                let terminal_finally_entry_snapshots =
+                    self.try_node_context_stack_manager.pop_context();
 
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit

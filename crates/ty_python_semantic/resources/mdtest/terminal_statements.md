@@ -576,6 +576,23 @@ def finally_assignment_runs_before_break():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Terminal paths through context managers reach enclosing `finally` clauses
+
+A context manager does not intercept a terminal entry intended for an enclosing `finally` clause.
+
+```py
+from contextlib import nullcontext
+
+def finally_runs_after_return_from_context_manager():
+    value = "before"
+    try:
+        with nullcontext():
+            value = "return"
+            return
+    finally:
+        reveal_type(value)  # revealed: Literal["return"]
+```
+
 ## Calls to functions returning `Never` / `NoReturn`
 
 These calls should be treated as terminal statements.
