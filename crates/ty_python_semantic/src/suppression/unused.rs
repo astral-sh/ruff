@@ -69,7 +69,7 @@ pub(super) fn check_unused_suppressions(context: &mut CheckSuppressionsContext) 
         })
         .peekable();
 
-    let source = source_text(context.db, context.file);
+    let source = source_text(context.db, context.file).load();
 
     while let Some(suppression) = unused_iter.next() {
         let unused_lint = match suppression.kind {

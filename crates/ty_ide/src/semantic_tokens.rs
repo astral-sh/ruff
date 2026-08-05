@@ -2845,7 +2845,7 @@ LegacyStyle: TypeAlias = IO[str]
         );
 
         let tokens = test.highlight_file();
-        let source = ruff_db::source::source_text(&test.db, test.file);
+        let source = ruff_db::source::source_text(&test.db, test.file).load();
         let io_ranges: Vec<_> = source
             .match_indices("IO")
             .skip(1)
@@ -4746,7 +4746,7 @@ from pathlib import Missing as Alias
         /// Helper function to convert semantic tokens to a snapshot-friendly text format
         fn to_snapshot(&self, tokens: &SemanticTokens) -> String {
             use std::fmt::Write;
-            let source = ruff_db::source::source_text(&self.db, self.file);
+            let source = ruff_db::source::source_text(&self.db, self.file).load();
             let mut result = String::new();
 
             for token in tokens.iter() {

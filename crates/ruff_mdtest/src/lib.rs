@@ -108,7 +108,7 @@ fn run_test(
         .filter_map(|test_file| {
             let mdtest_result = attempt_test(
                 |file| {
-                    let source = source_text(db, file);
+                    let source = source_text(db, file).load();
                     let path = file
                         .path(db)
                         .as_system_path()

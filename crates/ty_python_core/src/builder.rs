@@ -1,4 +1,4 @@
-use std::cell::{OnceCell, RefCell};
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
@@ -8,7 +8,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use ruff_db::source::{SourceText, source_text};
+use ruff_db::source::{SourceTextRef, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
@@ -255,7 +255,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Used for checking semantic syntax errors
     resolver_environment: ResolverEnvironment<'db>,
     python_version: PythonVersion,
-    source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
     in_try: bool,
 
@@ -347,7 +346,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
-            source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
             semantic_syntax_errors: RefCell::default(),
@@ -2941,9 +2939,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.semantic_checker = checker;
     }
 
-    fn source_text(&self) -> &SourceText {
-        self.source_text
-            .get_or_init(|| source_text(self.db, self.file.file(self.db)))
+    fn source_text(&self) -> &SourceTextRef {
+        self.module.source_text(self.db)
     }
 
     fn visit_stmt_impl(&mut self, stmt: &'ast ast::Stmt) {
@@ -5166,7 +5163,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn in_notebook(&self) -> bool {
-        self.source_text().is_notebook()
+        source_text(self.db, self.file.file(self.db)).is_notebook()
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {

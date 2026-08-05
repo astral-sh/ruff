@@ -195,7 +195,7 @@ impl DbWithWritableSystem for Db {
 
 #[salsa::tracked(returns(ref))]
 fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
     if source.is_notebook() {
         return FileSettings::Global;
     }

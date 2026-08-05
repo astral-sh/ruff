@@ -95,7 +95,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
             .into_par_iter()
             .with_min_len(minimum_job_len)
             .map_with_db(db, |db, other_file| {
-                let source = ruff_db::source::source_text(db, other_file);
+                let source = ruff_db::source::source_text(db, other_file).load();
                 if let Some(name) = needle
                     && !contains_identifier(&source, name)
                 {

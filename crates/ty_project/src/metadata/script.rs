@@ -17,7 +17,7 @@ pub(crate) fn script_metadata(db: &dyn Db, file: File) -> Option<Box<PyProject>>
         return None;
     }
 
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
     if source.is_notebook() {
         return None;
     }

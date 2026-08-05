@@ -76,7 +76,7 @@ impl Diagnostics {
                 for annotation in annotations {
                     let file = annotation.get_span().expect_ty_file();
                     if hashed_files.insert(file) {
-                        source_text(db, file).as_str().hash(&mut hasher);
+                        source_text(db, file).load().as_str().hash(&mut hasher);
                     }
                 }
             }

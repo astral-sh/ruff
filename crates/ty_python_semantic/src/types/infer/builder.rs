@@ -10416,7 +10416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                                 if is_dotted_name(value) {
                                     let source =
-                                        &source_text(self.db(), self.file())[value.range()];
+                                        &source_text(self.db(), self.file()).load()[value.range()];
                                     diag.help(format_args!(
                                         "This error may indicate that `{source}` was defined as \
                                         `{source} = {special_form}` when \

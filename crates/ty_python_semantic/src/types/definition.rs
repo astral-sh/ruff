@@ -43,7 +43,7 @@ impl TypeDefinition<'_> {
         match self {
             Self::Module(module) => {
                 let file = module.file(db)?;
-                let source = source_text(db, file);
+                let source = source_text(db, file).load();
                 Some(FileRange::new(file, TextRange::up_to(source.text_len())))
             }
             Self::StaticClass(definition)

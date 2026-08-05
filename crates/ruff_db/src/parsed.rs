@@ -1,5 +1,5 @@
 use std::fmt::Formatter;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
@@ -13,7 +13,7 @@ use ruff_python_parser::{
 };
 
 use crate::files::File;
-use crate::source::source_text;
+use crate::source::{SourceTextRef, source_text};
 use crate::{Db, PythonFile};
 
 /// Returns the parsed AST of `file`, including its token stream.
@@ -47,7 +47,7 @@ pub(super) fn disable_lru(db: &mut dyn Db) {
 }
 
 fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
     let ty = file.source_type(db);
 
     let options = ParseOptions::from(ty).with_target_version(target_version);
@@ -153,6 +153,7 @@ impl ParsedModule {
         ParsedModuleRef {
             module: self.clone(),
             indexed: parsed,
+            source: OnceLock::new(),
         }
     }
 
@@ -191,12 +192,19 @@ impl Eq for ParsedModule {}
 pub struct ParsedModuleRef {
     module: ParsedModule,
     indexed: Arc<indexed::IndexedModule>,
+    source: OnceLock<SourceTextRef>,
 }
 
 impl ParsedModuleRef {
     /// Returns a reference to the [`ParsedModule`] that this instance was loaded from.
     pub fn module(&self) -> &ParsedModule {
         &self.module
+    }
+
+    /// Loads this module's source and retains it for the lifetime of the parsed handle.
+    pub fn source_text(&self, db: &dyn Db) -> &SourceTextRef {
+        self.source
+            .get_or_init(|| source_text(db, self.module.file).load())
     }
 
     /// Returns a reference to the AST node at the given index.
@@ -900,6 +908,24 @@ mod tests {
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+
+        Ok(())
+    }
+
+    #[test]
+    fn source_text_is_cached_for_loaded_module() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 10")?;
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, file).load(&db);
+
+        let first = parsed.source_text(&db);
+        let second = parsed.source_text(&db);
+
+        assert_eq!(first.as_str(), "x = 10");
+        assert!(std::ptr::eq(first, second));
 
         Ok(())
     }

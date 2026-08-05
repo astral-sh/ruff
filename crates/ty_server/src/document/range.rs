@@ -137,7 +137,7 @@ impl PositionExt for lsp_types::Position {
         uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize> {
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
         let index = line_index(db, file);
 
         if let Some(notebook) = source.as_notebook() {
@@ -190,7 +190,7 @@ impl TextSizeExt for TextSize {
         file: File,
         encoding: PositionEncoding,
     ) -> Option<LspPosition> {
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
         let index = line_index(db, file);
 
         if let Some(notebook) = source.as_notebook() {
@@ -291,7 +291,7 @@ impl ToRangeExt for TextRange {
         file: File,
         encoding: PositionEncoding,
     ) -> Option<LspRange> {
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
         let index = line_index(db, file);
 
         if let Some(notebook) = source.as_notebook() {

@@ -977,7 +977,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             }) else {
                 continue;
             };
-            let contents = source_text(db, file);
+            let contents = source_text(db, file).load();
             if let Some(error) = contents.read_error() {
                 tracing::warn!("Failed to read .pth file `{path}`: {error}");
                 continue;

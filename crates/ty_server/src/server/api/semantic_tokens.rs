@@ -16,7 +16,7 @@ pub(crate) fn generate_semantic_tokens(
     encoding: PositionEncoding,
     multiline_token_support: bool,
 ) -> Vec<SemanticToken> {
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
     let line_index = line_index(db, file);
     let semantic_token_data = semantic_tokens(db, db.program_file(file), range);
 

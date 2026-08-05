@@ -408,7 +408,7 @@ mod tests {
     };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-    use ruff_db::source::{SourceText, source_text};
+    use ruff_db::source::{SourceTextRef, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_python_codegen::Stylist;
@@ -506,7 +506,7 @@ mod tests {
         pub(super) file: File,
         pub(super) offset: TextSize,
         pub(super) parsed: ParsedModuleRef,
-        pub(super) source: SourceText,
+        pub(super) source: SourceTextRef,
         pub(super) stylist: Stylist<'static>,
     }
 
@@ -566,7 +566,7 @@ mod tests {
                     // string-literal completions are only collected for open files.
                     db.project().open_file(&mut db, file);
 
-                    let source = source_text(&db, file);
+                    let source = source_text(&db, file).load();
                     let parsed =
                         parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
@@ -714,7 +714,7 @@ mod tests {
                     // string-literal completions are only collected for open files.
                     db.project().open_file(&mut db, file);
 
-                    let source = source_text(&db, file);
+                    let source = source_text(&db, file).load();
                     let parsed =
                         parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
                     let stylist =
