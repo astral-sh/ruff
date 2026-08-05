@@ -5521,6 +5521,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .may_prefer_declared_type(db, self.env)
         });
         let mut filtered_return_context = None;
+        let mut declared_constraints = None;
         let mut has_return_context = if let Some(tcx) = return_context {
             let return_ty =
                 self.return_ty
@@ -5531,6 +5532,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let return_constraints = return_ty
                 .when_constraint_set_assignable_to(db, self.env, tcx, constraints)
                 .remove_provisional_marker_constraints(db, self.env, constraints);
+            declared_constraints = Some(return_constraints);
             builder.intersect_declared_constraints(return_constraints);
             true
         } else {
@@ -5539,22 +5541,43 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut specialization_errors = Vec::new();
         self.infer_argument_constraints(&mut builder, &mut specialization_errors);
+        let mut fallback_inference = None;
 
-        // If the return context is incompatible with the arguments, attempt inference again
-        // without the return-context constraints.
+        // If the return context is incompatible with the arguments, attempt inference again.
+        // For constructors, compare the independently inferred and declared candidates so a
+        // narrower inferred candidate can retain the return-context specialization. This lets a
+        // failing constructor report its argument error without producing a second, misleading
+        // assignment error. Regular calls instead ignore the incompatible return context.
         //
         // Note that this will still lead to an invalid specialization, but may produce more precise
         // diagnostics.
         if has_return_context && !builder.constraints_are_satisfiable() {
-            builder =
-                SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
-            self.infer_argument_constraints(&mut builder, &mut specialization_errors);
-            has_return_context = false;
+            if self.constructor_kind.is_some() {
+                let mut declared_builder =
+                    SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+                if let Some(declared_constraints) = declared_constraints {
+                    declared_builder.intersect_declared_constraints(declared_constraints);
+                }
+                let declared = self.build_generic_inference(&mut declared_builder, generic_context);
+
+                builder =
+                    SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+                self.infer_argument_constraints(&mut builder, &mut specialization_errors);
+                let inferred = self.build_generic_inference(&mut builder, generic_context);
+                fallback_inference =
+                    Some(inferred.prefer_assignable_declared_candidates(db, self.env, declared));
+            } else {
+                builder =
+                    SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+                self.infer_argument_constraints(&mut builder, &mut specialization_errors);
+                has_return_context = false;
+            }
         }
 
-        let mut inference = self.build_generic_inference(&mut builder, generic_context);
+        let mut inference = fallback_inference
+            .unwrap_or_else(|| self.build_generic_inference(&mut builder, generic_context));
         let mut specialization = inference.specialization(db);
 
         if has_return_context

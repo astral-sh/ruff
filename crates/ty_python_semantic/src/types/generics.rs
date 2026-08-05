@@ -2386,6 +2386,42 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Prefer a declared candidate when the inferred candidate is assignable to it.
+    ///
+    /// This preserves a constructor's context-derived specialization when argument inference
+    /// fails only because the argument requires a narrower type. Other candidate pairs continue
+    /// to use the inferred type so that the assignment receives the diagnostic.
+    pub(crate) fn prefer_assignable_declared_candidates(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        declared: Self,
+    ) -> Self {
+        let generic_context = self.generic_context(db);
+        if generic_context != declared.generic_context(db) {
+            return self;
+        }
+
+        let types: Box<[Option<Type<'db>>]> = self
+            .types(db)
+            .iter()
+            .copied()
+            .zip(declared.types(db).iter().copied())
+            .map(|(inferred, declared)| match (inferred, declared) {
+                (Some(inferred), Some(declared)) => {
+                    Some(if inferred.is_assignable_to(db, env, declared) {
+                        declared
+                    } else {
+                        inferred
+                    })
+                }
+                (inferred, None) => inferred,
+                (None, declared) => declared,
+            })
+            .collect();
+        Self::new(db, generic_context, types)
+    }
+
     /// Project this inference result into a closed specialization.
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         #[salsa::tracked(
