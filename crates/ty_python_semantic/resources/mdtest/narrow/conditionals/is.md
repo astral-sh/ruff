@@ -345,7 +345,7 @@ def f(value: int | None | EllipsisType, other: T) -> None:
 
 Calling a `NewType` returns its argument unchanged. Values with distinct `NewType`s over `Foo` can
 therefore be the same object even though their types are disjoint. The examples below cover direct
-comparisons and narrowing through unions and intersections.
+comparisons and narrowing through unions.
 
 ```py
 from typing import NewType
@@ -366,10 +366,15 @@ def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
 def union(value: FooNewType1 | None, other: FooNewType2) -> None:
     if value is other:
         reveal_type(value)  # revealed: FooNewType1
+```
 
+An intersection between a `NewType` and a proper subclass of its base is statically empty, so
+narrowing through that intersection produces `Never`.
+
+```py
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
     if left is right:
-        reveal_type(right)  # revealed: FooNewType2 & FooSub
+        reveal_type(right)  # revealed: Never
 ```
 
 ### `NewType`s in `TypeVar` bounds and constraints

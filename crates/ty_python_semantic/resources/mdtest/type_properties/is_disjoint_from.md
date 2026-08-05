@@ -52,13 +52,15 @@ BoolId = NewType("BoolId", bool)
 
 static_assert(is_disjoint_from(NestedUserId, bool))
 static_assert(is_disjoint_from(FloatId, bool))
+static_assert(not is_disjoint_from(FloatId, int))
+static_assert(not is_disjoint_from(FloatId, float))
 static_assert(not is_disjoint_from(BoolId, bool))
 ```
 
-## NewTypes and final classes
+## NewTypes and nominal subclasses
 
-A NewType and a final subclass of its base cannot overlap unless the NewType itself is based on that
-final class. Non-final subclasses may still overlap with the NewType.
+A NewType is disjoint from proper subclasses of its base, whether or not those subclasses are final.
+It still overlaps with its own base and with any supertypes of that base.
 
 ```py
 from typing import NewType, final
@@ -75,11 +77,25 @@ class OrdinaryInt(int): ...
 FinalIntId = NewType("FinalIntId", FinalInt)
 
 static_assert(is_disjoint_from(UserId, FinalInt))
-static_assert(not is_disjoint_from(UserId, OrdinaryInt))
+static_assert(is_disjoint_from(UserId, OrdinaryInt))
+static_assert(is_disjoint_from(OrdinaryInt, UserId))
+static_assert(not is_disjoint_from(UserId, int))
+static_assert(not is_disjoint_from(UserId, object))
 static_assert(not is_disjoint_from(FinalIntId, FinalInt))
+static_assert(not is_disjoint_from(FinalIntId, int))
 ```
 
-An `IntEnum` with members is also final and disjoint from an integer-based NewType.
+The same rule applies when the base is `str`, which is not final.
+
+```py
+class OrdinaryStr(str): ...
+
+StringId = NewType("StringId", str)
+
+static_assert(is_disjoint_from(StringId, OrdinaryStr))
+```
+
+An `IntEnum` with members is another subclass disjoint from an integer-based NewType.
 
 ```py
 from enum import IntEnum
@@ -89,6 +105,51 @@ class Choice(IntEnum):
     SECOND = 2
 
 static_assert(is_disjoint_from(UserId, Choice))
+```
+
+## NewTypes and generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A NewType based on a covariant generic specialization overlaps with its generic supertypes, but is
+disjoint from incompatible specializations and subclasses of its base.
+
+```py
+from typing import Any, NewType, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+class Base[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+@final
+class FinalChild[T](Base[T]): ...
+
+class OrdinaryChild[T](Base[T]): ...
+
+BaseId = NewType("BaseId", Base[int])
+
+static_assert(not is_disjoint_from(BaseId, Base[int]))
+static_assert(not is_disjoint_from(BaseId, Base[object]))
+static_assert(is_disjoint_from(BaseId, Base[str]))
+static_assert(is_disjoint_from(BaseId, FinalChild[object]))
+static_assert(is_disjoint_from(BaseId, OrdinaryChild[object]))
+```
+
+Gradual type arguments can overlap even when strict subtyping does not hold.
+
+```py
+AnyListId = NewType("AnyListId", list[Any])
+IntListId = NewType("IntListId", list[int])
+
+static_assert(not is_subtype_of(AnyListId, list[int]))
+static_assert(not is_disjoint_from(AnyListId, list[int]))
+static_assert(not is_disjoint_from(IntListId, list[Any]))
+static_assert(is_disjoint_from(IntListId, list[str]))
 ```
 
 ## Statically empty and non-empty ranges
@@ -224,27 +285,6 @@ static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 
 # `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
-```
-
-A covariant final generic specialization can overlap with a NewType without being its supertype:
-`FinalChild[int]` is a subtype of both the NewType's base, `Base[int]`, and `FinalChild[object]`.
-
-```py
-from typing import NewType
-from ty_extensions._internal import is_subtype_of
-
-class Base[T]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-@final
-class FinalChild[T](Base[T]): ...
-
-BaseId = NewType("BaseId", Base[int])
-
-static_assert(is_subtype_of(FinalChild[int], FinalChild[object]))
-static_assert(not is_subtype_of(BaseId, FinalChild[object]))
-static_assert(not is_disjoint_from(BaseId, FinalChild[object]))
 ```
 
 ## Invariant generic specializations and bases

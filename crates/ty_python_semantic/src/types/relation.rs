@@ -3666,14 +3666,25 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
                 nontrivial_check(self, || {
                     let base = newtype.concrete_base_type(db);
-                    if let Type::NominalInstance(instance) = other
-                        && let ClassType::NonGeneric(class) = instance.class(db, env)
-                        && class.is_final(db)
-                        && base != other
-                    {
-                        // Unlike a final generic class, a non-generic final class cannot share a
-                        // narrower subtype with a NewType based on a different class.
-                        self.always()
+                    if matches!(other, Type::NominalInstance(_)) {
+                        // Ordinary classes cannot inherit from a NewType, so overlap must come
+                        // from an assignable concrete base. Assignability preserves overlap for
+                        // gradual specializations such as `list[Any]`, while numeric union bases
+                        // such as `int | float` must be checked one alternative at a time.
+                        let checker = self.as_relation_checker(TypeRelation::Assignability);
+                        let check_base = |base| {
+                            checker
+                                .check_type_pair(db, base, other)
+                                .negate(db, self.constraints)
+                        };
+                        if let Type::Union(union) = base {
+                            union
+                                .elements(db)
+                                .iter()
+                                .when_all(db, self.constraints, |&element| check_base(element))
+                        } else {
+                            check_base(base)
+                        }
                     } else {
                         self.check_type_pair(db, base, other)
                     }
