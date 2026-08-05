@@ -301,7 +301,8 @@ opt-level = "z"
 codegen-units = 1
 
 [profile.dev]
-# Cargo still enables local ThinLTO when optimization is enabled, slowing
+# Cargo enables local ThinLTO when optimization is enabled, which we often do
+# when testing via CARGO_PROFILE_DEV_OPT_LEVEL=1. Disable it to speed up
 # incremental test builds.
 lto = "off"
 
