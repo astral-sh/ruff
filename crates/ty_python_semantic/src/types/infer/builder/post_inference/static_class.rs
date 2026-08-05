@@ -240,6 +240,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let mut disjoint_bases = IncompatibleBases::default();
     let mut protocol_base_with_generic_context: Option<(&ast::Expr, _)> = None;
+    let mut protocol_header_is_valid = true;
     let mut direct_typed_dict_bases = vec![];
 
     let class_definition = index.expect_single_definition(class_node);
@@ -285,6 +286,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 else {
                     continue;
                 };
+                protocol_header_is_valid = false;
                 let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, previous_node)
                 else {
                     continue;
@@ -309,6 +311,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // but it is semantically invalid.
             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context)) => {
                 if let Some(type_params) = class_node.type_params.as_deref() {
+                    protocol_header_is_valid = false;
                     let node = source_node;
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node) else {
                         continue;
@@ -379,15 +382,15 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if is_protocol {
-            if !base_class.is_protocol(db)
-                && !base_class.is_object(db)
-                && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
-            {
-                builder.into_diagnostic(format_args!(
-                    "Protocol class `{}` cannot inherit from non-protocol class `{}`",
-                    class.name(db),
-                    base_class.name(db),
-                ));
+            if !base_class.is_protocol(db) && !base_class.is_object(db) {
+                protocol_header_is_valid = false;
+                if let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node) {
+                    builder.into_diagnostic(format_args!(
+                        "Protocol class `{}` cannot inherit from non-protocol class `{}`",
+                        class.name(db),
+                        base_class.name(db),
+                    ));
+                }
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
             if !base_class.class_literal(db).is_typed_dict(db)
@@ -791,13 +794,14 @@ pub(crate) fn check_static_class_definitions<'db>(
         class.legacy_generic_context(db),
         class.inherited_legacy_generic_context(db),
     ) {
-        if !inherited.is_subset_of(db, legacy)
-            && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-        {
-            builder.into_diagnostic(
-                "`Generic` base class must include all type \
-                    variables used in other base classes",
-            );
+        if !inherited.is_subset_of(db, legacy) {
+            protocol_header_is_valid = false;
+            if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node) {
+                builder.into_diagnostic(
+                    "`Generic` base class must include all type \
+                        variables used in other base classes",
+                );
+            }
         }
     }
 
@@ -816,7 +820,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         );
     }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) || is_protocol {
         if !class.has_pep_695_type_params(db)
             && let Some(generic_context) = class.legacy_generic_context(db)
         {
@@ -846,6 +850,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             if let Some(state) = state
                 && !state.invalid_later_tvars.is_empty()
             {
+                protocol_header_is_valid = false;
                 report_invalid_type_param_order(
                     context,
                     class,
@@ -855,7 +860,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
         }
+    }
 
+    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
         // Check that type variable defaults only reference type variables
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
@@ -1063,6 +1070,9 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
+        if protocol_header_is_valid {
+            protocol.validate_type_parameter_variance(context);
+        }
     }
 
     if class.is_typed_dict(db) {

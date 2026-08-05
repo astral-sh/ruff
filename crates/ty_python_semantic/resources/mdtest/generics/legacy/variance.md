@@ -296,6 +296,191 @@ equivalent to) each other.
 
 It is not possible to construct a legacy typevar that is explicitly bivariant.
 
+## Generic protocols require matching variance
+
+A protocol's declared type-variable variance must agree with the positions where its interface uses
+that variable. Unlike nominal generic classes, a protocol cannot declare an input-only or
+output-only type variable as invariant.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
+class InvariantSource(Protocol[T]):
+    def read(self) -> T: ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSink` should be contravariant, but is invariant"
+class InvariantSink(Protocol[T]):
+    def write(self, value: T) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
+class CovariantSink(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_contra` in protocol `ContravariantSource` should be covariant, but is contravariant"
+class ContravariantSource(Protocol[T_contra]):
+    def read(self) -> T_contra: ...
+
+class CovariantSource(Protocol[T_co]):
+    def read(self) -> T_co: ...
+
+class ContravariantSink(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+
+class InvariantReadWrite(Protocol[T]):
+    def read(self) -> T: ...
+    def write(self, value: T) -> None: ...
+```
+
+## Generic protocol variance follows properties and mutable attributes
+
+A read-only property uses its type variable covariantly. A writable property or mutable attribute
+uses the same variable both covariantly and contravariantly, so it requires invariance.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class ReadOnlyProperty(Protocol[T_co]):
+    @property
+    def value(self) -> T_co: ...
+
+class WritableProperty(Protocol[T]):
+    @property
+    def value(self) -> T: ...
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+class MutableAttribute(Protocol[T]):
+    value: T
+
+class MutableDunderAttribute(Protocol[T]):
+    __call__: Callable[..., T]
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantDunderAttribute` should be invariant, but is covariant"
+class CovariantDunderAttribute(Protocol[T_co]):
+    __call__: Callable[..., T_co]
+
+class CovariantDunderMethod(Protocol[T_co]):
+    def __call__(self) -> T_co: ...
+
+class WritableClassValue(Protocol[T]):
+    @property
+    def value(self) -> type[T]: ...
+    @value.setter
+    def value(self, value: type[T]) -> None: ...
+
+class WritableClassAttribute(Protocol[T]):
+    @property
+    def __class__(self) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T]) -> None: ...
+
+class InvariantReturn(Protocol[T]):
+    def read(self) -> list[T]: ...
+```
+
+Explicit receiver annotations on property accessors do not influence the variance of the values that
+the property accepts.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class ContravariantProperty(Protocol[T_contra]):
+    @property
+    def value(self: "ContravariantProperty[T_contra]") -> object: ...
+    @value.setter
+    def value(self: "ContravariantProperty[T_contra]", value: T_contra) -> None: ...
+```
+
+## Generic protocol variance ignores constructors and receiver annotations
+
+Constructors do not belong to a protocol's structural interface. If a type variable appears only in
+a constructor, its inferred variance therefore falls back to covariance.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+# error: [invalid-protocol] "Type variable `T` in protocol `ConstructorOnly` should be covariant, but is invariant"
+class ConstructorOnly(Protocol[T]):
+    def __init__(self, value: T) -> None: ...
+
+class CovariantConstructorOnly(Protocol[T_co]):
+    def __init__(self, value: T_co) -> None: ...
+
+class ExcludedClassGetitem(Protocol[T_co]):
+    @classmethod
+    def __class_getitem__(cls, value: T_co) -> object: ...
+```
+
+Explicit instance and class receivers identify where a method is bound; they do not make a
+contravariant protocol type variable appear covariantly.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class ExplicitReceivers(Protocol[T_contra]):
+    def send(self: "ExplicitReceivers[T_contra]", value: T_contra) -> None: ...
+    @classmethod
+    def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
+```
+
+## Parameter specifications and inferred protocol variance
+
+Protocol variance validation applies only to explicitly declared regular type variables. Parameter
+specifications and variables whose variance is inferred do not need matching declarations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+R_co = TypeVar("R_co", covariant=True)
+T_infer = TypeVar("T_infer", infer_variance=True)
+
+class Callback(Protocol[P, R_co]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co: ...
+
+class InferredSource(Protocol[T_infer]):
+    def read(self) -> T_infer: ...
+```
+
+## Invalid protocol headers do not cause cascading variance diagnostics
+
+Malformed generic parameter ordering and duplicate generic bases are diagnosed separately. Ignoring
+those diagnostics does not turn them into protocol-variance errors.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+invalid-generic-class = "ignore"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+DefaultT = TypeVar("DefaultT", default=int)
+T = TypeVar("T")
+
+class InvalidParameterOrder(Protocol[DefaultT, T]): ...
+class DuplicateGenericBase(Protocol[T], Generic[T]): ...
+```
+
 ## Inheriting from generic classes with explicit variance
 
 A generic subclass cannot claim a variance that is less restrictive than the variance required by
