@@ -9644,7 +9644,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Still not found? It might be `reveal_type`...
             .or_fall_back_to(db, env, || {
                 if symbol_name == "reveal_type" {
-                    if let Some(builder) = self.context.report_lint(&UNDEFINED_REVEAL, name_node) {
+                    if !self.in_stub()
+                        && !self.is_in_type_checking_block(self.scope(), name_node)
+                        && let Some(builder) =
+                            self.context.report_lint(&UNDEFINED_REVEAL, name_node)
+                    {
                         let mut diag =
                             builder.into_diagnostic("`reveal_type` used without importing it");
                         diag.info(
