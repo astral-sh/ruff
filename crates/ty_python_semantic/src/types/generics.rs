@@ -2018,18 +2018,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         (ty, ty)
                     };
-                    RelationConstraintSet::from_constraint_set(
+                    RelationConstraintSet::from(ConstraintSet::constrain_typevar(
                         db,
+                        env,
                         self.constraints,
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            env,
-                            self.constraints,
-                            typevar,
-                            lower,
-                            upper,
-                        ),
-                    )
+                        typevar,
+                        lower,
+                        upper,
+                    ))
                 } else {
                     self.check_type_pair(db, target_type, source_type).and(
                         db,

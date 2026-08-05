@@ -2153,12 +2153,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 })
                         })
                     };
-                    return RelationConstraintSet::from_constraint_set(
+                    return RelationConstraintSet::from(param_spec_matches).and(
                         db,
                         self.constraints,
-                        param_spec_matches,
-                    )
-                    .and(db, self.constraints, return_types_match);
+                        return_types_match,
+                    );
                 }
 
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
@@ -2213,12 +2212,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 })
                         })
                     };
-                    return RelationConstraintSet::from_constraint_set(
+                    return RelationConstraintSet::from(param_spec_matches).and(
                         db,
                         self.constraints,
-                        param_spec_matches,
-                    )
-                    .and(db, self.constraints, return_types_match);
+                        return_types_match,
+                    );
                 }
 
                 _ => {}

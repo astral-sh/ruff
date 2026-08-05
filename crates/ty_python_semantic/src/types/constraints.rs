@@ -426,7 +426,7 @@ impl<'db> OwnedRelationConstraintSet<'db> {
             ConstraintSet::from_node(&builder, evidence.node, evidence.source_order)
         };
         let relation = match self {
-            Self::Boolean(evidence) => RelationConstraintSet::from_boolean(load(evidence)),
+            Self::Boolean(evidence) => RelationConstraintSet::from(load(evidence)),
             Self::EvidencePair(evidence) => RelationConstraintSet::from_evidence_pair(
                 load(&evidence.positive_evidence),
                 load(&evidence.negative_evidence),
@@ -513,30 +513,17 @@ pub(crate) struct ConstraintSet<'db, 'c> {
 /// positive evidence. Those relations retain only that one constraint set. Independent evidence
 /// is stored only when the two sides cannot be represented as complements.
 ///
-/// `tagged_node` is a regular BDD node for Boolean relations. Three node IDs that cannot be
-/// created by the BDD builder encode the non-Boolean states, keeping this type the same size as a
-/// [`ConstraintSet`].
+/// `tagged_evidence` is a regular constraint set for Boolean relations. Two node IDs that cannot
+/// be created by the BDD builder encode an evidence pair and its negation. For those tags, the
+/// `source_order` field instead contains the index into `relation_evidence`; a missing index
+/// represents an indeterminate relation.
 #[derive(Clone, Copy)]
 pub(crate) struct RelationConstraintSet<'db, 'c> {
-    tagged_node: NodeId,
-
-    /// The source order for a Boolean relation. For an evidence-pair tag, this instead contains
-    /// the index into `relation_evidence`; an indeterminate relation has no payload.
-    source_order_or_evidence: Option<SourceOrderId>,
-    builder: &'c ConstraintSetBuilder<'db>,
-
-    /// Ensures that the `'c` lifetime is invariant
-    _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
+    tagged_evidence: ConstraintSet<'db, 'c>,
 }
 
-static_assertions::const_assert_eq!(
-    std::mem::size_of::<RelationConstraintSet<'static, 'static>>(),
-    std::mem::size_of::<ConstraintSet<'static, 'static>>()
-);
-
-const INDETERMINATE_RELATION: NodeId = NodeId(0xffff_fffd);
-const EVIDENCE_PAIR_RELATION: NodeId = NodeId(0xffff_fffc);
-const SWAPPED_EVIDENCE_PAIR_RELATION: NodeId = NodeId(0xffff_fffb);
+const EVIDENCE_PAIR_RELATION: NodeId = NodeId(0xffff_fffd);
+const SWAPPED_EVIDENCE_PAIR_RELATION: NodeId = NodeId(0xffff_fffc);
 
 #[derive(Clone, Copy, Debug)]
 struct RelationEvidence {
@@ -544,58 +531,26 @@ struct RelationEvidence {
     negative: (NodeId, Option<SourceOrderId>),
 }
 
-impl RelationEvidence {
-    fn swapped(self) -> Self {
+impl<'db, 'c> From<ConstraintSet<'db, 'c>> for RelationConstraintSet<'db, 'c> {
+    fn from(evidence: ConstraintSet<'db, 'c>) -> Self {
         Self {
-            positive: self.negative,
-            negative: self.positive,
+            tagged_evidence: evidence,
         }
-    }
-}
-
-pub(crate) trait IntoRelationConstraintSet<'db, 'c> {
-    fn into_relation_constraint_set(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> RelationConstraintSet<'db, 'c>;
-}
-
-impl<'db, 'c> IntoRelationConstraintSet<'db, 'c> for RelationConstraintSet<'db, 'c> {
-    fn into_relation_constraint_set(
-        self,
-        _db: &'db dyn Db,
-        _builder: &'c ConstraintSetBuilder<'db>,
-    ) -> RelationConstraintSet<'db, 'c> {
-        self
-    }
-}
-
-impl<'db, 'c> IntoRelationConstraintSet<'db, 'c> for ConstraintSet<'db, 'c> {
-    fn into_relation_constraint_set(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> RelationConstraintSet<'db, 'c> {
-        RelationConstraintSet::from_constraint_set(db, builder, self)
     }
 }
 
 impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     pub(crate) fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_boolean(ConstraintSet::always(builder))
+        Self::from(ConstraintSet::always(builder))
     }
 
     pub(crate) fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self::from_boolean(ConstraintSet::never(builder))
+        Self::from(ConstraintSet::never(builder))
     }
 
     pub(crate) fn indeterminate(builder: &'c ConstraintSetBuilder<'db>) -> Self {
         Self {
-            tagged_node: INDETERMINATE_RELATION,
-            source_order_or_evidence: None,
-            builder,
-            _invariant: PhantomData,
+            tagged_evidence: ConstraintSet::from_node(builder, EVIDENCE_PAIR_RELATION, None),
         }
     }
 
@@ -607,37 +562,19 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         }
     }
 
-    /// Lifts a fully decided Boolean constraint set into a relation result.
-    pub(crate) fn from_constraint_set(
-        _db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        positive_evidence: ConstraintSet<'db, 'c>,
-    ) -> Self {
-        positive_evidence.verify_builder(builder);
-        Self::from_boolean(positive_evidence)
-    }
-
-    fn from_boolean(evidence: ConstraintSet<'db, 'c>) -> Self {
-        Self {
-            tagged_node: evidence.node,
-            source_order_or_evidence: evidence.source_order,
-            builder: evidence.builder,
-            _invariant: PhantomData,
-        }
-    }
-
     fn boolean_evidence(self) -> Option<ConstraintSet<'db, 'c>> {
         if matches!(
-            self.tagged_node,
-            INDETERMINATE_RELATION | EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION
+            self.tagged_evidence.node,
+            EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION
         ) {
             return None;
         }
-        Some(ConstraintSet::from_node(
-            self.builder,
-            self.tagged_node,
-            self.source_order_or_evidence,
-        ))
+        Some(self.tagged_evidence)
+    }
+
+    fn is_indeterminate(self) -> bool {
+        self.tagged_evidence.node == EVIDENCE_PAIR_RELATION
+            && self.tagged_evidence.source_order.is_none()
     }
 
     fn from_evidence_pair(
@@ -655,7 +592,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
             || (positive_evidence.is_trivially_never_satisfied()
                 && negative_evidence.is_trivially_always_satisfied())
         {
-            Self::from_boolean(positive_evidence)
+            Self::from(positive_evidence)
         } else {
             let evidence = builder
                 .storage
@@ -666,52 +603,41 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
                     negative: (negative_evidence.node, negative_evidence.source_order),
                 });
             Self {
-                tagged_node: EVIDENCE_PAIR_RELATION,
-                source_order_or_evidence: Some(SourceOrderId::from_u32(evidence.as_u32())),
-                builder,
-                _invariant: PhantomData,
+                tagged_evidence: ConstraintSet::from_node(
+                    builder,
+                    EVIDENCE_PAIR_RELATION,
+                    Some(SourceOrderId::from_u32(evidence.as_u32())),
+                ),
             }
         }
     }
 
     fn into_evidence_pair(self) -> (ConstraintSet<'db, 'c>, ConstraintSet<'db, 'c>) {
-        match self.tagged_node {
-            INDETERMINATE_RELATION => {
-                let never = ConstraintSet::never(self.builder);
-                (never, never)
-            }
+        let tagged_evidence = self.tagged_evidence;
+        match tagged_evidence.node {
             EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION => {
-                let Some(evidence_id) = self.source_order_or_evidence else {
+                let Some(evidence_id) = tagged_evidence.source_order else {
+                    debug_assert_eq!(tagged_evidence.node, EVIDENCE_PAIR_RELATION);
                     return (
-                        ConstraintSet::never(self.builder),
-                        ConstraintSet::never(self.builder),
+                        ConstraintSet::never(tagged_evidence.builder),
+                        ConstraintSet::never(tagged_evidence.builder),
                     );
                 };
                 let evidence_id = RelationEvidenceId::from_u32(evidence_id.as_u32());
-                let evidence = self.builder.storage.borrow().relation_evidence[evidence_id];
-                let evidence = if self.tagged_node == SWAPPED_EVIDENCE_PAIR_RELATION {
-                    evidence.swapped()
+                let evidence =
+                    tagged_evidence.builder.storage.borrow().relation_evidence[evidence_id];
+                let (positive, negative) = if tagged_evidence.node == SWAPPED_EVIDENCE_PAIR_RELATION
+                {
+                    (evidence.negative, evidence.positive)
                 } else {
-                    evidence
+                    (evidence.positive, evidence.negative)
                 };
                 (
-                    ConstraintSet::from_node(
-                        self.builder,
-                        evidence.positive.0,
-                        evidence.positive.1,
-                    ),
-                    ConstraintSet::from_node(
-                        self.builder,
-                        evidence.negative.0,
-                        evidence.negative.1,
-                    ),
+                    ConstraintSet::from_node(tagged_evidence.builder, positive.0, positive.1),
+                    ConstraintSet::from_node(tagged_evidence.builder, negative.0, negative.1),
                 )
             }
-            node => {
-                let evidence =
-                    ConstraintSet::from_node(self.builder, node, self.source_order_or_evidence);
-                (evidence, evidence.negated())
-            }
+            _ => (tagged_evidence, tagged_evidence.negated()),
         }
     }
 
@@ -724,8 +650,6 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     pub(crate) fn positive_evidence(self) -> ConstraintSet<'db, 'c> {
         if let Some(evidence) = self.boolean_evidence() {
             evidence
-        } else if self.tagged_node == INDETERMINATE_RELATION {
-            ConstraintSet::never(self.builder)
         } else {
             self.into_evidence_pair().0
         }
@@ -739,8 +663,6 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     pub(crate) fn is_always_true(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         if let Some(evidence) = self.boolean_evidence() {
             evidence.is_always_satisfied(db, env)
-        } else if self.tagged_node == INDETERMINATE_RELATION {
-            false
         } else {
             let (positive_evidence, negative_evidence) = self.into_evidence_pair();
             positive_evidence.is_always_satisfied(db, env)
@@ -755,8 +677,6 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     pub(crate) fn is_always_false(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         if let Some(evidence) = self.boolean_evidence() {
             evidence.is_never_satisfied(db, env)
-        } else if self.tagged_node == INDETERMINATE_RELATION {
-            false
         } else {
             let (positive_evidence, negative_evidence) = self.into_evidence_pair();
             positive_evidence.is_never_satisfied(db, env)
@@ -772,41 +692,17 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     ) -> bool {
         if let Some(evidence) = self.boolean_evidence() {
             !evidence.is_always_satisfied(db, env)
-        } else if self.tagged_node == INDETERMINATE_RELATION {
-            false
         } else {
             !self.into_evidence_pair().1.is_never_satisfied(db, env)
         }
     }
 
     fn is_trivially_always_true(self) -> bool {
-        if self.tagged_node == ALWAYS_TRUE {
-            true
-        } else if matches!(
-            self.tagged_node,
-            EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION
-        ) {
-            let (positive_evidence, negative_evidence) = self.into_evidence_pair();
-            positive_evidence.is_trivially_always_satisfied()
-                && negative_evidence.is_trivially_never_satisfied()
-        } else {
-            false
-        }
+        self.tagged_evidence.node == ALWAYS_TRUE
     }
 
     fn is_trivially_always_false(self) -> bool {
-        if self.tagged_node == ALWAYS_FALSE {
-            true
-        } else if matches!(
-            self.tagged_node,
-            EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION
-        ) {
-            let (positive_evidence, negative_evidence) = self.into_evidence_pair();
-            positive_evidence.is_trivially_never_satisfied()
-                && negative_evidence.is_trivially_always_satisfied()
-        } else {
-            false
-        }
+        self.tagged_evidence.node == ALWAYS_FALSE
     }
 
     #[inline]
@@ -817,13 +713,15 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         other: T,
     ) -> Self
     where
-        T: IntoRelationConstraintSet<'db, 'c>,
+        T: Into<RelationConstraintSet<'db, 'c>>,
     {
-        let other = other.into_relation_constraint_set(db, builder);
+        let other = other.into();
+        self.tagged_evidence.verify_builder(builder);
+        other.tagged_evidence.verify_builder(builder);
         *self = match (self.boolean_evidence(), other.boolean_evidence()) {
             (Some(mut left), Some(right)) => {
                 left.union(db, builder, right);
-                Self::from_boolean(left)
+                Self::from(left)
             }
             _ => self.union_non_boolean(db, builder, other),
         };
@@ -852,13 +750,15 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         other: T,
     ) -> Self
     where
-        T: IntoRelationConstraintSet<'db, 'c>,
+        T: Into<RelationConstraintSet<'db, 'c>>,
     {
-        let other = other.into_relation_constraint_set(db, builder);
+        let other = other.into();
+        self.tagged_evidence.verify_builder(builder);
+        other.tagged_evidence.verify_builder(builder);
         *self = match (self.boolean_evidence(), other.boolean_evidence()) {
             (Some(mut left), Some(right)) => {
                 left.intersect(db, builder, right);
-                Self::from_boolean(left)
+                Self::from(left)
             }
             _ => self.intersect_non_boolean(db, builder, other),
         };
@@ -879,20 +779,27 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         Self::from_evidence_pair(positive, negative)
     }
 
-    pub(crate) fn negate(self, _db: &'db dyn Db, _builder: &'c ConstraintSetBuilder<'db>) -> Self {
+    pub(crate) fn negate(
+        mut self,
+        _db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        self.tagged_evidence.verify_builder(builder);
         if let Some(evidence) = self.boolean_evidence() {
-            return Self::from_boolean(evidence.negated());
+            return Self::from(evidence.negated());
         }
-        match self.tagged_node {
-            INDETERMINATE_RELATION => self,
-            EVIDENCE_PAIR_RELATION => Self {
-                tagged_node: SWAPPED_EVIDENCE_PAIR_RELATION,
-                ..self
-            },
-            SWAPPED_EVIDENCE_PAIR_RELATION => Self {
-                tagged_node: EVIDENCE_PAIR_RELATION,
-                ..self
-            },
+        if self.is_indeterminate() {
+            return self;
+        }
+        match self.tagged_evidence.node {
+            EVIDENCE_PAIR_RELATION => {
+                self.tagged_evidence.node = SWAPPED_EVIDENCE_PAIR_RELATION;
+                self
+            }
+            SWAPPED_EVIDENCE_PAIR_RELATION => {
+                self.tagged_evidence.node = EVIDENCE_PAIR_RELATION;
+                self
+            }
             _ => self,
         }
     }
@@ -905,7 +812,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         other: impl FnOnce() -> T,
     ) -> Self
     where
-        T: IntoRelationConstraintSet<'db, 'c>,
+        T: Into<RelationConstraintSet<'db, 'c>>,
     {
         if !self.is_trivially_always_false() {
             self.intersect(db, builder, other());
@@ -921,7 +828,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         other: impl FnOnce() -> T,
     ) -> Self
     where
-        T: IntoRelationConstraintSet<'db, 'c>,
+        T: Into<RelationConstraintSet<'db, 'c>>,
     {
         if !self.is_trivially_always_true() {
             self.union(db, builder, other());
@@ -941,9 +848,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         to_remove: TypeVarSet<'db>,
     ) -> Self {
         if let Some(evidence) = self.boolean_evidence() {
-            Self::from_boolean(evidence.reduce_inferable(db, env, builder, to_remove))
-        } else if self.tagged_node == INDETERMINATE_RELATION {
-            self
+            Self::from(evidence.reduce_inferable(db, env, builder, to_remove))
         } else {
             let (positive_evidence, negative_evidence) = self.into_evidence_pair();
             Self::from_evidence_pair(
@@ -962,9 +867,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let Some(evidence) = self.boolean_evidence() {
-            Self::from_boolean(evidence.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-        } else if self.tagged_node == INDETERMINATE_RELATION {
-            self
+            Self::from(evidence.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
         } else {
             let (positive_evidence, negative_evidence) = self.into_evidence_pair();
             Self::from_evidence_pair(
@@ -1770,18 +1673,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         let roots = if let Some(evidence) = relation.boolean_evidence() {
             RelationRoots::Boolean((evidence.node, evidence.source_order))
         } else {
-            match relation.tagged_node {
-                INDETERMINATE_RELATION => {
-                    RelationRoots::EvidencePair([(ALWAYS_FALSE, None), (ALWAYS_FALSE, None)])
-                }
-                _ => {
-                    let (positive_evidence, negative_evidence) = relation.into_evidence_pair();
-                    RelationRoots::EvidencePair([
-                        (positive_evidence.node, positive_evidence.source_order),
-                        (negative_evidence.node, negative_evidence.source_order),
-                    ])
-                }
-            }
+            let (positive_evidence, negative_evidence) = relation.into_evidence_pair();
+            RelationRoots::EvidencePair([
+                (positive_evidence.node, positive_evidence.source_order),
+                (negative_evidence.node, negative_evidence.source_order),
+            ])
         };
 
         match roots {
@@ -1973,11 +1869,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         match other {
             OwnedRelationConstraintSet::Boolean(evidence) => {
                 let (node, source_order) = storage.load(db, env, evidence);
-                RelationConstraintSet::from_boolean(ConstraintSet::from_node(
-                    self,
-                    node,
-                    source_order,
-                ))
+                RelationConstraintSet::from(ConstraintSet::from_node(self, node, source_order))
             }
             OwnedRelationConstraintSet::EvidencePair(evidence) => {
                 let [positive_evidence, negative_evidence] = storage.load_roots(

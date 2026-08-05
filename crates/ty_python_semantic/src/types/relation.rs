@@ -1322,12 +1322,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         if self.relation == TypeRelation::SubtypingAssuming
             && (source.is_type_var() || target.is_type_var())
         {
-            return RelationConstraintSet::from_constraint_set(
+            return RelationConstraintSet::from(self.given.implies_subtype_of(
                 db,
+                env,
                 self.constraints,
-                self.given
-                    .implies_subtype_of(db, env, self.constraints, source, target),
-            );
+                source,
+                target,
+            ));
         }
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -1344,34 +1345,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 } else {
                     target
                 };
-                return RelationConstraintSet::from_constraint_set(
+                return RelationConstraintSet::from(ConstraintSet::constrain_typevar_upper_bound(
                     db,
+                    env,
                     self.constraints,
-                    ConstraintSet::constrain_typevar_upper_bound(
-                        db,
-                        env,
-                        self.constraints,
-                        bound_typevar,
-                        upper,
-                    ),
-                );
+                    bound_typevar,
+                    upper,
+                ));
             } else if let Type::TypeVar(bound_typevar) = target {
                 let lower = if self.relation.is_subtyping() {
                     source.top_materialization(db, env)
                 } else {
                     source
                 };
-                return RelationConstraintSet::from_constraint_set(
+                return RelationConstraintSet::from(ConstraintSet::constrain_typevar_lower_bound(
                     db,
+                    env,
                     self.constraints,
-                    ConstraintSet::constrain_typevar_lower_bound(
-                        db,
-                        env,
-                        self.constraints,
-                        bound_typevar,
-                        lower,
-                    ),
-                );
+                    bound_typevar,
+                    lower,
+                ));
             }
         }
 
@@ -3453,51 +3446,37 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::NominalInstance(instance), Type::LiteralValue(literal)) => {
                 nontrivial_check(self, || {
                     let positive_relation_holds = match literal.kind() {
-                        LiteralValueTypeKind::Int(_) => RelationConstraintSet::from_constraint_set(
-                            db,
-                            self.constraints,
-                            KnownClass::Int.when_subclass_of(
+                        LiteralValueTypeKind::Int(_) => {
+                            RelationConstraintSet::from(KnownClass::Int.when_subclass_of(
                                 db,
                                 env,
                                 instance.class(db, env),
                                 self.constraints,
-                            ),
-                        ),
+                            ))
+                        }
                         LiteralValueTypeKind::Bool(_) => {
-                            RelationConstraintSet::from_constraint_set(
+                            RelationConstraintSet::from(KnownClass::Bool.when_subclass_of(
                                 db,
+                                env,
+                                instance.class(db, env),
                                 self.constraints,
-                                KnownClass::Bool.when_subclass_of(
-                                    db,
-                                    env,
-                                    instance.class(db, env),
-                                    self.constraints,
-                                ),
-                            )
+                            ))
                         }
                         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
-                            RelationConstraintSet::from_constraint_set(
+                            RelationConstraintSet::from(KnownClass::Str.when_subclass_of(
                                 db,
+                                env,
+                                instance.class(db, env),
                                 self.constraints,
-                                KnownClass::Str.when_subclass_of(
-                                    db,
-                                    env,
-                                    instance.class(db, env),
-                                    self.constraints,
-                                ),
-                            )
+                            ))
                         }
                         LiteralValueTypeKind::Bytes(_) => {
-                            RelationConstraintSet::from_constraint_set(
+                            RelationConstraintSet::from(KnownClass::Bytes.when_subclass_of(
                                 db,
+                                env,
+                                instance.class(db, env),
                                 self.constraints,
-                                KnownClass::Bytes.when_subclass_of(
-                                    db,
-                                    env,
-                                    instance.class(db, env),
-                                    self.constraints,
-                                ),
-                            )
+                            ))
                         }
                         LiteralValueTypeKind::Enum(enum_literal) => self
                             .as_relation_checker(TypeRelation::Subtyping)
@@ -3516,16 +3495,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 // A boolean literal must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
                 nontrivial_check(self, || {
-                    RelationConstraintSet::from_constraint_set(
+                    RelationConstraintSet::from(KnownClass::Bool.when_subclass_of(
                         db,
+                        env,
+                        instance.class(db, env),
                         self.constraints,
-                        KnownClass::Bool.when_subclass_of(
-                            db,
-                            env,
-                            instance.class(db, env),
-                            self.constraints,
-                        ),
-                    )
+                    ))
                     .negate(db, self.constraints)
                 })
             }
@@ -3572,16 +3547,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
                 nontrivial_check(self, || {
-                    RelationConstraintSet::from_constraint_set(
+                    RelationConstraintSet::from(KnownClass::FunctionType.when_subclass_of(
                         db,
+                        env,
+                        instance.class(db, env),
                         self.constraints,
-                        KnownClass::FunctionType.when_subclass_of(
-                            db,
-                            env,
-                            instance.class(db, env),
-                            self.constraints,
-                        ),
-                    )
+                    ))
                     .negate(db, self.constraints)
                 })
             }
