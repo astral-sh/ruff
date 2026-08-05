@@ -888,6 +888,9 @@ fn specialize_narrowing_target<'db>(
 }
 
 /// Infer a generic subclass specialization from a specialized base class.
+///
+/// For example, if `target_class` is `list` and `subject_class` is `Sequence[int]`,
+/// this returns the specialized class `list[int]`.
 fn specialize_generic_class_for_subject<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
