@@ -1007,6 +1007,45 @@ def _(
     x(1.0)
 ```
 
+### Constructor intersection diagnostics retain the called class types
+
+When an intersection of class objects rejects a constructor call, the diagnostic should describe the
+original class types instead of reconstructing an intersection from their `__init__` and `__new__`
+methods.
+
+```py
+from typing import Self
+
+class UsesInit:
+    def __init__(self, value: int) -> None: ...
+
+class UsesNew:
+    def __new__(cls, value: str) -> Self:
+        return object.__new__(cls)
+
+def _(cls: type[UsesInit]) -> None:
+    if issubclass(cls, UsesNew):
+        reveal_type(cls)  # revealed: type[UsesInit] & type[UsesNew]
+        # error: [invalid-argument-type] "UsesNew.__new__"
+        # snapshot: invalid-argument-type
+        cls(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
+  --> src/mdtest_snippet.py:15:13
+   |
+15 |         cls(None)
+   |             ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
+info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
+```
+
 ### Error priority: binding error over top-callable
 
 When intersection elements fail with different error types, we use a priority hierarchy to determine

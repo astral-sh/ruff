@@ -1005,6 +1005,124 @@ info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 ```
 
+## Union of intersected constructors retains the called class types
+
+When one union variant is an intersection of class objects, its constructor diagnostics should
+describe that original intersection instead of intersecting the underlying constructor methods.
+
+```py
+from typing_extensions import Self
+
+class UsesInit:
+    def __init__(self, value: int) -> None: ...
+
+class UsesNew:
+    def __new__(cls, value: str) -> Self:
+        return object.__new__(cls)
+
+class UsesBytes:
+    def __init__(self, value: bytes) -> None: ...
+
+def _(cls: type[UsesInit], other: type[UsesBytes], condition: bool) -> None:
+    if issubclass(cls, UsesNew):
+        constructor = cls if condition else other
+        reveal_type(constructor)  # revealed: (type[UsesInit] & type[UsesNew]) | type[UsesBytes]
+        # error: [invalid-argument-type] "UsesBytes.__init__"
+        # error: [invalid-argument-type] "UsesNew.__new__"
+        # snapshot: invalid-argument-type
+        constructor(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
+  --> src/mdtest_snippet.py:20:21
+   |
+20 |         constructor(None)
+   |                     ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
+info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
+info: Attempted to call union type `(type[UsesInit] & type[UsesNew]) | type[UsesBytes]`
+```
+
+## Union intersection diagnostics retain excluded types
+
+A failing intersection inside a union should keep its excluded type in the intersection-specific
+diagnostic, even though the exclusion does not contribute a callable binding.
+
+```py
+from ty_extensions import Intersection, Not
+
+class IntCaller:
+    def __call__(self, value: int) -> None: ...
+
+class Required: ...
+class Excluded: ...
+
+class AcceptsNone:
+    def __call__(self, value: None) -> None: ...
+
+def _(value: Intersection[IntCaller, Required, Not[Excluded]] | AcceptsNone) -> None:
+    # snapshot: invalid-argument-type
+    value(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:14:11
+   |
+14 |     value(None)
+   |           ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & Required & ~Excluded`
+info: Attempted to call union type `(IntCaller & Required & ~Excluded) | AcceptsNone`
+```
+
+## Union variants retain excluded types with one callable
+
+An intersection with only one positive callable is still a distinct union variant, so its excluded
+type should remain visible in the variant-specific diagnostic.
+
+```py
+from ty_extensions import Intersection, Not
+
+class IntCaller:
+    def __call__(self, value: int) -> None: ...
+
+class Excluded: ...
+
+class AcceptsNone:
+    def __call__(self, value: None) -> None: ...
+
+def _(value: Intersection[IntCaller, Not[Excluded]] | AcceptsNone) -> None:
+    # snapshot: invalid-argument-type
+    value(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is incorrect
+  --> src/mdtest_snippet.py:13:11
+   |
+13 |     value(None)
+   |           ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __call__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Union variant `IntCaller & ~Excluded` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & ~Excluded) | AcceptsNone`
+```
+
 ## Union semantics with constrained callable typevars
 
 ```toml
