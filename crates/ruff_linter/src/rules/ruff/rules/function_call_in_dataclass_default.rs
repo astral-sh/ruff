@@ -85,31 +85,28 @@ pub(crate) fn function_call_in_dataclass_default(
 ) {
     let semantic = checker.semantic();
 
-    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic, scope_id) else {
         return;
     };
 
-    let attrs_auto_attribs = match dataclass_kind {
-        DataclassKind::Stdlib => None,
-
-        DataclassKind::Attrs(auto_attribs) => match auto_attribs {
-            AttrsAutoAttribs::Unknown => return,
-
-            AttrsAutoAttribs::None => {
-                if any_annotated(&class_def.body) {
-                    Some(AttrsAutoAttribs::True)
-                } else {
-                    Some(AttrsAutoAttribs::False)
-                }
-            }
-
-            _ => Some(auto_attribs),
-        },
+    // Resolve `AttrsAutoAttribs::None` (i.e. auto-detect) to a concrete `True`/`False`, now that
+    // we can inspect the class body. Other dataclass kinds pass through unchanged.
+    let dataclass_kind = match dataclass_kind {
+        DataclassKind::Attrs(AttrsAutoAttribs::Unknown) => return,
+        DataclassKind::Attrs(AttrsAutoAttribs::None) => {
+            let auto_attribs = if any_annotated(&class_def.body) {
+                AttrsAutoAttribs::True
+            } else {
+                AttrsAutoAttribs::False
+            };
+            DataclassKind::Attrs(auto_attribs)
+        }
+        dataclass_kind => dataclass_kind,
     };
 
-    let dataclass_kind = match attrs_auto_attribs {
-        None => DataclassKind::Stdlib,
-        Some(auto_attribs) => DataclassKind::Attrs(auto_attribs),
+    let attrs_auto_attribs = match dataclass_kind {
+        DataclassKind::Attrs(auto_attribs) => Some(auto_attribs),
+        DataclassKind::Stdlib | DataclassKind::Transform(_) => None,
     };
 
     let extend_immutable_calls: Vec<QualifiedName> = checker
@@ -133,7 +130,7 @@ pub(crate) fn function_call_in_dataclass_default(
             continue;
         };
 
-        let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
+        let is_field = is_dataclass_field(func, checker.semantic(), &dataclass_kind);
 
         // Non-explicit fields in an `attrs` dataclass
         // with `auto_attribs=False` are class variables.
@@ -183,7 +180,8 @@ fn is_frozen_dataclass_instantiation(
                 return false;
             };
 
-            let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
+            let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic, scope_id)
+            else {
                 return false;
             };
             is_frozen_dataclass(dataclass_decorator, semantic)

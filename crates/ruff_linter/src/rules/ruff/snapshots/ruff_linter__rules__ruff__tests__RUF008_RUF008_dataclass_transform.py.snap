@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF008 Do not use mutable default values for dataclass attributes
+  --> RUF008_dataclass_transform.py:21:34
+   |
+19 | @create_model()
+20 | class CustomerModel:
+21 |     mutable_default: list[int] = []
+   |                                  ^^
+22 |     class_variable: ClassVar[list[int]] = []
+   |

@@ -1,6 +1,7 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::ScopeId;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -71,10 +72,14 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_dataclass_default(
+    checker: &Checker,
+    class_def: &ast::StmtClassDef,
+    scope_id: ScopeId,
+) {
     let semantic = checker.semantic();
 
-    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic, scope_id) else {
         return;
     };
 
@@ -92,7 +97,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             Expr::Call(ast::ExprCall {
                 func, arguments, ..
             }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
-                && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
+                && is_dataclass_field(func, checker.semantic(), &dataclass_kind) =>
             {
                 arguments.find_argument_value("default", 0)
             }

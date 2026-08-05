@@ -68,7 +68,7 @@ impl Violation for ImplicitClassVarInDataclass {
 
 /// RUF045
 pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: &StmtClassDef) {
-    let dataclass_kind = dataclass_kind(class_def, checker.semantic());
+    let dataclass_kind = dataclass_kind(class_def, checker.semantic(), checker.semantic().scope_id);
 
     if !matches!(dataclass_kind, Some((DataclassKind::Stdlib, _))) {
         return;
