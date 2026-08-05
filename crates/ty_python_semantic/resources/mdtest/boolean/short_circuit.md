@@ -171,7 +171,7 @@ def _(x: str):
     if not (x and (y := x)):
         raise ValueError
 
-    reveal_type(y)  # revealed: str & ~AlwaysFalsy
+    reveal_type(y)  # revealed: str
 ```
 
 ## Other condition consumers

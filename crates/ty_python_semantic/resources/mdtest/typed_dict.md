@@ -1378,8 +1378,8 @@ def process_aliased_unpacking(data: RecordAlias) -> Record:
     return Record(**data)
 ```
 
-Intersection types containing a TypedDict (e.g., from truthiness narrowing) are also supported. With
-`total=False`, TypedDicts can be empty (falsy), so truthiness narrowing creates an intersection:
+TypedDicts with `total=False` can be empty (falsy), but construction after a truthiness check is
+still supported:
 
 ```py
 from typing import TypedDict
@@ -1390,8 +1390,7 @@ class OptionalInfo(TypedDict, total=False):
 
 def process_truthy(data: OptionalInfo) -> OptionalInfo:
     if data:
-        reveal_type(data)  # revealed: OptionalInfo & ~AlwaysFalsy
-        # Here data is `OptionalInfo & ~AlwaysFalsy`, but we can still construct OptionalInfo from it
+        reveal_type(data)  # revealed: OptionalInfo
         return OptionalInfo(data)
     return {}
 

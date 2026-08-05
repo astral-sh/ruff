@@ -299,7 +299,7 @@ def f(l: list[str | None] | None):
 def f(a: A):
     if a:
         def _():
-            reveal_type(a)  # revealed: A & ~AlwaysFalsy
+            reveal_type(a)  # revealed: A
     a.x = None
 ```
 

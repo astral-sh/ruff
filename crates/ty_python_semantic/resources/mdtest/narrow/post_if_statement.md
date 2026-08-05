@@ -398,5 +398,5 @@ api_key = data.get("api_key")
 if not api_key:
     exit(1)
 
-reveal_type(api_key)  # revealed: str & ~AlwaysFalsy
+reveal_type(api_key)  # revealed: str
 ```

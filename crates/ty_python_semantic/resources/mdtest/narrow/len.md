@@ -58,9 +58,9 @@ and `tuple[()]` in the negative case (see <https://github.com/astral-sh/ty/issue
 ```py
 def _(x: tuple[int, ...]):
     if len(x):
-        reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysFalsy
+        reveal_type(x)  # revealed: tuple[int, ...]
     else:
-        reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysTruthy
+        reveal_type(x)  # revealed: tuple[int, ...]
 ```
 
 ## Exact length comparisons
@@ -287,9 +287,9 @@ from typing import Literal
 
 def _(x: Literal["foo", ""] | tuple[int, ...]):
     if len(x):
-        reveal_type(x)  # revealed: Literal["foo"] | (tuple[int, ...] & ~AlwaysFalsy)
+        reveal_type(x)  # revealed: Literal["foo"] | tuple[int, ...]
     else:
-        reveal_type(x)  # revealed: Literal[""] | (tuple[int, ...] & ~AlwaysTruthy)
+        reveal_type(x)  # revealed: Literal[""] | tuple[int, ...]
 ```
 
 ## Custom types that can be narrowed
@@ -408,10 +408,10 @@ def _(x: Literal["foo", ""] | list[int]):
         reveal_type(x)  # revealed: Literal[""] | list[int]
 ```
 
-## Narrowing away empty literals
+## Empty literals after truthiness checks
 
-This pattern is common when a prior truthiness check narrows a type, and then a conditional
-expression adds an empty literal back:
+When a prior truthiness check is followed by a conditional expression that adds an empty literal,
+the literal is absorbed into the wider `str` type:
 
 ```py
 def _(lines: list[str]):
@@ -419,13 +419,12 @@ def _(lines: list[str]):
         if not line:
             continue
 
-        reveal_type(line)  # revealed: str & ~AlwaysFalsy
+        reveal_type(line)  # revealed: str
         value = line if len(line) < 3 else ""
-        reveal_type(value)  # revealed: (str & ~AlwaysFalsy) | Literal[""]
+        reveal_type(value)  # revealed: str
 
         if len(value):
-            # `Literal[""]` is removed, `str & ~AlwaysFalsy` is unchanged
-            reveal_type(value)  # revealed: str & ~AlwaysFalsy
+            reveal_type(value)  # revealed: str
             # Accessing value[0] is safe here
             _ = value[0]
 ```
