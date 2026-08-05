@@ -91,9 +91,16 @@ def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
 
 ## Class patterns with generic classes
 
+### Gradual mode
+
+Generic class patterns follow the same gradual filtering as `isinstance()` checks.
+
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
 ```
 
 ```py
@@ -112,174 +119,22 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
-## Gradual generic class patterns
-
-Generic class patterns follow the same gradual filtering as `isinstance()` checks. Unknown type
-arguments remain gradual, while specialized base classes determine the arguments of matching
-subclasses.
-
-```toml
-[environment]
-python-version = "3.12"
-
-[analysis]
-strict-generic-narrowing = false
-```
-
-These classes provide invariant, partially inferred, and covariant inheritance relationships:
+A `list()` pattern preserves the type argument inherited from a specialized `Sequence`.
 
 ```py
-from collections.abc import Callable, Mapping, Sequence
-from typing import Generic, TypedDict, TypeVar
-from ty_extensions import Intersection
+from typing import Sequence
 
-T = TypeVar("T")
-U = TypeVar("U")
-CovariantT = TypeVar("CovariantT", covariant=True)
-
-class Base(Generic[T]): ...
-
-class Child(Base[T]):
-    item: T
-
-class PartialChild(Base[T], Generic[T, U]):
-    item: T
-
-class CovariantBase(Generic[CovariantT]): ...
-
-class CovariantChild(CovariantBase[CovariantT]):
-    item: CovariantT
-
-class Marker: ...
-
-class Payload(TypedDict):
-    item: int
-
-BoundedT = TypeVar("BoundedT", bound=Base[int] | None)
-UnionBoundedT = TypeVar("UnionBoundedT", bound=Base[int] | Base[str])
+def narrow_sequence_to_list(value: Sequence[int]) -> None:
+    match value:
+        case list():
+            reveal_type(value)  # revealed: list[int]
+        case _:
+            reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
 ```
 
-Matching an unknown object against `list` produces `list[Unknown]`. List elements remain gradual,
-mutations are accepted, and the fallback still excludes every possible list specialization:
+### Strict mode
 
-```py
-def match_unspecialized_list(value: object) -> None:
-    match value:
-        case list() as items:
-            reveal_type(value)  # revealed: list[Unknown]
-            reveal_type(items)  # revealed: list[Unknown]
-            reveal_type(items[0])  # revealed: Unknown
-            items.append(1)
-        case remaining:
-            reveal_type(remaining)  # revealed: ~Top[list[Unknown]]
-```
-
-Callable class patterns also retain an unknown callable signature instead of materializing its
-parameters and return value:
-
-```py
-def match_unspecialized_callable(value: object) -> None:
-    match value:
-        case Callable() as function:
-            reveal_type(value)  # revealed: (...) -> Unknown
-            reveal_type(function)  # revealed: (...) -> Unknown
-            reveal_type(function())  # revealed: Unknown
-            function(1)
-        case remaining:
-            reveal_type(remaining)  # revealed: ~Top[(...) -> object]
-```
-
-A specialized base class contributes its arguments to the matching subclass and its captures:
-
-```py
-def match_specialized_base(value: Base[int]) -> None:
-    match value:
-        case Child(item=item) as child:
-            reveal_type(value)  # revealed: Child[int]
-            reveal_type(child)  # revealed: Child[int]
-            reveal_type(item)  # revealed: int
-```
-
-Partially inferred and covariant subclasses likewise retain any argument known from the subject:
-
-```py
-def match_partially_inferred_subclass(value: Base[int]) -> None:
-    match value:
-        case PartialChild(item=item) as child:
-            reveal_type(child)  # revealed: PartialChild[int, Unknown]
-            reveal_type(item)  # revealed: int
-
-def match_covariant_subclass(value: CovariantBase[int]) -> None:
-    match value:
-        case CovariantChild(item=item) as child:
-            reveal_type(child)  # revealed: CovariantChild[int]
-            reveal_type(item)  # revealed: int
-```
-
-Type-variable bounds can also determine the matching subclass's attribute types:
-
-```py
-def match_optional_typevar_bound(value: BoundedT) -> None:
-    match value:
-        case Child(item=item):
-            reveal_type(item)  # revealed: int
-
-def match_union_typevar_bound(value: UnionBoundedT) -> None:
-    match value:
-        case Child(item=item):
-            reveal_type(item)  # revealed: int | str
-```
-
-A subclass pattern preserves unrelated information already present in an intersection:
-
-```py
-def match_intersection(value: Intersection[Marker, Base[int]]) -> None:
-    match value:
-        case Child(item=item) as child:
-            reveal_type(child)  # revealed: Marker & Child[int]
-            reveal_type(item)  # revealed: int
-```
-
-Tuple subclasses preserve inherited element types, and dictionary patterns preserve concrete
-`TypedDict` field information:
-
-```py
-def match_specialized_tuple(value: Sequence[int]) -> None:
-    match value:
-        case tuple() as items:
-            reveal_type(value)  # revealed: tuple[int, ...]
-            reveal_type(items)  # revealed: tuple[int, ...]
-
-def match_typed_dict(value: Payload | list[int]) -> None:
-    match value:
-        case dict() as payload:
-            reveal_type(value)  # revealed: Payload
-            reveal_type(payload)  # revealed: Payload
-            reveal_type(payload["item"])  # revealed: int
-
-def match_typed_dict_mapping(value: Payload) -> None:
-    match value:
-        case Mapping() as payload:
-            reveal_type(payload)  # revealed: Payload
-            reveal_type(payload["item"])  # revealed: int
-```
-
-A guard can use the inferred capture without excluding the matching subclass from later cases:
-
-```py
-def match_guarded_subclass(value: Base[int]) -> None:
-    match value:
-        case Child(item=item) as child if item > 0:
-            reveal_type(child)  # revealed: Child[int]
-            reveal_type(item)  # revealed: int
-        case remaining:
-            reveal_type(remaining)  # revealed: Base[int]
-```
-
-## Strict generic class patterns
-
-With strict generic narrowing enabled, class patterns retain their existing top materializations.
-Subclass captures use an inferred specialization only when every argument has one exact solution.
+With strict generic narrowing enabled, class patterns retain their top materializations.
 
 ```toml
 [environment]
@@ -289,89 +144,17 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-```py
-from collections.abc import Callable, Sequence
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-U = TypeVar("U")
-CovariantT = TypeVar("CovariantT", covariant=True)
-
-class Base(Generic[T]): ...
-
-class Child(Base[T]):
-    item: T
-
-class PartialChild(Base[T], Generic[T, U]):
-    item: T
-
-class CovariantBase(Generic[CovariantT]): ...
-
-class CovariantChild(CovariantBase[CovariantT]):
-    item: CovariantT
-```
-
-An unknown list is top-materialized, so reading returns `object` and writing is rejected:
+A `list()` pattern retains the original `Sequence` alongside the top-materialized list.
 
 ```py
-def match_unspecialized_list(value: object) -> None:
+from typing import Sequence
+
+def narrow_sequence_to_list(value: Sequence[int]) -> None:
     match value:
-        case list() as items:
-            reveal_type(value)  # revealed: Top[list[Unknown]]
-            reveal_type(items)  # revealed: Top[list[Unknown]]
-            reveal_type(items[0])  # revealed: object
-            # error: [invalid-argument-type]
-            items.append(1)
-        case remaining:
-            reveal_type(remaining)  # revealed: ~Top[list[Unknown]]
-```
-
-A top-materialized callable cannot safely be invoked:
-
-```py
-def match_unspecialized_callable(value: object) -> None:
-    match value:
-        case Callable() as function:
-            reveal_type(value)  # revealed: Top[(...) -> object]
-            reveal_type(function)  # revealed: Top[(...) -> object]
-            # error: [call-top-callable]
-            function(1)
-        case remaining:
-            reveal_type(remaining)  # revealed: ~Top[(...) -> object]
-```
-
-An invariant subclass with one exact specialization still produces a precise capture, even though
-the matched subject retains the conservative intersection:
-
-```py
-def match_specialized_base(value: Base[int]) -> None:
-    match value:
-        case Child(item=item) as child:
-            # revealed: Base[int] & Top[Child[Unknown]]
-            reveal_type(value)
-            # revealed: Base[int] & Top[Child[Unknown]]
-            reveal_type(child)
-            reveal_type(item)  # revealed: int
-```
-
-Additional unconstrained arguments and covariance do not have exact solutions:
-
-```py
-def match_partially_inferred_subclass(value: Base[int]) -> None:
-    match value:
-        case PartialChild(item=item):
-            reveal_type(item)  # revealed: Unknown
-
-def match_covariant_subclass(value: CovariantBase[int]) -> None:
-    match value:
-        case CovariantChild(item=item):
-            reveal_type(item)  # revealed: Unknown
-
-def match_specialized_tuple(value: Sequence[int]) -> None:
-    match value:
-        case tuple() as items:
-            reveal_type(value)  # revealed: Sequence[int] & tuple[object, ...]
-            reveal_type(items)  # revealed: Sequence[int] & tuple[object, ...]
+        case list():
+            reveal_type(value)  # revealed: Sequence[int] & Top[list[Unknown]]
+        case _:
+            reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
 ```
 
 ## Generic patterns ignore type parameter defaults
