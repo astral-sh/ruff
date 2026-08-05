@@ -13,7 +13,7 @@ use ty_static::EnvVars;
 use crate::Db;
 use crate::metadata::options::{
     EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
-    ToSettingsError,
+    ToProgramSettingsError, ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
@@ -572,8 +572,10 @@ impl MergedOptions<'_> {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
+    ) -> Result<
+        (ProgramSettings, Vec<ProgramSettingsDiagnostic>),
+        Strategy::Error<ToProgramSettingsError>,
+    > {
         self.options.to_program_settings(
             OptionsContext::Project(self.metadata.root()),
             self.metadata.name(),
