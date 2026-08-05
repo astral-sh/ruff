@@ -756,15 +756,23 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
                 left.union(db, builder, right);
                 Self::Boolean(left)
             }
-            (left, right) => {
-                let (mut positive, mut negative) = left.into_evidence_pair();
-                let (other_positive, other_negative) = right.into_evidence_pair();
-                positive.union(db, builder, other_positive);
-                negative.intersect(db, builder, other_negative);
-                Self::from_evidence_pair(positive, negative)
-            }
+            (left, right) => left.union_non_boolean(db, builder, right),
         };
         *self
+    }
+
+    #[cold]
+    fn union_non_boolean(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
+        let (mut positive, mut negative) = self.into_evidence_pair();
+        let (other_positive, other_negative) = other.into_evidence_pair();
+        positive.union(db, builder, other_positive);
+        negative.intersect(db, builder, other_negative);
+        Self::from_evidence_pair(positive, negative)
     }
 
     pub(crate) fn intersect<T>(
@@ -782,15 +790,23 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
                 left.intersect(db, builder, right);
                 Self::Boolean(left)
             }
-            (left, right) => {
-                let (mut positive, mut negative) = left.into_evidence_pair();
-                let (other_positive, other_negative) = right.into_evidence_pair();
-                positive.intersect(db, builder, other_positive);
-                negative.union(db, builder, other_negative);
-                Self::from_evidence_pair(positive, negative)
-            }
+            (left, right) => left.intersect_non_boolean(db, builder, right),
         };
         *self
+    }
+
+    #[cold]
+    fn intersect_non_boolean(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
+        let (mut positive, mut negative) = self.into_evidence_pair();
+        let (other_positive, other_negative) = other.into_evidence_pair();
+        positive.intersect(db, builder, other_positive);
+        negative.union(db, builder, other_negative);
+        Self::from_evidence_pair(positive, negative)
     }
 
     pub(crate) fn negate(self, _db: &'db dyn Db, _builder: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -809,6 +825,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         }
     }
 
+    #[inline]
     pub(crate) fn and<T>(
         mut self,
         db: &'db dyn Db,
@@ -824,6 +841,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         self
     }
 
+    #[inline]
     pub(crate) fn or<T>(
         mut self,
         db: &'db dyn Db,
