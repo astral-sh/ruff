@@ -675,6 +675,8 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     /// Returns `true` only if the relation is unconditionally true.
     ///
     /// In particular, both indeterminate and inconsistent results return `false`.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(crate) fn is_always_true(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Self::Boolean(evidence) => evidence.is_always_satisfied(db, env),
@@ -690,6 +692,8 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     /// Returns `true` only if the relation is unconditionally false.
     ///
     /// In particular, both indeterminate and inconsistent results return `false`.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(crate) fn is_always_false(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Self::Boolean(evidence) => evidence.is_never_satisfied(db, env),
@@ -741,6 +745,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         }
     }
 
+    #[inline]
     pub(crate) fn union<T>(
         &mut self,
         db: &'db dyn Db,
@@ -775,6 +780,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
         Self::from_evidence_pair(positive, negative)
     }
 
+    #[inline]
     pub(crate) fn intersect<T>(
         &mut self,
         db: &'db dyn Db,
