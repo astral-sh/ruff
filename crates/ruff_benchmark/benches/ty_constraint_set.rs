@@ -294,6 +294,52 @@ def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] 
     });
 }
 
+fn benchmark_missing_key_typed_dict_union_copy(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 12;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/4176.
+    let mut code = "from typing import Literal, NotRequired, TypedDict\n\n".to_string();
+    for i in 0..NUM_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Item{i}(TypedDict):\n    kind: Literal[{i}]\n    field_{i}: NotRequired[int]\n"
+        )
+        .ok();
+    }
+
+    code.push_str("type Item = ");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Item{i}").ok();
+    }
+
+    code.push_str(
+        r#"
+
+def copy(value: Item) -> dict[str, object] | None:
+    if "missing" in value:
+        return dict(value)
+    return None
+"#,
+    );
+
+    criterion.bench_function("ty_micro[missing_key_typed_dict_union_copy]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
     const NUM_BRANCHES: usize = 11;
 
@@ -568,6 +614,7 @@ criterion_group!(
     benchmark_many_upper_bound_callbacks,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
+    benchmark_missing_key_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
     benchmark_sequence_literal_union_access,
