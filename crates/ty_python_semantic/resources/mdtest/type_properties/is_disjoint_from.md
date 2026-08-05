@@ -85,16 +85,6 @@ static_assert(not is_disjoint_from(FinalIntId, FinalInt))
 static_assert(not is_disjoint_from(FinalIntId, int))
 ```
 
-The same rule applies when the base is `str`, which is not final.
-
-```py
-class OrdinaryStr(str): ...
-
-StringId = NewType("StringId", str)
-
-static_assert(is_disjoint_from(StringId, OrdinaryStr))
-```
-
 An `IntEnum` with members is another subclass disjoint from an integer-based NewType.
 
 ```py

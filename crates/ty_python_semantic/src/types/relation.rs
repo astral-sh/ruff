@@ -3667,10 +3667,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     let base = newtype.concrete_base_type(db);
                     if matches!(other, Type::NominalInstance(_)) {
-                        // Ordinary classes cannot inherit from a NewType, so overlap must come
-                        // from an assignable concrete base. Assignability preserves overlap for
-                        // gradual specializations such as `list[Any]`, while numeric union bases
-                        // such as `int | float` must be checked one alternative at a time.
+                        // Ordinary classes cannot inherit from a NewType, so overlap requires a
+                        // compatible concrete base. Assignability preserves overlap both with
+                        // supertypes of the base and with gradual specializations such as
+                        // `list[Any]`.
+                        //
+                        // Numeric NewTypes have union bases such as `int | float`. Assigning a
+                        // union requires every alternative to match, but proving disjointness
+                        // requires every alternative not to match.
                         let checker = self.as_relation_checker(TypeRelation::Assignability);
                         let check_base = |base| {
                             checker
