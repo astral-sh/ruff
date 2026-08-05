@@ -2652,6 +2652,50 @@ def _(item: Item | str) -> None:
         reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
+A successful membership test for an undeclared key narrows each union member to an intersection with
+a synthesized `TypedDict`. Its mapping methods should retain their precise types, and copying the
+narrowed union should remain efficient even when each member has a distinct optional field:
+
+```py
+from typing import NotRequired
+
+MembershipA = TypedDict("MembershipA", {"kind": Literal["a"], "field_a": NotRequired[int]})
+MembershipB = TypedDict("MembershipB", {"kind": Literal["b"], "field_b": NotRequired[int]})
+MembershipC = TypedDict("MembershipC", {"kind": Literal["c"], "field_c": NotRequired[int]})
+MembershipD = TypedDict("MembershipD", {"kind": Literal["d"], "field_d": NotRequired[int]})
+MembershipE = TypedDict("MembershipE", {"kind": Literal["e"], "field_e": NotRequired[int]})
+MembershipF = TypedDict("MembershipF", {"kind": Literal["f"], "field_f": NotRequired[int]})
+MembershipG = TypedDict("MembershipG", {"kind": Literal["g"], "field_g": NotRequired[int]})
+MembershipH = TypedDict("MembershipH", {"kind": Literal["h"], "field_h": NotRequired[int]})
+MembershipI = TypedDict("MembershipI", {"kind": Literal["i"], "field_i": NotRequired[int]})
+MembershipJ = TypedDict("MembershipJ", {"kind": Literal["j"], "field_j": NotRequired[int]})
+
+type MembershipItem = (
+    MembershipA
+    | MembershipB
+    | MembershipC
+    | MembershipD
+    | MembershipE
+    | MembershipF
+    | MembershipG
+    | MembershipH
+    | MembershipI
+    | MembershipJ
+)
+
+def _(item: MembershipItem) -> None:
+    if "missing" in item:
+        reveal_type(item.keys())  # revealed: dict_keys[str, object]
+        reveal_type(item.items())  # revealed: dict_items[str, object]
+        reveal_type(item.values())  # revealed: dict_values[str, object]
+        reveal_type(item["missing"])  # revealed: object
+        reveal_type(dict(item))  # revealed: dict[str, object]
+
+def _(item: MembershipA) -> None:
+    if "missing" in item:
+        reveal_type(item.copy())  # revealed: MembershipA & <TypedDict with items 'missing'>
+```
+
 Adding a regular dictionary to the union should not make copying it slow:
 
 ```py

@@ -2978,6 +2978,9 @@ impl<'db> Type<'db> {
             Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, env, |elem| {
                 elem.class_member_with_policy(db, env, name, policy)
             }),
+            Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
+                class::synthesized_typed_dict_class_member(db, env, synthesized, policy, name)
+            }
             // TODO: Remove this once synthesized protocols have a precise meta-type.
             Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_none() => {
                 ty.instance_member(db, env, name)
