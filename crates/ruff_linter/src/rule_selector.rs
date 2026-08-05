@@ -104,6 +104,7 @@ impl std::fmt::Display for RuleResolutionError {
         };
         let source = match &source {
             ValueSource::File(path) => format_args!("`{}`", path.as_path()),
+            ValueSource::ScriptMetadata(_) => format_args!("script metadata"),
             ValueSource::Cli => format_args!("the CLI"),
             ValueSource::Editor => format_args!("the editor configuration"),
             ValueSource::UvWorkspace => format_args!("uv workspace metadata"),
