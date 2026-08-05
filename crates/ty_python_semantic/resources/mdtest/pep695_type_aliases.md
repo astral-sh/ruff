@@ -930,6 +930,82 @@ type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
+### Recursive alias relations with finite specialization orbits
+
+A recursive specialization can change its arguments while still reaching an exact repetition after
+finitely many expansions. This includes shifting arguments to the left and resetting arguments to
+types that do not depend on the current specialization.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+# Resetting the recursive argument makes these aliases reach a fixed specialization.
+type L[T] = tuple[T] | tuple[T, L[int]]
+type R[T] = tuple[T] | tuple[T, R[int]]
+
+def _(left: L[str], right: R[str]):
+    right = left
+    left = right
+
+type ShiftingLeft[A, B, C, D, E, F, G, H, I, J, K, L] = tuple[A, ShiftingLeft[B, C, D, E, F, G, H, I, J, K, L, None]]
+type ShiftingRight[A, B, C, D, E, F, G, H, I, J, K, L] = tuple[A, ShiftingRight[B, C, D, E, F, G, H, I, J, K, L, None]]
+
+static_assert(
+    is_subtype_of(
+        ShiftingLeft[int, int, int, int, int, int, int, int, int, int, int, int],
+        ShiftingRight[int, int, int, int, int, int, int, int, int, int, int, int],
+    )
+)
+
+type MutualLeft[T] = tuple[T, MutualLeftHelper[list[T]]]
+type MutualLeftHelper[U] = tuple[U, MutualLeft[int]]
+type MutualRight[T] = tuple[T, MutualRightHelper[list[T]]]
+type MutualRightHelper[U] = tuple[U, MutualRight[int]]
+
+static_assert(is_subtype_of(MutualLeft[str], MutualRight[str]))
+
+# Repeatedly adding the same union element reaches a fixed point after one expansion.
+type SaturatingLeft[T] = tuple[T, SaturatingLeft[T | int]]
+type SaturatingRight[T] = tuple[T, SaturatingRight[T | int]]
+
+static_assert(is_subtype_of(SaturatingLeft[bytes], SaturatingRight[bytes]))
+
+# A specialization can also have a finite period greater than one.
+type PeriodicLeft[A, B] = tuple[A, B, PeriodicLeft[B, A | int]]
+type PeriodicRight[A, B] = tuple[A, B, PeriodicRight[B, A | int]]
+
+static_assert(is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
+
+# The nested aliases grow their first argument, but the references back to the outer aliases erase
+# that argument. The outer specialization orbits are therefore finite.
+type OuterLeft[A, B] = NodeLeft[A, B]
+type NodeLeft[A, B] = tuple[A, NodeLeft[list[A], B], OuterLeft[B, None]]
+type OuterRight[A, B] = NodeRight[A, B]
+type NodeRight[A, B] = tuple[A, NodeRight[list[A], B], OuterRight[None, B]]
+
+# Although this judgment is correct, it simply returns a conservative result.
+static_assert(not is_subtype_of(OuterLeft[int, str], OuterRight[int, str]))
+
+# If the reference back to the outer alias retains the growing argument, the outer specialization
+# can grow transitively.
+type TransitiveOuterLeft[T] = TransitiveNodeLeft[T]
+type TransitiveNodeLeft[T] = tuple[
+    T,
+    TransitiveNodeLeft[list[T]],
+    TransitiveOuterLeft[T],
+]
+type TransitiveOuterRight[T] = TransitiveNodeRight[T]
+type TransitiveNodeRight[T] = tuple[
+    T,
+    TransitiveNodeRight[list[T]],
+    TransitiveOuterRight[T],
+]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(TransitiveOuterLeft[int], TransitiveOuterRight[int]))
+```
+
 ### Non-recursive nested generic aliases
 
 A repeated use of the same generic alias can be a finite alias application instead of recursion.
@@ -1023,17 +1099,21 @@ def growing_callable(x: GrowingCallable[int]):
     reveal_type(x())
 ```
 
-Non-growing recursive aliases should continue to preserve distinct specializations.
+If a type parameter never appears outside an unchanged recursive reference, different
+specializations satisfy the same recursive equation and are equivalent.
 
 ```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
 type StableWrapped[T] = list[StableWrapped[T]]
+
+static_assert(is_equivalent_to(StableWrapped[int], StableWrapped[str]))
 
 def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     reveal_type(x)  # revealed: list[StableWrapped[int]]
     reveal_type(y)  # revealed: list[StableWrapped[str]]
-    # error: [invalid-assignment] "Object of type `StableWrapped[str]` is not assignable to `StableWrapped[int]`"
     x = y
-    # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
     y = x
 ```
 

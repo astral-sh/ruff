@@ -5488,6 +5488,27 @@ static_assert(not is_subtype_of(LeftAlias[int], RightAlias[int]))
 # A conservative cycle fallback must not accept structurally different recursive protocols.
 static_assert(not is_subtype_of(LeftProtocol[int], DifferentProtocol[int]))
 
+class ShiftingLeftProtocol[A, B, C](Protocol):
+    @property
+    def value(self) -> A: ...
+    @property
+    def child(self) -> ShiftingLeftProtocol[B, C, None]: ...
+
+class ShiftingRightProtocol[A, B, C](Protocol):
+    @property
+    def value(self) -> A: ...
+    @property
+    def child(self) -> ShiftingRightProtocol[B, C, None]: ...
+
+# These recursive specializations reach an exact repetition after shifting out every initial
+# argument.
+static_assert(
+    is_subtype_of(
+        ShiftingLeftProtocol[int, str, bytes],
+        ShiftingRightProtocol[int, str, bytes],
+    )
+)
+
 class FiniteLeft[T](Protocol):
     value: T
 
