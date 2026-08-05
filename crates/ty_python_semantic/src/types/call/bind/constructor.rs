@@ -641,7 +641,12 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<ClassLiteral<'db>> {
-        self.constructed_instance_type()
+        let instance_type = self.constructed_instance_type();
+        let lookup_instance = match instance_type {
+            Type::Intersection(_) => instance_type.flatten_typevars(db, env),
+            _ => instance_type,
+        };
+        lookup_instance
             .as_nominal_instance()
             // TODO may need to handle `Type::KnownInstance` here as well?
             .map(|instance| instance.class(db, env).class_literal(db))
