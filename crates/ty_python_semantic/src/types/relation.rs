@@ -3671,16 +3671,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         // compatible concrete base. Assignability preserves overlap both with
                         // supertypes of the base and with gradual specializations such as
                         // `list[Any]`.
-                        //
-                        // Numeric NewTypes have union bases such as `int | float`. Assigning a
-                        // union requires every alternative to match, but proving disjointness
-                        // requires every alternative not to match.
                         let checker = self.as_relation_checker(TypeRelation::Assignability);
                         let check_base = |base| {
                             checker
                                 .check_type_pair(db, base, other)
                                 .negate(db, self.constraints)
                         };
+
+                        // Numeric NewTypes have union bases such as `int | float`. Assigning a
+                        // union requires every alternative to match, but proving disjointness
+                        // requires every alternative not to match.
                         if let Type::Union(union) = base {
                             union
                                 .elements(db)
