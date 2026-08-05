@@ -109,6 +109,19 @@ impl<'db> Module<'db> {
         }
     }
 
+    /// Returns whether this module resolves to a bundled typing-only stub.
+    ///
+    /// A project or installed module with the same name may still exist on a
+    /// lower-priority search path and be available at runtime.
+    pub fn is_type_check_only(self, db: &'db dyn Database) -> bool {
+        self.search_path(db)
+            .is_some_and(SearchPath::is_standard_library)
+            && matches!(
+                self.name(db).first_component(),
+                "_typeshed" | "typing_extensions" | "ty_extensions"
+            )
+    }
+
     /// Determine whether this module is a single-file module or a package
     pub fn kind(self, db: &'db dyn Database) -> ModuleKind {
         match self {
