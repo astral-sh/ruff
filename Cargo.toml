@@ -300,12 +300,6 @@ inherits = "release"
 opt-level = "z"
 codegen-units = 1
 
-[profile.dev]
-# Cargo enables local ThinLTO when optimization is enabled, which we often do
-# when testing via CARGO_PROFILE_DEV_OPT_LEVEL=1. Disable it to speed up
-# incremental test builds.
-lto = "off"
-
 [profile.dev.package.insta]
 opt-level = 3
 
@@ -349,6 +343,9 @@ lto = false
 [profile.fast-test]
 inherits = "dev"
 opt-level = 1
+debug = "line-tables-only"
+# Avoid the local ThinLTO that Cargo enables at nonzero optimization levels.
+lto = "off"
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]
