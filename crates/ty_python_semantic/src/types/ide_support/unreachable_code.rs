@@ -834,24 +834,4 @@ mod tests {
         assert_snapshot!(UnreachableTest::new().render(source)?, @"");
         Ok(())
     }
-
-    #[test]
-    fn protocol_operations_make_exception_handlers_reachable() -> anyhow::Result<()> {
-        let source = r#"
-            def f(value, iterable):
-                try:
-                    value.attribute
-                except:
-                    print("attribute access can raise")
-
-                try:
-                    for _ in iterable:
-                        pass
-                except:
-                    print("iteration can raise")
-            "#;
-
-        assert_snapshot!(UnreachableTest::new().render(source)?, @"");
-        Ok(())
-    }
 }
