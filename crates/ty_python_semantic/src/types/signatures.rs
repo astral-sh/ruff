@@ -45,7 +45,7 @@ use crate::types::{
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
     TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    VarianceInferable, VarianceInferenceMode, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -574,15 +574,16 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
 impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     // TODO: possibly need to replace self
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         self.overloads
             .iter()
-            .map(|signature| signature.variance_of(db, env, typevar))
+            .map(|signature| signature.variance_of_in_mode(db, env, typevar, mode))
             .collect()
     }
 }
@@ -1908,11 +1909,12 @@ impl<'db> Signature<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
@@ -1923,7 +1925,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             parameter
                 .annotated_type()
                 .with_polarity(TypeVarVariance::Contravariant)
-                .variance_of(db, env, typevar)
+                .variance_of_in_mode(db, env, typevar, mode)
         };
 
         let parameter_variances = if let Some((prefix_parameters, paramspec)) =
@@ -1936,7 +1938,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                     .chain(std::iter::once(
                         Type::TypeVar(paramspec)
                             .with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, env, typevar),
+                            .variance_of_in_mode(db, env, typevar, mode),
                     )),
             )
         } else {
@@ -1945,7 +1947,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
 
         itertools::chain(
             parameter_variances,
-            Some(self.return_ty.variance_of(db, env, typevar)),
+            Some(self.return_ty.variance_of_in_mode(db, env, typevar, mode)),
         )
         .collect()
     }

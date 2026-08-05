@@ -638,10 +638,32 @@ class InferredSource(Protocol[T_infer]):
     def read(self) -> T_infer: ...
 ```
 
+Inferred legacy parameters use the same structural interface as explicitly declared protocol
+parameters. An underscore-prefixed protocol attribute remains writable, so its inferred parameter is
+invariant.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class InferredWritableAttribute(Protocol[T_infer]):
+    _value: T_infer
+
+static_assert(not is_subtype_of(InferredWritableAttribute[int], InferredWritableAttribute[object]))
+static_assert(not is_assignable_to(InferredWritableAttribute[int], InferredWritableAttribute[object]))
+
+def overwrite_inferred(value: InferredWritableAttribute[object]) -> None:
+    value._value = object()
+
+def unsound_inferred(value: InferredWritableAttribute[int]) -> None:
+    overwrite_inferred(value)  # error: [invalid-argument-type]
+```
+
 ## Invalid protocol headers do not cause cascading variance diagnostics
 
-Malformed generic parameter ordering, invalid default references, and invalid generic bases are
-diagnosed separately. Ignoring those diagnostics does not turn them into protocol-variance errors.
+Malformed generic parameter ordering, invalid default references, incompatible base variance, and
+invalid generic bases are separate from protocol variance. Ignoring their diagnostics does not turn
+them into protocol-variance errors.
 
 ```toml
 [environment]
@@ -653,17 +675,24 @@ invalid-base = "ignore"
 ```
 
 ```py
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar, TypeVarTuple
 
 DefaultT = TypeVar("DefaultT", default=int)
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+Ts = TypeVarTuple("Ts")
 A = TypeVar("A", default="B")
 B = TypeVar("B", default=int)
+
+class InvariantBase(Protocol[T]):
+    value: T
 
 class InvalidParameterOrder(Protocol[DefaultT, T]): ...
 class DuplicateGenericBase(Protocol[T], Generic[T]): ...
 class InvalidDefaultReference(Protocol[A, B]): ...
 class UnsubscriptedGeneric(Protocol[T], Generic): ...
+class IncompatibleBaseVariance(InvariantBase[T_co], Protocol[T_co]): ...
+class DefaultAfterTypeVarTuple(Protocol[*Ts, DefaultT]): ...
 ```
 
 ## Inheriting from generic classes with explicit variance
