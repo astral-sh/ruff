@@ -301,6 +301,8 @@ opt-level = "z"
 codegen-units = 1
 
 [profile.dev]
+# Cargo still enables local ThinLTO when optimization is enabled, slowing
+# incremental test builds.
 lto = "off"
 
 [profile.dev.package.insta]
