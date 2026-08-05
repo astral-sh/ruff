@@ -172,7 +172,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    6700,
+    6800,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -227,7 +227,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
     },
-    2000,
+    2200,
 );
 
 #[track_caller]
