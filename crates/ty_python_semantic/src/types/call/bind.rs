@@ -1708,17 +1708,7 @@ impl<'db> Bindings<'db> {
                             },
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    if let Ok(return_ty) = getter
-                                        .try_call(db, env, &CallArguments::positional([*instance]))
-                                        .map(|binding| binding.return_type(db, env))
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    } else {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the getter failed",
-                                        ));
-                                        overload.set_return_type(Type::unknown());
-                                    }
+                                    overload.check_property_getter(db, env, getter, *instance, 1);
                                 } else {
                                     overload
                                         .errors
@@ -1737,17 +1727,7 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    if let Ok(return_ty) = getter
-                                        .try_call(db, env, &CallArguments::positional([*instance]))
-                                        .map(|binding| binding.return_type(db, env))
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    } else {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the getter failed",
-                                        ));
-                                        overload.set_return_type(Type::unknown());
-                                    }
+                                    overload.check_property_getter(db, env, getter, *instance, 0);
                                 } else {
                                     overload.set_return_type(Type::Never);
                                     overload.errors.push(BindingError::InternalCallError(
@@ -6718,6 +6698,29 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
+    fn check_property_getter(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        getter: Type<'db>,
+        instance: Type<'db>,
+        argument_index_offset: usize,
+    ) {
+        match getter.try_call(db, env, &CallArguments::positional([instance])) {
+            Ok(bindings) => self.set_return_type(bindings.return_type(db, env)),
+            Err(CallError(_, bindings)) => {
+                self.set_return_type(bindings.return_type(db, env));
+                self.errors.push(BindingError::PropertyGetterCallError(
+                    PropertyAccessorCallError {
+                        bindings,
+                        argument_index_offset,
+                    },
+                ));
+            }
+        }
+    }
+
     fn check_property_setter(
         &mut self,
         db: &'db dyn Db,
@@ -6740,7 +6743,7 @@ impl<'db> Binding<'db> {
             }
             Err(CallError(_, bindings)) => {
                 self.errors.push(BindingError::PropertySetterCallError(
-                    PropertySetterCallError {
+                    PropertyAccessorCallError {
                         bindings,
                         argument_index_offset,
                     },
@@ -7965,10 +7968,11 @@ pub(crate) enum BindingError<'db> {
     },
     PropertyHasNoSetter(PropertyInstanceType<'db>),
     PropertyHasNoDeleter(PropertyInstanceType<'db>),
-    PropertySetterCallError(PropertySetterCallError<'db>),
+    PropertyGetterCallError(PropertyAccessorCallError<'db>),
+    PropertySetterCallError(PropertyAccessorCallError<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
-    /// We use this variant to report errors in `property.__get__` and `property.__delete__`,
-    /// which can occur when the call to the underlying getter/deleter fails.
+    /// We use this variant to report errors in `property.__delete__`, which can occur when the
+    /// call to the underlying deleter fails.
     InternalCallError(&'static str),
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
@@ -7984,12 +7988,12 @@ pub(crate) enum BindingError<'db> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PropertySetterCallError<'db> {
+pub(crate) struct PropertyAccessorCallError<'db> {
     bindings: Box<Bindings<'db>>,
     argument_index_offset: usize,
 }
 
-impl PartialEq for PropertySetterCallError<'_> {
+impl PartialEq for PropertyAccessorCallError<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.argument_index_offset == other.argument_index_offset
             && self.bindings.callable_type() == other.bindings.callable_type()
@@ -8006,7 +8010,7 @@ impl PartialEq for PropertySetterCallError<'_> {
     }
 }
 
-impl Eq for PropertySetterCallError<'_> {}
+impl Eq for PropertyAccessorCallError<'_> {}
 
 impl BindingError<'_> {
     /// Returns whether this error is relevant to `functools.partial(...)` construction.
@@ -8094,6 +8098,7 @@ impl BindingError<'_> {
             | BindingError::UnmatchedOverload
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..)
+            | BindingError::PropertyGetterCallError(..)
             | BindingError::PropertySetterCallError(..) => {}
         }
     }
@@ -8154,6 +8159,7 @@ impl<'db> BindingError<'db> {
             | Self::InvalidDataclassArgument(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
+            | Self::PropertyGetterCallError(_)
             | Self::PropertySetterCallError(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
@@ -8646,7 +8652,7 @@ impl<'db> BindingError<'db> {
                 );
             }
 
-            Self::PropertySetterCallError(error) => {
+            Self::PropertyGetterCallError(error) | Self::PropertySetterCallError(error) => {
                 let context = CallDiagnosticContext {
                     context: context.context,
                     overrides: context.overrides,
