@@ -223,22 +223,16 @@ def narrowed_subclass[T](cls: type[T]) -> T:
     return cls()
 ```
 
-An invalid call after narrowing should report only the narrowed constructor's argument error.
-Existing intersection-call issues currently add a redundant error from the original upper bound:
+Invalid positional and keyword arguments each produce only the narrowed subclass constructor's
+diagnostic:
 
 ```py
 def narrowed_invalid[T](cls: type[T]) -> None:
     if issubclass(cls, IntConstructor):
-        # TODO: Only report `invalid-argument-type`; the upper-bound constructor also reports
-        # `too-many-positional-arguments` and describes the attempted intersection as `Never`.
-        # error: [too-many-positional-arguments]
-        # error: [invalid-argument-type]
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
         cls("wrong")
 
-        # TODO: Only report `invalid-argument-type`; the upper-bound constructor also reports
-        # `unknown-argument` for the same call.
-        # error: [unknown-argument]
-        # error: [invalid-argument-type]
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
         cls(value="wrong")
 ```
 

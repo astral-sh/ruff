@@ -811,6 +811,15 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    /// Set the overall receiver without replacing individual constructor callables.
+    pub(crate) fn with_callable_type(mut self, callable_type: Type<'db>) -> Self {
+        self.callable_type = callable_type;
+        for element in &mut self.elements {
+            element.callable_type = callable_type;
+        }
+        self
+    }
+
     pub(crate) fn with_constructed_instance_type(
         mut self,
         db: &'db dyn Db,
@@ -914,6 +923,12 @@ impl<'db> Bindings<'db> {
     fn iter_constructor_items(&self) -> impl Iterator<Item = &ConstructorBinding<'db>> {
         self.iter_callable_items()
             .filter_map(CallableItem::as_constructor)
+    }
+
+    /// Return whether every callable uses ordinary constructor binding semantics.
+    pub(crate) fn has_only_constructor_items(&self) -> bool {
+        self.iter_callable_items()
+            .all(|item| item.as_constructor().is_some())
     }
 
     fn iter_constructor_items_mut(&mut self) -> impl Iterator<Item = &mut ConstructorBinding<'db>> {

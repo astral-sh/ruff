@@ -5254,6 +5254,32 @@ impl<'db> Type<'db> {
                     .map(|element| element.bindings(db, env)),
             ),
 
+            // A narrowed `type[T: Base] & type[Child]` still needs to construct `T & Child`,
+            // but its constructor must come from `Child`, not from `Base` as an independent,
+            // competing alternative. Flattening the projected instance lets intersection
+            // simplification select that constructor without discarding unrelated providers.
+            Type::Intersection(intersection)
+                if intersection.positive(db).iter().all(|element| {
+                    // A metaclass instance also has an instance-space projection, but it can
+                    // provide an independent `__call__`. Only simplify actual class-object
+                    // variants so `type[Base] & Meta` retains both callable candidates.
+                    matches!(
+                        element.resolve_type_alias(db),
+                        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+                    )
+                }) && let Some(instance_type) = self.to_instance_approximation(db, env)
+                    && let Type::NominalInstance(lookup_instance) =
+                        instance_type.flatten_typevars(db, env)
+                    && let Some(bindings) = {
+                        let bindings = lookup_instance.to_meta_type(db, env).bindings(db, env);
+                        bindings.has_only_constructor_items().then_some(bindings)
+                    } =>
+            {
+                bindings
+                    .with_constructed_instance_type(db, instance_type)
+                    .with_callable_type(self)
+            }
+
             Type::Intersection(intersection) => Bindings::from_intersection(
                 self,
                 intersection
