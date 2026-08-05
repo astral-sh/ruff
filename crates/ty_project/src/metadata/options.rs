@@ -14,7 +14,6 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
     Span, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
@@ -220,6 +219,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
+                ValueSource::ScriptMetadata(_) => SysPrefixPathOrigin::ScriptMetadataSetting,
                 ValueSource::Editor => SysPrefixPathOrigin::Editor,
                 ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
             };
@@ -568,6 +568,9 @@ fn python_version_from_config(
             ValueSource::File(path) => PythonVersionSource::ConfigFile(
                 PythonVersionFileSource::new(path.clone(), ranged_version.range()),
             ),
+            ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
+                Span::from(*file).with_optional_range(ranged_version.range()),
+            ),
             ValueSource::Editor => PythonVersionSource::Editor,
             ValueSource::UvWorkspace => PythonVersionSource::UvWorkspace,
         },
@@ -660,6 +663,12 @@ fn unsupported_inferred_python_version_diagnostic(
             .sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
                 "The version was inferred from a configuration file.",
+            )),
+        source @ PythonVersionSource::ScriptMetadata(_) => diagnostic
+            .with_annotation(inferred_python_version_source_annotation(db, source))
+            .sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                "The version was inferred from script metadata.",
             )),
         source @ PythonVersionSource::PyvenvCfgFile(_) => diagnostic
             .with_annotation(inferred_python_version_source_annotation(db, source))
@@ -1103,6 +1112,7 @@ impl Rules {
             let source = rule_name.source();
             let lint_source = match source {
                 ValueSource::File(_) => LintSource::File,
+                ValueSource::ScriptMetadata(_) => LintSource::ScriptMetadata,
                 ValueSource::Cli => LintSource::Cli,
                 ValueSource::Editor => LintSource::Editor,
                 ValueSource::UvWorkspace => LintSource::UvWorkspace,
@@ -1129,12 +1139,9 @@ impl Rules {
                     set_lint_level(lint);
                 }
                 Err(error) => {
-                    // `system_path_to_file` can return `Err` if the file was deleted since the configuration
-                    // was read. This should be rare and it should be okay to default to not showing a configuration
-                    // file in that case.
-                    let file = source
-                        .file()
-                        .and_then(|path| system_path_to_file(db, path).ok());
+                    // The file may have been deleted since its configuration was read. In that
+                    // case, report the diagnostic without a configuration-file annotation.
+                    let file = source.file(db);
 
                     // TODO: Add a note if the value was configured on the CLI
                     let diagnostic = OptionDiagnostic::new(
@@ -1211,14 +1218,12 @@ fn build_include_filter(
             ));
 
             // Add source annotation if we have source information
-            if let Some(source_file) = include_patterns.source().file() {
-                if let Ok(file) = system_path_to_file(db, source_file) {
-                    let annotation = Annotation::primary(
-                        Span::from(file).with_optional_range(include_patterns.range()),
-                    )
-                    .message("This `include` list is empty");
-                    diagnostic = diagnostic.with_annotation(Some(annotation));
-                }
+            if let Some(file) = include_patterns.source().file(db) {
+                let annotation = Annotation::primary(
+                    Span::from(file).with_optional_range(include_patterns.range()),
+                )
+                .message("This `include` list is empty");
+                diagnostic = diagnostic.with_annotation(Some(annotation));
             }
 
             diagnostics.push(diagnostic);
@@ -1975,13 +1980,11 @@ impl ToOverride for RangedValue<OverrideOptions> {
             ));
 
             // Add source annotation if we have source information
-            if let Some(source_file) = self.source().file() {
-                if let Ok(file) = system_path_to_file(db, source_file) {
-                    let annotation =
-                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                            .message("This overrides section overrides no settings");
-                    diagnostic = diagnostic.with_annotation(Some(annotation));
-                }
+            if let Some(file) = self.source().file(db) {
+                let annotation =
+                    Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                        .message("This overrides section overrides no settings");
+                diagnostic = diagnostic.with_annotation(Some(annotation));
             }
 
             diagnostics.push(diagnostic);
@@ -2028,13 +2031,11 @@ impl ToOverride for RangedValue<OverrideOptions> {
             ));
 
             // Add source annotation if we have source information
-            if let Some(source_file) = self.source().file() {
-                if let Ok(file) = system_path_to_file(db, source_file) {
-                    let annotation =
-                        Annotation::primary(Span::from(file).with_optional_range(self.range()))
-                            .message("This overrides section applies to all files");
-                    diagnostic = diagnostic.with_annotation(Some(annotation));
-                }
+            if let Some(file) = self.source().file(db) {
+                let annotation =
+                    Annotation::primary(Span::from(file).with_optional_range(self.range()))
+                        .message("This overrides section applies to all files");
+                diagnostic = diagnostic.with_annotation(Some(annotation));
             }
 
             diagnostics.push(diagnostic);
@@ -2287,8 +2288,8 @@ impl OptionDiagnostic {
         err: impl Display,
     ) -> Self {
         match value.source() {
-            ValueSource::File(file_path) => {
-                if let Ok(file) = system_path_to_file(db, &**file_path) {
+            ValueSource::File(_) | ValueSource::ScriptMetadata(_) => {
+                if let Some(file) = value.source().file(db) {
                     let concise_message = std::mem::take(&mut self.message);
                     self.with_concise_message(concise_message)
                         .with_message(format_args!("Invalid {value_label}"))
