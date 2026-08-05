@@ -1516,7 +1516,6 @@ python-version = "3.13"
 from typing import ParamSpec, TypeVar, TypeVarTuple, Unpack, Generic, Protocol
 
 T = TypeVar("T", default=int)
-ProtocolT = TypeVar("ProtocolT", default=int, covariant=True)
 T2 = TypeVar("T2", default=str)
 U = TypeVar("U")
 Ts = TypeVarTuple("Ts")
@@ -1531,7 +1530,7 @@ class Foo(Generic[*Ts, T]): ...
 class Bar(Generic[U, *Ts, T]): ...
 
 # TODO: should emit [invalid-type-variable-default]
-class Baz(Protocol[*Ts, ProtocolT]): ...
+class Baz(Protocol[*Ts, T]): ...
 
 # TODO: should emit [invalid-type-variable-default]
 class Qux(Generic[*Ts, T, T2]): ...

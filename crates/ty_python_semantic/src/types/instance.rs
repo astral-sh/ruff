@@ -38,6 +38,7 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
+    VarianceInferenceMode,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -1125,13 +1126,15 @@ pub(crate) struct SliceLiteral {
 }
 
 impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.class(db, env).variance_of(db, env, typevar)
+        self.class(db, env)
+            .variance_of_in_mode(db, env, typevar, mode)
     }
 }
 
@@ -1537,13 +1540,14 @@ impl<'db> ProtocolInstanceType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.inner.variance_of(db, env, typevar)
+        self.inner.variance_of_in_mode(db, env, typevar, mode)
     }
 }
 
@@ -1610,20 +1614,23 @@ impl<'db> Protocol<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         match self {
-            Protocol::FromClass(class_type) => class_type.variance_of(db, env, typevar),
+            Protocol::FromClass(class_type) => {
+                class_type.variance_of_in_mode(db, env, typevar, mode)
+            }
             Protocol::Synthesized(synthesized_protocol_type) => {
-                synthesized_protocol_type.variance_of(db, env, typevar)
+                synthesized_protocol_type.variance_of_in_mode(db, env, typevar, mode)
             }
-            Protocol::Materialized(materialized) => {
-                materialized.origin(db).variance_of(db, env, typevar)
-            }
+            Protocol::Materialized(materialized) => materialized
+                .origin(db)
+                .variance_of_in_mode(db, env, typevar, mode),
         }
     }
 }
@@ -1634,7 +1641,7 @@ mod synthesized_protocol {
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance,
         FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, TypeVarVariance,
-        VarianceInferable,
+        VarianceInferable, VarianceInferenceMode,
     };
     use crate::{Db, FxOrderSet, ProgramEnvironment};
     use ty_python_core::definition::Definition;
@@ -1692,13 +1699,14 @@ mod synthesized_protocol {
     }
 
     impl<'db> VarianceInferable<'db> for SynthesizedProtocolType<'db> {
-        fn variance_of(
+        fn variance_of_in_mode(
             self,
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             typevar: BoundTypeVarIdentity<'db>,
+            mode: VarianceInferenceMode,
         ) -> TypeVarVariance {
-            self.0.variance_of(db, env, typevar)
+            self.0.variance_of_in_mode(db, env, typevar, mode)
         }
     }
 }

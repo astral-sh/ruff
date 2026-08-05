@@ -25,8 +25,8 @@ use crate::{
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
-        UnionBuilder, UnionType,
+        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
+        TypingModule, UnionBuilder, UnionType, VarianceInferenceMode,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
@@ -48,6 +48,7 @@ use crate::{
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
+        protocol_class::inferred_protocol_typevar_variance,
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
@@ -3365,23 +3366,25 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
 }
 
 impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+        self.variance_of_owner(db, typevar, mode)
     }
 }
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of_owner(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
 
@@ -3397,6 +3400,11 @@ impl<'db> StaticClassLiteral<'db> {
         if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
+
+        if self.is_protocol(db) {
+            return inferred_protocol_typevar_variance(db, self, typevar);
+        }
+
         let class_body_scope = self.body_scope(db);
         let program_file = class_body_scope.program_file(db);
         let python_version = env.python_version(db);
@@ -3406,7 +3414,7 @@ impl<'db> StaticClassLiteral<'db> {
         let explicit_bases_variances = self
             .explicit_bases(db)
             .iter()
-            .map(|class| class.variance_of(db, &env, typevar));
+            .map(|class| class.variance_of_in_mode(db, &env, typevar, mode));
 
         let default_attribute_variance = {
             let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self.into());
@@ -3505,7 +3513,8 @@ impl<'db> StaticClassLiteral<'db> {
                     } else {
                         default_attribute_variance
                     };
-                    ty.with_polarity(variance).variance_of(db, &env, typevar)
+                    ty.with_polarity(variance)
+                        .variance_of_in_mode(db, &env, typevar, mode)
                 })
             });
 

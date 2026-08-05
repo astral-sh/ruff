@@ -481,6 +481,32 @@ static_assert(not is_subtype_of(D[Any], D[A]))
 static_assert(not is_subtype_of(D[Any], D[B]))
 ```
 
+## Effective variance of recursive protocols
+
+A purely recursive protocol parameter is structurally bivariant while its fixed point is inferred,
+but an explicitly covariant declaration remains covariant when the protocol is used in another type.
+A mutable container around that protocol must therefore make its enclosing class invariant.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Recursive(Protocol[T_co]):
+    def next(self) -> Recursive[T_co]: ...
+
+class MutableWrapper[T]:
+    def values(self) -> list[Recursive[T]]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(MutableWrapper[int], MutableWrapper[object]))
+static_assert(not is_assignable_to(MutableWrapper[int], MutableWrapper[object]))
+```
+
 ## Class Attributes
 
 ### Mutable Attributes
@@ -534,6 +560,29 @@ class DescriptorOwner[T]:
 
 static_assert(not is_subtype_of(DescriptorOwner[B], DescriptorOwner[A]))
 static_assert(not is_subtype_of(DescriptorOwner[A], DescriptorOwner[B]))
+```
+
+### Mutable protocol attributes
+
+Unlike private attributes on a nominal class, underscore-prefixed protocol attributes belong to the
+public structural interface and remain writable. Their inferred type parameters must be invariant.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+static_assert(not is_subtype_of(WritableProtocol[int], WritableProtocol[object]))
+static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[object]))
+
+def overwrite(value: WritableProtocol[object]) -> None:
+    value._value = object()
+
+def unsound(value: WritableProtocol[int]) -> None:
+    overwrite(value)  # error: [invalid-argument-type]
 ```
 
 ### Immutable Attributes

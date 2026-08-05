@@ -411,7 +411,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
-                if check_explicit_base_variance
+                if (check_explicit_base_variance || is_protocol)
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
@@ -427,20 +427,23 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 None
                             }
                         })
-                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
                 {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Variance of type variable `{}` is incompatible with base class `{}`",
-                        typevar.typevar(db).name(db),
-                        base_alias.origin(db).name(db),
-                    ));
-                    diagnostic.help(format_args!(
-                        "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
-                        typevar.typevar(db).name(db),
-                        declared_variance.as_str(),
-                        base_alias.origin(db).name(db),
-                        required_variance.as_str(),
-                    ));
+                    protocol_header_is_valid = false;
+                    if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
+                    {
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Variance of type variable `{}` is incompatible with base class `{}`",
+                            typevar.typevar(db).name(db),
+                            base_alias.origin(db).name(db),
+                        ));
+                        diagnostic.help(format_args!(
+                            "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
+                            typevar.typevar(db).name(db),
+                            declared_variance.as_str(),
+                            base_alias.origin(db).name(db),
+                            required_variance.as_str(),
+                        ));
+                    }
                 }
 
                 ClassType::Generic(base_alias)
@@ -910,10 +913,16 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
 
             let mut state: Option<State<'db>> = None;
+            let mut follows_typevar_tuple = false;
 
             for bound_typevar in generic_context.variables(db) {
                 let typevar = bound_typevar.typevar(db);
                 let has_default = typevar.default_type(db, env).is_some();
+
+                if follows_typevar_tuple && has_default {
+                    protocol_header_is_valid = false;
+                }
+                follows_typevar_tuple |= bound_typevar.is_typevartuple(db);
 
                 if let Some(state) = state.as_mut() {
                     if !has_default {

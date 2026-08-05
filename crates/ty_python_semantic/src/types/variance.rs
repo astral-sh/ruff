@@ -125,6 +125,17 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
     }
 }
 
+/// Controls whether protocol specializations use declared variance or their structural fixed point.
+///
+/// Ordinary type relationships must honor a protocol parameter's effective variance. Validating
+/// the declaration itself instead has to follow recursive protocol references structurally;
+/// otherwise the declaration being checked would determine its own inferred result.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum VarianceInferenceMode {
+    Effective,
+    Structural,
+}
+
 pub(crate) trait VarianceInferable<'db>: Sized {
     /// The variance of `typevar` in `self`
     ///
@@ -139,6 +150,17 @@ pub(crate) trait VarianceInferable<'db>: Sized {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+    ) -> TypeVarVariance {
+        self.variance_of_in_mode(db, env, typevar, VarianceInferenceMode::Effective)
+    }
+
+    /// Computes variance while preserving the inference mode through nested types and Salsa keys.
+    fn variance_of_in_mode(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
@@ -171,17 +193,18 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, env, typevar))
+        polarity.compose_thunk(|| variance_inferable.variance_of_in_mode(db, env, typevar, mode))
     }
 }
