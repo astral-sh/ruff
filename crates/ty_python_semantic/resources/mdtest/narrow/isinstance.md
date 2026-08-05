@@ -332,6 +332,37 @@ else:
     reveal_type(x)  # revealed: ~A & ~B & ~C
 ```
 
+## `NewType` instances and concrete-base subclasses
+
+A `NewType` constructor returns its argument unchanged, so a branded value can still be an instance
+of any subclass accepted by the concrete base. Type checkers accept `UserId(True)` because `bool` is
+a subtype of `int`, so they cannot reliably prevent an integer-based brand from containing a
+boolean.
+
+```py
+from typing import NewType
+
+class Base: ...
+class Child(Base): ...
+
+BrandedBase = NewType("BrandedBase", Base)
+UserId = NewType("UserId", int)
+
+UserId(True)
+
+def narrow_branded_subclass(value: BrandedBase) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: BrandedBase & Child
+    else:
+        reveal_type(value)  # revealed: BrandedBase & ~Child
+
+def narrow_branded_boolean(value: UserId) -> None:
+    if isinstance(value, bool):
+        reveal_type(value)  # revealed: UserId & bool
+    else:
+        reveal_type(value)  # revealed: UserId & ~bool
+```
+
 ## No narrowing for instances of `builtins.type`
 
 ```py

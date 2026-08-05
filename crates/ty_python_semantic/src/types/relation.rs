@@ -3455,6 +3455,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (
+                Type::NewTypeInstance(newtype),
+                other @ (Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_)),
+            )
+            | (
+                other @ (Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_)),
+                Type::NewTypeInstance(newtype),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, newtype.concrete_base_type(db), other)
+            }),
+
             (Type::TypeIs(_) | Type::TypeGuard(_), _)
             | (_, Type::TypeIs(_) | Type::TypeGuard(_)) => self.always(),
 
@@ -3660,38 +3671,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                nontrivial_check(self, || self.check_newtype_pair(db, left, right))
-            }
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
                 nontrivial_check(self, || {
-                    let base = newtype.concrete_base_type(db);
-                    if matches!(other, Type::NominalInstance(_)) {
-                        // Ordinary classes cannot inherit from a NewType, so overlap requires a
-                        // compatible concrete base. Assignability preserves overlap both with
-                        // supertypes of the base and with gradual specializations such as
-                        // `list[Any]`.
-                        let checker = self.as_relation_checker(TypeRelation::Assignability);
-                        let check_base = |base| {
-                            checker
-                                .check_type_pair(db, base, other)
-                                .negate(db, self.constraints)
-                        };
-
-                        // Numeric NewTypes have union bases such as `int | float`. Assigning a
-                        // union requires every alternative to match, but proving disjointness
-                        // requires every alternative not to match.
-                        if let Type::Union(union) = base {
-                            union
-                                .elements(db)
-                                .iter()
-                                .when_all(db, self.constraints, |&element| check_base(element))
-                        } else {
-                            check_base(base)
-                        }
-                    } else {
-                        self.check_type_pair(db, base, other)
-                    }
+                    self.check_type_pair(db, newtype.concrete_base_type(db), other)
                 })
             }
 

@@ -121,6 +121,45 @@ def f(value: Not[E]) -> None:
         value.does_not_exist  # no error (unreachable branch)
 ```
 
+A `NewType` exclusion cannot exclude the runtime objects of its base: an unbranded integer can still
+be identical to the integer passed into the `NewType` constructor.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+
+def f(value: Not[UserId]) -> None:
+    reveal_type(value is 1)  # revealed: bool
+    reveal_type(value is not 1)  # revealed: bool
+```
+
+`LiteralString` describes how a string was constructed rather than which runtime object it is. A
+string excluded from `LiteralString` can therefore still be identical to a particular string
+literal.
+
+```py
+from typing_extensions import LiteralString
+from ty_extensions import Intersection
+
+def f(value: Not[LiteralString], nonliteral_string: Intersection[str, Not[LiteralString]]) -> None:
+    reveal_type(value is "hello")  # revealed: bool
+    reveal_type(value is not "hello")  # revealed: bool
+    reveal_type(nonliteral_string is "hello")  # revealed: bool
+    reveal_type(nonliteral_string is not "hello")  # revealed: bool
+```
+
+A specific string literal does identify a runtime value, so excluding it still makes the identity
+comparison definite.
+
+```py
+from typing import Literal
+
+def f(value: Not[Literal["hello"]]) -> None:
+    reveal_type(value is "hello")  # revealed: Literal[False]
+    reveal_type(value is not "hello")  # revealed: Literal[True]
+```
+
 After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true
 when `value` has also been narrowed to `A`, so the inner branch is unreachable.
 

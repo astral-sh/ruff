@@ -517,6 +517,35 @@ def _(x: Unrelated | Invariant[int]):
         reveal_type(x)  # revealed: Unrelated
 ```
 
+## `TypeIs` narrowing of `NewType` instances
+
+`NewType` constructors return compatible subclass instances unchanged. A `TypeIs` guard for such a
+subclass must therefore preserve the possibility of a branded value matching it.
+
+```py
+from typing import NewType
+from typing_extensions import TypeIs
+
+class Base: ...
+class Child(Base): ...
+
+BaseId = NewType("BaseId", Base)
+UserId = NewType("UserId", int)
+
+def is_child(value: object) -> TypeIs[Child]:
+    return isinstance(value, Child)
+
+def is_bool(value: object) -> TypeIs[bool]:
+    return isinstance(value, bool)
+
+def _(branded: BaseId, user_id: UserId):
+    if is_child(branded):
+        reveal_type(branded)  # revealed: BaseId & Child
+
+    if is_bool(user_id):
+        reveal_type(user_id)  # revealed: UserId & bool
+```
+
 ## `TypeGuard` special cases
 
 ```py

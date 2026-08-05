@@ -449,19 +449,28 @@ def example_type_bool_type_str(
     reveal_type(i)  # revealed: Never
 ```
 
-An integer-based `NewType` is disjoint from `bool`, regardless of the intersection element order.
+An integer-based `NewType` can contain a boolean value or the same object as another integer-based
+`NewType`. Intersections retain overlapping brands and simplify brands with disjoint bases.
 
 ```py
 from typing import NewType
 
 UserId = NewType("UserId", int)
+OtherUserId = NewType("OtherUserId", int)
+StringId = NewType("StringId", str)
 
 def newtype_intersections(
     user_bool: UserId & bool,
     bool_user: bool & UserId,
+    user_other: UserId & OtherUserId,
+    other_user: OtherUserId & UserId,
+    user_string: UserId & StringId,
 ) -> None:
-    reveal_type(user_bool)  # revealed: Never
-    reveal_type(bool_user)  # revealed: Never
+    reveal_type(user_bool)  # revealed: UserId & bool
+    reveal_type(bool_user)  # revealed: bool & UserId
+    reveal_type(user_other)  # revealed: UserId & OtherUserId
+    reveal_type(other_user)  # revealed: OtherUserId & UserId
+    reveal_type(user_string)  # revealed: Never
 ```
 
 #### Positive and negative contributions

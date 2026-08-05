@@ -26,11 +26,9 @@ impl<'db> Type<'db> {
     /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
     /// type here while remaining distinct for ordinary type relations and intersections.
     ///
-    /// Negative intersection elements are generally omitted. A static exclusion does not imply a
-    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `~Literal[True]`, but evaluates
-    /// to the `True` singleton at runtime. However, excluding an entire nominal instance type is
-    /// stable under `NewType` erasure, so constraints such as `~None` and `~SomeClass` are
-    /// preserved.
+    /// Negative `NewType`, type-variable, and `LiteralString` constraints are omitted because
+    /// their static exclusions need not rule out particular runtime objects. Nominal and concrete
+    /// literal exclusions directly describe runtime objects, so they remain valid.
     pub(crate) fn identity_comparison_type(
         self,
         db: &'db dyn Db,
@@ -66,7 +64,12 @@ impl<'db> Type<'db> {
                         builder = builder.add_positive(upcast(db, env, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        if element.resolve_type_alias(db).is_nominal_instance() {
+                        let preserve_exclusion = match element.resolve_type_alias(db) {
+                            Type::NominalInstance(_) => true,
+                            Type::LiteralValue(literal) => !literal.is_literal_string(),
+                            _ => false,
+                        };
+                        if preserve_exclusion {
                             builder = builder.add_negative(*element);
                         }
                     }

@@ -67,9 +67,8 @@ def f(x: str, y: int):
     reveal_type(x is not y)  # revealed: Literal[True]
 ```
 
-but simple disjointness is not enough -- these two `NewType`s are disjoint, yet `B(True)` shares the
-same memory address as `C(True)`. Disjointness of the nominal-instance types *backing* the `NewType`
-is the necessary precondition:
+Distinct `NewType`s with compatible bases are not disjoint: their constructors return their
+arguments unchanged, so `B(True)` and `C(True)` share the same memory address.
 
 ```py
 from typing import NewType, Literal
@@ -78,8 +77,8 @@ from ty_extensions._internal import is_disjoint_from
 B = NewType("B", bool)
 C = NewType("C", bool)
 
-reveal_type(is_disjoint_from(B, C))  # revealed: ConstraintSet[Literal[True]]
-reveal_type(is_disjoint_from(B, Literal[True]))  # revealed: ConstraintSet[Literal[True]]
+reveal_type(is_disjoint_from(B, C))  # revealed: ConstraintSet[Literal[False]]
+reveal_type(is_disjoint_from(B, Literal[True]))  # revealed: ConstraintSet[Literal[False]]
 
 def f(x: B, y: C):
     reveal_type(x is y)  # revealed: bool

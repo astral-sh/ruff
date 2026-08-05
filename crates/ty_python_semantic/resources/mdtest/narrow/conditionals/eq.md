@@ -1118,7 +1118,8 @@ def _(answer: CoupledInequality):
 
 ## Recursive aliases containing enum domains
 
-Enum domains nested in a recursive alias fall back to general comparison inference:
+Enum domains nested in a recursive alias fall back to general comparison inference. Comparisons
+against specific enum members must also terminate and preserve any `NewType` brand:
 
 ```toml
 [environment]
@@ -1127,6 +1128,7 @@ python-version = "3.12"
 
 ```py
 from enum import Enum
+from typing import NewType
 
 class EnumValue(Enum):
     VALUE = 1
@@ -1136,6 +1138,16 @@ type Recursive = EnumValue | Recursive
 
 def _(left: Recursive, right: EnumValue):
     reveal_type(left == right)  # revealed: bool
+
+BrandedEnumValue = NewType("BrandedEnumValue", EnumValue)
+type RecursiveBrand = BrandedEnumValue | RecursiveBrand
+
+def compare_recursive_brand(left: RecursiveBrand, right: EnumValue) -> None:
+    reveal_type(left == right)  # revealed: bool
+
+def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
+    if left == EnumValue.VALUE:
+        reveal_type(left)  # revealed: BrandedEnumValue
 ```
 
 ## Known built-in equality behavior
@@ -2187,6 +2199,72 @@ WrappedIdentityEnum = NewType("WrappedIdentityEnum", IdentityEnum)
 def literal_with_erased_identity(value: WrappedIdentityEnum) -> None:
     reveal_type(IdentityEnum.A == value)  # revealed: bool
     reveal_type(IdentityEnum.A != value)  # revealed: bool
+```
+
+Branded enum values retain their brand after narrowing, while equality transfers only enum-member
+restrictions to the other operand. Excluding a member from the branded operand therefore narrows a
+union of possible members without producing a spurious argument-type error.
+
+```py
+from typing import Literal, TypeAlias
+from ty_extensions import Intersection, Not
+
+def accepts_b(value: Literal[IdentityEnum.B]) -> None: ...
+def compare_branded_exclusion(
+    branded: Intersection[WrappedIdentityEnum, Not[Literal[IdentityEnum.A]]],
+    other: Literal[IdentityEnum.A, IdentityEnum.B],
+) -> None:
+    if branded == other:
+        reveal_type(branded)  # revealed: WrappedIdentityEnum & ~Literal[IdentityEnum.A]
+        reveal_type(other)  # revealed: Literal[IdentityEnum.B]
+        accepts_b(other)
+    else:
+        reveal_type(other)  # revealed: Literal[IdentityEnum.A]
+
+NestedIdentityEnum = NewType("NestedIdentityEnum", WrappedIdentityEnum)
+NestedAlias: TypeAlias = NestedIdentityEnum
+
+def compare_nested_brand(value: NestedAlias, other: Literal[IdentityEnum.A]) -> None:
+    if value == other:
+        reveal_type(value)  # revealed: NestedIdentityEnum & Literal[IdentityEnum.A]
+    else:
+        reveal_type(value)  # revealed: NestedIdentityEnum & ~Literal[IdentityEnum.A]
+```
+
+Distinct branded `IntEnum` classes still compare by their integer values, and custom equality
+methods continue to determine comparisons after branding.
+
+```py
+from enum import IntEnum
+
+class FirstNumber(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class SecondNumber(IntEnum):
+    ONE = 1
+    THREE = 3
+
+BrandedFirstNumber = NewType("BrandedFirstNumber", FirstNumber)
+BrandedSecondNumber = NewType("BrandedSecondNumber", SecondNumber)
+
+def compare_branded_int_enums(left: BrandedFirstNumber, right: BrandedSecondNumber) -> None:
+    if left == right:
+        reveal_type(left)  # revealed: BrandedFirstNumber & Literal[FirstNumber.ONE]
+        reveal_type(right)  # revealed: BrandedSecondNumber & Literal[SecondNumber.ONE]
+
+class NeverEqualEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+BrandedNeverEqual = NewType("BrandedNeverEqual", NeverEqualEnum)
+
+def branded_custom_equality(value: BrandedNeverEqual, other: NeverEqualEnum) -> None:
+    reveal_type(value == other)  # revealed: Literal[False]
+    reveal_type(value != other)  # revealed: bool
 ```
 
 ## Narrowing with enums that have custom `__eq__` methods

@@ -23,9 +23,11 @@ static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
-## NewTypes and boolean types
+## NewTypes and literal types
 
-An integer-based `NewType` is disjoint from both boolean literals, their union, and `bool` itself.
+A `NewType` overlaps with any literal compatible with its concrete base. Type checkers accept
+`UserId(True)` and cannot reliably prevent such calls because `bool` is a subtype of `int`, so an
+integer-based `NewType` also overlaps boolean literals.
 
 ```py
 from typing import Literal, NewType
@@ -33,37 +35,82 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
 UserId = NewType("UserId", int)
+StringId = NewType("StringId", str)
+BytesId = NewType("BytesId", bytes)
 
-static_assert(is_disjoint_from(UserId, Literal[True]))
-static_assert(is_disjoint_from(UserId, Literal[False]))
-static_assert(is_disjoint_from(UserId, Literal[True, False]))
-static_assert(is_disjoint_from(UserId, bool))
-static_assert(is_disjoint_from(bool, UserId))
+UserId(True)
+
+static_assert(not is_disjoint_from(UserId, Literal[True]))
+static_assert(not is_disjoint_from(Literal[True], UserId))
+static_assert(not is_disjoint_from(UserId, Literal[False]))
+static_assert(not is_disjoint_from(Literal[False], UserId))
+static_assert(not is_disjoint_from(UserId, Literal[True, False]))
+static_assert(not is_disjoint_from(UserId, Literal[1]))
+static_assert(not is_disjoint_from(Literal[1], UserId))
+static_assert(not is_disjoint_from(UserId, bool))
+static_assert(not is_disjoint_from(bool, UserId))
 static_assert(not is_disjoint_from(UserId, int))
+static_assert(is_disjoint_from(UserId, Literal["user"]))
+static_assert(is_disjoint_from(Literal["user"], UserId))
+
+static_assert(not is_disjoint_from(StringId, Literal["user"]))
+static_assert(not is_disjoint_from(BytesId, Literal[b"user"]))
 ```
 
-Nested and float-based NewTypes retain the distinction, while a NewType based directly on `bool`
-still overlaps with its base.
+Nested NewTypes retain the overlap, and a float-based NewType also accepts `int` and `bool` through
+the numeric tower.
 
 ```py
 NestedUserId = NewType("NestedUserId", UserId)
 FloatId = NewType("FloatId", float)
 BoolId = NewType("BoolId", bool)
 
-static_assert(is_disjoint_from(NestedUserId, bool))
-static_assert(is_disjoint_from(FloatId, bool))
+static_assert(not is_disjoint_from(NestedUserId, bool))
+static_assert(not is_disjoint_from(NestedUserId, Literal[True]))
+static_assert(not is_disjoint_from(FloatId, bool))
+static_assert(not is_disjoint_from(FloatId, Literal[True]))
+static_assert(not is_disjoint_from(FloatId, Literal[1]))
 static_assert(not is_disjoint_from(FloatId, int))
 static_assert(not is_disjoint_from(FloatId, float))
 static_assert(not is_disjoint_from(BoolId, bool))
 ```
 
-## NewTypes and nominal subclasses
+## Distinct NewTypes
 
-A NewType is disjoint from proper subclasses of its base, whether or not those subclasses are final.
-It still overlaps with its own base and with any supertypes of that base.
+Distinct `NewType`s are not assignable to each other, but they overlap whenever their concrete bases
+overlap. They are disjoint only when their concrete bases are disjoint.
 
 ```py
-from typing import NewType, final
+from typing import NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_disjoint_from, is_subtype_of
+
+First = NewType("First", int)
+Second = NewType("Second", int)
+NestedFirst = NewType("NestedFirst", First)
+Numeric = NewType("Numeric", float)
+Text = NewType("Text", str)
+
+static_assert(not is_disjoint_from(First, Second))
+static_assert(not is_disjoint_from(Second, First))
+static_assert(not is_disjoint_from(NestedFirst, Second))
+static_assert(not is_disjoint_from(First, Numeric))
+static_assert(is_disjoint_from(First, Text))
+static_assert(is_disjoint_from(Text, First))
+
+static_assert(not is_subtype_of(First, Second))
+static_assert(not is_subtype_of(Second, First))
+static_assert(not is_assignable_to(First, Second))
+static_assert(not is_assignable_to(Second, First))
+```
+
+## NewTypes and nominal subclasses
+
+A `NewType` overlaps with subclasses of its base, whether or not those subclasses are final. It also
+overlaps with its own base and with any supertypes of that base.
+
+```py
+from typing import Literal, NewType, final
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
@@ -76,16 +123,18 @@ class OrdinaryInt(int): ...
 
 FinalIntId = NewType("FinalIntId", FinalInt)
 
-static_assert(is_disjoint_from(UserId, FinalInt))
-static_assert(is_disjoint_from(UserId, OrdinaryInt))
-static_assert(is_disjoint_from(OrdinaryInt, UserId))
+static_assert(not is_disjoint_from(UserId, FinalInt))
+static_assert(not is_disjoint_from(FinalInt, UserId))
+static_assert(not is_disjoint_from(UserId, OrdinaryInt))
+static_assert(not is_disjoint_from(OrdinaryInt, UserId))
 static_assert(not is_disjoint_from(UserId, int))
 static_assert(not is_disjoint_from(UserId, object))
+static_assert(is_disjoint_from(UserId, str))
 static_assert(not is_disjoint_from(FinalIntId, FinalInt))
 static_assert(not is_disjoint_from(FinalIntId, int))
 ```
 
-An `IntEnum` with members is another subclass disjoint from an integer-based NewType.
+An `IntEnum` and its members also overlap with an integer-based `NewType`.
 
 ```py
 from enum import IntEnum
@@ -94,7 +143,9 @@ class Choice(IntEnum):
     FIRST = 1
     SECOND = 2
 
-static_assert(is_disjoint_from(UserId, Choice))
+static_assert(not is_disjoint_from(UserId, Choice))
+static_assert(not is_disjoint_from(UserId, Literal[Choice.FIRST]))
+static_assert(not is_disjoint_from(Literal[Choice.FIRST], UserId))
 ```
 
 ## NewTypes and generic classes
@@ -104,8 +155,9 @@ static_assert(is_disjoint_from(UserId, Choice))
 python-version = "3.12"
 ```
 
-A NewType based on a covariant generic specialization overlaps with its generic supertypes, but is
-disjoint from incompatible specializations and subclasses of its base.
+A `NewType` based on a covariant generic specialization overlaps with its generic supertypes and
+subclasses. Two differently specialized covariant types can also overlap through a common, more
+specific specialization.
 
 ```py
 from typing import Any, NewType, final
@@ -125,9 +177,9 @@ BaseId = NewType("BaseId", Base[int])
 
 static_assert(not is_disjoint_from(BaseId, Base[int]))
 static_assert(not is_disjoint_from(BaseId, Base[object]))
-static_assert(is_disjoint_from(BaseId, Base[str]))
-static_assert(is_disjoint_from(BaseId, FinalChild[object]))
-static_assert(is_disjoint_from(BaseId, OrdinaryChild[object]))
+static_assert(not is_disjoint_from(BaseId, Base[str]))
+static_assert(not is_disjoint_from(BaseId, FinalChild[object]))
+static_assert(not is_disjoint_from(BaseId, OrdinaryChild[object]))
 ```
 
 Gradual type arguments can overlap even when strict subtyping does not hold.
@@ -135,11 +187,30 @@ Gradual type arguments can overlap even when strict subtyping does not hold.
 ```py
 AnyListId = NewType("AnyListId", list[Any])
 IntListId = NewType("IntListId", list[int])
+StrListId = NewType("StrListId", list[str])
 
 static_assert(not is_subtype_of(AnyListId, list[int]))
 static_assert(not is_disjoint_from(AnyListId, list[int]))
 static_assert(not is_disjoint_from(IntListId, list[Any]))
 static_assert(is_disjoint_from(IntListId, list[str]))
+static_assert(not is_disjoint_from(IntListId, AnyListId))
+static_assert(is_disjoint_from(IntListId, StrListId))
+```
+
+A generic type variable must not make a potentially compatible specialization appear disjoint.
+Compatible constraints and bounds also preserve the overlap.
+
+```py
+def unconstrained[T]() -> None:
+    static_assert(not is_disjoint_from(IntListId, list[T]))
+    static_assert(not is_disjoint_from(list[T], IntListId))
+
+def compatible_constraints[T: (int, str)]() -> None:
+    static_assert(not is_disjoint_from(IntListId, list[T]))
+    static_assert(not is_disjoint_from(list[T], IntListId))
+
+def compatible_bound[T: int]() -> None:
+    static_assert(not is_disjoint_from(IntListId, list[T]))
 ```
 
 ## Statically empty and non-empty ranges
@@ -961,6 +1032,39 @@ static_assert(not is_disjoint_from(bool, TypeIs[str]))
 
 static_assert(is_disjoint_from(str, TypeGuard[str]))
 static_assert(is_disjoint_from(str, TypeIs[str]))
+```
+
+`TypeGuard` and `TypeIs` represent boolean return values, so they overlap with `NewType`s whose
+concrete bases accept booleans, including `int` and `float`. A `NewType` with an incompatible base
+remains disjoint.
+
+```py
+from typing import NewType
+
+Boolean = NewType("Boolean", bool)
+Integer = NewType("Integer", int)
+Numeric = NewType("Numeric", float)
+Text = NewType("Text", str)
+
+static_assert(not is_disjoint_from(Boolean, TypeGuard[str]))
+static_assert(not is_disjoint_from(TypeGuard[str], Boolean))
+static_assert(not is_disjoint_from(Boolean, TypeIs[str]))
+static_assert(not is_disjoint_from(TypeIs[str], Boolean))
+
+static_assert(not is_disjoint_from(Integer, TypeGuard[str]))
+static_assert(not is_disjoint_from(TypeGuard[str], Integer))
+static_assert(not is_disjoint_from(Integer, TypeIs[str]))
+static_assert(not is_disjoint_from(TypeIs[str], Integer))
+
+static_assert(not is_disjoint_from(Numeric, TypeGuard[str]))
+static_assert(not is_disjoint_from(TypeGuard[str], Numeric))
+static_assert(not is_disjoint_from(Numeric, TypeIs[str]))
+static_assert(not is_disjoint_from(TypeIs[str], Numeric))
+
+static_assert(is_disjoint_from(Text, TypeGuard[str]))
+static_assert(is_disjoint_from(TypeGuard[str], Text))
+static_assert(is_disjoint_from(Text, TypeIs[str]))
+static_assert(is_disjoint_from(TypeIs[str], Text))
 ```
 
 ### `Protocol`

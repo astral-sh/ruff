@@ -44,6 +44,35 @@ match x:
 reveal_type(x)  # revealed: object
 ```
 
+## Class patterns on `NewType` instances
+
+A `NewType` does not change its argument's runtime class. Its values can therefore match class
+patterns for subclasses of the concrete base, including `bool` for a `NewType` based on `int`.
+
+```py
+from typing import NewType
+
+class Base: ...
+class Child(Base): ...
+
+BrandedBase = NewType("BrandedBase", Base)
+UserId = NewType("UserId", int)
+
+def match_branded_subclass(value: BrandedBase) -> None:
+    match value:
+        case Child():
+            reveal_type(value)  # revealed: BrandedBase & Child
+        case _:
+            reveal_type(value)  # revealed: BrandedBase & ~Child
+
+def match_branded_boolean(value: UserId) -> None:
+    match value:
+        case bool():
+            reveal_type(value)  # revealed: UserId & bool
+        case _:
+            reveal_type(value)  # revealed: UserId & ~bool
+```
+
 ## Class pattern with guard
 
 ```py
@@ -3326,7 +3355,7 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, IntEnum, StrEnum, auto
-from typing import Literal, assert_never
+from typing import Literal, NewType, assert_never
 from ty_extensions._internal import Unknown
 
 class Color(StrEnum):
@@ -3380,6 +3409,34 @@ class First(IntEnum):
 class Second(IntEnum):
     ONE = 1
     TWO = 2
+
+BrandedFirst = NewType("BrandedFirst", First)
+BrandedSecond = NewType("BrandedSecond", Second)
+
+def branded_int_enum_integer_patterns_are_exhaustive(value: BrandedFirst) -> int:
+    match value:
+        case 1:
+            reveal_type(value)  # revealed: BrandedFirst & Literal[First.ONE]
+            return 1
+        case 2:
+            reveal_type(value)  # revealed: BrandedFirst & Literal[First.TWO]
+            return 2
+
+def branded_int_enum_member_patterns_are_exhaustive(value: BrandedFirst) -> int:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: BrandedFirst & Literal[First.ONE]
+            return 1
+        case First.TWO:
+            reveal_type(value)  # revealed: BrandedFirst & Literal[First.TWO]
+            return 2
+
+def branded_cross_int_enum_member_patterns(value: BrandedFirst | BrandedSecond) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: (BrandedFirst & Literal[First.ONE]) | (BrandedSecond & Literal[Second.ONE])
+        case _:
+            reveal_type(value)  # revealed: (BrandedFirst & ~Literal[First.ONE]) | (BrandedSecond & ~Literal[Second.ONE])
 
 def cross_int_enum_members(value: First | Second) -> None:
     match value:

@@ -344,8 +344,8 @@ def f(value: int | None | EllipsisType, other: T) -> None:
 ### Distinct `NewType`s with the same base
 
 Calling a `NewType` returns its argument unchanged. Values with distinct `NewType`s over `Foo` can
-therefore be the same object even though their types are disjoint. The examples below cover direct
-comparisons and narrowing through unions.
+therefore be the same object, and their types are not disjoint. The examples below cover direct
+comparisons and narrowing through unions and intersections.
 
 ```py
 from typing import NewType
@@ -360,28 +360,23 @@ FooNewType2 = NewType("FooNewType2", Foo)
 def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     reveal_type(foo1 is foo2)  # revealed: bool
     if foo1 is foo2:
-        reveal_type(foo1)  # revealed: FooNewType1
-        reveal_type(foo2)  # revealed: FooNewType2
+        reveal_type(foo1)  # revealed: FooNewType1 & FooNewType2
+        reveal_type(foo2)  # revealed: FooNewType2 & FooNewType1
 
 def union(value: FooNewType1 | None, other: FooNewType2) -> None:
     if value is other:
-        reveal_type(value)  # revealed: FooNewType1
-```
+        reveal_type(value)  # revealed: FooNewType1 & FooNewType2
 
-An intersection between a `NewType` and a proper subclass of its base is statically empty, so
-narrowing through that intersection produces `Never`.
-
-```py
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
     if left is right:
-        reveal_type(right)  # revealed: Never
+        reveal_type(right)  # revealed: FooNewType2 & FooNewType1 & FooSub
 ```
 
 ### `NewType`s in `TypeVar` bounds and constraints
 
 `NewType`s inside `TypeVar` bounds and constraints can likewise refer to the same runtime object.
-Comparing the distinct `TypeVar`s below is not always false, and a true branch keeps the original
-`TypeVar`.
+Comparing the distinct `TypeVar`s below is not always false, and a true branch narrows to their
+intersection.
 
 ```py
 from typing import NewType, TypeVar
@@ -399,9 +394,8 @@ BoundedU = TypeVar("BoundedU", bound=FooNewType2)
 def bounded_typevars(left: BoundedT, right: BoundedU) -> tuple[BoundedU, BoundedU]:
     reveal_type(left is right)  # revealed: bool
     if left is right:
-        # TODO: This should narrow to `BoundedT & BoundedU` and avoid the false positive below.
-        reveal_type(left)  # revealed: BoundedT@bounded_typevars
-        return (left, left)  # error: [invalid-return-type]
+        reveal_type(left)  # revealed: BoundedT@bounded_typevars & BoundedU@bounded_typevars
+        return (left, left)
     return (right, right)
 
 ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
@@ -410,9 +404,8 @@ ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
 def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> tuple[ConstrainedU, ConstrainedU]:
     reveal_type(left is right)  # revealed: bool
     if left is right:
-        # TODO: This should narrow to `ConstrainedT & ConstrainedU` and avoid the false positive.
-        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
-        return (left, left)  # error: [invalid-return-type]
+        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars & ConstrainedU@constrained_typevars
+        return (left, left)
     return (right, right)
 ```
 
@@ -465,11 +458,11 @@ IntNewType = NewType("IntNewType", int)
 
 def literals(true: Literal[True], b: BoolNewType, forty_two: Literal[42], i: IntNewType) -> None:
     if b is true:
-        reveal_type(true)  # revealed: Literal[True]
-        reveal_type(b)  # revealed: BoolNewType
+        reveal_type(true)  # revealed: Literal[True] & BoolNewType
+        reveal_type(b)  # revealed: BoolNewType & Literal[True]
     if i is forty_two:
-        reveal_type(forty_two)  # revealed: Literal[42]
-        reveal_type(i)  # revealed: IntNewType
+        reveal_type(forty_two)  # revealed: Literal[42] & IntNewType
+        reveal_type(i)  # revealed: IntNewType & Literal[42]
 ```
 
 ### `is not` with singleton `NewType`s
@@ -487,38 +480,6 @@ SingletonB = NewType("SingletonB", EllipsisType)
 def singleton_is_not(value: SingletonA | int, other: SingletonB) -> None:
     if value is not other:
         reveal_type(value)  # revealed: int
-```
-
-### Static exclusions
-
-The type `~Literal[True]` excludes the literal type but accepts the distinct `BoolNewType`. However,
-`BoolNewType(True)` returns `True` unchanged, so `value is True` can be either true or false.
-
-```py
-from __future__ import annotations
-
-from typing import Literal, NewType
-
-BoolNewType = NewType("BoolNewType", bool)
-
-def excludes_true(value: ~Literal[True]) -> None:
-    reveal_type(value is True)  # revealed: bool
-
-excludes_true(BoolNewType(True))
-```
-
-Similarly, `int & ~Literal[1]` accepts `IntNewType(1)`, which returns the `1` object unchanged, so
-the comparison remains possible.
-
-```py
-from typing import Literal, NewType
-
-IntNewType = NewType("IntNewType", int)
-
-def excludes_one(value: int & ~Literal[1]) -> None:
-    reveal_type(value is 1)  # revealed: bool
-
-excludes_one(IntNewType(1))
 ```
 
 ### Comparisons that are always false
