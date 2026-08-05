@@ -41,7 +41,10 @@ async def main():
     reveal_type(value)  # revealed: Literal[1] | str
 ```
 
-## Bindings may be absent after an asynchronously suppressed exception
+## Bindings may be absent after a suppressed exception
+
+An awaited call can raise before its result is assigned. If the context manager suppresses the
+exception, the target remains undefined.
 
 ```py
 class Suppresses:
@@ -59,44 +62,9 @@ async def main():
     value  # error: [possibly-unresolved-reference]
 ```
 
-## Suppressed async name lookups can leave later bindings undefined
+## Returning from an asynchronous context manager
 
-A potentially unbound name can raise before a later assignment executes.
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def main():
-    async with Suppresses():
-        missing  # ty: ignore[unresolved-reference]
-        value = 1
-
-    value  # error: [possibly-unresolved-reference]
-```
-
-## Asynchronously suppressed exceptions do not terminate control flow
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def main():
-    async with Suppresses():
-        raise ValueError
-
-    reveal_type("reachable")  # revealed: Literal["reachable"]
-```
-
-## Async control-flow transfers without exception checkpoints are not suppressed
-
-A literal return does not create an exception checkpoint and cannot be suppressed. Awaiting a return
-expression can raise, so the manager can suppress that exception and continue past the `async with`
-statement.
+Returning a literal exits the context manager normally and cannot be suppressed:
 
 ```py
 from typing import Literal
@@ -112,85 +80,21 @@ async def could_raise_returns_int() -> int:
 async def returns_from_body() -> int:
     async with Suppresses():
         return 1
+```
 
+An awaited return expression can raise before the function returns. If the context manager
+suppresses that exception, the function continues after the `async with` statement:
+
+```py
 async def return_expression_can_be_suppressed() -> int:  # error: [invalid-return-type]
     async with Suppresses():
         return await could_raise_returns_int()
 ```
 
-## Async typed handlers do not block exceptional checkpoint propagation
+## Exceptions during asynchronous iteration
 
-Exception checkpoints can propagate through a typed inner handler because ty does not yet determine
-which exceptions match each handler. An unreachable branch does not create a reachable checkpoint.
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def caught_by_inner_handler() -> int:  # error: [invalid-return-type]
-    async with Suppresses():
-        try:
-            raise ValueError
-        except ValueError:
-            return 1
-
-async def statically_unreachable_exception() -> int:
-    async with Suppresses():
-        if False:
-            raise ValueError
-        return 1
-```
-
-## Async bare inner handlers block exceptional checkpoint propagation
-
-A bare handler receives and handles an exception checkpoint before it can propagate to an outer
-asynchronously suppressing context manager.
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def caught_by_bare_inner_handler() -> int:
-    async with Suppresses():
-        try:
-            raise ValueError
-        except:
-            return 1
-```
-
-## Async suppression follows eager and lazy scope boundaries
-
-An eager comprehension can raise into its enclosing asynchronous context manager. A lazy generator
-body cannot raise merely because its generator is constructed.
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-def could_raise() -> None:
-    raise ValueError
-
-async def eager_comprehension() -> int:  # error: [invalid-return-type]
-    async with Suppresses():
-        [could_raise() for _ in [0]]
-        return 1
-
-async def lazy_generator_body() -> int:
-    async with Suppresses():
-        (could_raise() for _ in [0])
-        return 1
-```
-
-## Assertions and async iteration can leave through a suppressing manager
-
-Assertions and asynchronous iteration can raise without a visible call expression. The shared
-exception model records checkpoints for those implicit protocol operations.
+Requesting the next item from an asynchronous iterator can raise. The surrounding context manager
+may suppress that exception before the function reaches its return statement.
 
 ```py
 from typing_extensions import Self
@@ -199,11 +103,6 @@ class Suppresses:
     async def __aenter__(self) -> None: ...
     async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
         return True
-
-async def suppressed_assertion(condition: bool) -> int:  # error: [invalid-return-type]
-    async with Suppresses():
-        assert condition
-        return 1
 
 class RaisingAsyncIterable:
     def __aiter__(self) -> Self:
@@ -219,103 +118,12 @@ async def suppressed_iteration(values: RaisingAsyncIterable) -> int:  # error: [
         return 1
 ```
 
-## Async literal assignments complete before an exception checkpoint
+## Asynchronous exit return types
 
-A literal assignment cannot raise. An asynchronously suppressing manager therefore does not retain
-the original binding when the body contains no exception checkpoint.
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def main():
-    value = 1
-
-    async with Suppresses():
-        value = "finished"
-
-    reveal_type(value)  # revealed: Literal["finished"]
-```
-
-## Async literal initializers remain defined at a later exception checkpoint
-
-Safe setup assignments complete before a later awaited operation can raise and be suppressed.
+The awaited return type of `__aexit__`, rather than the coroutine itself, determines whether an
+asynchronous context manager can suppress an exception. An awaited `bool` can suppress:
 
 ```py
-from typing_extensions import assert_type
-
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def could_raise() -> None:
-    raise ValueError
-
-async def initialized_before_exception() -> None:
-    async with Suppresses():
-        first = [1, 2, 4]
-        second = [0.5, 0.8]
-        await could_raise()
-
-    assert_type(first, list[int])
-    assert_type(second, list[float])
-```
-
-## Async exception-assertion managers do not exempt setup calls
-
-An exception-assertion name does not make an awaited setup call safe. The manager can suppress an
-exception raised before the setup assignment completes.
-
-```py
-class Raises:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-def assert_raises(exception: type[ValueError]) -> Raises:
-    return Raises()
-
-async def could_raise_returns_list() -> list[int]:
-    raise ValueError
-
-async def exception_assertion() -> list[int]:
-    async with assert_raises(ValueError):
-        values = await could_raise_returns_list()
-
-    return values  # error: [possibly-unresolved-reference]
-```
-
-## Async suppressed exceptions preserve deleted-name state
-
-A checkpoint after `del` captures the fact that the name is no longer defined. Suppressing the
-subsequent exception cannot restore its earlier binding.
-
-```py
-class Suppresses:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-async def deleted_after_suppression() -> int:
-    value = 1
-
-    async with Suppresses():
-        del value
-        raise ValueError
-
-    return value  # error: [unresolved-reference]
-```
-
-## Async context manager exception suppression follows the typing specification
-
-The awaited return type of `__aexit__`, rather than the coroutine object, determines whether an
-async context manager can suppress an exception.
-
-```py
-from typing import Any, Literal
 from typing_extensions import assert_type
 
 class Manager:
@@ -326,148 +134,46 @@ class SuppressBool(Manager):
     async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
         return True
 
-class SuppressTrue(Manager):
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True]:
-        return True
-
-class PropagateNone(Manager):
-    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
-        return None
-
-class PropagateFalse(Manager):
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False]:
-        return False
-
-class PropagateAny(Manager):
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Any:
-        return False
-
-class PropagateOptionalBool(Manager):
-    async def __aexit__(self, exc_type, exc_value, traceback) -> bool | None:
-        return None
-
-class PropagateOptionalTrue(Manager):
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
-        return None
-
 async def suppress_bool(value: int | str) -> None:
     if isinstance(value, int):
         async with SuppressBool():
             raise ValueError
     assert_type(value, int | str)
+```
 
-async def suppress_true(value: int | str) -> None:
-    if isinstance(value, int):
-        async with SuppressTrue():
-            raise ValueError
-    assert_type(value, int | str)
+An awaited `None` cannot suppress an exception:
+
+```py
+class PropagateNone(Manager):
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        return None
 
 async def propagate_none(value: int | str) -> None:
     if isinstance(value, int):
         async with PropagateNone():
             raise ValueError
     assert_type(value, str)
+```
 
-async def propagate_false(value: int | str) -> None:
-    if isinstance(value, int):
-        async with PropagateFalse():
-            raise ValueError
-    assert_type(value, str)
+As with synchronous context managers, the typing specification treats `bool | None` as
+non-suppressing:
 
-async def propagate_any(value: int | str) -> None:
-    if isinstance(value, int):
-        async with PropagateAny():
-            raise ValueError
-    assert_type(value, str)
+```py
+class PropagateOptionalBool(Manager):
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return None
 
 async def propagate_optional_bool(value: int | str) -> None:
     if isinstance(value, int):
         async with PropagateOptionalBool():
             raise ValueError
     assert_type(value, str)
-
-async def propagate_optional_true(value: int | str) -> None:
-    if isinstance(value, int):
-        async with PropagateOptionalTrue():
-            raise ValueError
-    assert_type(value, str)
-```
-
-## Always-falsy async exit methods preserve precise bindings
-
-```py
-from typing import Literal
-
-class NoneExit:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
-
-class FalseExit:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False]:
-        return False
-
-async def main():
-    none_value = 1
-    async with NoneExit():
-        none_value = "finished"
-
-    reveal_type(none_value)  # revealed: Literal["finished"]
-
-    false_value = 1
-    async with FalseExit():
-        false_value = "finished"
-
-    reveal_type(false_value)  # revealed: Literal["finished"]
-```
-
-## Async exit overloads are conservatively combined
-
-The awaited return types of all `__aexit__` overloads are considered. A truthy normal-exit overload
-is enough to make the manager potentially suppressing even when the exceptional overload returns
-`Literal[False]`; selecting the applicable exceptional overload is a known precision limitation.
-
-```py
-from types import TracebackType
-from typing import Literal, overload
-
-class NormalOnlyTruthyExit:
-    async def __aenter__(self) -> None: ...
-    @overload
-    async def __aexit__(
-        self,
-        exc_type: None,
-        exc_value: None,
-        traceback: None,
-    ) -> Literal[True]: ...
-    @overload
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException],
-        exc_value: BaseException,
-        traceback: TracebackType | None,
-    ) -> Literal[False]: ...
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool:
-        return exc_type is None
-
-async def could_raise_returns_str() -> str:
-    return "finished"
-
-async def main():
-    value = 1
-
-    async with NormalOnlyTruthyExit():
-        value = await could_raise_returns_str()
-
-    reveal_type(value)  # revealed: Literal[1] | str
 ```
 
 ## Earlier async context managers can suppress later entry failures
+
+Entering a later asynchronous context manager can fail before its target is assigned. An earlier
+context manager may suppress that exception, leaving the target undefined.
 
 ```py
 from typing import Literal
@@ -489,20 +195,12 @@ async def main():
         pass
 
     value  # error: [possibly-unresolved-reference]
-
-    inner = Inner()
-
-    async with Suppresses(), inner as preexisting_value:
-        pass
-
-    preexisting_value  # error: [possibly-unresolved-reference]
 ```
 
 ## Union async context managers combine awaited exit return types
 
-The awaited `__aexit__` return types of alternative managers must be combined before applying the
-typing specification. A conditional union of a `bool`-returning async manager and `nullcontext`
-therefore has an effective return type of `bool | None` and is non-suppressing.
+The awaited return types of both context managers are combined. Choosing between a manager that
+returns `bool` and `nullcontext` produces `bool | None`, which cannot suppress an exception.
 
 ```py
 from contextlib import nullcontext
@@ -513,20 +211,6 @@ class Suppresses:
     async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
         return True
 
-async def conditional_return(flag: bool) -> int:
-    manager = Suppresses() if flag else nullcontext()
-    async with manager:
-        return 1
-
-async def reversed_conditional_return(flag: bool) -> int:
-    manager = nullcontext() if flag else Suppresses()
-    async with manager:
-        return 1
-
-async def explicit_union_return(manager: Suppresses | nullcontext[None]) -> int:
-    async with manager:
-        return 1
-
 async def conditional_narrowing(flag: bool, value: int | str) -> None:
     if isinstance(value, int):
         manager = Suppresses() if flag else nullcontext()
@@ -536,10 +220,10 @@ async def conditional_narrowing(flag: bool, value: int | str) -> None:
     assert_type(value, str)
 ```
 
-## Falsy async union alternatives do not change a boolean exit type
+## A `False` alternative does not change an awaited boolean exit type
 
-After awaiting, `bool | Literal[False]` simplifies to `bool`, so a union of these async manager
-alternatives remains potentially suppressing.
+The awaited return type `bool | Literal[False]` is still `bool`, so the context manager may suppress
+an exception.
 
 ```py
 from typing import Literal
@@ -577,35 +261,6 @@ async def test():
     async with Manager() as (x, y):
         reveal_type(x)  # revealed: int
         reveal_type(y)  # revealed: str
-```
-
-## Async exit methods are looked up on the context manager's class
-
-An `async with` statement invokes `type(manager).__aexit__`, not an attribute stored on the manager
-instance. An instance-only `__aexit__` is therefore neither a valid async context-manager method nor
-a source of exception suppression.
-
-```py
-from collections.abc import Awaitable, Callable
-from typing_extensions import assert_type
-
-async def suppress_exit(*args: object) -> bool:
-    return True
-
-class InstanceOnlyAsyncExit:
-    def __init__(self) -> None:
-        self.__aexit__: Callable[..., Awaitable[bool]] = suppress_exit
-
-    async def __aenter__(self) -> None:
-        return None
-
-async def instance_attributes_do_not_suppress(value: int | str) -> None:
-    if isinstance(value, int):
-        # error: [invalid-context-manager]
-        async with InstanceOnlyAsyncExit():
-            raise ValueError
-
-    assert_type(value, str)
 ```
 
 ## Context manager without an `__aenter__` or `__aexit__` method

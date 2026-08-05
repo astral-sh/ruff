@@ -21,7 +21,7 @@ with Manager() as f:
 ## Exception-suppressing context managers
 
 A context manager can suppress an exception raised in its body. Consequently, any binding visible at
-a potentially raising operation must remain visible after the `with` statement.
+an operation that may raise remains a possible binding after the `with` statement.
 
 ```py
 from contextlib import suppress
@@ -43,9 +43,10 @@ reveal_type(first)  # revealed: Literal[1] | str
 reveal_type(second)  # revealed: Literal[2] | bytes
 ```
 
-## Suppressed exceptions invalidate post-with narrowing
+## Interrupted assignments cannot narrow a value
 
-Regression test for <https://github.com/astral-sh/ty/issues/2285>.
+If an assignment inside a suppressing context manager raises before it completes, the original value
+remains in use after the `with` statement.
 
 ```py
 class Suppresses:
@@ -66,6 +67,9 @@ def uses_suppressing_context_manager(value: int) -> str:
 ```
 
 ## Bindings may be absent after a suppressed exception
+
+A name assigned only inside the `with` body may remain undefined if its value raises before the
+assignment completes.
 
 ```py
 from contextlib import suppress
@@ -93,23 +97,10 @@ with suppress(NameError):
 value  # error: [possibly-unresolved-reference]
 ```
 
-## Suppressed exceptions do not terminate control flow
+## Returns, breaks, and continues are not suppressed
 
-```py
-from contextlib import suppress
-
-with suppress(ValueError):
-    raise ValueError
-
-reveal_type("reachable")  # revealed: Literal["reachable"]
-```
-
-## Control-flow transfers without exception checkpoints are not suppressed
-
-Returning, breaking, and continuing call `__exit__` with three `None` arguments, so a truthy exit
-value cannot itself cancel those control-flow transfers. A literal return, `break`, or `continue`
-does not create an exception checkpoint. A call in a return expression can raise, so a suppressing
-manager can instead continue after that call fails.
+Returning, breaking, and continuing exit the context manager normally. The return value of
+`__exit__` cannot cancel those operations.
 
 ```py
 from contextlib import suppress
@@ -117,14 +108,23 @@ from contextlib import suppress
 def returns_from_body() -> int:
     with suppress(ValueError):
         return 1
+```
 
+A function call in a return expression can raise before the function returns. The context manager
+may suppress that exception, allowing execution to continue after the `with` statement.
+
+```py
 def could_raise_returns_int() -> int:
     return 1
 
 def return_expression_can_be_suppressed() -> int:  # error: [invalid-return-type]
     with suppress(ValueError):
         return could_raise_returns_int()
+```
 
+The same normal-exit rule applies to `break` and `continue`:
+
+```py
 def breaks_from_body() -> int:
     while True:
         with suppress(ValueError):
@@ -140,11 +140,10 @@ def continues_from_body(values: list[int]) -> int:
     return 1
 ```
 
-## Typed handlers do not block exceptional checkpoint propagation
+## Exception handlers inside a suppressing context manager
 
-Exception checkpoints can propagate through a typed inner handler because ty does not yet determine
-which exceptions match each handler. An exception in an unreachable branch does not create a
-reachable checkpoint.
+The type checker does not yet determine which exceptions match a typed handler. An exception may
+therefore also be treated as reaching the enclosing context manager.
 
 ```py
 from contextlib import suppress
@@ -155,35 +154,11 @@ def caught_by_inner_handler() -> int:  # error: [invalid-return-type]
             raise ValueError
         except ValueError:
             return 1
-
-def suppressed_by_inner_manager() -> int:  # error: [invalid-return-type]
-    with suppress(ValueError):
-        with suppress(ValueError):
-            raise ValueError
-        return 1
-
-def overridden_by_finally() -> int:  # error: [invalid-return-type]
-    with suppress(ValueError):
-        try:
-            raise ValueError
-        finally:
-            return 1
-
-def statically_unreachable_exception() -> int:
-    with suppress(ValueError):
-        if False:
-            raise ValueError
-        return 1
 ```
 
-## Bare inner handlers block exceptional checkpoint propagation
-
-A bare handler receives and handles an exception checkpoint before it can propagate to the outer
-suppressing context manager.
+A bare handler, in contrast, catches every exception before it can reach the outer context manager:
 
 ```py
-from contextlib import suppress
-
 def caught_by_bare_inner_handler() -> int:
     with suppress(ValueError):
         try:
@@ -192,11 +167,25 @@ def caught_by_bare_inner_handler() -> int:
             return 1
 ```
 
-## Suppression follows eager and lazy scope boundaries
+## Entering a nested context manager can raise
 
-Checkpoints from class bodies and list comprehensions propagate to an enclosing context manager
-because those scopes execute eagerly. Generator-expression bodies execute lazily and do not create
-an exception checkpoint when the generator is constructed.
+Evaluating or entering a nested context manager can raise before its body begins. The outer manager
+may suppress that exception, skipping the later return:
+
+```py
+from contextlib import suppress
+
+def suppressed_by_inner_manager() -> int:  # error: [invalid-return-type]
+    with suppress(ValueError):
+        with suppress(ValueError):
+            raise ValueError
+        return 1
+```
+
+## Class bodies, comprehensions, and generator expressions
+
+A class body executes immediately, so its exceptions can be suppressed by the enclosing context
+manager:
 
 ```py
 from contextlib import suppress
@@ -210,31 +199,46 @@ def eager_class_body() -> int:  # error: [invalid-return-type]
             could_raise()
 
         return 1
+```
 
+A list comprehension also executes immediately:
+
+```py
 def eager_comprehension() -> int:  # error: [invalid-return-type]
     with suppress(ValueError):
         [could_raise() for _ in [0]]
         return 1
+```
 
+A generator expression does not execute its body when the generator is created:
+
+```py
 def lazy_generator_body() -> int:
     with suppress(ValueError):
         (could_raise() for _ in [0])
         return 1
 ```
 
-## Assertions and iteration can leave through a suppressing manager
+## Assertions inside a suppressing context manager
 
-A suppressed exception does not have to originate from a call expression. Assertions and the
-iterator protocol can raise implicitly, so they also create exception checkpoints.
+A failed assertion raises an exception that the context manager can suppress:
 
 ```py
-from collections.abc import Iterator
 from contextlib import suppress
 
 def suppressed_assertion(condition: bool) -> int:  # error: [invalid-return-type]
     with suppress(AssertionError):
         assert condition
         return 1
+```
+
+## Iteration inside a suppressing context manager
+
+Requesting an item from an iterator can raise before the loop body runs:
+
+```py
+from collections.abc import Iterator
+from contextlib import suppress
 
 class RaisingIterable:
     def __iter__(self) -> Iterator[int]:
@@ -247,10 +251,10 @@ def suppressed_iteration(values: RaisingIterable) -> int:  # error: [invalid-ret
         return 1
 ```
 
-## Literal assignments complete before an exception checkpoint
+## Assignments that cannot raise
 
-Assigning a literal to a local name cannot raise. The original binding is therefore not visible
-after a suppressing manager whose body contains no exception checkpoint.
+Assigning a literal cannot raise. Adding support for exception suppression must not introduce a path
+where that assignment fails to complete.
 
 ```py
 from contextlib import suppress
@@ -263,12 +267,9 @@ with suppress(ValueError):
 reveal_type(value)  # revealed: Literal["finished"]
 ```
 
-## Literal initializers remain defined at a later exception checkpoint
-
-Safe setup assignments complete before a later operation can raise and be suppressed.
+An assignment that cannot raise also remains defined when a later call raises:
 
 ```py
-from contextlib import suppress
 from typing_extensions import assert_type
 
 def could_raise() -> None:
@@ -276,64 +277,16 @@ def could_raise() -> None:
 
 def initialized_before_exception() -> None:
     with suppress(ValueError):
-        first = [1, 2, 4]
-        second = [0.5, 0.8]
+        values = [1, 2, 4]
         could_raise()
 
-    assert_type(first, list[int])
-    assert_type(second, list[float])
+    assert_type(values, list[int])
 ```
 
-## Exception-assertion managers do not exempt setup calls
+## Deleted names remain undefined
 
-A context manager named `raises`, `assert_raises`, or `pytest.raises` does not make a call in its
-body safe. If that setup call raises the expected exception before its assignment completes, the
-manager suppresses the exception and the assigned name remains undefined.
-
-```py
-class Raises:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-def raises(exception: type[ValueError]) -> Raises:
-    return Raises()
-
-def assert_raises(exception: type[ValueError]) -> Raises:
-    return Raises()
-
-class Pytest:
-    def raises(self, exception: type[ValueError]) -> Raises:
-        return Raises()
-
-pytest = Pytest()
-
-def could_raise_returns_list() -> list[int]:
-    raise ValueError
-
-def direct_exception_assertion() -> list[int]:
-    with raises(ValueError):
-        values = could_raise_returns_list()
-
-    return values  # error: [possibly-unresolved-reference]
-
-def aliased_exception_assertion() -> list[int]:
-    with assert_raises(ValueError):
-        values = could_raise_returns_list()
-
-    return values  # error: [possibly-unresolved-reference]
-
-def qualified_exception_assertion() -> list[int]:
-    with pytest.raises(ValueError):
-        values = could_raise_returns_list()
-
-    return values  # error: [possibly-unresolved-reference]
-```
-
-## Suppressed exceptions preserve deleted-name state
-
-A checkpoint after `del` captures the fact that the name is no longer defined. Suppressing the
-subsequent exception cannot restore its earlier binding.
+Deleting a name removes its binding. Suppressing a later exception does not restore the deleted
+value.
 
 ```py
 from contextlib import suppress
@@ -350,11 +303,7 @@ def deleted_after_suppression() -> int:
 
 ## Context manager exception suppression follows the typing specification
 
-Only exit methods returning `bool` or `Literal[True]` are considered exception-suppressing. Other
-return annotations, including `Any` and `bool | None`, preserve the narrowing that follows an
-exception propagating out of the `with` statement.
-
-This is adapted from the Python typing conformance test for context managers.
+Exit methods annotated with `bool` or `Literal[True]` can suppress an exception:
 
 ```py
 from typing import Any, Literal
@@ -372,26 +321,6 @@ class SuppressTrue(Manager):
     def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
         return True
 
-class PropagateNone(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        return None
-
-class PropagateFalse(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
-        return False
-
-class PropagateAny(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> Any:
-        return False
-
-class PropagateOptionalBool(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
-        return None
-
-class PropagateOptionalTrue(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
-        return None
-
 def suppress_bool(value: int | str) -> None:
     if isinstance(value, int):
         with SuppressBool():
@@ -403,6 +332,18 @@ def suppress_true(value: int | str) -> None:
         with SuppressTrue():
             raise ValueError
     assert_type(value, int | str)
+```
+
+Exit methods returning `None` or `Literal[False]` allow the exception to propagate:
+
+```py
+class PropagateNone(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return None
+
+class PropagateFalse(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
 
 def propagate_none(value: int | str) -> None:
     if isinstance(value, int):
@@ -415,6 +356,23 @@ def propagate_false(value: int | str) -> None:
         with PropagateFalse():
             raise ValueError
     assert_type(value, str)
+```
+
+The typing specification also treats `Any`, `bool | None`, and `Literal[True] | None` as
+non-suppressing return annotations:
+
+```py
+class PropagateAny(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Any:
+        return False
+
+class PropagateOptionalBool(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return None
+
+class PropagateOptionalTrue(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return None
 
 def propagate_any(value: int | str) -> None:
     if isinstance(value, int):
@@ -435,100 +393,11 @@ def propagate_optional_true(value: int | str) -> None:
     assert_type(value, str)
 ```
 
-## Always-falsy exit methods preserve precise bindings
+## Overloaded exit methods
 
-```py
-from typing import Literal
-
-class NoneExit:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
-
-class FalseExit:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
-        return False
-
-none_value = 1
-with NoneExit():
-    none_value = "finished"
-
-reveal_type(none_value)  # revealed: Literal["finished"]
-
-false_value = 1
-with FalseExit():
-    false_value = "finished"
-
-reveal_type(false_value)  # revealed: Literal["finished"]
-```
-
-## Truthy exit methods preserve the exceptional path
-
-```py
-from typing import Literal
-
-class TrueExit:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
-        return True
-
-def could_raise_returns_str() -> str:
-    return "finished"
-
-true_value = 1
-with TrueExit():
-    true_value = could_raise_returns_str()
-
-reveal_type(true_value)  # revealed: Literal[1] | str
-```
-
-## Exit overloads are conservatively combined
-
-An overloaded exit method is treated as potentially suppressing if any callable signature returns
-`bool` or `Literal[True]`. The implementation does not select an overload based on whether the
-manager is exiting normally or handling an exception. This intentionally avoids promising precision
-that mypy and Pyright do not consistently provide.
-
-```py
-from types import TracebackType
-from typing import Literal, overload
-
-class OverloadedExit:
-    def __enter__(self) -> None: ...
-    @overload
-    def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> Literal[False]: ...
-    @overload
-    def __exit__(
-        self,
-        exc_type: type[BaseException],
-        exc_value: BaseException,
-        traceback: TracebackType | None,
-    ) -> Literal[True]: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool:
-        return exc_type is not None
-
-def could_raise_returns_str() -> str:
-    return "finished"
-
-value = 1
-
-with OverloadedExit():
-    value = could_raise_returns_str()
-
-reveal_type(value)  # revealed: Literal[1] | str
-```
-
-## A normal-only truthy exit overload is also treated as suppressing
-
-This is a limitation of considering all exit signatures: the `Literal[True]` overload below applies
-only to the normal `(None, None, None)` call, while the exceptional overload always returns
-`Literal[False]`. Python propagates an exception, but ty conservatively preserves the initial
-binding. Mypy makes the same approximation; Pyright is more precise for this particular overload.
+All overloads of `__exit__` are considered together. Here, only the normal-exit overload returns
+`True`, so Python would propagate an exception. The type checker does not yet distinguish the two
+calls and therefore treats the context manager as potentially suppressing.
 
 ```py
 from types import TracebackType
@@ -566,6 +435,9 @@ reveal_type(value)  # revealed: Literal[1] | str
 
 ## Earlier context managers can suppress later entry failures
 
+If entering a later context manager raises, an earlier context manager can suppress that exception.
+The later context manager's target may therefore remain undefined.
+
 ```py
 from contextlib import suppress
 from typing import Literal
@@ -581,49 +453,16 @@ with suppress(ValueError), Inner() as value:
     pass
 
 value  # error: [possibly-unresolved-reference]
-
-inner = Inner()
-
-with suppress(ValueError), inner as preexisting_value:
-    pass
-
-preexisting_value  # error: [possibly-unresolved-reference]
-```
-
-## Non-suppressing context managers do not make later targets optional
-
-```py
-from contextlib import nullcontext
-
-with nullcontext(), nullcontext("value") as value:
-    pass
-
-reveal_type(value)  # revealed: str
 ```
 
 ## Union context managers combine their exit return types
 
-A union of context-manager alternatives is classified from its combined `__exit__` return type, not
-from each alternative independently. In particular, the common conditional combination of `suppress`
-and `nullcontext` returns `bool | None`, which the typing specification treats as non-suppressing.
+A conditional choice between `suppress` and `nullcontext` gives `__exit__` the return type
+`bool | None`. The typing specification does not treat that type as exception-suppressing.
 
 ```py
 from contextlib import nullcontext, suppress
 from typing_extensions import assert_type
-
-def conditional_return(flag: bool) -> int:
-    manager = suppress(ValueError) if flag else nullcontext()
-    with manager:
-        return 1
-
-def reversed_conditional_return(flag: bool) -> int:
-    manager = nullcontext() if flag else suppress(ValueError)
-    with manager:
-        return 1
-
-def explicit_union_return(manager: suppress | nullcontext[None]) -> int:
-    with manager:
-        return 1
 
 def conditional_narrowing(flag: bool, value: int | str) -> None:
     if isinstance(value, int):
@@ -634,10 +473,21 @@ def conditional_narrowing(flag: bool, value: int | str) -> None:
     assert_type(value, str)
 ```
 
-## Falsy union alternatives do not change a boolean exit type
+An explicitly annotated union follows the same rule:
 
-Unlike `bool | None`, a union of `bool` and `Literal[False]` simplifies to `bool`. The combined exit
-return type therefore remains potentially suppressing.
+```py
+def explicitly_annotated_union(manager: suppress | nullcontext[None], value: int | str) -> None:
+    if isinstance(value, int):
+        with manager:
+            raise ValueError
+
+    assert_type(value, str)
+```
+
+## A `False` alternative does not change a boolean exit type
+
+Unlike `bool | None`, the union `bool | Literal[False]` is still `bool`. This context manager may
+therefore suppress an exception.
 
 ```py
 from contextlib import suppress

@@ -576,9 +576,10 @@ def finally_assignment_runs_before_break():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-## Terminal paths through context managers reach enclosing `finally` clauses
+## Returning from a context manager still runs an enclosing `finally` clause
 
-A context manager does not intercept a terminal entry intended for an enclosing `finally` clause.
+Adding exception handling for context managers must not prevent an enclosing `finally` clause from
+running when execution returns from inside a `with` statement.
 
 ```py
 from contextlib import nullcontext
