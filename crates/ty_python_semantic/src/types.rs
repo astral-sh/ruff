@@ -6715,16 +6715,15 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => special_form
                 .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
                 .map_err(|err| {
-                    let fallback_type = if matches!(
-                        err,
+                    let fallback_type = match err {
                         InvalidTypeExpression::Concatenate
-                            | InvalidTypeExpression::RequiresTwoArguments(
-                                SpecialFormType::Concatenate
-                            )
-                    ) {
-                        Type::Dynamic(DynamicType::InvalidConcatenateUnknown)
-                    } else {
-                        Type::unknown()
+                        | InvalidTypeExpression::RequiresTwoArguments(
+                            SpecialFormType::Concatenate,
+                        ) => Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
+                        InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(typing_self) => {
+                            Type::TypeVar(typing_self)
+                        }
+                        _ => Type::unknown(),
                     };
 
                     InvalidTypeExpressionError {
@@ -8914,6 +8913,8 @@ enum InvalidTypeExpression<'db> {
     TypingSelfInTypeAlias,
     /// `typing.Self` cannot be used in metaclass definitions.
     TypingSelfInMetaclass,
+    /// `typing.Self` cannot be used with an incompatible explicit method receiver.
+    TypingSelfWithIncompatibleReceiver(BoundTypeVarInstance<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
@@ -9028,6 +9029,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypingSelfInMetaclass => {
                         f.write_str("`Self` cannot be used in a metaclass")
                     }
+                    InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(_) => f.write_str(
+                        "`Self` requires `self: Self` or `cls: type[Self]` for annotated receivers",
+                    ),
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,
