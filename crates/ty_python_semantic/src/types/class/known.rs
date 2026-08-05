@@ -2173,7 +2173,7 @@ mod tests {
                     python_platform: python_platform.clone(),
                     search_paths: search_paths.clone(),
                 };
-                program = Program::from_settings(&db, settings);
+                program = Program::from_settings(&db, &settings);
                 current_version = version_added;
             }
 
