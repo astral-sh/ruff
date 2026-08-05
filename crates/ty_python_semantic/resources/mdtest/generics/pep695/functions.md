@@ -131,7 +131,7 @@ argument _explicitly_ implements the protocol by listing it as a base class.
 ```py
 from typing import Protocol, TypeVar
 
-S = TypeVar("S")
+S = TypeVar("S", covariant=True)
 
 class CanIndex(Protocol[S]):
     def __getitem__(self, index: int, /) -> S: ...

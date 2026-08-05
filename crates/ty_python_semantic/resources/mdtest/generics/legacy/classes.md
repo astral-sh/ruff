@@ -1372,13 +1372,14 @@ from typing_extensions import Generic, ParamSpec, Protocol, TypeVar
 
 P = ParamSpec("P")
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 class GenericClass(Generic[P, T]):
     def hint(self) -> Callable[P, T]:
         raise NotImplementedError
 
-class GenericProtocol(Protocol[P, T]):
-    def hint(self) -> Callable[P, T]: ...
+class GenericProtocol(Protocol[P, T_co]):
+    def hint(self) -> Callable[P, T_co]: ...
 
 def class_case(x: GenericClass[[int], str]) -> None:
     # revealed: bound method GenericClass[(int, /), str].hint() -> ((int, /) -> str)
@@ -1515,6 +1516,7 @@ python-version = "3.13"
 from typing import ParamSpec, TypeVar, TypeVarTuple, Unpack, Generic, Protocol
 
 T = TypeVar("T", default=int)
+ProtocolT = TypeVar("ProtocolT", default=int, covariant=True)
 T2 = TypeVar("T2", default=str)
 U = TypeVar("U")
 Ts = TypeVarTuple("Ts")
@@ -1529,7 +1531,7 @@ class Foo(Generic[*Ts, T]): ...
 class Bar(Generic[U, *Ts, T]): ...
 
 # TODO: should emit [invalid-type-variable-default]
-class Baz(Protocol[*Ts, T]): ...
+class Baz(Protocol[*Ts, ProtocolT]): ...
 
 # TODO: should emit [invalid-type-variable-default]
 class Qux(Generic[*Ts, T, T2]): ...
