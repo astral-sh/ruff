@@ -1030,11 +1030,6 @@ properties, including classes with unconstrained type parameters or variant base
 does not provide type arguments, members declared by the pattern class use `Unknown`; a type
 parameter default does not restrict which instances match at runtime.
 
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
-
 ```py
 from typing import final, Generic
 from typing_extensions import TypeVar

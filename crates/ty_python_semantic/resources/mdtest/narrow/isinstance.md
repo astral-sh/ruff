@@ -978,6 +978,28 @@ def narrow_intersection_with_unrelated_class(
         reveal_type(value)  # revealed: OpenItem & list[int]
 ```
 
+Subclass type arguments are inferred through their actual inheritance relationship, so this also
+works correctly if type parameters change position:
+
+```py
+class Base[A, B]: ...
+class Child[X, Y](Base[Y, X]): ...
+
+def _(value: Base[int, str]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Child[str, int]
+```
+
+A subclass type parameter that cannot be inferred from its base remains `Unknown`:
+
+```py
+class PartiallyInferredChild[Extra1, T, Extra2](Sequence[T]): ...
+
+def _(value: Sequence[int]) -> None:
+    if isinstance(value, PartiallyInferredChild):
+        reveal_type(value)  # revealed: PartiallyInferredChild[Unknown, int, Unknown]
+```
+
 ## Use cases: `isinstance` narrowing and generics
 
 ### Strict mode
@@ -1444,6 +1466,31 @@ def test(a: Any, items: list[T]) -> None:
     v = combined[0]
     if isinstance(v, dict):
         cast(T, v)  # no panic
+```
+
+## Narrowing with named expressions (walrus operator)
+
+When `isinstance()` is used with a named expression, the target of the named expression should be
+narrowed. When the `isinstance()` check is the value of a named expression, its argument should also
+be narrowed.
+
+```py
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if isinstance(x := get_value(), int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: str
+
+    value = get_value()
+    if result := isinstance(value, int):
+        reveal_type(value)  # revealed: int
+        reveal_type(result)  # revealed: Literal[True]
+    else:
+        reveal_type(value)  # revealed: str
+        reveal_type(result)  # revealed: Literal[False]
 ```
 
 ## Preserving TypedDict interfaces when narrowing mappings
