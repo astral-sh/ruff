@@ -644,11 +644,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.bindings.extend(inference.bindings());
         }
 
+        self.return_types_and_ranges
+            .extend(inference.return_types_and_ranges.iter().copied());
+
         if let Some(extra) = &inference.extra {
             self.called_functions
                 .extend(extra.called_functions.iter().copied());
-            self.return_types_and_ranges
-                .extend(extra.return_types_and_ranges.iter().copied());
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
             self.deferred.extend(extra.deferred.iter().copied());
@@ -11188,19 +11189,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
+        collection_use_constraints.shrink_to_fit();
+        return_types_and_ranges.shrink_to_fit();
+
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
             || cycle_recovery.is_some()
             || !expected_types.is_empty()
             || !deferred.is_empty()
             || !called_functions.is_empty()
-            || !return_types_and_ranges.is_empty()
             || !qualifiers.is_empty()
-            || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty())
+            || !type_expression_flags.is_empty())
         .then(|| {
-            collection_use_constraints.shrink_to_fit();
-            return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
                 string_annotations: FrozenSet::from(string_annotations),
                 expected_types: FrozenMap::from(expected_types),
@@ -11208,9 +11208,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .into_iter()
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
-                return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
-                collection_use_constraints,
                 cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
@@ -11240,6 +11238,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             bindings: bindings.into_boxed_slice(),
             declarations: declarations.into_boxed_slice(),
+            return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
+            collection_use_constraints,
             extra,
         }
     }
