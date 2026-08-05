@@ -143,6 +143,23 @@ def _(u: InvalidEmptyUnion):
     reveal_type(u)  # revealed: Unknown
 ```
 
+### `typing.Unpack`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+An empty `Unpack` nested inside a union and a generic specialization should report its syntax error
+without panicking.
+
+```py
+from typing import Union, Unpack
+
+# error: [invalid-syntax] "Expected index or slice expression"
+list[Union[Unpack[], None]]
+```
+
 ### `typing.Annotated`
 
 ```py
