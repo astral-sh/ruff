@@ -343,6 +343,9 @@ lto = false
 [profile.fast-test]
 inherits = "dev"
 opt-level = 1
+debug = "line-tables-only"
+# Avoid the local ThinLTO that Cargo enables at nonzero optimization levels.
+lto = "off"
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]
