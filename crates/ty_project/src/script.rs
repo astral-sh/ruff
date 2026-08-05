@@ -41,9 +41,9 @@ pub(crate) struct Script<'db> {
 impl<'db> Script<'db> {
     /// Returns the script for `file` without creating a second Salsa memo for ordinary files.
     pub(crate) fn for_file(db: &'db dyn Db, file: File) -> Option<Self> {
-        // Most files are not scripts. Check the existing metadata query first so ordinary files
+        // Most files are not scripts. Check the existing tag query first so ordinary files
         // do not also allocate a tracked `script` memo just to cache another `None`.
-        script_metadata(db, file)?;
+        script_tag(db, file)?;
         script(db, file)
     }
 }
@@ -54,11 +54,24 @@ impl get_size2::GetSize for Script<'_> {}
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     // Files without script metadata must not depend on the low-durability open-file set.
-    let metadata = script_metadata(db, file)?;
+    let tag = script_tag(db, file)?;
 
     // Never treat third-party files as scripts.
     if !crate::should_check_file(db, file) {
         return None;
+    }
+
+    let mut metadata = {
+        let _guard = ValueSourceGuard::with_source_map(
+            ValueSource::ScriptMetadata(file),
+            tag.source_map().clone(),
+        );
+        // FIXME: Report invalid TOML in script metadata instead of silently ignoring it.
+        toml::from_str::<ScriptMetadata>(tag.metadata()).ok()?
+    };
+
+    if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
+        options.prioritize_all_selectors();
     }
 
     let configuration_root = file
@@ -73,7 +86,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let mut diagnostics = Vec::new();
     // FIXME: Report configuration errors as diagnostics and skip checking the script entirely so
     // that fixes cannot be applied using the enclosing project's configuration.
-    let options = resolve_script_options(project_metadata, metadata)?;
+    let options = resolve_script_options(project_metadata, &metadata)?;
     let settings = resolve_script_settings(db, &options, context, &mut diagnostics)?;
     let program_settings = resolve_script_program_settings(
         db,
@@ -95,6 +108,24 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         program_settings.python_version,
         diagnostics.into_boxed_slice(),
     ))
+}
+
+/// Returns the PEP 723 script tag embedded in `file`.
+///
+/// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
+#[salsa::tracked(returns(as_deref))]
+pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
+    let path = file.path(db);
+    if path.is_vendored_path() {
+        return None;
+    }
+
+    let source = source_text(db, file);
+    if source.is_notebook() {
+        return None;
+    }
+
+    ScriptTag::parse(source.as_bytes()).map(Box::new)
 }
 
 fn resolve_script_options(
@@ -163,33 +194,6 @@ fn resolve_script_program_settings(
             .map(|diagnostic| diagnostic.into_diagnostic(db).to_diagnostic()),
     );
     Some(settings)
-}
-
-/// Returns the PEP 723 metadata embedded in `file`.
-///
-/// Most files have no script metadata. Boxing keeps the cached result compact when it is `None`.
-#[salsa::tracked(returns(as_deref))]
-pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<ScriptMetadata>> {
-    let path = file.path(db);
-    if path.is_vendored_path() {
-        return None;
-    }
-
-    let source = source_text(db, file);
-    if source.is_notebook() {
-        return None;
-    }
-
-    let (content, source_map) = ScriptTag::parse(source.as_bytes())?.into_metadata_and_source_map();
-    let _guard = ValueSourceGuard::with_source_map(ValueSource::ScriptMetadata(file), source_map);
-    // FIXME: Report invalid TOML in script metadata instead of silently ignoring it.
-    let mut metadata: ScriptMetadata = toml::from_str(&content).ok()?;
-
-    if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
-        options.prioritize_all_selectors();
-    }
-
-    Some(Box::new(metadata))
 }
 
 /// PEP 723 metadata, whose Python requirement belongs at the top level rather than in `project`.

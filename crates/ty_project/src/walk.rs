@@ -1,5 +1,5 @@
 use crate::glob::IncludeExcludeFilter;
-use crate::script::script_metadata;
+use crate::script::script_tag;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
@@ -263,7 +263,7 @@ impl ProjectFilesWalker {
                             if let Ok(file) = system_path_to_file(&*db, entry.path()) {
                                 if entry.depth() > 0
                                     && exclude_scripts
-                                    && script_metadata(&*db, file).is_some()
+                                    && script_tag(&*db, file).is_some()
                                 {
                                     tracing::debug!(
                                         "Ignoring implicitly discovered PEP 723 script `{path}` \
