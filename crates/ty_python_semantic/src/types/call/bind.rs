@@ -7695,6 +7695,12 @@ impl<'db> CallableDescription<'db> {
                 kind: Some("class"),
                 name: Cow::Borrowed(class_type.name(db)),
             }),
+            Type::SubclassOf(subclass) if let Some(typevar) = subclass.into_type_var() => {
+                Some(CallableDescription {
+                    kind: None,
+                    name: Cow::Owned(format!("type[{}]", typevar.name(db))),
+                })
+            }
             Type::BoundMethod(bound_method) => Some({
                 let function = bound_method.function(db);
                 let kind = if function.name(db) == "__init__" {

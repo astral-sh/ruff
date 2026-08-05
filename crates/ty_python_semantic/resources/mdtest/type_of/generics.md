@@ -26,7 +26,10 @@ def unbounded[T](x: type[T]) -> T:
     reveal_type(x.__init__)  # revealed: def __init__(self) -> None
     reveal_type(x.__qualname__)  # revealed: str
     reveal_type(x())  # revealed: T@unbounded
-    x(1)  # error: [too-many-positional-arguments]
+    # error: [too-many-positional-arguments] "Too many positional arguments to `type[T]`: expected 0, got 1"
+    x(1)
+    # error: [unknown-argument] "Argument `value` does not match any known parameter of `type[T]`"
+    x(value=1)
 
     return x()
 ```
@@ -48,6 +51,27 @@ def legacy_object_bound(x: type[LegacyObjectT]) -> LegacyObjectT:
     reveal_type(x())  # revealed: LegacyObjectT@legacy_object_bound
     x(1)  # error: [too-many-positional-arguments]
     return x()
+```
+
+Aliases of `object` have the same constructor and callable signature as a direct `object` bound,
+even when the bound contains more than one alias:
+
+```py
+from collections.abc import Callable
+
+type ObjectAlias = object
+type ChainedObjectAlias = ObjectAlias
+
+def aliased_object_bound[T: ChainedObjectAlias](cls: type[T]) -> T:
+    # error: [too-many-positional-arguments] "Too many positional arguments to `type[T]`: expected 0, got 1"
+    cls(1)
+    # error: [unknown-argument] "Argument `value` does not match any known parameter of `type[T]`"
+    cls(value=1)
+
+    zero_argument: Callable[[], T] = cls
+    # error: [invalid-assignment]
+    one_argument: Callable[[int], T] = cls
+    return cls()
 ```
 
 `type[T]` with an upper bound of `T: A` represents any subclass of `A`.
@@ -197,6 +221,25 @@ def narrowed_subclass[T](cls: type[T]) -> T:
         reveal_type(cls(1))  # revealed: T@narrowed_subclass & IntConstructor
         return cls(1)
     return cls()
+```
+
+An invalid call after narrowing should report only the narrowed constructor's argument error.
+Existing intersection-call issues currently add a redundant error from the original upper bound:
+
+```py
+def narrowed_invalid[T](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        # TODO: Only report `invalid-argument-type`; the upper-bound constructor also reports
+        # `too-many-positional-arguments` and describes the attempted intersection as `Never`.
+        # error: [too-many-positional-arguments]
+        # error: [invalid-argument-type]
+        cls("wrong")
+
+        # TODO: Only report `invalid-argument-type`; the upper-bound constructor also reports
+        # `unknown-argument` for the same call.
+        # error: [unknown-argument]
+        # error: [invalid-argument-type]
+        cls(value="wrong")
 ```
 
 Checking a class object's identity preserves the original type variable in the same way:

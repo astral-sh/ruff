@@ -176,12 +176,8 @@ impl<'db> Type<'db> {
                 SubclassOfInner::TypeVar(tvar) => {
                     match tvar.typevar(db).require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            let constructor = if bound.is_object() {
-                                KnownClass::Object.to_class_literal(db, env)
-                            } else {
-                                bound.to_meta_type(db, env)
-                            };
-                            let upcast_callables = constructor
+                            let upcast_callables = bound
+                                .constructor_for_typevar_bound(db, env)
                                 .try_upcast_to_callable_with_policy_and_context(
                                     db, env, policy, context,
                                 )?;

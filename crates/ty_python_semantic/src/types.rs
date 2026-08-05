@@ -1805,6 +1805,23 @@ impl<'db> Type<'db> {
         ty
     }
 
+    /// Selects the constructor used for a type variable's upper bound.
+    ///
+    /// The meta-type of `object` simplifies to permissive bare `type`, so retain the exact class
+    /// object instead. Resolve aliases first so an alias of `object` cannot bypass that behavior.
+    fn constructor_for_typevar_bound(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let bound = self.resolve_type_alias(db);
+        if bound.is_object() {
+            KnownClass::Object.to_class_literal(db, env)
+        } else {
+            bound.to_meta_type(db, env)
+        }
+    }
+
     /// Returns `Some(UnionType)` if this type behaves like a union. Apart from explicit unions,
     /// this returns `Some` for `TypeAlias`es of unions and `NewType`s of `float` and `complex`.
     fn as_union_like(self, db: &'db dyn Db) -> Option<UnionType<'db>> {
@@ -5150,13 +5167,16 @@ impl<'db> Type<'db> {
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
                     let bindings = match tvar.typevar(db).require_bound_or_constraints(db, env) {
-                        TypeVarBoundOrConstraints::UpperBound(bound) if bound.is_object() => {
-                            KnownClass::Object
-                                .to_class_literal(db, env)
-                                .bindings(db, env)
-                        }
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            bound.to_meta_type(db, env).bindings(db, env)
+                            let constructor = bound.constructor_for_typevar_bound(db, env);
+                            if let Type::ClassLiteral(class) = constructor
+                                && let Some(bindings) =
+                                    self.known_class_literal_bindings(db, env, class)
+                            {
+                                bindings
+                            } else {
+                                constructor.bindings(db, env)
+                            }
                         }
                         TypeVarBoundOrConstraints::Constraints(constraints) => {
                             Bindings::from_union(
