@@ -6,6 +6,7 @@ use std::{cmp, fmt};
 pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
+use crate::script::Script;
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
@@ -527,11 +528,19 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
-        self.project().program(self).program_file(self, file)
+        let program = match Script::for_file(self, file) {
+            None => self.project().program(self),
+            Some(script) => script.program(self),
+        };
+
+        program.program_file(self, file)
     }
 
-    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
-        &self.project().program_settings(self).python_version
+    fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
+        match Script::for_file(self, file) {
+            None => &self.project().program_settings(self).python_version,
+            Some(script) => script.python_version_with_source(self),
+        }
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -642,6 +651,8 @@ pub(crate) mod testing {
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
     use crate::db::Db;
+    use crate::metadata::settings::file_settings;
+    use crate::script::Script;
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -773,11 +784,19 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn program_file(&self, file: File) -> ProgramFile<'_> {
-            self.project().program(self).program_file(self, file)
+            let program = match Script::for_file(self, file) {
+                None => self.project().program(self),
+                Some(script) => script.program(self),
+            };
+
+            program.program_file(self, file)
         }
 
-        fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
-            &self.project().program_settings(self).python_version
+        fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
+            match Script::for_file(self, file) {
+                None => &self.project().program_settings(self).python_version,
+                Some(script) => script.python_version_with_source(self),
+            }
         }
 
         #[inline]
@@ -785,16 +804,16 @@ pub(crate) mod testing {
             crate::check_file(self, file)
         }
 
-        fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
-            self.project().rules(self)
+        fn rule_selection(&self, file: ruff_db::files::File) -> &RuleSelection {
+            file_settings(self, file).rules(self)
         }
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
         }
 
-        fn analysis_settings(&self, _file: ruff_db::files::File) -> &AnalysisSettings {
-            self.project().settings(self).analysis()
+        fn analysis_settings(&self, file: ruff_db::files::File) -> &AnalysisSettings {
+            file_settings(self, file).analysis(self)
         }
 
         fn verbose(&self) -> bool {
