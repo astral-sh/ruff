@@ -1024,16 +1024,15 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 
 ## Generic subclass captures
 
-When a generic pattern class inherits from the subject's class through an invariant base, the
-subject specialization determines the pattern class's type arguments. This applies to annotated
-attributes and properties. Every pattern-class type parameter must have an exact solution; variant
-bases and unconstrained parameters retain the existing conservative fallback. When the subject does
-not provide type arguments, members declared by the pattern class use `Unknown`; a type parameter
-default does not restrict which instances match at runtime.
+When a generic pattern class inherits from the subject's class, the subject specialization
+determines any inferable pattern-class type arguments. This applies to annotated attributes and
+properties, including classes with unconstrained type parameters or variant bases. When the subject
+does not provide type arguments, members declared by the pattern class use `Unknown`; a type
+parameter default does not restrict which instances match at runtime.
 
 ```toml
 [analysis]
-strict-generic-narrowing = true
+strict-generic-narrowing = false
 ```
 
 ```py
@@ -1146,17 +1145,14 @@ def test_match_partially_specialized_generic_subclass(
 ) -> None:
     match value:
         case PartiallySpecializedGenericPatternChild(item=item):
-            # `ExtraGenericPatternT` is not constrained by the subject, so the pattern class does
-            # not have one exact specialization.
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_covariant_generic_subclass(
     value: CovariantGenericPatternBase[int],
 ) -> None:
     match value:
         case CovariantGenericPatternChild(item=item):
-            # The subject constrains only one end of the possible pattern-class specializations.
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_inherited_generic_subclass_capture(
     value: GenericMemberBase[GenericPatternT],
