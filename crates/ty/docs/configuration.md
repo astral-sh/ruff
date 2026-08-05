@@ -269,7 +269,7 @@ def narrow_match(x: str) -> None:
 ### `strict-generic-narrowing`
 
 Whether ty should use strict narrowing for unspecialized generic classes in
-`isinstance()` and `issubclass()` checks.
+`isinstance()` and `issubclass()` checks, as well as `match` class patterns.
 
 When enabled, ty narrows to the top materialization of the class. For example,
 `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
@@ -280,7 +280,7 @@ When disabled, ty preserves compatible type arguments from the original type whe
 possible. For example, `isinstance(value, list)` narrows a value of type
 `Sequence[int]` to `list[int]`. If no specialization is available, the same check
 narrows a value of type `object` to `list[Unknown]`; items of any type can then be
-appended to the list.
+appended to the list. Class patterns such as `case list():` follow the same behavior.
 
 Defaults to `false`.
 
@@ -911,7 +911,7 @@ def narrow_match(x: str) -> None:
 #### `strict-generic-narrowing`
 
 Whether ty should use strict narrowing for unspecialized generic classes in
-`isinstance()` and `issubclass()` checks.
+`isinstance()` and `issubclass()` checks, as well as `match` class patterns.
 
 When enabled, ty narrows to the top materialization of the class. For example,
 `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
@@ -922,7 +922,7 @@ When disabled, ty preserves compatible type arguments from the original type whe
 possible. For example, `isinstance(value, list)` narrows a value of type
 `Sequence[int]` to `list[int]`. If no specialization is available, the same check
 narrows a value of type `object` to `list[Unknown]`; items of any type can then be
-appended to the list.
+appended to the list. Class patterns such as `case list():` follow the same behavior.
 
 Defaults to `false`.
 

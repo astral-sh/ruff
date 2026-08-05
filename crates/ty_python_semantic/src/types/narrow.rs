@@ -1268,10 +1268,15 @@ fn positive_class_pattern_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class_expression_ty: Type<'db>,
+    use_generic_filtering: bool,
 ) -> Option<Type<'db>> {
     match class_expression_ty {
         Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-            Some(callable_pattern_type(db, env))
+            Some(if use_generic_filtering {
+                Type::Callable(CallableType::unknown(db))
+            } else {
+                callable_pattern_type(db, env)
+            })
         }
         _ if class_expression_ty.is_assignable_to(
             db,
@@ -1284,7 +1289,7 @@ fn positive_class_pattern_type<'db>(
                 env,
                 class_expression_ty,
                 true,
-                false,
+                use_generic_filtering,
             )
         }
         _ => None,
@@ -1354,6 +1359,7 @@ fn necessary_match_pattern_type<'db>(
             db,
             env,
             infer_same_file_expression_type(db, kind.class, TypeContext::default()),
+            false,
         )
         .unwrap_or_else(Type::object),
         PatternPredicateKind::Mapping(_) => mapping_pattern_type(db, env),
@@ -1765,6 +1771,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(self.scope.file(db)))
     }
 
+    fn use_generic_filtering(&self) -> bool {
+        let db = self.db;
+        !db.analysis_settings(self.scope.file(db))
+            .strict_generic_narrowing
+    }
+
     fn merge_binding(
         bindings: &mut BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
         place: ScopedPlaceId,
@@ -2060,6 +2072,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let db = self.db;
+        let intersect = |subject_ty| {
+            if self.use_generic_filtering() {
+                filter_generic_narrowing_constraint(db, &self.env, subject_ty, class_ty)
+            } else {
+                self.intersect_types(subject_ty, class_ty)
+            }
+        };
         match subject_ty {
             Type::TypeAlias(alias) => {
                 self.filter_class_pattern_subject_type(class, class_ty, alias.value_type(db))
@@ -2068,7 +2087,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 self.filter_class_pattern_subject_type(class, class_ty, *element)
             }),
             Type::Intersection(intersection) if intersection.positive(db).is_empty() => {
-                self.intersect_types(subject_ty, class_ty)
+                intersect(subject_ty)
             }
             Type::Intersection(intersection) => {
                 intersection.map_positive(db, &self.env, |positive| {
@@ -2077,7 +2096,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             }
             Type::NominalInstance(instance) => {
                 let Some(class) = class else {
-                    return self.intersect_types(subject_ty, class_ty);
+                    return intersect(subject_ty);
                 };
                 let subject_class = instance.class(db, &self.env);
                 if subject_class.is_subtype_of_class_literal(db, class) {
@@ -2085,7 +2104,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 } else if subject_ty.is_disjoint_from(db, &self.env, class_ty) {
                     Type::Never
                 } else {
-                    self.intersect_types(subject_ty, class_ty)
+                    intersect(subject_ty)
                 }
             }
             Type::TypedDict(_)
@@ -2095,9 +2114,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             {
                 subject_ty
             }
+            Type::Callable(_) if matches!(class_ty, Type::Callable(_)) => subject_ty,
             _ if subject_ty.is_subtype_of(db, &self.env, class_ty) => subject_ty,
             _ if subject_ty.is_disjoint_from(db, &self.env, class_ty) => Type::Never,
-            _ => self.intersect_types(subject_ty, class_ty),
+            _ => intersect(subject_ty),
         }
     }
 
@@ -2113,23 +2133,44 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let subject_is_final = subject_ty
             .nominal_class(db, &self.env)
             .is_some_and(|class| class.is_final(db));
-        let specialized_pattern_class =
-            if context.positional_sources.is_empty() && kind.keywords.is_empty() {
-                None
-            } else {
-                context
-                    .class
-                    .zip(filtering_subject_ty.nominal_class(db, &self.env))
-                    .and_then(|(pattern_class, subject_class)| {
-                        specialize_generic_class_for_subject(
-                            db,
-                            &self.env,
-                            pattern_class,
-                            subject_class,
-                            GenericClassSpecializationPolicy::Exact,
-                        )
-                    })
-            };
+        let specialized_pattern_class = if context.positional_sources.is_empty()
+            && kind.keywords.is_empty()
+        {
+            None
+        } else if self.use_generic_filtering() {
+            context
+                .class
+                .filter(|pattern_class| pattern_class.generic_context(db).is_some())
+                .and_then(|pattern_class| {
+                    subject_ty
+                        .nominal_class(db, &self.env)
+                        .filter(|subject_class| subject_class.class_literal(db) == pattern_class)
+                        .or_else(|| {
+                            if let Type::Intersection(intersection) = subject_ty {
+                                intersection.positive(db).iter().find_map(|element| {
+                                    element
+                                        .nominal_class(db, &self.env)
+                                        .filter(|class| class.class_literal(db) == pattern_class)
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                })
+        } else {
+            context
+                .class
+                .zip(filtering_subject_ty.nominal_class(db, &self.env))
+                .and_then(|(pattern_class, subject_class)| {
+                    specialize_generic_class_for_subject(
+                        db,
+                        &self.env,
+                        pattern_class,
+                        subject_class,
+                        GenericClassSpecializationPolicy::Exact,
+                    )
+                })
+        };
         let member_type = |name: &Name| {
             let original_member_ty = original_subject_ty
                 .member(db, &self.env, name.as_str())
@@ -2236,12 +2277,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let db = self.db;
         let class_expr_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default())
             .resolve_type_alias(db);
+        let use_generic_filtering = self.use_generic_filtering();
         let context = |class_expr_ty: Type<'db>| {
             let class = class_expr_ty.as_class_literal();
             ClassPatternContext {
                 class,
-                class_ty: positive_class_pattern_type(db, &self.env, class_expr_ty)
-                    .unwrap_or_else(Type::object),
+                class_ty: positive_class_pattern_type(
+                    db,
+                    &self.env,
+                    class_expr_ty,
+                    use_generic_filtering,
+                )
+                .unwrap_or_else(Type::object),
                 positional_sources: class.map_or_else(
                     || vec![ClassPatternPositionalSource::Unknown; kind.positional.len()],
                     |class| {
