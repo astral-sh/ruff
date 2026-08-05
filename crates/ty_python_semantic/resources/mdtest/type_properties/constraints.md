@@ -1177,10 +1177,9 @@ def quantifier_order[S, T]() -> None:
 
 ## Gradual constraints
 
-Constraint-set assignability preserves gradual types. Opaque decision nodes represent dependence on
-a gradual materialization, while useful constraints are recorded directly on inferable type
-variables. The opaque nodes participate in the decision diagram but are existentially quantified
-when the constraint set is converted to a Boolean result.
+Constraint-set assignability preserves gradual types. Constraints on the materializations of gradual
+types themselves are represented by opaque existential variables, while constraints involving
+gradual types are recorded on inferable type variables.
 
 ```py
 from typing import Any, Never
@@ -1227,9 +1226,8 @@ def _[T]() -> None:
     static_assert((gradual | (other & ~other)) == gradual)
 ```
 
-A target without type variables is preserved as one gradual decision. Each union arm that requires a
-different materialization receives its own decision, preventing distinct materialization conditions
-from being conflated.
+Distinct existential variables are created for each constraint on a gradual type in a given
+assignability check.
 
 ```py
 from typing import Any
@@ -1256,8 +1254,7 @@ second = is_constraint_set_assignable_to(Any, str)
 reveal_type((first & second).with_detailed_display())
 ```
 
-A recursive structural projection might not infer a useful bound. It must still retain its gradual
-decision so that it does not erase informative alternatives in a surrounding disjunction.
+Recursive protocol checks retain their gradual variables instead of falling back to `Unknown`.
 
 ```py
 from typing import Any, Protocol

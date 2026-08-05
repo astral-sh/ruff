@@ -1334,7 +1334,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         union,
                         target,
                         |element| {
-                            let variable = self.constraints.new_gradual_variable();
+                            let variable = self.constraints.next_gradual_variable();
                             self.check_gradual_source(db, source, range, element, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, source, element))
                         },
@@ -1347,7 +1347,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         intersection,
                         target,
                         |positive| {
-                            let variable = self.constraints.new_gradual_variable();
+                            let variable = self.constraints.next_gradual_variable();
                             self.check_gradual_source(db, source, range, positive, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, source, positive))
                         },
@@ -1418,7 +1418,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         union,
                         target,
                         |element| {
-                            let variable = self.constraints.new_gradual_variable();
+                            let variable = self.constraints.next_gradual_variable();
                             self.check_gradual_target(db, element, target, range, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, element, target))
                         },
@@ -1431,7 +1431,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         intersection,
                         target,
                         |element| {
-                            let variable = self.constraints.new_gradual_variable();
+                            let variable = self.constraints.next_gradual_variable();
                             self.check_gradual_target(db, element, target, range, variable)
                                 .unwrap_or_else(|| self.check_type_pair(db, element, target))
                         },
@@ -2075,7 +2075,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             let target_range = target.materialize_once(db, env);
 
             if source_range.is_some() || target_range.is_some() {
-                // Preserve set-operation precedence before choosing which gradual range to project.
                 match (source, target) {
                     (Type::Union(union), Type::Union(_)) => {
                         return self.check_source_union(db, source, union, target);
@@ -2088,7 +2087,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             if let Some(range) = source_range {
-                let variable = self.constraints.new_gradual_variable();
+                let variable = self.constraints.next_gradual_variable();
                 if let Some(constraints) = self.relation_visitor.visit_gradual_projection(
                     db,
                     GradualProjectionKey {
@@ -2103,7 +2102,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
             }
             if let Some(range) = target_range {
-                let variable = self.constraints.new_gradual_variable();
+                let variable = self.constraints.next_gradual_variable();
                 if let Some(constraints) = self.relation_visitor.visit_gradual_projection(
                     db,
                     GradualProjectionKey {
@@ -2350,7 +2349,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     },
                 )
             }
-            (_, Type::Dynamic(_)) => self.gradual(db, self.constraints.new_gradual_variable()),
+            (_, Type::Dynamic(_)) => self.gradual(db, self.constraints.next_gradual_variable()),
 
             // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -2555,8 +2554,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_target_intersection(db, source, intersection, target)
             }
 
-            // If projection was ambiguous or recursive, preserve its gradual decision.
-            (Type::Dynamic(_), _) => self.gradual(db, self.constraints.new_gradual_variable()),
+            (Type::Dynamic(_), _) => self.gradual(db, self.constraints.next_gradual_variable()),
 
             (Type::Intersection(intersection), _) => {
                 self.check_source_intersection(db, source, intersection, target)

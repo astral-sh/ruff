@@ -3332,8 +3332,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }
 
-            // Preserve concrete set-operation branches until the gradual relation distributes
-            // across them. Disjoint filtering can otherwise remove a valid constraint path.
+            // Handle gradual types directly before union/intersection expansion.
             let when = actual.has_relation_to_with_variance(
                 self.db,
                 self.env,

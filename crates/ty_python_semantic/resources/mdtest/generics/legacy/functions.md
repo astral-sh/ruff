@@ -1254,7 +1254,7 @@ def value(items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-# TODO: Preserve the gradual nominal evidence alongside the static structural proof.
+# TODO: Solve intersections in the constraint solver.
 reveal_type(value(items))  # revealed: object
 ```
 
