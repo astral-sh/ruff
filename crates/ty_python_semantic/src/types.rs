@@ -67,7 +67,7 @@ pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
-    INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_dunder_get_call, report_bad_dunder_getattr_call,
+    INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call, report_bad_dunder_get_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
@@ -622,6 +622,12 @@ enum MemberLookupErrorKind<'db> {
         receiver: Type<'db>,
         name: Type<'db>,
     },
+
+    /// An invalid attribute-interception call, represented by its receiver and attribute name.
+    GetAttribute {
+        receiver: Type<'db>,
+        name: Type<'db>,
+    },
 }
 
 /// A failed member lookup together with the member used to recover from the error.
@@ -665,21 +671,38 @@ impl<'db> MemberLookupError<'db> {
                     target,
                 );
             }
-            MemberLookupErrorKind::GetAttr { receiver, name }
-                if assigned_type.is_none()
-                    && let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
-                        .try_call_dunder(
-                            db,
-                            env,
-                            "__getattr__",
-                            CallArguments::positional([name]),
-                            TypeContext::default(),
-                        ) =>
-            {
-                let failure = CallError(kind, bindings);
-                report_bad_dunder_getattr_call(context, &failure, object_type, target);
+            kind @ (MemberLookupErrorKind::GetAttr { receiver, name }
+            | MemberLookupErrorKind::GetAttribute { receiver, name }) => {
+                let is_fallback = matches!(kind, MemberLookupErrorKind::GetAttr { .. });
+                if is_fallback && assigned_type.is_some() {
+                    return;
+                }
+
+                let method = if is_fallback {
+                    "__getattr__"
+                } else {
+                    "__getattribute__"
+                };
+                if let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
+                    .try_call_dunder(
+                        db,
+                        env,
+                        method,
+                        CallArguments::positional([name]),
+                        TypeContext::default(),
+                    )
+                {
+                    let failure = CallError(kind, bindings);
+                    report_bad_attribute_access_call(
+                        context,
+                        &failure,
+                        object_type,
+                        target,
+                        method,
+                    );
+                }
             }
-            MemberLookupErrorKind::DescriptorGet(_) | MemberLookupErrorKind::GetAttr { .. } => {}
+            MemberLookupErrorKind::DescriptorGet(_) => {}
         }
     }
 }
@@ -6616,46 +6639,62 @@ impl<'db> Type<'db> {
             }
         };
 
-        let custom_getattribute = OnceCell::new();
-        let custom_getattribute = || {
-            *custom_getattribute.get_or_init(|| {
-                if "__getattribute__" == name.as_str() {
-                    return (MemberLookupResult::from(Place::Undefined), false);
+        let custom_getattribute = if "__getattribute__" == name.as_str() {
+            (MemberLookupResult::from(Place::Undefined), false)
+        } else {
+            // Skip `object.__getattribute__`, which is the default mechanism we
+            // already model via the normal attribute-lookup path.
+            let name_type = Type::string_literal(db, name);
+            match self.try_call_dunder_with_policy(
+                db,
+                env,
+                "__getattribute__",
+                &mut CallArguments::positional([name_type]),
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            ) {
+                Ok(bindings) => (Place::bound(bindings.return_type(db, env)).into(), true),
+                Err(CallDunderError::CallError(_, bindings, _)) => (
+                    member_lookup_result(
+                        db,
+                        Place::bound(bindings.return_type(db, env)).into(),
+                        Some(MemberLookupErrorKind::GetAttribute {
+                            receiver: self,
+                            name: name_type,
+                        }),
+                    ),
+                    true,
+                ),
+                Err(CallDunderError::PossiblyUnbound { .. }) => {
+                    (MemberLookupResult::from(Place::Undefined), true)
                 }
-
-                // Skip `object.__getattribute__`, which is the default mechanism we
-                // already model via the normal attribute-lookup path.
-                match self.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    "__getattribute__",
-                    &mut CallArguments::positional([Type::string_literal(db, name)]),
-                    TypeContext::default(),
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                ) {
-                    Ok(bindings) => (Place::bound(bindings.return_type(db, env)).into(), true),
-                    Err(
-                        CallDunderError::PossiblyUnbound { .. } | CallDunderError::CallError(..),
-                    ) => (MemberLookupResult::from(Place::Undefined), true),
-                    Err(CallDunderError::MethodNotAvailable) => {
-                        (MemberLookupResult::from(Place::Undefined), false)
-                    }
+                Err(CallDunderError::MethodNotAvailable) => {
+                    (MemberLookupResult::from(Place::Undefined), false)
                 }
-            })
+            }
         };
+
+        if let Err(error) = custom_getattribute.0 {
+            let member = result.unwrap_or_else(|error| error.fallback_member(db));
+            return Err(MemberLookupError::new(
+                db,
+                member.or_fall_back_to(db, env, || error.fallback_member(db)),
+                error.kind(db),
+            ));
+        }
 
         // A custom override runs before the descriptor and might return without invoking it.
         let result = if matches!(
             result.err().map(|error| error.kind(db)),
             Some(MemberLookupErrorKind::DescriptorGet(_))
-        ) && custom_getattribute().1
+        ) && custom_getattribute.1
         {
             Ok(result.unwrap_or_else(|error| error.fallback_member(db)))
         } else {
             result
         };
 
-        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute().0);
+        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute.0);
         member_lookup_or_fall_back_to(db, env, result, custom_getattr_result)
     }
 

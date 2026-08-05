@@ -1307,6 +1307,27 @@ class C:
 C().value
 ```
 
+### An invalid `__getattribute__` runs before descriptors
+
+A malformed `__getattribute__` fails before it can invoke a malformed descriptor. The diagnostic
+therefore describes the `__getattribute__` call while preserving the descriptor's return type.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> str:
+        return "fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: int
+```
+
 ### An assigned instance attribute shadows a non-data descriptor
 
 An instance attribute takes precedence over a non-data descriptor. After the assignment, reading the
