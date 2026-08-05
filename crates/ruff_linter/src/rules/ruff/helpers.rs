@@ -1,6 +1,7 @@
 use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
-use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
+use ruff_python_semantic::{BindingKind, Modules, ScopeId, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -44,15 +45,21 @@ fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
 /// I.e., if `DataclassKind::Attrs` is passed in,
 /// return `true` if `func` represents a call to `attr.ib()` or `attrs.field()`;
 /// if `DataclassKind::Stdlib` is passed in,
-/// return `true` if `func` represents a call to `dataclasses.field()`.
+/// return `true` if `func` represents a call to `dataclasses.field()`;
+/// if `DataclassKind::Transform` is passed in,
+/// return `true` if `func` matches one of the `field_specifiers` declared on the
+/// `dataclass_transform(...)` call that marked the class's decorator.
 pub(super) fn is_dataclass_field(
     func: &Expr,
     semantic: &SemanticModel,
-    dataclass_kind: DataclassKind,
+    dataclass_kind: &DataclassKind,
 ) -> bool {
     match dataclass_kind {
         DataclassKind::Attrs(..) => is_attrs_field(func, semantic),
         DataclassKind::Stdlib => is_stdlib_dataclass_field(func, semantic),
+        DataclassKind::Transform(field_specifiers) => semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| field_specifiers.contains(&qualified_name)),
     }
 }
 
@@ -95,76 +102,140 @@ pub(super) enum AttrsAutoAttribs {
 }
 
 /// Enumeration of various kinds of dataclasses recognised by Ruff
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum DataclassKind {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum DataclassKind<'a> {
     /// dataclasses created by the stdlib `dataclasses` module
     Stdlib,
     /// dataclasses created by the third-party `attrs` library
     Attrs(AttrsAutoAttribs),
+    /// dataclasses created by a decorator marked with [PEP 681's `dataclass_transform`],
+    /// carrying the qualified names of the decorator's `field_specifiers`.
+    ///
+    /// [PEP 681's `dataclass_transform`]: https://peps.python.org/pep-0681/
+    Transform(Vec<QualifiedName<'a>>),
 }
 
-/// Return the kind of dataclass this class definition is (stdlib or `attrs`),
-/// or `None` if the class is not a dataclass.
+/// Return the kind of dataclass this class definition is (stdlib, `attrs`, or a
+/// PEP 681 `dataclass_transform`), or `None` if the class is not a dataclass.
 pub(super) fn dataclass_kind<'a>(
     class_def: &'a ast::StmtClassDef,
-    semantic: &SemanticModel,
-) -> Option<(DataclassKind, &'a ast::Decorator)> {
-    if !(semantic.seen_module(Modules::DATACLASSES) || semantic.seen_module(Modules::ATTRS)) {
+    semantic: &SemanticModel<'a>,
+    scope_id: ScopeId,
+) -> Option<(DataclassKind<'a>, &'a ast::Decorator)> {
+    if !(semantic.seen_module(Modules::DATACLASSES)
+        || semantic.seen_module(Modules::ATTRS)
+        || semantic.seen_typing())
+    {
         return None;
     }
 
     for decorator in &class_def.decorator_list {
-        let Some(qualified_name) =
+        if let Some(qualified_name) =
             semantic.resolve_qualified_name(map_callable(&decorator.expression))
-        else {
-            continue;
-        };
+        {
+            match qualified_name.segments() {
+                ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
+                // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L32
+                | ["attr", func @ ("s" | "attributes" | "attrs")] => {
+                    // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
+                    // whereas `@attr.s` implicitly sets `auto_attribs=False`.
+                    // https://www.attrs.org/en/stable/api.html#attrs.define
+                    // https://www.attrs.org/en/stable/api-attr.html#attr.s
+                    let Expr::Call(ExprCall { arguments, .. }) = &decorator.expression else {
+                        let auto_attribs = if *func == "s" {
+                            AttrsAutoAttribs::False
+                        } else {
+                            AttrsAutoAttribs::None
+                        };
 
-        match qualified_name.segments() {
-            // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L32
-            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
-            | ["attr", func @ ("s" | "attributes" | "attrs")] => {
-                // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
-                // whereas `@attr.s` implicitly sets `auto_attribs=False`.
-                // https://www.attrs.org/en/stable/api.html#attrs.define
-                // https://www.attrs.org/en/stable/api-attr.html#attr.s
-                let Expr::Call(ExprCall { arguments, .. }) = &decorator.expression else {
-                    let auto_attribs = if *func == "s" {
-                        AttrsAutoAttribs::False
-                    } else {
-                        AttrsAutoAttribs::None
+                        return Some((DataclassKind::Attrs(auto_attribs), decorator));
+                    };
+
+                    let Some(auto_attribs) = arguments.find_keyword("auto_attribs") else {
+                        return Some((DataclassKind::Attrs(AttrsAutoAttribs::None), decorator));
+                    };
+
+                    let auto_attribs = match Truthiness::from_expr(&auto_attribs.value, |id| {
+                        semantic.has_builtin_binding(id)
+                    }) {
+                        // `auto_attribs` requires an exact `True` to be true
+                        Truthiness::True => AttrsAutoAttribs::True,
+                        // Or an exact `None` to auto-detect.
+                        Truthiness::None => AttrsAutoAttribs::None,
+                        // Otherwise, anything else (even a truthy value, like `1`) is considered `False`.
+                        Truthiness::Truthy | Truthiness::False | Truthiness::Falsey => {
+                            AttrsAutoAttribs::False
+                        }
+                        // Unless, of course, we can't determine the value.
+                        Truthiness::Unknown => AttrsAutoAttribs::Unknown,
                     };
 
                     return Some((DataclassKind::Attrs(auto_attribs), decorator));
-                };
-
-                let Some(auto_attribs) = arguments.find_keyword("auto_attribs") else {
-                    return Some((DataclassKind::Attrs(AttrsAutoAttribs::None), decorator));
-                };
-
-                let auto_attribs = match Truthiness::from_expr(&auto_attribs.value, |id| {
-                    semantic.has_builtin_binding(id)
-                }) {
-                    // `auto_attribs` requires an exact `True` to be true
-                    Truthiness::True => AttrsAutoAttribs::True,
-                    // Or an exact `None` to auto-detect.
-                    Truthiness::None => AttrsAutoAttribs::None,
-                    // Otherwise, anything else (even a truthy value, like `1`) is considered `False`.
-                    Truthiness::Truthy | Truthiness::False | Truthiness::Falsey => {
-                        AttrsAutoAttribs::False
-                    }
-                    // Unless, of course, we can't determine the value.
-                    Truthiness::Unknown => AttrsAutoAttribs::Unknown,
-                };
-
-                return Some((DataclassKind::Attrs(auto_attribs), decorator));
+                }
+                ["dataclasses", "dataclass"] => return Some((DataclassKind::Stdlib, decorator)),
+                _ => {}
             }
-            ["dataclasses", "dataclass"] => return Some((DataclassKind::Stdlib, decorator)),
-            _ => continue,
+        }
+
+        if let Some(field_specifiers) =
+            dataclass_transform_field_specifiers(&decorator.expression, semantic, scope_id)
+        {
+            return Some((DataclassKind::Transform(field_specifiers), decorator));
         }
     }
 
     None
+}
+
+/// If `decorator` resolves, via same-file semantic lookup, to a function or class that is
+/// itself decorated with [PEP 681's `dataclass_transform`], return the qualified names of the
+/// `field_specifiers` it declares (or an empty list, if none are declared).
+///
+/// This only recognises decorators defined in the same file being linted; a `dataclass_transform`
+/// applied within a third-party library (e.g. Pydantic's `BaseModel`) is not detected, since Ruff's
+/// semantic model does not perform cross-module type inference.
+///
+/// [PEP 681's `dataclass_transform`]: https://peps.python.org/pep-0681/
+fn dataclass_transform_field_specifiers<'a>(
+    decorator: &Expr,
+    semantic: &SemanticModel<'a>,
+    scope_id: ScopeId,
+) -> Option<Vec<QualifiedName<'a>>> {
+    let callee = map_callable(decorator);
+    let binding_id = semantic.lookup_attribute_in_scope(callee, scope_id)?;
+    let (Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. })
+    | Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. })) =
+        semantic.binding(binding_id).statement(semantic)?
+    else {
+        return None;
+    };
+
+    decorator_list.iter().find_map(|transform_decorator| {
+        if !semantic.match_typing_expr(
+            map_callable(&transform_decorator.expression),
+            "dataclass_transform",
+        ) {
+            return None;
+        }
+
+        let Expr::Call(ExprCall { arguments, .. }) = &transform_decorator.expression else {
+            return Some(Vec::new());
+        };
+
+        Some(
+            arguments
+                .find_keyword("field_specifiers")
+                .and_then(|keyword| keyword.value.as_tuple_expr())
+                .map(|tuple| {
+                    tuple
+                        .elts
+                        .iter()
+                        .filter_map(|elt| semantic.resolve_qualified_name(elt))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        )
+    })
 }
 
 /// Return true if dataclass (stdlib or `attrs`) is frozen
