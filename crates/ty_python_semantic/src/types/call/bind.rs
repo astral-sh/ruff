@@ -385,10 +385,6 @@ impl<'db> CallableItem<'db> {
         self.callable().is_callable()
     }
 
-    fn callable_type(&self) -> Type<'db> {
-        self.callable().callable_type
-    }
-
     /// Returns the reduced callable synthesized from this callable item.
     fn functools_partial_callable<'a>(
         &self,
@@ -441,6 +437,10 @@ impl<'db> CallableItem<'db> {
 /// If there are multiple items, they form an intersection.
 #[derive(Debug, Clone)]
 struct BindingsElement<'db> {
+    /// The callable type associated with this union element. For an intersection, retain the
+    /// complete source type because its bindings can omit negative contributions or represent
+    /// constructor methods instead of the called class objects.
+    callable_type: Type<'db>,
     items: SmallVec<[CallableItem<'db>; 1]>,
 }
 
@@ -778,6 +778,7 @@ impl<'db> Bindings<'db> {
         }
         assert!(!inner_items_acc.is_empty());
         let elements = smallvec![BindingsElement {
+            callable_type,
             items: inner_items_acc,
         }];
         Self {
@@ -793,8 +794,13 @@ impl<'db> Bindings<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
-        for binding in self.iter_flat_mut() {
-            binding.replace_callable_type(before, after);
+        for element in &mut self.elements {
+            if element.callable_type == before {
+                element.callable_type = after;
+            }
+            for binding in element.callables_mut() {
+                binding.replace_callable_type(before, after);
+            }
         }
     }
 
@@ -1132,6 +1138,7 @@ impl<'db> Bindings<'db> {
                 .elements
                 .into_iter()
                 .map(|elem| BindingsElement {
+                    callable_type: elem.callable_type,
                     items: elem.items.into_iter().map(|item| item.map(f)).collect(),
                 })
                 .collect(),
@@ -1465,13 +1472,10 @@ impl<'db> Bindings<'db> {
         node: ast::AnyNodeRef,
         element: &BindingsElement<'db>,
     ) {
-        let db = context.db();
         // If this element succeeded, no diagnostics to report
         if element.as_result(context.db()).is_ok() {
             return;
         }
-
-        let env = context.program_environment();
 
         let is_union = self.elements.len() > 1;
 
@@ -1479,13 +1483,6 @@ impl<'db> Bindings<'db> {
         if element.is_intersection() {
             // Find the highest priority error among bindings in this element
             let max_priority = element.error_priority(context.db());
-
-            // Construct the intersection type from the bindings
-            let intersection_type = IntersectionType::from_elements(
-                db,
-                env,
-                element.items.iter().map(CallableItem::callable_type),
-            );
 
             // Only report errors from bindings with the highest priority
             for item in &element.items {
@@ -1498,14 +1495,14 @@ impl<'db> Bindings<'db> {
                         // Use layered diagnostic for intersection inside a union
                         let layered_diag = LayeredDiagnostic {
                             union_callable_type: self.callable_type(),
-                            intersection_callable_type: intersection_type,
+                            intersection_callable_type: element.callable_type,
                             binding,
                         };
                         binding.report_diagnostics(context, node, Some(&layered_diag));
                     } else {
                         // Just intersection, no union context needed
                         let intersection_diag = IntersectionDiagnostic {
-                            callable_type: intersection_type,
+                            callable_type: element.callable_type,
                             binding,
                         };
                         binding.report_diagnostics(context, node, Some(&intersection_diag));
@@ -1524,7 +1521,7 @@ impl<'db> Bindings<'db> {
                 }
                 let union_diag = UnionDiagnostic {
                     callable_type: self.callable_type(),
-                    binding,
+                    variant_type: element.callable_type,
                 };
                 binding.report_diagnostics(context, node, Some(&union_diag));
             }
@@ -3153,6 +3150,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
             elements: smallvec_inline![BindingsElement {
+                callable_type: from.callable_type,
                 items: smallvec_inline![CallableItem::Regular(from)],
             }],
             implicit_dunder_new_is_possibly_unbound: false,
@@ -3175,15 +3173,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
         };
-        Bindings {
-            callable_type,
-            elements: smallvec_inline![BindingsElement {
-                items: smallvec_inline![CallableItem::Regular(callable_binding)],
-            }],
-            implicit_dunder_new_is_possibly_unbound: false,
-            implicit_dunder_init_is_possibly_unbound: false,
-            enclosing_binding_contexts: None,
-        }
+        callable_binding.into()
     }
 }
 
@@ -8773,20 +8763,20 @@ trait CompoundDiagnostic {
 /// This is used when a function call is inconsistent with one or more variants
 /// of a union. This can be used to attach sub-diagnostics that clarify that
 /// the error is part of a union.
-struct UnionDiagnostic<'b, 'db> {
+struct UnionDiagnostic<'db> {
     /// The type of the union.
     callable_type: Type<'db>,
-    /// The specific binding that failed.
-    binding: &'b CallableBinding<'db>,
+    /// The type associated with the specific union variant that failed.
+    variant_type: Type<'db>,
 }
 
-impl CompoundDiagnostic for UnionDiagnostic<'_, '_> {
+impl CompoundDiagnostic for UnionDiagnostic<'_> {
     fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic) {
         let sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Union variant `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.binding.callable_type.display(db, env),
+                callable_ty = self.variant_type.display(db, env),
             ),
         );
         diag.sub(sub);
