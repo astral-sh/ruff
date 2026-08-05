@@ -30,7 +30,6 @@ use crate::{
         MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
         ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
         TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
-        VarianceInferenceMode,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -379,8 +378,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 /// Infers the variance of a protocol parameter from its structural interface.
 ///
 /// The identity specialization preserves the class-bound type-variable identities used by its
-/// members. Recursive protocol references start at bivariance and converge through Salsa's
-/// existing variance fixed point instead of trusting the declaration being validated.
+/// members. Nested generic types retain their effective declared variance.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| TypeVarVariance::Bivariant,
@@ -395,9 +393,7 @@ pub(super) fn inferred_protocol_typevar_variance<'db>(
         return TypeVarVariance::Bivariant;
     };
     let env = ProgramEnvironment::from_scope(class.body_scope(db));
-    protocol
-        .interface(db)
-        .variance_of_in_mode(db, &env, typevar, VarianceInferenceMode::Structural)
+    protocol.interface(db).variance_of(db, &env, typevar)
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
@@ -1194,12 +1190,11 @@ impl<'db> ProtocolMemberWrite<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
-    fn variance_of_in_mode(
+    fn variance_of(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         self.members(db)
             .flat_map(|member| {
@@ -1215,10 +1210,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
                     .into_iter()
                     .flat_map(|access| access.variances(db, env))
             })
-            .map(|(ty, variance)| {
-                ty.with_polarity(variance)
-                    .variance_of_in_mode(db, env, typevar, mode)
-            })
+            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
             .collect()
     }
 }
@@ -1435,16 +1427,29 @@ impl<'db> ProtocolMemberAccess<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> {
+        let write_variance = self.write.and_then(|write| match write {
+            ProtocolMemberWrite::Descriptor {
+                descriptor,
+                domain: None,
+            } => {
+                // A generic setter can be writable without having a single representable domain.
+                // Conservatively include its descriptor so its type variables cannot become
+                // covariant merely because the setter's contract must be resolved at call time.
+                descriptor
+                    .resolve(db, env)
+                    .map(|member| (member.ty(), TypeVarVariance::Invariant))
+            }
+            write => write
+                .domain()
+                .and_then(|member| member.resolve(db, env))
+                .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
+        });
+
         self.read
             .and_then(|member| member.resolve(db, env))
             .map(|member| (member.ty(), TypeVarVariance::Covariant))
             .into_iter()
-            .chain(
-                self.write
-                    .and_then(ProtocolMemberWrite::domain)
-                    .and_then(|member| member.resolve(db, env))
-                    .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
-            )
+            .chain(write_variance)
     }
 }
 

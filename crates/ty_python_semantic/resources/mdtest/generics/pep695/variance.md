@@ -481,30 +481,40 @@ static_assert(not is_subtype_of(D[Any], D[A]))
 static_assert(not is_subtype_of(D[Any], D[B]))
 ```
 
-## Effective variance of recursive protocols
+## Nested protocol variance uses declared variance
 
-A purely recursive protocol parameter is structurally bivariant while its fixed point is inferred,
-but an explicitly covariant declaration remains covariant when the protocol is used in another type.
-A mutable container around that protocol must therefore make its enclosing class invariant.
+Standard-library protocols retain their declared covariance even when their type parameters appear
+only through recursive members in older Python versions. A mutable list containing any of those
+protocols must therefore make its enclosing protocol invariant.
 
 ```py
-from __future__ import annotations
-
-from typing import Protocol, TypeVar
+from typing import AsyncIterator, Awaitable, Generator, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
-T_co = TypeVar("T_co", covariant=True)
+class WrappedGenerator[T](Protocol):
+    def values(self) -> list[Generator[None, None, T]]: ...
 
-class Recursive(Protocol[T_co]):
-    def next(self) -> Recursive[T_co]: ...
+class WrappedAwaitable[T](Protocol):
+    def values(self) -> list[Awaitable[T]]: ...
 
-class MutableWrapper[T]:
-    def values(self) -> list[Recursive[T]]:
-        raise NotImplementedError
+class WrappedAsyncIterator[T](Protocol):
+    def values(self) -> list[AsyncIterator[T]]: ...
 
-static_assert(not is_subtype_of(MutableWrapper[int], MutableWrapper[object]))
-static_assert(not is_assignable_to(MutableWrapper[int], MutableWrapper[object]))
+static_assert(not is_subtype_of(WrappedGenerator[int], WrappedGenerator[object]))
+static_assert(not is_assignable_to(WrappedGenerator[int], WrappedGenerator[object]))
+
+static_assert(not is_subtype_of(WrappedAwaitable[int], WrappedAwaitable[object]))
+static_assert(not is_assignable_to(WrappedAwaitable[int], WrappedAwaitable[object]))
+
+static_assert(not is_subtype_of(WrappedAsyncIterator[int], WrappedAsyncIterator[object]))
+static_assert(not is_assignable_to(WrappedAsyncIterator[int], WrappedAsyncIterator[object]))
+
+def append(value: WrappedGenerator[object], item: Generator[None, None, object]) -> None:
+    value.values().append(item)
+
+def unsound(value: WrappedGenerator[int], item: Generator[None, None, object]) -> None:
+    append(value, item)  # error: [invalid-argument-type]
 ```
 
 ## Class Attributes
