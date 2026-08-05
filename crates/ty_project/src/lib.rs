@@ -243,7 +243,7 @@ impl Project {
 
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub fn program(self, db: &dyn Db) -> Program<'_> {
-        Program::from_settings(db, self.program_settings(db).clone())
+        Program::from_settings(db, self.program_settings(db))
     }
 
     pub fn update_program(self, db: &mut dyn Db, settings: ProgramSettings) {
