@@ -11,7 +11,8 @@ except as e:  # error: [invalid-syntax]
 
 ## Invalid handler syntax does not create an exception path
 
-A parser error in the handler does not make a non-raising `try` suite reach that handler.
+A syntax error in an exception handler does not make that handler reachable if the `try` block
+cannot raise.
 
 ```py
 state = 0
