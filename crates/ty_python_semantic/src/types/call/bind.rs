@@ -68,10 +68,10 @@ use crate::types::visitor::{
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, list_members,
+    InternedConstraintSet, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -3638,13 +3638,12 @@ impl<'db> CallableBinding<'db> {
 
         // Step 1: Check the result of the arity check which is done by `match_parameters`
 
-        // For overloaded calls with expandable `*args`, any arity-based overload pruning is only
-        // provisional. If we have an arity-2 overload and an arity-3 overload, and the call has
-        // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
-        // overload for arity reasons before trying argument expansion.
-        let (should_retry_after_provisional_arity, overloads_for_expansion) =
-            if self.should_retry_after_provisional_arity(db, env, call_arguments.as_ref()) {
-                // We will retry all overloads after argument expansion.
+        // Arity-based overload pruning is provisional when forwarded tuple alternatives differ in
+        // length. Unpacked parameters also require each alternative's fixed elements to be checked
+        // separately, including when there is only one signature.
+        let (should_retry_after_variadic_expansion, overloads_for_expansion) =
+            if self.should_retry_after_variadic_expansion(db, env, call_arguments.as_ref()) {
+                // Retry every candidate against each forwarded tuple alternative.
                 (true, (0..self.overloads.len()).collect())
             } else {
                 match self.matching_overload_index() {
@@ -3698,9 +3697,8 @@ impl<'db> CallableBinding<'db> {
             "after step 2",
         );
 
-        // If we are in the "retry for provisional arity" case, we have to try argument expansion
-        // before deciding we are done or moving on to step 4+.
-        if !should_retry_after_provisional_arity {
+        // A merged forwarded tuple cannot establish that every concrete alternative is valid.
+        if !should_retry_after_variadic_expansion {
             match self.matching_overload_index() {
                 MatchingOverloadIndex::None => {
                     // If all overloads result in errors, proceed to step 3.
@@ -3769,6 +3767,18 @@ impl<'db> CallableBinding<'db> {
         // not by checking whether there are any non-expandable argument type that cannot be
         // assigned to any of the overloads.
         for (argument_index, (argument, argument_types)) in call_arguments.iter().enumerate() {
+            if should_retry_after_variadic_expansion
+                && self.overloads.iter().any(|overload| {
+                    overload
+                        .signature
+                        .parameters()
+                        .variadic()
+                        .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
+                })
+            {
+                // A fixed argument can move between tuple elements as forwarded lengths vary.
+                break;
+            }
             // TODO: Remove `Keywords` once `**kwargs` support is added
             if matches!(argument, Argument::Synthetic | Argument::Keywords) {
                 continue;
@@ -3784,8 +3794,9 @@ impl<'db> CallableBinding<'db> {
             let mut is_argument_assignable_to_any_overload = false;
             'overload: for overload in &self.overloads {
                 for matched_parameter in &overload.argument_matches[argument_index].parameters {
-                    let parameter_type =
-                        overload.signature.parameters()[matched_parameter.index].annotated_type();
+                    let parameter_type = matched_parameter.expected_type.unwrap_or_else(|| {
+                        overload.signature.parameters()[matched_parameter.index].annotated_type()
+                    });
                     let argument_type = argument_types.get_for_declared_type(parameter_type);
                     if argument_type
                         .when_assignable_to(
@@ -3817,14 +3828,20 @@ impl<'db> CallableBinding<'db> {
         // State of the bindings _after_ evaluating (type checking) the matching overloads using
         // the non-expanded argument types.
         let post_evaluation_snapshot = snapshotter.take(self);
+        let mut failed_variadic_expansion_snapshot = None;
 
         for expansion in expansions {
             let expanded_argument_lists = match expansion {
                 Expansion::LimitReached(index) => {
-                    snapshotter.restore(self, post_evaluation_snapshot);
-                    self.overload_call_return_type = Some(
-                        OverloadCallReturnType::ArgumentTypeExpansionLimitReached(index),
+                    snapshotter.restore(
+                        self,
+                        failed_variadic_expansion_snapshot.unwrap_or(post_evaluation_snapshot),
                     );
+                    if self.overloads.len() > 1 {
+                        self.overload_call_return_type = Some(
+                            OverloadCallReturnType::ArgumentTypeExpansionLimitReached(index),
+                        );
+                    }
                     return;
                 }
                 Expansion::Expanded(argument_lists) => argument_lists,
@@ -3934,6 +3951,9 @@ impl<'db> CallableBinding<'db> {
                 if let Some(return_type) = return_type {
                     return_types.push(return_type);
                 } else {
+                    if should_retry_after_variadic_expansion {
+                        failed_variadic_expansion_snapshot = Some(snapshotter.take(self));
+                    }
                     // No need to check the remaining argument lists if the current argument list
                     // doesn't evaluate successfully. Move on to expanding the next argument type.
                     break;
@@ -3941,6 +3961,18 @@ impl<'db> CallableBinding<'db> {
             }
 
             if return_types.len() == expanded_argument_lists.len() {
+                if should_retry_after_variadic_expansion
+                    && expanded_argument_lists.iter().any(|arguments| {
+                        arguments.iter().any(|(argument, argument_types)| {
+                            matches!(argument, Argument::Variadic)
+                                && argument_types
+                                    .get_default()
+                                    .is_some_and(|ty| is_expandable_type(db, env, ty))
+                        })
+                    })
+                {
+                    continue;
+                }
                 // Restore the bindings state to the one that merges the bindings state evaluating
                 // each of the expanded argument list.
                 //
@@ -3962,11 +3994,12 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        // If the type expansion didn't yield any successful return type, we need to restore the
-        // bindings state back to the one after the type checking step using the non-expanded
-        // argument types. This is necessary because we restore the state to the pre-evaluation
-        // snapshot when processing the expanded argument lists.
-        snapshotter.restore(self, post_evaluation_snapshot);
+        // Restoring a merged input after a concrete alternative failed could erase its type or
+        // arity error and make an invalid forwarded call appear successful.
+        snapshotter.restore(
+            self,
+            failed_variadic_expansion_snapshot.unwrap_or(post_evaluation_snapshot),
+        );
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
@@ -3980,21 +4013,37 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_provisional_arity(db, env, call_arguments) {
+        if self.should_retry_after_variadic_expansion(db, env, call_arguments) {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
         }
     }
 
-    fn should_retry_after_provisional_arity(
+    /// Returns whether forwarded tuple alternatives must be checked separately.
+    ///
+    /// Expansion can restore an overload excluded by provisional arity matching, or expose an
+    /// incompatible alternative hidden by a merged unpacked parameter:
+    ///
+    /// ```python
+    /// def callback(*args: *tuple[int, str]) -> None: ...
+    /// def forward(values: tuple[int, str] | tuple[str, str]) -> None:
+    ///     callback(*values)
+    /// ```
+    fn should_retry_after_variadic_expansion(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> bool {
-        self.overloads.len() > 1
-            && self.matching_overloads().count() < self.overloads.len()
+        (self.overloads.len() > 1 && self.matching_overloads().count() < self.overloads.len()
+            || self.overloads.iter().any(|overload| {
+                overload
+                    .signature
+                    .parameters()
+                    .variadic()
+                    .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
+            }))
             && call_arguments.iter().any(|(argument, argument_types)| {
                 matches!(argument, Argument::Variadic)
                     && argument_types
@@ -5195,6 +5244,104 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
+    /// Returns the intersection of tuple positions a forwarded argument might occupy.
+    ///
+    /// A fixed argument can shift into a required suffix when a following forwarded tuple is
+    /// empty, so checking only its position in the merged argument list is insufficient:
+    ///
+    /// ```python
+    /// def callback(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+    /// def forward(values: tuple[str, ...]) -> None:
+    ///     callback(1, *values)
+    /// ```
+    fn unpacked_expected_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        tuple: &TupleSpec<'db>,
+        fixed_positions: (usize, usize),
+        variable_positions: (bool, bool),
+        fallback: Type<'db>,
+    ) -> Type<'db> {
+        let (fixed_before, fixed_after) = fixed_positions;
+        let (variable_before, variable_after) = variable_positions;
+        let mut candidates: SmallVec<[Type<'db>; 4]> = SmallVec::new();
+        let mut add_candidate = |candidate| {
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
+            }
+        };
+
+        match tuple {
+            TupleSpec::Fixed(expected) => {
+                let elements = expected.all_elements();
+                if !variable_before {
+                    if let Some(candidate) = elements.get(fixed_before) {
+                        add_candidate(*candidate);
+                    }
+                } else if !variable_after {
+                    if let Some(candidate) = elements
+                        .len()
+                        .checked_sub(fixed_after + 1)
+                        .and_then(|index| elements.get(index))
+                    {
+                        add_candidate(*candidate);
+                    }
+                } else {
+                    let end = elements.len().saturating_sub(fixed_after);
+                    for candidate in elements.get(fixed_before..end).unwrap_or_default() {
+                        add_candidate(*candidate);
+                    }
+                }
+            }
+            TupleSpec::Variable(expected) => {
+                let expected_prefix = expected.prefix_elements();
+                let expected_suffix = expected.suffix_elements();
+                let expected_variable = expected.variable().element_type(db);
+                let minimum_arity = expected_prefix.len() + expected_suffix.len();
+                if !variable_before && let Some(candidate) = expected_prefix.get(fixed_before) {
+                    add_candidate(*candidate);
+                } else if !variable_after && fixed_after < expected_suffix.len() {
+                    add_candidate(expected_suffix[expected_suffix.len() - fixed_after - 1]);
+                } else {
+                    add_candidate(expected_variable);
+                    if variable_before {
+                        for (index, candidate) in
+                            expected_prefix.iter().enumerate().skip(fixed_before)
+                        {
+                            if variable_after || index + fixed_after + 1 >= minimum_arity {
+                                add_candidate(*candidate);
+                            }
+                        }
+                    }
+                    if variable_after {
+                        for (index, candidate) in expected_suffix
+                            .iter()
+                            .enumerate()
+                            .take(expected_suffix.len().saturating_sub(fixed_after))
+                        {
+                            let distance = expected_suffix.len() - index - 1;
+                            if variable_before || fixed_before + distance + 1 >= minimum_arity {
+                                add_candidate(*candidate);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        match candidates.as_slice() {
+            [] => fallback,
+            [candidate] => *candidate,
+            _ => {
+                let mut intersection = IntersectionBuilder::new(db, env);
+                for candidate in candidates {
+                    intersection.add_positive_in_place(candidate);
+                }
+                intersection.build()
+            }
+        }
+    }
+
     /// Checks the positional requirements encoded inside an unpacked variadic annotation.
     ///
     /// Unlike ordinary `*args`, an unpacked tuple can require arguments and prescribe a different
@@ -5263,7 +5410,55 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 TupleLength::Variable(first, argument_count.saturating_sub(last + 1))
             });
 
-        if !argument_length.is_variable() && argument_count < tuple.len().minimum() {
+        // Fixed tuple alternatives retain a definite minimum even when merging their union makes
+        // the forwarded argument appear variable or expansion stops before reaching every branch.
+        let minimum_finite_argument_count = argument_length.is_variable().then(|| {
+            self.argument_matches.iter().enumerate().try_fold(
+                0usize,
+                |minimum, (argument_index, matches)| {
+                    let matched_count = matches
+                        .parameters
+                        .iter()
+                        .filter(|matched| matched.index == parameter_index)
+                        .count();
+                    if matched_count == 0 {
+                        return Some(minimum);
+                    }
+                    if !self
+                        .variable_length_positional_arguments
+                        .iter()
+                        .any(|(index, _, _)| *index == argument_index)
+                    {
+                        return Some(minimum + matched_count);
+                    }
+
+                    let argument_type = self
+                        .arguments
+                        .argument_types(argument_index)?
+                        .get_default()?;
+                    let Type::Union(union) = argument_type.resolve_type_alias(db) else {
+                        return None;
+                    };
+                    let union_minimum =
+                        union
+                            .elements(db)
+                            .iter()
+                            .try_fold(usize::MAX, |minimum, element| {
+                                let spec = element
+                                    .exact_tuple_instance_spec(db)
+                                    .filter(|spec| !spec.len().is_variable())?;
+                                Some(minimum.min(spec.len().minimum()))
+                            })?;
+                    let matched_prefix = matches.parameters.len() - matched_count;
+                    Some(minimum + union_minimum.saturating_sub(matched_prefix))
+                },
+            )
+        });
+        if (!argument_length.is_variable() && argument_count < tuple.len().minimum())
+            || minimum_finite_argument_count
+                .flatten()
+                .is_some_and(|minimum| minimum < tuple.len().minimum())
+        {
             missing.push(ParameterContext::new(parameter, parameter_index, false));
             return;
         }
@@ -5287,14 +5482,33 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         };
         let variable_type = expected.variable_element_type(db);
         let mut expected_types = expected.iter_element_types(db);
-        for (position, matched) in self
-            .argument_matches
-            .iter_mut()
-            .flat_map(|argument| argument.parameters.iter_mut())
-            .filter(|matched| matched.index == parameter_index)
-            .enumerate()
+        let fixed_count = matched_arguments()
+            .filter(|(argument_index, position, match_count)| {
+                !is_variable_match(*argument_index, *position, *match_count)
+            })
+            .count();
+        let mut fixed_before = 0;
+        let matched_parameters =
+            self.argument_matches
+                .iter_mut()
+                .enumerate()
+                .flat_map(|(argument_index, argument)| {
+                    let match_count = argument.parameters.len();
+                    argument
+                        .parameters
+                        .iter_mut()
+                        .enumerate()
+                        .filter(move |(_, matched)| matched.index == parameter_index)
+                        .map(move |(position, matched)| {
+                            (argument_index, position, match_count, matched)
+                        })
+                });
+        for (position, (argument_index, match_position, match_count, matched)) in
+            matched_parameters.enumerate()
         {
-            matched.expected_type = if first_variable
+            let is_variable = is_variable_match(argument_index, match_position, match_count);
+            let fixed_after = fixed_count - fixed_before - usize::from(!is_variable);
+            let expected_type = if first_variable
                 .zip(last_variable)
                 .is_some_and(|(first, last)| position > first && position <= last)
             {
@@ -5302,6 +5516,24 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             } else {
                 expected_types.next()
             };
+            matched.expected_type = expected_type.map(|expected_type| {
+                if argument_length.is_variable() {
+                    Self::unpacked_expected_type(
+                        db,
+                        env,
+                        &tuple,
+                        (fixed_before, fixed_after),
+                        (
+                            is_variable || first_variable.is_some_and(|first| first < position),
+                            is_variable || last_variable.is_some_and(|last| last > position),
+                        ),
+                        expected_type,
+                    )
+                } else {
+                    expected_type
+                }
+            });
+            fixed_before += usize::from(!is_variable);
         }
     }
 
@@ -7770,7 +8002,7 @@ struct CallableBindingSnapshotter(Vec<usize>);
 impl CallableBindingSnapshotter {
     /// Creates a new snapshotter for the given indexes of the matched overloads.
     fn new(indexes: Vec<usize>) -> Self {
-        debug_assert!(indexes.len() > 1);
+        debug_assert!(!indexes.is_empty());
         CallableBindingSnapshotter(indexes)
     }
 

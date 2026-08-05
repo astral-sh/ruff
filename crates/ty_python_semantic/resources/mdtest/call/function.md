@@ -959,6 +959,63 @@ def f25(x: tuple[int] | tuple[int, str]) -> None:
     f24(*x, 1)  # error: [invalid-argument-type]
 ```
 
+### Forwarded tuple unions and unpacked variadic parameters
+
+Every alternative of a forwarded tuple union must satisfy an unpacked parameter's fixed elements.
+Merging alternatives of different lengths must not conceal an incompatible suffix or missing
+argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def fixed(*args: *tuple[int, str]) -> None: ...
+def with_suffix(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+def forward(
+    valid: tuple[int, str] | tuple[int, int, str],
+    wrong_suffix: tuple[int, str] | tuple[int, int, int],
+    too_short: tuple[int, str] | tuple[int],
+) -> None:
+    with_suffix(*valid)
+    with_suffix(*wrong_suffix)  # error: [invalid-argument-type]
+    fixed(*too_short)  # error: [missing-argument]
+```
+
+When several independently forwarded tuple unions are combined, every combination must satisfy the
+complete unpacked parameter.
+
+```py
+def combine(
+    prefix: tuple[()] | tuple[int],
+    valid_suffix: tuple[str] | tuple[int, str],
+    wrong_suffix: tuple[str] | tuple[int, int],
+) -> None:
+    with_suffix(*prefix, *valid_suffix)
+    with_suffix(*prefix, *wrong_suffix)  # error: [invalid-argument-type]
+```
+
+A fixed argument preceding an unknown-length tuple can become the required final element if that
+tuple is empty. It must therefore satisfy every position it might occupy.
+
+```py
+def requires_string_suffix(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+def forward_unknown_length(values: tuple[str, ...]) -> None:
+    requires_string_suffix("first", *values)
+    requires_string_suffix(1, *values)  # error: [invalid-argument-type]
+```
+
+The shortest alternatives still determine the minimum argument count even when too many forwarded
+tuple unions prevent all combinations from being expanded.
+
+```py
+def requires_ten(*args: *tuple[int, int, int, int, int, int, int, int, int, int]) -> None: ...
+def forward_beyond_limit(values: tuple[()] | tuple[int]) -> None:
+    # error: [missing-argument]
+    requires_ten(*values, *values, *values, *values, *values, *values, *values, *values, *values, 1)
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml

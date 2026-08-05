@@ -1164,6 +1164,64 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     reveal_type(m(*t))  # revealed: Literal[1, 2]
 ```
 
+### Forwarded tuple unions and unpacked overloads
+
+A forwarded tuple union is valid only when each alternative matches an overload. A successful
+shorter alternative must not conceal an incompatible fixed element in a longer alternative.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, overload
+
+@overload
+def select(*args: *tuple[object]) -> Literal[1]: ...
+@overload
+def select(*args: *tuple[object, int, object]) -> Literal[2]: ...
+def select(*args: object) -> int:
+    return 1
+
+def forward(
+    valid: tuple[str] | tuple[str, int, str],
+    invalid: tuple[str] | tuple[str, str, str],
+) -> None:
+    reveal_type(select(*valid))  # revealed: Literal[1, 2]
+    select(*invalid)  # error: [no-matching-overload]
+```
+
+A fixed argument can occupy different positions when a preceding forwarded tuple has alternatives of
+different lengths. Each concrete alternative must be checked before rejecting that argument.
+
+```py
+@overload
+def accept(*args: *tuple[str]) -> None: ...
+@overload
+def accept(*args: *tuple[bytes, *tuple[object, ...]]) -> None: ...
+def accept(*args: object) -> None: ...
+def forward_fixed(values: tuple[bytes] | tuple[bytes, str]) -> None:
+    accept(*values, 1)
+```
+
+If independently forwarded tuple unions exceed the expansion limit, an incompatible suffix must not
+be accepted merely because some earlier alternatives were valid.
+
+```py
+@overload
+def bounded(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+@overload
+def bounded(*args: *tuple[bytes]) -> None: ...
+def bounded(*args: object) -> None: ...
+def forward_beyond_limit(
+    prefix: tuple[()] | tuple[int],
+    suffix: tuple[str] | tuple[int],
+) -> None:
+    # error: [no-matching-overload]
+    bounded(*prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *suffix)
+```
+
 ### Retry from parameter matching with type context
 
 When retrying, arguments are inferred with the correct type context:
