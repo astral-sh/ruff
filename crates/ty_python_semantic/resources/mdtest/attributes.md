@@ -2733,7 +2733,6 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
 7 | InvalidGetAttr().missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttr.__getattr__`: expected 1, got 2
 info: This access implicitly calls `__getattr__`
-info: Method signature here
  --> src/mdtest_snippet.py:4:9
   |
 4 |     def __getattr__(self) -> str:
@@ -2769,8 +2768,8 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
-reveal_type(date.century)  # revealed: Unknown
+# error: [invalid-attribute-access] "Invalid access to attribute `century` on type `Date`"
+reveal_type(date.century)  # revealed: int
 ```
 
 ### `argparse.Namespace`

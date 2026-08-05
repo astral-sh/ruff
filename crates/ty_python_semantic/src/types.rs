@@ -60,7 +60,7 @@ use crate::place::{
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
-use crate::types::call::bind::{BindingError, ConstructorCallableKind};
+use crate::types::call::bind::ConstructorCallableKind;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -6561,26 +6561,6 @@ impl<'db> Type<'db> {
                 TypeContext::default(),
             ) {
                 Ok(outcome) => Place::bound(outcome.return_type(db, env)).into(),
-                // A literal-typed `name` parameter describes which dynamic attributes exist.
-                // Rejecting this particular name does not make the method invalid.
-                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _))
-                    if bindings
-                        .iter_flat()
-                        .flatten()
-                        .flat_map(Binding::errors)
-                        .all(|error| match error {
-                            BindingError::InvalidArgumentType {
-                                expected_ty: Type::Union(union),
-                                ..
-                            } => union.elements(db).iter().all(Type::is_string_literal),
-                            BindingError::InvalidArgumentType { expected_ty, .. } => {
-                                expected_ty.is_string_literal()
-                            }
-                            _ => false,
-                        }) =>
-                {
-                    Place::Undefined.into()
-                }
                 Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
                     db,
                     Place::bound(bindings.return_type(db, env)).into(),

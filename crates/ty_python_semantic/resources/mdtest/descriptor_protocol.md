@@ -1026,7 +1026,6 @@ error[invalid-attribute-access]: Invalid access to descriptor attribute `descrip
 9 | C().descriptor  # snapshot: invalid-attribute-access
   | ^^^ Too many positional arguments to function `Descriptor.__get__`: expected 1, got 3
 info: This access implicitly calls `__get__` on a descriptor of type `Descriptor`
-info: Function signature here
  --> src/mdtest_snippet.py:3:9
   |
 3 |     def __get__(self) -> int:
