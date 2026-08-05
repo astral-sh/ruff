@@ -1077,6 +1077,201 @@ static_assert(is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable
 static_assert(is_assignable_to(RegularCallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Unpacked positional parameters with a required suffix
+
+A variadic positional parameter can accept both the unpacked tuple and a required positional
+parameter following that tuple.
+
+```py
+from typing import Any, Callable, Never, Unpack, cast
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def expects_suffix(callback: Callable[[Unpack[tuple[str, ...]], None], None]) -> None: ...
+def accepts_unknown(*args): ...
+
+expects_suffix(accepts_unknown)
+```
+
+The variadic parameter's annotation must be compatible with the unpacked elements and the required
+suffix.
+
+```py
+def accepts_objects(*args: object) -> None: ...
+def accepts_strings_or_none(*args: str | None) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+expects_suffix(accepts_objects)
+expects_suffix(accepts_strings_or_none)
+expects_suffix(accepts_strings)  # error: [invalid-argument-type]
+
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[accepts_objects],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[accepts_strings_or_none],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[accepts_strings],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+```
+
+A required keyword-only parameter cannot be supplied by the positional callback signature.
+
+```py
+def requires_keyword(*args: object, value: int) -> None: ...
+
+expects_suffix(requires_keyword)  # error: [invalid-argument-type]
+```
+
+A required positional prefix does not prevent the source variadic parameter from also accepting the
+target's required suffix.
+
+```py
+def expects_prefix_and_suffix(
+    callback: Callable[[int, Unpack[tuple[str, ...]], None], None],
+) -> None: ...
+def accepts_prefixed_objects(first: int, *args: object) -> None: ...
+
+expects_prefix_and_suffix(accepts_prefixed_objects)
+```
+
+A required suffix can align with a longer suffix or an equivalent positional prefix when all the
+unpacked elements have the same type.
+
+```py
+def requires_one_integer(*args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+longer_suffix: Callable[[*tuple[int, ...], int, int], None] = requires_one_integer
+equivalent_prefix: Callable[[int, *tuple[int, ...]], None] = requires_one_integer
+
+type OneOrMoreIntegers = RegularCallableTypeOf[requires_one_integer]
+
+static_assert(is_assignable_to(OneOrMoreIntegers, Callable[[*tuple[int, ...], int, int], None]))
+static_assert(is_assignable_to(OneOrMoreIntegers, Callable[[int, *tuple[int, ...]], None]))
+```
+
+A type alias for the variadic element does not prevent the required suffix from matching.
+
+```py
+type Integer = int
+
+def requires_one_aliased_integer(*args: *tuple[*tuple[Integer, ...], int]) -> None: ...
+
+type AliasedIntegers = RegularCallableTypeOf[requires_one_aliased_integer]
+
+static_assert(is_assignable_to(AliasedIntegers, Callable[[int, *tuple[int, ...]], None]))
+```
+
+A longer suffix is aligned from the end when its other elements fit the source variadic parameter.
+
+```py
+def requires_string_suffix(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+def requires_string_after_integers(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+
+type StringSuffix = RegularCallableTypeOf[requires_string_suffix]
+type IntegerStringSuffix = RegularCallableTypeOf[requires_string_after_integers]
+
+static_assert(is_assignable_to(StringSuffix, Callable[[*tuple[object, ...], int, str], None]))
+static_assert(is_assignable_to(IntegerStringSuffix, Callable[[*tuple[int, ...], int, str], None]))
+```
+
+Gradual variadic elements remain assignable in both directions.
+
+```py
+type GradualSuffix = Callable[[*tuple[Any, ...], int], None]
+
+static_assert(is_assignable_to(OneOrMoreIntegers, GradualSuffix))
+static_assert(is_assignable_to(GradualSuffix, OneOrMoreIntegers))
+```
+
+A positional parameter cannot also be filled by a target keyword argument.
+
+```py
+def occupies_keyword(a: int, *args: int, **kwargs: int) -> None: ...
+def accepts_keyword(*args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+type OccupiesKeyword = RegularCallableTypeOf[occupies_keyword]
+type AcceptsKeyword = RegularCallableTypeOf[accepts_keyword]
+
+static_assert(not is_assignable_to(OccupiesKeyword, AcceptsKeyword))
+```
+
+An uninhabited keyword parameter cannot collide with an occupied positional parameter.
+
+```py
+type Bottom = Never
+
+def rejects_keywords(*args: *tuple[*tuple[int, ...], int], **kwargs: Bottom) -> None: ...
+def rejects_named_keyword(*args: *tuple[*tuple[int, ...], int], a: Never = cast(Never, 0)) -> None: ...
+
+static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[rejects_keywords]))
+static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
+```
+
+A suffix cannot be extended with elements that the source variadic parameter rejects.
+
+```py
+# error: [invalid-assignment]
+incompatible_suffix: Callable[[*tuple[int, ...], str, str], None] = requires_string_after_integers
+```
+
+### Fixed-length unpacked positional parameters
+
+An unpacked fixed-length tuple accepts exactly its declared positional arguments, including when the
+tuple is empty. Equivalent unpacked source and target tuples are compatible.
+
+```py
+from typing import Callable, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def accepts_no_arguments(*args: Unpack[tuple[()]]) -> None: ...
+def accepts_one_integer(*args: Unpack[tuple[int]]) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+empty_callback: Callable[[Unpack[tuple[()]]], None] = accepts_no_arguments
+fixed_callback: Callable[[Unpack[tuple[int]]], None] = accepts_one_integer
+fixed_strings: Callable[[Unpack[tuple[str, str]]], None] = accepts_strings
+empty_strings: Callable[[Unpack[tuple[()]]], None] = accepts_strings
+
+static_assert(is_assignable_to(RegularCallableTypeOf[accepts_no_arguments], Callable[[Unpack[tuple[()]]], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[accepts_one_integer], Callable[[Unpack[tuple[int]]], None]))
+```
+
+Empty and exhausted fixed-length source tuples cannot satisfy a target with additional positional
+arguments or an open-ended variadic parameter.
+
+```py
+# error: [invalid-assignment]
+empty_with_prefix: Callable[[int, Unpack[tuple[str, ...]], None], None] = accepts_no_arguments
+
+# error: [invalid-assignment]
+empty_with_suffix: Callable[[Unpack[tuple[str, ...]], None], None] = accepts_no_arguments
+
+# error: [invalid-assignment]
+exhausted_with_suffix: Callable[[int, Unpack[tuple[str, ...]], None], None] = accepts_one_integer
+
+# error: [invalid-assignment]
+callback: Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None] = accepts_one_integer
+
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[accepts_one_integer],
+        Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None],
+    )
+)
+```
+
 ### Function types
 
 ```py
