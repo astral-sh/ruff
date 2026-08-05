@@ -297,9 +297,24 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - name: "Clippy"
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+        env:
+          CARGO_BUILD_WARNINGS: deny
+        run: cargo clippy --workspace --all-targets --all-features --locked --keep-going
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        env:
+          CARGO_BUILD_WARNINGS: deny
+        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked --keep-going
+      # Check for broken links in the documentation.
+      - run: cargo doc --all --no-deps --keep-going
+        env:
+          CARGO_BUILD_WARNINGS: deny
+      # Use --document-private-items so that all our doc comments are kept in
+      # sync, not just public items. Eventually we should do this for all
+      # crates; for now add crates here as they are warning-clean to prevent
+      # regression.
+      - run: cargo doc --no-deps --keep-going -p ty_python_semantic -p ty_python_core -p ty_module_resolver -p ty_site_packages -p ty_combine -p ty_project -p ty_ide -p ty_wasm -p ty_vendored -p ty_static -p ty -p ty_test -p ruff_db -p ruff_python_formatter --document-private-items
+        env:
+          CARGO_BUILD_WARNINGS: deny
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
@@ -367,18 +382,6 @@ jobs:
         run: uv run --project=./scripts cargo run -p ty check --project=./scripts
       - name: Dogfood ty on ty_benchmark
         run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
-      # Check for broken links in the documentation.
-      - run: cargo doc --all --no-deps
-        env:
-          RUSTDOCFLAGS: "-D warnings"
-      # Use --document-private-items so that all our doc comments are kept in
-      # sync, not just public items. Eventually we should do this for all
-      # crates; for now add crates here as they are warning-clean to prevent
-      # regression.
-      - run: cargo doc --no-deps -p ty_python_semantic -p ty_python_core -p ty_module_resolver -p ty_site_packages -p ty_combine -p ty_project -p ty_ide -p ty_wasm -p ty_vendored -p ty_static -p ty -p ty_test -p ruff_db -p ruff_python_formatter --document-private-items
-        env:
-          # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
-          RUSTDOCFLAGS: "-D warnings"
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
