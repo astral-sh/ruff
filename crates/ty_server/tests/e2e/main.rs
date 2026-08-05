@@ -33,6 +33,7 @@ mod commands;
 mod completions;
 mod configuration;
 mod folding_range;
+mod goto_definition;
 mod hover;
 mod implementation;
 mod initialize;
@@ -59,7 +60,8 @@ use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::{
     ClientCapabilities, CompletionItem, CompletionParams, CompletionRequest, CompletionResponse,
-    CompletionTriggerKind, ConfigurationParams, ConfigurationRequest, DiagnosticClientCapabilities,
+    CompletionTriggerKind, ConfigurationParams, ConfigurationRequest, DefinitionParams,
+    DefinitionRequest, DefinitionResponse, DiagnosticClientCapabilities,
     DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
     DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
@@ -78,7 +80,7 @@ use lsp_types::{
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
@@ -798,9 +800,25 @@ impl TestServer {
         content: impl AsRef<str>,
         version: i32,
     ) {
+        self.open_text_document_with_uri(self.file_uri(path), content, version);
+    }
+
+    /// Send a `textDocument/didOpen` notification for an unsaved virtual document.
+    pub(crate) fn open_virtual_text_document(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<str>,
+        version: i32,
+    ) -> Result<()> {
+        let uri = Uri::parse(path.as_ref().as_str())?;
+        self.open_text_document_with_uri(uri, content, version);
+        Ok(())
+    }
+
+    fn open_text_document_with_uri(&mut self, uri: Uri, content: impl AsRef<str>, version: i32) {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
-                uri: self.file_uri(path),
+                uri,
                 language_id: LanguageKind::Python,
                 version,
                 text: content.as_ref().to_string(),
@@ -953,6 +971,26 @@ impl TestServer {
 
         let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
         self.await_response::<WorkspaceDiagnosticRequest>(&id)
+    }
+
+    /// Send a `textDocument/definition` request for the document at the given path and position.
+    pub(crate) fn goto_definition_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        position: Position,
+    ) -> Option<DefinitionResponse> {
+        let params = DefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                position,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let id = self.send_request::<DefinitionRequest>(params);
+        self.await_response::<DefinitionRequest>(&id)
     }
 
     /// Send a `textDocument/hover` request for the document at the given path and position.
