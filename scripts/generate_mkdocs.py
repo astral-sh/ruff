@@ -176,6 +176,7 @@ def generate_rule_metadata(rule_doc: Path) -> None:
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
+    subprocess.run(["cargo", "dev", "generate-cli-help"], check=True)
     subprocess.run(["cargo", "dev", "generate-docs"], check=True)
 
     with Path("README.md").open(encoding="utf8") as fp:
