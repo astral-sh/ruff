@@ -253,6 +253,9 @@ pub(crate) struct TypeTransformer<'db, Tag> {
     /// Memoized transformations from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<Type<'db>, Type<'db>>>,
 
+    /// Total recursive-alias reentries explored while transforming one recursive root.
+    recursive_type_alias_unfolds: Cell<usize>,
+
     _tag: PhantomData<fn() -> Tag>,
 }
 
@@ -264,6 +267,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
         Self {
             seen: RefCell::default(),
             cache: RefCell::default(),
+            recursive_type_alias_unfolds: Cell::default(),
             _tag: PhantomData,
         }
     }
@@ -312,8 +316,14 @@ impl<'db, Tag: 'static> TypeTransformer<'db, Tag> {
             .filter(|active| active.identity == identity)
             .count();
         let should_stop = match identity {
-            TypeIdentity::RecursiveTypeAlias(_) => {
-                active_occurrences > MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS
+            TypeIdentity::RecursiveTypeAlias(_) if active_occurrences > 0 => {
+                let unfolds = self.recursive_type_alias_unfolds.get();
+                if unfolds >= MAX_RECURSIVE_TYPE_ALIAS_UNFOLDS {
+                    true
+                } else {
+                    self.recursive_type_alias_unfolds.set(unfolds + 1);
+                    false
+                }
             }
             _ => active_occurrences > 0,
         };
@@ -346,6 +356,10 @@ impl<'db, Tag: 'static> TypeTransformer<'db, Tag> {
             .iter()
             .filter(|active| matches!(active.identity, TypeIdentity::RecursiveTypeAlias(_)))
             .count();
+
+        if active_recursive_aliases == 0 {
+            self.recursive_type_alias_unfolds.set(0);
+        }
 
         let unwinding = unwinding_to_fallback.get();
         if unwinding == Some(TypeId::of::<Tag>())
