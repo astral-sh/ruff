@@ -2140,7 +2140,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         if self.is_lazy_gradual_assignability() {
-            if let Some(range) = source.materialize_once(db, env) {
+            let source_range = source.materialize_once(db, env);
+            let target_range = target.materialize_once(db, env);
+
+            if source_range.is_some() || target_range.is_some() {
+                // Preserve set-operation precedence before choosing which gradual range to project.
+                match (source, target) {
+                    (Type::Union(union), Type::Union(_)) => {
+                        return self.check_source_union(db, source, union, target);
+                    }
+                    (Type::Intersection(_), Type::Intersection(intersection)) => {
+                        return self.check_target_intersection(db, source, intersection, target);
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(range) = source_range {
                 let variable = self.constraints.new_gradual_variable();
                 if let Some(constraints) = self.relation_visitor.visit_gradual_projection(
                     db,
@@ -2155,7 +2171,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     return constraints;
                 }
             }
-            if let Some(range) = target.materialize_once(db, env) {
+            if let Some(range) = target_range {
                 let variable = self.constraints.new_gradual_variable();
                 if let Some(constraints) = self.relation_visitor.visit_gradual_projection(
                     db,

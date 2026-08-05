@@ -88,6 +88,26 @@ def _(value: Any):
     reveal_type(takes_tuple(value))  # revealed: Any
 ```
 
+When a union has only one arm that can contribute to inference, a gradual materialization through
+another arm must not erase the informative arm's constraints.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+def takes_optional[T](value: T | None) -> T:
+    raise NotImplementedError
+
+def takes_optional_tuple[T](value: tuple[T] | None) -> T:
+    raise NotImplementedError
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(takes_optional(any_value))  # revealed: Any
+    reveal_type(takes_optional_tuple(any_value))  # revealed: Any
+    reveal_type(takes_optional(unknown_value))  # revealed: Unknown
+    reveal_type(takes_optional_tuple(unknown_value))  # revealed: Unknown
+```
+
 Conversely, when assigning `tuple[T]` to `Any`, `Any` may materialize to any tuple type, and so we
 have a gradual upper bound on `T`.
 
@@ -472,6 +492,7 @@ Gradual constraints are distributed across unions and intersections.
 
 ```py
 from typing import Any, Callable
+from ty_extensions._internal import Unknown
 
 def takes_pair[T, U](value: tuple[T, U]) -> tuple[T, U]:
     raise NotImplementedError
@@ -510,14 +531,17 @@ def _(
     nested: tuple[str | Any] | Any,
     recursive: Any & list[int],
     lower_bounded: int | Any,
+    unknown_lower_bounded: int | Unknown,
     upper_bounded: int & Any,
 ):
     reveal_type(takes_pair(pair))  # revealed: tuple[str | Any, int | Any]
     reveal_type(takes_union(fixed_point))  # revealed: str | Any
-    reveal_type(takes_nested_union(nested))  # revealed: str | Any | int
+    reveal_type(takes_union(lower_bounded))  # revealed: Any
+    reveal_type(takes_union(unknown_lower_bounded))  # revealed: Unknown
+    reveal_type(takes_nested_union(nested))  # revealed: str | Any
     # TODO: This should reveal `Any & list[int]`.
     reveal_type(takes_recursive_union(recursive))  # revealed: Any
-    reveal_type(takes_union_arms(lower_bounded))  # revealed: tuple[int | Any, Unknown]
+    reveal_type(takes_union_arms(lower_bounded))  # revealed: tuple[int | Any, Any]
     # TODO: This should reveal `tuple[Any & int, Unknown]`.
     reveal_type(takes_union_arms(upper_bounded))  # revealed: tuple[Any, Unknown]
     reveal_type(takes_union_arms_callable(accepts_lower_bounded))  # revealed: tuple[Any, Any]
@@ -536,6 +560,16 @@ class Left[T](Protocol):
 class Right[T](Protocol):
     @property
     def right(self) -> T: ...
+
+def takes_intersection[T, U](
+    callback: Callable[[Left[T] & Right[U]], None],
+) -> tuple[T, U]:
+    raise NotImplementedError
+
+def accepts_intersection(value: Any & Left[int] & Right[str]) -> None:
+    pass
+
+reveal_type(takes_intersection(accepts_intersection))  # revealed: tuple[int, str]
 
 def takes_ambiguous_source[T](value: Left[T] | Right[T]) -> T:
     raise NotImplementedError
