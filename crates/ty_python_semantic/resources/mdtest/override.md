@@ -1078,8 +1078,8 @@ class DeferredChild2(DeferredBase):
 
 ## Gradual receiver annotations accept generic subclasses
 
-An explicit gradual receiver does not restrict which instances can call an inherited method. It
-must not impose additional constraints on the type variables of a generic subclass.
+An explicit gradual receiver does not restrict which instances can call an inherited method. It must
+not impose additional constraints on the type variables of a generic subclass.
 
 ```toml
 [environment]
