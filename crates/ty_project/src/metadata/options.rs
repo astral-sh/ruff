@@ -791,6 +791,9 @@ pub struct EnvironmentOptions {
     /// * `./src`
     /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
     /// * `./python`
+    ///
+    /// PEP 723 scripts default to an empty list of first-party roots because they are considered
+    /// single-file programs. Configure `root` explicitly to allow importing local modules.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -819,6 +822,9 @@ pub struct EnvironmentOptions {
     /// 2. Check for an activated or configured Python environment
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the default value (see below)
+    ///
+    /// Standalone PEP 723 scripts use their top-level `requires-python` field instead of
+    /// `project.requires-python` and do not inherit an enclosing project's Python version.
     ///
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
@@ -903,6 +909,10 @@ pub struct EnvironmentOptions {
     /// your environment from an activated Conda environment, and will look for a `.venv` directory
     /// in the project root if none of the above apply. Failing that, ty will look for a `python3`
     /// or `python` binary available in `PATH`.
+    ///
+    /// PEP 723 scripts use their own Python environment. Scripts can use an explicitly configured
+    /// environment, an activated environment, or an environment selected by the editor. Unlike
+    /// projects, ty does not automatically discover a `.venv` for scripts.
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[serde(skip_serializing_if = "Option::is_none")]
