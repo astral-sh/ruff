@@ -776,12 +776,12 @@ static_assert(is_assignable_to(Qux, HasXWithDefault))
 class HasClassVarX(Protocol):
     x: ClassVar[int]
 
-static_assert(is_subtype_of(FooWithZero, HasClassVarX))
-static_assert(is_assignable_to(FooWithZero, HasClassVarX))
+static_assert(not is_subtype_of(FooWithZero, HasClassVarX))
+static_assert(not is_assignable_to(FooWithZero, HasClassVarX))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
+# An instance declaration does not become a class variable without an explicit qualifier.
+static_assert(not is_subtype_of(Foo, HasClassVarX))
+static_assert(not is_assignable_to(Foo, HasClassVarX))
 
 static_assert(not is_subtype_of(Qux, HasClassVarX))
 static_assert(not is_assignable_to(Qux, HasClassVarX))
@@ -2050,7 +2050,9 @@ static_assert(is_assignable_to(UsesMeta, HasX))
 
 If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
 the non-callable attribute must be readable with the same type through both an inhabitant of
-`ClassVarX` and the type of that inhabitant:
+`ClassVarX` and the type of that inhabitant. An implementing class must declare the member as a
+`ClassVar`; an instance attribute does not satisfy the requirement merely because it has a default
+value in the class body:
 
 `classvars.py`:
 
@@ -2070,9 +2072,20 @@ def f(obj: ClassVarXProto):
 class InstanceAttrX:
     x: int
 
-# TODO: these should pass
-static_assert(not is_assignable_to(InstanceAttrX, ClassVarXProto))  # error: [static-assert-error]
-static_assert(not is_subtype_of(InstanceAttrX, ClassVarXProto))  # error: [static-assert-error]
+static_assert(not is_assignable_to(InstanceAttrX, ClassVarXProto))
+static_assert(not is_subtype_of(InstanceAttrX, ClassVarXProto))
+
+class InstanceAttrXWithDefault:
+    x: int = 42
+
+static_assert(not is_assignable_to(InstanceAttrXWithDefault, ClassVarXProto))
+static_assert(not is_subtype_of(InstanceAttrXWithDefault, ClassVarXProto))
+
+class InstanceAttrAnyWithDefault:
+    x: Any = 42
+
+static_assert(not is_assignable_to(InstanceAttrAnyWithDefault, ClassVarXProto))
+static_assert(not is_subtype_of(InstanceAttrAnyWithDefault, ClassVarXProto))
 
 class PropertyX:
     @property
@@ -2087,6 +2100,11 @@ class ClassVarX:
 
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
+
+class InheritedClassVarX(ClassVarX): ...
+
+static_assert(is_assignable_to(InheritedClassVarX, ClassVarXProto))
+static_assert(is_subtype_of(InheritedClassVarX, ClassVarXProto))
 
 class XMeta(type):
     def x(cls) -> str:

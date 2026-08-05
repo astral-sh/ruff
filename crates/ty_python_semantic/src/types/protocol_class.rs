@@ -2424,7 +2424,7 @@ fn protocol_member_read_type<'db>(
 
     // Module-level functions and ordinary methods on class objects are matched through direct
     // member access. Special instance methods still use special-method lookup on the meta-type.
-    let place = if access == ProtocolMemberAccessMode::Instance
+    let member_place = if access == ProtocolMemberAccessMode::Instance
         && member.is_instance_method()
         && !matches!(ty, Type::ModuleLiteral(_))
         && (!is_class_object_type(ty) || member.uses_special_method_lookup())
@@ -2445,12 +2445,30 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
-        .place
     } else {
-        receiver_ty.member(db, env, member.name).place
+        receiver_ty.member(db, env, member.name)
     };
 
-    match place {
+    // An instance declaration can be readable through its class when it has a default, but that
+    // does not make it a class variable. A writable class-variable requirement must preserve the
+    // qualifier of an actual declaration. Synthesized members and dynamic implementations have no
+    // declaration to inspect; read-only requirements do not permit writes through either path.
+    if access == ProtocolMemberAccessMode::Class
+        && member.data.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+        && !member.data.qualifiers.contains(TypeQualifiers::FINAL)
+        && !member_place.is_class_var()
+        && matches!(
+            member_place.place,
+            Place::Defined(DefinedPlace {
+                provenance: Provenance::SingleDefinition(_) | Provenance::MultipleDefinitions,
+                ..
+            })
+        )
+    {
+        return None;
+    }
+
+    match member_place.place {
         Place::Defined(DefinedPlace {
             ty: attribute_type,
             definedness: Definedness::AlwaysDefined,
