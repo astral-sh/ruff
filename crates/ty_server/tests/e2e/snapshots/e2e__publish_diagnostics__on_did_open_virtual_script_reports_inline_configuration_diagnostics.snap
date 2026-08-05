@@ -1,0 +1,52 @@
+---
+source: crates/ty_server/tests/e2e/publish_diagnostics.rs
+expression: diagnostics
+---
+PublishDiagnosticsParams {
+    uri: Url {
+        scheme: "untitled",
+        cannot_be_a_base: true,
+        username: "",
+        password: None,
+        host: None,
+        port: None,
+        path: "script.py",
+        query: None,
+        fragment: None,
+    },
+    version: Some(
+        1,
+    ),
+    diagnostics: [
+        Diagnostic {
+            range: Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 0,
+                    character: 0,
+                },
+            },
+            severity: Some(
+                Warning,
+            ),
+            code: Some(
+                String(
+                    "unknown-rule",
+                ),
+            ),
+            code_description: None,
+            source: Some(
+                "ty",
+            ),
+            message: String(
+                "Unknown rule `unknown-rule`. Did you mean `unknown-argument`?",
+            ),
+            tags: None,
+            related_information: None,
+            data: None,
+        },
+    ],
+}

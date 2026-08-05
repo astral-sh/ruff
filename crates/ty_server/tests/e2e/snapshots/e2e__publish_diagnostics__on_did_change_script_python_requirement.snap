@@ -1,16 +1,16 @@
 ---
 source: crates/ty_server/tests/e2e/publish_diagnostics.rs
-expression: diagnostics
+expression: initial_diagnostics
 ---
 PublishDiagnosticsParams {
     uri: Url {
-        scheme: "untitled",
-        cannot_be_a_base: true,
+        scheme: "file",
+        cannot_be_a_base: false,
         username: "",
         password: None,
         host: None,
         port: None,
-        path: "foo.py",
+        path: "<temp_dir>/src/script.py",
         query: None,
         fragment: None,
     },
@@ -21,12 +21,12 @@ PublishDiagnosticsParams {
         Diagnostic {
             range: Range {
                 start: Position {
-                    line: 1,
-                    character: 11,
+                    line: 4,
+                    character: 0,
                 },
                 end: Position {
-                    line: 1,
-                    character: 13,
+                    line: 4,
+                    character: 23,
                 },
             },
             severity: Some(
@@ -34,7 +34,7 @@ PublishDiagnosticsParams {
             ),
             code: Some(
                 String(
-                    "invalid-return-type",
+                    "unresolved-reference",
                 ),
             ),
             code_description: Some(
@@ -53,7 +53,7 @@ PublishDiagnosticsParams {
                         path: "/rules",
                         query: None,
                         fragment: Some(
-                            "invalid-return-type",
+                            "unresolved-reference",
                         ),
                     },
                 },
@@ -62,7 +62,7 @@ PublishDiagnosticsParams {
                 "ty",
             ),
             message: String(
-                "Return type does not match returned value: expected `str`, found `Literal[42]`",
+                "Name `PythonFinalizationError` used when not defined\n\ninfo: `PythonFinalizationError` was added as a builtin in Python 3.13\ninfo: Python 3.12 was assumed when resolving types because it was specified in script metadata",
             ),
             tags: None,
             related_information: None,
