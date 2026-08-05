@@ -650,10 +650,17 @@ impl<'db> MemberLookupError<'db> {
         self,
         context: &InferContext<'db, '_>,
         object_type: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::AnyNodeRef<'_>,
+        attribute: &str,
         assigned_type: Option<Type<'db>>,
     ) {
-        if matches!(target.ctx, ast::ExprContext::Del) {
+        if matches!(
+            target,
+            ast::AnyNodeRef::ExprAttribute(ast::ExprAttribute {
+                ctx: ast::ExprContext::Del,
+                ..
+            })
+        ) {
             return;
         }
 
@@ -664,6 +671,7 @@ impl<'db> MemberLookupError<'db> {
             MemberLookupErrorKind::DescriptorGet(call_context)
                 if (assigned_type.is_none()
                     || call_context.descriptor_type(db).is_data_descriptor(db, env))
+                    && let ast::AnyNodeRef::ExprAttribute(target) = target
                     && let Some(failure) = call_context.into_error(db, env) =>
             {
                 report_bad_dunder_get_call(
@@ -701,6 +709,7 @@ impl<'db> MemberLookupError<'db> {
                         &failure,
                         object_type,
                         target,
+                        attribute,
                         method,
                     );
                 }
@@ -715,6 +724,7 @@ impl<'db> MemberLookupError<'db> {
                     &failure,
                     object_type,
                     target,
+                    attribute,
                     "__getattr__",
                 );
             }

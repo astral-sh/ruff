@@ -39,6 +39,7 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
 3 | invalid_getattr_module.missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to function `__getattr__`: expected 0, got 1
 info: This access implicitly calls `__getattr__`
+info: Function signature here
  --> src/invalid_getattr_module.py:3:5
   |
 3 | def __getattr__() -> str:
@@ -88,6 +89,25 @@ reveal_type(nonexistent_attr)  # revealed: int
 ```py
 def __getattr__(name: str) -> int:
     return 42
+```
+
+## Invalid `__getattr__` calls in `from` imports
+
+An invalid module-level `__getattr__` call is reported on `from ... import` statements while
+retaining the function's return type for recovery.
+
+```py
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<module 'invalid_getattr_module'>`"
+from invalid_getattr_module import missing
+
+reveal_type(missing)  # revealed: str
+```
+
+`invalid_getattr_module.py`:
+
+```py
+def __getattr__() -> str:
+    return "fallback"
 ```
 
 ## Precedence: explicit attributes take priority over `__getattr__`
@@ -166,20 +186,42 @@ from mod import sub
 reveal_type(sub)  # revealed: <module 'mod.sub'>
 ```
 
+## Precedence: submodules vs invalid `__getattr__`
+
+A real submodule takes precedence even when the package's `__getattr__` would reject its name.
+
+`invalid_mod/__init__.py`:
+
+```py
+def __getattr__() -> str:
+    return "fallback"
+```
+
+`invalid_mod/sub.py`:
+
+```py
+value = 42
+```
+
+```py
+from invalid_mod import sub
+
+reveal_type(sub)  # revealed: <module 'invalid_mod.sub'>
+```
+
 ## Limiting names handled by `__getattr__`
 
-If a module `__getattr__` is annotated to accept only certain string literals, unsupported names are
-reported as unresolved imports in `from ... import` statements. Direct attribute access instead
-reports the invalid call and retains the fallback return type.
+If a module `__getattr__` is annotated to accept only certain string literals, unsupported names
+produce the same invalid-access diagnostic and recovered return type for imports and direct access.
 
 ```py
 from limited_getattr_module import known_attr
 
-# error: [unresolved-import]
+# error: [invalid-attribute-access] "Invalid access to attribute `unknown_attr` on type `<module 'limited_getattr_module'>`"
 from limited_getattr_module import unknown_attr
 
 reveal_type(known_attr)  # revealed: int
-reveal_type(unknown_attr)  # revealed: Unknown
+reveal_type(unknown_attr)  # revealed: int
 
 import limited_getattr_module
 

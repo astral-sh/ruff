@@ -10320,7 +10320,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let fallback_place = value_type
             .try_member_lookup(db, env, &attr.id)
             .unwrap_or_else(|error| {
-                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
+                error.report_diagnostic(
+                    &self.context,
+                    value_type,
+                    attribute.into(),
+                    attribute.attr.as_str(),
+                    assigned_type,
+                );
                 error.fallback_member(db)
             })
             .map_type(|ty| {
