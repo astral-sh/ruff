@@ -1041,7 +1041,79 @@ fn scripts_use_an_activated_virtual_environment() -> anyhow::Result<()> {
 }
 
 #[test]
-fn invalid_python_requirement_falls_back_to_project_configuration() -> anyhow::Result<()> {
+fn invalid_toml_reports_configuration_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python =
+        # ///
+
+        print(missing)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-script-metadata]: string values must be quoted, expected literal string
+     --> script.py:3:20
+      |
+    3 | # requires-python =
+      |                    ^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:20: error[invalid-script-metadata] string values must be quoted, expected literal string
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_metadata_options_report_configuration_error() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # [tool.ty.environment]
+        # python-version = true
+        # ///
+
+        print(missing)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-script-metadata]: wanted string or table
+     --> script.py:4:20
+      |
+    4 | # python-version = true
+      |                    ^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_python_requirement_reports_configuration_error() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -1077,39 +1149,32 @@ fn invalid_python_requirement_falls_back_to_project_configuration() -> anyhow::R
     success: false
     exit_code: 1
     ----- stdout -----
-    info[revealed-type]: Revealed type
-      --> script.py:13:13
-       |
-    13 | reveal_type(sys.platform)
-       |             ^^^^^^^^^^^^ `Literal["linux"]`
+    error[invalid-script-metadata]: value `<3.12` does not contain a lower bound
+     --> script.py:3:21
+      |
+    3 | # requires-python = "<3.12"
+      |                     ^^^^^^^
+    info: Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.
 
-    error[unresolved-reference]: Name `missing` used when not defined
-      --> script.py:14:7
-       |
-    14 | print(missing)
-       |       ^^^^^^^
-
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     "#);
-    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @r#"
+    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    script.py:13:13: info[revealed-type] Revealed type: `Literal["linux"]`
-    script.py:14:7: error[unresolved-reference] Name `missing` used when not defined
-    Found 2 diagnostics
+    script.py:3:21: error[invalid-script-metadata] value `<3.12` does not contain a lower bound
+    Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
 
 #[test]
-fn invalid_script_settings_fall_back_to_project_configuration() -> anyhow::Result<()> {
-    // FIXME: Scripts with invalid settings should not be checked.
+fn invalid_script_settings_report_configuration_error() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -1137,14 +1202,14 @@ fn invalid_script_settings_fall_back_to_project_configuration() -> anyhow::Resul
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    info[revealed-type]: Revealed type
-      --> script.py:12:13
-       |
-    12 | reveal_type(sys.platform)
-       |             ^^^^^^^^^^^^ `Literal["linux"]`
+    error[invalid-glob]: Invalid pattern
+     --> script.py:4:14
+      |
+    4 | # include = ["src/**test/"]
+      |              ^^^^^^^^^^^^^ Too many stars at position 5
 
     Found 1 diagnostic
 
@@ -1155,8 +1220,7 @@ fn invalid_script_settings_fall_back_to_project_configuration() -> anyhow::Resul
 }
 
 #[test]
-fn invalid_script_environment_falls_back_to_project_configuration() -> anyhow::Result<()> {
-    // FIXME: Scripts with invalid environments should not be checked.
+fn invalid_script_environment_reports_configuration_error() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
             "pyproject.toml",
@@ -1186,25 +1250,71 @@ fn invalid_script_environment_falls_back_to_project_configuration() -> anyhow::R
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    info[revealed-type]: Revealed type
-      --> script.py:12:13
-       |
-    12 | reveal_type(sys.version_info[:2])
-       |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[13]]`
+    error[invalid-script-metadata]: Invalid `environment.python` setting in script metadata `<temp_dir>/missing-environment`: does not point to a Python executable or a directory on disk
+     --> script.py:4:12
+      |
+    4 | # python = "./missing-environment"
+      |            ^^^^^^^^^^^^^^^^^^^^^^^
 
-    info[revealed-type]: Revealed type
-      --> script.py:13:13
-       |
-    13 | reveal_type(sys.platform)
-       |             ^^^^^^^^^^^^ `Literal["linux"]`
-
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_script_search_paths_do_not_blame_python_environment() -> anyhow::Result<()> {
+    let dependency = if cfg!(windows) {
+        "environment/Lib/site-packages/dependency.py"
+    } else {
+        "environment/lib/python3.13/site-packages/dependency.py"
+    };
+
+    let case = CliTest::with_files([
+        ("environment/pyvenv.cfg", "home = ./\nversion = 3.13\n"),
+        (dependency, "value = 1\n"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # [tool.ty.environment]
+            # python = "./environment"
+            # typeshed = "./missing-typeshed"
+            # ///
+
+            print(missing)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-script-metadata]: Failed to read the custom typeshed versions file '<temp_dir>/missing-typeshed/stdlib/VERSIONS'
+     --> script.py:5:14
+      |
+    5 | # typeshed = "./missing-typeshed"
+      |              ^^^^^^^^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:14: error[invalid-script-metadata] Failed to read the custom typeshed versions file '<temp_dir>/missing-typeshed/stdlib/VERSIONS'
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
