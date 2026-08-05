@@ -66,7 +66,7 @@ pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
-use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
+use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_dunder_get_call};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
@@ -583,18 +583,56 @@ enum MemberLookupErrorKind<'db> {
     DescriptorGet(DescriptorGetCallContext<'db>),
 }
 
-/// A failed member lookup together with the recovered member used to prevent cascading errors.
+/// A failed member lookup together with the member used to recover from the error.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct MemberLookupError<'db> {
     #[returns(copy)]
-    member: PlaceAndQualifiers<'db>,
+    fallback_member: PlaceAndQualifiers<'db>,
     #[returns(copy)]
     kind: MemberLookupErrorKind<'db>,
 }
 
 impl get_size2::GetSize for MemberLookupError<'_> {}
 
-/// A resolved member or an attribute-lookup error that retains its recovery value.
+impl<'db> MemberLookupError<'db> {
+    /// Reports the failed implicit call unless the lookup is shadowed or used for deletion.
+    fn report_diagnostic(
+        self,
+        context: &InferContext<'db, '_>,
+        object_type: Type<'db>,
+        target: &ast::ExprAttribute,
+        assigned_type: Option<Type<'db>>,
+    ) {
+        if matches!(target.ctx, ast::ExprContext::Del) {
+            return;
+        }
+
+        let db = context.db();
+        let env = context.program_environment();
+
+        match self.kind(db) {
+            MemberLookupErrorKind::DescriptorGet(call_context)
+                if (assigned_type.is_none()
+                    || call_context.descriptor_type(db).is_data_descriptor(db, env))
+                    && let Some(failure) = call_context.into_error(db, env) =>
+            {
+                report_bad_dunder_get_call(
+                    context,
+                    &failure,
+                    object_type,
+                    call_context.descriptor_type(db),
+                    target,
+                );
+            }
+            MemberLookupErrorKind::DescriptorGet(_) => {}
+        }
+    }
+}
+
+/// A resolved member or an implicit-call error that retains its recovery value.
+///
+/// Unlike [`crate::place::LookupResult`], errors here describe failed attribute-access operations,
+/// not undefined or possibly undefined places.
 type MemberLookupResult<'db> = Result<PlaceAndQualifiers<'db>, MemberLookupError<'db>>;
 
 fn member_lookup_result<'db>(
@@ -617,7 +655,7 @@ fn map_member_lookup_type<'db>(
         Ok(member) => Ok(member.map_type(f)),
         Err(error) => Err(MemberLookupError::new(
             db,
-            error.member(db).map_type(f),
+            error.fallback_member(db).map_type(f),
             error.kind(db),
         )),
     }
@@ -629,7 +667,7 @@ fn member_lookup_or_fall_back_to<'db>(
     result: MemberLookupResult<'db>,
     fallback_fn: impl FnOnce() -> MemberLookupResult<'db>,
 ) -> MemberLookupResult<'db> {
-    let member = result.unwrap_or_else(|error| error.member(db));
+    let member = result.unwrap_or_else(|error| error.fallback_member(db));
     match member.place {
         Place::Undefined => fallback_fn(),
         Place::Defined(DefinedPlace {
@@ -641,7 +679,7 @@ fn member_lookup_or_fall_back_to<'db>(
             ..
         }) => {
             let fallback = fallback_fn();
-            let fallback_member = fallback.unwrap_or_else(|error| error.member(db));
+            let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
             member_lookup_result(
                 db,
                 member.or_fall_back_to(db, env, || fallback_member),
@@ -665,8 +703,8 @@ fn cycle_normalized_member_lookup<'db>(
         .err()
         .map(|error| error.kind(db))
         .filter(|_| cycle.iteration() <= crate::TAINTED_CYCLES || previous.is_err());
-    let member = result.unwrap_or_else(|error| error.member(db));
-    let previous = previous.unwrap_or_else(|error| error.member(db));
+    let member = result.unwrap_or_else(|error| error.fallback_member(db));
+    let previous = previous.unwrap_or_else(|error| error.fallback_member(db));
     member_lookup_result(db, member.cycle_normalized(db, env, previous, cycle), error)
 }
 
@@ -4192,7 +4230,7 @@ impl<'db> Type<'db> {
         let PlaceAndQualifiers {
             place: fallback,
             qualifiers: fallback_qualifiers,
-        } = fallback.unwrap_or_else(|error| error.member(db));
+        } = fallback.unwrap_or_else(|error| error.fallback_member(db));
 
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
@@ -4325,7 +4363,7 @@ impl<'db> Type<'db> {
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         self.try_member_lookup(db, env, name)
-            .unwrap_or_else(|error| error.member(db))
+            .unwrap_or_else(|error| error.fallback_member(db))
     }
 
     /// Performs member lookup while retaining errors from implicit attribute-access methods.
@@ -4354,7 +4392,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
-            .unwrap_or_else(|error| error.member(db))
+            .unwrap_or_else(|error| error.fallback_member(db))
     }
 
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
@@ -4411,7 +4449,7 @@ impl<'db> Type<'db> {
                 env: &ProgramEnvironment<'db>,
                 result: MemberLookupResult<'db>,
             ) -> MemberLookupResult<'db> {
-                let member = result.unwrap_or_else(|error| error.member(db));
+                let member = result.unwrap_or_else(|error| error.fallback_member(db));
                 let should_promote = matches!(
                     member.place,
                     Place::Defined(DefinedPlace {
@@ -4469,7 +4507,7 @@ impl<'db> Type<'db> {
                 );
 
                 if result
-                    .unwrap_or_else(|error| error.member(db))
+                    .unwrap_or_else(|error| error.fallback_member(db))
                     .is_class_var()
                     && this.is_typed_dict()
                 {
@@ -4512,7 +4550,7 @@ impl<'db> Type<'db> {
                             db, env, name_str, policy, receiver,
                         );
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                        result.unwrap_or_else(|error| error.member(db))
+                        result.unwrap_or_else(|error| error.fallback_member(db))
                     });
                     member_lookup_result(db, member, error)
                 }
@@ -4532,7 +4570,7 @@ impl<'db> Type<'db> {
                                     db, env, name_str, policy, receiver,
                                 );
                                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                                result.unwrap_or_else(|error| error.member(db))
+                                result.unwrap_or_else(|error| error.fallback_member(db))
                             });
                         member_lookup_result(db, member, error)
                     }
@@ -4933,7 +4971,7 @@ impl<'db> Type<'db> {
                         );
                     if name_str == "func" {
                         match nominal_lookup
-                            .unwrap_or_else(|error| error.member(db))
+                            .unwrap_or_else(|error| error.fallback_member(db))
                             .place
                         {
                             Place::Defined(DefinedPlace {
@@ -6514,19 +6552,19 @@ impl<'db> Type<'db> {
             Some(MemberLookupErrorKind::DescriptorGet(_))
         ) && let (override_result, true) = custom_getattribute()
             && override_result
-                .unwrap_or_else(|error| error.member(db))
+                .unwrap_or_else(|error| error.fallback_member(db))
                 .place
                 .ignore_possibly_undefined()
                 .is_none_or(|override_type| {
                     result
-                        .unwrap_or_else(|error| error.member(db))
+                        .unwrap_or_else(|error| error.fallback_member(db))
                         .place
                         .ignore_possibly_undefined()
                         .is_some_and(|member_type| {
                             override_type.is_disjoint_from(db, env, member_type)
                         })
                 }) {
-            Ok(result.unwrap_or_else(|error| error.member(db)))
+            Ok(result.unwrap_or_else(|error| error.fallback_member(db)))
         } else {
             result
         };

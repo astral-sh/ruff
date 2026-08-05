@@ -2505,7 +2505,7 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
-        .unwrap_or_else(|error| error.member(db))
+        .unwrap_or_else(|error| error.fallback_member(db))
         .place
     } else {
         receiver_ty.member(db, env, member.name).place
