@@ -17,8 +17,8 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    TypedDictField, TypedDictOpenness, TypedDictSchema, deferred_functional_typed_dict_openness,
-    deferred_functional_typed_dict_schema,
+    SynthesizedTypedDictType, TypedDictField, TypedDictOpenness, TypedDictSchema,
+    deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
@@ -1040,6 +1040,33 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 }
 
+/// Resolves members of a schema that has no defining `TypedDict` class.
+pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    synthesized: SynthesizedTypedDictType<'db>,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    let typed_dict = TypedDictType::Synthesized(synthesized);
+
+    if let Some(member) = synthesize_typed_dict_method(db, env, typed_dict, name, || {
+        TypedDictFields::Dynamic(synthesized.items(db))
+    }) {
+        return Member::definitely_declared(member).inner;
+    }
+
+    typed_dict_inherited_class_member(
+        db,
+        env,
+        typed_dict,
+        TypedDictModule::Typing,
+        lookup_policy,
+        name,
+        || Type::TypedDict(typed_dict),
+    )
+}
+
 pub(super) fn typed_dict_fallback_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1067,18 +1094,39 @@ pub(super) fn typed_dict_class_member<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let self_class = class.class_literal(db);
+
+    typed_dict_inherited_class_member(
+        db,
+        env,
+        TypedDictType::new(class),
+        module,
+        lookup_policy,
+        name,
+        || determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict),
+    )
+}
+
+fn typed_dict_inherited_class_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    typed_dict: TypedDictType<'db>,
+    module: TypedDictModule,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+    new_upper_bound: impl FnOnce() -> Type<'db>,
+) -> PlaceAndQualifiers<'db> {
     let fallback_member = typed_dict_fallback_class_member(db, env, module, lookup_policy, name)
         .map_type(|ty| {
-            let new_upper_bound =
-                determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict);
-            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
+            let mapping = TypeMapping::ReplaceSelf {
+                new_upper_bound: new_upper_bound(),
+            };
             ty.apply_type_mapping(db, env, &mapping, TypeContext::default())
         });
     if !fallback_member.is_undefined() {
         return fallback_member;
     }
 
-    if let Some(value_ty) = TypedDictType::new(class).dict_value_type(db, env)
+    if let Some(value_ty) = typed_dict.dict_value_type(db, env)
         && let Some(dict_class) = KnownClass::Dict.to_specialized_class_type(
             db,
             env,
