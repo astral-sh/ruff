@@ -92,6 +92,10 @@ pub(crate) enum ErrorContext<'db> {
         target_field: Type<'db>,
     },
     TypedDictNotAssignableToDict(TypedDictType<'db>),
+    OpenTypedDictNotAssignableToMapping {
+        source: TypedDictType<'db>,
+        target: Type<'db>,
+    },
     IncompatibleReturnTypes {
         source: Type<'db>,
         target: Type<'db>,
@@ -279,6 +283,21 @@ impl<'db> ErrorContext<'db> {
                     source = typed_dict_name(typed_dict)
                 )
             }
+            Self::OpenTypedDictNotAssignableToMapping { source, target } => {
+                let name = source.defining_class().map(|class| class.name(db));
+                help_messages.insert(HelpMessages::OpenTypedDictNotAssignableToMapping {
+                    typed_dict_name: name.cloned(),
+                });
+                help_messages.insert(HelpMessages::ExplainOpenTypedDictUnsoundness {
+                    typed_dict_name: name.cloned(),
+                });
+
+                format!(
+                    "{source} is not assignable to `{target}`",
+                    source = typed_dict_name(source),
+                    target = target.display(db, env)
+                )
+            }
             Self::IncompatibleReturnTypes { source, target } => format!(
                 "incompatible return types: `{source}` is not assignable to `{target}`",
                 source = source.display(db, env),
@@ -426,6 +445,8 @@ enum HelpMessages {
     ConsiderUsingMappingInsteadOfDict,
     TopCallableExplanation,
     ConsiderAddingADefaultValue { parameter_name: Option<Name> },
+    OpenTypedDictNotAssignableToMapping { typed_dict_name: Option<Name> },
+    ExplainOpenTypedDictUnsoundness { typed_dict_name: Option<Name> },
 }
 
 impl std::fmt::Display for HelpMessages {
@@ -439,6 +460,22 @@ impl std::fmt::Display for HelpMessages {
             }
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
+            }
+            HelpMessages::OpenTypedDictNotAssignableToMapping {typed_dict_name} => {
+                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+                write!(
+                    f,
+                    "{name} would be assignable to this `Mapping` type \
+                    if it were declared with `closed=True`, but TypedDicts are open by default."
+                )
+            }
+            HelpMessages::ExplainOpenTypedDictUnsoundness {typed_dict_name} => {
+                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+                write!(
+                    f,
+                    "A subclass of {name} could validly add a new field of an arbitrary type, \
+                    violating subtyping with the `Mapping` type"
+                )
             }
             HelpMessages::TopCallableExplanation => f.write_str(
                 "This type includes all possible parameter sets, \
