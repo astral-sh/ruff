@@ -763,10 +763,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ));
 
         let constructed_ty = meta_ty.bindings(db, env).return_type(db, env);
-        self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
-            .and(db, self.constraints, || {
-                self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
-            })
+        let constructed_result =
+            self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol));
+
+        // A protocol declaration necessarily provides its own class variables and unbound
+        // methods. Only its constructed instance can prevent its exact class object from
+        // inhabiting `type[Protocol]`; rechecking the declarations can recurse back into the same
+        // interface without adding evidence.
+        if protocol.materialization_kind(db).is_none()
+            && let Type::ClassLiteral(meta_class) = meta_ty
+            && protocol
+                .class_origin(db)
+                .is_some_and(|origin| origin.class_literal(db) == meta_class)
+        {
+            return constructed_result;
+        }
+
+        constructed_result.and(db, self.constraints, || {
+            self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
+        })
     }
 
     pub(super) fn check_nominal_instance_pair(
