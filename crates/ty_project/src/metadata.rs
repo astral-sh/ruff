@@ -12,7 +12,8 @@ use ty_static::EnvVars;
 
 use crate::Db;
 use crate::metadata::options::{
-    EnvironmentOptions, OptionDiagnostic, ProgramSettingsDiagnostic, ToSettingsError,
+    EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
+    ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
@@ -399,7 +400,7 @@ impl ProjectMetadata {
         self.name.as_str()
     }
 
-    fn options(&self) -> &Options {
+    pub(crate) fn options(&self) -> &Options {
         &self.options
     }
 
@@ -483,6 +484,26 @@ impl ProjectMetadata {
             .chain(self.fallback_options.as_deref())
     }
 
+    /// Returns the option layers applicable to a standalone script.
+    ///
+    /// Scripts inherit invocation and user settings, but not the enclosing project's options or
+    /// Python-version settings derived from its uv workspace.
+    pub(crate) fn script_options_in_precedence_order<'a>(
+        &'a self,
+        options: &'a Options,
+    ) -> impl Iterator<Item = &'a Options> {
+        self.override_options
+            .as_deref()
+            .into_iter()
+            .chain(std::iter::once(options))
+            .chain(
+                self.user_configuration
+                    .as_deref()
+                    .map(|(_, options)| options),
+            )
+            .chain(self.fallback_options.as_deref())
+    }
+
     /// Loads the lower-precedence options from configuration files.
     ///
     /// This includes:
@@ -554,7 +575,7 @@ impl MergedOptions<'_> {
     ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
     {
         self.options.to_program_settings(
-            self.metadata.root(),
+            OptionsContext::Project(self.metadata.root()),
             self.metadata.name(),
             system,
             vendored,
@@ -567,7 +588,8 @@ impl MergedOptions<'_> {
         db: &dyn Db,
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
-        self.options.to_settings(db, self.metadata.root(), strategy)
+        self.options
+            .to_settings(db, OptionsContext::Project(self.metadata.root()), strategy)
     }
 }
 
