@@ -2652,6 +2652,50 @@ def _(item: Item | str) -> None:
         reveal_type(dict(item))  # revealed: dict[str, object]
 ```
 
+A successful membership test for an undeclared key narrows each union member to an intersection with
+a synthesized `TypedDict`. Its mapping methods should retain their precise types, and copying the
+narrowed union should remain efficient even when each member has a distinct optional field:
+
+```py
+from typing import NotRequired
+
+MembershipA = TypedDict("MembershipA", {"kind": Literal["a"], "field_a": NotRequired[int]})
+MembershipB = TypedDict("MembershipB", {"kind": Literal["b"], "field_b": NotRequired[int]})
+MembershipC = TypedDict("MembershipC", {"kind": Literal["c"], "field_c": NotRequired[int]})
+MembershipD = TypedDict("MembershipD", {"kind": Literal["d"], "field_d": NotRequired[int]})
+MembershipE = TypedDict("MembershipE", {"kind": Literal["e"], "field_e": NotRequired[int]})
+MembershipF = TypedDict("MembershipF", {"kind": Literal["f"], "field_f": NotRequired[int]})
+MembershipG = TypedDict("MembershipG", {"kind": Literal["g"], "field_g": NotRequired[int]})
+MembershipH = TypedDict("MembershipH", {"kind": Literal["h"], "field_h": NotRequired[int]})
+MembershipI = TypedDict("MembershipI", {"kind": Literal["i"], "field_i": NotRequired[int]})
+MembershipJ = TypedDict("MembershipJ", {"kind": Literal["j"], "field_j": NotRequired[int]})
+
+type MembershipItem = (
+    MembershipA
+    | MembershipB
+    | MembershipC
+    | MembershipD
+    | MembershipE
+    | MembershipF
+    | MembershipG
+    | MembershipH
+    | MembershipI
+    | MembershipJ
+)
+
+def _(item: MembershipItem) -> None:
+    if "missing" in item:
+        reveal_type(item.keys())  # revealed: dict_keys[str, object]
+        reveal_type(item.items())  # revealed: dict_items[str, object]
+        reveal_type(item.values())  # revealed: dict_values[str, object]
+        reveal_type(item["missing"])  # revealed: object
+        reveal_type(dict(item))  # revealed: dict[str, object]
+
+def _(item: MembershipA) -> None:
+    if "missing" in item:
+        reveal_type(item.copy())  # revealed: MembershipA & <TypedDict with items 'missing'>
+```
+
 Adding a regular dictionary to the union should not make copying it slow:
 
 ```py
@@ -3643,6 +3687,93 @@ class Pair[T](TypedDict):
 
 reveal_type(Pair(**{"first": 1, "second": "x"}))  # revealed: Pair[Unknown]
 reveal_type(Pair(**{"first": 1}, **{"second": "x"}))  # revealed: Pair[Unknown]
+```
+
+### Constructor inference from unpacked TypedDicts
+
+Unpacking a `TypedDict` with required keys contributes each field's type to constructor inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NotRequired, TypedDict
+
+class Source(TypedDict):
+    value: int
+
+class Box[T](TypedDict):
+    value: T
+
+def unpack(source: Source):
+    reveal_type(Box(**source))  # revealed: Box[int]
+```
+
+A type alias to a single `TypedDict` contributes the same field information.
+
+```py
+type SourceAlias = Source
+
+def unpack_alias(source: SourceAlias):
+    reveal_type(Box(**source))  # revealed: Box[int]
+```
+
+Different unpacked `TypedDict` arguments retain their separate field types.
+
+```py
+class First(TypedDict):
+    first: int
+
+class Second(TypedDict):
+    second: str
+
+class Pair[T](TypedDict):
+    first: T
+    second: str
+
+def unpack_multiple(first: First, second: Second):
+    reveal_type(Pair(**first, **second))  # revealed: Pair[int]
+```
+
+An optional source key does not satisfy a required constructor field.
+
+```py
+class MaybeSource(TypedDict):
+    value: NotRequired[int]
+
+def unpack_optional(source: MaybeSource):
+    Box(**source)  # error: [missing-typed-dict-key]
+```
+
+### Constructor inference from unpacked TypedDict unions
+
+A union can associate different value types with different callbacks. Inference remains gradual
+because combining those fields independently would reject a valid constructor call.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypedDict
+
+class IntSource(TypedDict):
+    value: int
+    callback: Callable[[int], None]
+
+class StrSource(TypedDict):
+    value: str
+    callback: Callable[[str], None]
+
+class Box[T](TypedDict):
+    value: T
+    callback: Callable[[T], None]
+
+def unpack(source: IntSource | StrSource):
+    reveal_type(Box(**source))  # revealed: Box[Unknown]
 ```
 
 ### Constructor inference from recursive fields

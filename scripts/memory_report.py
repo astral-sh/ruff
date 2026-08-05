@@ -4,13 +4,13 @@ Compare memory usage reports between two ty versions and generate a PR comment.
 This script can be used in two modes:
 
 1. Report comparison mode: Reads pre-generated JSON memory reports and compares them.
-2. Full run mode: Clones projects, builds ty, runs memory tests, and generates comparison.
+2. Full run mode: Sets up projects, runs memory tests, and generates comparison.
 
 Examples:
     # Compare pre-generated memory reports
     %(prog)s compare --old-dir old_reports/ --new-dir new_reports/
 
-    # Full run: clone projects, build ty, run memory tests
+    # Full run: set up projects and their dependencies, then run memory tests
     %(prog)s run --old-ty ./ty-old --new-ty ./ty-new
 
     # Write output to a file
@@ -25,18 +25,11 @@ import os
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Self
 
-# Known projects with their Git URLs for memory testing.
-KNOWN_PROJECTS: Final[Mapping[str, str]] = {
-    "flake8": "https://github.com/PyCQA/flake8",
-    "sphinx": "https://github.com/sphinx-doc/sphinx",
-    "prefect": "https://github.com/PrefectHQ/prefect",
-    "trio": "https://github.com/python-trio/trio",
-}
+KNOWN_PROJECTS: Final = ("flake8", "sphinx", "prefect", "trio")
 
 
 @dataclass(slots=True, kw_only=True)
@@ -251,18 +244,29 @@ def render_summary(projects: list[ProjectComparison]) -> str:
     return "\n".join(lines)
 
 
-def clone_project(*, name: str, url: str, dest: Path) -> Path:
-    """Clone a project from Git. Returns the path to the cloned project."""
+def setup_project(*, name: str, dest: Path) -> Path:
+    """Clone a project and install its mypy-primer dependencies."""
     project_path = dest / name
     if project_path.exists():
         print(f"Project {name} already exists at {project_path}", file=sys.stderr)
         return project_path
 
-    print(f"Cloning {name} from {url}...", file=sys.stderr)
+    setup_script = Path(__file__).with_name("setup_primer_project.py")
+    print(f"Setting up {name} and its dependencies...", file=sys.stderr)
     subprocess.run(
-        ["git", "clone", "--depth=1", url, str(project_path)],
+        [
+            "uv",
+            "run",
+            "--locked",
+            "--python",
+            sys.executable,
+            "--script",
+            str(setup_script),
+            name,
+            str(project_path),
+        ],
         check=True,
-        capture_output=True,
+        stdout=sys.stderr,
     )
     return project_path
 
@@ -280,7 +284,7 @@ def run_ty_memory_check(
 
     print(f"Running {ty_path} on {project_path.name}...", file=sys.stderr)
     result = subprocess.run(
-        [ty_path, "check", str(project_path), "--exit-zero"],
+        [ty_path, "check", "--project", str(project_path), "--exit-zero"],
         capture_output=True,
         text=True,
         env=env,
@@ -301,8 +305,8 @@ def run_memory_tests(
     old_reports_dir.mkdir(parents=True, exist_ok=True)
     new_reports_dir.mkdir(parents=True, exist_ok=True)
 
-    for project_name, url in KNOWN_PROJECTS.items():
-        project_path = clone_project(name=project_name, url=url, dest=projects_dir)
+    for project_name in KNOWN_PROJECTS:
+        project_path = setup_project(name=project_name, dest=projects_dir)
 
         # Run old ty
         old_report_path = old_reports_dir / f"{project_name}.json"
@@ -455,7 +459,7 @@ def parse_args() -> argparse.Namespace:
     # Run subcommand
     run_parser = subparsers.add_parser(
         "run",
-        help="Clone projects, run ty, and compare memory usage",
+        help="Set up projects, run ty, and compare memory usage",
     )
     run_parser.add_argument(
         "--old-ty",

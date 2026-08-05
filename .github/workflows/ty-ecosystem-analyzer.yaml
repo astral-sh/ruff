@@ -42,6 +42,8 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+  # TODO: Update the mypy-primer revision in scripts/setup_primer_project.py
+  # and regenerate its lockfile when updating ecosystem-analyzer.
   ECOSYSTEM_ANALYZER_COMMIT: f6f1b7b8586c8a6c60dc3d37c3f6ae917a9ad9c4
 
 jobs:

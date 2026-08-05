@@ -24,10 +24,10 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorators, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            function_known_decorator_flags, function_known_decorators, infer_statement_types,
+            nearest_enclosing_function, original_class_type,
         },
-        infer_definition_types, infer_scope_types,
+        infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
@@ -39,7 +39,7 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
@@ -54,6 +54,65 @@ fn parameters_have_annotations(parameters: &ast::Parameters) -> bool {
             .kwarg
             .as_deref()
             .is_some_and(|param| param.annotation.is_some())
+}
+
+/// Whether a non-static method receives an instance or the class itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MethodReceiverKind {
+    Instance,
+    Class,
+}
+
+impl MethodReceiverKind {
+    /// Classifies methods by their decorators and implicit class-receiver rules.
+    ///
+    /// Free functions and ordinary static methods have no receiver; `__new__` receives the class.
+    ///
+    /// ```python
+    /// class Example:
+    ///     def instance(self): ...
+    ///     @classmethod
+    ///     def class_method(cls): ...
+    ///     @staticmethod
+    ///     def static_method(): ...
+    /// ```
+    fn from_function<'db>(
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        function: &ast::StmtFunctionDef,
+    ) -> Option<Self> {
+        if !definition.scope(db).scope(db).kind().is_class() {
+            return None;
+        }
+
+        let decorators = function_known_decorator_flags(db, definition);
+        if decorators.contains(FunctionDecorators::STATICMETHOD) && function.name.id != "__new__" {
+            return None;
+        }
+
+        if decorators.contains(FunctionDecorators::CLASSMETHOD)
+            || is_implicit_classmethod(&function.name)
+            || function.name.id == "__new__"
+        {
+            Some(Self::Class)
+        } else {
+            Some(Self::Instance)
+        }
+    }
+
+    /// Accepts only `Self` for an instance receiver and `type[Self]` for a class receiver.
+    fn accepts_annotation(self, db: &dyn Db, annotation: Type<'_>) -> bool {
+        match (self, annotation) {
+            (Self::Instance, Type::TypeVar(typevar)) => typevar.typevar(db).is_self(db),
+            (Self::Class, Type::SubclassOf(subclass)) => {
+                matches!(
+                    subclass.subclass_of(),
+                    SubclassOfInner::TypeVar(typevar) if typevar.typevar(db).is_self(db)
+                )
+            }
+            _ => false,
+        }
+    }
 }
 
 /// Return type policy for checking explicit `return` statements in a function body.
@@ -585,8 +644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
         if !has_type_params {
-            self.infer_return_type_annotation(function.returns.as_deref());
-            self.infer_parameters(function.parameters.as_ref());
+            self.infer_function_signature_annotations(function, definition);
         }
 
         if has_defaults {
@@ -656,21 +714,81 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
-        let type_params = function
-            .type_params
-            .as_deref()
-            .expect("function type params scope without type params");
-
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
-        self.infer_return_type_annotation(function.returns.as_deref());
-        self.infer_type_parameters(type_params);
-        self.infer_parameters(&function.parameters);
+        self.infer_function_signature_annotations(function, binding_context);
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    fn infer_parameters(&mut self, parameters: &ast::Parameters) {
+    /// Infer an annotated method receiver before the rest of its signature so `Self` can be
+    /// validated where it occurs, including inside parsed string annotations.
+    ///
+    /// ```python
+    /// class Example:
+    ///     def method(self: object) -> "Self | object": ...
+    /// ```
+    fn infer_function_signature_annotations(
+        &mut self,
+        function: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) {
+        let receiver_is_incompatible = self.infer_method_receiver_annotation(function, definition);
+        let previous_incompatible_receiver = self.context.inference_flags.replace(
+            InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
+            receiver_is_incompatible == Some(true),
+        );
+
+        self.infer_return_type_annotation(function.returns.as_deref());
+        if let Some(type_params) = function.type_params.as_deref() {
+            self.infer_type_parameters(type_params);
+        }
+        self.infer_parameters(&function.parameters, receiver_is_incompatible.is_some());
+
+        self.context.inference_flags.set(
+            InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
+            previous_incompatible_receiver,
+        );
+    }
+
+    /// Infers an explicitly annotated method receiver before the rest of its signature.
+    ///
+    /// Returns whether the annotation is incompatible with `Self`, or `None` for functions without
+    /// an annotated instance or class receiver.
+    fn infer_method_receiver_annotation(
+        &mut self,
+        function: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Option<bool> {
+        let receiver = function
+            .parameters
+            .posonlyargs
+            .first()
+            .or_else(|| function.parameters.args.first())?;
+        let annotation = receiver.parameter.annotation.as_deref()?;
+        let receiver_kind = MethodReceiverKind::from_function(self.db(), definition, function)?;
+
+        let previously_in_parameter_annotation = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_PARAMETER_ANNOTATION, true);
+        let annotation_type = self.infer_type_expression_with_state(
+            annotation,
+            DeferredExpressionState::from(self.defer_annotations()),
+        );
+        self.context.inference_flags.set(
+            InferenceFlags::IN_PARAMETER_ANNOTATION,
+            previously_in_parameter_annotation,
+        );
+
+        Some(!receiver_kind.accepts_annotation(self.db(), annotation_type))
+    }
+
+    fn infer_parameters(
+        &mut self,
+        parameters: &ast::Parameters,
+        first_annotation_already_inferred: bool,
+    ) {
         let ast::Parameters {
             range: _,
             node_index: _,
@@ -682,7 +800,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = parameters;
 
         self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
-        for param_with_default in parameters.iter_non_variadic_params() {
+        for param_with_default in parameters
+            .iter_non_variadic_params()
+            .skip(usize::from(first_annotation_already_inferred))
+        {
             self.infer_parameter_with_default(param_with_default);
         }
         if let Some(vararg) = vararg {
@@ -1049,33 +1170,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let function_node = function_definition.node(self.module());
-        let function_name = &function_node.name;
-
-        let mut is_classmethod = is_implicit_classmethod(function_name);
-        let inference = infer_definition_types(self.db(), method_definition);
-        for decorator in &function_node.decorator_list {
-            let decorator_ty = inference.expression_type(&decorator.expression);
-            if let Some(known_class) = decorator_ty
-                .as_class_literal()
-                .and_then(|class| class.known(db))
-            {
-                if known_class == KnownClass::Staticmethod && function_name != "__new__" {
-                    return None;
-                }
-
-                is_classmethod |= known_class == KnownClass::Classmethod;
-            }
-        }
+        let receiver_kind =
+            MethodReceiverKind::from_function(db, method_definition, function_node)?;
 
         let class_definition = self.index.expect_single_definition(class);
         let class_literal = original_class_type(db, class_definition)?;
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
-        if is_classmethod || function_name == "__new__" {
-            typing_self.map(|typing_self| {
+        match receiver_kind {
+            MethodReceiverKind::Class => typing_self.map(|typing_self| {
                 SubclassOfType::from(db, env, SubclassOfInner::TypeVar(typing_self))
-            })
-        } else {
-            typing_self.map(Type::TypeVar)
+            }),
+            MethodReceiverKind::Instance => typing_self.map(Type::TypeVar),
         }
     }
 
