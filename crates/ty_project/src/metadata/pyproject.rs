@@ -40,14 +40,6 @@ impl PyProject {
         Self::deserialize_toml(content)
     }
 
-    pub(crate) fn from_toml_str_without_spans(
-        content: &str,
-        source: ValueSource,
-    ) -> Result<Self, PyProjectError> {
-        let _guard = ValueSourceGuard::new(source, false);
-        Self::deserialize_toml(content)
-    }
-
     fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
         let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
         // TOML tables are unordered and the `toml` crate sorts keys
