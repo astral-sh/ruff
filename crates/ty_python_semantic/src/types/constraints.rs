@@ -692,8 +692,7 @@ impl<'db, 'c> RelationConstraintSet<'db, 'c> {
     /// Returns `true` only if the relation is unconditionally false.
     ///
     /// In particular, both indeterminate and inconsistent results return `false`.
-    #[expect(clippy::inline_always)]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn is_always_false(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Self::Boolean(evidence) => evidence.is_never_satisfied(db, env),
