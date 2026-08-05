@@ -542,6 +542,123 @@ def unsound(value: WrappedDescriptor[int]) -> None:
     overwrite(value)  # error: [invalid-argument-type]
 ```
 
+If a generic setter's accepted value depends only on its own method-local type variable, the
+protocol's type parameter remains covariant. The method-local variable does not affect protocol
+variance merely because the complete write domain cannot be represented.
+
+```py
+class IndependentSetterDescriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__[U](self, instance: object, value: tuple[U, object]) -> None: ...
+
+class CovariantIndependentSetter(Protocol[T_co]):
+    @IndependentSetterDescriptor
+    def value(self) -> T_co: ...
+
+class InferredIndependentSetter[T](Protocol):
+    @IndependentSetterDescriptor
+    def value(self) -> T: ...
+
+class WrappedIndependentSetter[T]:
+    def protocol(self) -> InferredIndependentSetter[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(WrappedIndependentSetter[int], WrappedIndependentSetter[object]))
+static_assert(is_assignable_to(WrappedIndependentSetter[int], WrappedIndependentSetter[object]))
+```
+
+The setter's complete value annotation also preserves nested polarity. A callback that accepts the
+protocol parameter is contravariant in that parameter, and passing the callback to a setter flips it
+back to covariance.
+
+```py
+class CallbackSetterDescriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__[U](self, instance: object, value: Callable[[T_co], U]) -> None: ...
+
+class CovariantCallbackSetter(Protocol[T_co]):
+    @CallbackSetterDescriptor
+    def value(self) -> T_co: ...
+```
+
+An overload that cannot accept the protocol's receiver is not part of its write capability, even if
+that overload mentions the protocol's type parameter.
+
+```py
+from typing import overload
+
+class SelectiveSetterDescriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+
+    @overload
+    def __set__[U](self, instance: int, value: tuple[T_co, U]) -> None: ...
+    @overload
+    def __set__[U](self, instance: object, value: tuple[U, object]) -> None: ...
+    def __set__(self, instance: object, value: object) -> None: ...
+
+class CovariantSelectiveSetter(Protocol[T_co]):
+    @SelectiveSetterDescriptor
+    def value(self) -> T_co: ...
+```
+
+A variadic setter accepts its assigned value through `*args`. Its element annotation determines
+variance even though there is no second named positional parameter.
+
+```py
+class VariadicSetterDescriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__[U](self, instance: object, *values: U) -> None: ...
+
+class CovariantVariadicSetter(Protocol[T_co]):
+    @VariadicSetterDescriptor
+    def value(self) -> T_co: ...
+```
+
+When a descriptor may have more than one runtime type, a write must be accepted by every possible
+setter. An unrestricted setter therefore cannot hide another setter that depends on the protocol's
+type parameter.
+
+```py
+class UnrestrictedDescriptor(Generic[T_co]):
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: object) -> None: ...
+
+class RestrictedDescriptor(Generic[T_co]):
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__[U](self, instance: object, value: tuple[T_co, U]) -> None: ...
+
+def either_descriptor[U](
+    getter: Callable[..., U],
+) -> UnrestrictedDescriptor[U] | RestrictedDescriptor[U]:
+    raise NotImplementedError
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantUnionDescriptor` should be invariant, but is covariant"
+class CovariantUnionDescriptor(Protocol[T_co]):
+    @either_descriptor
+    def value(self) -> T_co: ...
+
+class InferredUnionDescriptor[T](Protocol):
+    @either_descriptor
+    def value(self) -> T: ...
+
+class WrappedUnionDescriptor[T]:
+    def protocol(self) -> InferredUnionDescriptor[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(WrappedUnionDescriptor[int], WrappedUnionDescriptor[object]))
+static_assert(not is_assignable_to(WrappedUnionDescriptor[int], WrappedUnionDescriptor[object]))
+```
+
 ## Protocol variance ignores constructors and undeclared instance attributes
 
 Constructors do not belong to a protocol's structural interface. If a type variable appears only in
