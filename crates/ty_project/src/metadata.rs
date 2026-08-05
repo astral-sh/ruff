@@ -143,26 +143,13 @@ impl ProjectMetadata {
             .map(|name| ProjectName::new(&**name))
             .unwrap_or_else(|| ProjectName::new(root.file_name().unwrap_or("root")));
 
-        // If the `options` don't specify a python version but the `project.requires-python` field is set,
-        // use that as a lower bound instead.
         if let Some(project) = project {
-            if options
-                .environment
-                .as_ref()
-                .is_none_or(|env| env.python_version.is_none())
-            {
-                let requires_python = strategy.fallback_opt(
-                    project.resolve_requires_python_lower_bound(),
-                    |err| {
-                        tracing::debug!("skipping invalid requires_python lower bound: {err}");
-                    },
-                )?;
-                if let Some(requires_python) = requires_python.flatten() {
-                    let mut environment = options.environment.unwrap_or_default();
-                    environment.python_version = Some(requires_python);
-                    options.environment = Some(environment);
-                }
-            }
+            // If the `options` don't specify a python version but the `project.requires-python` field is set,
+            // use that as a lower bound instead.
+            strategy.fallback(
+                options.apply_requires_python(project.requires_python.as_ref()),
+                |error| tracing::debug!("skipping invalid requires_python lower bound: {error}"),
+            )?;
         }
 
         Ok(Self {

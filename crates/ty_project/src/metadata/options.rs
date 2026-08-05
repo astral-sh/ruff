@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
+use crate::metadata::pyproject::{ResolveRequiresPythonError, resolve_requires_python_lower_bound};
 use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
@@ -7,6 +8,7 @@ use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use anyhow::Context;
 use ordermap::OrderMap;
+use pep440_rs::VersionSpecifiers;
 use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
@@ -123,6 +125,28 @@ impl Options {
         let mut options: Self = toml::from_str(content)?;
         options.prioritize_all_selectors();
         Ok(options)
+    }
+
+    /// Infers the Python version from `requires-python` unless it was configured explicitly.
+    pub(super) fn apply_requires_python(
+        &mut self,
+        requires_python: Option<&RangedValue<VersionSpecifiers>>,
+    ) -> Result<(), ResolveRequiresPythonError> {
+        if self
+            .environment
+            .as_ref()
+            .is_some_and(|environment| environment.python_version.is_some())
+        {
+            return Ok(());
+        }
+
+        if let Some(requires_python) = requires_python
+            && let Some(python_version) = resolve_requires_python_lower_bound(requires_python)?
+        {
+            self.environment.get_or_insert_default().python_version = Some(python_version);
+        }
+
+        Ok(())
     }
 
     /// Ensures that the `all` selector is applied before per-rule selectors
