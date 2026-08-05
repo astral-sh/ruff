@@ -30,6 +30,7 @@ use crate::{
         MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
         ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
         TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
+        VarianceInferenceMode,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -394,35 +395,9 @@ pub(super) fn inferred_protocol_typevar_variance<'db>(
         return TypeVarVariance::Bivariant;
     };
     let env = ProgramEnvironment::from_scope(class.body_scope(db));
-    let interface = protocol.interface(db);
-    let variance = interface.variance_of(db, &env, typevar);
-
-    if variance == TypeVarVariance::Bivariant
-        && !interface.members(db).any(|member| {
-            let capabilities = member.capabilities(db, &env);
-            let class_access = if member.is_instance_method() {
-                ProtocolMemberAccess::NONE
-            } else {
-                capabilities.class
-            };
-
-            [capabilities.instance, class_access]
-                .into_iter()
-                .flat_map(|access| access.variances(db, &env))
-                .any(|(ty, _)| {
-                    any_over_type(db, &env, ty, false, |nested| {
-                        matches!(nested, Type::TypeVar(inner) if inner.identity(db) == typevar)
-                    })
-                })
-        })
-    {
-        // An unused protocol parameter is conventionally covariant. Do not apply this fallback
-        // to parameters present in recursive specializations: their bivariance can be a
-        // temporary fixed-point approximation rather than an unused parameter.
-        TypeVarVariance::Covariant
-    } else {
-        variance
-    }
+    protocol
+        .interface(db)
+        .variance_of_in_mode(db, &env, typevar, VarianceInferenceMode::Structural)
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
@@ -1244,11 +1219,12 @@ impl<'db> ProtocolMemberWrite<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         self.members(db)
             .flat_map(|member| {
@@ -1264,7 +1240,10 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
                     .into_iter()
                     .flat_map(|access| access.variances(db, env))
             })
-            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
+            .map(|(ty, variance)| {
+                ty.with_polarity(variance)
+                    .variance_of_in_mode(db, env, typevar, mode)
+            })
             .collect()
     }
 }

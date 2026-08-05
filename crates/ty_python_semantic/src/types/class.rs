@@ -35,7 +35,6 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
-use crate::types::protocol_class::inferred_protocol_typevar_variance;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -47,7 +46,7 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
-    UnionBuilder, VarianceInferable,
+    UnionBuilder, VarianceInferable, VarianceInferenceMode,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -480,13 +479,14 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+        self.variance_of_owner(db, typevar, mode)
     }
 }
 
@@ -494,13 +494,14 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 impl<'db> GenericAlias<'db> {
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of_owner(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
@@ -514,11 +515,15 @@ impl<'db> GenericAlias<'db> {
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db)
+                if origin.is_protocol(db) && mode == VarianceInferenceMode::Effective {
+                    let substituted_variance = ty.variance_of_in_mode(db, &env, typevar, mode);
+                    generic_typevar.variance_with_polarity(db, substituted_variance)
+                } else if let Some(explicit_variance) =
+                    generic_typevar.typevar(db).explicit_variance(db)
                     && !origin.is_protocol(db)
                 {
                     ty.with_polarity(explicit_variance)
-                        .variance_of(db, &env, typevar)
+                        .variance_of_in_mode(db, &env, typevar, mode)
                 } else {
                     // `with_polarity` composes the passed variance with the
                     // inferred one. The inference is done lazily, as we can
@@ -531,20 +536,11 @@ impl<'db> GenericAlias<'db> {
                     // If salsa let us look at the cache, we could check first
                     // to see if the class literal query was already run.
 
-                    let typevar_variance_in_substituted_type = ty.variance_of(db, &env, typevar);
-                    if origin.is_protocol(db) {
-                        typevar_variance_in_substituted_type.compose_thunk(|| {
-                            inferred_protocol_typevar_variance(
-                                db,
-                                origin,
-                                generic_typevar.identity(db),
-                            )
-                        })
-                    } else {
-                        origin
-                            .with_polarity(typevar_variance_in_substituted_type)
-                            .variance_of(db, &env, generic_typevar.identity(db))
-                    }
+                    let typevar_variance_in_substituted_type =
+                        ty.variance_of_in_mode(db, &env, typevar, mode);
+                    origin
+                        .with_polarity(typevar_variance_in_substituted_type)
+                        .variance_of_in_mode(db, &env, generic_typevar.identity(db), mode)
                 }
             })
             .collect()
@@ -2542,21 +2538,24 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, env, typevar),
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.variance_of_in_mode(db, env, typevar, mode)
+            }
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => TypeVarVariance::Bivariant,
-            Self::Generic(generic) => generic.variance_of(db, env, typevar),
+            Self::Generic(generic) => generic.variance_of_in_mode(db, env, typevar, mode),
         }
     }
 }
@@ -2767,14 +2766,15 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
         match self {
-            Self::Static(class) => class.variance_of(db, env, typevar),
+            Self::Static(class) => class.variance_of_in_mode(db, env, typevar, mode),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)

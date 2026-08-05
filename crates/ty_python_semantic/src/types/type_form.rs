@@ -1,4 +1,4 @@
-use super::variance::VarianceInferable;
+use super::variance::{VarianceInferable, VarianceInferenceMode};
 use super::{
     BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
     visitor,
@@ -98,12 +98,14 @@ impl<'db> Type<'db> {
 
 impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
     // `TypeForm` is covariant in its type argument.
-    fn variance_of(
+    fn variance_of_in_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
+        mode: VarianceInferenceMode,
     ) -> TypeVarVariance {
-        self.type_argument(db).variance_of(db, env, typevar)
+        self.type_argument(db)
+            .variance_of_in_mode(db, env, typevar, mode)
     }
 }
