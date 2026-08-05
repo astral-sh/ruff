@@ -280,7 +280,7 @@ def run_ty_memory_check(
 
     print(f"Running {ty_path} on {project_path.name}...", file=sys.stderr)
     result = subprocess.run(
-        [ty_path, "check", str(project_path), "--exit-zero"],
+        [ty_path, "check", "--project", str(project_path), "--exit-zero"],
         capture_output=True,
         text=True,
         env=env,
