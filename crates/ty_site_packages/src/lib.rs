@@ -2119,6 +2119,8 @@ impl Deref for SysPrefixPath {
 pub enum SysPrefixPathOrigin {
     /// The `sys.prefix` path came from a configuration file setting: `pyproject.toml` or `ty.toml`
     ConfigFileSetting(Arc<SystemPathBuf>, Option<TextRange>),
+    /// The `sys.prefix` path came from a standalone script's inline metadata.
+    ScriptMetadataSetting,
     /// The `sys.prefix` path came from a `--python` CLI flag
     PythonCliFlag,
     /// The selected interpreter in the user's editor.
@@ -2149,6 +2151,7 @@ impl SysPrefixPathOrigin {
         match self {
             Self::LocalVenv | Self::VirtualEnvVar => true,
             Self::ConfigFileSetting(..)
+            | Self::ScriptMetadataSetting
             | Self::PythonCliFlag
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
@@ -2167,6 +2170,7 @@ impl SysPrefixPathOrigin {
         match self {
             Self::PythonCliFlag
             | Self::ConfigFileSetting(..)
+            | Self::ScriptMetadataSetting
             | Self::Editor
             | Self::SelfEnvironment
             | Self::PythonBinary => false,
@@ -2188,6 +2192,7 @@ impl SysPrefixPathOrigin {
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
             | Self::ConfigFileSetting(..)
+            | Self::ScriptMetadataSetting
             | Self::PythonCliFlag
             | Self::PythonBinary
             | Self::UvWorkspace => false,
@@ -2201,6 +2206,9 @@ impl std::fmt::Display for SysPrefixPathOrigin {
         match self {
             Self::PythonCliFlag => f.write_str("`--python` argument"),
             Self::ConfigFileSetting(_, _) => f.write_str("`environment.python` setting"),
+            Self::ScriptMetadataSetting => {
+                f.write_str("`environment.python` setting in script metadata")
+            }
             Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
             Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),
