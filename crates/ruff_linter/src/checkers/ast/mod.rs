@@ -670,12 +670,13 @@ impl<'a> Checker<'a> {
         self.context
     }
 
-    /// Return the instance parameter when visiting a statement directly in an `__init__` method.
-    fn init_instance_parameter(&self) -> Option<&'a str> {
+    /// Return `true` if the statement assigns an instance attribute directly in an `__init__`
+    /// method.
+    fn is_init_instance_attribute_assignment(&self, stmt: &Stmt) -> bool {
         let semantic = self.semantic();
         let scope = semantic.current_scope();
         let ScopeKind::Function(function) = scope.kind else {
-            return None;
+            return false;
         };
 
         if !visibility::is_init(&function.name)
@@ -687,15 +688,34 @@ impl<'a> Checker<'a> {
                 Some(Stmt::FunctionDef(parent)) if std::ptr::eq(parent, function)
             )
         {
-            return None;
+            return false;
         }
 
-        function
+        let Some(instance) = function
             .parameters
             .posonlyargs
             .first()
             .or_else(|| function.parameters.args.first())
             .map(|parameter| parameter.name().as_str())
+        else {
+            return false;
+        };
+
+        let is_instance_attribute = |target: &Expr| {
+            matches!(
+                target,
+                Expr::Attribute(attribute)
+                    if attribute.value.as_name_expr().is_some_and(|name| name.id == instance)
+            )
+        };
+
+        match stmt {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                matches!(targets.as_slice(), [target] if is_instance_attribute(target))
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => is_instance_attribute(target),
+            _ => false,
+        }
     }
 
     /// Return the current [`DocstringState`].
@@ -1668,33 +1688,24 @@ impl<'a> Visitor<'a> for Checker<'a> {
             _ => visitor::walk_stmt(self, stmt),
         }
 
-        let in_module_or_class =
-            self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class();
-        let init_instance_parameter = self.init_instance_parameter();
-        let is_attribute_target = |target: &Expr| {
-            (in_module_or_class && target.is_name_expr())
-                || init_instance_parameter.is_some_and(|instance| {
-                    matches!(
-                        target,
-                        Expr::Attribute(attribute)
-                            if attribute.value.as_name_expr().is_some_and(|name| name.id == instance)
-                    )
-                })
-        };
-
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                if let [target] = targets.as_slice()
-                    && is_attribute_target(target)
-                {
+        if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
+            match stmt {
+                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                    if let [Expr::Name(_)] = targets.as_slice() {
+                        self.docstring_state =
+                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                    }
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if target.is_name_expr() => {
                     self.docstring_state =
                         DocstringState::Expected(ExpectedDocstringKind::Attribute);
                 }
+                _ => {}
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if is_attribute_target(target) => {
-                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Attribute);
-            }
-            _ => {}
+        }
+
+        if self.is_init_instance_attribute_assignment(stmt) {
+            self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Attribute);
         }
 
         // Step 3: Clean-up
