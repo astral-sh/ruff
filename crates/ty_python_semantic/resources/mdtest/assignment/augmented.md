@@ -610,14 +610,12 @@ def update(value: Payload, key: Literal["whole", "fractional"]) -> None:
 
 ## Inferred collection entries
 
-Augmented assignments are not yet included when inferring the element type of an unannotated
-collection.
+Augmented subscript assignments contribute their operator result to full-scope collection inference.
 
 ```py
 values = [1]
-# TODO: Infer `list[float]` instead of rejecting the assignment.
-# error: [invalid-assignment]
 values[0] /= 2
+reveal_type(values)  # revealed: list[float]
 ```
 
 ## Implicit dunder calls on class objects
