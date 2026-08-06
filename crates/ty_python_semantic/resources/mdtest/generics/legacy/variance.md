@@ -366,6 +366,51 @@ class CallableMethod(Protocol[T_co]):
     def __call__(self) -> T_co: ...
 ```
 
+## Descriptor-decorated protocol variance
+
+A descriptor with a known setter domain contributes its actual read and write types to protocol
+variance. A descriptor that returns `T` but accepts any `object` for writes is covariant in `T`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class Descriptor(Generic[T_co]):
+    def __init__(self, getter: Callable[..., T_co]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T_co:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: object) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `InvariantDescriptor` should be covariant, but is invariant"
+class InvariantDescriptor(Protocol[T]):
+    @Descriptor
+    def value(self) -> T: ...
+
+class CovariantDescriptor(Protocol[T_co]):
+    @Descriptor
+    def value(self) -> T_co: ...
+
+class InferredDescriptor[T](Protocol):
+    @Descriptor
+    def value(self) -> T: ...
+
+class Wrapper[T]:
+    def value(self) -> InferredDescriptor[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(is_assignable_to(Wrapper[int], Wrapper[object]))
+```
+
 ## Protocol constructors and method receivers
 
 Constructors are not protocol members. Explicit receiver annotations do not add another input or
