@@ -2471,8 +2471,7 @@ asdict(Foo)
 ## `dataclasses.is_dataclass`
 
 `is_dataclass` recognizes both dataclass instances and dataclass classes. A concrete dataclass
-instance always satisfies the `DataclassInstance` protocol, but we do not currently recognize that
-the negative branch is unreachable:
+instance always satisfies the `DataclassInstance` protocol:
 
 ```py
 from dataclasses import dataclass, is_dataclass
@@ -2483,8 +2482,15 @@ class Event:
 
 def check(event: Event) -> None:
     if not is_dataclass(event):
-        # TODO: This should be `Never`.
-        reveal_type(event)  # revealed: Event & ~DataclassInstance & ~type[DataclassInstance]
+        reveal_type(event)  # revealed: Never
+```
+
+This also works for class objects:
+
+```py
+def check_class(event_type: type[Event]) -> None:
+    if not is_dataclass(event_type):
+        reveal_type(event_type)  # revealed: Never
 ```
 
 ## `dataclasses.KW_ONLY`

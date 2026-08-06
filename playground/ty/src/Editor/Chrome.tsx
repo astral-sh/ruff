@@ -171,7 +171,7 @@ export default function Chrome({
           <PanelGroup
             id="main-group"
             orientation="horizontal"
-            className="h-full"
+            className="grow min-h-0"
           >
             <Panel id="main" minSize={100}>
               <PanelGroup

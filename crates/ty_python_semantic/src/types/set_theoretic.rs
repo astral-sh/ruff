@@ -504,6 +504,25 @@ pub(crate) enum KnownUnion {
 }
 
 impl KnownUnion {
+    /// Returns the class whose annotation denotes this numeric-tower union.
+    pub(crate) const fn annotation_class(self) -> KnownClass {
+        match self {
+            Self::Float => KnownClass::Float,
+            Self::Complex => KnownClass::Complex,
+        }
+    }
+
+    /// Returns whether this union contains exact instances of `class`.
+    pub(crate) const fn contains(self, class: KnownClass) -> bool {
+        match self {
+            Self::Float => matches!(class, KnownClass::Int | KnownClass::Float),
+            Self::Complex => matches!(
+                class,
+                KnownClass::Int | KnownClass::Float | KnownClass::Complex
+            ),
+        }
+    }
+
     pub(crate) fn to_type<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(

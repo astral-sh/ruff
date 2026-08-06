@@ -57,7 +57,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, 1, c=3.14)
-reveal_type(p)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### All args bound
@@ -765,7 +765,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int, str] = (1, "hello")
 p = partial(f, *args)
-reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(c: float) -> bool]
 ```
 
 ### Mixed positional and starred args
@@ -778,7 +778,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[str] = ("hello",)
 p = partial(f, 1, *args)
-reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(c: float) -> bool]
 ```
 
 ### Fallback for starred args with variable-length tuple
@@ -984,10 +984,10 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p1 = partial(f, 1)
-reveal_type(p1)  # revealed: partial[(b: str, c: int | float) -> bool]
+reveal_type(p1)  # revealed: partial[(b: str, c: float) -> bool]
 
 p2 = partial(p1, "hello")
-reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p2)  # revealed: partial[(c: float) -> bool]
 ```
 
 ## Constructors and advanced signatures
@@ -1254,7 +1254,7 @@ def f(a: int, b: str = "default", c: float = 0.0) -> bool:
     return True
 
 p = partial(f, 1, "hello")
-reveal_type(p)  # revealed: partial[(c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(c: float = ...) -> bool]
 ```
 
 ### Multiple keyword bindings
@@ -1266,7 +1266,7 @@ def f(a: int, b: str, c: float, d: bool) -> int:
     return 0
 
 p = partial(f, b="hello", d=True)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float, d: bool = True) -> int]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float, d: bool = True) -> int]
 ```
 
 ### Mixed positional-only, regular, and keyword-only
@@ -1279,15 +1279,15 @@ def f(a: int, /, b: str, *, c: float) -> bool:
 
 # Bind the positional-only param
 p1 = partial(f, 1)
-reveal_type(p1)  # revealed: partial[(b: str, *, c: int | float) -> bool]
+reveal_type(p1)  # revealed: partial[(b: str, *, c: float) -> bool]
 
 # Bind a keyword-only param by keyword
 p2 = partial(f, c=3.14)
-reveal_type(p2)  # revealed: partial[(a: int, /, b: str, *, c: int | float = ...) -> bool]
+reveal_type(p2)  # revealed: partial[(a: int, /, b: str, *, c: float = ...) -> bool]
 
 # Bind both positional-only and keyword-only
 p3 = partial(f, 1, c=3.14)
-reveal_type(p3)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p3)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### Starred args combined with keyword args
@@ -1300,7 +1300,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int] = (1,)
 p = partial(f, *args, c=3.14)
-reveal_type(p)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### Starred args with empty tuple
@@ -1393,7 +1393,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float) -> bool]
 
 # Override b at call time
 reveal_type(p(1, b="world", c=3.14))  # revealed: bool

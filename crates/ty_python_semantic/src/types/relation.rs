@@ -1699,16 +1699,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Fast path for various types that we know `object` is never a subtype of
-            // (`object` can be a subtype of some protocols, or of itself, but those cases are
-            // handled above).
+            // Fast path for various types that we know `object` is never a subtype of.
             (
                 Type::NominalInstance(source),
-                Type::NominalInstance(_)
-                | Type::SubclassOf(_)
-                | Type::Callable(_)
-                | Type::ProtocolInstance(_),
+                Type::NominalInstance(_) | Type::SubclassOf(_) | Type::Callable(_),
             ) if source.is_object() => self.never(),
+
+            // `object` is not a subtype of a non-universal protocol because some subclasses
+            // might not implement it. For assignability, still inspect its actual members:
+            // `object()` is hashable and commonly used as a sentinel for `Hashable` parameters.
+            (Type::NominalInstance(source), Type::ProtocolInstance(_))
+                if source.is_object() && !self.relation.is_assignability() =>
+            {
+                self.never()
+            }
 
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
@@ -2156,13 +2160,45 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         )
                     };
                     let result = self.check_type_pair(db, fallback, target);
+
                     if let Some(context) = self.report_context()
                         && result.is_never_satisfied(db, env)
                         && let Type::NominalInstance(instance) = target
-                        && instance.class(db, env).is_known(db, KnownClass::Dict)
                     {
-                        context.push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
+                        match instance.class(db, env).known(db) {
+                            Some(KnownClass::Dict) => {
+                                context
+                                    .push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
+                            }
+                            Some(KnownClass::Mapping)
+                                if typed_dict.openness(db).is_implicitly_open() =>
+                            {
+                                let field_types =
+                                    typed_dict.items(db).values().map(|field| field.declared_ty);
+                                let mapping_fallback_spec = &[
+                                    KnownClass::Str.to_instance(db, env),
+                                    UnionType::from_elements(db, env, field_types),
+                                ];
+
+                                let closed_typeddict_fallback = KnownClass::Mapping
+                                    .to_specialized_instance(db, env, mapping_fallback_spec);
+
+                                if self
+                                    .check_type_pair(db, closed_typeddict_fallback, target)
+                                    .is_always_satisfied(db, env)
+                                {
+                                    let context_element =
+                                        ErrorContext::OpenTypedDictNotAssignableToMapping {
+                                            source: typed_dict,
+                                            target,
+                                        };
+                                    context.push(context_element);
+                                }
+                            }
+                            _ => {}
+                        }
                     }
+
                     result
                 })
             }

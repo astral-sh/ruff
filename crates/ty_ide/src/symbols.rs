@@ -715,6 +715,8 @@ struct SymbolVisitor<'db> {
     in_class: bool,
     /// The statement whose expressions are currently being visited.
     current_stmt: Option<&'db ast::Stmt>,
+    /// The binding declared directly by the pattern currently being visited.
+    pattern_binding: Option<&'db ast::Identifier>,
     /// Whether store-context names should be excluded from the enclosing scope.
     suppress_store_symbols: bool,
     /// When enabled, the visitor should only try to extract
@@ -747,6 +749,7 @@ impl<'db> SymbolVisitor<'db> {
             in_function: false,
             in_class: false,
             current_stmt: None,
+            pattern_binding: None,
             suppress_store_symbols: false,
             exports_only: false,
             all_origin: None,
@@ -865,27 +868,45 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Adds a symbol for a name definition.
-    fn add_name_symbol(&mut self, stmt: &ast::Stmt, name: &ast::ExprName, kind: SymbolKind) {
+    fn add_name_symbol(
+        &mut self,
+        stmt: &ast::Stmt,
+        name: &Name,
+        name_range: TextRange,
+        kind: SymbolKind,
+    ) {
         let symbol = SymbolTree {
             parent: None,
-            name: name.id.to_string(),
+            name: name.to_string(),
             kind,
             deprecated: false,
-            name_range: name.range(),
+            name_range,
             full_range: stmt.range(),
             imported_from: None,
         };
         self.add_symbol(symbol);
     }
 
+    fn add_pattern_binding(&mut self, stmt: &ast::Stmt, name: &ast::Identifier) {
+        if self.in_function || !name.is_valid() || name.id == "_" {
+            return;
+        }
+
+        self.add_assignment(stmt, &name.id, name.range());
+
+        if self.exports_only && self.all_origin.is_some() && name.id == "__all__" {
+            self.all_invalid = true;
+        }
+    }
+
     /// Adds a symbol introduced via an assignment.
-    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &ast::ExprName) {
+    fn add_assignment(&mut self, stmt: &ast::Stmt, name: &Name, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
         }
 
-        let kind = if Self::is_constant_name(name.id.as_str()) {
+        let kind = if Self::is_constant_name(name.as_str()) {
             SymbolKind::Constant
         } else if self
             .iter_symbol_stack()
@@ -895,7 +916,7 @@ impl<'db> SymbolVisitor<'db> {
         } else {
             SymbolKind::Variable
         };
-        self.add_name_symbol(stmt, name, kind);
+        self.add_name_symbol(stmt, name, name_range, kind);
     }
 
     /// Adds a symbol introduced via an import `stmt`.
@@ -1382,7 +1403,7 @@ impl<'db> SymbolVisitor<'db> {
                 let ast::Expr::Name(name) = &*type_alias.name else {
                     return;
                 };
-                self.add_name_symbol(stmt, name, SymbolKind::Variable);
+                self.add_name_symbol(stmt, &name.id, name.range(), SymbolKind::Variable);
             }
             ast::Stmt::Assign(assign) => {
                 self.add_all_assignment(&assign.targets, Some(&assign.value));
@@ -1532,7 +1553,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     && !self.suppress_store_symbols
                     && let Some(stmt) = self.current_stmt =>
             {
-                self.add_assignment(stmt, name);
+                self.add_assignment(stmt, &name.id, name.range());
 
                 if name.id != "__all__" {
                     return;
@@ -1573,6 +1594,32 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
 
         for condition in &comprehension.ifs {
             self.visit_expr(condition);
+        }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
+        let binding = match pattern {
+            ast::Pattern::MatchStar(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchAs(pattern) => pattern.name.as_ref(),
+            ast::Pattern::MatchMapping(pattern) => pattern.rest.as_ref(),
+            _ => None,
+        };
+
+        let previous_binding = self.pattern_binding;
+        self.pattern_binding = binding;
+        source_order::walk_pattern(self, pattern);
+        self.pattern_binding = previous_binding;
+    }
+
+    fn visit_identifier(&mut self, identifier: &'db ast::Identifier) {
+        source_order::walk_identifier(self, identifier);
+
+        if let Some(stmt) = self.current_stmt
+            && self
+                .pattern_binding
+                .is_some_and(|binding| std::ptr::eq(binding, identifier))
+        {
+            self.add_pattern_binding(stmt, identifier);
         }
     }
 }
@@ -1736,6 +1783,85 @@ with_left :: Variable\n\
 with_rest :: Variable\n\
 captured :: Variable\n\
 walrus :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_match_pattern_bindings() {
+        let test = public_test(
+            "\
+match subject:
+    case [first, *middle, last] as sequence:
+        body_target = 1
+    case {\"key\": mapping_value, **remaining}:
+        fallback_target = 2
+    case Point(positional, named=keyword):
+        pass
+    case (0 as alternative) | (1 as alternative):
+        pass
+    case _:
+        wildcard_body = 3
+
+match other:
+    case CONSTANT_CAPTURE:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "first :: Variable\n\
+middle :: Variable\n\
+last :: Variable\n\
+sequence :: Variable\n\
+body_target :: Variable\n\
+mapping_value :: Variable\n\
+remaining :: Variable\n\
+fallback_target :: Variable\n\
+positional :: Variable\n\
+keyword :: Variable\n\
+alternative :: Variable\n\
+wildcard_body :: Variable\n\
+CONSTANT_CAPTURE :: Constant"
+        );
+    }
+
+    #[test]
+    fn exports_reports_mapping_pattern_bindings_in_source_order() {
+        let test = public_test(
+            "\
+match subject:
+    case {\"a\": before, **between, \"b\": after}:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "before :: Variable\n\
+between :: Variable\n\
+after :: Variable"
+        );
+    }
+
+    #[test]
+    fn exports_invalidate_all_rebound_by_match_pattern() {
+        let test = public_test(
+            "\
+hidden = 1
+visible = 2
+__all__ = ['visible']
+match subject:
+    case __all__:
+        pass
+",
+        );
+
+        assert_eq!(
+            test.exports(),
+            "hidden :: Variable\n\
+visible :: Variable\n\
+__all__ :: Variable"
         );
     }
 

@@ -1023,7 +1023,7 @@ def _(args: tuple[str, str]) -> None:
 
 # But, with a fixed-length tuple that is too long, we get the expected error.
 def _(args: tuple[str, str, str]) -> None:
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int | float`, found `str`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `float`, found `str`"
     # error: [parameter-already-assigned] "Multiple values provided for parameter `c` of function `f`"
     f(*args, c=1.0)
 ```

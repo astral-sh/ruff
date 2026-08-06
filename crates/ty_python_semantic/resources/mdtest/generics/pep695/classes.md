@@ -307,6 +307,35 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Calls within the generic class
+
+A call to a generic class from one of its own methods creates an independent generic occurrence. The
+enclosing class's type variable does not constrain the new instance.
+
+```py
+class C[T]:
+    def __init__(self) -> None: ...
+    def method(self) -> None:
+        reveal_type(C())  # revealed: C[Unknown]
+        contextual: C[int] = C()
+```
+
+The same applies when an explicit `__new__` is followed by a downstream `__init__`. Both bound
+receivers refer to the new generic occurrence.
+
+```py
+from typing import Self
+
+class D[T]:
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self) -> None: ...
+    def method(self) -> None:
+        reveal_type(D())  # revealed: D[Unknown]
+        contextual: D[int] = D()
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
@@ -350,6 +379,57 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 
 # error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+### Failed constructor inference
+
+A failed constructor call reports its argument error without exposing an unsolved class type
+parameter or producing an additional assignment error.
+
+```py
+from collections.abc import Callable
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Consumer[T]:
+    def __init__(self, callback: Callable[[T], None]) -> None:
+        self.callback = callback
+
+def accepts_dog(value: Dog) -> None: ...
+
+consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+```
+
+### Constructing the class from its own type variable
+
+A constructor call inside a generic class can use a value whose type is one of the class's type
+variables. The constructed instance keeps that type variable instead of falling back to `Unknown`,
+so an incompatible type context is rejected.
+
+```py
+class C[T]:
+    def __init__(self, value: T) -> None:
+        reveal_type(C(value))  # revealed: C[T@C]
+
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        invalid: C[int] = C(value)
+
+    def from_union(self, value: T | list[T]) -> None:
+        reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
+
+        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
+        invalid_union: C[list[T]] = C(value)
+```
+
+A method's own type variable is independent of the class type variable and is preserved in the same
+way.
+
+```py
+class D[T]:
+    def __init__(self, value: T) -> None: ...
+    def method[S](self, value: S) -> None:
+        reveal_type(D(value))  # revealed: D[S@method]
 ```
 
 ### Identical `__new__` and `__init__` signatures
@@ -510,7 +590,7 @@ def test_seq[T](x: Sequence[T]) -> Sequence[T]:
     return x
 
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
-    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t1))  # revealed: Sequence[complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
     reveal_type(test_seq(t3))  # revealed: Sequence[Never]
 ```

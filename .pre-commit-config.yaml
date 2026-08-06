@@ -113,13 +113,13 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 5900cba2cfe6d20f562458d4d308ac55569f92eb # frozen: 0.12.0
+    rev: 8ff2449591c8de025b17661ba76d60237a1ae62b # frozen: 0.12.1
     hooks:
       - id: uv-lock
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: cb8c523fd4835aba42af70f4cad5568db4df0b6c # frozen: v0.16.0
+    rev: 39d9ac5938dadb73df0564a45f163e25ff9fa6e2 # frozen: v0.16.1
     hooks:
       - id: ruff-format
         exclude: crates/ty_python_semantic/resources/corpus/
@@ -127,7 +127,7 @@ repos:
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: cb8c523fd4835aba42af70f4cad5568db4df0b6c # frozen: v0.16.0
+    rev: 39d9ac5938dadb73df0564a45f163e25ff9fa6e2 # frozen: v0.16.1
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -150,7 +150,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: cb8c523fd4835aba42af70f4cad5568db4df0b6c # frozen: v0.16.0
+    rev: 39d9ac5938dadb73df0564a45f163e25ff9fa6e2 # frozen: v0.16.1
     hooks:
       - id: ruff-format
         name: mdtest format

@@ -442,7 +442,7 @@ T3 = TypeVar("T3", bound=str)
 # and the upper bound of `T` (`int`) is assignable to `int | float`
 S = TypeVar("S", default=T1, bound=float)
 
-# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `float` of `U` because its upper bound `str` is not assignable to `float`"
 U = TypeVar("U", default=T3, bound=float)
 ```
 
@@ -576,7 +576,7 @@ T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
 S = TypeVar("S", float, str)
-reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
+reveal_type(S.__constraints__)  # revealed: tuple[float, str]
 ```
 
 ### Cannot have only one constraint
@@ -1020,6 +1020,71 @@ reveal_type(D().x)  # revealed: Unknown
 ```
 
 ## Regression
+
+### Specialization cycle recovery preserves concrete defaults
+
+When a generic call uses a type variable's default, cycle recovery must allow the initial `Unknown`
+specialization to resolve to the concrete default.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C:
+    pass
+
+def f(a: T | None = None) -> T:
+    raise NotImplementedError
+
+if f():
+    pass
+
+if f():
+    sum()  # error: [no-matching-overload]
+else:
+    sum()  # error: [no-matching-overload]
+
+from typing import TypeVar
+
+T = TypeVar("T", default=C)
+
+reveal_type(f())  # revealed: C
+```
+
+### Specialization cycle recovery prevents oscillating defaults
+
+A type variable's default can depend on an overloaded call that itself uses the same type variable.
+Specialization must converge even when overload selection changes between cycle iterations.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar, overload
+
+@overload
+def choose(value: int) -> type[int]: ...
+@overload
+def choose(value: object) -> type[str]: ...
+def choose(value: object) -> type[int] | type[str]:
+    return str
+
+def f() -> T:
+    raise NotImplementedError
+
+if f():
+    Default = str
+else:
+    Default = choose(f())
+
+T = TypeVar("T", default=Default)
+
+reveal_type(f())  # revealed: Unknown
+```
 
 ### Use of typevar with default inside a function body that binds it
 

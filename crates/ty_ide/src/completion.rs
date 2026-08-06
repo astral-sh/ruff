@@ -453,6 +453,7 @@ impl<'db> CompletionBuilder<'db> {
         Completion::builder(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
+            .type_check_only(semantic.is_type_check_only)
             .docstring(documentation)
     }
 
@@ -492,7 +493,7 @@ impl<'db> CompletionBuilder<'db> {
         query: &UserQuery,
     ) -> Completion<'db> {
         if let Some(ty) = self.ty {
-            self.is_type_check_only = ty.is_type_check_only(db);
+            self.is_type_check_only |= ty.is_type_check_only(db);
             // Tags completions with context-specific if they are
             // known to be usable in an exception context and we have
             // determined an `exception_ty`.
@@ -608,6 +609,11 @@ impl<'db> CompletionBuilder<'db> {
 
     fn builtin(mut self, yes: bool) -> CompletionBuilder<'db> {
         self.builtin = yes;
+        self
+    }
+
+    fn type_check_only(mut self, yes: bool) -> CompletionBuilder<'db> {
+        self.is_type_check_only = yes;
         self
     }
 
@@ -3609,25 +3615,95 @@ if TYPE_CHECKING:
         test.contains("__mangled_name");
         test.contains("__dunder_name__");
         test.contains("public_type_var");
-        test.not_contains("_private_type_var");
-        test.not_contains("__mangled_type_var");
         test.contains("public_param_spec");
-        test.not_contains("_private_param_spec");
         test.contains("public_type_var_tuple");
-        test.not_contains("_private_type_var_tuple");
         test.contains("public_explicit_type_alias");
-        test.not_contains("_private_explicit_type_alias");
         test.contains("public_implicit_union_alias");
-        test.not_contains("_private_implicit_union_alias");
         test.contains("_private_runtime_union");
         test.contains("_private_runtime_typevar");
         test.contains("_private_precise_runtime_union");
         test.contains("PublicProtocol");
         test.contains("_PrivateProtocol");
-        test.not_contains("PublicTypeOnlyProtocol");
-        test.not_contains("_PrivateTypeOnlyProtocol");
-        test.not_contains("PublicTypeCheckingProtocol");
-        test.not_contains("_PrivateTypeCheckingProtocol");
+
+        for name in [
+            "_private_type_var",
+            "__mangled_type_var",
+            "_private_param_spec",
+            "_private_type_var_tuple",
+            "_private_explicit_type_alias",
+            "_private_implicit_union_alias",
+            "PublicTypeOnlyProtocol",
+            "_PrivateTypeOnlyProtocol",
+            "PublicTypeCheckingProtocol",
+            "_PrivateTypeCheckingProtocol",
+        ] {
+            assert!(
+                test.completions()
+                    .iter()
+                    .any(|completion| completion.name == name && completion.is_type_check_only),
+                "Expected `{name}` to be marked as typing-only",
+            );
+        }
+    }
+
+    #[test]
+    fn private_stub_symbols_rank_below_runtime_values() {
+        let builder = CursorTest::builder()
+            .source(
+                "package/__init__.pyi",
+                "from typing import TypeVar\n_Alpha = TypeVar(\"_Alpha\")\n_Zeta = 1",
+            )
+            .source("main.py", "import package; package._<CURSOR>")
+            .completion_test_builder()
+            .filter(|completion| matches!(completion.name.as_str(), "_Alpha" | "_Zeta"));
+
+        let test = builder.build();
+        let completions = test
+            .completions()
+            .iter()
+            .map(|completion| (completion.name.as_str(), completion.is_type_check_only))
+            .collect::<Vec<_>>();
+
+        assert_eq!(completions, [("_Zeta", false), ("_Alpha", true)]);
+    }
+
+    #[test]
+    fn type_checking_import_includes_private_stub_symbols() {
+        let builder = CursorTest::builder()
+            .source(
+                "package/__init__.pyi",
+                "from typing import TypeAlias, TypeVar\n_Alias: TypeAlias = int\n_T = TypeVar(\"_T\")",
+            )
+            .source(
+                "main.py",
+                "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from package import _<CURSOR>",
+            )
+            .completion_test_builder();
+
+        let test = builder.build();
+        for name in ["_Alias", "_T"] {
+            assert!(
+                test.completions()
+                    .iter()
+                    .any(|completion| completion.name == name && completion.is_type_check_only),
+                "Expected `{name}` to be available as a typing-only completion",
+            );
+        }
+    }
+
+    #[test]
+    fn typing_only_project_builtins_not_suggested_implicitly() {
+        let builder = CursorTest::builder()
+            .source(
+                "__builtins__.pyi",
+                "from typing import TypeVar\n_typing_only = TypeVar(\"_typing_only\")\n_runtime: int",
+            )
+            .source("main.py", "_<CURSOR>")
+            .completion_test_builder()
+            .skip_auto_import();
+
+        let test = builder.build();
+        test.contains("_runtime").not_contains("_typing_only");
     }
 
     /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names

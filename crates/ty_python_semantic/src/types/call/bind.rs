@@ -354,9 +354,9 @@ impl<'db> CallableItem<'db> {
             CallableItem::Regular(binding) => {
                 binding.freshen_generic_contexts_in_place(db, env, nonce_generator);
             }
-            // TODO: Constructor freshening also has to keep constructor instance context in sync
-            // with `__new__`/`__init__` signatures.
-            CallableItem::Constructor(_) => {}
+            CallableItem::Constructor(binding) => {
+                binding.freshen_generic_contexts_in_place(db, env, nonce_generator);
+            }
         }
     }
 
@@ -383,10 +383,6 @@ impl<'db> CallableItem<'db> {
 
     fn is_callable(&self) -> bool {
         self.callable().is_callable()
-    }
-
-    fn callable_type(&self) -> Type<'db> {
-        self.callable().callable_type
     }
 
     /// Returns the reduced callable synthesized from this callable item.
@@ -441,6 +437,10 @@ impl<'db> CallableItem<'db> {
 /// If there are multiple items, they form an intersection.
 #[derive(Debug, Clone)]
 struct BindingsElement<'db> {
+    /// The callable type associated with this union element. For an intersection, retain the
+    /// complete source type because its bindings can omit negative contributions or represent
+    /// constructor methods instead of the called class objects.
+    callable_type: Type<'db>,
     items: SmallVec<[CallableItem<'db>; 1]>,
 }
 
@@ -531,11 +531,18 @@ impl<'db> BindingsElement<'db> {
     /// `f: KnownCallable & Top[Callable[..., Awaitable[object]]]`, even though the top-callable
     /// call itself is unsafe. (We know that somewhere in the infinite-union of the top callable,
     /// there is a callable with the right parameters to match the call.)
+    ///
+    /// Likewise, a narrowed class can provide a more specific constructor signature than `type[T]`.
+    /// Even when the `type[T]` constructor rejects the arguments, its return type still constrains
+    /// the successful constructor call.
     fn retain_successful(&mut self, db: &'db dyn Db) {
         if self.is_intersection() && self.as_result(db).is_ok() {
             self.items.retain(|item| {
                 item.as_result(db).is_ok()
                     || item.error_priority(db) == CallErrorPriority::TopCallable
+                    || item.as_constructor().is_some_and(|constructor| {
+                        matches!(constructor.constructed_instance_type(), Type::TypeVar(_))
+                    })
             });
         }
     }
@@ -778,6 +785,7 @@ impl<'db> Bindings<'db> {
         }
         assert!(!inner_items_acc.is_empty());
         let elements = smallvec![BindingsElement {
+            callable_type,
             items: inner_items_acc,
         }];
         Self {
@@ -793,9 +801,23 @@ impl<'db> Bindings<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
-        for binding in self.iter_flat_mut() {
-            binding.replace_callable_type(before, after);
+        for element in &mut self.elements {
+            if element.callable_type == before {
+                element.callable_type = after;
+            }
+            for binding in element.callables_mut() {
+                binding.replace_callable_type(before, after);
+            }
         }
+    }
+
+    /// Set the overall receiver without replacing individual constructor callables.
+    pub(crate) fn with_callable_type(mut self, callable_type: Type<'db>) -> Self {
+        self.callable_type = callable_type;
+        for element in &mut self.elements {
+            element.callable_type = callable_type;
+        }
+        self
     }
 
     pub(crate) fn with_constructed_instance_type(
@@ -901,6 +923,12 @@ impl<'db> Bindings<'db> {
     fn iter_constructor_items(&self) -> impl Iterator<Item = &ConstructorBinding<'db>> {
         self.iter_callable_items()
             .filter_map(CallableItem::as_constructor)
+    }
+
+    /// Return whether every callable uses ordinary constructor binding semantics.
+    pub(crate) fn has_only_constructor_items(&self) -> bool {
+        self.iter_callable_items()
+            .all(|item| item.as_constructor().is_some())
     }
 
     fn iter_constructor_items_mut(&mut self) -> impl Iterator<Item = &mut ConstructorBinding<'db>> {
@@ -1132,6 +1160,7 @@ impl<'db> Bindings<'db> {
                 .elements
                 .into_iter()
                 .map(|elem| BindingsElement {
+                    callable_type: elem.callable_type,
                     items: elem.items.into_iter().map(|item| item.map(f)).collect(),
                 })
                 .collect(),
@@ -1465,13 +1494,10 @@ impl<'db> Bindings<'db> {
         node: ast::AnyNodeRef,
         element: &BindingsElement<'db>,
     ) {
-        let db = context.db();
         // If this element succeeded, no diagnostics to report
         if element.as_result(context.db()).is_ok() {
             return;
         }
-
-        let env = context.program_environment();
 
         let is_union = self.elements.len() > 1;
 
@@ -1479,13 +1505,6 @@ impl<'db> Bindings<'db> {
         if element.is_intersection() {
             // Find the highest priority error among bindings in this element
             let max_priority = element.error_priority(context.db());
-
-            // Construct the intersection type from the bindings
-            let intersection_type = IntersectionType::from_elements(
-                db,
-                env,
-                element.items.iter().map(CallableItem::callable_type),
-            );
 
             // Only report errors from bindings with the highest priority
             for item in &element.items {
@@ -1498,14 +1517,14 @@ impl<'db> Bindings<'db> {
                         // Use layered diagnostic for intersection inside a union
                         let layered_diag = LayeredDiagnostic {
                             union_callable_type: self.callable_type(),
-                            intersection_callable_type: intersection_type,
+                            intersection_callable_type: element.callable_type,
                             binding,
                         };
                         binding.report_diagnostics(context, node, Some(&layered_diag));
                     } else {
                         // Just intersection, no union context needed
                         let intersection_diag = IntersectionDiagnostic {
-                            callable_type: intersection_type,
+                            callable_type: element.callable_type,
                             binding,
                         };
                         binding.report_diagnostics(context, node, Some(&intersection_diag));
@@ -1524,7 +1543,7 @@ impl<'db> Bindings<'db> {
                 }
                 let union_diag = UnionDiagnostic {
                     callable_type: self.callable_type(),
-                    binding,
+                    variant_type: element.callable_type,
                 };
                 binding.report_diagnostics(context, node, Some(&union_diag));
             }
@@ -1689,17 +1708,7 @@ impl<'db> Bindings<'db> {
                             },
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    if let Ok(return_ty) = getter
-                                        .try_call(db, env, &CallArguments::positional([*instance]))
-                                        .map(|binding| binding.return_type(db, env))
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    } else {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the getter failed",
-                                        ));
-                                        overload.set_return_type(Type::unknown());
-                                    }
+                                    overload.check_property_getter(db, env, getter, *instance, 1);
                                 } else {
                                     overload
                                         .errors
@@ -1718,17 +1727,7 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    if let Ok(return_ty) = getter
-                                        .try_call(db, env, &CallArguments::positional([*instance]))
-                                        .map(|binding| binding.return_type(db, env))
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    } else {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the getter failed",
-                                        ));
-                                        overload.set_return_type(Type::unknown());
-                                    }
+                                    overload.check_property_getter(db, env, getter, *instance, 0);
                                 } else {
                                     overload.set_return_type(Type::Never);
                                     overload.errors.push(BindingError::InternalCallError(
@@ -3153,6 +3152,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
             elements: smallvec_inline![BindingsElement {
+                callable_type: from.callable_type,
                 items: smallvec_inline![CallableItem::Regular(from)],
             }],
             implicit_dunder_new_is_possibly_unbound: false,
@@ -3175,15 +3175,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
         };
-        Bindings {
-            callable_type,
-            elements: smallvec_inline![BindingsElement {
-                items: smallvec_inline![CallableItem::Regular(callable_binding)],
-            }],
-            implicit_dunder_new_is_possibly_unbound: false,
-            implicit_dunder_init_is_possibly_unbound: false,
-            enclosing_binding_contexts: None,
-        }
+        callable_binding.into()
     }
 }
 
@@ -4322,6 +4314,20 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn best_failing_overload(&self) -> Option<&Binding<'db>> {
         self.best_failing_overload_index(FailingOverloadSelection::AffectsOverloadResolution)
             .and_then(|index| self.overloads.get(index))
+    }
+
+    /// Returns a failing overload only when the call's argument shape selected it uniquely.
+    ///
+    /// The overload chosen for diagnostics can be arbitrary when multiple signatures accept the
+    /// same argument shape. Its specialization must not determine a constructor's return type:
+    /// for example, `dict(value)` may match the shapes of both mapping and iterable overloads.
+    fn unambiguous_failing_overload(&self) -> Option<&Binding<'db>> {
+        match self.overloads.as_slice() {
+            [overload] => Some(overload),
+            _ => self
+                .matching_overload_before_type_checking
+                .and_then(|index| self.overloads.get(index)),
+        }
     }
 
     /// Returns an iterator over all the mutable overloads that matched for this call binding.
@@ -7003,6 +7009,29 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
+    fn check_property_getter(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        getter: Type<'db>,
+        instance: Type<'db>,
+        argument_index_offset: usize,
+    ) {
+        match getter.try_call(db, env, &CallArguments::positional([instance])) {
+            Ok(bindings) => self.set_return_type(bindings.return_type(db, env)),
+            Err(CallError(_, bindings)) => {
+                self.set_return_type(bindings.return_type(db, env));
+                self.errors.push(BindingError::PropertyGetterCallError(
+                    PropertyAccessorCallError {
+                        bindings,
+                        argument_index_offset,
+                    },
+                ));
+            }
+        }
+    }
+
     fn check_property_setter(
         &mut self,
         db: &'db dyn Db,
@@ -7025,7 +7054,7 @@ impl<'db> Binding<'db> {
             }
             Err(CallError(_, bindings)) => {
                 self.errors.push(BindingError::PropertySetterCallError(
-                    PropertySetterCallError {
+                    PropertyAccessorCallError {
                         bindings,
                         argument_index_offset,
                     },
@@ -8004,6 +8033,12 @@ impl<'db> CallableDescription<'db> {
                 kind: Some("class"),
                 name: Cow::Borrowed(class_type.name(db)),
             }),
+            Type::SubclassOf(subclass) if let Some(typevar) = subclass.into_type_var() => {
+                Some(CallableDescription {
+                    kind: None,
+                    name: Cow::Owned(format!("type[{}]", typevar.name(db))),
+                })
+            }
             Type::BoundMethod(bound_method) => Some({
                 let function = bound_method.function(db);
                 let kind = if function.name(db) == "__init__" {
@@ -8253,10 +8288,11 @@ pub(crate) enum BindingError<'db> {
     },
     PropertyHasNoSetter(PropertyInstanceType<'db>),
     PropertyHasNoDeleter(PropertyInstanceType<'db>),
-    PropertySetterCallError(PropertySetterCallError<'db>),
+    PropertyGetterCallError(PropertyAccessorCallError<'db>),
+    PropertySetterCallError(PropertyAccessorCallError<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
-    /// We use this variant to report errors in `property.__get__` and `property.__delete__`,
-    /// which can occur when the call to the underlying getter/deleter fails.
+    /// We use this variant to report errors in `property.__delete__`, which can occur when the
+    /// call to the underlying deleter fails.
     InternalCallError(&'static str),
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
@@ -8272,12 +8308,12 @@ pub(crate) enum BindingError<'db> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PropertySetterCallError<'db> {
+pub(crate) struct PropertyAccessorCallError<'db> {
     bindings: Box<Bindings<'db>>,
     argument_index_offset: usize,
 }
 
-impl PartialEq for PropertySetterCallError<'_> {
+impl PartialEq for PropertyAccessorCallError<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.argument_index_offset == other.argument_index_offset
             && self.bindings.callable_type() == other.bindings.callable_type()
@@ -8294,7 +8330,7 @@ impl PartialEq for PropertySetterCallError<'_> {
     }
 }
 
-impl Eq for PropertySetterCallError<'_> {}
+impl Eq for PropertyAccessorCallError<'_> {}
 
 impl BindingError<'_> {
     /// Returns whether this error is relevant to `functools.partial(...)` construction.
@@ -8382,6 +8418,7 @@ impl BindingError<'_> {
             | BindingError::UnmatchedOverload
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..)
+            | BindingError::PropertyGetterCallError(..)
             | BindingError::PropertySetterCallError(..) => {}
         }
     }
@@ -8442,6 +8479,7 @@ impl<'db> BindingError<'db> {
             | Self::InvalidDataclassArgument(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
+            | Self::PropertyGetterCallError(_)
             | Self::PropertySetterCallError(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
@@ -8934,7 +8972,7 @@ impl<'db> BindingError<'db> {
                 );
             }
 
-            Self::PropertySetterCallError(error) => {
+            Self::PropertyGetterCallError(error) | Self::PropertySetterCallError(error) => {
                 let context = CallDiagnosticContext {
                     context: context.context,
                     overrides: context.overrides,
@@ -9079,20 +9117,20 @@ trait CompoundDiagnostic {
 /// This is used when a function call is inconsistent with one or more variants
 /// of a union. This can be used to attach sub-diagnostics that clarify that
 /// the error is part of a union.
-struct UnionDiagnostic<'b, 'db> {
+struct UnionDiagnostic<'db> {
     /// The type of the union.
     callable_type: Type<'db>,
-    /// The specific binding that failed.
-    binding: &'b CallableBinding<'db>,
+    /// The type associated with the specific union variant that failed.
+    variant_type: Type<'db>,
 }
 
-impl CompoundDiagnostic for UnionDiagnostic<'_, '_> {
+impl CompoundDiagnostic for UnionDiagnostic<'_> {
     fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic) {
         let sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
                 "Union variant `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.binding.callable_type.display(db, env),
+                callable_ty = self.variant_type.display(db, env),
             ),
         );
         diag.sub(sub);

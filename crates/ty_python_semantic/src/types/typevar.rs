@@ -986,7 +986,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.identity(db).paramspec_attr
     }
 
-    fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
+    pub(super) fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
         self.identity(db).freshness
     }
 

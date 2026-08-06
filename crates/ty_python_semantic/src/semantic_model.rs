@@ -18,7 +18,7 @@ use ty_module_resolver::{
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
-use crate::types::list_members::{Member, all_members, all_reachable_members};
+use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
     infer_complete_scope_types, inferred_declaration,
@@ -169,6 +169,7 @@ impl<'db> SemanticModel<'db> {
                     name: CompactString::new(module.name(self.db).as_str()),
                     ty: Some(ty),
                     builtin,
+                    is_type_check_only: false,
                 }
             })
             .collect()
@@ -239,11 +240,12 @@ impl<'db> SemanticModel<'db> {
             clippy::iter_over_hash_type,
             reason = "completion order is determined later by relevance ranking"
         )]
-        for Member { name, ty } in all_members(db, &self.program_environment(), ty) {
+        for member in all_members(db, &self.program_environment(), ty) {
             completions.push(Completion {
-                name: CompactString::new(name),
-                ty: Some(ty),
+                name: CompactString::new(member.name),
+                ty: Some(member.ty),
                 builtin,
+                is_type_check_only: member.is_type_check_only,
             });
         }
         completions.extend(self.submodule_completions(&module));
@@ -262,6 +264,7 @@ impl<'db> SemanticModel<'db> {
                 name: CompactString::new(base),
                 ty: Some(ty),
                 builtin,
+                is_type_check_only: false,
             });
         }
         completions
@@ -280,6 +283,7 @@ impl<'db> SemanticModel<'db> {
                 name: CompactString::new(member.name),
                 ty: Some(member.ty),
                 builtin: false,
+                is_type_check_only: member.is_type_check_only,
             })
             .collect()
     }
@@ -304,6 +308,7 @@ impl<'db> SemanticModel<'db> {
                         name: CompactString::new(memberdef.member.name),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
+                        is_type_check_only: memberdef.member.is_type_check_only,
                     },
                 ),
             );
@@ -318,6 +323,7 @@ impl<'db> SemanticModel<'db> {
                 name: CompactString::new(name),
                 ty: Some(ty),
                 builtin: true,
+                is_type_check_only: false,
             }),
         );
 
@@ -326,17 +332,24 @@ impl<'db> SemanticModel<'db> {
         let importing_file =
             ImportingFile::File(self.file(), self.file.resolver_environment(self.db));
         if resolve_module(self.db, importing_file, &project_builtins).is_some() {
-            completions.extend(self.module_completions(&project_builtins).into_iter().map(
-                |mut completion| {
-                    completion.builtin = true;
-                    completion
-                },
-            ));
+            completions.extend(
+                self.module_completions(&project_builtins)
+                    .into_iter()
+                    .filter(|completion| !completion.is_type_check_only)
+                    .map(|mut completion| {
+                        completion.builtin = true;
+                        completion
+                    }),
+            );
         }
 
         // Builtins are available in all scopes.
         let builtins = KnownModule::Builtins.name();
-        completions.extend(self.module_completions(&builtins));
+        completions.extend(
+            self.module_completions(&builtins)
+                .into_iter()
+                .filter(|completion| !completion.is_type_check_only),
+        );
 
         // The above can sometimes result in duplicates. Get rid of them.
         completions.sort_by(|c1, c2| c1.name.cmp(&c2.name));
@@ -725,6 +738,9 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
+    /// Whether this symbol is known to exist only for type checking and should
+    /// be ranked below runtime values.
+    pub is_type_check_only: bool,
 }
 
 #[derive(Clone, Debug)]

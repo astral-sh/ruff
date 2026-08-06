@@ -1345,6 +1345,136 @@ static_assert(is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableType
 static_assert(is_subtype_of(RegularCallableTypeOf[variadic], RegularCallableTypeOf[positional_variadic]))
 ```
 
+#### Variadic with an unpacked positional suffix
+
+A variadic positional parameter must accept both the unpacked elements and any fixed positional
+suffix in the supertype.
+
+```py
+from typing import Callable, Never, Unpack, cast
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
+
+def accepts_objects(*args: object) -> None: ...
+def accepts_strings_or_none(*args: str | None) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[accepts_objects],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[accepts_strings_or_none],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_strings],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+```
+
+A required suffix can align with a longer suffix or an equivalent positional prefix when all the
+unpacked elements have the same type.
+
+```py
+def requires_one_integer(*args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+type OneOrMoreIntegers = RegularCallableTypeOf[requires_one_integer]
+
+static_assert(is_subtype_of(OneOrMoreIntegers, Callable[[*tuple[int, ...], int, int], None]))
+static_assert(is_subtype_of(OneOrMoreIntegers, Callable[[int, *tuple[int, ...]], None]))
+```
+
+A type alias for the variadic element does not prevent the required suffix from matching.
+
+```py
+type Integer = int
+
+def requires_one_aliased_integer(*args: *tuple[*tuple[Integer, ...], int]) -> None: ...
+
+type AliasedIntegers = RegularCallableTypeOf[requires_one_aliased_integer]
+
+static_assert(is_subtype_of(AliasedIntegers, Callable[[int, *tuple[int, ...]], None]))
+```
+
+A longer suffix is aligned from the end when its other elements fit the source variadic parameter.
+
+```py
+def requires_string_suffix(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+def requires_string_after_integers(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+
+type StringSuffix = RegularCallableTypeOf[requires_string_suffix]
+type IntegerStringSuffix = RegularCallableTypeOf[requires_string_after_integers]
+
+static_assert(is_subtype_of(StringSuffix, Callable[[*tuple[object, ...], int, str], None]))
+static_assert(is_subtype_of(IntegerStringSuffix, Callable[[*tuple[int, ...], int, str], None]))
+```
+
+A positional parameter cannot also be filled by a target keyword argument.
+
+```py
+def occupies_keyword(a: int, *args: int, **kwargs: int) -> None: ...
+def accepts_keyword(*args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+type OccupiesKeyword = RegularCallableTypeOf[occupies_keyword]
+type AcceptsKeyword = RegularCallableTypeOf[accepts_keyword]
+
+static_assert(not is_subtype_of(OccupiesKeyword, AcceptsKeyword))
+```
+
+An uninhabited keyword parameter cannot collide with an occupied positional parameter.
+
+```py
+type Bottom = Never
+
+def rejects_keywords(*args: *tuple[*tuple[int, ...], int], **kwargs: Bottom) -> None: ...
+def rejects_named_keyword(*args: *tuple[*tuple[int, ...], int], a: Never = cast(Never, 0)) -> None: ...
+
+static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_keywords]))
+static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
+```
+
+Equivalent empty or fixed-length unpacked parameters are compatible, but cannot be reused for
+additional positional arguments.
+
+```py
+def accepts_no_arguments(*args: Unpack[tuple[()]]) -> None: ...
+def accepts_one_integer(*args: Unpack[tuple[int]]) -> None: ...
+
+static_assert(is_subtype_of(RegularCallableTypeOf[accepts_no_arguments], Callable[[Unpack[tuple[()]]], None]))
+static_assert(is_subtype_of(RegularCallableTypeOf[accepts_one_integer], Callable[[Unpack[tuple[int]]], None]))
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_no_arguments],
+        Callable[[int, Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_no_arguments],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_one_integer],
+        Callable[[int, Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[accepts_one_integer],
+        Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None],
+    )
+)
+```
+
 #### Variadic with other kinds
 
 Variadic parameter in a subtype can only be used to match against an unmatched positional-only
@@ -1689,6 +1819,120 @@ from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
 def f(*args: Any, **kwargs: Any) -> Any: ...
 
 static_assert(not is_subtype_of(RegularCallableTypeOf[f], Callable[[], object]))
+```
+
+#### Bottom callables with gradual positional prefixes
+
+A callable accepting every argument list is a subtype of a gradual callable with any positional
+prefix when its return type is compatible.
+
+```py
+from typing import Any, Callable, Concatenate, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
+
+def bottom(*args: object, **kwargs: object) -> Never:
+    raise Exception()
+
+type BottomCallable = RegularCallableTypeOf[bottom]
+
+static_assert(is_subtype_of(BottomCallable, Callable[Concatenate[int, ...], None]))
+static_assert(is_subtype_of(BottomCallable, Callable[Concatenate[int, str, ...], None]))
+```
+
+A callable with an optional positional-only parameter and a dynamically typed variadic tail is also
+a supertype of the bottom callable.
+
+```py
+def gradual_prefix(value: int = 0, /, *args: Any, **kwargs: Any) -> None: ...
+
+static_assert(is_subtype_of(BottomCallable, RegularCallableTypeOf[gradual_prefix]))
+```
+
+#### Object-variadic callables with matching gradual prefixes
+
+Object-variadic callables are subtypes of gradual callables when their required positional
+parameters match the gradual callable's prefix.
+
+```py
+from typing import Callable, Concatenate
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
+
+def positional_or_keyword(value: int, *args: object, **kwargs: object) -> None: ...
+def positional_only(value: int, /, *args: object, **kwargs: object) -> None: ...
+
+type GradualIntCallable = Callable[Concatenate[int, ...], None]
+
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_or_keyword], GradualIntCallable))
+static_assert(is_subtype_of(RegularCallableTypeOf[positional_only], GradualIntCallable))
+```
+
+An unrestricted variadic parameter can satisfy additional positional parameters in the target.
+
+```py
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[positional_only],
+        Callable[Concatenate[int, str, ...], None],
+    )
+)
+```
+
+Unpacked positional parameters are normalized before comparing an unrestricted variadic tail.
+
+```py
+def unpacked_prefix(*args: *tuple[int, *tuple[object, ...]], **kwargs: object) -> None: ...
+
+static_assert(is_subtype_of(RegularCallableTypeOf[unpacked_prefix], GradualIntCallable))
+```
+
+#### Object-variadic callables with incompatible gradual prefixes
+
+A source callable cannot be a subtype when its prefix has an incompatible parameter or requires more
+positional arguments than the target's prefix.
+
+```py
+from typing import Callable, Concatenate
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
+
+type GradualIntCallable = Callable[Concatenate[int, ...], None]
+
+def wrong_prefix(value: str, *args: object, **kwargs: object) -> None: ...
+def extra_required(value: int, another: str, *args: object, **kwargs: object) -> None: ...
+
+static_assert(not is_subtype_of(RegularCallableTypeOf[wrong_prefix], GradualIntCallable))
+static_assert(not is_subtype_of(RegularCallableTypeOf[extra_required], GradualIntCallable))
+```
+
+Both variadic parameters must accept every possible argument from the gradual tail.
+
+```py
+def restricted_args(value: int, *args: int, **kwargs: object) -> None: ...
+def restricted_kwargs(value: int, *args: object, **kwargs: int) -> None: ...
+
+static_assert(not is_subtype_of(RegularCallableTypeOf[restricted_args], GradualIntCallable))
+static_assert(not is_subtype_of(RegularCallableTypeOf[restricted_kwargs], GradualIntCallable))
+```
+
+An additional keyword-only parameter also restricts the otherwise unrestricted variadic tail.
+
+```py
+def required_keyword(value: int, *args: object, flag: int, **kwargs: object) -> None: ...
+def optional_keyword(value: int, *args: object, flag: int = 0, **kwargs: object) -> None: ...
+
+static_assert(not is_subtype_of(RegularCallableTypeOf[required_keyword], GradualIntCallable))
+static_assert(not is_subtype_of(RegularCallableTypeOf[optional_keyword], GradualIntCallable))
+```
+
+The return type must remain compatible even when the parameters accept every possible call.
+
+```py
+def wrong_return(value: int, *args: object, **kwargs: object) -> int:
+    return 1
+
+static_assert(not is_subtype_of(RegularCallableTypeOf[wrong_return], GradualIntCallable))
 ```
 
 ### Classes with `__call__`

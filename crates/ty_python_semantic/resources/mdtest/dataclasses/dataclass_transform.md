@@ -847,6 +847,30 @@ class NotOrderedWithOverrides:
         return False
 ```
 
+### Unrecognized parameters
+
+`dataclass_transform` rejects unrecognized parameters:
+
+```py
+from typing import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
+This also works for the variant from `typing_extensions`:
+
+```py
+from typing_extensions import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
 ## Other `dataclass` parameters
 
 Other parameters from normal dataclasses can also be set on models created using
@@ -2048,7 +2072,7 @@ WithClassConverter("1", "2.5")
 
 with_class_converter = WithClassConverter("1", "2.5")
 reveal_type(with_class_converter.a)  # revealed: PermissiveNumber
-reveal_type(with_class_converter.b)  # revealed: int | float
+reveal_type(with_class_converter.b)  # revealed: float
 
 with_class_converter.a = "2"
 with_class_converter.a = 1.5  # error: [invalid-assignment]

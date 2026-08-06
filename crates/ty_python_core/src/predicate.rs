@@ -138,6 +138,10 @@ pub enum PredicateNode<'db> {
     /// semantically during type checking, so calls to a shadowed `range` remain ambiguous.
     IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
+    /// Whether control flow takes one branch of an OR pattern instead of its remaining
+    /// alternatives. The selected branch is unknown, but recording a predicate and its negation
+    /// preserves the fact that exactly one branch is taken.
+    OrPatternAlternative(ScopeId<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }

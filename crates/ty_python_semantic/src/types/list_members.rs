@@ -17,7 +17,7 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownFunction, ProgramEnvironment, StaticClassLiteral,
+        ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
         exists_at_runtime,
     },
@@ -52,6 +52,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
             let member = Member {
                 name: symbol.name().clone(),
                 ty,
+                is_type_check_only: false,
             };
             Some(MemberWithDefinition {
                 member,
@@ -72,6 +73,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let member = Member {
                     name: symbol.name().clone(),
                     ty,
+                    is_type_check_only: false,
                 };
                 Some(MemberWithDefinition {
                     member,
@@ -109,6 +111,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let member = Member {
                             name: symbol.name().clone(),
                             ty,
+                            is_type_check_only: false,
                         };
                         Some(MemberWithDefinition {
                             member,
@@ -125,6 +128,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let member = Member {
                             name: symbol.name().clone(),
                             ty,
+                            is_type_check_only: false,
                         };
                         Some(MemberWithDefinition {
                             member,
@@ -419,6 +423,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: Name::new_static("__file__"),
                     ty: dunder_file_type,
+                    is_type_check_only: false,
                 });
 
                 self.extend_with_type(db, env, KnownClass::ModuleType.to_instance(db, env));
@@ -440,25 +445,13 @@ impl<'db> AllMembers<'db> {
                         continue;
                     };
 
-                    if let Some(definition) = defined.provenance.definition()
-                        && !exists_at_runtime(db, definition)
-                        // Source-module completions retain `@type_check_only` symbols and rank them
-                        // lower.
-                        && (file.is_stub(db) || !defined.ty.is_type_check_only(db))
-                        // The decorator itself is typing-only, but users must still be able to
-                        // import it when defining typing-only classes and functions.
-                        && !matches!(
-                            defined.ty,
-                            Type::FunctionLiteral(function)
-                                if function.known(db) == Some(KnownFunction::TypeCheckOnly)
-                        )
-                    {
-                        continue;
-                    }
-
                     self.members.insert(Member {
                         name: symbol_name.clone(),
                         ty: defined.ty,
+                        is_type_check_only: defined
+                            .provenance
+                            .definition()
+                            .is_some_and(|definition| !exists_at_runtime(db, definition)),
                     });
                 }
 
@@ -467,7 +460,11 @@ impl<'db> AllMembers<'db> {
                         |submodule_name| {
                             let ty = literal.resolve_submodule(db, &submodule_name)?;
                             let name = submodule_name.clone();
-                            Some(Member { name, ty })
+                            Some(Member {
+                                name,
+                                ty,
+                                is_type_check_only: false,
+                            })
                         },
                     ));
             }
@@ -516,6 +513,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: memberdef.member.name,
                     ty,
+                    is_type_check_only: memberdef.member.is_type_check_only,
                 });
             }
         }
@@ -565,6 +563,7 @@ impl<'db> AllMembers<'db> {
                 self.members.insert(Member {
                     name: Name::new(name),
                     ty,
+                    is_type_check_only: false,
                 });
             }
         }
@@ -582,6 +581,7 @@ impl<'db> AllMembers<'db> {
             self.members.insert(Member {
                 name: memberdef.member.name,
                 ty,
+                is_type_check_only: memberdef.member.is_type_check_only,
             });
         }
     }
@@ -644,6 +644,7 @@ impl<'db> AllMembers<'db> {
                         self.members.insert(Member {
                             name: Name::from(*attr),
                             ty: synthetic_member,
+                            is_type_check_only: false,
                         });
                     }
                 }
@@ -677,6 +678,8 @@ pub struct MemberWithDefinition<'db> {
 pub struct Member<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
+    /// Whether this member is known to exist only during type checking.
+    pub(crate) is_type_check_only: bool,
 }
 
 impl std::hash::Hash for Member<'_> {

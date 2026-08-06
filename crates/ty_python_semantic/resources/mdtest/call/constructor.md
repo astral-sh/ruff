@@ -1512,6 +1512,193 @@ def f(cls: type[T]):
     reveal_type(cls(1, "foo"))  # revealed: T@f
 ```
 
+## Intersection constructors
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### Narrowed bound type variables
+
+Narrowing a bounded class type with `issubclass` must use the subclass constructor while preserving
+both the original type variable and the narrowed subclass in the return type.
+
+```py
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class IntConstructor(Base):
+    def __init__(self, value: int) -> None: ...
+
+def valid[T: Base](cls: type[T]) -> T:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@valid] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@valid & IntConstructor
+        return cls(1)
+    return cls("ok")
+```
+
+An argument accepted by the bound's constructor must still be rejected by the narrowed subclass.
+Arguments rejected by both constructors produce only the subclass constructor's diagnostic.
+
+```py
+def invalid_arguments[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `None`"
+        cls(None)
+```
+
+### Narrowed constrained type variables
+
+Narrowing a constrained type variable selects the matching constructor without losing the original
+type variable in the return type.
+
+```py
+class StringConstructor:
+    def __init__(self, value: str) -> None: ...
+
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def construct[T: (StringConstructor, IntConstructor)](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@construct] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@construct & IntConstructor
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Narrowed unbounded type variables
+
+The narrowed subclass constructor also determines which arguments are valid when the original type
+variable has no upper bound.
+
+```py
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def construct[T](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@construct] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@construct & IntConstructor
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Specialized generic constructors
+
+A generic constructor provider must retain its explicit specialization when validating arguments and
+preserve the original type variable in its return type.
+
+```py
+from ty_extensions import Intersection
+
+class Box[S]:
+    def __init__(self, value: S) -> None: ...
+
+def construct[T](cls: Intersection[type[T], type[Box[int]]]) -> None:
+    reveal_type(cls(1))  # revealed: T@construct & Box[int]
+    # error: [invalid-argument-type] "Argument to `Box.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+    cls("wrong")
+```
+
+### Built-in constructor behavior
+
+Narrowing to a final built-in class must retain its specialized constructor behavior and the
+original type variable.
+
+```py
+def construct[T](cls: type[T]) -> None:
+    if issubclass(cls, bool):
+        reveal_type(cls)  # revealed: type[T@construct] & <class 'bool'>
+        reveal_type(cls(1))  # revealed: T@construct & Literal[True]
+```
+
+### `Self` constructor returns
+
+An explicit `Self` return still represents the constructed instance, so narrowing must preserve the
+original type variable and validate the subclass initializer.
+
+```py
+from typing import Self
+
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class NewChild(Base):
+    def __new__(cls, value: object) -> Self:
+        return object.__new__(cls)
+
+    def __init__(self, value: int) -> None: ...
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, NewChild):
+        reveal_type(cls(1))  # revealed: T@construct & NewChild
+        # error: [invalid-argument-type] "Argument to `NewChild.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Non-instance `__new__` returns
+
+A constructor explicitly returning a non-instance type must retain that return type instead of
+intersecting it with the original type variable.
+
+```py
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class ReturnsString(Base):
+    def __new__(cls, value: int) -> str:
+        return str(value)
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, ReturnsString):
+        reveal_type(cls(1))  # revealed: str
+```
+
+### Non-instance metaclass `__call__` returns
+
+A custom metaclass's explicit non-instance return similarly takes precedence over the original type
+variable.
+
+```py
+class StringFactory(type):
+    def __call__(cls, value: int) -> str:
+        return str(value)
+
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class Factory(Base, metaclass=StringFactory): ...
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, Factory):
+        reveal_type(cls(1))  # revealed: str
+```
+
+### Independent metaclass callables
+
+An intersection of a class-object type and a metaclass instance retains both independent callables.
+Arguments accepted by only one callable use that callable's return type.
+
+```py
+from ty_extensions import Intersection
+
+class StringBase:
+    def __init__(self, value: str) -> None: ...
+
+class IntMeta(type):
+    def __call__(cls, value: int) -> str:
+        return str(value)
+
+def construct(cls: Intersection[type[StringBase], IntMeta]) -> None:
+    reveal_type(cls(1))  # revealed: str
+    reveal_type(cls("ok"))  # revealed: StringBase
+```
+
 ## Union of constructors
 
 ```py

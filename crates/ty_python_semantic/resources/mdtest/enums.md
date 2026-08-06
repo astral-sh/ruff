@@ -2992,8 +2992,8 @@ reveal_type(StringyNames.A.value)  # revealed: Literal["1"]
 reveal_type(StringyNames.B.value)  # revealed: Literal["2"]
 reveal_type(BytesyNames.A.value)  # revealed: bytes
 reveal_type(BytesyNames.B.value)  # revealed: bytes
-reveal_type(FloatyNames.A.value)  # revealed: float
-reveal_type(FloatyNames.B.value)  # revealed: float
+reveal_type(FloatyNames.A.value)  # revealed: float*
+reveal_type(FloatyNames.B.value)  # revealed: float*
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(enum_members(StringyNames))

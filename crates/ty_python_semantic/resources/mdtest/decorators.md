@@ -179,6 +179,30 @@ class Foo:
 reveal_type(Foo().foo)  # revealed: str
 ```
 
+### `functools.cached_property` on a generic class
+
+A cached property must preserve the type variable bound by its enclosing generic class, including
+when the return type is a union:
+
+```py
+from functools import cached_property
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    @cached_property
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @cached_property
+    def values(self) -> list[T] | None:
+        raise NotImplementedError
+
+reveal_type(Box[int]().value)  # revealed: int
+reveal_type(Box[int]().values)  # revealed: list[int] | None
+```
+
 ## Lambdas as decorators
 
 ```py

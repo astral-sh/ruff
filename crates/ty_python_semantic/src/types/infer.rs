@@ -1983,6 +1983,9 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting the argument to `Unpack[...]` or `*`.
         const IN_UNPACK_TYPE_ARGUMENT = 1 << 14;
+
+        /// Whether the current method's explicit receiver annotation is incompatible with `Self`.
+        const HAS_INCOMPATIBLE_SELF_RECEIVER = 1 << 15;
     }
 }
 

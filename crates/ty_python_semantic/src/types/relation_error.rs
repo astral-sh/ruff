@@ -8,7 +8,7 @@ use ruff_python_ast::name::Name;
 
 use crate::types::context::LintDiagnosticGuard;
 use crate::types::tuple::TupleLength;
-use crate::types::{Type, TypedDictType};
+use crate::types::{DisplaySettings, Type, TypedDictType};
 use crate::{FxOrderSet, ProgramEnvironment};
 
 /// Identifies a parameter, either by name or by position.
@@ -92,6 +92,10 @@ pub(crate) enum ErrorContext<'db> {
         target_field: Type<'db>,
     },
     TypedDictNotAssignableToDict(TypedDictType<'db>),
+    OpenTypedDictNotAssignableToMapping {
+        source: TypedDictType<'db>,
+        target: Type<'db>,
+    },
     IncompatibleReturnTypes {
         source: Type<'db>,
         target: Type<'db>,
@@ -184,17 +188,28 @@ impl<'db> ErrorContext<'db> {
                 element,
                 union,
                 target,
-            } => format!(
-                "element `{}` of union `{}` is not assignable to `{}`",
-                element.display(db, env),
-                union.display(db, env),
-                target.display(db, env),
-            ),
-            Self::NotAssignableToAnyUnionElement { source, union } => format!(
-                "type `{}` is not assignable to any element of the union `{}`",
-                source.display(db, env),
-                union.display(db, env),
-            ),
+            } => {
+                let settings = DisplaySettings::from_possibly_ambiguous_types(
+                    db,
+                    env,
+                    [*element, *union, *target],
+                );
+                format!(
+                    "element `{}` of union `{}` is not assignable to `{}`",
+                    element.display_with(db, env, settings.clone()),
+                    union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                    target.display_with(db, env, settings),
+                )
+            }
+            Self::NotAssignableToAnyUnionElement { source, union } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*source, *union]);
+                format!(
+                    "type `{}` is not assignable to any element of the union `{}`",
+                    source.display_with(db, env, settings.clone()),
+                    union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                )
+            }
             Self::NotAssignableToNOtherUnionElements { n } => format!(
                 "... omitted {n} union element{} without additional context",
                 if *n == 1 { "" } else { "s" }
@@ -277,6 +292,21 @@ impl<'db> ErrorContext<'db> {
                 format!(
                     "{source} is not assignable to `dict`",
                     source = typed_dict_name(typed_dict)
+                )
+            }
+            Self::OpenTypedDictNotAssignableToMapping { source, target } => {
+                let name = source.defining_class().map(|class| class.name(db));
+                help_messages.insert(HelpMessages::OpenTypedDictNotAssignableToMapping {
+                    typed_dict_name: name.cloned(),
+                });
+                help_messages.insert(HelpMessages::ExplainOpenTypedDictUnsoundness {
+                    typed_dict_name: name.cloned(),
+                });
+
+                format!(
+                    "{source} is not assignable to `{target}`",
+                    source = typed_dict_name(source),
+                    target = target.display(db, env)
                 )
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
@@ -426,6 +456,8 @@ enum HelpMessages {
     ConsiderUsingMappingInsteadOfDict,
     TopCallableExplanation,
     ConsiderAddingADefaultValue { parameter_name: Option<Name> },
+    OpenTypedDictNotAssignableToMapping { typed_dict_name: Option<Name> },
+    ExplainOpenTypedDictUnsoundness { typed_dict_name: Option<Name> },
 }
 
 impl std::fmt::Display for HelpMessages {
@@ -439,6 +471,22 @@ impl std::fmt::Display for HelpMessages {
             }
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
+            }
+            HelpMessages::OpenTypedDictNotAssignableToMapping {typed_dict_name} => {
+                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+                write!(
+                    f,
+                    "{name} would be assignable to this `Mapping` type \
+                    if it were declared with `closed=True`, but TypedDicts are open by default."
+                )
+            }
+            HelpMessages::ExplainOpenTypedDictUnsoundness {typed_dict_name} => {
+                let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
+                write!(
+                    f,
+                    "A subclass of {name} could validly add a new field of an arbitrary type, \
+                    violating subtyping with the `Mapping` type"
+                )
             }
             HelpMessages::TopCallableExplanation => f.write_str(
                 "This type includes all possible parameter sets, \

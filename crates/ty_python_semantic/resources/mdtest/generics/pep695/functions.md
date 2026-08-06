@@ -77,7 +77,7 @@ def f[T](x: T) -> T:
     return x
 
 reveal_type(f(1))  # revealed: Literal[1]
-reveal_type(f(1.0))  # revealed: float
+reveal_type(f(1.0))  # revealed: float*
 reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
@@ -738,6 +738,35 @@ reveal_type(invoke(head_invariant, Invariant[int]()))
 # TODO: revealed: `Invariant[int]`
 # revealed: Unknown
 reveal_type(invoke(lift_invariant, 1))
+```
+
+## Passing unbound generic methods to generic functions
+
+An unbound method of a generic class can be passed to a generic higher-order function. The class
+type parameter must still be inferred from the concrete receiver expected by that function.
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+
+class Box[T]:
+    def merge(self, other: Box[T]) -> Box[T]:
+        return self
+
+def fold[T](function: Callable[[T, T], T], values: list[T]) -> T:
+    return values[0]
+
+def merge_boxes(values: list[Box[str]]) -> Box[str]:
+    return fold(Box.merge, values)
+```
+
+The same applies to the standard-library `set.union` method passed to `functools.reduce`.
+
+```py
+from functools import reduce
+
+reveal_type(reduce(set.union, [set[str]()]))  # revealed: set[str]
 ```
 
 ## Protocols as TypeVar bounds

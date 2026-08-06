@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterable, Mapping
 from types import GenericAlias
 from typing import Any, Final, Generic, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Never, TypeIs
+from ty_extensions import Top
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
@@ -402,14 +403,14 @@ def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tu
 
 # HACK: `obj: Never` typing matches if object argument is using `Any` type.
 @overload
-def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]
+def is_dataclass(obj: Never) -> TypeIs[Top[DataclassInstance | type[DataclassInstance]]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]
     """Returns True if obj is a dataclass or an instance of a
     dataclass.
     """
 @overload
-def is_dataclass(obj: type) -> TypeIs[type[DataclassInstance]]: ...
+def is_dataclass(obj: type) -> TypeIs[Top[type[DataclassInstance]]]: ...
 @overload
-def is_dataclass(obj: object) -> TypeIs[DataclassInstance | type[DataclassInstance]]: ...
+def is_dataclass(obj: object) -> TypeIs[Top[DataclassInstance | type[DataclassInstance]]]: ...
 
 class FrozenInstanceError(AttributeError): ...
 

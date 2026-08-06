@@ -2380,7 +2380,21 @@ impl get_size2::GetSize for TypeVarInference<'_> {}
 impl<'db> TypeVarInference<'db> {
     /// Project this inference result into a closed specialization.
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        #[salsa::tracked(returns(copy))]
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|db, _, inference: TypeVarInference<'db>| {
+                inference.generic_context(db).unknown_specialization(db, None)
+            },
+            cycle_fn=|db, cycle: &salsa::Cycle, previous: &Specialization<'db>, current: Specialization<'db>, inference: TypeVarInference<'db>| {
+                if cycle.iteration() <= crate::TAINTED_CYCLES {
+                    current
+                } else {
+                    current
+                        .merge_cycle_recovery(db, *previous)
+                        .unwrap_or_else(|| inference.generic_context(db).unknown_specialization(db, None))
+                }
+            }
+        )]
         fn specialization_inner<'db>(
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,
@@ -2704,13 +2718,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> bool {
         let db = self.db;
         let target_context = target.binding_context(db);
+        let target_freshness = target.freshness(db);
         ty.as_typevar().is_some_and(|typevar| {
             // Relationships across binding contexts can intentionally remap one generic context
-            // onto another, as with constructor `self` annotations. Synthetic contexts do not
-            // identify a single source-level binding, so they are not safe to project either.
+            // onto another, as with constructor `self` annotations. Relationships across fresh
+            // occurrences preserve an outer generic value through a recursive call. Synthetic
+            // contexts do not identify a single source-level binding, so they are not safe to
+            // project either.
             !matches!(target_context, BindingContext::Synthetic(_))
                 && typevar.is_inferable(db, self.inferable)
                 && typevar.binding_context(db) == target_context
+                && typevar.freshness(db) == target_freshness
         })
     }
 

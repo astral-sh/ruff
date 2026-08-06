@@ -1279,7 +1279,16 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
-            let env = ProgramEnvironment::from_program(protocol.interface(db).base().program(db));
+            let interface = protocol.interface(db);
+
+            // Hashability is not preserved by inheritance: subclasses can replace
+            // `object.__hash__` with `None`. A protocol that explicitly requires `__hash__`
+            // therefore does not describe every object, despite `object` defining that method.
+            if interface.includes_member(db, "__hash__") {
+                return false;
+            }
+
+            let env = ProgramEnvironment::from_program(interface.base().program(db));
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);

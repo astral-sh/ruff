@@ -547,6 +547,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
             callable.scope(db)
         }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::OrPatternAlternative(scope) => scope,
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
         PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
@@ -1529,6 +1530,7 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         }) => analyze_non_terminal_call(db, callable, call_expr, is_await)
             .negate_if(!predicate.is_positive),
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
+        PredicateNode::OrPatternAlternative(_) => Truthiness::Ambiguous,
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)
         }

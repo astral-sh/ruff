@@ -2168,6 +2168,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::IsNonEmptyIterable(_)
+                    | PredicateNode::OrPatternAlternative(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -2277,6 +2278,40 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast, 'db>> {
         self.current_statements.last_mut()
+    }
+
+    /// Return whether a pattern contains any capture that changes the current flow state.
+    fn pattern_has_bindings(pattern: &ast::Pattern) -> bool {
+        match pattern {
+            ast::Pattern::MatchValue(_) | ast::Pattern::MatchSingleton(_) => false,
+            ast::Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. })
+            | ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+                patterns.iter().any(Self::pattern_has_bindings)
+            }
+            ast::Pattern::MatchMapping(pattern) => {
+                pattern.rest.is_some() || pattern.patterns.iter().any(Self::pattern_has_bindings)
+            }
+            ast::Pattern::MatchClass(pattern) => pattern
+                .arguments
+                .patterns
+                .iter()
+                .chain(
+                    pattern
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| &keyword.pattern),
+                )
+                .any(Self::pattern_has_bindings),
+            ast::Pattern::MatchStar(pattern) => pattern.name.is_some(),
+            ast::Pattern::MatchAs(pattern) => {
+                pattern.name.is_some()
+                    || pattern
+                        .pattern
+                        .as_deref()
+                        .is_some_and(Self::pattern_has_bindings)
+            }
+        }
     }
 
     fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
@@ -4949,6 +4984,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern
+            && let Some((last, alternatives)) = patterns.split_last()
+            // Capture-free alternatives do not affect bindings and need no flow merge.
+            && patterns.iter().any(Self::pattern_has_bindings)
+        {
+            // Start each alternative without earlier captures so repeated names do not shadow one
+            // another. Complementary predicates preserve possible missing captures while all
+            // alternatives together recover the incoming reachability.
+            let mut successful_alternatives = None;
+            for alternative in alternatives {
+                let remaining_alternatives = self.flow_snapshot();
+                let selected_alternative =
+                    self.record_reachability_constraint(PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::OrPatternAlternative(self.current_scope_id()),
+                        is_positive: true,
+                    }));
+                self.visit_pattern(alternative);
+                if let Some(previous_alternatives) = successful_alternatives.take() {
+                    self.flow_merge(previous_alternatives);
+                }
+                successful_alternatives = Some(self.flow_snapshot());
+                self.flow_restore(remaining_alternatives);
+                self.record_negated_reachability_constraint(selected_alternative);
+            }
+
+            self.visit_pattern(last);
+            if let Some(successful_alternative) = successful_alternatives {
+                self.flow_merge(successful_alternative);
+            }
+            return;
+        }
+
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
