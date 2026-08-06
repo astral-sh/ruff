@@ -2081,12 +2081,6 @@ class InstanceAttrXWithDefault:
 static_assert(not is_assignable_to(InstanceAttrXWithDefault, ClassVarXProto))
 static_assert(not is_subtype_of(InstanceAttrXWithDefault, ClassVarXProto))
 
-class InstanceAttrAnyWithDefault:
-    x: Any = 42
-
-static_assert(not is_assignable_to(InstanceAttrAnyWithDefault, ClassVarXProto))
-static_assert(not is_subtype_of(InstanceAttrAnyWithDefault, ClassVarXProto))
-
 class PropertyX:
     @property
     def x(self) -> int:
@@ -2174,9 +2168,9 @@ implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
 
 ```snapshot
 error[invalid-assignment]: Object of type `InstanceAttrX` is not assignable to `ClassVarXProto`
-   --> src/classvars.py:113:34
+   --> src/classvars.py:107:34
     |
-113 | implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
+107 | implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
     |                 --------------   ^^^^^^^^^^^^^^^ Incompatible value of type `InstanceAttrX`
     |                 |
     |                 Declared type

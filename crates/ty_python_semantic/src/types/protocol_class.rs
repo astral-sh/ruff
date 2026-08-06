@@ -1861,11 +1861,26 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.qualifiers
     }
 
-    /// Returns whether a writable class variable conflicts with an instance declaration.
+    /// Returns whether an instance declaration conflicts with a required writable class variable.
     ///
-    /// Descriptor lookup can discard declaration qualifiers, and an unannotated override inherits
-    /// the variable kind of its superclass declaration. Inspect the effective declaration before
-    /// applying descriptors so both cases retain the original `ClassVar` status.
+    /// An unannotated assignment preserves an inherited `ClassVar`; an explicit instance
+    /// annotation does not:
+    ///
+    /// ```python
+    /// from typing import ClassVar
+    ///
+    /// class Base:
+    ///     value: ClassVar[int]
+    ///
+    /// class Valid(Base):
+    ///     value = 1
+    ///
+    /// class Invalid(Base):
+    ///     value: int = 1
+    /// ```
+    ///
+    /// Inspect declarations before descriptor binding, and ignore synthesized members without
+    /// source provenance.
     pub(super) fn has_incompatible_class_variable_declaration(
         &self,
         db: &'db dyn Db,
