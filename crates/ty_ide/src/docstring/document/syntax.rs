@@ -145,7 +145,7 @@ impl<'a> Iterator for InlineMarkupScanner<'a> {
         {
             (
                 preceding_text,
-                InlineMarkupToken::RestPrefixRole { name, span },
+                InlineMarkupToken::RestPrefixRole(Role { name, span }),
             )
         } else {
             (preceding_text, InlineMarkupToken::Code(span))
@@ -178,12 +178,24 @@ pub(crate) enum InlineMarkupToken<'a> {
     /// A complete code span whose backtick delimiters have equal lengths.
     Code(BacktickSpan<'a>),
     /// A reStructuredText prefix-role pattern and its single-backtick span.
-    RestPrefixRole {
-        /// The role name between the colons, for example `py:class`.
-        name: &'a str,
-        /// The complete single-backtick span following the role name.
-        span: BacktickSpan<'a>,
-    },
+    RestPrefixRole(Role<'a>),
+}
+
+/// A reStructuredText prefix role recognized by [`InlineMarkupScanner`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Role<'a> {
+    name: &'a str,
+    span: BacktickSpan<'a>,
+}
+
+impl<'a> Role<'a> {
+    /// Returns the complete single-backtick span following the role name.
+    ///
+    /// For `` :class:`Model <pkg.Model>` ``, this returns the span
+    /// `` `Model <pkg.Model>` ``.
+    pub(crate) fn span(self) -> BacktickSpan<'a> {
+        self.span
+    }
 }
 
 /// Splits a trailing reStructuredText prefix-role pattern from its preceding text.
@@ -688,8 +700,8 @@ mod tests {
             (":foo..bar:`Value`", None),
         ] {
             let actual = InlineMarkupScanner::new(source).next().and_then(|token| {
-                if let InlineMarkupToken::RestPrefixRole { name, span } = token {
-                    Some((name, span.content()))
+                if let InlineMarkupToken::RestPrefixRole(role) = token {
+                    Some((role.name, role.span().content()))
                 } else {
                     None
                 }
@@ -811,7 +823,7 @@ mod tests {
             .map(|token| match token {
                 InlineMarkupToken::Text(text) => ("text", text),
                 InlineMarkupToken::Code(code) => ("code", code.content()),
-                InlineMarkupToken::RestPrefixRole { span, .. } => ("rest role", span.content()),
+                InlineMarkupToken::RestPrefixRole(role) => ("rest role", role.span().content()),
             })
             .collect()
     }
