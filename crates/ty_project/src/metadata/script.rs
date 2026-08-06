@@ -8,6 +8,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 use ruff_db::source::source_text;
+use ruff_db::system::SystemPath;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::{TextRange, TextSize};
@@ -22,7 +23,7 @@ use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
 use crate::metadata::uv::{MetadataTarget, Uv, UvMetadata};
 use crate::metadata::value::RelativePathBuf;
-use crate::{Db, ProjectMetadata};
+use crate::{Db, ProgressReporter, ProjectMetadata};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -155,7 +156,12 @@ pub struct ScriptEnvironments {
 }
 
 impl ScriptEnvironments {
-    pub(crate) fn get_or_init(&self, db: &dyn Db, file: File) -> ScriptEnvironment {
+    pub(crate) fn get_or_init(
+        &self,
+        db: &dyn Db,
+        file: File,
+        reporter: Option<&dyn ProgressReporter>,
+    ) -> ScriptEnvironment {
         self.get_or_init_with(file, || {
             if !matches!(
                 db.system().env_var(EnvVars::TY_UV).as_deref(),
@@ -175,6 +181,15 @@ impl ScriptEnvironments {
                 .and_then(|options| options.environment.as_ref())
                 .and_then(|environment| environment.python.as_ref())
                 .map(|python| python.absolute(project_metadata.root(), db.system()));
+
+            let display_path = path.strip_prefix(project_metadata.root()).unwrap_or(path);
+            let _progress = reporter.map(|reporter| {
+                reporter.report_script_initialization_started(display_path);
+                ScriptInitializationProgress {
+                    reporter,
+                    path: display_path,
+                }
+            });
 
             match Uv::new(db.system()).metadata(MetadataTarget::Script {
                 path,
@@ -205,6 +220,18 @@ impl ScriptEnvironments {
 }
 
 impl std::panic::RefUnwindSafe for ScriptEnvironments {}
+
+struct ScriptInitializationProgress<'a> {
+    reporter: &'a dyn ProgressReporter,
+    path: &'a SystemPath,
+}
+
+impl Drop for ScriptInitializationProgress<'_> {
+    fn drop(&mut self) {
+        self.reporter
+            .report_script_initialization_finished(self.path);
+    }
+}
 
 /// Stable input recording script-specific uv metadata or an initialization failure.
 #[salsa::input(heap_size=ruff_memory_usage::heap_size)]
