@@ -92,16 +92,26 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(newtype) => {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
-            // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) if alias.may_have_unbounded_specialization(db) => {
-                Some(TypeIdentity::RecursiveTypeAlias(alias.definition(db)))
-            }
-            Type::ProtocolInstance(protocol) if protocol.may_have_unbounded_specialization(db) => {
-                Some(TypeIdentity::RecursiveProtocol(protocol.definition(db)?))
-            }
-            Type::TypedDict(typed_dict) if typed_dict.may_have_unbounded_specialization(db) => {
-                let definition = typed_dict.definition(db)?;
-                Some(TypeIdentity::RecursiveTypedDict(definition))
+            // Recursive aliases, protocols, and TypedDicts whose specialization can keep changing
+            // (e.g. `type Growing[T] = T | Growing[list[T]]`) are collapsed to their definition so
+            // that visits stop even though no exact type repeats. Recursion that revisits one
+            // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
+            // no definition-level identity: the detectors stop on the repeated type itself.
+            Type::TypeAlias(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+                let target = RecursiveDefinition::from_type(db, self)?.target;
+                if !target.may_have_unbounded_specialization(db) {
+                    return None;
+                }
+                let definition = target.definition(db);
+                Some(match target {
+                    RecursiveDefinition::TypeAlias(_) => {
+                        TypeIdentity::RecursiveTypeAlias(definition)
+                    }
+                    RecursiveDefinition::Protocol(_) => TypeIdentity::RecursiveProtocol(definition),
+                    RecursiveDefinition::TypedDict(_) => {
+                        TypeIdentity::RecursiveTypedDict(definition)
+                    }
+                })
             }
             _ => None,
         }
@@ -116,13 +126,6 @@ enum RecursiveDefinition<'db> {
     TypedDict(StaticClassLiteral<'db>),
 }
 
-/// The position of a formal parameter in a recursive definition.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct ParameterSlot<'db> {
-    definition: Definition<'db>,
-    index: usize,
-}
-
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum FlowKind {
     /// The source parameter is passed directly or only through normalized set operations.
@@ -131,10 +134,12 @@ enum FlowKind {
     Nested,
 }
 
+/// Formal parameters are identified by their [`BoundTypeVarIdentity`], which is unique across
+/// definitions, so parameter identities can serve directly as the flow graph's nodes.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct FlowEdge<'db> {
-    from: ParameterSlot<'db>,
-    to: ParameterSlot<'db>,
+    from: BoundTypeVarIdentity<'db>,
+    to: BoundTypeVarIdentity<'db>,
     kind: FlowKind,
 }
 
@@ -160,7 +165,7 @@ struct SpecializationFlowGraph<'db> {
 ///
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
-    source_parameters: FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
+    source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
     env: ProgramEnvironment<'db>,
     visited_types: TypeCollector<'db>,
     edges: RefCell<Vec<FlowEdge<'db>>>,
@@ -170,9 +175,9 @@ struct SpecializationFlowVisitor<'db> {
 
 /// Finds which parameters of the current source definition occur in one actual argument.
 struct SourceParameterCollector<'a, 'db> {
-    source_parameters: &'a FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
+    source_parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
     env: &'a ProgramEnvironment<'db>,
-    found: RefCell<FxHashMap<ParameterSlot<'db>, bool>>,
+    found: RefCell<FxHashMap<BoundTypeVarIdentity<'db>, bool>>,
     visited_types: TypeCollector<'db>,
     in_nested_type: Cell<bool>,
 }
@@ -248,32 +253,20 @@ impl<'db> RecursiveDefinition<'db> {
         }
     }
 
-    fn parameter_slots(self, db: &'db dyn Db) -> impl Iterator<Item = ParameterSlot<'db>> {
-        let definition = self.definition(db);
+    /// The identities of this definition's formal parameters, in declaration order.
+    fn parameters(self, db: &'db dyn Db) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
         self.generic_context(db)
             .into_iter()
             .flat_map(|context| context.variables(db))
-            .enumerate()
-            .map(move |(index, _)| ParameterSlot { definition, index })
+            .map(move |parameter| Self::parameter_identity(db, parameter))
     }
 
-    fn source_parameters(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>> {
-        let definition = self.definition(db);
-        let mut parameters = FxHashMap::default();
-        for (index, parameter) in self
-            .generic_context(db)
-            .into_iter()
-            .flat_map(|context| context.variables(db))
-            .enumerate()
-        {
-            let identity = Self::parameter_identity(db, parameter);
-            if parameters
-                .insert(identity, ParameterSlot { definition, index })
-                .is_some()
-            {
+    /// Returns `None` if two formal parameters share an identity, since their flows could not be
+    /// distinguished.
+    fn source_parameters(self, db: &'db dyn Db) -> Option<FxHashSet<BoundTypeVarIdentity<'db>>> {
+        let mut parameters = FxHashSet::default();
+        for identity in self.parameters(db) {
+            if !parameters.insert(identity) {
                 return None;
             }
         }
@@ -387,16 +380,16 @@ impl<'db> SpecializationFlowGraph<'db> {
             return true;
         }
 
-        root.parameter_slots(db).into_iter().any(|root_slot| {
+        root.parameters(db).any(|root_parameter| {
             self.edges.iter().any(|edge| {
                 edge.kind == FlowKind::Nested
-                    && self.reachable(root_slot, edge.from)
-                    && self.reachable(edge.to, root_slot)
+                    && self.reachable(root_parameter, edge.from)
+                    && self.reachable(edge.to, root_parameter)
             })
         })
     }
 
-    fn reachable(&self, from: ParameterSlot<'db>, to: ParameterSlot<'db>) -> bool {
+    fn reachable(&self, from: BoundTypeVarIdentity<'db>, to: BoundTypeVarIdentity<'db>) -> bool {
         if from == to {
             return true;
         }
@@ -477,14 +470,14 @@ impl<'db> SpecializationFlowVisitor<'db> {
             return;
         }
 
-        let target_slots = reference.target.parameter_slots(db).collect::<Vec<_>>();
+        let target_parameters = reference.target.parameters(db).collect::<Vec<_>>();
         let arguments = specialization.types(db);
-        if target_slots.len() != arguments.len() {
+        if target_parameters.len() != arguments.len() {
             self.inconclusive.set(true);
             return;
         }
 
-        for (target, argument) in target_slots.into_iter().zip(arguments.iter().copied()) {
+        for (target, argument) in target_parameters.into_iter().zip(arguments.iter().copied()) {
             for (from, kind) in
                 SourceParameterCollector::classify(db, &self.env, &self.source_parameters, argument)
             {
@@ -510,7 +503,7 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
-            if !self.source_parameters.contains_key(&identity) {
+            if !self.source_parameters.contains(&identity) {
                 // Nested definitions can capture a type variable from an outer generic scope.
                 // Specialization does not yet retain the parent mapping needed to model it.
                 self.inconclusive.set(true);
@@ -539,9 +532,9 @@ impl<'a, 'db> SourceParameterCollector<'a, 'db> {
     fn classify(
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
-        source_parameters: &'a FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
+        source_parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
         argument: Type<'db>,
-    ) -> impl Iterator<Item = (ParameterSlot<'db>, FlowKind)> {
+    ) -> impl Iterator<Item = (BoundTypeVarIdentity<'db>, FlowKind)> {
         let collector = Self {
             source_parameters,
             env,
@@ -579,10 +572,10 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
-            if let Some(&parameter) = self.source_parameters.get(&identity) {
+            if self.source_parameters.contains(&identity) {
                 self.found
                     .borrow_mut()
-                    .entry(parameter)
+                    .entry(identity)
                     .and_modify(|nested| *nested |= self.in_nested_type.get())
                     .or_insert_with(|| self.in_nested_type.get());
             }
@@ -620,38 +613,10 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
     }
 }
 
-impl<'db> TypeAliasType<'db> {
-    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
-        RecursiveDefinition::TypeAlias(self.unspecialized(db)).may_have_unbounded_specialization(db)
-    }
-}
-
 impl<'db> ProtocolInstanceType<'db> {
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
         Some(origin.definition(db))
-    }
-
-    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
-        let Some(class) = self.class_origin(db) else {
-            return false;
-        };
-        let Some((origin, _)) = class.static_class_literal(db) else {
-            return false;
-        };
-        RecursiveDefinition::Protocol(origin).may_have_unbounded_specialization(db)
-    }
-}
-
-impl<'db> TypedDictType<'db> {
-    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
-        let Some(class) = self.defining_class() else {
-            return false;
-        };
-        let Some((origin, _)) = class.static_class_literal(db) else {
-            return false;
-        };
-        RecursiveDefinition::TypedDict(origin).may_have_unbounded_specialization(db)
     }
 }
 
@@ -1214,16 +1179,16 @@ type Helper[U] = U
         let helper = RecursiveDefinition::TypeAlias(
             global_type_alias(&db, &env, "Helper").unspecialized(&db),
         );
-        let mut one_slots = one.parameter_slots(&db);
-        let Some(one_t) = one_slots.next() else {
+        let mut one_parameters = one.parameters(&db);
+        let Some(one_t) = one_parameters.next() else {
             panic!("expected one parameter");
         };
-        let mut two_slots = two.parameter_slots(&db);
-        let (Some(two_x), Some(two_y)) = (two_slots.next(), two_slots.next()) else {
+        let mut two_parameters = two.parameters(&db);
+        let (Some(two_x), Some(two_y)) = (two_parameters.next(), two_parameters.next()) else {
             panic!("expected two parameters");
         };
-        let mut helper_slots = helper.parameter_slots(&db);
-        let Some(helper_u) = helper_slots.next() else {
+        let mut helper_parameters = helper.parameters(&db);
+        let Some(helper_u) = helper_parameters.next() else {
             panic!("expected one helper parameter");
         };
 
@@ -1396,7 +1361,9 @@ type Saturating[T] = tuple[T, Saturating[T | int]]
             ("PeriodicHelper", false),
             ("Saturating", false),
         ] {
-            let alias = global_type_alias(&db, &env, name);
+            let alias = RecursiveDefinition::TypeAlias(
+                global_type_alias(&db, &env, name).unspecialized(&db),
+            );
             assert_eq!(
                 alias.may_have_unbounded_specialization(&db),
                 expected,
