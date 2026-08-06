@@ -31,23 +31,20 @@ impl AllowedValue {
             ) => unary_op.is_none() && allowed.as_str() == string_literal.value.to_str(),
             (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
                 match &number_literal.value {
-                    Number::Int(i) => i.as_i64().and_then(|value| apply_unary_int(value, unary_op)) == Some(*allowed),
-                    Number::Float(f) => float_as_i64(*f).and_then(|value| apply_unary_int(value, unary_op)) == Some(*allowed),
-                    Number::Complex { .. } => false,
+                    Number::Int(i) => {
+                        i.as_i64().and_then(|value| apply_unary_int(value, unary_op)) == Some(*allowed)
+                    }
+                    _ => false,
                 }
             }
             (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
                 match &number_literal.value {
-                    Number::Int(i) => i
-                        .as_i64()
-                        .and_then(|value| apply_unary_float(value as f64, unary_op))
-                        .is_some_and(|value| value == allowed.value()),
                     Number::Float(f) => {
                         number_to_f64(&number_literal.value)
                             .and_then(|value| apply_unary_float(value, unary_op))
                             .is_some_and(|value| value == allowed.value())
                     }
-                    Number::Complex { .. } => false,
+                    _ => false,
                 }
             }
             _ => false,
