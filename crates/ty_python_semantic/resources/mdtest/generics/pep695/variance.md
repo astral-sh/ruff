@@ -847,7 +847,8 @@ static_assert(not is_assignable_to(Intersection[C, Not[B]], Intersection[C, Not[
 ## Subclass Types (type[T])
 
 The `type[T]` construct represents the type of classes that are subclasses of `T`. It is covariant
-in `T` because if `A <: B`, then `type[A] <: type[B]` holds.
+in `T` because if `A <: B`, then `type[A] <: type[B]` holds. A public, writable `type[T]` attribute
+still makes its enclosing class invariant, while a private attribute can remain covariant.
 
 ```py
 from ty_extensions import static_assert
@@ -866,10 +867,10 @@ static_assert(not is_assignable_to(type[A], type[B]))
 # With generic classes using type[T]
 class ClassContainer[T]:
     def __init__(self, cls: type[T]) -> None:
-        self.cls = cls
+        self._cls = cls
 
     def create_instance(self) -> T:
-        return self.cls()
+        return self._cls()
 
 # ClassContainer is covariant in T due to type[T]
 static_assert(is_subtype_of(ClassContainer[B], ClassContainer[A]))
@@ -885,6 +886,64 @@ def use_a_class_container(container: ClassContainer[A]) -> A:
 
 b_container = ClassContainer[B](B)
 a_instance: A = use_a_class_container(b_container)  # This should work
+```
+
+## Subclass types in writable attributes
+
+A writable public `type[T]` attribute makes its enclosing class invariant in `T`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class ClassContainer[T]:
+    cls: type[T]
+
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_subtype_of(ClassContainer[object], ClassContainer[int]))
+
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_assignable_to(ClassContainer[object], ClassContainer[int]))
+```
+
+## Subclass types in return positions
+
+A `type[T]` return contributes covariance for `T`. Combining it with a method that accepts `T`
+therefore makes the enclosing class invariant.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class ClassContainer[T]:
+    def get(self) -> type[T]:
+        raise NotImplementedError
+
+    def put(self, value: T) -> None: ...
+
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_subtype_of(ClassContainer[object], ClassContainer[int]))
+
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_assignable_to(ClassContainer[object], ClassContainer[int]))
+```
+
+## Subclass types in parameter positions
+
+A method parameter annotated as `type[T]` makes the enclosing class contravariant in `T`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class ClassContainer[T]:
+    def put(self, cls: type[T]) -> None: ...
+
+static_assert(is_subtype_of(ClassContainer[object], ClassContainer[int]))
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+
+static_assert(is_assignable_to(ClassContainer[object], ClassContainer[int]))
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
 ```
 
 ## TypeIs
