@@ -150,6 +150,31 @@ struct DefinitionUse<'db> {
 }
 
 /// Parameter flow between all recursive definitions reachable from one root.
+///
+/// Whether a recursive definition can keep producing new specializations is modeled as a graph
+/// problem. The formal parameters of every reachable definition are the nodes, and each argument
+/// of a recursive reference adds an edge to the parameter it specializes from every source
+/// parameter occurring in it: [`FlowKind::Direct`] if the parameter is passed as is, and
+/// [`FlowKind::Nested`] if it occurs inside a type structure that can accumulate. Arguments
+/// without source parameters add no edges and act as resets.
+///
+/// Each expansion step moves the argument types along these edges, so the root's specialization
+/// can grow without bound only if a directed cycle through one of the root's parameters contains
+/// a nested edge:
+///
+/// ```py
+/// type Growing[X, Y] = Growing[list[Y], X]        # Y -> X nested, X -> Y direct: growing cycle
+/// type Shifting[A, B, C] = Shifting[B, C, None]   # direct edges only: repeats after 3 steps
+/// type Resetting[X, Y] = Resetting[list[Y], None] # Y -> X nested, but X flows nowhere: no cycle
+/// type GrowingOuter[T] = GrowingHelper[list[T]]   # T -> U nested
+/// type GrowingHelper[U] = GrowingOuter[U]         # U -> T direct: the growing cycle spans both
+/// type ResetOuter[T] = ResetHelper[list[T]]       # T -> U nested
+/// type ResetHelper[U] = ResetOuter[int]           # parameter-free argument: no edge, no cycle
+/// ```
+///
+/// Without such a cycle, every parameter's value stays within the finite set of types built from
+/// the initial arguments and reset types by normalized set operations, so the expansions reach an
+/// exact repetition and the cycle detectors can rely on exact type identities.
 #[derive(Default)]
 struct SpecializationFlowGraph<'db> {
     edges: FxHashSet<FlowEdge<'db>>,
