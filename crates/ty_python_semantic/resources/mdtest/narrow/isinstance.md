@@ -1469,6 +1469,29 @@ def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
     return value
 ```
 
+## Narrowing bounded generic defaults in gradual mode
+
+In gradual mode, narrowing a value of type `object` to a tuple subclass leaves its type argument
+`Unknown`.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+class DefaultedTuple[T: int = bool](tuple[T, str]): ...
+
+def narrow_defaulted_tuple(value: object) -> None:
+    if isinstance(value, DefaultedTuple):
+        reveal_type(value)  # revealed: DefaultedTuple[Unknown]
+        reveal_type(value[0])  # revealed: Unknown
+        reveal_type(value[1])  # revealed: str
+```
+
 ## Narrowing generic `classmethod`
 
 After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
