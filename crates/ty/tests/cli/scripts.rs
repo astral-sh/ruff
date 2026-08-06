@@ -1550,7 +1550,7 @@ mod uv_metadata {
 
         let environment = case.root().join(".venv");
         let output = Command::new("uv")
-            .args(["venv", "--no-project"])
+            .args(["venv", "--no-project", "--python", "3.11"])
             .arg(&environment)
             .env("UV_CACHE_DIR", case.root().join("cache"))
             .output()?;
