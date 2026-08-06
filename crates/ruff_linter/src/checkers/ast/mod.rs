@@ -696,17 +696,22 @@ impl<'a> Checker<'a> {
             .posonlyargs
             .first()
             .or_else(|| function.parameters.args.first())
-            .map(|parameter| parameter.name().as_str())
         else {
             return false;
         };
 
         let is_instance_attribute = |target: &Expr| {
-            matches!(
-                target,
-                Expr::Attribute(attribute)
-                    if attribute.value.as_name_expr().is_some_and(|name| name.id == instance)
-            )
+            let Some(name) = target
+                .as_attribute_expr()
+                .and_then(|attribute| attribute.value.as_name_expr())
+            else {
+                return false;
+            };
+            let Some(binding_id) = semantic.resolve_name(name) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            binding.kind.is_argument() && binding.range == instance.parameter.name.range()
         };
 
         match stmt {

@@ -119,6 +119,10 @@ class Class:
             this.nested_attribute = 1
             "Not a top-level assignment."  # error: [useless-expression]
 
+        this = object()
+        this.rebound_attribute = 1
+        "Not an instance attribute docstring."  # error: [useless-expression]
+
     def method(self):
         self.attribute = 1
         "Not in an `__init__` method."  # error: [useless-expression]
