@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.16.2
+
+Released on 2026-08-06.
+
+### Bug fixes
+
+- \[`flake8-pyi`\] Avoid false positives on `singledispatch` functions (`PYI041`) ([#27335](https://github.com/astral-sh/ruff/pull/27335))
+
+### Server
+
+- Register formatting capabilities dynamically to exclude TOML files ([#27332](https://github.com/astral-sh/ruff/pull/27332))
+
+### Documentation
+
+- [ty] Target the mdtest binary when running individual mdtests ([#27521](https://github.com/astral-sh/ruff/pull/27521))
+
+### Other changes
+
+- Refactor db's suggestion logic ([#27524](https://github.com/astral-sh/ruff/pull/27524))
+- Remove unused APIs from ruff_ranged_value ([#27391](https://github.com/astral-sh/ruff/pull/27391))
+- [ty] Bump ecosystem-analyzer for strict project settings ([#27542](https://github.com/astral-sh/ruff/pull/27542))
+- [ty] Temporarily remove myself from the reviewer pool ([#27541](https://github.com/astral-sh/ruff/pull/27541))
+- [ty] [playground] Make run panel scrollable and wrapping ([#27474](https://github.com/astral-sh/ruff/pull/27474))
+
+### Contributors
+
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@epage](https://github.com/epage)
+- [@sharkdp](https://github.com/sharkdp)
+- [@ntBre](https://github.com/ntBre)
+
 ## 0.16.1
 
 Released on 2026-07-30.
