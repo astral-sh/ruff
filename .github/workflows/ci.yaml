@@ -340,9 +340,6 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    env:
-      # Line-tables-only debug info: faster builds, backtraces still work.
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -373,26 +370,26 @@ jobs:
           MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
         # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
-        run: cargo test -p ty_python_semantic --test mdtest || true
+        run: cargo test --profile ci -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        run: cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        run: cargo insta test --profile ci --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
-        run: cargo test --doc --all-features
+        run: cargo test --doc --profile ci --all-features
       - name: Dogfood ty on py-fuzzer
-        run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
+        run: uv run --project=./python/py-fuzzer cargo run --profile ci -p ty check --project=./python/py-fuzzer
       - name: Dogfood ty on the scripts directory
-        run: uv run --project=./scripts cargo run -p ty check --project=./scripts
+        run: uv run --project=./scripts cargo run --profile ci -p ty check --project=./scripts
       - name: Dogfood ty on ty_benchmark
-        run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
+        run: uv run --project=./scripts/ty_benchmark cargo run --profile ci -p ty check --project=./scripts/ty_benchmark
       # Check for broken links in the documentation.
-      - run: cargo doc --all --no-deps
+      - run: cargo doc --profile ci --all --no-deps
         env:
           RUSTDOCFLAGS: "-D warnings"
       # Use --document-private-items so that all our doc comments are kept in
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p ty_python_semantic -p ty_python_core -p ty_module_resolver -p ty_site_packages -p ty_combine -p ty_project -p ty_ide -p ty_wasm -p ty_vendored -p ty_static -p ty -p ty_test -p ruff_db -p ruff_python_formatter --document-private-items
+      - run: cargo doc --profile ci --no-deps -p ty_python_semantic -p ty_python_core -p ty_module_resolver -p ty_site_packages -p ty_combine -p ty_project -p ty_ide -p ty_wasm -p ty_vendored -p ty_static -p ty -p ty_test -p ruff_db -p ruff_python_formatter --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
@@ -446,9 +443,6 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    env:
-      # Line-tables-only debug info: faster builds, backtraces still work.
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -471,8 +465,8 @@ jobs:
           enable-cache: "true"
       - name: "Run tests"
         run: |
-          cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
+          cargo nextest run --cargo-profile ci --all-features --profile ci
+          cargo test --profile ci --all-features --doc
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
