@@ -28,6 +28,7 @@ use ty_python_core::predicate::{
     PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
     SubjectElementPatternPredicate,
 };
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
@@ -3438,6 +3439,59 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         place_table(db, self.scope())
     }
 
+    /// Returns whether this predicate controls an assignment to the given member.
+    fn predicate_initializes_member(&self, member: ScopedPlaceId) -> bool {
+        let db = self.db;
+        let scope = self.scope();
+        let index = semantic_index(db, scope.program_file(db));
+        let use_def = index.use_def_map(scope.file_scope_id(db));
+        let constraints = use_def.reachability_constraints();
+        let predicates = use_def.predicates();
+        let is_terminal = |constraint| {
+            matches!(
+                constraint,
+                ScopedReachabilityConstraintId::ALWAYS_TRUE
+                    | ScopedReachabilityConstraintId::AMBIGUOUS
+                    | ScopedReachabilityConstraintId::ALWAYS_FALSE
+            )
+        };
+
+        let mut initialized_by_predicate = false;
+        for binding in use_def.reachable_bindings(member) {
+            if binding.binding.definition().is_none() {
+                continue;
+            }
+
+            if binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                return false;
+            }
+            if is_terminal(binding.reachability_constraint) {
+                continue;
+            }
+
+            let node = constraints.get_interior_node(binding.reachability_constraint);
+            let predicate = predicates[node.atom()];
+            let opposing_branch = if self.is_positive == predicate.is_positive {
+                node.if_false()
+            } else {
+                node.if_true()
+            };
+
+            if predicate.node != self.predicate
+                || opposing_branch != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                || ![node.if_true(), node.if_ambiguous(), node.if_false()]
+                    .into_iter()
+                    .all(is_terminal)
+            {
+                return false;
+            }
+
+            initialized_by_predicate = true;
+        }
+
+        initialized_by_predicate
+    }
+
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
@@ -4446,9 +4500,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg_place = PlaceExpr::try_from_expr(first_arg)?;
                 let function = function_type.known(db)?;
-                let place = self.expect_place(&first_arg);
+                let place = self.expect_place(&first_arg_place);
 
                 if function == KnownFunction::HasAttr {
                     let attr = inference
@@ -4457,6 +4511,42 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         .value(db);
 
                     if !is_identifier(attr) {
+                        return None;
+                    }
+
+                    let places = self.places();
+                    let receiver = inference.expression_type(first_arg);
+                    if !is_positive
+                        && let Some(member) = places.member_id_by_instance_attribute_name(attr)
+                        && places.place(member).is_bound()
+                        && places
+                            .parents(places.place(member))
+                            .any(|parent| parent == place)
+                        && matches!(receiver, Type::TypeVar(typevar) if typevar.typevar(db).is_self(db))
+                        && matches!(
+                            self.predicate,
+                            PredicateNode::Expression(expression)
+                                if !matches!(
+                                    expression.node_ref(db).node(self.module),
+                                    ast::Expr::BoolOp(_)
+                                )
+                        )
+                        && self.predicate_initializes_member(member.into())
+                        && !receiver.nominal_class(db, &self.env).is_some_and(|class| {
+                            class
+                                .iter_mro(db)
+                                .filter_map(ClassBase::into_class)
+                                .filter_map(|base| base.static_class_literal(db))
+                                .any(|(base, _)| {
+                                    let places = place_table(db, base.body_scope(db));
+                                    places
+                                        .symbol_id(attr)
+                                        .is_some_and(|symbol| places.symbol(symbol).is_bound())
+                                })
+                        })
+                    {
+                        // An implicit attribute cannot establish its own absence while its
+                        // initializer is being inferred.
                         return None;
                     }
 

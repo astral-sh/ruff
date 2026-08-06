@@ -385,6 +385,80 @@ class Cached:
 reveal_type(Cached().metadata)  # revealed: int
 ```
 
+## Guarded instance attributes when the base is checked first
+
+A guarded bound-method initializer remains valid, while another initializer still reports an
+attribute that is missing from the base class.
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__
+        if not hasattr(self, "z"):
+            self.z = self.y  # error: [unresolved-attribute]
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+
+    def z(self): ...
+    def y(self): ...
+```
+
+## Guarded instance attributes when the subclass is checked first
+
+Checking the subclass first preserves the valid initializer and the missing-attribute diagnostic.
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+
+    def z(self): ...
+    def y(self): ...
+```
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__
+        if not hasattr(self, "z"):
+            self.z = self.y  # error: [unresolved-attribute]
+```
+
+## Assignments in the opposite guard branch do not initialize an attribute
+
+Assigning an existing attribute when `hasattr` succeeds does not initialize it in the opposite
+branch. That branch remains unreachable and cannot create another instance attribute.
+
+```py
+class C:
+    def __init__(self):
+        self.x = 1
+
+    def update(self):
+        if hasattr(self, "x"):
+            self.x = 2
+        else:
+            self.y = self.missing
+
+C().y  # error: [unresolved-attribute]
+```
+
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
 
 This example was minimized from
