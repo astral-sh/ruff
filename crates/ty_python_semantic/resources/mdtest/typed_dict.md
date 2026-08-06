@@ -2644,8 +2644,8 @@ Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S
 def _(item: Item) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
-# Runtime narrowing retains a `Top[dict[Unknown, Unknown]]` intersection around each `TypedDict`.
-# Those intersections should still reuse the common protocol constraints of the union.
+# Runtime narrowing preserves each `TypedDict` schema without exposing unrestricted dictionary
+# operations. The union should still reuse its common protocol constraints.
 # Regression test for https://github.com/astral-sh/ty/issues/3974.
 def _(item: Item | str) -> None:
     if isinstance(item, dict):

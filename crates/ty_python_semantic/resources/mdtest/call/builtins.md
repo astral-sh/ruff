@@ -517,6 +517,11 @@ for function in map(Function, [object()]):
 Several `dict` overloads accept one positional argument. When none matches, an arbitrarily selected
 overload must not make an otherwise compatible return type fail.
 
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
 ```py
 from collections.abc import Mapping
 
@@ -530,6 +535,11 @@ def copy(value: object) -> dict[str, str]:
 
 An invalid `dict` call must not invalidate an assignment inside a branch where the original value
 has already been narrowed to a mapping.
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
 
 ```py
 from collections.abc import Mapping

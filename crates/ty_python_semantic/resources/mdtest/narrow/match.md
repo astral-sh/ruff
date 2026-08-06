@@ -91,9 +91,16 @@ def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
 
 ## Class patterns with generic classes
 
+### Gradual mode
+
+Generic class patterns follow the same gradual filtering as `isinstance()` checks.
+
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
 ```
 
 ```py
@@ -112,6 +119,44 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
+A `list()` pattern preserves the type argument inherited from a specialized `Sequence`.
+
+```py
+from typing import Sequence
+
+def narrow_sequence_to_list(value: Sequence[int]) -> None:
+    match value:
+        case list():
+            reveal_type(value)  # revealed: list[int]
+        case _:
+            reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
+```
+
+### Strict mode
+
+With strict generic narrowing enabled, class patterns retain their top materializations.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+A `list()` pattern retains the original `Sequence` alongside the top-materialized list.
+
+```py
+from typing import Sequence
+
+def narrow_sequence_to_list(value: Sequence[int]) -> None:
+    match value:
+        case list():
+            reveal_type(value)  # revealed: Sequence[int] & Top[list[Unknown]]
+        case _:
+            reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
+```
+
 ## Generic patterns ignore type parameter defaults
 
 A generic class pattern matches every runtime specialization, not only the specialization described
@@ -120,6 +165,9 @@ by its type parameter's default.
 ```toml
 [environment]
 python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
 ```py
@@ -203,7 +251,7 @@ from typing import Any
 
 def test_isinstance(x: dict[Any, Any] | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+        reveal_type(x)  # revealed: dict[Any, Any] | (int & Mapping[Unknown, Unknown])
     else:
         reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
@@ -976,12 +1024,18 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 
 ## Generic subclass captures
 
-When a generic pattern class inherits from the subject's class through an invariant base, the
-subject specialization determines the pattern class's type arguments. This applies to annotated
-attributes and properties. Every pattern-class type parameter must have an exact solution; variant
-bases and unconstrained parameters retain the existing conservative fallback. When the subject does
-not provide type arguments, members declared by the pattern class use `Unknown`; a type parameter
-default does not restrict which instances match at runtime.
+### Gradual mode
+
+When a generic pattern class inherits from the subject's class, the subject specialization
+determines any inferable pattern-class type arguments. This applies to annotated attributes and
+properties, including classes with unconstrained type parameters or variant bases. When the subject
+does not provide type arguments, members declared by the pattern class use `Unknown`; a type
+parameter default does not restrict which instances match at runtime.
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
 
 ```py
 from typing import final, Generic
@@ -1093,8 +1147,164 @@ def test_match_partially_specialized_generic_subclass(
 ) -> None:
     match value:
         case PartiallySpecializedGenericPatternChild(item=item):
-            # `ExtraGenericPatternT` is not constrained by the subject, so the pattern class does
-            # not have one exact specialization.
+            reveal_type(item)  # revealed: int
+
+def test_match_covariant_generic_subclass(
+    value: CovariantGenericPatternBase[int],
+) -> None:
+    match value:
+        case CovariantGenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_inherited_generic_subclass_capture(
+    value: GenericMemberBase[GenericPatternT],
+) -> GenericPatternT:
+    match value:
+        case GenericMemberChild(item=item):
+            # revealed: GenericPatternT@test_match_inherited_generic_subclass_capture
+            reveal_type(item)
+            return item
+        case _:
+            raise ValueError
+
+def test_match_generic_base_capture_preserves_subject_specialization(
+    value: IntGenericMemberChild,
+) -> None:
+    match value:
+        case GenericMemberBase(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_direct_generic_pattern_preserves_declared_member(value: object) -> None:
+    match value:
+        case FinalGenericPatternBox(value=int() as item):
+            reveal_type(item)  # revealed: Never
+
+def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
+    match value:
+        case DefaultGenericPatternBox(value=int() as item):
+            reveal_type(item)  # revealed: Unknown & int
+```
+
+### Strict mode
+
+An invariant generic base determines its subclass's type arguments only when every argument has one
+exact solution. Unconstrained arguments and variant bases retain conservative member types.
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import final, Generic
+from typing_extensions import TypeVar
+
+GenericPatternT = TypeVar("GenericPatternT")
+ExtraGenericPatternT = TypeVar("ExtraGenericPatternT")
+CovariantGenericPatternT = TypeVar("CovariantGenericPatternT", covariant=True)
+DefaultGenericPatternT = TypeVar("DefaultGenericPatternT", default=str)
+
+class GenericPatternBase(Generic[GenericPatternT]): ...
+
+OptionalGenericPatternT = TypeVar(
+    "OptionalGenericPatternT",
+    bound=GenericPatternBase[int] | None,
+)
+UnionBoundGenericPatternT = TypeVar(
+    "UnionBoundGenericPatternT",
+    bound=GenericPatternBase[int] | GenericPatternBase[str],
+)
+
+class GenericPatternChild(GenericPatternBase[GenericPatternT]):
+    item: GenericPatternT
+    items: list[GenericPatternT]
+
+class PartiallySpecializedGenericPatternChild(
+    GenericPatternBase[GenericPatternT],
+    Generic[GenericPatternT, ExtraGenericPatternT],
+):
+    item: GenericPatternT
+
+class CovariantGenericPatternBase(Generic[CovariantGenericPatternT]): ...
+
+class CovariantGenericPatternChild(CovariantGenericPatternBase[CovariantGenericPatternT]):
+    item: CovariantGenericPatternT
+
+class GenericMemberBase(Generic[GenericPatternT]):
+    item: GenericPatternT
+
+class GenericMemberChild(GenericMemberBase[GenericPatternT]): ...
+class IntGenericMemberChild(GenericMemberBase[int]): ...
+
+@final
+class FinalGenericPatternBox(Generic[GenericPatternT]):
+    value: list[GenericPatternT]
+
+class DefaultGenericPatternBox(Generic[DefaultGenericPatternT]):
+    value: DefaultGenericPatternT
+
+ResultValueT = TypeVar("ResultValueT")
+ResultErrorT = TypeVar("ResultErrorT")
+
+class MatchResult(Generic[ResultValueT, ResultErrorT]): ...
+
+class MatchOk(MatchResult[ResultValueT, ResultErrorT]):
+    __match_args__ = ("value",)
+
+    @property
+    def value(self) -> ResultValueT:
+        raise NotImplementedError
+
+class MatchErr(MatchResult[ResultValueT, ResultErrorT]):
+    __match_args__ = ("error",)
+
+    @property
+    def error(self) -> ResultErrorT:
+        raise NotImplementedError
+
+def test_match_generic_subclass_property_capture(
+    result: MatchResult[int, str],
+) -> int:
+    match result:
+        case MatchOk(value):
+            reveal_type(value)  # revealed: int
+            return value
+        case MatchErr(error):
+            reveal_type(error)  # revealed: str
+            raise ValueError(error)
+    raise AssertionError
+
+def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_generic_subclass_capture_from_optional_typevar_bound(
+    value: OptionalGenericPatternT,
+) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_generic_subclass_capture_from_union_typevar_bound(
+    value: UnionBoundGenericPatternT,
+) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int | str
+
+def test_match_nested_generic_subclass_capture(value: GenericPatternBase[int]) -> list[int]:
+    match value:
+        case GenericPatternChild(items=items):
+            reveal_type(items)  # revealed: list[int]
+            return items
+    return []
+
+def test_match_partially_specialized_generic_subclass(
+    value: GenericPatternBase[int],
+) -> None:
+    match value:
+        case PartiallySpecializedGenericPatternChild(item=item):
             reveal_type(item)  # revealed: Unknown
 
 def test_match_covariant_generic_subclass(
@@ -1102,7 +1312,6 @@ def test_match_covariant_generic_subclass(
 ) -> None:
     match value:
         case CovariantGenericPatternChild(item=item):
-            # The subject constrains only one end of the possible pattern-class specializations.
             reveal_type(item)  # revealed: Unknown
 
 def test_match_inherited_generic_subclass_capture(
@@ -1338,7 +1547,8 @@ Two unrelated non-final classes can have a common subclass through multiple inhe
 successful pattern therefore preserves both class types. Attributes defined on both classes use the
 intersection of their declared types, consistent with ordinary attribute access on an intersection.
 For a generic pattern class whose type arguments are not known from the subject, its attributes use
-`Unknown`.
+`Unknown`. Iterating over a generic attribute likewise produces an unknown element type in gradual
+mode.
 
 ```py
 from typing import Generic, TypeVar
@@ -1434,7 +1644,7 @@ def test_match_generic_container_member_keeps_loop_reachable(
     match value:
         case GenericListOverlapB(values=items):
             for item in items:
-                reveal_type(item)  # revealed: object
+                reveal_type(item)  # revealed: Unknown
 ```
 
 ## Class pattern captures from `Any` and `Unknown`
