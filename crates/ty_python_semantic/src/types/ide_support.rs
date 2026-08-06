@@ -13,7 +13,7 @@ use crate::types::{
     KnownUnion, PropertyAccessorRole, SubclassOfInner, Type, TypeContext,
     TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{Db, DisplaySettings, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
+use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -1773,11 +1773,7 @@ pub fn call_type_simplified_by_overloads(
     }
 
     let signature = resolve_single_overload(model, callable_type, call_expr)?;
-    Some(
-        signature
-            .display_with(db, env, DisplaySettings::default().multiline())
-            .to_string(),
-    )
+    Some(signature.display(db, env).multiline().to_string())
 }
 
 /// Returns the definitions of the binary operation along with its callable type.
@@ -3069,14 +3065,10 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
     let env = &model.program_environment();
     let display_sig = |signature: &Signature| {
         let params = signature
-            .display_with(
-                db,
-                env,
-                DisplaySettings::default()
-                    .multiline()
-                    .disallow_signature_name()
-                    .hide_return_type(),
-            )
+            .display(db, env)
+            .multiline()
+            .disallow_name()
+            .hide_return_type()
             .to_string();
 
         format!("class {class_name}{params}")

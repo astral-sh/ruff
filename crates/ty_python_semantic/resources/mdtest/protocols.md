@@ -1242,9 +1242,11 @@ static_assert(not is_assignable_to(HasX, Foo))
 static_assert(not is_subtype_of(HasX, Foo))
 ```
 
-Since `object` defines a `__hash__` method, this means that the standard-library `Hashable` protocol
-is currently understood by ty as being equivalent to `object`, much like `SupportsStr` and
-`UniversalSet` above:
+Although `object` defines a `__hash__` method, its subclasses can disable hashing by replacing that
+method with `None`. The standard-library `Hashable` protocol is therefore not equivalent to
+`object`, unlike `SupportsStr` and `UniversalSet` above. Modeling this distinction violates normal
+subtyping rules and is therefore unsound, but it is widely relied on throughout the Python
+ecosystem:
 
 ```py
 from typing import Hashable, Protocol
@@ -1252,9 +1254,9 @@ from typing import Hashable, Protocol
 class SupportsHash(Protocol):
     def __hash__(self) -> int: ...
 
-static_assert(is_equivalent_to(object, Hashable))
+static_assert(not is_equivalent_to(object, Hashable))
 static_assert(is_assignable_to(object, Hashable))
-static_assert(is_subtype_of(object, Hashable))
+static_assert(not is_subtype_of(object, Hashable))
 
 def check_object_or_hashable(x: object | Hashable):
     reveal_type(x)  # revealed: object
@@ -1266,14 +1268,13 @@ def check_hashable_or_supports_hash(x: Hashable | SupportsHash):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_universal(x: Hashable | UniversalSet):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: UniversalSet
 ```
 
-This means that any type considered assignable to `object` (which is all types) is considered by ty
-to be assignable to `Hashable`. However, ty preserves a non-final nominal type in a union with
-`Hashable` instead of discarding it as redundant. A non-final class can have unhashable subclasses,
-so keeping the corresponding union element retains the annotation's more precise description of
-those subclasses. For example, `list[str]` is unhashable but is a subtype of `Sequence[Hashable]`:
+ty checks whether a type actually provides a callable `__hash__` method instead of assuming all
+subtypes of `object` are hashable. It also preserves a non-final nominal type in a union with
+`Hashable` instead of discarding it as redundant, since a subclass can disable hashing. For example,
+`list[str]` is unhashable but is a subtype of `Sequence[Hashable]`:
 
 ```py
 from collections.abc import Hashable as AbcHashable
@@ -1297,8 +1298,9 @@ static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
 static_assert(is_subtype_of(list[str], Sequence[Hashable]))
 ```
 
-The additional union element is still simplified if it is a final class, because instances of the
-class cannot override their inherited hashability:
+The additional union element is still simplified if it is a final hashable class, because instances
+of that class cannot override their inherited hashability. Final classes with `__hash__ = None` must
+remain in the union:
 
 ```py
 from dataclasses import dataclass
@@ -1330,9 +1332,8 @@ class UnhashableDataclass: ...
 def check_hashable_or_final(x: Hashable | C):
     reveal_type(x)  # revealed: Hashable
 
-# TODO: Preserve final classes that are known to be unhashable.
 def check_hashable_or_unhashable_final(x: Hashable | Unhashable):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | Unhashable
 
 def check_hashable_or_eq_only(x: Hashable | EqOnly):
     reveal_type(x)  # revealed: Hashable
@@ -1341,10 +1342,10 @@ def check_hashable_or_eq_only_child(x: Hashable | EqOnlyChild):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_unhashable_dataclass(x: Hashable | UnhashableDataclass):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | UnhashableDataclass
 ```
 
-The special case is currently limited to nominal instance types:
+Type variables and protocols that can contain unhashable values also remain in the union:
 
 ```py
 from typing import TypeVar, TypedDict
@@ -1354,24 +1355,24 @@ T = TypeVar("T")
 class Payload(TypedDict):
     value: int
 
-# TODO: Preserve non-nominal types that can contain unhashable values.
 def check_hashable_or_typevar(x: Hashable | T):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | T@check_hashable_or_typevar
 
+# TODO: Preserve TypedDict types, which are unhashable at runtime.
 def check_hashable_or_typed_dict(x: Hashable | Payload):
     reveal_type(x)  # revealed: Hashable
 
 def check_hashable_or_protocol(x: Hashable | HasX):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | HasX
 ```
 
-We do not detect errors in cases like the following, which are flagged by other type checkers:
+A list does not satisfy `Hashable`, even though it inherits from `object`:
 
 ```py
 def needs_something_hashable(x: Hashable):
     hash(x)
 
-needs_something_hashable([])
+needs_something_hashable([])  # error: [invalid-argument-type]
 ```
 
 ## Diagnostics for protocols with invalid attribute members
@@ -1433,6 +1434,148 @@ from typing import Protocol
 
 class C(A, Protocol):
     x = 42  # fine, due to declaration in the base class
+```
+
+## Hashable protocol assignability
+
+An explicitly disabled `__hash__` method makes an object incompatible with the standard-library
+`Hashable` protocol, even though `object` itself defines a valid `__hash__` method.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Hashable
+from typing import ClassVar, Hashable as TypingHashable, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+def accepts_hashable(value: Hashable) -> None: ...
+
+class AnnotationOnly:
+    __hash__: ClassVar[None]
+
+class ExplicitNone:
+    __hash__: ClassVar[None] = None
+
+accepts_hashable(AnnotationOnly())  # error: [invalid-argument-type]
+accepts_hashable(ExplicitNone())  # error: [invalid-argument-type]
+```
+
+Disabling `__hash__` also applies to subclasses, and declaring an unhashable class final does not
+make it hashable.
+
+```py
+class InheritedNone(ExplicitNone): ...
+
+@final
+class FinalExplicitNone:
+    __hash__: ClassVar[None] = None
+
+accepts_hashable(InheritedNone())  # error: [invalid-argument-type]
+accepts_hashable(FinalExplicitNone())  # error: [invalid-argument-type]
+```
+
+The standard-library stubs mark mutable built-in containers as unhashable.
+
+```py
+accepts_hashable([])  # error: [invalid-argument-type]
+accepts_hashable({})  # error: [invalid-argument-type]
+accepts_hashable(set())  # error: [invalid-argument-type]
+```
+
+The `typing` alias imposes the same requirements as `collections.abc.Hashable`.
+
+```py
+def accepts_typing_hashable(value: TypingHashable) -> None: ...
+
+accepts_typing_hashable(ExplicitNone())  # error: [invalid-argument-type]
+accepts_typing_hashable([])  # error: [invalid-argument-type]
+```
+
+Explicitly hashable classes and immutable built-in values remain valid.
+
+```py
+class ExplicitHash:
+    def __hash__(self) -> int:
+        return 1
+
+accepts_hashable(ExplicitHash())
+accepts_hashable(1)
+accepts_hashable("value")
+accepts_hashable(("value",))
+```
+
+Concrete `object()` instances are hashable and commonly used as sentinel values, even though the
+`object` type can also include unhashable subclasses.
+
+```py
+SENTINEL = object()
+
+def accepts_hashable_default(value: Hashable = SENTINEL) -> None: ...
+
+accepts_hashable(object())
+accepts_hashable(SENTINEL)
+```
+
+The same distinction applies to both assignability and subtyping checks.
+
+```py
+static_assert(not is_assignable_to(ExplicitNone, Hashable))
+static_assert(not is_subtype_of(ExplicitNone, Hashable))
+static_assert(not is_assignable_to(list[str], Hashable))
+static_assert(not is_subtype_of(list[str], Hashable))
+```
+
+## User-defined hash protocols
+
+A user-defined protocol that explicitly requires a callable `__hash__` method imposes the same
+requirement as the standard-library `Hashable` protocol.
+
+```py
+from typing import ClassVar, Protocol
+
+class SupportsHash(Protocol):
+    def __hash__(self) -> int: ...
+
+class ExplicitNone:
+    __hash__: ClassVar[None] = None
+
+class ExplicitHash:
+    def __hash__(self) -> int:
+        return 1
+
+def accepts_hashable(value: SupportsHash) -> None: ...
+
+accepts_hashable(ExplicitNone())  # error: [invalid-argument-type]
+accepts_hashable([])  # error: [invalid-argument-type]
+accepts_hashable(ExplicitHash())
+accepts_hashable(object())
+```
+
+## Hashability of dataclasses
+
+Mutable dataclasses disable hashing by default, while frozen dataclasses synthesize a callable
+`__hash__` method.
+
+```py
+from collections.abc import Hashable
+from dataclasses import dataclass
+
+@dataclass
+class Mutable:
+    value: int
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int
+
+def accepts_hashable(value: Hashable) -> None: ...
+
+accepts_hashable(Mutable(1))  # error: [invalid-argument-type]
+accepts_hashable(Frozen(1))
 ```
 
 ## Equivalence of protocols
@@ -2291,7 +2434,7 @@ class ReadClass(Protocol[JustT_co]):
     def __class__(self, /) -> type[JustT_co]: ...
 
 def takes_read_class(value: ReadClass[float]) -> None:
-    reveal_type(value)  # revealed: ReadClass[int | float]
+    reveal_type(value)  # revealed: ReadClass[float]
 
 takes_read_class(1)
 takes_read_class(1.0)
@@ -2303,7 +2446,7 @@ class WritableValue(Protocol[JustT]):
     def value(self, value: type[JustT], /) -> None: ...
 
 def takes_writable_value(value: WritableValue[float]) -> None:
-    reveal_type(value)  # revealed: WritableValue[int | float]
+    reveal_type(value)  # revealed: WritableValue[float]
 ```
 
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the

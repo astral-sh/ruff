@@ -3456,6 +3456,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         target_index += 1;
                     }
+
+                    // Once every fixed source parameter matches the target prefix, an
+                    // object-variadic tail accepts every materialization of the gradual remainder.
+                    // Reject additional fixed or keyword-only parameters: they would make the
+                    // source more restrictive than at least one possible target signature.
+                    if let [source_prefix @ .., variadic, keyword_variadic] =
+                        source_parameters.as_slice()
+                        && source_prefix.len() <= target_prefix_params.len()
+                        && variadic.is_variadic()
+                        && variadic.annotated_type().is_object()
+                        && keyword_variadic.is_keyword_variadic()
+                        && keyword_variadic.annotated_type().is_object()
+                    {
+                        return result;
+                    }
                 }
 
                 _ => {}

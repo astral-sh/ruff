@@ -248,7 +248,7 @@ def _(a: object, flag: bool) -> TypeGuard[str]:
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
 def f(a: object, flag: bool) -> TypeIs[str]:
     if flag:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float*`"
         return 1.2
 
 def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:

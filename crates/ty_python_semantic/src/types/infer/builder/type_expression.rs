@@ -2069,17 +2069,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 ty,
                                 Type::TypeVar(typevar) if typevar.is_typevartuple(db)
                             ) || if let ast::Expr::Subscript(subscript) = argument {
-                                let previously_in_unpack_type_argument = self
-                                    .context
-                                    .inference_flags
-                                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
-                                let inner_ty = self.infer_type_expression(&subscript.slice);
-                                self.context.inference_flags.set(
-                                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
-                                    previously_in_unpack_type_argument,
-                                );
                                 matches!(
-                                    inner_ty,
+                                    self.expression_type(&subscript.slice),
                                     Type::TypeVar(typevar) if typevar.is_typevartuple(db)
                                 )
                             } else {
@@ -2470,10 +2461,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     TypeExpressionFlags::UNPACK,
                 );
 
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
+                let inference_flags = self.inference_flags();
+                let is_nested_unpack =
+                    inference_flags.contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT);
+                let is_nested_kwargs = inference_flags
+                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
+                    && inference_flags.contains(InferenceFlags::IN_NESTED_TYPE_EXPRESSION);
+                let is_invalid_context = !inference_flags.intersects(
+                    InferenceFlags::IN_VARARG_ANNOTATION
+                        | InferenceFlags::IN_KWARG_ANNOTATION
+                        | InferenceFlags::IN_VALID_UNPACK_CONTEXT,
+                );
+
+                let previously_in_unpack_type_argument = self
+                    .context
+                    .inference_flags
+                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
+                let inner_ty = if self.in_string_annotation()
+                    && (is_nested_unpack || is_nested_kwargs || is_invalid_context)
                 {
+                    // Invalid string annotations never execute, so their operands must not
+                    // produce runtime errors even though their inferred types are still needed.
+                    let mut speculative = self.speculate_without_diagnostics();
+                    let inner_ty = speculative.infer_type_expression(arguments_slice);
+                    self.extend(speculative);
+                    inner_ty
+                } else {
+                    self.infer_type_expression(arguments_slice)
+                };
+                self.context.inference_flags.set(
+                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+                    previously_in_unpack_type_argument,
+                );
+
+                if is_nested_unpack {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(
                             builder.into_diagnostic("`Unpack` cannot be nested"),
@@ -2482,13 +2503,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    && self
-                        .inference_flags()
-                        .contains(InferenceFlags::IN_NESTED_TYPE_EXPRESSION)
-                {
+                if is_nested_kwargs {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
                             "`Unpack` is only valid as the top-level `**kwargs` annotation form",
@@ -2497,11 +2512,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                if !self.inference_flags().intersects(
-                    InferenceFlags::IN_VARARG_ANNOTATION
-                        | InferenceFlags::IN_KWARG_ANNOTATION
-                        | InferenceFlags::IN_VALID_UNPACK_CONTEXT,
-                ) {
+                if is_invalid_context {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
                             format_args!(
@@ -2512,16 +2523,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     return Type::unknown();
                 }
-
-                let previously_in_unpack_type_argument = self
-                    .context
-                    .inference_flags
-                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
-                let inner_ty = self.infer_type_expression(arguments_slice);
-                self.context.inference_flags.set(
-                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
-                    previously_in_unpack_type_argument,
-                );
 
                 if self
                     .inference_flags()

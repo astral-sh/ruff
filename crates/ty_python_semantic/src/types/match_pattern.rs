@@ -109,7 +109,11 @@ fn typed_dict_pattern_domain_satisfies<'db>(
 }
 
 /// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-fn is_typed_dict_pattern_domain(db: &dyn Db, env: &ProgramEnvironment<'_>, ty: Type<'_>) -> bool {
+pub(super) fn is_typed_dict_runtime_domain(
+    db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
+    ty: Type<'_>,
+) -> bool {
     typed_dict_pattern_domain_satisfies(db, env, ty, &|_| true)
 }
 
@@ -273,7 +277,7 @@ fn class_pattern_is_exhaustive(
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
     let class_instance_ty = Type::instance(db, env, class.top_materialization(db));
-    let is_typed_dict_match = is_typed_dict_pattern_domain(db, env, subject_ty)
+    let is_typed_dict_match = is_typed_dict_runtime_domain(db, env, subject_ty)
         && typed_dict_matches_class_pattern(db, env, class);
     if !is_typed_dict_match && !subject_ty.is_subtype_of(db, env, class_instance_ty) {
         return false;

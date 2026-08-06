@@ -55,12 +55,12 @@ reveal_type(x4)  # revealed: Literal[MyEnum.A]
 reveal_type(promote(x4))  # revealed: list[MyEnum]
 
 x5 = 3.14
-reveal_type(x5)  # revealed: float
-reveal_type(promote(x5))  # revealed: list[int | float]
+reveal_type(x5)  # revealed: float*
+reveal_type(promote(x5))  # revealed: list[float]
 
 x6 = 3.14j
-reveal_type(x6)  # revealed: complex
-reveal_type(promote(x6))  # revealed: list[int | float | complex]
+reveal_type(x6)  # revealed: complex*
+reveal_type(promote(x6))  # revealed: list[complex]
 
 def _(source: Literal["foo", "bar"]):
     x7 = f"hello"

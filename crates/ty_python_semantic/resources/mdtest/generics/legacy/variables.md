@@ -442,7 +442,7 @@ T3 = TypeVar("T3", bound=str)
 # and the upper bound of `T` (`int`) is assignable to `int | float`
 S = TypeVar("S", default=T1, bound=float)
 
-# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `float` of `U` because its upper bound `str` is not assignable to `float`"
 U = TypeVar("U", default=T3, bound=float)
 ```
 
@@ -576,7 +576,7 @@ T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
 S = TypeVar("S", float, str)
-reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
+reveal_type(S.__constraints__)  # revealed: tuple[float, str]
 ```
 
 ### Cannot have only one constraint
