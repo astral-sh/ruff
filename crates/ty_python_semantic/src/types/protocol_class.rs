@@ -853,8 +853,8 @@ impl<'db> ProtocolInterface<'db> {
 
     /// Return whether this interface is currently supported by structural variance inference.
     ///
-    /// TODO: Support recursive protocol members, descriptor writes, and writable `type[T]`
-    /// members instead of skipping variance inference for these interfaces.
+    /// TODO: Support recursive protocol members, descriptor writes with unrepresentable domains,
+    /// and writable `type[T]` members instead of skipping variance inference for these interfaces.
     pub(super) fn supports_variance_inference(
         self,
         db: &'db dyn Db,
@@ -872,7 +872,10 @@ impl<'db> ProtocolInterface<'db> {
                 ) && [capabilities.instance, capabilities.class]
                     .into_iter()
                     .all(|access| {
-                        !matches!(access.write, Some(ProtocolMemberWrite::Descriptor { .. }))
+                        !matches!(
+                            access.write,
+                            Some(ProtocolMemberWrite::Descriptor { domain: None, .. })
+                        )
                     })
             })
     }
