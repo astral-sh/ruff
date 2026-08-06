@@ -17,7 +17,7 @@ use crate::Db;
 pub(crate) fn lexical_name_path_for_definition(
     db: &dyn Db,
     definition: Definition,
-) -> Option<Box<[Name]>> {
+) -> Option<Vec<Name>> {
     let parsed = parsed_module(db, definition.python_file(db));
     let module = parsed.load(db);
 
@@ -42,7 +42,7 @@ pub(crate) fn lexical_name_path_for_definition(
     }
 
     path.reverse();
-    Some(path.into_boxed_slice())
+    Some(path)
 }
 
 /// Computes a lexical name path component for an enclosing scope.

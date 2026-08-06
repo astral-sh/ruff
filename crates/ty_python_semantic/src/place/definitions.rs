@@ -6,18 +6,10 @@ use crate::Db;
 use crate::reachability::ReachabilityConstraintsExtension;
 
 /// A set of definitions found by name resolution.
-#[expect(
-    dead_code,
-    reason = "shared infrastructure is dormant until a definition-resolution consumer is added"
-)]
 pub(crate) struct DefinitionResolution<'db> {
     definitions: SmallVec<[Definition<'db>; 2]>,
 }
 
-#[expect(
-    dead_code,
-    reason = "shared infrastructure is dormant until a definition-resolution consumer is added"
-)]
 impl<'db> DefinitionResolution<'db> {
     /// Returns the definitions found by name resolution.
     pub(crate) fn definitions(&self) -> &[Definition<'db>] {
