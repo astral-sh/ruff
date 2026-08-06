@@ -1377,12 +1377,16 @@ def narrow_mutual(value: object) -> None:
 
 ## Narrowing generic defaults in Python 3.13
 
-When a type parameter has a bare `Any` default, its uninferred type argument remains `Unknown`,
-while an unrelated `Any` is unchanged:
+When a type parameter has a bare `Any` default, narrowing still materializes the substituted
+typevar. The default isn't used during `isinstance` narrowing (the type parameter gets `Unknown`
+instead), so the default value is irrelevant here:
 
 ```toml
 [environment]
 python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
 ```py
@@ -1393,10 +1397,10 @@ class WithAnyDefault[T = Any]:
 
 def _(x: object):
     if isinstance(x, WithAnyDefault):
-        reveal_type(x.y)  # revealed: tuple[Any, Unknown]
+        reveal_type(x.y)  # revealed: tuple[Any, object]
 ```
 
-This also works with type aliases:
+Type alias defaults substituted into type parameters still need to be materialized when narrowing:
 
 ```py
 from typing import Any
@@ -1408,7 +1412,7 @@ class WithAliasDefault[T = A]:
 
 def _(x: object):
     if isinstance(x, WithAliasDefault):
-        reveal_type(x.y)  # revealed: tuple[A, Unknown]
+        reveal_type(x.y)  # revealed: tuple[A, object]
 ```
 
 `isinstance(value, Box)` checks the runtime class, not the type argument used to specialize it.
@@ -1416,39 +1420,35 @@ Narrowing must therefore preserve the original type argument instead of substitu
 default.
 
 ```py
-from typing import assert_never, final
+from typing import assert_never
 
-@final
-class Item: ...
-
-class Box[T: Item = Item]:
+class Box[T: str = str]:
     value: T
 
     def __init__(self, value: T) -> None: ...
 
-def box_with_default[T: Item = Item](value: Box[T] | T) -> Box[T]:
+def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
         reveal_type(value)  # revealed: Box[T@box_with_default]
         return value
 
     if not isinstance(value, Box):
-        reveal_type(value)  # revealed: T@box_with_default
+        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
         return Box[T](value)
 
     assert_never(value)
 ```
 
-When gradual `isinstance()` narrowing encounters an unknown value, a tuple subclass's uninferred
-type argument remains `Unknown`, regardless of its bound or default. Its element types are inherited
-from the specialized base.
+When `isinstance()` narrows an unknown value to a tuple subclass, its type argument comes from the
+declared upper bound, not the default. Its element types are inherited from the specialized base.
 
 ```py
 class DefaultedTuple[T: int = bool](tuple[T, str]): ...
 
 def narrow_defaulted_tuple(value: object) -> None:
     if isinstance(value, DefaultedTuple):
-        reveal_type(value)  # revealed: DefaultedTuple[Unknown]
-        reveal_type(value[0])  # revealed: Unknown
+        reveal_type(value)  # revealed: DefaultedTuple[int]
+        reveal_type(value[0])  # revealed: int
         reveal_type(value[1])  # revealed: str
 ```
 
