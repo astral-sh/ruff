@@ -4663,18 +4663,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.report_undeclared_protocol_attribute(attr_expr);
-                self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
+
+                // Composite receiver stores are outside the scope of augmented-store validation,
+                // but their existing `Final` checks must continue to apply.
+                if object_ty.as_union_like(self.db()).is_some()
+                    || matches!(
+                        object_ty.resolve_type_alias(self.db()),
+                        Type::Intersection(_)
+                    )
+                {
+                    self.validate_final_attribute_assignment(
+                        attr_expr,
+                        object_ty,
+                        attr_expr.attr.id(),
+                    );
+                }
             }
         }
     }
 
+    /// Infer an augmented operator, returning its recovery type if the operation fails.
     fn infer_augmented_op(
         &mut self,
         assignment: &ast::StmtAugAssign,
         target_type: Type<'db>,
         value_expr: &ast::Expr,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
@@ -4685,7 +4700,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binary_return_ty = |builder: &mut Self, value_ty| {
             builder
                 .infer_binary_expression_type(assignment.into(), false, target_type, value_ty, op)
-                .unwrap_or_else(|| {
+                .ok_or_else(|| {
                     report_unsupported_augmented_assignment(
                         &builder.context,
                         assignment,
@@ -4704,14 +4719,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // equally applicable type contexts for each union member.
                 infer_value_ty.infer_loud(self, TypeContext::default());
 
-                union.map(db, env, |&elem_type| {
-                    self.infer_augmented_op(
+                let mut operation_failed = false;
+                let result_ty = union.map(db, env, |&elem_type| {
+                    match self.infer_augmented_op(
                         assignment,
                         elem_type,
                         value_expr,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                    )
-                })
+                    ) {
+                        Ok(ty) => ty,
+                        Err(recovery_ty) => {
+                            operation_failed = true;
+                            recovery_ty
+                        }
+                    }
+                });
+
+                if operation_failed {
+                    Err(result_ty)
+                } else {
+                    Ok(result_ty)
+                }
             }
 
             _ => {
@@ -4723,7 +4751,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         infer_value_ty,
                     )
                 {
-                    return typed_dict_update_ty;
+                    return Ok(typed_dict_update_ty);
                 }
 
                 let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
@@ -4739,7 +4767,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeContext::default(),
                 );
                 match call {
-                    Ok(outcome) => outcome.return_type(db, env),
+                    Ok(outcome) => Ok(outcome.return_type(db, env)),
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
@@ -4748,12 +4776,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         bindings: outcome, ..
                     }) => {
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
-                        UnionType::from_two_elements(
-                            db,
-                            env,
-                            outcome.return_type(db, env),
-                            binary_return_ty(self, value_ty),
-                        )
+                        match binary_return_ty(self, value_ty) {
+                            Ok(binary_ty) => Ok(UnionType::from_two_elements(
+                                db,
+                                env,
+                                outcome.return_type(db, env),
+                                binary_ty,
+                            )),
+                            Err(recovery_ty) => Err(UnionType::from_two_elements(
+                                db,
+                                env,
+                                outcome.return_type(db, env),
+                                recovery_ty,
+                            )),
+                        }
                     }
                     Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
@@ -4763,7 +4799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             target_type,
                             value_ty,
                         );
-                        bindings.return_type(db, env)
+                        Err(bindings.return_type(db, env))
                     }
                 }
             }
@@ -4809,8 +4845,175 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => self.infer_expression(target, TypeContext::default()),
         };
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
+        let result_ty =
+            match self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            }) {
+                Ok(result_ty) => result_ty,
+                Err(recovery_ty) => return recovery_ty,
+            };
+
+        let db = self.db();
+        let env = self.program_environment();
+        match target.as_ref() {
+            ast::Expr::Attribute(attribute) => {
+                let object_ty = self.expression_type(&attribute.value);
+
+                // A union or intersection requires correlating each receiver with its own
+                // operator result; validating the combined result would reject valid programs.
+                if object_ty.as_union_like(db).is_some()
+                    || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
+                {
+                    return result_ty;
+                }
+
+                let PlaceAndQualifiers {
+                    place:
+                        Place::Defined(DefinedPlace {
+                            origin,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }),
+                    qualifiers,
+                } = object_ty.member(db, env, &attribute.attr.id)
+                else {
+                    return result_ty;
+                };
+
+                let is_data_descriptor =
+                    assignment_attribute_members(db, env, object_ty, &attribute.attr.id)
+                        .and_then(AssignmentAttributeMembers::type_member)
+                        .and_then(|member| member.place.ignore_possibly_undefined())
+                        .is_some_and(|ty| ty.may_be_data_descriptor(db, env));
+
+                // Inferred-only attributes can change type across augmented assignments. Concrete
+                // descriptors and qualified attributes still impose independent write contracts.
+                if !origin.is_declared()
+                    && !qualifiers.intersects(
+                        TypeQualifiers::FINAL
+                            | TypeQualifiers::CLASS_VAR
+                            | TypeQualifiers::READ_ONLY,
+                    )
+                    && !is_data_descriptor
+                {
+                    return result_ty;
+                }
+
+                let valid = self.validate_attribute_assignment(
+                    attribute,
+                    target,
+                    object_ty,
+                    attribute.attr.id(),
+                    &mut |_, _| result_ty,
+                    true,
+                );
+
+                if !valid || is_data_descriptor {
+                    target_type
+                } else {
+                    result_ty
+                }
+            }
+            ast::Expr::Subscript(subscript) => {
+                let object_ty = self.expression_type(&subscript.value);
+                let slice_ty = self.expression_type(&subscript.slice);
+
+                if object_ty.as_union_like(db).is_some()
+                    || slice_ty.as_union_like(db).is_some()
+                    || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
+                    || object_ty
+                        .subscript(db, env, slice_ty, ExprContext::Load)
+                        .is_err()
+                    || self.is_unannotated_mutable_collection(&subscript.value, object_ty)
+                {
+                    return result_ty;
+                }
+
+                if self.validate_augmented_subscript_assignment(
+                    subscript, target, object_ty, slice_ty, result_ty,
+                ) && (object_ty.is_typed_dict()
+                    || AddBinding::is_safe_mutable_class(db, env, object_ty))
+                {
+                    result_ty
+                } else {
+                    target_type
+                }
+            }
+            _ => result_ty,
+        }
+    }
+
+    /// Return whether this collection lacks a directly declared element-type contract.
+    ///
+    /// Augmented stores must participate in full-scope collection inference before they can
+    /// constrain these collections without rejecting valid element-type changes.
+    fn is_unannotated_mutable_collection(&self, object: &ast::Expr, object_ty: Type<'db>) -> bool {
+        let db = self.db();
+        if !AddBinding::is_safe_mutable_class(db, self.program_environment(), object_ty) {
+            return false;
+        }
+
+        let has_declared_type = |expression: &ast::Expr| match expression {
+            ast::Expr::Name(name) => {
+                let place = PlaceExpr::from_expr_name(name);
+                if matches!(
+                    self.infer_place_load(PlaceExprRef::from(&place), ast::ExprRef::Name(name))
+                        .0
+                        .place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        ..
+                    })
+                ) {
+                    return true;
+                }
+
+                let use_id = ast::ExprRef::Name(name).scoped_use_id(db, self.program_file());
+                let use_def = self.index.use_def_map(self.scope.file_scope_id(db));
+                use_def.bindings_at_use(use_id).any(|binding| {
+                    binding.binding.definition().is_some_and(|definition| {
+                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                            || use_def
+                                .declarations_at_binding(definition)
+                                .any(|declaration| declaration.declaration.definition().is_some())
+                    })
+                })
+            }
+            ast::Expr::Attribute(attribute) => {
+                let receiver_ty = self.expression_type(&attribute.value);
+                matches!(
+                    receiver_ty
+                        .member(db, self.program_environment(), &attribute.attr.id)
+                        .place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        ..
+                    })
+                )
+            }
+            _ => false,
+        };
+
+        if has_declared_type(object) {
+            return false;
+        }
+
+        let Some(name) = object.as_name_expr() else {
+            return true;
+        };
+        let use_id = ast::ExprRef::Name(name).scoped_use_id(db, self.program_file());
+        let use_def = self.index.use_def_map(self.scope.file_scope_id(db));
+
+        !use_def.bindings_at_use(use_id).any(|binding| {
+            binding
+                .binding
+                .definition()
+                .is_some_and(|definition| match definition.kind(db) {
+                    DefinitionKind::Assignment(assignment) => {
+                        has_declared_type(assignment.value(self.module()))
+                    }
+                    _ => false,
+                })
         })
     }
 

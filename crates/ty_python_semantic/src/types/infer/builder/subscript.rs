@@ -1662,6 +1662,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         is_valid_assignment
     }
 
+    /// Validate the already-inferred value written by an augmented subscript assignment.
+    pub(super) fn validate_augmented_subscript_assignment(
+        &mut self,
+        target: &ast::ExprSubscript,
+        result_node: &ast::Expr,
+        object_ty: Type<'db>,
+        slice_ty: Type<'db>,
+        result_ty: Type<'db>,
+    ) -> bool {
+        self.validate_subscript_assignment_impl(
+            target,
+            None,
+            object_ty,
+            &mut |_, _| slice_ty,
+            result_node,
+            &mut |_, _| result_ty,
+            true,
+        )
+    }
+
     #[expect(clippy::too_many_arguments)]
     fn validate_subscript_assignment_impl(
         &mut self,

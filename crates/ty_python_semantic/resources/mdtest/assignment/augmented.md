@@ -187,6 +187,285 @@ def f(flag: bool, flag2: bool):
     reveal_type(f)  # revealed: float | str
 ```
 
+## Annotated name targets
+
+An augmented assignment to an annotated name must validate its result against the declaration. An
+unannotated name can instead change type.
+
+```py
+class Value:
+    def __add__(self, other: int) -> object:
+        return other
+
+annotated: Value = Value()
+# error: [invalid-assignment]
+annotated += 1
+reveal_type(annotated)  # revealed: Value
+
+inferred = Value()
+inferred += 1
+reveal_type(inferred)  # revealed: object
+```
+
+## Attribute targets
+
+The result must satisfy the attribute's write contract, whether the operation uses `__iadd__` or
+falls back to `__add__`.
+
+```py
+class AddValue:
+    def __add__(self, other: int) -> object:
+        return other
+
+class InplaceValue:
+    def __iadd__(self, other: int) -> object:
+        return other
+
+class Holder:
+    add: AddValue
+    inplace: InplaceValue
+
+holder = Holder()
+# error: [invalid-assignment]
+holder.add += 1
+reveal_type(holder.add)  # revealed: AddValue
+
+# error: [invalid-assignment]
+holder.inplace += 1
+reveal_type(holder.inplace)  # revealed: InplaceValue
+```
+
+## Attribute descriptors
+
+Even an in-place operation writes its result back, so a read-only property rejects augmented
+assignment.
+
+```py
+class ReadOnly:
+    @property
+    def value(self) -> int:
+        return 1
+
+read_only = ReadOnly()
+# error: [invalid-assignment]
+read_only.value += 1
+reveal_type(read_only.value)  # revealed: int
+```
+
+A property's setter can accept a different type than its getter returns. The operation's result must
+satisfy the setter, while later reads continue to use the getter type.
+
+```py
+class ReadValue:
+    def __iadd__(self, other: int) -> str:
+        return "updated"
+
+class Writable:
+    @property
+    def value(self) -> ReadValue:
+        return ReadValue()
+
+    @value.setter
+    def value(self, value: str) -> None:
+        pass
+
+writable = Writable()
+writable.value += 1
+reveal_type(writable.value)  # revealed: ReadValue
+```
+
+## Subscript targets
+
+An augmented subscript assignment must pass its result, not the operator's right-hand operand, to
+the target's `__setitem__` method.
+
+```py
+class Value:
+    def __iadd__(self, other: int) -> object:
+        return other
+
+class Container:
+    def __getitem__(self, key: int) -> Value:
+        return Value()
+
+    def __setitem__(self, key: int, value: Value) -> None:
+        pass
+
+container = Container()
+# error: [invalid-assignment]
+container[0] += 1
+reveal_type(container[0])  # revealed: Value
+```
+
+Explicitly annotated lists and dictionaries retain their write contracts, including through one-hop
+aliases and references from enclosing scopes.
+
+```py
+items: list[Value] = [Value()]
+# error: [invalid-assignment]
+items[0] += 1
+reveal_type(items[0])  # revealed: Value
+
+alias = items
+# error: [invalid-assignment]
+alias[0] += 1
+
+separately_declared: list[Value]
+separately_declared = [Value()]
+# error: [invalid-assignment]
+separately_declared[0] += 1
+
+mapping: dict[str, Value] = {"value": Value()}
+# error: [invalid-assignment]
+mapping["value"] += 1
+reveal_type(mapping["value"])  # revealed: Value
+
+def update_declared_outer() -> None:
+    # error: [invalid-assignment]
+    items[0] += 1
+
+    alias = items
+    # error: [invalid-assignment]
+    alias[0] += 1
+```
+
+Declared collection-valued attributes also retain their write contracts through immediate aliases.
+
+```py
+class Holder:
+    values: list[Value]
+
+holder = Holder()
+# error: [invalid-assignment]
+holder.values[0] += 1
+
+member_alias = holder.values
+# error: [invalid-assignment]
+member_alias[0] += 1
+```
+
+Typed dictionary entries validate the value written back to their declared fields.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: Value
+
+payload: Payload = {"value": Value()}
+# error: [invalid-assignment]
+payload["value"] += 1
+reveal_type(payload["value"])  # revealed: Value
+```
+
+## Read-only subscripts
+
+A readable subscript is not necessarily writable.
+
+```py
+values: tuple[int] = (1,)
+# error: [invalid-assignment]
+values[0] += 1
+```
+
+## Failed attribute and subscript loads
+
+If the load has already failed, its corresponding store must not emit another diagnostic.
+
+```py
+class Missing: ...
+
+missing = Missing()
+# error: [unresolved-attribute]
+missing.value += 1
+
+mapping: dict[str, int] = {}
+# error: [invalid-argument-type]
+mapping[1] += 1
+```
+
+## Failed augmented operations
+
+An operation that cannot run does not perform a store.
+
+```py
+class Value:
+    def __iadd__(self, other: int) -> object:
+        return other
+
+class Holder:
+    value: Value
+
+holder = Holder()
+# error: [unsupported-operator]
+holder.value += "invalid"
+```
+
+## Correlated union targets
+
+The result of an operation on one union member must not be checked against another member's write
+contract.
+
+```py
+class AValue:
+    def __iadd__(self, other: int) -> "AValue":
+        return self
+
+class BValue:
+    def __iadd__(self, other: int) -> "BValue":
+        return self
+
+class A:
+    value: AValue
+
+class B:
+    value: BValue
+
+def update(value: A | B) -> None:
+    value.value += 1
+```
+
+## Inferred collection targets
+
+Augmented stores to inferred collection literals must not be treated as writes to an explicitly
+declared element type.
+
+```py
+values = [1]
+values[0] /= 2
+
+alias = values
+alias[0] /= 2
+
+second_alias = alias
+second_alias[0] /= 2
+
+nested = [[1]]
+nested[0][0] /= 2
+```
+
+The same inference behavior applies to unannotated attributes and values from enclosing scopes.
+
+```py
+class Holder:
+    def __init__(self) -> None:
+        self.values = [1]
+
+    def update(self) -> None:
+        self.values[0] /= 2
+
+        alias = self.values
+        alias[0] /= 2
+
+outer = [1]
+
+def update_outer() -> None:
+    outer[0] /= 2
+
+    alias = outer
+    alias[0] /= 2
+```
+
 ## Implicit dunder calls on class objects
 
 ```py
