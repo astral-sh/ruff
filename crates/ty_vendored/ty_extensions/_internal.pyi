@@ -164,16 +164,6 @@ class ConstraintSet:
         Universally abstracts the given type variables from this constraint set.
         """
 
-    def satisfied_by_all_typevars(
-        self, *, inferable: TypeForm[tuple[object, ...]] | None = None
-    ) -> bool:
-        """
-        Returns whether this constraint set is satisfied by all of the typevars
-        that it mentions. You must provide a tuple of the typevars that should
-        be considered `inferable`. All other typevars mentioned in the
-        constraint set will be considered non-inferable.
-        """
-
     def solutions_for(
         self,
         typevar: TypeForm[object],

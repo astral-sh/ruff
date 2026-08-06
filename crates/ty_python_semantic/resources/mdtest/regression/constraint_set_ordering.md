@@ -389,7 +389,6 @@ truncated diagnostic display must not depend on which implications were encounte
 
 ```py
 from typing import Literal
-from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def high_fanout[
@@ -499,6 +498,7 @@ def high_fanout[
     reveal_type(result)
 
     impossible = constraints & ConstraintSet.upper_bound(R11, Literal[0])
-    # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
-    static_assert(not impossible.satisfied_by_all_typevars(inferable=inferable))
+    # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
+    # revealed: None
+    reveal_type(impossible.solutions_for(R11, inferable=inferable))
 ```
