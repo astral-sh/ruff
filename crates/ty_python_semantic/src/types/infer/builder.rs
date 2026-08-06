@@ -1466,7 +1466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node, binding)
+            self.fallback_member_declared_type(node)
         } else {
             None
         }
@@ -1483,11 +1483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// For a member binding without a live place declaration, obtain its declared type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(
-        &mut self,
-        node: AnyNodeRef<'_>,
-        binding: Definition<'db>,
-    ) -> Option<Type<'db>> {
+    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
@@ -1495,20 +1491,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
             if let Place::Defined(DefinedPlace {
                 ty,
-                origin,
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) = value_type
                 .member(db, self.program_environment(), attr)
                 .place
-                && (!matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_))
-                    || origin.is_declared()
-                    || AddBinding::attribute_is_data_descriptor(
-                        db,
-                        self.program_environment(),
-                        value_type,
-                        attr,
-                    ))
             {
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
@@ -4300,7 +4287,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node, definition),
+                declared_ty: self.fallback_member_declared_type(node),
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),
@@ -4684,26 +4671,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
-            self.infer_augment_assignment(assignment);
+            if let Ok(result_ty) = self.infer_augment_assignment(assignment) {
+                let target = assignment.target.as_ref();
+                match target {
+                    ast::Expr::Attribute(attribute) => {
+                        let object_ty = self.expression_type(&attribute.value);
+                        self.validate_attribute_assignment(
+                            attribute,
+                            target,
+                            object_ty,
+                            attribute.attr.id(),
+                            &mut |_, _| result_ty,
+                            true,
+                        );
+                    }
+                    ast::Expr::Subscript(subscript) => {
+                        let object_ty = self.expression_type(&subscript.value);
+                        let slice_ty = self.expression_type(&subscript.slice);
+                        self.validate_subscript_assignment(
+                            subscript,
+                            target,
+                            object_ty,
+                            &mut |_, _| slice_ty,
+                            &mut |_, _| result_ty,
+                        );
+                    }
+                    _ => {}
+                }
+            }
 
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
-                let object_ty = self.expression_type(&attr_expr.value);
                 self.report_undeclared_protocol_attribute(attr_expr);
-
-                // Composite receiver stores are outside the scope of augmented-store validation,
-                // but their existing `Final` checks must continue to apply.
-                if object_ty.as_union_like(self.db()).is_some()
-                    || matches!(
-                        object_ty.resolve_type_alias(self.db()),
-                        Type::Intersection(_)
-                    )
-                {
-                    self.validate_final_attribute_assignment(
-                        attr_expr,
-                        object_ty,
-                        attr_expr.attr.id(),
-                    );
-                }
             }
         }
     }
@@ -4837,12 +4835,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &'ast ast::StmtAugAssign,
         definition: Definition<'db>,
     ) {
-        let target_ty = self.infer_augment_assignment(assignment);
+        let target_ty = self
+            .infer_augment_assignment(assignment)
+            .unwrap_or_else(|recovery_ty| recovery_ty);
         self.add_binding(assignment.target.as_ref().into(), definition)
             .insert(self, target_ty);
     }
 
-    fn infer_augment_assignment(&mut self, assignment: &ast::StmtAugAssign) -> Type<'db> {
+    fn infer_augment_assignment(
+        &mut self,
+        assignment: &ast::StmtAugAssign,
+    ) -> Result<Type<'db>, Type<'db>> {
         let ast::StmtAugAssign {
             range: _,
             node_index: _,
@@ -4871,94 +4874,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => self.infer_expression(target, TypeContext::default()),
         };
 
-        let result_ty =
-            match self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-                builder.infer_expression(value, tcx)
-            }) {
-                Ok(result_ty) => result_ty,
-                Err(recovery_ty) => return recovery_ty,
-            };
-
-        let db = self.db();
-        let env = self.program_environment();
-        match target.as_ref() {
-            ast::Expr::Attribute(attribute) => {
-                let object_ty = self.expression_type(&attribute.value);
-
-                // A union or intersection requires correlating each receiver with its own
-                // operator result; validating the combined result would reject valid programs.
-                if object_ty.as_union_like(db).is_some()
-                    || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
-                {
-                    return result_ty;
-                }
-
-                let PlaceAndQualifiers {
-                    place:
-                        Place::Defined(DefinedPlace {
-                            origin,
-                            definedness: Definedness::AlwaysDefined,
-                            ..
-                        }),
-                    qualifiers,
-                } = object_ty.member(db, env, &attribute.attr.id)
-                else {
-                    return result_ty;
-                };
-
-                // Inferred-only attributes can change type, but descriptors and qualified
-                // attributes still impose independent write contracts.
-                if !origin.is_declared()
-                    && !qualifiers.intersects(
-                        TypeQualifiers::FINAL
-                            | TypeQualifiers::CLASS_VAR
-                            | TypeQualifiers::READ_ONLY,
-                    )
-                    && !AddBinding::attribute_is_data_descriptor(
-                        db,
-                        env,
-                        object_ty,
-                        &attribute.attr.id,
-                    )
-                {
-                    return result_ty;
-                }
-
-                self.validate_attribute_assignment(
-                    attribute,
-                    target,
-                    object_ty,
-                    attribute.attr.id(),
-                    &mut |_, _| result_ty,
-                    true,
-                );
-                result_ty
-            }
-            ast::Expr::Subscript(subscript) => {
-                let object_ty = self.expression_type(&subscript.value);
-                let slice_ty = self.expression_type(&subscript.slice);
-
-                if object_ty.as_union_like(db).is_some()
-                    || slice_ty.as_union_like(db).is_some()
-                    || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
-                    || object_ty
-                        .subscript(db, env, slice_ty, ExprContext::Load)
-                        .is_err()
-                {
-                    return result_ty;
-                }
-
-                self.validate_subscript_assignment(
-                    subscript,
-                    target,
-                    object_ty,
-                    &mut |_, _| slice_ty,
-                    &mut |_, _| result_ty,
-                );
-                result_ty
-            }
-            _ => result_ty,
-        }
+        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+            builder.infer_expression(value, tcx)
+        })
     }
 
     fn infer_dict_key_assignment_definition(
@@ -12570,7 +12488,11 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
-            if Self::attribute_is_data_descriptor(db, env, value_ty, &attr.id) {
+            if assignment_attribute_members(db, env, value_ty, &attr.id)
+                .and_then(AssignmentAttributeMembers::type_member)
+                .and_then(|member| member.place.ignore_possibly_undefined())
+                .is_some_and(|ty| ty.may_be_data_descriptor(db, env))
+            {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
@@ -12588,19 +12510,6 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         builder.bindings.insert(self.binding, bound_ty);
 
         inferred_ty
-    }
-
-    /// Return whether writes to this attribute are handled by a concrete data descriptor.
-    fn attribute_is_data_descriptor(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        object_ty: Type<'db>,
-        attribute: &str,
-    ) -> bool {
-        assignment_attribute_members(db, env, object_ty, attribute)
-            .and_then(AssignmentAttributeMembers::type_member)
-            .and_then(|member| member.place.ignore_possibly_undefined())
-            .is_some_and(|ty| ty.may_be_data_descriptor(db, env))
     }
 
     /// Arbitrary `__getitem__`/`__setitem__` methods on a class do not

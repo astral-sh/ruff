@@ -48,7 +48,7 @@ use crate::{
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::infer_unpack_types,
+        infer::{infer_definition_types, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -3106,8 +3106,7 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                     }
                     DefinitionKind::AugmentedAssignment(_) => {
-                        // TODO:
-                        None
+                        Some(infer_definition_types(db, binding).binding_type(binding))
                     }
                     DefinitionKind::NamedExpression(_) => {
                         // A named expression whose target is an attribute is syntactically prohibited

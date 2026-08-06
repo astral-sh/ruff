@@ -269,9 +269,8 @@ class C:
         self.w = Weird()
         self.w += None
 
-# TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Weird
+# TODO: Infer `str` alone, since the initial `Weird` value has been overwritten.
+reveal_type(C().w)  # revealed: Weird | str
 ```
 
 #### Nested augmented assignments after narrowing
