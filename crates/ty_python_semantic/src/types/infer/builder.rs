@@ -1465,7 +1465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node)
+            self.fallback_member_declared_type(node, binding)
         } else {
             None
         }
@@ -1482,17 +1482,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// For a member binding without a live place declaration, obtain its declared type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+    fn fallback_member_declared_type(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        binding: Definition<'db>,
+    ) -> Option<Type<'db>> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-            let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+            let value_type = self.try_expression_type(value).unwrap_or_else(|| {
+                self.infer_maybe_standalone_expression(value, TypeContext::default())
+            });
             if let Place::Defined(DefinedPlace {
                 ty,
+                origin,
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) = value_type
                 .member(db, self.program_environment(), attr)
                 .place
+                && (!matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_))
+                    || origin.is_declared()
+                    || AddBinding::attribute_is_data_descriptor(
+                        db,
+                        self.program_environment(),
+                        value_type,
+                        attr,
+                    ))
             {
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
@@ -1505,8 +1520,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         ) = node
         {
-            let value_ty = self.infer_expression(value, TypeContext::default());
-            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            let value_ty = self.get_or_infer_expression(value, TypeContext::default());
+            let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
             Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
         } else {
             None
@@ -3213,13 +3228,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Subscript(subscript_expr) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    let object_ty =
+                        self.infer_expression(&subscript_expr.value, TypeContext::default());
+                    let mut infer_slice_ty = |builder: &mut Self, tcx| {
+                        builder.infer_expression(&subscript_expr.slice, tcx)
+                    };
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
                         let assigned_ty = infer_assigned_ty(builder, tcx);
                         builder.store_expression_type(target, assigned_ty);
                         assigned_ty
                     };
 
-                    self.validate_subscript_assignment(subscript_expr, value, infer_assigned_ty);
+                    self.validate_subscript_assignment(
+                        subscript_expr,
+                        value,
+                        object_ty,
+                        &mut infer_slice_ty,
+                        infer_assigned_ty,
+                    );
                 }
             }
 
@@ -4240,7 +4266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node),
+                declared_ty: self.fallback_member_declared_type(node, definition),
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),
@@ -4635,18 +4661,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::Expr::Attribute(attr_expr) = assignment.target.as_ref() {
                 let object_ty = self.expression_type(&attr_expr.value);
                 self.report_undeclared_protocol_attribute(attr_expr);
-                self.validate_final_attribute_assignment(attr_expr, object_ty, attr_expr.attr.id());
+
+                // Composite receiver stores are outside the scope of augmented-store validation,
+                // but their existing `Final` checks must continue to apply.
+                if object_ty.as_union_like(self.db()).is_some()
+                    || matches!(
+                        object_ty.resolve_type_alias(self.db()),
+                        Type::Intersection(_)
+                    )
+                {
+                    self.validate_final_attribute_assignment(
+                        attr_expr,
+                        object_ty,
+                        attr_expr.attr.id(),
+                    );
+                }
             }
         }
     }
 
+    /// Infer an augmented operator, returning its recovery type if the operation fails.
     fn infer_augmented_op(
         &mut self,
         assignment: &ast::StmtAugAssign,
         target_type: Type<'db>,
         value_expr: &ast::Expr,
         infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
         // If the target defines, e.g., `__iadd__`, infer the augmented assignment as a call to that
@@ -4657,7 +4698,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binary_return_ty = |builder: &mut Self, value_ty| {
             builder
                 .infer_binary_expression_type(assignment.into(), false, target_type, value_ty, op)
-                .unwrap_or_else(|| {
+                .ok_or_else(|| {
                     report_unsupported_augmented_assignment(
                         &builder.context,
                         assignment,
@@ -4676,14 +4717,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // equally applicable type contexts for each union member.
                 infer_value_ty.infer_loud(self, TypeContext::default());
 
-                union.map(db, env, |&elem_type| {
-                    self.infer_augmented_op(
+                let mut operation_failed = false;
+                let result_ty = union.map(db, env, |&elem_type| {
+                    match self.infer_augmented_op(
                         assignment,
                         elem_type,
                         value_expr,
                         &mut |builder, tcx| infer_value_ty.infer_silent(builder, tcx),
-                    )
-                })
+                    ) {
+                        Ok(ty) => ty,
+                        Err(recovery_ty) => {
+                            operation_failed = true;
+                            recovery_ty
+                        }
+                    }
+                });
+
+                if operation_failed {
+                    Err(result_ty)
+                } else {
+                    Ok(result_ty)
+                }
             }
 
             _ => {
@@ -4695,7 +4749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         infer_value_ty,
                     )
                 {
-                    return typed_dict_update_ty;
+                    return Ok(typed_dict_update_ty);
                 }
 
                 let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
@@ -4711,7 +4765,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypeContext::default(),
                 );
                 match call {
-                    Ok(outcome) => outcome.return_type(db, env),
+                    Ok(outcome) => Ok(outcome.return_type(db, env)),
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
@@ -4720,12 +4774,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         bindings: outcome, ..
                     }) => {
                         let value_ty = outcome.type_for_argument(&call_arguments, 0);
-                        UnionType::from_two_elements(
-                            db,
-                            env,
-                            outcome.return_type(db, env),
-                            binary_return_ty(self, value_ty),
-                        )
+                        match binary_return_ty(self, value_ty) {
+                            Ok(binary_ty) => Ok(UnionType::from_two_elements(
+                                db,
+                                env,
+                                outcome.return_type(db, env),
+                                binary_ty,
+                            )),
+                            Err(recovery_ty) => Err(UnionType::from_two_elements(
+                                db,
+                                env,
+                                outcome.return_type(db, env),
+                                recovery_ty,
+                            )),
+                        }
                     }
                     Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
@@ -4735,7 +4797,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             target_type,
                             value_ty,
                         );
-                        bindings.return_type(db, env)
+                        Err(bindings.return_type(db, env))
                     }
                 }
             }
@@ -4748,7 +4810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let target_ty = self.infer_augment_assignment(assignment);
-        self.add_binding(assignment.into(), definition)
+        self.add_binding(assignment.target.as_ref().into(), definition)
             .insert(self, target_ty);
     }
 
@@ -4781,9 +4843,94 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => self.infer_expression(target, TypeContext::default()),
         };
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
-        })
+        let result_ty =
+            match self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            }) {
+                Ok(result_ty) => result_ty,
+                Err(recovery_ty) => return recovery_ty,
+            };
+
+        let db = self.db();
+        let env = self.program_environment();
+        match target.as_ref() {
+            ast::Expr::Attribute(attribute) => {
+                let object_ty = self.expression_type(&attribute.value);
+
+                // A union or intersection requires correlating each receiver with its own
+                // operator result; validating the combined result would reject valid programs.
+                if object_ty.as_union_like(db).is_some()
+                    || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
+                {
+                    return result_ty;
+                }
+
+                let PlaceAndQualifiers {
+                    place:
+                        Place::Defined(DefinedPlace {
+                            origin,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        }),
+                    qualifiers,
+                } = object_ty.member(db, env, &attribute.attr.id)
+                else {
+                    return result_ty;
+                };
+
+                // Inferred-only attributes can change type, but descriptors and qualified
+                // attributes still impose independent write contracts.
+                if !origin.is_declared()
+                    && !qualifiers.intersects(
+                        TypeQualifiers::FINAL
+                            | TypeQualifiers::CLASS_VAR
+                            | TypeQualifiers::READ_ONLY,
+                    )
+                    && !AddBinding::attribute_is_data_descriptor(
+                        db,
+                        env,
+                        object_ty,
+                        &attribute.attr.id,
+                    )
+                {
+                    return result_ty;
+                }
+
+                self.validate_attribute_assignment(
+                    attribute,
+                    target,
+                    object_ty,
+                    attribute.attr.id(),
+                    &mut |_, _| result_ty,
+                    true,
+                );
+                result_ty
+            }
+            ast::Expr::Subscript(subscript) => {
+                let object_ty = self.expression_type(&subscript.value);
+                let slice_ty = self.expression_type(&subscript.slice);
+
+                if object_ty.as_union_like(db).is_some()
+                    || slice_ty.as_union_like(db).is_some()
+                    || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
+                    || object_ty
+                        .subscript(db, env, slice_ty, ExprContext::Load)
+                        .is_err()
+                {
+                    return result_ty;
+                }
+
+                self.validate_subscript_assignment(
+                    subscript,
+                    target,
+                    object_ty,
+                    &mut |_, _| slice_ty,
+                    &mut |_, _| result_ty,
+                );
+                result_ty
+            }
+            _ => result_ty,
+        }
     }
 
     fn infer_dict_key_assignment_definition(
@@ -12359,11 +12506,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
-            if assignment_attribute_members(db, env, value_ty, &attr.id)
-                .and_then(AssignmentAttributeMembers::type_member)
-                .and_then(|member| member.place.ignore_possibly_undefined())
-                .is_some_and(|ty| ty.may_be_data_descriptor(db, env))
-            {
+            if Self::attribute_is_data_descriptor(db, env, value_ty, &attr.id) {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
@@ -12381,6 +12524,19 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         builder.bindings.insert(self.binding, bound_ty);
 
         inferred_ty
+    }
+
+    /// Return whether writes to this attribute are handled by a concrete data descriptor.
+    fn attribute_is_data_descriptor(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        object_ty: Type<'db>,
+        attribute: &str,
+    ) -> bool {
+        assignment_attribute_members(db, env, object_ty, attribute)
+            .and_then(AssignmentAttributeMembers::type_member)
+            .and_then(|member| member.place.ignore_possibly_undefined())
+            .is_some_and(|ty| ty.may_be_data_descriptor(db, env))
     }
 
     /// Arbitrary `__getitem__`/`__setitem__` methods on a class do not

@@ -1553,6 +1553,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         target: &ast::ExprSubscript,
         rhs_value: &ast::Expr,
+        object_ty: Type<'db>,
+        infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> bool {
         let env = self.program_environment();
@@ -1566,15 +1568,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let object_ty = self.infer_expression(object, TypeContext::default());
         self.store_typed_dict_key_expected_type(slice, object_ty);
-        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
 
         let is_valid_assignment = self.validate_subscript_assignment_impl(
             target,
             None,
             object_ty,
-            &mut infer_slice_ty,
+            infer_slice_ty,
             rhs_value,
             infer_rhs_value,
             true,
