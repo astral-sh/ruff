@@ -169,3 +169,7 @@ print("%02X" % 1)
 "%(1)s" % {1: 2, "1": 2}
 
 "%(and)s" % {"and": 2}
+
+# Don't flag printf-style formatting inside string type definitions (forward references).
+# https://github.com/astral-sh/ruff/issues/10586
+x: "Literal['%s' % 'a']" = ""

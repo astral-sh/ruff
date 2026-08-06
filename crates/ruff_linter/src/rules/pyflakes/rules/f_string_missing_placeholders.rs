@@ -70,6 +70,14 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 
 /// F541
 pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprFString) {
+    // Don't flag f-strings inside a string type definition (forward
+    // reference), e.g. `x: "Literal[f'']"`. The f-string is part of the type
+    // expression, not a runtime string.
+    // https://github.com/astral-sh/ruff/issues/10586
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     if expr.value.f_strings().any(|f_string| {
         f_string
             .elements

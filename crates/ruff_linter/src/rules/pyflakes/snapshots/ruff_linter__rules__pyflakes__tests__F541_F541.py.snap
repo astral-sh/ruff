@@ -346,9 +346,13 @@ F541 [*] f-string without any placeholders
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
    | ^^^^^^^^^
+45 |
+46 | # Don't flag f-strings inside string type definitions (forward references).
+   |
 help: Remove extraneous `f` prefix
    |
 43 | f"{v:{f"0.2f"}}"
    - f"\{{x}}"
 44 + "\{x}"
+45 |
    |

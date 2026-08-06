@@ -281,3 +281,7 @@ if __name__ == "__main__":
 
 # Raw string with \N{...}
 r"\N{angle}AOB = {angle}°".format(angle=180)
+
+# Don't flag str.format inside string type definitions (forward references).
+# https://github.com/astral-sh/ruff/issues/10586
+x: "Literal['{}'.format(1)]" = ""

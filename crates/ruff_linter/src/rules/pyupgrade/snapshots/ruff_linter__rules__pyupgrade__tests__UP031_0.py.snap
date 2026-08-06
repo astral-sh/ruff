@@ -902,25 +902,6 @@ help: Replace with format specifiers
 note: This is an unsafe fix and may change runtime behavior
 
 UP031 [*] Use format specifiers instead of percent format
-   --> UP031_0.py:131:5
-    |
-129 | # Not a valid type annotation but this test shouldn't result in a panic.
-130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-131 | x: "'%s + %s' % (1, 2)"
-    |     ^^^^^^^^^^^^^^^^^^
-132 |
-133 | # See: https://github.com/astral-sh/ruff/issues/12421
-    |
-help: Replace with format specifiers
-    |
-130 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-    - x: "'%s + %s' % (1, 2)"
-131 + x: "'{} + {}'.format(1, 2)"
-132 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-UP031 [*] Use format specifiers instead of percent format
    --> UP031_0.py:134:7
     |
 133 | # See: https://github.com/astral-sh/ruff/issues/12421
@@ -1212,4 +1193,7 @@ UP031 Use format specifiers instead of percent format
 170 |
 171 | "%(and)s" % {"and": 2}
     | ^^^^^^^^^
+172 |
+173 | # Don't flag printf-style formatting inside string type definitions (forward references).
+    |
 help: Replace with format specifiers

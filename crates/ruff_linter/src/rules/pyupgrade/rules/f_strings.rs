@@ -403,6 +403,14 @@ impl FStringConversion {
 
 /// UP032
 pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
+    // Don't flag `str.format` inside a string type definition (forward
+    // reference), e.g. `x: "Literal['{}'.format(1)]"`. The string is part of
+    // the type expression, not a runtime string.
+    // https://github.com/astral-sh/ruff/issues/10586
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     if summary.has_nested_parts {
         return;
     }

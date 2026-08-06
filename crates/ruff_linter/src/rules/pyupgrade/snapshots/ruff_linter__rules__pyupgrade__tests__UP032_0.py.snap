@@ -1202,24 +1202,6 @@ help: Convert to f-string
     |
 
 UP032 [*] Use f-string instead of `format` call
-   --> UP032_0.py:270:5
-    |
-268 | # Not a valid type annotation but this test shouldn't result in a panic.
-269 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-270 | x: "'{} + {}'.format(x, y)"
-    |     ^^^^^^^^^^^^^^^^^^^^^^
-271 |
-272 | # Regression https://github.com/astral-sh/ruff/issues/21000
-    |
-help: Convert to f-string
-    |
-269 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-    - x: "'{} + {}'.format(x, y)"
-270 + x: "f'{x} + {y}'"
-271 |
-    |
-
-UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:276:14
     |
 274 | if __name__ == "__main__":
@@ -1259,9 +1241,13 @@ UP032 [*] Use f-string instead of `format` call
 282 | # Raw string with \N{...}
 283 | r"\N{angle}AOB = {angle}°".format(angle=180)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+284 |
+285 | # Don't flag str.format inside string type definitions (forward references).
+    |
 help: Convert to f-string
     |
 282 | # Raw string with \N{...}
     - r"\N{angle}AOB = {angle}°".format(angle=180)
 283 + rf"\N{180}AOB = {180}°"
+284 |
     |

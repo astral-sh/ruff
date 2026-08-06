@@ -42,3 +42,8 @@ f"{{{{x}}}}"
 (""f""r"")
 f"{v:{f"0.2f"}}"
 f"\{{x}}"
+
+# Don't flag f-strings inside string type definitions (forward references).
+# https://github.com/astral-sh/ruff/issues/10586
+x: "Literal[f'']" = ""
+y: "Literal[f'{1}']" = ""

@@ -372,6 +372,14 @@ pub(crate) fn printf_string_formatting(
     bin_op: &ast::ExprBinOp,
     string_expr: &ast::ExprStringLiteral,
 ) {
+    // Don't flag printf-style formatting inside a string type definition
+    // (forward reference), e.g. `x: "Literal['%s' % 'a']"`. The string is part
+    // of the type expression, not a runtime string.
+    // https://github.com/astral-sh/ruff/issues/10586
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
+
     let right = &*bin_op.right;
 
     let mut num_positional_arguments = 0;
