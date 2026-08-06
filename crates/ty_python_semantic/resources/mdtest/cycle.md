@@ -579,3 +579,196 @@ reveal_mro(GenericBase["Foo", "Bar"])
 class Foo: ...
 class Bar: ...
 ```
+
+## Nominal instances in recursively-specialized relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: Impl[list[T]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: Impl[int]) -> Proto[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Generic aliases in recursively-specialized relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import TypeOf
+
+class Impl[T]:
+    child: TypeOf[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: TypeOf[Impl[int]]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Subclass-of types in recursively-specialized relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: type[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: type[Impl[int]]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Subclass-of types in recursively-specialized meta-type relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: type[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: type[Proto[list[T]]]
+
+def assign(value: type[Impl[int]]) -> type[Proto[int]]:
+    return value  # error: [invalid-return-type]
+```
+
+## Recursively-specialized descriptor members
+
+Descriptor-backed protocol members can expose recursive specializations through their getter.
+Checking compatibility between such protocols must terminate.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class LeftReadDescriptor[T]:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> LeftReadProtocol[list[T]]:
+        raise NotImplementedError
+
+class RightReadDescriptor[T]:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> RightReadProtocol[list[T]]:
+        raise NotImplementedError
+
+class LeftReadProtocol[T](Protocol):
+    @LeftReadDescriptor[T]
+    def child(self) -> object: ...
+
+class RightReadProtocol[T](Protocol):
+    @RightReadDescriptor[T]
+    def child(self) -> object: ...
+
+def assign_read(value: LeftReadProtocol[int]) -> RightReadProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+Writable descriptor members expose the recursive specialization contravariantly. The comparison
+therefore alternates direction before returning to the same pair of protocol definitions.
+
+```py
+class LeftWriteDescriptor[T]:
+    def __init__(self, setter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: LeftWriteProtocol[list[T]]) -> None: ...
+
+class RightWriteDescriptor[T]:
+    def __init__(self, setter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: RightWriteProtocol[list[T]]) -> None: ...
+
+class LeftWriteProtocol[T](Protocol):
+    @LeftWriteDescriptor[T]
+    def child(self, value: object) -> None: ...
+
+class RightWriteProtocol[T](Protocol):
+    @RightWriteDescriptor[T]
+    def child(self, value: object) -> None: ...
+
+def assign_write(value: LeftWriteProtocol[int]) -> RightWriteProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Recursively-specialized fallback attribute types
+
+The return types of `__getattr__` and custom `__getattribute__` methods become the effective types
+of protocol members that are not declared directly on a nominal class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class GetattrImpl[T]:
+    def __getattr__(self, name: str) -> GetattrImpl[list[T]]:
+        raise AttributeError(name)
+
+class GetattributeImpl[T]:
+    def __getattribute__(self, name: str) -> GetattributeImpl[list[T]]:
+        raise AttributeError(name)
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign_getattr(value: GetattrImpl[int]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+
+def assign_getattribute(value: GetattributeImpl[int]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```

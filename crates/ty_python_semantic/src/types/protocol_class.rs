@@ -1,6 +1,6 @@
 use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
-use std::{collections::BTreeMap, ops::Deref};
+use std::{cell::Cell, collections::BTreeMap, ops::Deref};
 
 use itertools::Itertools;
 
@@ -13,9 +13,12 @@ use crate::types::attribute_write::{
     ProtocolMemberWriteRequirement, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
+use crate::types::instance::Protocol;
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::visitor::any_over_type_expanding_aliases;
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+};
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -134,7 +137,7 @@ impl<'db> ProtocolClass<'db> {
                     return;
                 }
                 let candidate = candidate.apply_specialization(db, specialization);
-                candidate.walk_recursive_member_types(db, visitor);
+                candidate.walk_recursive_member_types(db, *self, visitor);
             },
         );
     }
@@ -1562,6 +1565,25 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
+    fn walk_recursive_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
+        &self,
+        db: &'db dyn Db,
+        visitor: &V,
+    ) {
+        let env = visitor.program_environment();
+        let access = self.capabilities(db, env).instance;
+        if let Some(read) = access.read.and_then(|read| read.resolve(db, env)) {
+            visitor.visit_type(db, read.ty());
+        }
+        if let Some(write) = access
+            .write
+            .and_then(ProtocolMemberWrite::domain)
+            .and_then(|write| write.resolve(db, env))
+        {
+            visitor.visit_type(db, write.ty());
+        }
+    }
+
     /// Derives the instance/class read/write capabilities exposed by this member.
     ///
     /// These are views of the canonical method, property, or attribute representation below;
@@ -2506,11 +2528,70 @@ fn contains_signature_typevar<'db>(
     signature: &Signature<'db>,
     ty: Type<'db>,
 ) -> bool {
-    signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, env, ty, true, |ty| {
-            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
-        })
-    })
+    let Some(generic_context) = signature.generic_context else {
+        return false;
+    };
+    let visitor = SignatureTypevarVisitor {
+        generic_context,
+        env,
+        found: Cell::default(),
+        visited_types: TypeCollector::default(),
+    };
+    visitor.visit_type(db, ty);
+    visitor.found.get()
+}
+
+/// Finds type variables owned by one signature without expanding class-based protocol members.
+struct SignatureTypevarVisitor<'a, 'db> {
+    generic_context: GenericContext<'db>,
+    env: &'a ProgramEnvironment<'db>,
+    found: Cell<bool>,
+    visited_types: TypeCollector<'db>,
+}
+
+impl<'db> TypeVisitor<'db> for SignatureTypevarVisitor<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        true
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+        if let Type::TypeVar(typevar) = ty
+            && self.generic_context.contains(db, typevar.identity(db))
+        {
+            self.found.set(true);
+            return;
+        }
+        walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        match protocol.inner {
+            Protocol::FromClass(_) | Protocol::Materialized(_) => {
+                if let Some((_, Some(specialization))) = protocol
+                    .class_origin(db)
+                    .and_then(|class| class.static_class_literal(db))
+                {
+                    for ty in specialization.types(db) {
+                        self.visit_type(db, *ty);
+                    }
+                }
+            }
+            Protocol::Synthesized(synthesized) => {
+                walk_protocol_interface(
+                    db,
+                    ProtocolInterfaceView::new(synthesized.interface(), None),
+                    self,
+                );
+            }
+        }
+    }
 }
 
 fn property_set_type<'db>(
@@ -3612,6 +3693,7 @@ impl<'db> ProtocolMemberCandidate<'db> {
     fn walk_recursive_member_types<V: super::visitor::TypeVisitor<'db> + ?Sized>(
         self,
         db: &'db dyn Db,
+        protocol: ClassType<'db>,
         visitor: &V,
     ) {
         match self.ty {
@@ -3632,6 +3714,23 @@ impl<'db> ProtocolMemberCandidate<'db> {
                 }
             }
             _ if self.is_bound_method_like(db) => {}
+            _ if self.bound_on_class.is_yes()
+                && self
+                    .definition
+                    .is_some_and(|definition| definition.kind(db).is_function_def()) =>
+            {
+                if let Some(member) = descriptor_decorated_protocol_member(
+                    db,
+                    visitor.program_environment(),
+                    self.ty,
+                    protocol,
+                    self.definition,
+                ) {
+                    member.walk_recursive_types(db, visitor);
+                } else {
+                    visitor.visit_type(db, self.ty);
+                }
+            }
             _ => visitor.visit_type(db, self.ty),
         }
     }
