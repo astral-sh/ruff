@@ -5273,6 +5273,22 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
+fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
+    match ty {
+        Type::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| typeddict_declares_key(db, *element, key)),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| typeddict_declares_key(db, *element, key)),
+        Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
+        _ => false,
+    }
+}
+
 fn is_or_contains_mapping<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5318,8 +5334,8 @@ fn key_membership_implies_subscript<'db>(
 
 /// Refine `ty` with the fact that the literal `key` is present.
 ///
-/// `Mapping` arms gain matching `__contains__` and `__getitem__` methods, while other arms only
-/// gain the successful membership fact.
+/// `TypedDict` arms gain a synthesized required key, other `Mapping` arms gain matching
+/// `__contains__` and `__getitem__` methods, and other arms only gain the membership fact.
 fn narrow_with_present_key<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5335,11 +5351,30 @@ fn narrow_with_present_key<'db>(
             narrow_with_present_key(db, env, *element, key)
         }),
         resolved if closed_typeddict_excludes_key(db, resolved, key) => Type::Never,
+        resolved if typeddict_declares_key(db, resolved, key) => ty,
+        resolved if is_or_contains_typeddict(db, resolved) => constrain(
+            ty,
+            Type::TypedDict(required_typeddict_key(db, key, Type::object())),
+        ),
         resolved if is_mapping_subtype(db, env, resolved) => {
             constrain(ty, mapping_present_key_protocol(db, env, key))
         }
         _ => constrain(ty, key_membership_contains_protocol(db, env, key)),
     }
+}
+
+/// Return a synthesized `TypedDict` that makes a present key safe to subscript.
+fn required_typeddict_key<'db>(
+    db: &'db dyn Db,
+    key: &str,
+    value_ty: Type<'db>,
+) -> TypedDictType<'db> {
+    let field = TypedDictFieldBuilder::new(value_ty)
+        .required(true)
+        .read_only(true)
+        .build();
+    let schema = TypedDictSchema::from_iter([(Name::from(key), field)]);
+    TypedDictType::from_schema_items(db, schema)
 }
 
 /// Return whether a closed `TypedDict` in `ty` rules out `key`.
