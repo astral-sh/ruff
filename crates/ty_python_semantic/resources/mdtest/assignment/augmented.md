@@ -274,6 +274,24 @@ writable.value += 1
 reveal_type(writable.value)  # revealed: ReadValue
 ```
 
+Unannotated data descriptors still impose the write contract declared by their setter.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object] | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class Custom:
+    value = Descriptor()
+
+custom = Custom()
+# error: [invalid-assignment]
+custom.value += 1
+```
+
 ## Subscript targets
 
 An augmented subscript assignment must pass its result, not the operator's right-hand operand, to
@@ -295,6 +313,21 @@ container = Container()
 # error: [invalid-assignment]
 container[0] += 1
 reveal_type(container[0])  # revealed: Value
+```
+
+A custom setter may accept a broader type than its getter returns.
+
+```py
+class PermissiveContainer:
+    def __getitem__(self, key: int) -> Value:
+        return Value()
+
+    def __setitem__(self, key: int, value: object) -> None:
+        pass
+
+permissive = PermissiveContainer()
+permissive[0] += 1
+reveal_type(permissive[0])  # revealed: Value
 ```
 
 Explicitly annotated lists and dictionaries retain their write contracts.
