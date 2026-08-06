@@ -135,13 +135,12 @@ class Variadic[*Ts]:
 reveal_type(Positional(()))  # revealed: Positional[()]
 reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(Variadic())  # revealed: Variadic[*tuple[Unknown, ...]]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[*tuple[Unknown, ...]]
+reveal_type(Variadic())  # revealed: Variadic[()]
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
-    reveal_type(Variadic(i, s))  # revealed: Variadic[*tuple[Unknown, ...]]
+    reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
 ```
 
 ### Unspecified type arguments
@@ -301,8 +300,9 @@ def materialized_default[*Ts = *tuple[Any, ...]]() -> None:
 
 ### Starred variadic parameters
 
-An unpacked `TypeVarTuple` can annotate `*args`. Inferring the `TypeVarTuple` from arguments matched
-to the variadic parameter is not yet supported, so these calls use a gradual specialization.
+An unpacked `TypeVarTuple` can annotate `*args`. Arguments matched to the variadic parameter infer
+the complete type-variable tuple, preserving the shape of forwarded tuples and excluding ordinary
+positional and keyword-only parameters.
 
 ```py
 def simple[*Ts](*args: *Ts) -> tuple[*Ts]:
@@ -316,29 +316,61 @@ def with_kw_only[T, *Ts](*args: *Ts, kw: T) -> tuple[*Ts, T]:
     raise NotImplementedError
 
 def f(i: int, s: str, b: bool, t: tuple[int, str], vt: tuple[int, ...]) -> None:
-    reveal_type(simple())  # revealed: tuple[Unknown, ...]
-    reveal_type(simple(i, s))  # revealed: tuple[Unknown, ...]
-    reveal_type(simple(*(i, s)))  # revealed: tuple[Unknown, ...]
-    reveal_type(simple(t))  # revealed: tuple[Unknown, ...]
-    reveal_type(simple(*t))  # revealed: tuple[Unknown, ...]
-    reveal_type(simple(*vt))  # revealed: tuple[Unknown, ...]
+    reveal_type(simple())  # revealed: tuple[()]
+    reveal_type(simple(i, s))  # revealed: tuple[int, str]
+    reveal_type(simple(*(i, s)))  # revealed: tuple[int, str]
+    reveal_type(simple(t))  # revealed: tuple[tuple[int, str]]
+    reveal_type(simple(*t))  # revealed: tuple[int, str]
+    reveal_type(simple(*vt))  # revealed: tuple[int, ...]
 
-    reveal_type(with_prefix(i))  # revealed: tuple[int, *tuple[Unknown, ...]]
-    reveal_type(with_prefix(i, s, b))  # revealed: tuple[int, *tuple[Unknown, ...]]
-    reveal_type(with_prefix(*t))  # revealed: tuple[int, *tuple[Unknown, ...]]
-    reveal_type(with_prefix(i, *t))  # revealed: tuple[int, *tuple[Unknown, ...]]
-    reveal_type(with_prefix(*vt))  # revealed: tuple[int, *tuple[Unknown, ...]]
-    reveal_type(with_prefix(i, *vt))  # revealed: tuple[int, *tuple[Unknown, ...]]
+    reveal_type(with_prefix(i))  # revealed: tuple[int]
+    reveal_type(with_prefix(i, s, b))  # revealed: tuple[int, str, bool]
+    reveal_type(with_prefix(*t))  # revealed: tuple[int, str]
+    reveal_type(with_prefix(i, *t))  # revealed: tuple[int, int, str]
+    reveal_type(with_prefix(*vt))  # revealed: tuple[int, *tuple[int, ...]]
+    reveal_type(with_prefix(i, *vt))  # revealed: tuple[int, *tuple[int, ...]]
 
-    reveal_type(with_kw_only(kw=b))  # revealed: tuple[*tuple[Unknown, ...], bool]
-    reveal_type(with_kw_only(i, s, kw=b))  # revealed: tuple[*tuple[Unknown, ...], bool]
-    reveal_type(with_kw_only(t, kw=b))  # revealed: tuple[*tuple[Unknown, ...], bool]
-    reveal_type(with_kw_only(*t, kw=b))  # revealed: tuple[*tuple[Unknown, ...], bool]
-    reveal_type(with_kw_only(vt, kw=b))  # revealed: tuple[*tuple[Unknown, ...], bool]
-    reveal_type(with_kw_only(*vt, kw=b))  # revealed: tuple[*tuple[Unknown, ...], bool]
+    reveal_type(with_kw_only(kw=b))  # revealed: tuple[bool]
+    reveal_type(with_kw_only(i, s, kw=b))  # revealed: tuple[int, str, bool]
+    reveal_type(with_kw_only(t, kw=b))  # revealed: tuple[tuple[int, str], bool]
+    reveal_type(with_kw_only(*t, kw=b))  # revealed: tuple[int, str, bool]
+    reveal_type(with_kw_only(vt, kw=b))  # revealed: tuple[tuple[int, ...], bool]
+    reveal_type(with_kw_only(*vt, kw=b))  # revealed: tuple[*tuple[int, ...], bool]
 
     # error: [missing-argument] "No argument provided for required parameter `kw` of function `with_kw_only`"
-    reveal_type(with_kw_only(i, s, b))  # revealed: tuple[*tuple[Unknown, ...], Unknown]
+    reveal_type(with_kw_only(i, s, b))  # revealed: tuple[int, str, bool, Unknown]
+```
+
+Variadic inference must preserve contextual argument types, including contexts that contain an outer
+type variable.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def contextual[T](value: T) -> None:
+    concrete: tuple[Payload, list[int]] = simple({"value": 1}, [])
+    generic: tuple[Payload, T] = simple({"value": 1}, value)
+```
+
+Fixed elements beside the type-variable tuple retain their individual bound diagnostics without
+reporting the same error twice.
+
+```py
+def bounded_suffix[T: str, *Ts](*args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
+    raise NotImplementedError
+
+def bounded_arguments[U: bytes, T: str, *Ts](first: U, *args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
+    raise NotImplementedError
+
+bounded_suffix("ok", 1)  # error: [invalid-argument-type] "upper bound `str`"
+bounded_arguments(
+    1,  # error: [invalid-argument-type] "upper bound `bytes`"
+    "ok",
+    2,  # error: [invalid-argument-type] "upper bound `str`"
+)
 ```
 
 ### Callable inference
@@ -793,8 +825,7 @@ accept_str_in_between(True, "phase", "status", b"ok")
 accept_str_in_between(True, b"ok")
 accept_str_in_between(True, 1, b"bad")  # error: [invalid-argument-type]
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(remove_bytes(1, "record", b"sum"))  # revealed: tuple[Unknown, ...]
+reveal_type(remove_bytes(1, "record", b"sum"))  # revealed: tuple[Literal[1], Literal["record"]]
 ```
 
 ## `@staticmethod` and `@classmethod`

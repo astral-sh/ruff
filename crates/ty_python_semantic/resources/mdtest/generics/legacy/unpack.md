@@ -40,9 +40,8 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(collect())  # revealed: tuple[Unknown, ...]
-reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 ```
 
 ## Callable parameters

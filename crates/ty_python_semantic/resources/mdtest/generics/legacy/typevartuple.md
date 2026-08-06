@@ -370,13 +370,12 @@ class Variadic(Generic[*Ts]):
 reveal_type(Positional(()))  # revealed: Positional[()]
 reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(Variadic())  # revealed: Variadic[*tuple[Unknown, ...]]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[*tuple[Unknown, ...]]
+reveal_type(Variadic())  # revealed: Variadic[()]
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
 
 def _(i: int, s: str) -> None:
     reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
-    reveal_type(Variadic(i, s))  # revealed: Variadic[*tuple[Unknown, ...]]
+    reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
 ```
 
 ### Unspecified type arguments
@@ -443,6 +442,46 @@ class WithBackportedDefault(Generic[Unpack[Ts]]):
     attr: tuple[Unpack[Ts]]
 
 reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
+```
+
+## Generic Functions
+
+### Starred variadic parameters
+
+A legacy type-variable tuple is inferred from all positional arguments matched to `*args`, including
+an empty argument list.
+
+```py
+from typing import TypeVarTuple, assert_type
+
+Ts = TypeVarTuple("Ts")
+
+def args_to_tuple(*args: *Ts) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def _(i: int, s: str) -> None:
+    assert_type(args_to_tuple(), tuple[()])
+    assert_type(args_to_tuple(i, s), tuple[int, str])
+```
+
+### Starred variadic parameters with fixed suffixes
+
+Required tuple elements following the type-variable tuple are excluded from its inferred
+specialization. The type-variable tuple can still be empty.
+
+```py
+from typing import TypeVarTuple, assert_type
+
+Ts = TypeVarTuple("Ts")
+
+class Env: ...
+
+def exec_le(path: str, *args: *tuple[*Ts, Env], env: Env | None = None) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def _(i: int, s: str) -> None:
+    assert_type(exec_le("", Env()), tuple[()])
+    assert_type(exec_le(s, i, s, Env()), tuple[int, str])
 ```
 
 ## Type Aliases
