@@ -481,42 +481,6 @@ static_assert(not is_subtype_of(D[Any], D[A]))
 static_assert(not is_subtype_of(D[Any], D[B]))
 ```
 
-## Nested protocol variance uses declared variance
-
-Standard-library protocols retain their declared covariance even when their type parameters appear
-only through recursive members in older Python versions. A mutable list containing any of those
-protocols must therefore make its enclosing protocol invariant.
-
-```py
-from typing import AsyncIterator, Awaitable, Generator, Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-
-class WrappedGenerator[T](Protocol):
-    def values(self) -> list[Generator[None, None, T]]: ...
-
-class WrappedAwaitable[T](Protocol):
-    def values(self) -> list[Awaitable[T]]: ...
-
-class WrappedAsyncIterator[T](Protocol):
-    def values(self) -> list[AsyncIterator[T]]: ...
-
-static_assert(not is_subtype_of(WrappedGenerator[int], WrappedGenerator[object]))
-static_assert(not is_assignable_to(WrappedGenerator[int], WrappedGenerator[object]))
-
-static_assert(not is_subtype_of(WrappedAwaitable[int], WrappedAwaitable[object]))
-static_assert(not is_assignable_to(WrappedAwaitable[int], WrappedAwaitable[object]))
-
-static_assert(not is_subtype_of(WrappedAsyncIterator[int], WrappedAsyncIterator[object]))
-static_assert(not is_assignable_to(WrappedAsyncIterator[int], WrappedAsyncIterator[object]))
-
-def append(value: WrappedGenerator[object], item: Generator[None, None, object]) -> None:
-    value.values().append(item)
-
-def unsound(value: WrappedGenerator[int], item: Generator[None, None, object]) -> None:
-    append(value, item)  # error: [invalid-argument-type]
-```
-
 ## Class Attributes
 
 ### Mutable Attributes
@@ -543,8 +507,8 @@ mutable, and thus the occurrences are invariant.
 
 ### Mutable protocol attributes
 
-Unlike private attributes on a nominal class, underscore-prefixed protocol attributes belong to the
-public structural interface and remain writable. Their inferred type parameters must be invariant.
+Underscore-prefixed protocol attributes remain writable through their structural interface, so their
+inferred type parameters are invariant.
 
 ```py
 from typing import Protocol

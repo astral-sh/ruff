@@ -27,9 +27,10 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
         GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
-        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
+        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
+        PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
+        Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -296,15 +297,23 @@ impl<'db> ProtocolClass<'db> {
         let Some((class, _)) = self.static_class_literal(db) else {
             return;
         };
-        if class.try_mro(db, None).is_err() {
-            return;
-        }
-        let Some(generic_context) = class.generic_context(db) else {
+        let [Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context))] =
+            class.explicit_bases(db)
+        else {
             return;
         };
+        if class.has_pep_695_type_params(db) || class.try_mro(db, None).is_err() {
+            return;
+        }
+        let env = ProgramEnvironment::from_scope(class.body_scope(db));
+        if generic_context.variables(db).any(|typevar| {
+            typevar.is_typevartuple(db) || typevar.typevar(db).default_type(db, &env).is_some()
+        }) {
+            return;
+        }
 
         for typevar in generic_context.variables(db) {
-            if typevar.is_paramspec(db) || typevar.is_typevartuple(db) {
+            if typevar.is_paramspec(db) {
                 continue;
             }
 
@@ -312,11 +321,15 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             };
 
-            let inferred_variance =
-                match inferred_protocol_typevar_variance(db, class, typevar.identity(db)) {
-                    TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
-                    variance => variance,
-                };
+            let Some(inferred_variance) =
+                inferred_protocol_typevar_variance(db, class, typevar.identity(db))
+            else {
+                continue;
+            };
+            let inferred_variance = match inferred_variance {
+                TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                variance => variance,
+            };
 
             if inferred_variance == declared_variance {
                 continue;
@@ -378,25 +391,35 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 /// Infers the variance of a protocol parameter from its structural interface.
 ///
 /// The identity specialization preserves the class-bound type-variable identities used by its
-/// members. Nested generic types retain their effective declared variance.
+/// members. Members whose write variance cannot be represented retain their existing inference.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| TypeVarVariance::Bivariant,
+    cycle_initial = |_, _, _, _| None,
     heap_size = ruff_memory_usage::heap_size,
 )]
 pub(super) fn inferred_protocol_typevar_variance<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
     typevar: BoundTypeVarIdentity<'db>,
-) -> TypeVarVariance {
-    let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
-        return TypeVarVariance::Bivariant;
-    };
+) -> Option<TypeVarVariance> {
+    let protocol = class.identity_specialization(db).into_protocol_class(db)?;
     let env = ProgramEnvironment::from_scope(class.body_scope(db));
-    let receiver_ty = Type::instance(db, &env, *protocol);
-    protocol
-        .interface(db)
-        .variance_of_with_receiver(db, &env, typevar, Some(receiver_ty))
+    let interface = protocol.interface(db);
+    if !ProtocolInterfaceView::new(interface, None).has_only_finite_members(db) {
+        return None;
+    }
+    let generic_context = class.generic_context(db)?;
+    if interface.members(db).any(|member| {
+        let capabilities = member.capabilities(db, &env);
+        interface.includes_generic_writable_instance_member(db, &env, member.name, generic_context)
+            || [capabilities.instance, capabilities.class]
+                .into_iter()
+                .any(|access| matches!(access.write, Some(ProtocolMemberWrite::Descriptor { .. })))
+    }) {
+        return None;
+    }
+
+    Some(interface.variance_of(db, &env, typevar))
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
@@ -740,32 +763,6 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
 }
 
 impl<'db> ProtocolInterface<'db> {
-    /// Infer member variance, accounting for the receiver when descriptor overloads need it.
-    fn variance_of_with_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
-        receiver_ty: Option<Type<'db>>,
-    ) -> TypeVarVariance {
-        self.members(db)
-            .flat_map(|member| {
-                let capabilities = member.capabilities(db, env);
-                // The unbound class-side copy of an instance method is checked only for its
-                // presence. Its receiver is not an input to the structural protocol interface.
-                let class_access = if member.is_instance_method() {
-                    ProtocolMemberAccess::NONE
-                } else {
-                    capabilities.class
-                };
-                [capabilities.instance, class_access]
-                    .into_iter()
-                    .flat_map(move |access| access.variances(db, env, receiver_ty))
-            })
-            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
-            .collect()
-    }
-
     /// Synthesize a new protocol interface with the given members.
     ///
     /// All created members will be covariant, read-only property members
@@ -1245,7 +1242,21 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        self.variance_of_with_receiver(db, env, typevar, None)
+        self.members(db)
+            .flat_map(|member| {
+                let capabilities = member.capabilities(db, env);
+                // Instance methods are checked only through their bound instance signature.
+                let class_access = if member.is_instance_method() {
+                    ProtocolMemberAccess::NONE
+                } else {
+                    capabilities.class
+                };
+                [capabilities.instance, class_access]
+                    .into_iter()
+                    .flat_map(|access| access.variances(db, env))
+            })
+            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
+            .collect()
     }
 }
 
@@ -1460,40 +1471,16 @@ impl<'db> ProtocolMemberAccess<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        receiver_ty: Option<Type<'db>>,
     ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> {
-        let mut deferred_write_types = None;
-        let write_variance = self.write.and_then(|write| match write {
-            ProtocolMemberWrite::Descriptor {
-                descriptor,
-                domain: None,
-            } => {
-                let descriptor_ty = descriptor.resolve(db, env)?.ty();
-                if let Some(write_types) =
-                    deferred_descriptor_setter_variance_types(db, env, descriptor_ty, receiver_ty)
-                {
-                    deferred_write_types = Some(write_types);
-                    None
-                } else {
-                    Some((descriptor_ty, TypeVarVariance::Invariant))
-                }
-            }
-            write => write
-                .domain()
-                .and_then(|member| member.resolve(db, env))
-                .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
-        });
-
         self.read
             .and_then(|member| member.resolve(db, env))
             .map(|member| (member.ty(), TypeVarVariance::Covariant))
             .into_iter()
-            .chain(write_variance)
             .chain(
-                deferred_write_types
-                    .into_iter()
-                    .flatten()
-                    .map(|write_ty| (write_ty, TypeVarVariance::Contravariant)),
+                self.write
+                    .and_then(ProtocolMemberWrite::domain)
+                    .and_then(|member| member.resolve(db, env))
+                    .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
             )
     }
 }
@@ -2392,85 +2379,6 @@ enum DescriptorSetterDomain<'db> {
     Missing,
     Known(Type<'db>),
     Deferred,
-}
-
-/// Return the value annotations contributing to a deferred descriptor setter's variance.
-///
-/// A setter such as `def __set__[U](self, instance, value: tuple[T, U])` does not have a
-/// representable write domain, but its value annotation still exposes the descriptor's `T`
-/// contravariantly. A setter accepting `tuple[U, object]`, by contrast, does not constrain `T`.
-/// Alternative runtime descriptors remain separate because their accepted domains intersect.
-fn deferred_descriptor_setter_variance_types<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    descriptor_ty: Type<'db>,
-    receiver_ty: Option<Type<'db>>,
-) -> Option<Vec<Type<'db>>> {
-    if let Type::Union(union) = descriptor_ty {
-        let mut value_types = Vec::new();
-        for descriptor_ty in union.elements(db) {
-            value_types.extend(deferred_descriptor_setter_variance_types(
-                db,
-                env,
-                *descriptor_ty,
-                receiver_ty,
-            )?);
-        }
-        return Some(value_types);
-    }
-
-    let Place::Defined(DefinedPlace {
-        ty: setter_ty,
-        definedness: Definedness::AlwaysDefined,
-        ..
-    }) = descriptor_ty
-        .member_lookup_with_policy(
-            db,
-            env,
-            "__set__",
-            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        )
-        .place
-    else {
-        return None;
-    };
-
-    let callables = setter_ty.try_upcast_to_callable(db, env)?;
-    let mut value_types = Vec::new();
-    for callable in &callables {
-        let mut overload_value_types = Vec::new();
-        for signature in callable.signatures(db) {
-            if let Some(receiver_ty) = receiver_ty {
-                match descriptor_setter_signature_domain(
-                    db,
-                    env,
-                    signature,
-                    descriptor_ty,
-                    receiver_ty,
-                ) {
-                    DescriptorSetterSignatureDomain::Inapplicable => continue,
-                    DescriptorSetterSignatureDomain::Known(write_ty) => {
-                        overload_value_types.push(write_ty);
-                        continue;
-                    }
-                    DescriptorSetterSignatureDomain::Deferred => {}
-                }
-            }
-
-            let parameters = signature.parameters();
-            let value_parameter = parameters
-                .get_positional(1)
-                .or_else(|| parameters.variadic().map(|(_, parameter)| parameter))?;
-            overload_value_types.push(value_parameter.annotated_type().bind_self_typevars(
-                db,
-                env,
-                descriptor_ty,
-            ));
-        }
-        value_types.push(UnionType::from_elements(db, env, overload_value_types));
-    }
-
-    (!value_types.is_empty()).then_some(value_types)
 }
 
 /// Derive the values accepted by every possible descriptor setter when they fit in [`Type`].

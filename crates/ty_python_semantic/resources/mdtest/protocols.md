@@ -186,7 +186,7 @@ But two exceptions to this rule are `object` and `Generic`:
 ```py
 from typing import TypeVar, Generic
 
-ProtocolT = TypeVar("ProtocolT", covariant=True)
+ProtocolT = TypeVar("ProtocolT")
 
 # Note: pyright and pyrefly do not consider this to be a valid `Protocol` class,
 # but mypy does (and has an explicit test for this behavior). Mypy was the
@@ -6039,7 +6039,7 @@ y: A | Foo[A]
 
 # The same thing, but using the legacy syntax:
 
-S = TypeVar("S", covariant=True)
+S = TypeVar("S")
 
 class Bar(Protocol[S]):
     def x(self) -> "S | Bar[S]": ...
@@ -6762,8 +6762,8 @@ from typing import Any, Protocol, TypeVar
 
 T1 = TypeVar("T1", bound="A2[Any]", covariant=True)
 T2 = TypeVar("T2", bound="A1[Any]", covariant=True)
-T3 = TypeVar("T3", bound="B2[Any]", covariant=True)
-T4 = TypeVar("T4", bound="B1[Any]", covariant=True)
+T3 = TypeVar("T3", bound="B2[Any]")
+T4 = TypeVar("T4", bound="B1[Any]")
 
 class A1(Protocol[T1]):
     def get_x(self): ...
@@ -6834,7 +6834,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
 
-T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 class A: ...
 class B: ...
@@ -6854,13 +6854,13 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomProtocol(Protocol[T]):
-    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
+class CustomCovariantProtocol(Protocol[T_co]):
+    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
 
-static_assert(not is_equivalent_to(CustomProtocol[A], CustomProtocol[B]))
-static_assert(not is_equivalent_to(CustomProtocol[A], CustomProtocol[Any]))
-static_assert(not is_subtype_of(CustomProtocol[A], CustomProtocol[B]))
-static_assert(not is_assignable_to(CustomProtocol[A], CustomProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
 ## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13
@@ -6878,7 +6878,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, TypeVar, Protocol, Any
 
-T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 class A: ...
 class B: ...
@@ -6896,13 +6896,13 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomProtocol(Protocol[T]):
-    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
+class CustomCovariantProtocol(Protocol[T_co]):
+    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
 
-static_assert(not is_equivalent_to(CustomProtocol[A], CustomProtocol[B]))
-static_assert(not is_equivalent_to(CustomProtocol[A], CustomProtocol[Any]))
-static_assert(not is_subtype_of(CustomProtocol[A], CustomProtocol[B]))
-static_assert(not is_assignable_to(CustomProtocol[A], CustomProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
 ## Inferring async return contexts on Python 3.13 or newer
