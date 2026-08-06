@@ -2248,12 +2248,15 @@ fn descriptor_decorated_protocol_member<'db>(
     };
 
     let receiver_ty = Type::instance(db, env, protocol);
-    let (read_ty, _) = descriptor_ty.try_call_dunder_get(
-        db,
-        env,
-        Some(receiver_ty),
-        receiver_ty.to_meta_type(db, env),
-    )?;
+    let read_ty = descriptor_ty
+        .try_call_dunder_get(
+            db,
+            env,
+            Some(receiver_ty),
+            receiver_ty.to_meta_type(db, env),
+        )
+        .unwrap_or_else(|error| Some(error.fallback()))?
+        .return_type;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
     let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
@@ -2505,6 +2508,7 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
+        .unwrap_or_else(|error| error.fallback_member(db))
         .place
     } else {
         receiver_ty.member(db, env, member.name).place

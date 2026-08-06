@@ -1712,7 +1712,7 @@ impl<'db> Bindings<'db> {
                                 } else {
                                     overload
                                         .errors
-                                        .push(BindingError::PropertyHasNoSetter(*property));
+                                        .push(BindingError::PropertyHasNoGetter(*property));
                                     overload.set_return_type(Type::Never);
                                 }
                             }
@@ -1730,9 +1730,9 @@ impl<'db> Bindings<'db> {
                                     overload.check_property_getter(db, env, getter, *instance, 0);
                                 } else {
                                     overload.set_return_type(Type::Never);
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "property has no getter",
-                                    ));
+                                    overload
+                                        .errors
+                                        .push(BindingError::PropertyHasNoGetter(property));
                                 }
                             }
                             _ => {}
@@ -7966,6 +7966,7 @@ pub(crate) enum BindingError<'db> {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
     },
+    PropertyHasNoGetter(PropertyInstanceType<'db>),
     PropertyHasNoSetter(PropertyInstanceType<'db>),
     PropertyHasNoDeleter(PropertyInstanceType<'db>),
     PropertyGetterCallError(PropertyAccessorCallError<'db>),
@@ -8096,6 +8097,7 @@ impl BindingError<'_> {
             | BindingError::InvalidDataclassArgument(..)
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
+            | BindingError::PropertyHasNoGetter(..)
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..)
             | BindingError::PropertyGetterCallError(..)
@@ -8157,6 +8159,7 @@ impl<'db> BindingError<'db> {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
             | Self::InvalidDataclassArgument(_)
+            | Self::PropertyHasNoGetter(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
             | Self::PropertyGetterCallError(_)
@@ -8626,6 +8629,18 @@ impl<'db> BindingError<'db> {
                 if let Some(compound_diag) = compound_diag {
                     compound_diag.add_context(db, env, &mut diag);
                 }
+            }
+
+            Self::PropertyHasNoGetter(_) => {
+                BindingError::InternalCallError("property has no getter").report_diagnostic(
+                    context,
+                    node,
+                    callable_ty,
+                    callable_description,
+                    compound_diag,
+                    matching_overload,
+                    source_parameter_index_offset,
+                );
             }
 
             Self::PropertyHasNoSetter(_) => {

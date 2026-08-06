@@ -928,7 +928,9 @@ wrapper_descriptor(f, None, type(f), "one too many")
 
 ### `__get__` is called with correct arguments
 
-This test makes sure that we call `__get__` with the right argument types for various scenarios:
+Python passes the instance and its class to a descriptor on an instance access. On a class access,
+it passes `None` and the class instead. A descriptor on a metaclass receives the class and its
+metaclass.
 
 ```py
 from __future__ import annotations
@@ -955,21 +957,52 @@ class C(metaclass=Meta):
 reveal_type(C.class_object_access)  # revealed: int
 reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
+```
 
-# TODO: These should emit a diagnostic
-#
-# However, we use the return-type of `__get__` as the inferred type anyway:
-# the way to specify that the descriptor object itself is returned when the
-# attribute is accessed on the instance or the class is by overloading `__get__`.
-#
-# Using the return type of `__get__` even for `__get__` calls that have invalid
-# arguments passed to them avoids false positives in situations where there are
-# `__get__` calls that we don't sufficiently understand.
+An invalid descriptor access is reported, but we still use the declared return type of `__get__` to
+avoid cascading errors.
+
+```py
+# snapshot: invalid-attribute-access
 reveal_type(C().class_object_access)  # revealed: int
+
+# snapshot: invalid-attribute-access
 reveal_type(C.instance_access)  # revealed: str
 ```
 
-### Descriptors with incorrect `__get__` signature
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `class_object_access` on type `C`
+  --> src/mdtest_snippet.py:26:13
+   |
+26 | reveal_type(C().class_object_access)  # revealed: int
+   |             ^^^ Expected `None`, found `C`
+info: Argument to function `TailoredForClassObjectAccess.__get__` is incorrect
+info: This access implicitly calls `__get__` on a descriptor of type `TailoredForClassObjectAccess`
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __get__(self, instance: None, owner: type[C]) -> int:
+  |         ^^^^^^^       -------------- Parameter declared here
+
+
+error[invalid-attribute-access]: Invalid access to descriptor attribute `instance_access` on type `<class 'C'>`
+  --> src/mdtest_snippet.py:29:13
+   |
+29 | reveal_type(C.instance_access)  # revealed: str
+   |             ^ Expected `C`, found `None`
+info: Argument to function `TailoredForInstanceAccess.__get__` is incorrect
+info: This access implicitly calls `__get__` on a descriptor of type `TailoredForInstanceAccess`
+info: Function defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |     def __get__(self, instance: C, owner: type[C] | None = None) -> str:
+  |         ^^^^^^^       ----------- Parameter declared here
+```
+
+### Descriptors with an incorrect `__get__` signature
+
+Python calls `__get__` with the descriptor, an instance or `None`, and the owner class. A method
+that accepts only the descriptor cannot handle that call.
 
 ```py
 class Descriptor:
@@ -980,29 +1013,506 @@ class Descriptor:
 class C:
     descriptor: Descriptor = Descriptor()
 
-# TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: int
+C().descriptor  # snapshot: invalid-attribute-access
 
-# TODO: This should be an error
-reveal_type(C().descriptor)  # revealed: int
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `descriptor` on type `<class 'C'>`"
+reveal_type(C.descriptor)  # revealed: int
 ```
 
-### "Descriptors" with non-callable `__get__` attributes
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `descriptor` on type `C`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | C().descriptor  # snapshot: invalid-attribute-access
+  | ^^^ Too many positional arguments to function `Descriptor.__get__`: expected 1, got 3
+info: This access implicitly calls `__get__` on a descriptor of type `Descriptor`
+info: Function signature here
+ --> src/mdtest_snippet.py:3:9
+  |
+3 |     def __get__(self) -> int:
+  |         ^^^^^^^^^^^^^^^^^^^^
+```
 
-If `__get__` is not callable at all, the interpreter will still attempt to call the method at
-runtime, and this will raise an exception. As such, even for `__get__ = None`, we still "attempt to
-call `__get__`" on the descriptor object (leading us to infer `Unknown`):
+### Recursive descriptor aliases terminate
+
+Inspecting a recursive attribute must not recurse forever. The recursive alternative also cannot
+prove that the access will invoke an invalid descriptor.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Recursive = int | Recursive
+
+class C:
+    value: Recursive = 1
+
+C().value
+```
+
+### Property getters reject invalid receiver specializations
+
+A property getter checks the same specialized receiver as an ordinary method. A generic alias with
+alternatives that impose different type-variable bounds can produce an invalid property access.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+AItem = TypeVar("AItem", bound=Callable[[int], str])
+BItem = TypeVar("BItem", bound=Callable[[str], str])
+
+class A(Generic[AItem]):
+    @property
+    def callback(self) -> AItem:
+        raise NotImplementedError
+
+class B(Generic[BItem]):
+    @property
+    def callback(self) -> BItem:
+        raise NotImplementedError
+
+AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
+Command = A[AnyCallback] | B[AnyCallback]
+Callback = TypeVar("Callback", bound=Callable[[int], str])
+
+def access(value: Callback | Command[Callback]) -> None:
+    if isinstance(value, A | B):
+        # error: [invalid-attribute-access]
+        value.callback
+```
+
+### Property getter failures preserve their underlying error and return type
+
+A property inherited from an unrelated class rejects the instance passed to its getter. The
+diagnostic reports the getter's actual receiver mismatch and preserves its return type.
+
+```py
+class Owner:
+    @property
+    def value(self) -> int:
+        return 1
+
+class Other:
+    value = Owner.value
+
+# error: [invalid-attribute-access] "Expected `Owner`, found `Other`"
+reveal_type(Other().value)  # revealed: int
+```
+
+### Every descriptor alternative must accept the call
+
+As with other operations on a union, an attribute access is invalid if any possible descriptor
+cannot accept the implicit call.
 
 ```py
 class BrokenDescriptor:
+    def __get__(self) -> bytes:
+        return b""
+
+class ValidDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+def descriptor() -> BrokenDescriptor | ValidDescriptor:
+    raise NotImplementedError
+
+class C:
+    value = descriptor()
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: bytes | str
+```
+
+### Descriptor diagnostics are reported through `super()`
+
+Accessing an inherited descriptor through `super()` still invokes its `__get__` method.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Base:
+    value = Descriptor()
+
+class Derived(Base):
+    def access(self) -> None:
+        # error: [invalid-attribute-access]
+        super().value
+```
+
+### Type variables preserve invalid descriptor calls
+
+A type variable's bound does not prevent its receiver or descriptor value from reaching an invalid
+`__get__` method. The same applies when accessing an attribute on `type[T]`.
+
+```py
+from typing import TypeVar
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Owner:
+    value = Descriptor()
+
+OwnerT = TypeVar("OwnerT", bound=Owner)
+DescriptorT = TypeVar("DescriptorT", bound=Descriptor)
+
+def instance(owner: OwnerT) -> None:
+    # error: [invalid-attribute-access]
+    owner.value
+
+def class_object(owner: type[OwnerT]) -> None:
+    # error: [invalid-attribute-access]
+    owner.value
+
+def descriptor_value(descriptor: DescriptorT) -> None:
+    class C:
+        value = descriptor
+
+    # error: [invalid-attribute-access]
+    C().value
+```
+
+### Intersections preserve invalid descriptor calls
+
+Intersecting a receiver or descriptor value with another type does not make its invalid `__get__`
+method callable.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class Owner:
+    value = Descriptor()
+
+class Marker: ...
+
+def receiver(owner: Owner) -> None:
+    if isinstance(owner, Marker):
+        # error: [invalid-attribute-access]
+        owner.value
+
+def descriptor_value(descriptor: Descriptor) -> None:
+    if isinstance(descriptor, Marker):
+        class C:
+            value = descriptor
+
+        # error: [invalid-attribute-access]
+        C().value
+```
+
+### Every `__get__` definition must accept the call
+
+A conditionally defined method can have several callable signatures. The access is invalid if any
+possible definition rejects the call.
+
+```py
+def access(flag: bool) -> None:
+    class Descriptor:
+        if flag:
+            def __get__(self, instance: object, owner: type | None = None) -> int:
+                return 1
+
+        else:
+            def __get__(self) -> str:
+                return ""
+
+    class C:
+        value = Descriptor()
+
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+    reveal_type(C().value)  # revealed: int | str
+```
+
+### A possible `__getattr__` fallback does not hide an invalid descriptor
+
+When a descriptor is only conditionally present, `__getattr__` handles the path where it is absent.
+The other path still invokes the invalid descriptor and must produce a diagnostic.
+
+```py
+def access(flag: bool) -> None:
+    class Descriptor:
+        def __get__(self) -> int:
+            return 1
+
+    class C:
+        if flag:
+            value = Descriptor()
+
+        def __getattr__(self, name: str) -> str:
+            return name
+
+    # error: [invalid-attribute-access]
+    reveal_type(C().value)  # revealed: int | str
+```
+
+### A class-object lookup uses its declared member type
+
+Class-object member lookup uses the declared attribute type even when the declaration has no value.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value: Descriptor
+
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `<class 'C'>`"
+C.value
+```
+
+### An instance `__getattribute__` can bypass descriptors
+
+A custom `__getattribute__` can return without invoking the malformed descriptor. The ordinary
+member type remains unchanged, even when the override has the same return type as the descriptor.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+    def __getattribute__(self, name: str) -> int:
+        return 42
+
+reveal_type(C().value)  # revealed: int
+```
+
+### An instance `__getattribute__` may delegate to descriptor lookup
+
+The return annotation of an override does not establish whether it delegates to the default
+attribute lookup. Since ty does not inspect the implementation, it cannot conclude that the
+descriptor is invoked.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+    def __getattribute__(self, name: str) -> str:
+        return super().__getattribute__(name)
+
+C().value
+```
+
+### An assigned instance attribute shadows a non-data descriptor
+
+An instance attribute takes precedence over a non-data descriptor. After the assignment, reading the
+attribute does not call the descriptor.
+
+```py
+from typing import Literal
+
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class C:
+    value = Descriptor()
+
+    def replace(self) -> None:
+        self.value: int = 1
+        reveal_type(self.value)  # revealed: Literal[1]
+```
+
+### An instance assignment does not shadow a data descriptor
+
+Assigning to a data descriptor invokes its `__set__` method. A subsequent read still invokes its
+`__get__` method, even though the attribute has a known assigned type.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    value = Descriptor()
+
+    def access(self) -> None:
+        self.value = 1
+        # error: [invalid-attribute-access]
+        self.value
+```
+
+### A conditional assignment does not hide an invalid descriptor call
+
+The assignment shadows the non-data descriptor on one path, but the other path still invokes its
+invalid `__get__` method.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class C:
+    value = Descriptor()
+
+def access(c: C, flag: bool) -> None:
+    if flag:
+        c.value = Descriptor()
+
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+    c.value
+```
+
+### Augmented assignment reads before writing
+
+An augmented assignment reads the descriptor before writing the operation's result. The malformed
+`__get__` call is therefore reported even though `__set__` accepts the result.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class C:
+    value = Descriptor()
+
+c = C()
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+c.value += 1
+```
+
+### Deletion does not read a descriptor
+
+Deleting a descriptor calls `__delete__` without first calling `__get__`.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+    def __delete__(self, instance: object) -> None:
+        pass
+
+class C:
+    value = Descriptor()
+
+c = C()
+del c.value
+```
+
+### A class attribute can shadow a metaclass non-data descriptor
+
+The class attribute takes precedence, so the malformed metaclass descriptor is not invoked.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    value = Descriptor()
+
+class C(metaclass=Meta):
+    value = 1
+
+reveal_type(C.value)  # revealed: int
+```
+
+### A possible class attribute does not shadow a metaclass descriptor
+
+A conditionally defined class attribute shadows a metaclass descriptor only when it exists. The
+other path invokes the invalid descriptor.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    value = Descriptor()
+
+def access(flag: bool) -> None:
+    class C(metaclass=Meta):
+        if flag:
+            value = 1
+
+    # error: [invalid-attribute-access]
+    reveal_type(C.value)  # revealed: str | int
+```
+
+### A metaclass data descriptor takes precedence over a class attribute
+
+A data descriptor on the metaclass runs even when the class defines an attribute with the same name,
+so an invalid descriptor call must be reported.
+
+```py
+class Descriptor:
+    def __get__(self) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class Meta(type):
+    value = Descriptor()
+
+class C(metaclass=Meta):
+    value = 1
+
+# error: [invalid-attribute-access]
+reveal_type(C.value)  # revealed: str
+```
+
+### A metaclass data descriptor shadows an invalid class descriptor
+
+A data descriptor on the metaclass has priority over a descriptor stored on the class. The class
+descriptor is never called, so its invalid signature does not affect the access.
+
+```py
+class DataDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class InvalidDescriptor:
+    def __get__(self) -> str:
+        return ""
+
+class Meta(type):
+    value = DataDescriptor()
+
+class C(metaclass=Meta):
+    value = InvalidDescriptor()
+
+reveal_type(C.value)  # revealed: int
+```
+
+### `__get__` is not callable
+
+Python still attempts to call a non-callable `__get__` attribute, so the access fails and its type
+is unknown.
+
+```py
+class Descriptor:
     __get__: None = None
 
-class Foo:
-    desc: BrokenDescriptor = BrokenDescriptor()
+class C:
+    value: Descriptor = Descriptor()
 
-# TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
-# we should emit a diagnostic
-reveal_type(Foo().desc)  # revealed: Unknown
+# error: [invalid-attribute-access] "Invalid access to descriptor attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: Unknown
 ```
 
 ### Undeclared descriptor arguments
@@ -1075,6 +1585,25 @@ def _(flag: bool):
     reveal_type(C.descriptor)  # revealed: int | MaybeDescriptor
 
     reveal_type(C().descriptor)  # revealed: int | MaybeDescriptor
+```
+
+### A possibly-unbound invalid `__get__` method still fails when present
+
+When a descriptor method is only conditionally defined, the branch where it exists must still accept
+the implicit descriptor arguments.
+
+```py
+def access(flag: bool) -> None:
+    class Descriptor:
+        if flag:
+            def __get__(self) -> int:
+                return 1
+
+    class C:
+        value = Descriptor()
+
+    # error: [invalid-attribute-access]
+    reveal_type(C().value)  # revealed: int | Descriptor
 ```
 
 ### Descriptors with non-function `__get__` callables that are descriptors themselves

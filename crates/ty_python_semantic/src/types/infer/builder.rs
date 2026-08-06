@@ -10317,9 +10317,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, env, &attr.id).map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        });
+        let fallback_place = value_type
+            .try_member_lookup(db, env, &attr.id)
+            .unwrap_or_else(|error| {
+                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
+                error.fallback_member(db)
+            })
+            .map_type(|ty| {
+                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            });
 
         let attr_name = &attr.id;
         let resolved_type =
