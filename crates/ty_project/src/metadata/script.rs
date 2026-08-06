@@ -159,7 +159,7 @@ impl ScriptEnvironments {
         *self.by_file.entry(file).or_insert_with(|| {
             if !matches!(
                 db.system().env_var(EnvVars::TY_UV).as_deref(),
-                Ok("1" | "true")
+                Ok("1" | "true" | "scripts")
             ) {
                 return ScriptEnvironment::new(db, None, None);
             }

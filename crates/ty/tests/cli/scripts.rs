@@ -1452,26 +1452,22 @@ mod uv_metadata {
         command
     }
 
-    fn uv_supports_script_metadata() -> anyhow::Result<bool> {
+    fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
         let output = Command::new("uv")
             .args(["workspace", "metadata", "--help"])
             .output()?;
 
-        let supported =
-            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("--script");
+        assert!(
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("--script"),
+            "installed uv does not support script metadata"
+        );
 
-        if !supported {
-            eprintln!("Skipping script integration: installed uv does not support script metadata");
-        }
-
-        Ok(supported)
+        Ok(())
     }
 
     #[test]
     fn uv_script_environment_is_initialized_lazily() -> anyhow::Result<()> {
-        if !uv_supports_script_metadata()? {
-            return Ok(());
-        }
+        assert_uv_supports_script_metadata()?;
 
         let case = CliTest::with_file(
             "script.py",
@@ -1499,7 +1495,7 @@ mod uv_metadata {
 
         assert!(!case.root().join("cache").exists());
 
-        assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
+        assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py").env("TY_UV", "scripts"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1533,9 +1529,7 @@ mod uv_metadata {
 
     #[test]
     fn fixes_script_using_uv_environment() -> anyhow::Result<()> {
-        if !uv_supports_script_metadata()? {
-            return Ok(());
-        }
+        assert_uv_supports_script_metadata()?;
 
         let case = CliTest::with_file(
             "script.py",
@@ -1591,9 +1585,7 @@ mod uv_metadata {
 
     #[test]
     fn failed_uv_script_synchronization_reports_an_error() -> anyhow::Result<()> {
-        if !uv_supports_script_metadata()? {
-            return Ok(());
-        }
+        assert_uv_supports_script_metadata()?;
 
         let case = CliTest::with_file(
             "script.py",
