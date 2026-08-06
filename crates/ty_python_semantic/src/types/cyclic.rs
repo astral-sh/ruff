@@ -31,15 +31,16 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
+use crate::types::class::ClassLiteral;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::list_members::all_members;
+use crate::types::list_members::all_end_of_scope_members;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, NominalInstanceType,
     ProtocolInstanceType, StaticClassLiteral, SubclassOfInner, Type, TypeAliasType, TypedDictType,
 };
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment, attribute_scopes, semantic_index};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -513,8 +514,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
         match source {
             RecursiveDefinition::Nominal(origin) => {
-                let nominal = Type::instance(db, &self.env, origin.identity_specialization(db));
-                self.visit_nominal_members(db, nominal);
+                self.visit_nominal_members(db, origin);
             }
             RecursiveDefinition::TypeAlias(alias) => {
                 self.visit_type(db, alias.raw_value_type(db));
@@ -539,25 +539,47 @@ impl<'db> SpecializationFlowVisitor<'db> {
         true
     }
 
-    fn visit_nominal_members(&self, db: &'db dyn Db, nominal: Type<'db>) {
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "specialization flow is independent of member order"
-        )]
-        for member in all_members(db, &self.env, nominal) {
-            // `all_members` synthesizes `__class__: type[Self]` for every nominal instance.
-            if member.name == "__class__" {
-                continue;
+    /// Visits the types this class contributes to its instances' specialization flow.
+    ///
+    /// Only the class's own body is inspected: inherited members are covered compositionally,
+    /// because each explicit base is itself a reference whose arguments carry this class's
+    /// parameter flow, and the base definition's own flow covers the members it contributes.
+    /// This avoids enumerating the full MRO member set per class.
+    fn visit_nominal_members(&self, db: &'db dyn Db, origin: StaticClassLiteral<'db>) {
+        for base in origin.explicit_bases(db) {
+            self.visit_type(db, *base);
+        }
+
+        let body_scope = origin.body_scope(db);
+        for memberdef in all_end_of_scope_members(db, body_scope) {
+            self.visit_nominal_member(db, memberdef.member.name.as_str(), memberdef.member.ty);
+        }
+
+        // Instance attributes implicitly defined by `self.x = ...` assignments in methods.
+        let class = ClassType::NonGeneric(ClassLiteral::Static(origin).into());
+        let index = semantic_index(db, body_scope.program_file(db));
+        for function_scope_id in attribute_scopes(db, body_scope) {
+            for place_expr in index.place_table(function_scope_id).members() {
+                let Some(name) = place_expr.as_instance_attribute() else {
+                    continue;
+                };
+                let member = class.own_instance_member(db, &self.env, name);
+                if let Some(ty) = member.ignore_possibly_undefined() {
+                    self.visit_nominal_member(db, name, ty);
+                }
             }
-            // These hooks determine the effective type of otherwise missing attributes.
-            if matches!(member.name.as_str(), "__getattr__" | "__getattribute__") {
-                self.visit_callable_return_types(db, member.ty);
-            }
-            match member.ty {
-                // Method relations have a separate declaration-based recursion guard.
-                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
-                ty => self.visit_type(db, ty),
-            }
+        }
+    }
+
+    fn visit_nominal_member(&self, db: &'db dyn Db, name: &str, ty: Type<'db>) {
+        // These hooks determine the effective type of otherwise missing attributes.
+        if matches!(name, "__getattr__" | "__getattribute__") {
+            self.visit_callable_return_types(db, ty);
+        }
+        match ty {
+            // Method relations have a separate declaration-based recursion guard.
+            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
+            ty => self.visit_type(db, ty),
         }
     }
 
