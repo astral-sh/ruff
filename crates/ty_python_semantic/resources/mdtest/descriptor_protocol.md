@@ -963,11 +963,40 @@ An invalid descriptor access is reported, but we still use the declared return t
 avoid cascading errors.
 
 ```py
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `class_object_access` on type `C`"
+# snapshot: invalid-attribute-access
 reveal_type(C().class_object_access)  # revealed: int
 
-# error: [invalid-attribute-access] "Invalid access to descriptor attribute `instance_access` on type `<class 'C'>`"
+# snapshot: invalid-attribute-access
 reveal_type(C.instance_access)  # revealed: str
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to descriptor attribute `class_object_access` on type `C`
+  --> src/mdtest_snippet.py:26:13
+   |
+26 | reveal_type(C().class_object_access)  # revealed: int
+   |             ^^^ Expected `None`, found `C`
+info: Argument to function `TailoredForClassObjectAccess.__get__` is incorrect
+info: This access implicitly calls `__get__` on a descriptor of type `TailoredForClassObjectAccess`
+info: Function defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __get__(self, instance: None, owner: type[C]) -> int:
+  |         ^^^^^^^       -------------- Parameter declared here
+
+
+error[invalid-attribute-access]: Invalid access to descriptor attribute `instance_access` on type `<class 'C'>`
+  --> src/mdtest_snippet.py:29:13
+   |
+29 | reveal_type(C.instance_access)  # revealed: str
+   |             ^ Expected `C`, found `None`
+info: Argument to function `TailoredForInstanceAccess.__get__` is incorrect
+info: This access implicitly calls `__get__` on a descriptor of type `TailoredForInstanceAccess`
+info: Function defined here
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |     def __get__(self, instance: C, owner: type[C] | None = None) -> str:
+  |         ^^^^^^^       ----------- Parameter declared here
 ```
 
 ### Descriptors with an incorrect `__get__` signature
