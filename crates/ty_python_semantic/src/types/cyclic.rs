@@ -37,8 +37,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::list_members::all_end_of_scope_members;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, NominalInstanceType,
-    ProtocolInstanceType, StaticClassLiteral, SubclassOfInner, Type, TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, StaticClassLiteral, SubclassOfInner,
+    Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment, attribute_scopes, semantic_index};
 
@@ -103,15 +103,15 @@ impl<'db> Type<'db> {
                 a.definition(db) == b.definition(db)
             }
             (Type::NominalInstance(a), Type::NominalInstance(b)) => {
-                a.definition(db).is_some_and(|definition| {
-                    b.definition(db).is_some_and(|other| definition == other)
-                })
+                matches!((a.stored_class(db), b.stored_class(db)), (Some(a), Some(b)) if a.class_literal(db) == b.class_literal(db))
             }
             (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
-                a.definition(db) == b.definition(db)
+                matches!((a.class_origin(db), b.class_origin(db)), (Some(a), Some(b)) if a.class_literal(db) == b.class_literal(db))
+            }
+            (Type::TypedDict(a), Type::TypedDict(b)) => {
+                matches!((a.defining_class(), b.defining_class()), (Some(a), Some(b)) if a.class_literal(db) == b.class_literal(db))
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
-            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
             _ => false,
         }
     }
@@ -556,7 +556,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
         }
 
         // Instance attributes implicitly defined by `self.x = ...` assignments in methods.
-        let class = ClassType::NonGeneric(ClassLiteral::Static(origin).into());
+        let class = ClassType::NonGeneric(ClassLiteral::Static(origin));
         let index = semantic_index(db, body_scope.program_file(db));
         for function_scope_id in attribute_scopes(db, body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
@@ -754,19 +754,6 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
         _db: &'db dyn Db,
         _bound_typevar: BoundTypeVarInstance<'db>,
     ) {
-    }
-}
-
-impl<'db> ProtocolInstanceType<'db> {
-    fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
-        Some(origin.definition(db))
-    }
-}
-
-impl<'db> NominalInstanceType<'db> {
-    fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        self.stored_class(db)?.definition(db)
     }
 }
 
