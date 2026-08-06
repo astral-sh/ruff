@@ -247,6 +247,22 @@ class Counter:
         self.value = 0
         for _ in range(1):
             self.value += increment
+
+reveal_type(Counter().value)  # revealed: None | float
+```
+
+## Inferred public attribute targets
+
+An inferred class attribute has the same public write contract for augmented and ordinary
+assignments.
+
+```py
+class Holder:
+    value = 1
+
+holder = Holder()
+# error: [invalid-assignment]
+holder.value += 0.5
 ```
 
 ## Attribute descriptors
@@ -395,17 +411,20 @@ values[0] += 1
 
 ## Failed attribute and subscript loads
 
-If the load has already failed, its corresponding store must not emit another diagnostic.
+Both the load and the store are checked, just as they are for an ordinary assignment whose value
+reads the same target.
 
 ```py
 class Missing: ...
 
 missing = Missing()
 # error: [unresolved-attribute]
+# error: [unresolved-attribute]
 missing.value += 1
 
 mapping: dict[str, int] = {}
 # error: [invalid-argument-type]
+# error: [invalid-assignment]
 mapping[1] += 1
 ```
 
@@ -447,7 +466,38 @@ class B:
     value: BValue
 
 def update(value: A | B) -> None:
+    # TODO: Preserve receiver correlation, which is also lost in ordinary assignments.
+    # error: [invalid-assignment]
     value.value += 1
+```
+
+## Union subscript targets
+
+An augmented assignment must reject a union alternative that does not support the write.
+
+```py
+def update(value: list[int] | tuple[int, ...]) -> None:
+    # error: [invalid-assignment]
+    value[0] += 1
+```
+
+## Union subscript keys
+
+Each possible typed-dictionary key must accept the value written by the augmented assignment.
+
+```py
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    first: int
+    second: int
+
+def update(value: Payload, key: Literal["first", "second"]) -> None:
+    value[key] += 1
+
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    value[key] /= 2
 ```
 
 ## Inferred collection targets
