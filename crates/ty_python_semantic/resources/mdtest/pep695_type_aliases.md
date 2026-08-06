@@ -930,6 +930,116 @@ type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
+### An undecided recursive relation does not prove incompatibility
+
+If relating two recursively growing aliases proves neither compatibility nor incompatibility, the
+lack of positive proof must not itself produce an incompatibility diagnostic.
+
+```py
+from typing import overload
+
+type EvidenceLeft[T] = T | tuple[EvidenceLeft[list[T]]]
+type EvidenceRight[T] = T | tuple[EvidenceRight[list[T]]]
+
+def evidence_return(value: EvidenceLeft[int]) -> EvidenceRight[int]:
+    return value
+
+def evidence_assignment(value: EvidenceLeft[int]) -> None:
+    target: EvidenceRight[int] = value
+
+class EvidenceBase:
+    def method(self) -> EvidenceRight[int]:
+        raise NotImplementedError
+
+class EvidenceSubclass(EvidenceBase):
+    def method(self) -> EvidenceLeft[int]:
+        raise NotImplementedError
+
+class EvidenceBox[T: EvidenceRight[int]]: ...
+class EvidenceConstrainedBox[T: (EvidenceRight[int], bytes)]: ...
+
+def evidence_bounded[T: EvidenceRight[int]](value: T) -> T:
+    return value
+
+def evidence_constrained[T: (EvidenceRight[int], bytes)](value: T) -> T:
+    return value
+
+def evidence_generic_bound(value: EvidenceLeft[int]) -> None:
+    # An undecided bound is not an error, but it also cannot validate the supplied type argument.
+    reveal_type(EvidenceBox[EvidenceLeft[int]]())  # revealed: EvidenceBox[Unknown]
+    reveal_type(evidence_bounded(value))  # revealed: Unknown
+    reveal_type(EvidenceConstrainedBox[EvidenceLeft[int]]())  # revealed: EvidenceConstrainedBox[Unknown]
+    reveal_type(evidence_constrained(value))  # revealed: Unknown
+
+@overload
+def evidence_implementation(value: EvidenceLeft[int]) -> EvidenceLeft[int]: ...
+@overload
+def evidence_implementation(value: bytes) -> bytes: ...
+def evidence_implementation(
+    value: EvidenceRight[int] | bytes,
+) -> EvidenceRight[int] | bytes:
+    return value
+```
+
+### A recursive alias does not lose alternatives after repeated unfolding
+
+Every type argument eventually becomes the first element of this rotating recursive alias. The `str`
+alternative must therefore remain part of the alias even though it only appears after many unfolding
+steps. Giving up on the relation also cannot prove its negation: both TypedDicts below can contain
+`{"item": 1}`, so they are not disjoint.
+
+```py
+from typing import Never, TypedDict
+from typing_extensions import TypeIs
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+type Delayed13[
+    T1,
+    T2,
+    T3,
+    T4,
+    T5,
+    T6,
+    T7,
+    T8,
+    T9,
+    T10,
+    T11,
+    T12,
+    T13,
+] = T1 | Delayed13[T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T1]
+
+def cannot_discard_delayed_str(
+    value: Delayed13[int, int, int, int, int, int, int, int, int, int, int, int, str],
+) -> int:
+    # TODO: Track the `str` alternative through every rotation so this invalid return is diagnosed.
+    return value
+
+type DelayedIntOrStr = Delayed13[int, int, int, int, int, int, int, int, int, int, int, int, str]
+
+class DelayedField(TypedDict):
+    item: DelayedIntOrStr
+
+class IntField(TypedDict):
+    item: int
+
+static_assert(not is_disjoint_from(DelayedField, IntField))
+
+def is_int_field(value: object) -> TypeIs[IntField]:
+    return isinstance(value, dict) and isinstance(value.get("item"), int)
+
+def expect_never(value: Never) -> None: ...
+def narrow_delayed_field(value: DelayedField) -> None:
+    if is_int_field(value):
+        reveal_type(value)  # revealed: DelayedField & IntField
+        # This branch is reachable because both TypedDicts can contain `{"item": 1}`.
+        expect_never(value)  # error: [invalid-argument-type]
+    else:
+        reveal_type(value)  # revealed: DelayedField & ~IntField
+```
+
 ### Non-recursive nested generic aliases
 
 A repeated use of the same generic alias can be a finite alias application instead of recursion.
@@ -1031,9 +1141,8 @@ type StableWrapped[T] = list[StableWrapped[T]]
 def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     reveal_type(x)  # revealed: list[StableWrapped[int]]
     reveal_type(y)  # revealed: list[StableWrapped[str]]
-    # error: [invalid-assignment] "Object of type `StableWrapped[str]` is not assignable to `StableWrapped[int]`"
+    # TODO: Determine whether these infinitely nested invariant aliases are incompatible.
     x = y
-    # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
     y = x
 ```
 

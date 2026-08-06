@@ -380,24 +380,29 @@ fn check_non_generic_overload_implementation_consistency<'db>(
             match (parameter_consistency, return_type_consistency) {
                 (ParameterConsistency::Consistent, ReturnTypeConsistency::Consistent) => continue,
                 (
-                    ParameterConsistency::Inconsistent(error_context),
-                    ReturnTypeConsistency::Consistent,
+                    ParameterConsistency::Unresolved,
+                    ReturnTypeConsistency::Consistent | ReturnTypeConsistency::Unresolved,
+                )
+                | (ParameterConsistency::Consistent, ReturnTypeConsistency::Unresolved) => continue,
+                (
+                    ParameterConsistency::Incompatible(error_context),
+                    ReturnTypeConsistency::Consistent | ReturnTypeConsistency::Unresolved,
                 ) => (
                     Some(error_context),
                     None,
                     "Implementation does not accept all arguments of this overload",
                 ),
                 (
-                    ParameterConsistency::Consistent,
-                    ReturnTypeConsistency::Inconsistent(error_context),
+                    ParameterConsistency::Consistent | ParameterConsistency::Unresolved,
+                    ReturnTypeConsistency::Incompatible(error_context),
                 ) => (
                     None,
                     Some(error_context),
                     "Overload return type is not assignable to implementation return type",
                 ),
                 (
-                    ParameterConsistency::Inconsistent(parameter_error_context),
-                    ReturnTypeConsistency::Inconsistent(return_type_error_context),
+                    ParameterConsistency::Incompatible(parameter_error_context),
+                    ReturnTypeConsistency::Incompatible(return_type_error_context),
                 ) => (
                     Some(parameter_error_context),
                     Some(return_type_error_context),

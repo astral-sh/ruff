@@ -68,7 +68,7 @@ use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module,
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::RelationConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
@@ -1740,7 +1740,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: FunctionType<'db>,
         target: FunctionType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if source.literal(db) != target.literal(db) {
             return self.never();
         }

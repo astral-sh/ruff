@@ -29,7 +29,10 @@ use crate::{
         MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
         ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
         TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
-        constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
+        constraints::{
+            IteratorRelationConstraintsExtension, OptionRelationConstraintsExtension,
+            RelationConstraintSet,
+        },
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
         generics::Specialization,
@@ -2472,7 +2475,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         member_name: &str,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let requirement = attribute_write_requirement(db, env, ty, member_name);
         self.check_property_write_requirement(db, &requirement, member_name, value_ty)
@@ -2484,7 +2487,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         requirement: &AttributeWriteRequirement<'db>,
         member_name: &str,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match requirement {
             AttributeWriteRequirement::All { element_tys, .. } => {
                 let env = self.env;
@@ -2499,7 +2502,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         value_ty,
                     );
                     result = result.and(db, self.constraints, || element_result);
-                    if result.is_trivially_never_satisfied() {
+                    if result.is_always_false(db, env) {
                         break;
                     }
                 }
@@ -2518,7 +2521,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         value_ty,
                     );
                     result = result.or(db, self.constraints, || element_result);
-                    if result.is_trivially_always_satisfied() {
+                    if result.is_always_true(db, env) {
                         break;
                     }
                 }
@@ -2555,7 +2558,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &InstanceAttributeWriteMember<'db>,
         member_name: &str,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let setattr_result = object_ty.try_call_dunder_with_policy(
             db,
@@ -2606,12 +2609,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         object_ty: Type<'db>,
         member: &ClassAttributeWriteMember<'db>,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result =
                     self.check_explicit_property_write(db, object_ty, member, value_ty);
-                if member_result.is_trivially_never_satisfied() {
+                if member_result.is_always_false(db, self.env) {
                     return member_result;
                 }
                 if let Some(fallback) = fallback {
@@ -2635,7 +2638,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         object_ty: Type<'db>,
         requirement: &ExplicitAttributeWriteRequirement<'db>,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if requirement.qualifiers().contains(TypeQualifiers::FINAL) {
             return self.never();
         }
@@ -2671,7 +2674,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         setter_ty: Type<'db>,
         object_ty: Type<'db>,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         if setter_ty
             .try_call(
@@ -2692,7 +2695,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         object_ty: Type<'db>,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let Place::Defined(DefinedPlace { ty: setattr_ty, .. }) = object_ty
             .member_lookup_with_policy(
@@ -2717,12 +2720,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         parameter_index: usize,
         self_ty: Type<'db>,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if let Type::Union(union) = value_ty {
             return union
                 .elements(db)
                 .iter()
-                .when_all(db, self.constraints, |value_ty| {
+                .when_all_relation(db, self.constraints, |value_ty| {
                     self.check_callable_write_parameter(
                         db,
                         callable_ty,
@@ -2736,31 +2739,33 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let env = self.env;
         callable_ty
             .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
-            .when_some_and(db, self.constraints, |callables| {
-                callables.iter().when_all(db, self.constraints, |callable| {
-                    callable.signatures(db).into_iter().when_any(
-                        db,
-                        self.constraints,
-                        |signature| {
-                            let parameters = signature.parameters();
-                            parameters
-                                .get_positional(parameter_index)
-                                .or_else(|| {
-                                    parameters.variadic().and_then(|(index, parameter)| {
-                                        (index <= parameter_index).then_some(parameter)
+            .when_some_and_relation(self.constraints, |callables| {
+                callables
+                    .iter()
+                    .when_all_relation(db, self.constraints, |callable| {
+                        callable.signatures(db).into_iter().when_any_relation(
+                            db,
+                            self.constraints,
+                            |signature| {
+                                let parameters = signature.parameters();
+                                parameters
+                                    .get_positional(parameter_index)
+                                    .or_else(|| {
+                                        parameters.variadic().and_then(|(index, parameter)| {
+                                            (index <= parameter_index).then_some(parameter)
+                                        })
                                     })
-                                })
-                                .map(|parameter| {
-                                    parameter
-                                        .annotated_type()
-                                        .bind_self_typevars(db, env, self_ty)
-                                })
-                                .when_some_and(db, self.constraints, |write_ty| {
-                                    self.check_type_pair(db, value_ty, write_ty)
-                                })
-                        },
-                    )
-                })
+                                    .map(|parameter| {
+                                        parameter
+                                            .annotated_type()
+                                            .bind_self_typevars(db, env, self_ty)
+                                    })
+                                    .when_some_and_relation(self.constraints, |write_ty| {
+                                        self.check_type_pair(db, value_ty, write_ty)
+                                    })
+                            },
+                        )
+                    })
             })
     }
 
@@ -2769,7 +2774,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         requirement: &FallbackAttributeWriteRequirement<'db>,
         value_ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match requirement {
             FallbackAttributeWriteRequirement::AssignableTo { ty, qualifiers, .. } => {
                 if qualifiers.contains(TypeQualifiers::FINAL) {
@@ -2790,7 +2795,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
         required_ty: ProtocolMemberType<'db>,
         access: ProtocolMemberAccessMode,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let Some(attribute_type) =
             protocol_member_read_type(db, env, ty, receiver_ty, member, access)
@@ -2826,7 +2831,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             attribute_type
                 .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
-                .when_some_and(db, self.constraints, |callables| {
+                .when_some_and_relation(self.constraints, |callables| {
                     self.check_callables_vs_callable(
                         db,
                         &callables.map(|callable| {
@@ -2856,23 +2861,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             attribute_type
                 .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
-                .when_some_and(db, self.constraints, |callables| {
-                    callables.iter().when_all(db, self.constraints, |callable| {
-                        if callable.is_function_like(db) {
-                            self.check_callable_pair(
-                                db,
-                                callable.bind_self(db, env, Some(implementation_self_binding_ty)),
-                                protocol_bind_self(
+                .when_some_and_relation(self.constraints, |callables| {
+                    callables
+                        .iter()
+                        .when_all_relation(db, self.constraints, |callable| {
+                            if callable.is_function_like(db) {
+                                self.check_callable_pair(
                                     db,
-                                    env.program(db),
-                                    required_callable,
-                                    Some(protocol_self_binding_ty),
-                                ),
-                            )
-                        } else {
-                            self.check_callable_pair(db, *callable, required_callable)
-                        }
-                    })
+                                    callable.bind_self(
+                                        db,
+                                        env,
+                                        Some(implementation_self_binding_ty),
+                                    ),
+                                    protocol_bind_self(
+                                        db,
+                                        env.program(db),
+                                        required_callable,
+                                        Some(protocol_self_binding_ty),
+                                    ),
+                                )
+                            } else {
+                                self.check_callable_pair(db, *callable, required_callable)
+                            }
+                        })
                 })
         } else if member.is_method() {
             let Some(required_ty) = required_ty.resolve(db, env) else {
@@ -2895,10 +2906,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             required_ty
                 .bind_self(db, env, protocol_self_binding_ty)
-                .when_some_and(db, self.constraints, |required_ty| {
+                .when_some_and_relation(self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env)
+                        && result.is_always_false(db, env)
                     {
                         context.push(ErrorContext::ProtocolMemberReadTypeIncompatible {
                             source: attribute_type,
@@ -2922,7 +2933,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
         required: ProtocolMemberAccess<'db>,
         access: ProtocolMemberAccessMode,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if access == ProtocolMemberAccessMode::Class
             && member.is_instance_method()
             && required.read.is_some()
@@ -2931,7 +2942,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // implementation. Class access only establishes that the member is present. Callable
             // types and several callable literal forms do not expose a useful `__call__` member
             // through their meta-type.
-            return ConstraintSet::from_bool(
+            return RelationConstraintSet::from_bool(
                 self.constraints,
                 member.name == "__call__"
                     || protocol_member_read_type(
@@ -2968,11 +2979,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
                     write
                         .bind_compatibility_type(db, env, fallback_ty)
-                        .when_some_and(db, self.constraints, |write_ty| {
+                        .when_some_and_relation(self.constraints, |write_ty| {
                             let result =
                                 self.check_property_write(db, receiver_ty, member.name, write_ty);
                             if let Some(context) = self.report_context()
-                                && result.is_never_satisfied(db, env)
+                                && result.is_always_false(db, env)
                             {
                                 context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible {
                                     target: write_ty,
@@ -2991,7 +3002,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let instance_access =
             member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
@@ -3057,7 +3068,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             });
         if let Some(context) = self.report_context()
-            && result.is_never_satisfied(db, env)
+            && result.is_always_false(db, env)
         {
             context.push(ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
@@ -3078,12 +3089,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         instance_ty: Type<'db>,
         meta_ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         protocol
             .interface(db)
             .members(db)
-            .when_all(db, self.constraints, |member| {
+            .when_all_relation(db, self.constraints, |member| {
                 let required = member.access(db, env, ProtocolMemberAccessMode::Class);
                 if required.read.is_none() && required.write.is_none() {
                     return self.always();
@@ -3115,7 +3126,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 };
 
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env)
+                    && result.is_always_false(db, env)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: member.name.into(),
@@ -3136,7 +3147,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_member: &ProtocolMember<'_, 'db>,
         target_member: &ProtocolMember<'_, 'db>,
         access: ProtocolMemberAccessMode,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let source = source_member.access(db, env, access);
 
@@ -3146,7 +3157,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             // The instance-side check is authoritative for an ordinary method's signature. Class
             // access only establishes that the source member is also present on the class.
-            return ConstraintSet::from_bool(self.constraints, source.read.is_some());
+            return RelationConstraintSet::from_bool(self.constraints, source.read.is_some());
         }
         let target = target_member.access(db, env, access);
 
@@ -3180,7 +3191,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let result = self.check_type_pair(db, source, target);
                 if let Some(context) = self.report_context()
                     && !target_member.is_method()
-                    && result.is_never_satisfied(db, env)
+                    && result.is_always_false(db, env)
                 {
                     context
                         .push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
@@ -3207,7 +3218,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
                     let result = self.check_type_pair(db, target, source);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env)
+                        && result.is_always_false(db, env)
                     {
                         context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible { target });
                     }
@@ -3223,7 +3234,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_type: Type<'db>,
         source: ProtocolInterfaceView<'db>,
         target: ProtocolInterfaceView<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if source.member_count(db) < target.member_count(db)
             && !self.is_context_collection_enabled()
         {
@@ -3234,7 +3245,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target
             .members(db)
             .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
-            .when_all(db, self.constraints, |target_member| {
+            .when_all_relation(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
                 if let Some(context) = self.report_context()
@@ -3247,26 +3258,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return self.never();
                 }
 
-                let result = source_member.when_some_and(db, self.constraints, |source_member| {
-                    self.check_protocol_member_access_pair(
-                        db,
-                        source_type,
-                        &source_member,
-                        &target_member,
-                        ProtocolMemberAccessMode::Instance,
-                    )
-                    .and(db, self.constraints, || {
+                let result =
+                    source_member.when_some_and_relation(self.constraints, |source_member| {
                         self.check_protocol_member_access_pair(
                             db,
                             source_type,
                             &source_member,
                             &target_member,
-                            ProtocolMemberAccessMode::Class,
+                            ProtocolMemberAccessMode::Instance,
                         )
-                    })
-                });
+                        .and(db, self.constraints, || {
+                            self.check_protocol_member_access_pair(
+                                db,
+                                source_type,
+                                &source_member,
+                                &target_member,
+                                ProtocolMemberAccessMode::Class,
+                            )
+                        })
+                    });
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env)
+                    && result.is_always_false(db, env)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
@@ -3287,7 +3299,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         if member
             .access(db, env, ProtocolMemberAccessMode::Instance)
@@ -3306,7 +3318,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             return self.never();
         };
 
-        ConstraintSet::from_bool(self.constraints, actual_property.setter(db).is_none())
+        RelationConstraintSet::from_bool(self.constraints, actual_property.setter(db).is_none())
     }
 
     /// Checks whether `ty` is disjoint from the readable type required by `member`.
@@ -3318,17 +3330,19 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         let access = member.access(db, env, ProtocolMemberAccessMode::Instance);
         if !member.is_method() {
-            access.read.when_some_and(db, self.constraints, |read_ty| {
-                read_ty
-                    .resolve(db, env)
-                    .when_some_and(db, self.constraints, |read_ty| {
-                        self.check_type_pair(db, ty, read_ty.ty())
-                    })
-            })
+            access
+                .read
+                .when_some_and_relation(self.constraints, |read_ty| {
+                    read_ty
+                        .resolve(db, env)
+                        .when_some_and_relation(self.constraints, |read_ty| {
+                            self.check_type_pair(db, ty, read_ty.ty())
+                        })
+                })
         } else {
             let Some(Type::Callable(method)) = access
                 .read
@@ -3347,31 +3361,34 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 return self.never();
             };
 
-            callables.iter().when_all(db, self.constraints, |callable| {
-                if !callable_has_only_non_never_returns(db, *callable) {
-                    return self.never();
-                }
+            callables
+                .iter()
+                .when_all_relation(db, self.constraints, |callable| {
+                    if !callable_has_only_non_never_returns(db, *callable) {
+                        return self.never();
+                    }
 
-                // Disjointness distributes over unions. Compare the overload return arms
-                // directly so that recursive return types do not require canonicalizing an
-                // intermediate union merely to distribute it again.
-                method
-                    .signatures(db)
-                    .iter()
-                    .when_all(db, self.constraints, |method_signature| {
-                        callable.signatures(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |callable_signature| {
-                                self.check_type_pair(
-                                    db,
-                                    method_signature.return_ty,
-                                    callable_signature.return_ty,
-                                )
-                            },
-                        )
-                    })
-            })
+                    // Disjointness distributes over unions. Compare the overload return arms
+                    // directly so that recursive return types do not require canonicalizing an
+                    // intermediate union merely to distribute it again.
+                    method.signatures(db).iter().when_all_relation(
+                        db,
+                        self.constraints,
+                        |method_signature| {
+                            callable.signatures(db).iter().when_all_relation(
+                                db,
+                                self.constraints,
+                                |callable_signature| {
+                                    self.check_type_pair(
+                                        db,
+                                        method_signature.return_ty,
+                                        callable_signature.return_ty,
+                                    )
+                                },
+                            )
+                        },
+                    )
+                })
         }
     }
 }

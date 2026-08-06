@@ -11,8 +11,8 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solutions,
+    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    IteratorRelationConstraintsExtension, PathBound, PathBounds, RelationConstraintSet, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1688,7 +1688,7 @@ impl<'db> Specialization<'db> {
         other: Self,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -1729,7 +1729,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: Specialization<'db>,
         target: Specialization<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1808,7 +1808,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target.types(db)
         );
 
-        types.when_all(
+        types.when_all_relation(
             db,
             self.constraints,
             |(bound_typevar, source_type, target_type)| {
@@ -1965,7 +1965,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_materialization: Option<MaterializationKind>,
         target_type: Type<'db>,
         target_materialization: Option<MaterializationKind>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match (
             source_materialization,
             target_materialization,
@@ -2018,14 +2018,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         (ty, ty)
                     };
-                    ConstraintSet::constrain_typevar(
+                    RelationConstraintSet::from(ConstraintSet::constrain_typevar(
                         db,
                         env,
                         self.constraints,
                         typevar,
                         lower,
                         upper,
-                    )
+                    ))
                 } else {
                     self.check_type_pair(db, target_type, source_type).and(
                         db,
@@ -2088,7 +2088,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_materialization: MaterializationKind,
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let source_top =
             source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
         let source_bottom = source_type.materialize(
@@ -2184,7 +2184,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: Specialization<'db>,
         right: Specialization<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let generic_context = left.generic_context(db);
         if generic_context != right.generic_context(db) {
             return self.always();
@@ -2201,7 +2201,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             right.types(db)
         );
 
-        types.when_any(
+        types.when_any_relation(
             db,
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
@@ -2523,7 +2523,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         for (formal, actual) in argument_relations {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
-            let _ = self.add_type_mappings_from_constraint_set(when);
+            let _ = self.add_type_mappings_from_constraint_set(when.positive_evidence());
         }
 
         let types = self.solve_hash_map_with(generic_context, &mut choose);
@@ -2981,19 +2981,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .typevar(db)
             .bound_or_constraints(db, self.env)?
         {
-            TypeVarBoundOrConstraints::UpperBound(bound) => (!argument
+            TypeVarBoundOrConstraints::UpperBound(bound) => argument
                 .when_assignable_to(db, self.env, bound, self.constraints, self.inferable)
-                .is_always_satisfied(db, self.env))
-            .then_some(SpecializationError::MismatchedBound {
-                bound_typevar,
-                argument,
-            }),
-            TypeVarBoundOrConstraints::Constraints(_) => {
-                (!path_bound.has_upper()).then_some(SpecializationError::MismatchedConstraint {
+                .is_always_false(db, self.env)
+                .then_some(SpecializationError::MismatchedBound {
                     bound_typevar,
                     argument,
-                })
-            }
+                }),
+            TypeVarBoundOrConstraints::Constraints(constraints) => argument
+                .when_assignable_to(
+                    db,
+                    self.env,
+                    constraints.as_type(db, self.env),
+                    self.constraints,
+                    self.inferable,
+                )
+                .is_always_false(db, self.env)
+                .then_some(SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    argument,
+                }),
         }
     }
 
@@ -3460,7 +3467,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
                         actual
                             .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)
-                            .is_always_satisfied(db, self.env)
+                            .is_always_true(db, self.env)
                     });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
@@ -3503,7 +3510,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env)
+                            .is_always_false(db, self.env)
                         {
                             found_matching_element = true;
                         }
@@ -3534,20 +3541,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             );
                             return Ok(());
                         }
-                        if !ty
-                            .when_assignable_to(
-                                db,
-                                self.env,
-                                bound,
-                                self.constraints,
-                                self.inferable,
-                            )
-                            .is_always_satisfied(db, self.env)
-                        {
+                        let relation = ty.when_assignable_to(
+                            db,
+                            self.env,
+                            bound,
+                            self.constraints,
+                            self.inferable,
+                        );
+                        if relation.is_always_false(db, self.env) {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
                                 argument: ty,
                             });
+                        }
+                        if !relation.is_always_true(db, self.env) {
+                            return Ok(());
                         }
                         self.add_type_mapping(bound_typevar, ty, polarity);
                     }
@@ -3594,17 +3602,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             }
                         }
 
+                        let mut has_unresolved_relation = false;
                         for constraint in typevar_constraints.elements(db) {
-                            let is_satisfied = if polarity.is_contravariant() {
-                                constraint
-                                    .when_assignable_to(
-                                        db,
-                                        self.env,
-                                        ty,
-                                        self.constraints,
-                                        self.inferable,
-                                    )
-                                    .is_always_satisfied(db, self.env)
+                            let relation = if polarity.is_contravariant() {
+                                constraint.when_assignable_to(
+                                    db,
+                                    self.env,
+                                    ty,
+                                    self.constraints,
+                                    self.inferable,
+                                )
                             } else {
                                 ty.when_assignable_to(
                                     db,
@@ -3613,10 +3620,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.constraints,
                                     self.inferable,
                                 )
-                                .is_always_satisfied(db, self.env)
                             };
 
-                            if is_satisfied {
+                            if relation.is_always_true(db, self.env) {
                                 // For the old solver, we use the constraint itself as the mapped
                                 // type, since the old solver's hash map stores solutions. For the
                                 // new solver's pending constraint set, we store the type that
@@ -3628,6 +3634,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.insert_pending_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
+                            if !relation.is_always_false(db, self.env) {
+                                has_unresolved_relation = true;
+                            }
+                        }
+                        if has_unresolved_relation {
+                            return Ok(());
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,
@@ -3684,7 +3696,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env)
+                            .is_always_false(db, self.env)
                         {
                             found_matching_element = true;
                         }
@@ -3947,6 +3959,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            // TODO: Preserve `RelationConstraintSet` through protocol inference. The old solver
+            // accepts only successful valuations, so these arms currently discard negative
+            // evidence.
+            //
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
@@ -3954,12 +3970,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let when = self
                     .common_typed_dict_protocol_constraints(formal, actual_union)
                     .unwrap_or_else(|| {
-                        actual.when_constraint_set_assignable_to(
-                            db,
-                            self.env,
-                            formal,
-                            self.constraints,
-                        )
+                        actual
+                            .when_constraint_set_assignable_to(
+                                db,
+                                self.env,
+                                formal,
+                                self.constraints,
+                            )
+                            .positive_evidence()
                     });
                 self.infer_from_constraint_set(when)?;
                 return Ok(());

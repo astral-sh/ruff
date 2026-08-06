@@ -23,8 +23,9 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
-    PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    IteratorRelationConstraintsExtension, OwnedRelationConstraintSet, PathBounds,
+    RelationConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -117,24 +118,24 @@ pub struct CallableSignature<'db> {
 fn merge_receiver_constraints<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    first: Option<&OwnedConstraintSet<'db>>,
-    second: Option<&OwnedConstraintSet<'db>>,
-) -> Option<OwnedConstraintSet<'db>> {
+    first: Option<&OwnedRelationConstraintSet<'db>>,
+    second: Option<&OwnedRelationConstraintSet<'db>>,
+) -> Option<OwnedRelationConstraintSet<'db>> {
     // Only discard sets whose root is the `always` terminal. A false negative from this cheap check
     // merely falls through to the merge below. Retaining such a nonterminal set is also important:
     // its presence makes signature comparison use lazy typevar evaluation.
     match (
-        first.filter(|constraints| !constraints.is_trivially_always_satisfied()),
-        second.filter(|constraints| !constraints.is_trivially_always_satisfied()),
+        first.filter(|constraints| !constraints.is_trivially_always_true()),
+        second.filter(|constraints| !constraints.is_trivially_always_true()),
     ) {
         (None, None) => None,
         (Some(constraints), None) | (None, Some(constraints)) => Some((*constraints).clone()),
         (Some(first), Some(second)) => {
             let constraints = ConstraintSetBuilder::new();
-            Some(constraints.into_owned(|builder| {
+            Some(constraints.into_owned_relation(|builder| {
                 builder
-                    .load(db, env, first)
-                    .and(db, builder, || builder.load(db, env, second))
+                    .load_relation(db, env, first)
+                    .and(db, builder, || builder.load_relation(db, env, second))
             }))
         }
     }
@@ -547,6 +548,8 @@ impl<'db> CallableSignature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: Return `RelationConstraintSet` after callable constraint inference can propagate
+        // negative evidence instead of retaining only successful valuations.
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -559,7 +562,9 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker
+            .check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+            .positive_evidence()
     }
 }
 
@@ -604,7 +609,7 @@ pub struct Signature<'db> {
     source_overload_index: Option<NonZeroU32>,
 
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
-    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    receiver_constraints: Option<OwnedRelationConstraintSet<'db>>,
 
     /// Parameters, in source order.
     ///
@@ -625,7 +630,9 @@ pub(crate) enum ParameterConsistency<'db> {
     /// The parameters are compatible.
     Consistent,
     /// The parameters are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
+    Incompatible(ErrorContextTree<'db>),
+    /// The relation did not produce an exclusively compatible or incompatible result.
+    Unresolved,
 }
 
 /// Whether one callable signature's return type is compatible with another's.
@@ -633,7 +640,9 @@ pub(crate) enum ReturnTypeConsistency<'db> {
     /// The return types are compatible.
     Consistent,
     /// The return types are incompatible, with context explaining the incompatibility.
-    Inconsistent(ErrorContextTree<'db>),
+    Incompatible(ErrorContextTree<'db>),
+    /// The relation did not produce an exclusively compatible or incompatible result.
+    Unresolved,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -1199,9 +1208,9 @@ impl<'db> Signature<'db> {
             if receiver_typevar.is_some_and(|typevar| {
                 Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
             }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
+                return std::borrow::Cow::Owned(OwnedRelationConstraintSet::never());
             }
-            receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+            receiver.when_constraint_set_assignable_to_owned_relation(db, env, annotation)
         });
         let receiver_constraints = merge_receiver_constraints(
             db,
@@ -1258,13 +1267,20 @@ impl<'db> Signature<'db> {
             return false;
         }
 
-        !match domain {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
-            }
+        match domain {
+            TypeVarBoundOrConstraints::UpperBound(bound) => receiver
+                .has_only_negative_assignability_evidence(
+                    db,
+                    env,
+                    bound.top_materialization(db, env),
+                ),
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                constraints.elements(db).iter().any(|constraint| {
-                    receiver.is_assignable_to(db, env, constraint.top_materialization(db, env))
+                constraints.elements(db).iter().all(|constraint| {
+                    receiver.has_only_negative_assignability_evidence(
+                        db,
+                        env,
+                        constraint.top_materialization(db, env),
+                    )
                 })
             }
         }
@@ -1294,7 +1310,9 @@ impl<'db> Signature<'db> {
         };
 
         let constraints = ConstraintSetBuilder::new();
-        let when = constraints.load(db, env, receiver_constraints);
+        let when = constraints
+            .load_relation(db, env, receiver_constraints)
+            .positive_evidence();
         let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, &constraints, inferable) {
@@ -1408,7 +1426,7 @@ impl<'db> Signature<'db> {
         }
 
         let constraints = ConstraintSetBuilder::new();
-        self_type
+        !self_type
             .when_assignable_to(
                 db,
                 env,
@@ -1416,7 +1434,9 @@ impl<'db> Signature<'db> {
                 &constraints,
                 self.inferable_typevars(db),
             )
-            .is_always_satisfied(db, env)
+            // This is only an overload-pruning check. Keep the candidate unless incompatibility
+            // is proved.
+            .is_always_false(db, env)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -1466,7 +1486,7 @@ impl<'db> Signature<'db> {
                 )
             })
             .filter(|constraints| {
-                !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db, env))
+                !constraints.query(|_builder, constraints| constraints.is_always_true(db, env))
             });
         if !self.needs_self_mapping(db, env, false) {
             return Self {
@@ -1501,11 +1521,13 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         checker: &TypeRelationChecker<'_, 'c, 'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let Some(constraints) = self.receiver_constraints.as_ref() else {
             return checker.always();
         };
-        checker.constraints.load(db, checker.env, constraints)
+        checker
+            .constraints
+            .load_relation(db, checker.env, constraints)
     }
 
     fn map_receiver_constraints(
@@ -1514,7 +1536,7 @@ impl<'db> Signature<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Option<OwnedConstraintSet<'db>> {
+    ) -> Option<OwnedRelationConstraintSet<'db>> {
         let constraints = Self::map_constraints(
             db,
             self.receiver_constraints.as_ref()?,
@@ -1522,18 +1544,17 @@ impl<'db> Signature<'db> {
             tcx,
             visitor,
         );
-        (!constraints
-            .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
-        .then_some(constraints)
+        (!constraints.query(|_builder, constraints| constraints.is_always_true(db, visitor.env)))
+            .then_some(constraints)
     }
 
     fn map_constraints(
         db: &'db dyn Db,
-        constraints: &OwnedConstraintSet<'db>,
+        constraints: &OwnedRelationConstraintSet<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> OwnedConstraintSet<'db> {
+    ) -> OwnedRelationConstraintSet<'db> {
         if !constraints
             .types()
             .any(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != ty)
@@ -1542,8 +1563,8 @@ impl<'db> Signature<'db> {
         }
 
         let builder = ConstraintSetBuilder::new();
-        builder.into_owned(|builder| {
-            let constraints = builder.load(db, visitor.env, constraints);
+        builder.into_owned_relation(|builder| {
+            let constraints = builder.load_relation(db, visitor.env, constraints);
             constraints.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
         })
     }
@@ -1551,7 +1572,7 @@ impl<'db> Signature<'db> {
     pub(super) fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.receiver_constraints
             .iter()
-            .flat_map(OwnedConstraintSet::types)
+            .flat_map(OwnedRelationConstraintSet::types)
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
@@ -1754,14 +1775,17 @@ impl<'db> Signature<'db> {
             &materialization_visitor,
         );
 
-        let is_consistent = checker
-            .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db, env);
+        let relation = checker.check_signature_pair(db, &implementation, &overload);
 
-        if is_consistent {
+        // The signature can close over type variables from an enclosing scope. Consistency must
+        // hold for every specialization of those variables, so any negative valuation is a
+        // counterexample. With no negative evidence, an undecided relation remains unresolved.
+        if relation.is_always_true(db, env) {
             ParameterConsistency::Consistent
+        } else if relation.has_negative_evidence(db, env) {
+            ParameterConsistency::Incompatible(checker.into_error_context())
         } else {
-            ParameterConsistency::Inconsistent(checker.into_error_context())
+            ParameterConsistency::Unresolved
         }
     }
 
@@ -1790,14 +1814,17 @@ impl<'db> Signature<'db> {
             &materialization_visitor,
         );
 
-        let is_consistent = checker
-            .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db, env);
+        let relation = checker.check_type_pair(db, overload.return_ty, self.return_ty);
 
-        if is_consistent {
+        // The signature can close over type variables from an enclosing scope. Consistency must
+        // hold for every specialization of those variables, so any negative valuation is a
+        // counterexample. With no negative evidence, an undecided relation remains unresolved.
+        if relation.is_always_true(db, env) {
             ReturnTypeConsistency::Consistent
+        } else if relation.has_negative_evidence(db, env) {
+            ReturnTypeConsistency::Incompatible(checker.into_error_context())
         } else {
-            ReturnTypeConsistency::Inconsistent(checker.into_error_context())
+            ReturnTypeConsistency::Unresolved
         }
     }
 
@@ -1808,6 +1835,8 @@ impl<'db> Signature<'db> {
         other: &CallableSignature<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: Return `RelationConstraintSet` after ParamSpec inference can combine positive and
+        // negative evidence from each candidate return type.
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
             && other.is_single_paramspec().is_none()
@@ -1836,12 +1865,9 @@ impl<'db> Signature<'db> {
                 .iter()
                 .map(|signature| signature.return_ty)
                 .when_any(db, constraints, |other_return_type| {
-                    self.return_ty.when_constraint_set_assignable_to(
-                        db,
-                        env,
-                        other_return_type,
-                        constraints,
-                    )
+                    self.return_ty
+                        .when_constraint_set_assignable_to(db, env, other_return_type, constraints)
+                        .positive_evidence()
                 });
             return param_spec_matches.and(db, constraints, || return_types_match);
         }
@@ -1861,6 +1887,8 @@ impl<'db> Signature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // TODO: Return `RelationConstraintSet` after signature inference no longer requires the
+        // legacy successful-valuation-only representation.
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -1873,7 +1901,9 @@ impl<'db> Signature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_signature_pair(db, self, other)
+        checker
+            .check_signature_pair(db, self, other)
+            .positive_evidence()
     }
 
     /// Create a new signature with the given definition.
@@ -1962,7 +1992,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
+    ) -> Option<RelationConstraintSet<'db, 'c>> {
         // Aggregation summarizes visible parameters and return types, but receiver bindings are
         // additional per-signature obligations. Leave those signatures to the ordinary relation,
         // which checks each receiver binding before comparing the visible signature.
@@ -2028,7 +2058,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let signatures_are_disjoint = self
                 .as_disjointness_checker()
                 .check_type_pair(db, self_parameter_type, other_parameter_type)
-                .is_always_satisfied(db, env);
+                .is_always_true(db, env);
 
             if signatures_are_disjoint {
                 continue;
@@ -2051,7 +2081,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let aggregate_relation =
             parameters_cover_target.and(db, self.constraints, returns_match_target);
         aggregate_relation
-            .is_always_satisfied(db, env)
+            .is_always_true(db, env)
             .then_some(aggregate_relation)
     }
 
@@ -2060,7 +2090,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
     }
 
@@ -2071,7 +2101,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
@@ -2118,12 +2148,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_overloads
                                 .iter()
                                 .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |target_return| {
+                                .when_any_relation(db, self.constraints, |target_return| {
                                     self.check_type_pair(db, source_return, target_return)
                                 })
                         })
                     };
-                    return param_spec_matches.and(db, self.constraints, return_types_match);
+                    return RelationConstraintSet::from(param_spec_matches).and(
+                        db,
+                        self.constraints,
+                        return_types_match,
+                    );
                 }
 
                 (None, Some((target_tvar, target_return))) if source_overloads.len() > 1 => {
@@ -2145,7 +2179,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 target_return,
                                             )
                                         })
-                                        .is_never_satisfied(db, env)
+                                        .is_always_false(db, env)
                                 })
                                 .map(|signature| {
                                     Signature::new_generic(
@@ -2173,12 +2207,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             source_overloads
                                 .iter()
                                 .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |source_return| {
+                                .when_any_relation(db, self.constraints, |source_return| {
                                     self.check_type_pair(db, source_return, target_return)
                                 })
                         })
                     };
-                    return param_spec_matches.and(db, self.constraints, return_types_match);
+                    return RelationConstraintSet::from(param_spec_matches).and(
+                        db,
+                        self.constraints,
+                        return_types_match,
+                    );
                 }
 
                 _ => {}
@@ -2217,41 +2255,45 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // TODO: Similar to how we do this for unions, we should collect error
                 // context for all elements and report it if *all* checks fail.
                 self.without_context_collection(|| {
-                    source_overloads
-                        .iter()
-                        .when_any(db, self.constraints, |self_signature| {
+                    source_overloads.iter().when_any_relation(
+                        db,
+                        self.constraints,
+                        |self_signature| {
                             self.check_callable_signature_pair_inner(
                                 db,
                                 std::slice::from_ref(self_signature),
                                 target_overloads,
                             )
-                        })
+                        },
+                    )
                 })
             }
 
             // source is definitely not overloaded while target is possibly overloaded.
-            ([_], _) => {
-                target_overloads
-                    .iter()
-                    .when_all(db, self.constraints, |target_signature| {
-                        self.check_callable_signature_pair_inner(
-                            db,
-                            source_overloads,
-                            std::slice::from_ref(target_signature),
-                        )
-                    })
-            }
-
-            // source is definitely overloaded while target is possibly overloaded.
-            (_, _) => target_overloads
-                .iter()
-                .when_all(db, self.constraints, |target_signature| {
+            ([_], _) => target_overloads.iter().when_all_relation(
+                db,
+                self.constraints,
+                |target_signature| {
                     self.check_callable_signature_pair_inner(
                         db,
                         source_overloads,
                         std::slice::from_ref(target_signature),
                     )
-                }),
+                },
+            ),
+
+            // source is definitely overloaded while target is possibly overloaded.
+            (_, _) => target_overloads.iter().when_all_relation(
+                db,
+                self.constraints,
+                |target_signature| {
+                    self.check_callable_signature_pair_inner(
+                        db,
+                        source_overloads,
+                        std::slice::from_ref(target_signature),
+                    )
+                },
+            ),
         }
     }
 
@@ -2261,7 +2303,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &Signature<'db>,
         target: &Signature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
@@ -2352,8 +2394,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         source: &Signature<'db>,
         target: &Signature<'db>,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
+        work: impl FnOnce() -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
         let Some(key) = SignatureRelationKey::from_signatures(
             source,
             target,
@@ -2378,7 +2420,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &Signature<'db>,
         target: &Signature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -2597,7 +2639,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
-            .is_never_satisfied(db, env);
+            .is_always_false(db, env);
         if let Some(context) = self.report_context()
             && !return_type_checks
         {
@@ -2607,7 +2649,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
 
-        let check_types = |result: &mut ConstraintSet<'db, 'c>,
+        let check_types = |result: &mut RelationConstraintSet<'db, 'c>,
                            target_ty: Type<'db>,
                            source_ty: Type<'db>,
                            target_name: Option<&Name>,
@@ -2636,7 +2678,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if let Some(context) = self.report_context()
-                && constraint_set.is_never_satisfied(db, env)
+                && constraint_set.is_always_false(db, env)
             {
                 let parameter = ParameterDescription::new(target_index, target_name);
                 context.push(ErrorContext::IncompatibleParameterTypes {
@@ -2649,7 +2691,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // replace the diagnostic context that explains the incompatible parameter.
             !result
                 .intersect(db, self.constraints, constraint_set)
-                .is_never_satisfied(db, env)
+                .is_always_false(db, env)
         };
         let parameter_must_have_default = |parameter: &Parameter<'db>, index: usize| {
             ErrorContext::RequiredParameterMustHaveDefault {
@@ -5858,11 +5900,21 @@ mod tests {
         let db = &db;
         let env = db.program_environment();
         assert!(
-            merge_receiver_constraints(db, &env, Some(&OwnedConstraintSet::always()), None,)
+            merge_receiver_constraints(
+                db,
+                &env,
+                Some(&OwnedRelationConstraintSet::always()),
+                None,
+            )
                 .is_none()
         );
         assert!(
-            merge_receiver_constraints(db, &env, None, Some(&OwnedConstraintSet::always()),)
+            merge_receiver_constraints(
+                db,
+                &env,
+                None,
+                Some(&OwnedRelationConstraintSet::always()),
+            )
                 .is_none()
         );
     }

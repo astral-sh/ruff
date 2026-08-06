@@ -2110,6 +2110,10 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                        // TODO: Give relation intrinsics a four-valued result type. Their current
+                        // `ConstraintSet` return type can expose only positive evidence, preserving
+                        // the legacy behavior that cannot distinguish false from indeterminate or
+                        // true from inconsistent when their positive evidence is equal.
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let ty_a = ty_a.project_type_form(db, env);
@@ -2117,6 +2121,7 @@ impl<'db> Bindings<'db> {
                                 let constraints = ConstraintSetBuilder::new();
                                 let result = constraints.into_owned(|constraints| {
                                     ty_a.when_equivalent_to(db, env, ty_b, constraints)
+                                        .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2138,6 +2143,7 @@ impl<'db> Bindings<'db> {
                                         constraints,
                                         TypeVarSet::None,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2159,6 +2165,7 @@ impl<'db> Bindings<'db> {
                                         constraints,
                                         TypeVarSet::None,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2179,6 +2186,7 @@ impl<'db> Bindings<'db> {
                                         ty_b,
                                         constraints,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2200,6 +2208,7 @@ impl<'db> Bindings<'db> {
                                         constraints,
                                         TypeVarSet::None,
                                     )
+                                    .positive_evidence()
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
@@ -2847,6 +2856,9 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
                     ) => {
+                        // TODO: Return a relation result once constraint-set intrinsics can expose
+                        // negative evidence; the current `ConstraintSet` result preserves only
+                        // valuations that prove the implication.
                         let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
                             continue;
                         };
@@ -2879,6 +2891,7 @@ impl<'db> Bindings<'db> {
                                 constraints,
                                 TypeVarSet::None,
                             )
+                            .positive_evidence()
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -3775,7 +3788,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env)
+                        .is_always_true(db, env)
                     {
                         is_argument_assignable_to_any_overload = true;
                         break 'overload;
@@ -4082,7 +4095,7 @@ impl<'db> CallableBinding<'db> {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env)
+                            .is_always_true(db, env)
                         {
                             participating_slot_indices.insert(slot_index);
                         }
@@ -4174,7 +4187,7 @@ impl<'db> CallableBinding<'db> {
                     constraints,
                     self.overloads[*current_index].inferable_typevars,
                 )
-                .is_always_satisfied(db, env)
+                .is_always_true(db, env)
             {
                 filter_remaining_overloads = true;
             }
@@ -4193,7 +4206,7 @@ impl<'db> CallableBinding<'db> {
                     overload
                         .return_type()
                         .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env)
+                        .is_always_true(db, env)
                 })
             } else {
                 // No matching overload
@@ -5277,7 +5290,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env)
+        .is_always_true(db, env)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -5942,6 +5955,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     self.inferable_typevars,
                 )
+                .positive_evidence()
                 .is_never_satisfied(db, self.env)
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),

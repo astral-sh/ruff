@@ -1,6 +1,6 @@
 use crate::Db;
 use crate::ProgramEnvironment;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::RelationConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
@@ -216,7 +216,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: NewType<'db>,
         target: NewType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
         // subtype of another is to have the other in its chain of newtype bases. Once we reach the
         // base class, we don't have to keep looking.
@@ -240,7 +240,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: NewType<'db>,
         right: NewType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.

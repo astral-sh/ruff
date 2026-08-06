@@ -998,10 +998,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // doing assignment checks here.
                     match typevar.typevar(db).bound_or_constraints(db, env) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if provided_type
-                                .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env)
-                            {
+                            let relation = provided_type.when_assignable_to(
+                                db,
+                                env,
+                                bound,
+                                &constraints,
+                                TypeVarSet::None,
+                            );
+                            if relation.is_always_false(db, env) {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
@@ -1020,8 +1024,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                                 error = Some(ExplicitSpecializationError::UnsatisfiedBound);
                                 specialization_types.push(Some(Type::unknown()));
-                            } else {
+                            } else if relation.is_always_true(db, env) {
                                 specialization_types.push(Some(provided_type));
+                            } else {
+                                specialization_types.push(Some(Type::unknown()));
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
@@ -1029,16 +1035,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // to _at least one_ of the individual constraints, not to the union of
                             // all of them. `int | str` is not a valid specialization of a typevar
                             // constrained to `(int, str)`.
-                            if provided_type
-                                .when_assignable_to(
-                                    db,
-                                    env,
-                                    typevar_constraints.as_type(db, env),
-                                    &constraints,
-                                    TypeVarSet::None,
-                                )
-                                .is_never_satisfied(db, env)
-                            {
+                            let relation = provided_type.when_assignable_to(
+                                db,
+                                env,
+                                typevar_constraints.as_type(db, env),
+                                &constraints,
+                                TypeVarSet::None,
+                            );
+                            if relation.is_always_false(db, env) {
                                 if let Some(builder) = self
                                     .context
                                     .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
@@ -1058,8 +1062,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                                 error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
                                 specialization_types.push(Some(Type::unknown()));
-                            } else {
+                            } else if relation.is_always_true(db, env) {
                                 specialization_types.push(Some(provided_type));
+                            } else {
+                                specialization_types.push(Some(Type::unknown()));
                             }
                         }
                         None => {

@@ -121,49 +121,41 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 mod support;
 
-/// An extension trait for building constraint sets from [`Option`] values.
-pub(crate) trait OptionConstraintsExtension<T> {
-    /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
-    /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db, 'c>(
+/// An extension trait for building relation results from [`Option`] values.
+pub(crate) trait OptionRelationConstraintsExtension<T> {
+    fn when_none_or_relation<'db, 'c>(
         self,
-        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c>;
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
 
-    /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
-    /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db, 'c>(
+    fn when_some_and_relation<'db, 'c>(
         self,
-        db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c>;
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
 }
 
-impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db, 'c>(
+impl<T> OptionRelationConstraintsExtension<T> for Option<T> {
+    fn when_none_or_relation<'db, 'c>(
         self,
-        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(builder),
+            None => RelationConstraintSet::always(builder),
         }
     }
 
-    fn when_some_and<'db, 'c>(
+    fn when_some_and_relation<'db, 'c>(
         self,
-        _db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
+        f: impl FnOnce(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(builder),
+            None => RelationConstraintSet::never(builder),
         }
     }
 }
@@ -234,6 +226,52 @@ where
     }
 }
 
+/// An extension trait for combining relation results from an [`Iterator`].
+pub(crate) trait IteratorRelationConstraintsExtension<T> {
+    /// Returns the relation result obtained by disjoining every element.
+    fn when_any_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
+
+    /// Returns the relation result obtained by conjoining every element.
+    fn when_all_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c>;
+}
+
+impl<I, T> IteratorRelationConstraintsExtension<T> for I
+where
+    I: Iterator<Item = T>,
+{
+    fn when_any_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        self.fold(RelationConstraintSet::never(builder), |result, element| {
+            result.or(db, builder, || f(element))
+        })
+    }
+
+    fn when_all_relation<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> RelationConstraintSet<'db, 'c>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        self.fold(RelationConstraintSet::always(builder), |result, element| {
+            result.and(db, builder, || f(element))
+        })
+    }
+}
+
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
 /// arenas that hold its BDD.
 ///
@@ -250,6 +288,21 @@ pub struct OwnedConstraintSet<'db> {
     node: NodeId,
     source_order: Option<SourceOrderId>,
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
+}
+
+/// An owned copy of a [`RelationConstraintSet`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum OwnedRelationConstraintSet<'db> {
+    /// A fully decided Boolean relation, represented by its positive evidence.
+    Boolean(OwnedConstraintSet<'db>),
+    /// Independent positive and negative evidence for a non-Boolean relation.
+    EvidencePair(Arc<OwnedRelationEvidence<'db>>),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct OwnedRelationEvidence<'db> {
+    positive_evidence: OwnedConstraintSet<'db>,
+    negative_evidence: OwnedConstraintSet<'db>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -287,16 +340,6 @@ impl<'db> OwnedConstraintSet<'db> {
         }
     }
 
-    /// Returns `true` if this constraint set's root is the `always` terminal.
-    ///
-    /// This is only a cheap sufficient check. A nonterminal constraint set can also be always
-    /// satisfied, so `false` does not prove that the set is not always satisfied. Call
-    /// [`ConstraintSet::is_always_satisfied`] through [`Self::query`] when false negatives are not
-    /// acceptable.
-    pub(crate) fn is_trivially_always_satisfied(&self) -> bool {
-        self.node == ALWAYS_TRUE
-    }
-
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -325,6 +368,84 @@ impl<'db> OwnedConstraintSet<'db> {
                     .chain(constraint.bounds.upper)
             })
         })
+    }
+}
+
+impl Default for OwnedRelationConstraintSet<'_> {
+    /// Returns an indeterminate relation result.
+    fn default() -> Self {
+        Self::EvidencePair(Arc::new(OwnedRelationEvidence {
+            positive_evidence: OwnedConstraintSet::default(),
+            negative_evidence: OwnedConstraintSet::default(),
+        }))
+    }
+}
+
+impl<'db> OwnedRelationConstraintSet<'db> {
+    /// Returns an owned relation that is unconditionally true.
+    pub(crate) fn always() -> Self {
+        Self::Boolean(OwnedConstraintSet::always())
+    }
+
+    /// Returns an owned relation that is unconditionally false.
+    pub(crate) fn never() -> Self {
+        Self::Boolean(OwnedConstraintSet::default())
+    }
+
+    /// Returns whether both roots are the terminals for unconditional truth.
+    pub(crate) fn is_trivially_always_true(&self) -> bool {
+        match self {
+            Self::Boolean(evidence) => evidence.node == ALWAYS_TRUE,
+            Self::EvidencePair(evidence) => {
+                evidence.positive_evidence.node == ALWAYS_TRUE
+                    && evidence.negative_evidence.node == ALWAYS_FALSE
+            }
+        }
+    }
+
+    pub(crate) fn query<F, R>(&self, f: F) -> R
+    where
+        F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, RelationConstraintSet<'db, 'c>) -> R,
+    {
+        let compacted = match self {
+            Self::Boolean(evidence) => evidence.inner.clone(),
+            Self::EvidencePair(evidence) => evidence
+                .positive_evidence
+                .inner
+                .clone()
+                .or_else(|| evidence.negative_evidence.inner.clone()),
+        };
+        let storage = ConstraintSetStorage {
+            compacted,
+            ..ConstraintSetStorage::default()
+        };
+        let builder = ConstraintSetBuilder {
+            storage: RefCell::new(storage),
+        };
+        let load = |evidence: &OwnedConstraintSet<'db>| {
+            ConstraintSet::from_node(&builder, evidence.node, evidence.source_order)
+        };
+        let relation = match self {
+            Self::Boolean(evidence) => RelationConstraintSet::from(load(evidence)),
+            Self::EvidencePair(evidence) => RelationConstraintSet::from_evidence_pair(
+                load(&evidence.positive_evidence),
+                load(&evidence.negative_evidence),
+            ),
+        };
+        f(&builder, relation)
+    }
+
+    /// Returns the types referenced by either side of this relation.
+    pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        let evidence = match self {
+            Self::Boolean(evidence) => Some(evidence),
+            Self::EvidencePair(evidence) => Some(if evidence.positive_evidence.inner.is_some() {
+                &evidence.positive_evidence
+            } else {
+                &evidence.negative_evidence
+            }),
+        };
+        evidence.into_iter().flat_map(OwnedConstraintSet::types)
     }
 }
 
@@ -371,7 +492,7 @@ impl OwnedConstraintSetInner<'_> {
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Copy)]
-pub struct ConstraintSet<'db, 'c> {
+pub(crate) struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
 
@@ -384,6 +505,377 @@ pub struct ConstraintSet<'db, 'c> {
 
     /// Ensures that the `'c` lifetime is invariant
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
+}
+
+/// Positive and negative evidence for a type relation.
+///
+/// Most relations are Boolean, so their negative evidence is exactly the complement of their
+/// positive evidence. Those relations retain only that one constraint set. Independent evidence
+/// is stored only when the two sides cannot be represented as complements.
+///
+/// `tagged_evidence` is a regular constraint set for Boolean relations. Two node IDs that cannot
+/// be created by the BDD builder encode an evidence pair and its negation. For those tags, the
+/// `source_order` field instead contains the index into `relation_evidence`; a missing index
+/// represents an indeterminate relation.
+#[derive(Clone, Copy)]
+pub(crate) struct RelationConstraintSet<'db, 'c> {
+    tagged_evidence: ConstraintSet<'db, 'c>,
+}
+
+const EVIDENCE_PAIR_RELATION: NodeId = NodeId(0xffff_fffd);
+const SWAPPED_EVIDENCE_PAIR_RELATION: NodeId = NodeId(0xffff_fffc);
+
+#[derive(Clone, Copy, Debug)]
+struct RelationEvidence {
+    positive: (NodeId, Option<SourceOrderId>),
+    negative: (NodeId, Option<SourceOrderId>),
+}
+
+impl<'db, 'c> From<ConstraintSet<'db, 'c>> for RelationConstraintSet<'db, 'c> {
+    fn from(evidence: ConstraintSet<'db, 'c>) -> Self {
+        Self {
+            tagged_evidence: evidence,
+        }
+    }
+}
+
+impl<'db, 'c> RelationConstraintSet<'db, 'c> {
+    pub(crate) fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self::from(ConstraintSet::always(builder))
+    }
+
+    pub(crate) fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self::from(ConstraintSet::never(builder))
+    }
+
+    pub(crate) fn indeterminate(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            tagged_evidence: ConstraintSet::from_node(builder, EVIDENCE_PAIR_RELATION, None),
+        }
+    }
+
+    pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, value: bool) -> Self {
+        if value {
+            Self::always(builder)
+        } else {
+            Self::never(builder)
+        }
+    }
+
+    fn boolean_evidence(self) -> Option<ConstraintSet<'db, 'c>> {
+        if matches!(
+            self.tagged_evidence.node,
+            EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION
+        ) {
+            return None;
+        }
+        Some(self.tagged_evidence)
+    }
+
+    fn is_indeterminate(self) -> bool {
+        self.tagged_evidence.node == EVIDENCE_PAIR_RELATION
+            && self.tagged_evidence.source_order.is_none()
+    }
+
+    fn from_evidence_pair(
+        positive_evidence: ConstraintSet<'db, 'c>,
+        negative_evidence: ConstraintSet<'db, 'c>,
+    ) -> Self {
+        let builder = positive_evidence.builder;
+        negative_evidence.verify_builder(builder);
+        if positive_evidence.is_trivially_never_satisfied()
+            && negative_evidence.is_trivially_never_satisfied()
+        {
+            Self::indeterminate(builder)
+        } else if (positive_evidence.is_trivially_always_satisfied()
+            && negative_evidence.is_trivially_never_satisfied())
+            || (positive_evidence.is_trivially_never_satisfied()
+                && negative_evidence.is_trivially_always_satisfied())
+        {
+            Self::from(positive_evidence)
+        } else {
+            let evidence = builder
+                .storage
+                .borrow_mut()
+                .relation_evidence
+                .push(RelationEvidence {
+                    positive: (positive_evidence.node, positive_evidence.source_order),
+                    negative: (negative_evidence.node, negative_evidence.source_order),
+                });
+            Self {
+                tagged_evidence: ConstraintSet::from_node(
+                    builder,
+                    EVIDENCE_PAIR_RELATION,
+                    Some(SourceOrderId::from_u32(evidence.as_u32())),
+                ),
+            }
+        }
+    }
+
+    fn into_evidence_pair(self) -> (ConstraintSet<'db, 'c>, ConstraintSet<'db, 'c>) {
+        let tagged_evidence = self.tagged_evidence;
+        match tagged_evidence.node {
+            EVIDENCE_PAIR_RELATION | SWAPPED_EVIDENCE_PAIR_RELATION => {
+                let Some(evidence_id) = tagged_evidence.source_order else {
+                    debug_assert_eq!(tagged_evidence.node, EVIDENCE_PAIR_RELATION);
+                    return (
+                        ConstraintSet::never(tagged_evidence.builder),
+                        ConstraintSet::never(tagged_evidence.builder),
+                    );
+                };
+                let evidence_id = RelationEvidenceId::from_u32(evidence_id.as_u32());
+                let evidence =
+                    tagged_evidence.builder.storage.borrow().relation_evidence[evidence_id];
+                let (positive, negative) = if tagged_evidence.node == SWAPPED_EVIDENCE_PAIR_RELATION
+                {
+                    (evidence.negative, evidence.positive)
+                } else {
+                    (evidence.positive, evidence.negative)
+                };
+                (
+                    ConstraintSet::from_node(tagged_evidence.builder, positive.0, positive.1),
+                    ConstraintSet::from_node(tagged_evidence.builder, negative.0, negative.1),
+                )
+            }
+            _ => (tagged_evidence, tagged_evidence.negated()),
+        }
+    }
+
+    /// Returns the valuations for which the relation is proven true.
+    ///
+    /// This deliberately discards negative evidence for compatibility with constraint-solving
+    /// APIs whose output is a set of successful valuations rather than a relation result.
+    // TODO: Migrate those APIs to `RelationConstraintSet` and remove this compatibility
+    // projection.
+    pub(crate) fn positive_evidence(self) -> ConstraintSet<'db, 'c> {
+        if let Some(evidence) = self.boolean_evidence() {
+            evidence
+        } else {
+            self.into_evidence_pair().0
+        }
+    }
+
+    /// Returns `true` only if the relation is unconditionally true.
+    ///
+    /// In particular, both indeterminate and inconsistent results return `false`.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub(crate) fn is_always_true(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        if let Some(evidence) = self.boolean_evidence() {
+            evidence.is_always_satisfied(db, env)
+        } else {
+            let (positive_evidence, negative_evidence) = self.into_evidence_pair();
+            positive_evidence.is_always_satisfied(db, env)
+                && negative_evidence.is_never_satisfied(db, env)
+        }
+    }
+
+    /// Returns `true` only if the relation is unconditionally false.
+    ///
+    /// In particular, both indeterminate and inconsistent results return `false`.
+    #[inline]
+    pub(crate) fn is_always_false(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        if let Some(evidence) = self.boolean_evidence() {
+            evidence.is_never_satisfied(db, env)
+        } else {
+            let (positive_evidence, negative_evidence) = self.into_evidence_pair();
+            positive_evidence.is_never_satisfied(db, env)
+                && negative_evidence.is_always_satisfied(db, env)
+        }
+    }
+
+    /// Returns whether the relation has negative evidence for any satisfiable valuation.
+    pub(crate) fn has_negative_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        if let Some(evidence) = self.boolean_evidence() {
+            !evidence.is_always_satisfied(db, env)
+        } else {
+            !self.into_evidence_pair().1.is_never_satisfied(db, env)
+        }
+    }
+
+    fn is_trivially_always_true(self) -> bool {
+        self.tagged_evidence.node == ALWAYS_TRUE
+    }
+
+    fn is_trivially_always_false(self) -> bool {
+        self.tagged_evidence.node == ALWAYS_FALSE
+    }
+
+    #[inline]
+    pub(crate) fn union<T>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: T,
+    ) -> Self
+    where
+        T: Into<RelationConstraintSet<'db, 'c>>,
+    {
+        let other = other.into();
+        self.tagged_evidence.verify_builder(builder);
+        other.tagged_evidence.verify_builder(builder);
+        *self = match (self.boolean_evidence(), other.boolean_evidence()) {
+            (Some(mut left), Some(right)) => {
+                left.union(db, builder, right);
+                Self::from(left)
+            }
+            _ => self.union_non_boolean(db, builder, other),
+        };
+        *self
+    }
+
+    #[cold]
+    fn union_non_boolean(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
+        let (mut positive, mut negative) = self.into_evidence_pair();
+        let (other_positive, other_negative) = other.into_evidence_pair();
+        positive.union(db, builder, other_positive);
+        negative.intersect(db, builder, other_negative);
+        Self::from_evidence_pair(positive, negative)
+    }
+
+    #[inline]
+    pub(crate) fn intersect<T>(
+        &mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: T,
+    ) -> Self
+    where
+        T: Into<RelationConstraintSet<'db, 'c>>,
+    {
+        let other = other.into();
+        self.tagged_evidence.verify_builder(builder);
+        other.tagged_evidence.verify_builder(builder);
+        *self = match (self.boolean_evidence(), other.boolean_evidence()) {
+            (Some(mut left), Some(right)) => {
+                left.intersect(db, builder, right);
+                Self::from(left)
+            }
+            _ => self.intersect_non_boolean(db, builder, other),
+        };
+        *self
+    }
+
+    #[cold]
+    fn intersect_non_boolean(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
+        let (mut positive, mut negative) = self.into_evidence_pair();
+        let (other_positive, other_negative) = other.into_evidence_pair();
+        positive.intersect(db, builder, other_positive);
+        negative.union(db, builder, other_negative);
+        Self::from_evidence_pair(positive, negative)
+    }
+
+    pub(crate) fn negate(
+        mut self,
+        _db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> Self {
+        self.tagged_evidence.verify_builder(builder);
+        if let Some(evidence) = self.boolean_evidence() {
+            return Self::from(evidence.negated());
+        }
+        if self.is_indeterminate() {
+            return self;
+        }
+        match self.tagged_evidence.node {
+            EVIDENCE_PAIR_RELATION => {
+                self.tagged_evidence.node = SWAPPED_EVIDENCE_PAIR_RELATION;
+                self
+            }
+            SWAPPED_EVIDENCE_PAIR_RELATION => {
+                self.tagged_evidence.node = EVIDENCE_PAIR_RELATION;
+                self
+            }
+            _ => self,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn and<T>(
+        mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> T,
+    ) -> Self
+    where
+        T: Into<RelationConstraintSet<'db, 'c>>,
+    {
+        if !self.is_trivially_always_false() {
+            self.intersect(db, builder, other());
+        }
+        self
+    }
+
+    #[inline]
+    pub(crate) fn or<T>(
+        mut self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> T,
+    ) -> Self
+    where
+        T: Into<RelationConstraintSet<'db, 'c>>,
+    {
+        if !self.is_trivially_always_true() {
+            self.union(db, builder, other());
+        }
+        self
+    }
+
+    /// Removes inferable type variables from an existential relation.
+    ///
+    /// A specialization proves the relation if any valuation has positive evidence. It disproves
+    /// the relation only if every valuation has negative evidence.
+    pub(crate) fn reduce_inferable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: TypeVarSet<'db>,
+    ) -> Self {
+        if let Some(evidence) = self.boolean_evidence() {
+            Self::from(evidence.reduce_inferable(db, env, builder, to_remove))
+        } else {
+            let (positive_evidence, negative_evidence) = self.into_evidence_pair();
+            Self::from_evidence_pair(
+                positive_evidence.reduce_inferable(db, env, builder, to_remove),
+                negative_evidence.for_all(db, env, builder, to_remove),
+            )
+        }
+    }
+
+    /// Applies a type mapping independently to the relation's positive and negative evidence.
+    pub(crate) fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        if let Some(evidence) = self.boolean_evidence() {
+            Self::from(evidence.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+        } else {
+            let (positive_evidence, negative_evidence) = self.into_evidence_pair();
+            Self::from_evidence_pair(
+                positive_evidence.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                negative_evidence.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
+        }
+    }
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
@@ -590,8 +1082,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
-        let mut storage = builder.storage.borrow_mut();
-        Self::from_node(builder, self.node.negate(&mut storage), self.source_order)
+        self.negated()
+    }
+
+    fn negated(self) -> Self {
+        let mut storage = self.builder.storage.borrow_mut();
+        Self::from_node(
+            self.builder,
+            self.node.negate(&mut storage),
+            self.source_order,
+        )
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -1001,6 +1501,10 @@ struct ConstraintSetStorage<'db> {
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
 
+    /// Independent evidence pairs are uncommon; relation values refer to entries here instead of
+    /// carrying two constraint sets through the Boolean fast path.
+    relation_evidence: IndexVec<RelationEvidenceId, RelationEvidence>,
+
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
@@ -1147,21 +1651,64 @@ impl<'db> ConstraintSetBuilder<'db> {
         self,
         f: impl for<'c> FnOnce(&'c Self) -> ConstraintSet<'db, 'c>,
     ) -> OwnedConstraintSet<'db> {
+        let root = {
+            let constraint = f(&self);
+            (constraint.node, constraint.source_order)
+        };
+        let [owned] = self.into_owned_roots([root]);
+        owned
+    }
+
+    /// Creates an [`OwnedRelationConstraintSet`], consuming this builder in the process.
+    pub(crate) fn into_owned_relation(
+        self,
+        f: impl for<'c> FnOnce(&'c Self) -> RelationConstraintSet<'db, 'c>,
+    ) -> OwnedRelationConstraintSet<'db> {
+        enum RelationRoots {
+            Boolean((NodeId, Option<SourceOrderId>)),
+            EvidencePair([(NodeId, Option<SourceOrderId>); 2]),
+        }
+
+        let relation = f(&self);
+        let roots = if let Some(evidence) = relation.boolean_evidence() {
+            RelationRoots::Boolean((evidence.node, evidence.source_order))
+        } else {
+            let (positive_evidence, negative_evidence) = relation.into_evidence_pair();
+            RelationRoots::EvidencePair([
+                (positive_evidence.node, positive_evidence.source_order),
+                (negative_evidence.node, negative_evidence.source_order),
+            ])
+        };
+
+        match roots {
+            RelationRoots::Boolean(root) => {
+                let [evidence] = self.into_owned_roots([root]);
+                OwnedRelationConstraintSet::Boolean(evidence)
+            }
+            RelationRoots::EvidencePair(roots) => {
+                let [positive_evidence, negative_evidence] = self.into_owned_roots(roots);
+                OwnedRelationConstraintSet::EvidencePair(Arc::new(OwnedRelationEvidence {
+                    positive_evidence,
+                    negative_evidence,
+                }))
+            }
+        }
+    }
+
+    fn into_owned_roots<const N: usize>(
+        self,
+        roots: [(NodeId, Option<SourceOrderId>); N],
+    ) -> [OwnedConstraintSet<'db>; N] {
         // NOTE: We do not store any of the builder's memoization caches in the result. Owned
         // constraint sets can only be used by adding them to a new builder. Operation caches from
         // the original builder aren't relevant to the new builder, and don't need to be retained.
-        let constraint = f(&self);
-        let node = constraint.node;
-        if node.is_terminal() {
-            return OwnedConstraintSet {
+        if roots.iter().all(|(node, _)| node.is_terminal()) {
+            return roots.map(|(node, _)| OwnedConstraintSet {
                 node,
                 source_order: None,
                 inner: None,
-            };
+            });
         }
-        let source_order = constraint
-            .source_order
-            .expect("non-terminal BDD should have source_order");
 
         // Combining constraint sets can allocate a new source-order tree even when the BDD is
         // unchanged. Preserve each constraint's first source position, but rebuild the persisted
@@ -1169,13 +1716,17 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Unlike node and constraint IDs, source-order IDs are not embedded in the BDD, so the
         // sidecar can be rebuilt without remapping the BDD.
         let mut storage = self.storage.into_inner();
-        let source_constraints = storage.calculate_source_orders(Some(source_order));
+        let source_constraints =
+            roots.map(|(_, source_order)| storage.calculate_source_orders(source_order));
 
         let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
         let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
         let mut used_supports = RankBitBox::bits_with_capacity(storage.supports.len());
 
-        let mut stack = vec![node];
+        let mut stack = roots
+            .iter()
+            .map(|(node, _)| *node)
+            .collect::<SmallVec<[_; N]>>();
         while let Some(node) = stack.pop() {
             if node.is_terminal() || used_nodes[node.index()] {
                 continue;
@@ -1194,20 +1745,35 @@ impl<'db> ConstraintSetBuilder<'db> {
             stack.push(interior.if_false);
         }
 
+        let source_order_capacity =
+            source_constraints
+                .iter()
+                .fold(0usize, |capacity, constraints| {
+                    capacity.saturating_add(constraints.len().saturating_mul(2).saturating_sub(1))
+                });
         let mut source_orders: IndexVec<SourceOrderId, SourceOrder> =
-            IndexVec::with_capacity(source_constraints.len().saturating_mul(2).saturating_sub(1));
-        let source_order = source_constraints
-            .into_iter()
-            .fold(None, |left, source_constraint| {
-                used_constraints.set(source_constraint.index(), true);
-                let right = source_orders.push(SourceOrder::Constraint(source_constraint));
+            IndexVec::with_capacity(source_order_capacity);
+        let mut source_order_cache = FxHashMap::default();
+        let source_orders_by_root = {
+            let mut intern_source_order = |data| {
+                *source_order_cache
+                    .entry(data)
+                    .or_insert_with(|| source_orders.push(data))
+            };
+            source_constraints.map(|constraints| {
+                constraints
+                    .into_iter()
+                    .fold(None, |left, source_constraint| {
+                        used_constraints.set(source_constraint.index(), true);
+                        let right = intern_source_order(SourceOrder::Constraint(source_constraint));
 
-                Some(match left {
-                    Some(left) => source_orders.push(SourceOrder::Ordered(left, right)),
-                    None => right,
-                })
+                        Some(match left {
+                            Some(left) => intern_source_order(SourceOrder::Ordered(left, right)),
+                            None => right,
+                        })
+                    })
             })
-            .expect("non-terminal BDD should have source_order");
+        };
 
         used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
         used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
@@ -1251,22 +1817,24 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         storage.typevars.shrink_to_fit();
 
-        OwnedConstraintSet {
-            node,
-            source_order: Some(source_order),
-            inner: Some(Arc::new(OwnedConstraintSetInner {
-                constraints,
-                constraint_supports,
-                constraint_indices,
-                typevars: storage.typevars,
-                nodes,
-                node_supports,
-                node_indices,
-                supports,
-                support_indices,
-                source_orders: source_orders.raw.into_boxed_slice(),
-            })),
-        }
+        let inner = Arc::new(OwnedConstraintSetInner {
+            constraints,
+            constraint_supports,
+            constraint_indices,
+            typevars: storage.typevars,
+            nodes,
+            node_supports,
+            node_indices,
+            supports,
+            support_indices,
+            source_orders: source_orders.raw.into_boxed_slice(),
+        });
+
+        std::array::from_fn(|index| OwnedConstraintSet {
+            node: roots[index].0,
+            source_order: source_orders_by_root[index],
+            inner: Some(Arc::clone(&inner)),
+        })
     }
 
     /// Loads an [`OwnedConstraintSet`] into this builder.
@@ -1288,6 +1856,33 @@ impl<'db> ConstraintSetBuilder<'db> {
         let mut storage = self.storage.borrow_mut();
         let (node, source_order) = storage.load(db, env, other);
         ConstraintSet::from_node(self, node, source_order)
+    }
+
+    /// Loads both sides of an owned relation into this builder.
+    pub(crate) fn load_relation<'c>(
+        &'c self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &OwnedRelationConstraintSet<'db>,
+    ) -> RelationConstraintSet<'db, 'c> {
+        let mut storage = self.storage.borrow_mut();
+        match other {
+            OwnedRelationConstraintSet::Boolean(evidence) => {
+                let (node, source_order) = storage.load(db, env, evidence);
+                RelationConstraintSet::from(ConstraintSet::from_node(self, node, source_order))
+            }
+            OwnedRelationConstraintSet::EvidencePair(evidence) => {
+                let [positive_evidence, negative_evidence] = storage.load_roots(
+                    db,
+                    env,
+                    [&evidence.positive_evidence, &evidence.negative_evidence],
+                );
+                RelationConstraintSet::from_evidence_pair(
+                    ConstraintSet::from_node(self, positive_evidence.0, positive_evidence.1),
+                    ConstraintSet::from_node(self, negative_evidence.0, negative_evidence.1),
+                )
+            }
+        }
     }
 }
 
@@ -1670,6 +2265,17 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
+        let [loaded] = self.load_roots(db, env, [other]);
+        loaded
+    }
+
+    /// Loads owned constraint sets that share storage into this storage.
+    fn load_roots<const N: usize>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        roots: [&OwnedConstraintSet<'db>; N],
+    ) -> [(NodeId, Option<SourceOrderId>); N] {
         fn rebuild_node<'db>(
             storage: &mut ConstraintSetStorage<'db>,
             inner: &OwnedConstraintSetInner<'db>,
@@ -1703,13 +2309,19 @@ impl<'db> ConstraintSetStorage<'db> {
             remapped
         }
 
-        if other.node.is_terminal() {
-            return (other.node, None);
+        if roots.iter().all(|root| root.node.is_terminal()) {
+            return roots.map(|root| (root.node, None));
         }
-        let inner = other
-            .inner
-            .as_ref()
+        let shared_inner = roots
+            .iter()
+            .find_map(|root| root.inner.as_ref())
             .expect("storage-free owned constraint sets must have terminal roots");
+        debug_assert!(roots.iter().all(|root| {
+            root.inner
+                .as_ref()
+                .is_none_or(|inner| Arc::ptr_eq(inner, shared_inner))
+        }));
+        let inner = shared_inner.as_ref();
 
         // Load all of the constraints into the this storage first, to maximize the chance that the
         // constraints and typevars will appear in the same order. (This is important because many
@@ -1748,12 +2360,17 @@ impl<'db> ConstraintSetStorage<'db> {
 
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
-        let node = rebuild_node(self, inner, &constraints, &mut cache, other.node);
-        let old_source_order = other
-            .source_order
-            .expect("non-terminal constraint set should have a source_order");
-        let source_order = source_orders[old_source_order.index()];
-        (node, source_order)
+        roots.map(|root| {
+            if root.node.is_terminal() {
+                return (root.node, None);
+            }
+            let node = rebuild_node(self, inner, &constraints, &mut cache, root.node);
+            let old_source_order = root
+                .source_order
+                .expect("non-terminal constraint set should have a source_order");
+            let source_order = source_orders[old_source_order.index()];
+            (node, source_order)
+        })
     }
 }
 
@@ -1841,6 +2458,9 @@ pub struct ConstraintId;
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 struct SourceOrderId;
+
+#[newtype_index]
+pub(crate) struct RelationEvidenceId;
 
 /// The nodes of the tree that defines source ordering for a constraint set.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -2728,9 +3348,9 @@ impl Node {
 
 impl NodeId {
     fn from_usize(value: usize) -> Self {
-        assert!(value <= (SMALLEST_TERMINAL.0 as usize));
+        assert!(value < (SWAPPED_EVIDENCE_PAIR_RELATION.0 as usize));
         // Safe due to the assertion immediately above:
-        // `SMALLEST_TERMINAL.0` is one less than the largest possible u32
+        // the reserved relation tags are below the largest possible u32.
         #[expect(clippy::cast_possible_truncation)]
         Self(value as u32)
     }
@@ -5674,7 +6294,7 @@ impl SequentMap {
         let builder = ConstraintSetBuilder::new();
         left_lower
             .when_trivially_disjoint_from(db, env, right_lower, &builder, TypeVarSet::None)
-            .is_trivially_always_satisfied()
+            .is_always_true(db, env)
     }
 
     fn add_single_tautology(&mut self, ante: ConstraintId) {
@@ -8343,8 +8963,8 @@ mod tests {
                 left.when_trivially_disjoint_from(db, &env, right, &builder, TypeVarSet::None);
             let full = left.when_disjoint_from(db, &env, right, &builder, TypeVarSet::None);
 
-            assert!(trivial.is_trivially_never_satisfied());
-            assert!(!full.is_always_satisfied(db, &env));
+            assert!(trivial.is_always_false(db, &env));
+            assert!(!full.is_always_true(db, &env));
         }
     }
 
@@ -8378,11 +8998,11 @@ mod tests {
             for right in types {
                 let trivial =
                     left.when_trivially_disjoint_from(db, &env, right, &builder, TypeVarSet::None);
-                if trivial.is_trivially_always_satisfied() {
+                if trivial.is_always_true(db, &env) {
                     positive_results += 1;
                     assert!(
                         left.when_disjoint_from(db, &env, right, &builder, TypeVarSet::None)
-                            .is_always_satisfied(db, &env),
+                            .is_always_true(db, &env),
                         "cheap disjointness incorrectly accepts `{}` and `{}`",
                         left.display(db, &env),
                         right.display(db, &env)

@@ -15,7 +15,8 @@ use super::{
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+    ConstraintSetBuilder, IteratorRelationConstraintsExtension, OwnedConstraintSet,
+    RelationConstraintSet,
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::walk_specialization;
@@ -536,7 +537,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         // Explicit protocol inheritance is nominal, but materializing a protocol can change
         // the requirements represented by that same class. The nominal shortcut is therefore
         // valid only when materialization leaves the target's members unchanged.
@@ -596,7 +597,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
-            let nominal_is_safe = nominally_satisfied.is_never_satisfied(db, env)
+            let nominal_is_safe = nominally_satisfied.is_always_false(db, env)
                 || (!protocol.materialization_changes_requirements(db, env, protocol)
                     && !source_protocol.is_some_and(|source| {
                         source.materialization_changes_requirements(db, env, protocol)
@@ -605,7 +606,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if nominal_is_safe {
                 if result
                     .union(db, self.constraints, nominally_satisfied)
-                    .is_trivially_always_satisfied()
+                    .is_always_true(db, env)
                 {
                     return result;
                 }
@@ -657,12 +658,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             protocol
                 .interface(db)
                 .members(db)
-                .when_all(db, self.constraints, |member| {
+                .when_all_relation(db, self.constraints, |member| {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
         if let Some(context) = self.report_context()
-            && structurally_satisfied.is_never_satisfied(db, env)
+            && structurally_satisfied.is_always_false(db, env)
         {
             context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
@@ -683,7 +684,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
         nominal_instance: NominalInstanceType<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
+    ) -> Option<RelationConstraintSet<'db, 'c>> {
         if self.typevar_evaluation != TypeVarEvaluation::Lazy
             || self.is_context_collection_enabled()
         {
@@ -754,7 +755,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         meta_ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let env = self.env;
         debug_assert!(matches!(
             meta_ty,
@@ -773,7 +774,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: NominalInstanceType<'db>,
         target: NominalInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         match (source.0, target.0) {
             (_, NominalInstanceInner::Object) => self.always(),
             (
@@ -888,12 +889,14 @@ fn non_recursive_protocol_constraints<'db>(
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_protocol_interface_pair(
-            db,
-            Type::ProtocolInstance(source),
-            source.interface(db),
-            target,
-        )
+        checker
+            .check_protocol_interface_pair(
+                db,
+                Type::ProtocolInstance(source),
+                source.interface(db),
+                target,
+            )
+            .positive_evidence()
     })
 }
 
@@ -907,7 +910,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         _db: &'db dyn Db,
         _left: ProtocolInstanceType<'db>,
         _right: ProtocolInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         self.never()
     }
 
@@ -916,7 +919,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         left: NominalInstanceType<'db>,
         right: NominalInstanceType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
+    ) -> RelationConstraintSet<'db, 'c> {
         let mut result = self.never();
         if left.is_object() || right.is_object() {
             return result;
@@ -928,14 +931,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
             if result
                 .union(db, self.constraints, compatible)
-                .is_trivially_always_satisfied()
+                .is_always_true(db, env)
             {
                 return result;
             }
         }
 
         result.or(db, self.constraints, || {
-            ConstraintSet::from_bool(
+            RelationConstraintSet::from_bool(
                 self.constraints,
                 !left
                     .class(db, env)
@@ -1305,7 +1308,7 @@ impl<'db> ProtocolInstanceType<'db> {
             );
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
-                .is_always_satisfied(db, &env)
+                .is_always_true(db, &env)
         }
 
         is_equivalent_to_object_inner(db, self, ())

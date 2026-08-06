@@ -161,10 +161,10 @@ impl<'db> ExpectedReturnType<'db> {
         self.public
     }
 
-    /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
-    /// type.
-    fn accepts(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
-        ty.is_assignable_to(db, env, self.public) || ty.is_assignable_to(db, env, self.lexical)
+    /// Returns `true` if `ty` is proved incompatible with both possible return types.
+    fn rejects(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+        ty.has_only_negative_assignability_evidence(db, env, self.public)
+            && ty.has_only_negative_assignability_evidence(db, env, self.lexical)
     }
 }
 
@@ -267,9 +267,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .iter()
                             .copied()
                             .filter(|actual_return_ty| {
-                                !actual_return_ty
+                                actual_return_ty
                                     .ty
-                                    .is_assignable_to(db, env, expected_return_ty)
+                                    .has_only_negative_assignability_evidence(
+                                        db,
+                                        env,
+                                        expected_return_ty,
+                                    )
                             })
                     {
                         report_invalid_return_type(
@@ -315,7 +319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(db) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| !expected_return.accepts(db, env, ty_range.ty))
+                .filter(|ty_range| expected_return.rejects(db, env, ty_range.ty))
             {
                 report_invalid_return_type(
                     &self.context,
