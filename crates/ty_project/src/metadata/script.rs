@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use pep440_rs::VersionSpecifiers;
 use ruff_db::Db as SourceDb;
@@ -151,12 +151,12 @@ pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>
 /// Lazily initialized script environments shared by database snapshots.
 #[derive(Clone, Default)]
 pub struct ScriptEnvironments {
-    by_file: Arc<FxDashMap<File, ScriptEnvironment>>,
+    by_file: Arc<FxDashMap<File, Arc<OnceLock<ScriptEnvironment>>>>,
 }
 
 impl ScriptEnvironments {
     pub(crate) fn get_or_init(&self, db: &dyn Db, file: File) -> ScriptEnvironment {
-        *self.by_file.entry(file).or_insert_with(|| {
+        self.get_or_init_with(file, || {
             if !matches!(
                 db.system().env_var(EnvVars::TY_UV).as_deref(),
                 Ok("1" | "true" | "scripts")
@@ -189,10 +189,18 @@ impl ScriptEnvironments {
     }
 
     fn get(&self, db: &dyn Db, file: File) -> ScriptEnvironment {
-        *self
-            .by_file
-            .entry(file)
-            .or_insert_with(|| ScriptEnvironment::new(db, None, None))
+        self.get_or_init_with(file, || ScriptEnvironment::new(db, None, None))
+    }
+
+    fn get_or_init_with(
+        &self,
+        file: File,
+        initialize: impl FnOnce() -> ScriptEnvironment,
+    ) -> ScriptEnvironment {
+        // Drop the map's shard guard before invoking uv so unrelated scripts sharing that shard
+        // can initialize concurrently.
+        let environment = Arc::clone(self.by_file.entry(file).or_default().value());
+        *environment.get_or_init(initialize)
     }
 }
 
