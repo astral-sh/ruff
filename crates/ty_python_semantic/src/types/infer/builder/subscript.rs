@@ -1580,10 +1580,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             true,
         );
 
-        // Record the constraints for the object of the subscript assignment, if the object is an
-        // unannotated collection initializer.
-        if is_valid_assignment
-            && let Some(collection_def) = self.index.unannotated_collection_initializer(object)
+        // Record constraints even if the write does not match the collection's provisional
+        // specialization: those constraints may widen the specialization and make the write valid.
+        if let Some(collection_def) = self.index.unannotated_collection_initializer(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db, env)
         {
             let identity_instance =
@@ -1621,14 +1620,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .infer_and_check_argument_types(
                         ArgumentsIter::synthesized(&ast_arguments),
                         &mut call_arguments,
-                        &mut |builder, (_, expr, tcx)| {
-                            // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                            // However, `object` would have been inferred to a be a collection with `Divergent`
-                            // element types, meaning the type context for a given argument, by which the inferred
-                            // type is keyed, may not be the same as the type context we get here. It is not immediately
-                            // clear how to retrieve those types, and so we just re-infer the argument expressions
-                            // for simplicity.
-                            builder.infer_maybe_standalone_expression(expr, tcx)
+                        &mut |builder, (argument_index, _, tcx)| {
+                            if argument_index == 0 {
+                                infer_slice_ty(builder, tcx)
+                            } else {
+                                infer_rhs_value(builder, tcx)
+                            }
                         },
                         &mut identity_bindings,
                         TypeContext::default(),

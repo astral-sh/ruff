@@ -4910,7 +4910,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let object_ty = self.expression_type(&subscript.value);
                 let slice_ty = self.expression_type(&subscript.slice);
 
-                if object_ty.as_union_like(db).is_some()
+                // A divergent operator result cannot constrain its own collection: recording it
+                // would prevent the initial element types from seeding fixed-point inference.
+                if any_over_type(db, env, result_ty, false, |ty| ty.is_divergent())
+                    || object_ty.as_union_like(db).is_some()
                     || slice_ty.as_union_like(db).is_some()
                     || matches!(object_ty.resolve_type_alias(db), Type::Intersection(_))
                     || object_ty

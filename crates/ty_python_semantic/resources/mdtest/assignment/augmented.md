@@ -452,13 +452,12 @@ def update(value: A | B) -> None:
 
 ## Inferred collection targets
 
-Augmented assignments do not yet participate in full-scope collection inference.
+Augmented subscript assignments contribute their operator result to full-scope collection inference.
 
 ```py
 values = [1]
-# TODO: This should widen the inferred element type without reporting an error.
-# error: [invalid-assignment]
 values[0] /= 2
+reveal_type(values)  # revealed: list[float]
 ```
 
 ## Implicit dunder calls on class objects

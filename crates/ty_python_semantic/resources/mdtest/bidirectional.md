@@ -2424,6 +2424,104 @@ x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
+## Augmented subscript collection inference
+
+An augmented subscript assignment constrains an inferred list using the operator's result, not its
+right-hand operand.
+
+```py
+values = [1]
+values[0] /= 2
+reveal_type(values)  # revealed: list[float]
+```
+
+Augmented assignments to inferred dictionary entries similarly constrain the value type while
+preserving the key type.
+
+```py
+mapping = {"value": 1}
+mapping["value"] /= 2
+reveal_type(mapping)  # revealed: dict[str, float]
+```
+
+Custom operators can produce a value unrelated to either the original element or the operand.
+
+```py
+class Updated:
+    def __add__(self, other: int) -> "Updated":
+        return self
+
+class Initial:
+    def __add__(self, other: int) -> Updated:
+        return Updated()
+
+custom = [Initial()]
+custom[0] += 1
+reveal_type(custom)  # revealed: list[Updated | Initial]
+```
+
+Augmented subscript assignments also combine with the existing constraints on empty collection
+constructors.
+
+```py
+constructed = list()
+constructed.append(1)
+constructed[0] /= 2
+reveal_type(constructed)  # revealed: list[float]
+
+constructed_mapping = dict()
+constructed_mapping["value"] = 1
+constructed_mapping["value"] /= 2
+reveal_type(constructed_mapping)  # revealed: dict[str, float]
+```
+
+The same collection may also appear in the right-hand operand.
+
+```py
+self_referential = [1]
+self_referential[0] /= self_referential[0]
+reveal_type(self_referential)  # revealed: list[float]
+```
+
+An existing augmented slice assignment must not lose its inferred element type.
+
+```py
+sliced = [1]
+sliced[:] += [2]
+reveal_type(sliced)  # revealed: list[int]
+
+dynamic_slice = [1]
+dynamic_slice[slice(1)] += [2]
+reveal_type(dynamic_slice)  # revealed: list[int]
+```
+
+A failed operator does not widen the collection or suppress its original diagnostic.
+
+```py
+invalid = [1]
+# error: [unsupported-operator]
+invalid[0] += "value"
+reveal_type(invalid)  # revealed: list[int]
+```
+
+An invalid index likewise cannot contribute a value constraint.
+
+```py
+invalid_index = [1]
+# error: [invalid-argument-type]
+invalid_index["value"] /= 2
+reveal_type(invalid_index)  # revealed: list[int]
+```
+
+An explicit annotation still fixes the collection's element type.
+
+```py
+annotated: list[int] = [1]
+# error: [invalid-assignment]
+annotated[0] /= 2
+reveal_type(annotated)  # revealed: list[int]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:
