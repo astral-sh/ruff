@@ -315,7 +315,7 @@ The same applies to generic protocols and the `typing_extensions` backport.
 from typing import TypeVar
 from typing_extensions import Protocol as ExtensionsProtocol
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class GenericProtocol(Protocol[T]): ...
 class BackportedProtocol(ExtensionsProtocol): ...

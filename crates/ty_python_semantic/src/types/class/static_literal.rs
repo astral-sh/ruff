@@ -25,8 +25,8 @@ use crate::{
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule, UnionBuilder, UnionType,
+        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
+        UnionBuilder, UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
@@ -3390,18 +3390,17 @@ impl<'db> StaticClassLiteral<'db> {
                 .variance_of_items(db, &env, typevar);
         }
 
-        let Some(generic_context) = self.generic_context(db) else {
-            return TypeVarVariance::Bivariant;
-        };
-        if !generic_context.contains(db, typevar) {
+        let typevar_in_generic_context = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.contains(db, typevar));
+
+        if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
 
         if self.is_protocol(db)
             && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
-            && protocol
-                .interface(db)
-                .supports_variance_inference(db, &env, generic_context)
+            && protocol.interface(db).supports_variance_inference(db)
         {
             return protocol.interface(db).variance_of(db, &env, typevar);
         }
