@@ -848,14 +848,14 @@ fn split_once_at_field_delimiter(line: &str) -> Option<(&str, &str)> {
 /// :exc:`ValueError`
 /// ```
 fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
-    let Some(InlineMarkupToken::RestPrefixRole { span, .. }) =
+    let Some(InlineMarkupToken::RestPrefixRole(role)) =
         InlineMarkupScanner::new(cursor.as_str()).next()
     else {
         return false;
     };
 
     // Resume delimiter scanning after the closing backtick in e.g., `` :exc:`ValueError` ``.
-    cursor.skip_bytes(span.end().to_usize());
+    cursor.skip_bytes(role.span().end().to_usize());
     true
 }
 
