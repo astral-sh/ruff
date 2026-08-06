@@ -38,7 +38,12 @@ pub(crate) struct GitDiff {
 }
 
 impl GitDiff {
-    pub(crate) fn discover(system: &OsSystem, cwd: &SystemPath, revision: &str) -> Result<Self> {
+    pub(crate) fn discover(
+        system: &OsSystem,
+        cwd: &SystemPath,
+        revision: &str,
+        config_file: Option<&SystemPath>,
+    ) -> Result<Self> {
         let root_output = run_git(system, cwd, &["rev-parse", "--show-toplevel"])?;
         let root = SystemPathBuf::from(git_text(&root_output, "repository root")?.trim());
 
@@ -93,10 +98,22 @@ impl GitDiff {
                 }
             };
 
+            let baseline_path = baseline_relative.map(|path| root.join(path));
+            let current_path = current_relative.map(|path| root.join(path));
+
+            if !baseline_path
+                .as_deref()
+                .is_some_and(|path| is_relevant_path(path, config_file))
+                && !current_path
+                    .as_deref()
+                    .is_some_and(|path| is_relevant_path(path, config_file))
+            {
+                continue;
+            }
+
             let baseline_contents = baseline_relative
                 .map(|path| git_file(system, &root, &merge_base, path))
                 .transpose()?;
-            let current_path = current_relative.map(|path| root.join(path));
             let current_contents = current_path
                 .as_deref()
                 .and_then(|path| system.read_to_string(path).ok());
@@ -108,7 +125,7 @@ impl GitDiff {
             }
 
             files.push(ChangedFile {
-                baseline_path: baseline_relative.map(|path| root.join(path)),
+                baseline_path,
                 current_path,
                 baseline_contents: baseline_contents.flatten(),
                 current_contents,
@@ -122,6 +139,11 @@ impl GitDiff {
         )?;
         for path in nul_fields(&untracked.stdout)? {
             let path = root.join(path);
+
+            if !is_relevant_path(&path, config_file) {
+                continue;
+            }
+
             files.push(ChangedFile {
                 baseline_path: None,
                 current_contents: system.read_to_string(&path).ok(),
@@ -231,6 +253,15 @@ impl GitDiff {
 
 fn is_python_path(path: &SystemPath) -> bool {
     matches!(path.extension(), Some("py" | "pyi" | "ipynb"))
+}
+
+fn is_relevant_path(path: &SystemPath, config_file: Option<&SystemPath>) -> bool {
+    is_python_path(path)
+        || matches!(
+            path.file_name(),
+            Some("pyproject.toml" | "ty.toml" | ".gitignore" | ".ignore" | "VERSIONS" | "py.typed")
+        )
+        || config_file.is_some_and(|config_file| config_file == path)
 }
 
 fn run_git(system: &OsSystem, cwd: &SystemPath, args: &[&str]) -> Result<Output> {

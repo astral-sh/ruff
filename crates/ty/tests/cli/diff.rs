@@ -177,6 +177,29 @@ fn unrelated_binary_changes_do_not_prevent_checking() -> anyhow::Result<()> {
 }
 
 #[test]
+fn unrelated_text_changes_are_excluded_from_the_baseline() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("example.py", "existing: int = 'old'\n"),
+        ("notes.md", "Before the change\n"),
+    ])?;
+    commit_baseline(&case)?;
+    case.write_file("notes.md", "After the change\n")?;
+
+    let output = case
+        .command()
+        .arg("--diff")
+        .arg("HEAD")
+        .env("TY_LOG", "ty::git=debug")
+        .output()?;
+    let output_text = stdout(&output)?;
+    let stderr = std::str::from_utf8(&output.stderr)?;
+    assert!(output.status.success(), "{output_text}\n{stderr}");
+    assert!(stderr.contains("(0 changed paths)"), "{stderr}");
+
+    Ok(())
+}
+
+#[test]
 fn untracked_python_files_are_checked() -> anyhow::Result<()> {
     let case = CliTest::with_file("existing.py", "value = 1\n")?;
     commit_baseline(&case)?;
@@ -265,6 +288,34 @@ fn configuration_changes_recheck_the_project() -> anyhow::Result<()> {
     case.write_file("ty.toml", "[rules]\ninvalid-assignment = 'error'\n")?;
 
     let output = check_diff(&case)?;
+    let output_text = stdout(&output)?;
+    assert!(!output.status.success(), "{output_text}");
+    assert!(output_text.contains("example.py:1:"), "{output_text}");
+
+    Ok(())
+}
+
+#[test]
+fn explicitly_named_configuration_changes_recheck_the_project() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("example.py", "value: int = 'existing'\n"),
+        (
+            "settings.custom",
+            "[rules]\ninvalid-assignment = 'ignore'\n",
+        ),
+    ])?;
+    commit_baseline(&case)?;
+    case.write_file("settings.custom", "[rules]\ninvalid-assignment = 'error'\n")?;
+
+    let output = case
+        .command()
+        .arg("--diff")
+        .arg("HEAD")
+        .arg("--config-file")
+        .arg("settings.custom")
+        .arg("--output-format")
+        .arg("concise")
+        .output()?;
     let output_text = stdout(&output)?;
     assert!(!output.status.success(), "{output_text}");
     assert!(output_text.contains("example.py:1:"), "{output_text}");

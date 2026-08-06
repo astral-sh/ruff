@@ -144,11 +144,15 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Check
     };
 
+    let config_file = args
+        .config_file
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
     let native_system = OsSystem::new(&cwd);
     let git_diff = args
         .diff
         .as_deref()
-        .map(|revision| GitDiff::discover(&native_system, &cwd, revision))
+        .map(|revision| GitDiff::discover(&native_system, &cwd, revision, config_file.as_deref()))
         .transpose()?;
     let git_system = git_diff
         .as_ref()
@@ -157,10 +161,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
-    let config_file = args
-        .config_file
-        .as_ref()
-        .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
