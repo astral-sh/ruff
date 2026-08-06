@@ -856,7 +856,10 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).contains_key(name)
     }
 
-    /// Return whether this interface can derive variance from its exposed member capabilities.
+    /// Return whether this interface is currently supported by structural variance inference.
+    ///
+    /// TODO: Support recursive protocol members, descriptor writes, and writable `type[T]`
+    /// members instead of skipping variance inference for these interfaces.
     pub(super) fn supports_variance_inference(
         self,
         db: &'db dyn Db,
