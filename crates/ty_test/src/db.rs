@@ -147,6 +147,10 @@ impl SemanticDb for Db {
         self.program().program_file(self, file)
     }
 
+    fn project_root(&self) -> &SystemPath {
+        SystemPath::new("/src")
+    }
+
     fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
         &self.settings().program(self).python_version
     }

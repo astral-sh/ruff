@@ -222,6 +222,10 @@ impl ty_python_semantic::Db for CorpusDb {
         self.program().program_file(self, file)
     }
 
+    fn project_root(&self) -> &SystemPath {
+        SystemPath::new("/src")
+    }
+
     fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
         &self.program_settings.python_version
     }

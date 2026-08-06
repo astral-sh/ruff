@@ -12,7 +12,7 @@ use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
-use ruff_db::system::System;
+use ruff_db::system::{System, SystemPath};
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_python_core::ProgramFile;
@@ -536,6 +536,10 @@ impl SemanticDb for ProjectDatabase {
         program.program_file(self, file)
     }
 
+    fn project_root(&self) -> &SystemPath {
+        self.project().root(self)
+    }
+
     fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
         match Script::for_file(self, file) {
             None => &self.project().program_settings(self).python_version,
@@ -637,7 +641,7 @@ pub(crate) mod testing {
     use ruff_db::Db as SourceDb;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{File, FileRootKind, Files};
-    use ruff_db::system::{DbWithTestSystem, System, TestSystem};
+    use ruff_db::system::{DbWithTestSystem, System, SystemPath, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     #[cfg(feature = "testing")]
     use ruff_python_ast::PythonVersion;
@@ -790,6 +794,10 @@ pub(crate) mod testing {
             };
 
             program.program_file(self, file)
+        }
+
+        fn project_root(&self) -> &SystemPath {
+            self.project().root(self)
         }
 
         fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
