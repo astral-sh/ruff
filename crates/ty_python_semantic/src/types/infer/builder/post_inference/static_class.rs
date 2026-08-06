@@ -240,7 +240,6 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     let mut disjoint_bases = IncompatibleBases::default();
     let mut protocol_base_with_generic_context: Option<(&ast::Expr, _)> = None;
-    let mut protocol_header_is_valid = true;
     let mut direct_typed_dict_bases = vec![];
 
     let class_definition = index.expect_single_definition(class_node);
@@ -274,7 +273,6 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         let base_class = match base_class {
             Type::SpecialForm(SpecialFormType::Generic) => {
-                protocol_header_is_valid = false;
                 if let Some(builder) = context.report_lint(&INVALID_BASE, source_node) {
                     // Unsubscripted `Generic` can appear in the MRO of many classes,
                     // but it is never valid as an explicit base class in user code.
@@ -287,7 +285,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                 else {
                     continue;
                 };
-                protocol_header_is_valid = false;
                 let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, previous_node)
                 else {
                     continue;
@@ -312,7 +309,6 @@ pub(crate) fn check_static_class_definitions<'db>(
             // but it is semantically invalid.
             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context)) => {
                 if let Some(type_params) = class_node.type_params.as_deref() {
-                    protocol_header_is_valid = false;
                     let node = source_node;
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node) else {
                         continue;
@@ -341,7 +337,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
             Type::GenericAlias(base_alias) => {
-                if (check_explicit_base_variance || is_protocol)
+                if check_explicit_base_variance
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
                         generic_context.variables(db).find_map(|typevar| {
@@ -357,33 +353,25 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 None
                             }
                         })
+                    && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
                 {
-                    protocol_header_is_valid = false;
-                    if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, source_node)
-                    {
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Variance of type variable `{}` is incompatible with base class `{}`",
-                            typevar.typevar(db).name(db),
-                            base_alias.origin(db).name(db),
-                        ));
-                        diagnostic.help(format_args!(
-                            "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
-                            typevar.typevar(db).name(db),
-                            declared_variance.as_str(),
-                            base_alias.origin(db).name(db),
-                            required_variance.as_str(),
-                        ));
-                    }
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Variance of type variable `{}` is incompatible with base class `{}`",
+                        typevar.typevar(db).name(db),
+                        base_alias.origin(db).name(db),
+                    ));
+                    diagnostic.help(format_args!(
+                        "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
+                        typevar.typevar(db).name(db),
+                        declared_variance.as_str(),
+                        base_alias.origin(db).name(db),
+                        required_variance.as_str(),
+                    ));
                 }
 
                 ClassType::Generic(base_alias)
             }
-            _ => {
-                if is_protocol && base_class.is_unknown() {
-                    protocol_header_is_valid = false;
-                }
-                continue;
-            }
+            _ => continue,
         };
 
         if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
@@ -391,15 +379,15 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
 
         if is_protocol {
-            if !base_class.is_protocol(db) && !base_class.is_object(db) {
-                protocol_header_is_valid = false;
-                if let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node) {
-                    builder.into_diagnostic(format_args!(
-                        "Protocol class `{}` cannot inherit from non-protocol class `{}`",
-                        class.name(db),
-                        base_class.name(db),
-                    ));
-                }
+            if !base_class.is_protocol(db)
+                && !base_class.is_object(db)
+                && let Some(builder) = context.report_lint(&INVALID_PROTOCOL, source_node)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Protocol class `{}` cannot inherit from non-protocol class `{}`",
+                    class.name(db),
+                    base_class.name(db),
+                ));
             }
         } else if class_kind == Some(CodeGeneratorKind::TypedDict) {
             if !base_class.class_literal(db).is_typed_dict(db)
@@ -803,14 +791,13 @@ pub(crate) fn check_static_class_definitions<'db>(
         class.legacy_generic_context(db),
         class.inherited_legacy_generic_context(db),
     ) {
-        if !inherited.is_subset_of(db, legacy) {
-            protocol_header_is_valid = false;
-            if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node) {
-                builder.into_diagnostic(
-                    "`Generic` base class must include all type \
-                        variables used in other base classes",
-                );
-            }
+        if !inherited.is_subset_of(db, legacy)
+            && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+        {
+            builder.into_diagnostic(
+                "`Generic` base class must include all type \
+                    variables used in other base classes",
+            );
         }
     }
 
@@ -829,7 +816,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         );
     }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) || is_protocol {
+    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
         if !class.has_pep_695_type_params(db)
             && let Some(generic_context) = class.legacy_generic_context(db)
         {
@@ -839,16 +826,10 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
 
             let mut state: Option<State<'db>> = None;
-            let mut follows_typevar_tuple = false;
 
             for bound_typevar in generic_context.variables(db) {
                 let typevar = bound_typevar.typevar(db);
                 let has_default = typevar.default_type(db, env).is_some();
-
-                if follows_typevar_tuple && has_default {
-                    protocol_header_is_valid = false;
-                }
-                follows_typevar_tuple |= bound_typevar.is_typevartuple(db);
 
                 if let Some(state) = state.as_mut() {
                     if !has_default {
@@ -865,7 +846,6 @@ pub(crate) fn check_static_class_definitions<'db>(
             if let Some(state) = state
                 && !state.invalid_later_tvars.is_empty()
             {
-                protocol_header_is_valid = false;
                 report_invalid_type_param_order(
                     context,
                     class,
@@ -875,9 +855,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 );
             }
         }
-    }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) || is_protocol {
         // Check that type variable defaults only reference type variables
         // that precede them in the type parameter list.
         if let Some(generic_context) = class
@@ -906,7 +884,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                     }
                 });
                 if let Some(bad_typevar) = first_bad_tvar {
-                    protocol_header_is_valid = false;
                     let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
                     report_invalid_typevar_default_reference(
                         context,
@@ -918,9 +895,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
         }
-    }
 
-    if context.is_lint_enabled(&INVALID_GENERIC_CLASS) || is_protocol {
         let scope = class.body_scope(db).scope(db);
         if let Some(parent) = scope.parent() {
             // Check that the class's own type parameters don't shadow
@@ -930,18 +905,15 @@ pub(crate) fn check_static_class_definitions<'db>(
                     let name = self_typevar.typevar(db).name(db);
                     for enclosing in enclosing_generic_contexts(db, index, parent) {
                         if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
-                            protocol_header_is_valid = false;
-                            if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-                                report_shadowed_type_variable(
-                                    context,
-                                    name,
-                                    "class",
-                                    &class_node.name.id,
-                                    class.header_range(db),
-                                    self_typevar.kind(db),
-                                    other_typevar,
-                                );
-                            }
+                            report_shadowed_type_variable(
+                                context,
+                                name,
+                                "class",
+                                &class_node.name.id,
+                                class.header_range(db),
+                                self_typevar.kind(db),
+                                other_typevar,
+                            );
                         }
                     }
                 }
@@ -953,18 +925,15 @@ pub(crate) fn check_static_class_definitions<'db>(
                 let typevar = base_typevar.typevar(db);
                 for enclosing in enclosing_generic_contexts(db, index, parent) {
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
-                        protocol_header_is_valid = false;
-                        if context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-                            report_shadowed_type_variable(
-                                context,
-                                typevar.name(db),
-                                "class",
-                                &class_node.name.id,
-                                class.header_range(db),
-                                base_typevar.kind(db),
-                                other_typevar,
-                            );
-                        }
+                        report_shadowed_type_variable(
+                            context,
+                            typevar.name(db),
+                            "class",
+                            &class_node.name.id,
+                            class.header_range(db),
+                            base_typevar.kind(db),
+                            other_typevar,
+                        );
                     }
                 }
             }
@@ -1094,9 +1063,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
-        if protocol_header_is_valid {
-            protocol.validate_type_parameter_variance(context);
-        }
+        protocol.validate_type_parameter_variance(context);
     }
 
     if class.is_typed_dict(db) {

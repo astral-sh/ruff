@@ -3741,8 +3741,10 @@ impl<'db> StaticClassLiteral<'db> {
             return TypeVarVariance::Bivariant;
         }
 
-        if self.is_protocol(db) {
-            return inferred_protocol_typevar_variance(db, self, typevar);
+        if self.is_protocol(db)
+            && let Some(variance) = inferred_protocol_typevar_variance(db, self, typevar)
+        {
+            return variance;
         }
 
         let class_body_scope = self.body_scope(db);
