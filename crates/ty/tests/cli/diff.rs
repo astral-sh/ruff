@@ -279,6 +279,45 @@ fn changed_diagnostic_messages_are_reported() -> anyhow::Result<()> {
 }
 
 #[test]
+fn multiple_changed_files_keep_their_own_baseline_contents() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("first.py", "first: int = 'old'\n"),
+        ("second.py", "second: str = 1\n"),
+    ])?;
+    commit_baseline(&case)?;
+    case.write_file("first.py", "header = 1\nfirst: int = 'old'\n")?;
+    case.write_file(
+        "second.py",
+        "header = 1\nsecond: str = 1\nintroduced: int = 'new'\n",
+    )?;
+
+    let output = check_diff(&case)?;
+    let output_text = stdout(&output)?;
+    assert!(!output.status.success(), "{output_text}");
+    assert!(output_text.contains("second.py:3:"), "{output_text}");
+    assert!(!output_text.contains("first.py:2:"), "{output_text}");
+    assert!(!output_text.contains("second.py:2:"), "{output_text}");
+    assert!(output_text.contains("Found 1 diagnostic"), "{output_text}");
+
+    Ok(())
+}
+
+#[test]
+fn changed_python_files_with_newlines_in_their_names_are_supported() -> anyhow::Result<()> {
+    let path = "before\nafter.py";
+    let case = CliTest::with_file(path, "value = 1\n")?;
+    commit_baseline(&case)?;
+    case.write_file(path, "value: int = 'introduced'\n")?;
+
+    let output = check_diff(&case)?;
+    let output_text = stdout(&output)?;
+    assert!(!output.status.success(), "{output_text}");
+    assert!(output_text.contains("invalid-assignment"), "{output_text}");
+
+    Ok(())
+}
+
+#[test]
 fn configuration_changes_recheck_the_project() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("example.py", "value: int = 'existing'\n"),

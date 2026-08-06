@@ -1,7 +1,8 @@
 use std::any::Any;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::process::Output;
+use std::io::Write;
+use std::process::{Command, Output, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -73,6 +74,7 @@ impl GitDiff {
         )?;
 
         let mut files = Vec::new();
+        let mut baseline_objects = Vec::new();
         let mut fields = nul_fields(&changes.stdout)?;
 
         while let Some(status) = fields.next() {
@@ -111,25 +113,33 @@ impl GitDiff {
                 continue;
             }
 
-            let baseline_contents = baseline_relative
-                .map(|path| git_file(system, &root, &merge_base, path))
-                .transpose()?;
             let current_contents = current_path
                 .as_deref()
                 .and_then(|path| system.read_to_string(path).ok());
 
-            // Binary files cannot affect Python source or TOML configuration and must not make a
-            // Python-only check fail merely because the same commit also updates an image.
-            if baseline_contents.as_ref().is_some_and(Option::is_none) {
-                continue;
+            if let Some(path) = baseline_relative {
+                baseline_objects.push((files.len(), format!("{merge_base}:{path}")));
             }
 
             files.push(ChangedFile {
                 baseline_path,
                 current_path,
-                baseline_contents: baseline_contents.flatten(),
+                baseline_contents: None,
                 current_contents,
             });
+        }
+
+        if !baseline_objects.is_empty() {
+            for ((index, _), contents) in baseline_objects
+                .iter()
+                .zip(git_files(&root, &baseline_objects)?)
+            {
+                files[*index].baseline_contents = contents;
+            }
+
+            // Binary files cannot affect Python source or TOML configuration and must not make a
+            // Python-only check fail merely because the same commit also updates an image.
+            files.retain(|file| file.baseline_path.is_none() || file.baseline_contents.is_some());
         }
 
         let untracked = run_git(
@@ -306,15 +316,93 @@ fn default_reference(system: &OsSystem, root: &SystemPath) -> String {
     "HEAD".to_owned()
 }
 
-fn git_file(
-    system: &OsSystem,
-    root: &SystemPath,
-    revision: &str,
-    path: &str,
-) -> Result<Option<String>> {
-    let object = format!("{revision}:{path}");
-    let output = run_git(system, root, &["show", &object])?;
-    Ok(String::from_utf8(output.stdout).ok())
+fn git_files(root: &SystemPath, objects: &[(usize, String)]) -> Result<Vec<Option<String>>> {
+    let mut command = Command::new("git");
+    command
+        .args(["cat-file", "--batch", "-Z"])
+        .current_dir(root.as_std_path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .context("Failed to run `git cat-file --batch -Z`")?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow!("Failed to open stdin for `git cat-file --batch -Z`"))?;
+
+    let output = std::thread::scope(|scope| {
+        let writer = scope.spawn(move || -> std::io::Result<()> {
+            for (_, object) in objects {
+                stdin.write_all(object.as_bytes())?;
+                stdin.write_all(&[0])?;
+            }
+            Ok(())
+        });
+
+        let output = child
+            .wait_with_output()
+            .context("Failed to read output from `git cat-file --batch -Z`")?;
+        let writer_result = writer
+            .join()
+            .map_err(|_| anyhow!("The Git object writer unexpectedly panicked"))?;
+        writer_result.context("Failed to request baseline Git objects")?;
+
+        Ok::<_, anyhow::Error>(output)
+    })?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        bail!("`git cat-file --batch -Z` failed: {}", error.trim());
+    }
+
+    let mut contents = Vec::with_capacity(objects.len());
+    let mut remaining = output.stdout.as_slice();
+
+    for (_, object) in objects {
+        let header_end = remaining
+            .iter()
+            .position(|byte| *byte == 0)
+            .ok_or_else(|| anyhow!("Git returned no object header for `{object}`"))?;
+        let header = std::str::from_utf8(&remaining[..header_end])
+            .with_context(|| format!("Git returned a non-UTF-8 object header for `{object}`"))?;
+        let mut fields = header.split_ascii_whitespace();
+        let _object_id = fields
+            .next()
+            .ok_or_else(|| anyhow!("Git returned an empty object header for `{object}`"))?;
+        let object_type = fields
+            .next()
+            .ok_or_else(|| anyhow!("Git could not read baseline object `{object}`: {header}"))?;
+
+        if object_type != "blob" {
+            bail!("Expected baseline Git object `{object}` to be a blob, found `{object_type}`");
+        }
+
+        let size = fields
+            .next()
+            .ok_or_else(|| anyhow!("Git returned no object size for `{object}`"))?
+            .parse::<usize>()
+            .with_context(|| format!("Git returned an invalid object size for `{object}`"))?;
+        remaining = remaining
+            .get(header_end + 1..)
+            .ok_or_else(|| anyhow!("Git returned a truncated object header for `{object}`"))?;
+        let bytes = remaining
+            .get(..size)
+            .ok_or_else(|| anyhow!("Git returned a truncated baseline object `{object}`"))?;
+        contents.push(std::str::from_utf8(bytes).ok().map(str::to_owned));
+        remaining = remaining
+            .get(size..)
+            .and_then(|bytes| bytes.strip_prefix(&[0]))
+            .ok_or_else(|| anyhow!("Git returned no terminator for baseline object `{object}`"))?;
+    }
+
+    if !remaining.is_empty() {
+        bail!("Git returned unexpected trailing baseline object data");
+    }
+
+    Ok(contents)
 }
 
 /// A normal OS filesystem whose changed files initially expose their merge-base contents.
