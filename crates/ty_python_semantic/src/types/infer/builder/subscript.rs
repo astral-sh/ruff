@@ -40,6 +40,12 @@ use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum SubscriptAssignmentKind {
+    Ordinary,
+    Augmented,
+}
+
 /// Given a string literal or a union of string literals, return an iterator over the contained
 /// strings, or `None` if the type is neither.
 fn string_literal_values<'db>(
@@ -1578,6 +1584,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         target: &ast::ExprSubscript,
         rhs_value: &ast::Expr,
+        assignment_kind: SubscriptAssignmentKind,
         object_ty: Type<'db>,
         infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
@@ -1605,9 +1612,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             true,
         );
 
-        // Record constraints even if the write does not match the collection's provisional
-        // specialization: those constraints may widen the specialization and make the write valid.
-        if let Some(collection_def) = self.index.unannotated_collection_initializer(object)
+        // An augmented store can initially fail against a provisional specialization and become
+        // valid after its operator result widens the collection. Rejected ordinary stores must not
+        // contribute constraints because they would also change unrelated reads and returns.
+        if (is_valid_assignment || assignment_kind == SubscriptAssignmentKind::Augmented)
+            && let Some(collection_def) = self.index.unannotated_collection_initializer(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db, env)
         {
             let identity_instance =
