@@ -595,7 +595,7 @@ async def sleep(seconds: float) -> None: ...
 async def check(token: object | None) -> None:
     bound = partial(from_thread, sleep, 0, token=token)
     # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
-    reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
+    reveal_type(bound)  # revealed: partial[(float, /, *, token: object = ...) -> None]
     bound()  # error: [missing-argument]
     # TODO: This should reject the extra argument once the bound pack is removed.
     bound(1)
