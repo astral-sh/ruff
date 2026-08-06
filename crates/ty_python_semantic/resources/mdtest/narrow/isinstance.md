@@ -978,6 +978,24 @@ def _(
         reveal_type(value)  # revealed: OpenItem & list[int]
 ```
 
+When an intersection contains multiple specialized bases, each base contributes its known type
+arguments to a matching subclass:
+
+```py
+class Left[L]: ...
+class Right[R]: ...
+
+class Both[L, R](Left[L], Right[R]):
+    left: L
+    right: R
+
+def _(value: Intersection[Left[int], Right[str]]) -> None:
+    if isinstance(value, Both):
+        reveal_type(value)  # revealed: Both[int, str]
+        reveal_type(value.left)  # revealed: int
+        reveal_type(value.right)  # revealed: str
+```
+
 Subclass type arguments are inferred through their actual inheritance relationship, so this also
 works correctly if type parameters change position:
 

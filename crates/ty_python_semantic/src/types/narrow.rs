@@ -799,11 +799,14 @@ fn filter_generic_narrowing_constraint<'db>(
             subject
         }
         (Type::Intersection(intersection), target) => {
-            let specialized_target = intersection
-                .positive(db)
-                .iter()
-                .find_map(|element| specialize_narrowing_target(db, env, *element, target))
-                .unwrap_or(target);
+            let specialized_target =
+                specialize_narrowing_target_from_intersection(db, env, intersection, target)
+                    .or_else(|| {
+                        intersection.positive(db).iter().find_map(|element| {
+                            specialize_narrowing_target(db, env, *element, target)
+                        })
+                    })
+                    .unwrap_or(target);
             IntersectionType::from_two_elements(db, env, subject, specialized_target)
         }
         (subject, target) => {
@@ -812,6 +815,65 @@ fn filter_generic_narrowing_constraint<'db>(
             IntersectionType::from_two_elements(db, env, subject, specialized_target)
         }
     }
+}
+
+/// Combine the constraints contributed by multiple specialized bases in an intersection.
+///
+/// For example, if `Both[L, R]` inherits from `Left[L]` and `Right[R]`, narrowing
+/// `Left[int] & Right[str]` to `Both` must infer `Both[int, str]`.
+fn specialize_narrowing_target_from_intersection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    intersection: IntersectionType<'db>,
+    target: Type<'db>,
+) -> Option<Type<'db>> {
+    let target_class = target.nominal_class(db, env)?.class_literal(db);
+    let generic_context = target_class.generic_context(db)?;
+    let target_identity = target_class.identity_specialization(db);
+
+    let compatible_bases: SmallVec<[(ClassType<'db>, ClassType<'db>); 2]> = intersection
+        .positive(db)
+        .iter()
+        .filter_map(|element| {
+            let subject_class = element.nominal_class(db, env)?;
+            subject_class.static_class_literal(db)?.1?;
+            let target_base = target_identity
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
+            Some((target_base, subject_class))
+        })
+        .collect();
+
+    if compatible_bases.len() < 2 {
+        return None;
+    }
+
+    let constraints = ConstraintSetBuilder::new();
+    let mut base_constraints = compatible_bases
+        .into_iter()
+        .map(|(target_base, subject_class)| {
+            Type::instance(db, env, target_base).when_constraint_set_assignable_to(
+                db,
+                env,
+                Type::instance(db, env, subject_class),
+                &constraints,
+            )
+        });
+    let mut combined_constraints = base_constraints.next()?;
+    for base_constraint in base_constraints {
+        combined_constraints.intersect(db, &constraints, base_constraint);
+    }
+
+    let solutions = combined_constraints.solutions(
+        db,
+        env,
+        &constraints,
+        generic_context.inferable_typevars(db),
+    );
+    let specialized_class =
+        specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
+    Some(Type::instance(db, env, specialized_class))
 }
 
 fn specialize_narrowing_target<'db>(
@@ -915,6 +977,17 @@ fn specialize_generic_class_for_subject<'db>(
             generic_context.inferable_typevars(db),
         )
         .solve(db, env, &constraints);
+
+    specialize_generic_class_from_solutions(db, env, target_class, solutions)
+}
+
+fn specialize_generic_class_from_solutions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target_class: ClassLiteral<'db>,
+    solutions: Solutions<'db>,
+) -> Option<ClassType<'db>> {
+    let generic_context = target_class.generic_context(db)?;
     let Solutions::Constrained(solutions) = solutions else {
         return None;
     };
