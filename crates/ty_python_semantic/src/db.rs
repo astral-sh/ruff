@@ -2,6 +2,7 @@ use crate::lint::{LintRegistry, RuleSelection};
 use crate::{AnalysisSettings, PythonVersionWithSource};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_db::system::SystemPath;
 use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
@@ -11,6 +12,9 @@ pub trait Db: PythonCoreDb {
 
     /// Returns the program file for `file`.
     fn program_file(&self, file: File) -> ProgramFile<'_>;
+
+    /// Returns the root of the project being analyzed.
+    fn project_root(&self) -> &SystemPath;
 
     /// Returns the Python version and its configuration source for `file`.
     fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource;
@@ -68,6 +72,7 @@ pub(crate) mod tests {
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
         open_files: rustc_hash::FxHashSet<File>,
+        project_root: SystemPathBuf,
         program_settings: ProgramSettings,
     }
 
@@ -92,6 +97,7 @@ pub(crate) mod tests {
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
+                project_root: SystemPathBuf::from("/src"),
                 program_settings,
             }
         }
@@ -102,6 +108,10 @@ pub(crate) mod tests {
 
         pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
             ProgramEnvironment::from_program(self.program())
+        }
+
+        pub(crate) fn set_project_root(&mut self, project_root: SystemPathBuf) {
+            self.project_root = project_root;
         }
 
         /// Marks `file` as open in the editor.
@@ -178,6 +188,10 @@ pub(crate) mod tests {
 
         fn program_file(&self, file: File) -> ProgramFile<'_> {
             self.program().program_file(self, file)
+        }
+
+        fn project_root(&self) -> &SystemPath {
+            &self.project_root
         }
 
         fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {

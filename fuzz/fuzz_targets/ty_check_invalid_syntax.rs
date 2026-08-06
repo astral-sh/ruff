@@ -11,7 +11,7 @@ use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{
-    DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+    DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
@@ -125,6 +125,10 @@ impl SemanticDb for TestDb {
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
         self.program().program_file(self, file)
+    }
+
+    fn project_root(&self) -> &SystemPath {
+        SystemPath::new("/src")
     }
 
     fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
