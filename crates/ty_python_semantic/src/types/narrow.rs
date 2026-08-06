@@ -38,12 +38,13 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
-use super::constraints::{ConstraintSetBuilder, Solutions};
+use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
 };
 use super::match_pattern::is_typed_dict_runtime_domain;
+use super::variance::TypeVarVariance;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -2099,18 +2100,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         original_subject_ty: Type<'db>,
+        filtering_subject_ty: Type<'db>,
         subject_ty: Type<'db>,
     ) -> Option<Vec<ClassPatternArgument<'db>>> {
         let db = self.db;
         let subject_is_final = subject_ty
             .nominal_class(db, &self.env)
             .is_some_and(|class| class.is_final(db));
-        let specialized_pattern_class = if (context.positional_sources.is_empty()
-            && kind.keywords.is_empty())
-            || !self.use_generic_filtering()
+        let specialized_pattern_class = if context.positional_sources.is_empty()
+            && kind.keywords.is_empty()
         {
             None
-        } else {
+        } else if self.use_generic_filtering() {
             context
                 .class
                 .filter(|pattern_class| pattern_class.generic_context(db).is_some())
@@ -2129,6 +2130,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                                 None
                             }
                         })
+                })
+        } else {
+            context
+                .class
+                .zip(filtering_subject_ty.nominal_class(db, &self.env))
+                .and_then(|(pattern_class, subject_class)| {
+                    self.specialize_pattern_class_for_subject(pattern_class, subject_class)
                 })
         };
         let member_type = |name: &Name| {
@@ -2234,6 +2242,84 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             .collect()
     }
 
+    /// Infer an exact specialization of a generic pattern subclass from a specialized base-class
+    /// subject.
+    ///
+    /// This intentionally handles only the case where every pattern-class type variable has one
+    /// exact solution. Variant base classes and pattern classes with unconstrained parameters keep
+    /// the existing conservative member type.
+    ///
+    /// ```python
+    /// class Base[T]:
+    ///     value: T
+    ///
+    /// class Child[T](Base[T]):
+    ///     item: T
+    ///
+    /// def f(value: Base[int]) -> None:
+    ///     match value:
+    ///         case Child(item=item):
+    ///             reveal_type(item)  # int
+    /// ```
+    fn specialize_pattern_class_for_subject(
+        &self,
+        pattern_class: ClassLiteral<'db>,
+        subject_class: ClassType<'db>,
+    ) -> Option<ClassType<'db>> {
+        let db = self.db;
+        let generic_context = pattern_class.generic_context(db)?;
+        let pattern_base = pattern_class
+            .identity_specialization(db)
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
+
+        let constraints = ConstraintSetBuilder::new();
+        let solutions = Type::instance(db, &self.env, pattern_base)
+            .assignable_solutions_with_inferable(
+                db,
+                &self.env,
+                Type::instance(db, &self.env, subject_class),
+                generic_context.inferable_typevars(db),
+            )
+            .solve_with(|variance, path_bound| {
+                let Some(lower) = path_bound.lower else {
+                    return Ok(None);
+                };
+                if variance != TypeVarVariance::Invariant
+                    || path_bound.upper.materialize_exact(db, &self.env) != lower
+                {
+                    return Ok(None);
+                }
+                PathBounds::default_solve(db, &self.env, &constraints, path_bound)
+            });
+        let Solutions::Constrained(solutions) = solutions else {
+            return None;
+        };
+        let [solution] = solutions.as_slice() else {
+            return None;
+        };
+
+        let typevars = generic_context.variables(db);
+        let types = typevars
+            .clone()
+            .map(|typevar| {
+                solution
+                    .iter()
+                    .find(|binding| binding.bound_typevar == typevar)
+                    .map(|binding| binding.solution)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        if types.iter().any(|ty| {
+            typevars.clone().any(|typevar| {
+                ty.references_typevar(db, &self.env, typevar.typevar(db).identity(db))
+            })
+        }) {
+            return None;
+        }
+        Some(pattern_class.apply_specialization(db, |_| generic_context.specialize(db, types)))
+    }
+
     fn class_pattern_contexts(
         &self,
         kind: &ClassPatternPredicateKind<'db>,
@@ -2288,6 +2374,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             kind,
             context,
             original_subject_ty,
+            subject_ty,
             narrowed_subject_ty,
         )?;
         Some((narrowed_subject_ty, arguments))
