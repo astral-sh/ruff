@@ -311,6 +311,15 @@ impl<'db> ProtocolClass<'db> {
         }) {
             return;
         }
+        let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
+            return;
+        };
+        if !protocol
+            .interface(db)
+            .supports_variance_inference(db, &env, *generic_context)
+        {
+            return;
+        }
 
         for typevar in generic_context.variables(db) {
             if typevar.is_paramspec(db) {
@@ -321,12 +330,7 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             };
 
-            let Some(inferred_variance) =
-                inferred_protocol_typevar_variance(db, class, typevar.identity(db))
-            else {
-                continue;
-            };
-            let inferred_variance = match inferred_variance {
+            let inferred_variance = match class.variance_of(db, &env, typevar.identity(db)) {
                 TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                 variance => variance,
             };
@@ -386,40 +390,6 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
     fn from(value: ProtocolClass<'db>) -> Self {
         Self::from(value.0)
     }
-}
-
-/// Infers the variance of a protocol parameter from its structural interface.
-///
-/// The identity specialization preserves the class-bound type-variable identities used by its
-/// members. Members whose write variance cannot be represented retain their existing inference.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _, _| None,
-    heap_size = ruff_memory_usage::heap_size,
-)]
-pub(super) fn inferred_protocol_typevar_variance<'db>(
-    db: &'db dyn Db,
-    class: StaticClassLiteral<'db>,
-    typevar: BoundTypeVarIdentity<'db>,
-) -> Option<TypeVarVariance> {
-    let protocol = class.identity_specialization(db).into_protocol_class(db)?;
-    let env = ProgramEnvironment::from_scope(class.body_scope(db));
-    let interface = protocol.interface(db);
-    if !ProtocolInterfaceView::new(interface, None).has_only_finite_members(db) {
-        return None;
-    }
-    let generic_context = class.generic_context(db)?;
-    if interface.members(db).any(|member| {
-        let capabilities = member.capabilities(db, &env);
-        interface.includes_generic_writable_instance_member(db, &env, member.name, generic_context)
-            || [capabilities.instance, capabilities.class]
-                .into_iter()
-                .any(|access| matches!(access.write, Some(ProtocolMemberWrite::Descriptor { .. })))
-    }) {
-        return None;
-    }
-
-    Some(interface.variance_of(db, &env, typevar))
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
@@ -879,6 +849,29 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
+    }
+
+    /// Return whether this interface can derive variance from its exposed member capabilities.
+    pub(super) fn supports_variance_inference(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
+        ProtocolInterfaceView::new(self, None).has_only_finite_members(db)
+            && self.members(db).all(|member| {
+                let capabilities = member.capabilities(db, env);
+                !self.includes_generic_writable_instance_member(
+                    db,
+                    env,
+                    member.name,
+                    generic_context,
+                ) && [capabilities.instance, capabilities.class]
+                    .into_iter()
+                    .all(|access| {
+                        !matches!(access.write, Some(ProtocolMemberWrite::Descriptor { .. }))
+                    })
+            })
     }
 
     /// Returns whether `name` has an instance-write requirement of `type[T]`, where `T` belongs

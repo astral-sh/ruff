@@ -48,7 +48,6 @@ use crate::{
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
-        protocol_class::inferred_protocol_typevar_variance,
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
@@ -3391,18 +3390,20 @@ impl<'db> StaticClassLiteral<'db> {
                 .variance_of_items(db, &env, typevar);
         }
 
-        let typevar_in_generic_context = self
-            .generic_context(db)
-            .is_some_and(|generic_context| generic_context.contains(db, typevar));
-
-        if !typevar_in_generic_context {
+        let Some(generic_context) = self.generic_context(db) else {
+            return TypeVarVariance::Bivariant;
+        };
+        if !generic_context.contains(db, typevar) {
             return TypeVarVariance::Bivariant;
         }
 
         if self.is_protocol(db)
-            && let Some(variance) = inferred_protocol_typevar_variance(db, self, typevar)
+            && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
+            && protocol
+                .interface(db)
+                .supports_variance_inference(db, &env, generic_context)
         {
-            return variance;
+            return protocol.interface(db).variance_of(db, &env, typevar);
         }
 
         let class_body_scope = self.body_scope(db);
