@@ -2733,6 +2733,7 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
 7 | InvalidGetAttr().missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttr.__getattr__`: expected 1, got 2
 info: This access implicitly calls `__getattr__`
+info: Method signature here
  --> src/mdtest_snippet.py:4:9
   |
 4 |     def __getattr__(self) -> str:

@@ -5,9 +5,7 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
-    diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span, SubDiagnostic,
-    },
+    diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
 };
 use ruff_python_ast::PythonVersion;
@@ -462,12 +460,6 @@ impl LintDiagnosticGuard<'_, '_> {
     pub(super) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
         let ann = self.primary_annotation_mut().unwrap();
         ann.push_tag(tag);
-    }
-
-    /// Returns the contextual info attached before any other sub-diagnostics by a message override.
-    pub(super) fn message_override_info_mut(&mut self) -> Option<&mut SubDiagnostic> {
-        self.message_override.as_ref()?;
-        self.sub_diagnostics_mut().next()
     }
 }
 
