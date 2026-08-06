@@ -298,33 +298,6 @@ impl<'db> RecursiveDefinition<'db> {
         Some(parameters)
     }
 
-    /// Walks the definition with each formal parameter mapped to itself.
-    fn walk_type_body(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) -> bool {
-        match self {
-            Self::TypeAlias(alias) => {
-                let value = alias.raw_value_type(db);
-                visitor.visit_type(db, value);
-            }
-            Self::Protocol(origin) => {
-                let Some(protocol) = origin.identity_specialization(db).into_protocol_class(db)
-                else {
-                    return false;
-                };
-                protocol.walk_recursive_member_types(db, visitor);
-            }
-            Self::TypedDict(origin) => {
-                let typed_dict = TypedDictType::new(origin.identity_specialization(db));
-                for field in typed_dict.items(db).values() {
-                    visitor.visit_type(db, field.declared_ty);
-                }
-                if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
-                    visitor.visit_type(db, extra_items.declared_ty);
-                }
-            }
-        }
-        true
-    }
-
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         #[salsa::tracked(
             returns(copy),
@@ -369,7 +342,7 @@ impl<'db> SpecializationFlowGraph<'db> {
                 graph.inconclusive = true;
                 continue;
             };
-            if !source.walk_type_body(db, &visitor) {
+            if !visitor.visit_definition_body(db, source) {
                 graph.inconclusive = true;
             }
             let (edges, referenced_definitions, inconclusive) = visitor.finish();
@@ -473,6 +446,32 @@ impl<'db> SpecializationFlowVisitor<'db> {
             self.referenced_definitions.into_inner(),
             self.inconclusive.get(),
         )
+    }
+
+    /// Visits the definition with each formal parameter mapped to itself.
+    fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
+        match source {
+            RecursiveDefinition::TypeAlias(alias) => {
+                self.visit_type(db, alias.raw_value_type(db));
+            }
+            RecursiveDefinition::Protocol(origin) => {
+                let Some(protocol) = origin.identity_specialization(db).into_protocol_class(db)
+                else {
+                    return false;
+                };
+                protocol.walk_recursive_member_types(db, self);
+            }
+            RecursiveDefinition::TypedDict(origin) => {
+                let typed_dict = TypedDictType::new(origin.identity_specialization(db));
+                for field in typed_dict.items(db).values() {
+                    self.visit_type(db, field.declared_ty);
+                }
+                if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+                    self.visit_type(db, extra_items.declared_ty);
+                }
+            }
+        }
+        true
     }
 
     fn record_reference(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
