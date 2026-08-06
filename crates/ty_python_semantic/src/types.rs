@@ -569,12 +569,34 @@ impl<'db> DescriptorGetCallContext<'db> {
     }
 }
 
-/// The result of applying the descriptor protocol to a value, including a deferred call failure.
+/// A failed implicit descriptor call together with its recovery value.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct DescriptorGetResult<'db> {
+pub(crate) struct DescriptorGetError<'db> {
+    fallback: (Type<'db>, AttributeKind),
+    context: DescriptorGetCallContext<'db>,
+}
+
+impl<'db> DescriptorGetError<'db> {
+    /// Returns the descriptor's declared return type and kind despite the invalid call.
+    pub(crate) const fn fallback(self) -> (Type<'db>, AttributeKind) {
+        self.fallback
+    }
+}
+
+type DescriptorGetResult<'db> = Result<Option<(Type<'db>, AttributeKind)>, DescriptorGetError<'db>>;
+
+fn descriptor_get_result<'db>(
     return_type: Type<'db>,
     kind: AttributeKind,
     error: Option<DescriptorGetCallContext<'db>>,
+) -> DescriptorGetResult<'db> {
+    match error {
+        Some(context) => Err(DescriptorGetError {
+            fallback: (return_type, kind),
+            context,
+        }),
+        None => Ok(Some((return_type, kind))),
+    }
 }
 
 /// An operation that failed while resolving an attribute.
@@ -3658,7 +3680,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Applies `__get__` and retains an invalid call for expression inference.
+    /// Looks up `__get__` on the meta-type of `self` and calls it with `self`, `instance`, and
+    /// `owner`. Unlike other dunder methods, `__get__` is not itself looked up using the
+    /// descriptor protocol.
+    ///
+    /// Returns the resulting type and descriptor kind, or an error retaining the recovery value
+    /// when the implicit call is invalid. Returns `Ok(None)` when `__get__` is not defined.
     ///
     /// For example, accessing `C().value` below implicitly supplies the descriptor value, the
     /// `C` instance, and `C`, so the declared method is missing two parameters:
@@ -3672,32 +3699,28 @@ impl<'db> Type<'db> {
     ///
     /// C().value
     /// ```
-    fn try_call_dunder_get_with_error(
+    pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
-    ) -> Option<DescriptorGetResult<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    ) -> DescriptorGetResult<'db> {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
-        ) -> Option<DescriptorGetResult<'db>> {
+        ) -> DescriptorGetResult<'db> {
             let env = &ProgramEnvironment::from_program(program);
             if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get_with_error(db, env, instance, owner);
+                return fallback.try_call_dunder_get(db, env, instance, owner);
             }
 
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
-                return Some(DescriptorGetResult {
-                    return_type: dynamic,
-                    kind: AttributeKind::DataDescriptor,
-                    error: None,
-                });
+                return Ok(Some((dynamic, AttributeKind::DataDescriptor)));
             }
 
             if let Some(union) = ty.as_union_like(db) {
@@ -3707,39 +3730,42 @@ impl<'db> Type<'db> {
                 let mut all_data_descriptors = true;
 
                 for alternative in union.elements(db) {
-                    if let Some(result) =
-                        alternative.try_call_dunder_get_with_error(db, env, instance, owner)
-                    {
+                    let result = alternative
+                        .try_call_dunder_get(db, env, instance, owner)
+                        .unwrap_or_else(|failure| {
+                            error = error.or(Some(failure.context));
+                            Some(failure.fallback())
+                        });
+                    if let Some((return_type, kind)) = result {
                         any_descriptor = true;
-                        all_data_descriptors &= result.kind.is_data();
-                        return_types = return_types.add(result.return_type);
-                        error = error.or(result.error);
+                        all_data_descriptors &= kind.is_data();
+                        return_types = return_types.add(return_type);
                     } else {
                         all_data_descriptors = false;
                         return_types = return_types.add(*alternative);
                     }
                 }
 
-                return any_descriptor.then(|| DescriptorGetResult {
-                    return_type: return_types.build(),
-                    kind: if all_data_descriptors {
-                        AttributeKind::DataDescriptor
-                    } else {
-                        AttributeKind::NormalOrNonDataDescriptor
-                    },
-                    error,
-                });
+                return if any_descriptor {
+                    descriptor_get_result(
+                        return_types.build(),
+                        if all_data_descriptors {
+                            AttributeKind::DataDescriptor
+                        } else {
+                            AttributeKind::NormalOrNonDataDescriptor
+                        },
+                        error,
+                    )
+                } else {
+                    Ok(None)
+                };
             }
 
             match ty {
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
-                    return Some(DescriptorGetResult {
-                        return_type: ty,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                        error: None,
-                    });
+                    return Ok(Some((ty, AttributeKind::NormalOrNonDataDescriptor)));
                 }
                 Type::Callable(callable)
                     if let is_function_like = callable.is_function_like(db)
@@ -3748,7 +3774,7 @@ impl<'db> Type<'db> {
                     // For "function-like" or "classmethod-like" callables, model the behavior of
                     // `FunctionType.__get__` or `classmethod.__get__`.
                     //
-                    // It is a shortcut to model this in `try_call_dunder_get_with_error`. If we
+                    // It is a shortcut to model this in `try_call_dunder_get`. If we
                     // want to be really precise, we should instead return a new method-wrapper
                     // type variant for the synthesized `__get__` method of these synthesized
                     // functions. The method-wrapper would then be returned from
@@ -3766,11 +3792,10 @@ impl<'db> Type<'db> {
                         Type::Callable(callable.bind_self(db, env, Some(self_type)))
                     };
 
-                    return Some(DescriptorGetResult {
+                    return Ok(Some((
                         return_type,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                        error: None,
-                    });
+                        AttributeKind::NormalOrNonDataDescriptor,
+                    )));
                 }
                 _ => {}
             }
@@ -3782,13 +3807,13 @@ impl<'db> Type<'db> {
                 .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
                 .place
             else {
-                return None;
+                return Ok(None);
             };
 
             // A recursive member lookup can yield the internal cycle marker. It does not
             // represent a concrete descriptor method and must not escape through the access.
             if concrete_descr_get.is_divergent() {
-                return None;
+                return Ok(None);
             }
 
             // Descriptor special-method lookup checks the descriptor's type, so instance storage
@@ -3806,7 +3831,7 @@ impl<'db> Type<'db> {
                 )
                 .place
             else {
-                return None;
+                return Ok(None);
             };
 
             let instance_ty = instance.unwrap_or_else(|| Type::none(db, env));
@@ -3834,11 +3859,7 @@ impl<'db> Type<'db> {
                 UnionType::from_two_elements(db, env, return_type, ty)
             };
 
-            Some(DescriptorGetResult {
-                return_type,
-                kind,
-                error,
-            })
+            descriptor_get_result(return_type, kind, error)
         }
 
         tracing::trace!(
@@ -3863,33 +3884,13 @@ impl<'db> Type<'db> {
                 self
             };
 
-            return Some(DescriptorGetResult {
+            return Ok(Some((
                 return_type,
-                kind: AttributeKind::NormalOrNonDataDescriptor,
-                error: None,
-            });
+                AttributeKind::NormalOrNonDataDescriptor,
+            )));
         }
 
         try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
-    }
-
-    /// Look up `__get__` on the meta-type of self, and call it with the arguments `self`, `instance`,
-    /// and `owner`. `__get__` is different than other dunder methods in that it is not looked up using
-    /// the descriptor protocol itself.
-    ///
-    /// In addition to the return type of `__get__`, this method also returns the *kind* of attribute
-    /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
-    ///
-    /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    pub(crate) fn try_call_dunder_get(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        instance: Option<Type<'db>>,
-        owner: Type<'db>,
-    ) -> Option<(Type<'db>, AttributeKind)> {
-        self.try_call_dunder_get_with_error(db, env, instance, owner)
-            .map(|result| (result.return_type, result.kind))
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
@@ -3963,12 +3964,16 @@ impl<'db> Type<'db> {
                 let mut error = None;
                 let place = union
                     .map_with_boundness(db, env, |elem| {
-                        let ty = match elem.try_call_dunder_get_with_error(db, env, instance, owner)
-                        {
-                            Some(result) => {
-                                all_data_descriptors &= result.kind.is_data();
-                                error = error.or(result.error);
-                                result.return_type
+                        let result = elem
+                            .try_call_dunder_get(db, env, instance, owner)
+                            .unwrap_or_else(|failure| {
+                                error = error.or(Some(failure.context));
+                                Some(failure.fallback())
+                            });
+                        let ty = match result {
+                            Some((return_type, kind)) => {
+                                all_data_descriptors &= kind.is_data();
+                                return_type
                             }
                             None => {
                                 all_data_descriptors = false;
@@ -4012,13 +4017,15 @@ impl<'db> Type<'db> {
                 } else {
                     intersection
                         .map_with_boundness(db, env, |elem| {
-                            let result =
-                                elem.try_call_dunder_get_with_error(db, env, instance, owner);
-                            if let Some(result) = result {
-                                error = error.or(result.error);
-                            }
+                            let ty = elem
+                                .try_call_dunder_get(db, env, instance, owner)
+                                .unwrap_or_else(|failure| {
+                                    error = error.or(Some(failure.context));
+                                    Some(failure.fallback())
+                                })
+                                .map_or(*elem, |(return_type, _)| return_type);
                             Place::Defined(DefinedPlace {
-                                ty: result.map_or(*elem, |result| result.return_type),
+                                ty,
                                 origin,
                                 definedness,
                                 public_type_policy,
@@ -4047,20 +4054,25 @@ impl<'db> Type<'db> {
                     }),
                 qualifiers: _,
             } => {
-                if let Some(result) =
-                    attribute_ty.try_call_dunder_get_with_error(db, env, instance, owner)
-                {
+                let mut error = None;
+                let result = attribute_ty
+                    .try_call_dunder_get(db, env, instance, owner)
+                    .unwrap_or_else(|failure| {
+                        error = Some(failure.context);
+                        Some(failure.fallback())
+                    });
+                if let Some((return_type, kind)) = result {
                     (
                         Place::Defined(DefinedPlace {
-                            ty: result.return_type,
+                            ty: return_type,
                             origin,
                             definedness: boundness,
                             public_type_policy,
                             provenance,
                         })
                         .into(),
-                        result.kind,
-                        result.error,
+                        kind,
+                        error,
                     )
                 } else {
                     (attribute, AttributeKind::NormalOrNonDataDescriptor, None)

@@ -367,9 +367,11 @@ impl<'db> Place<'db> {
             }),
 
             Place::Defined(defined) => {
-                if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, env, None, owner)
-                {
+                let result = defined
+                    .ty
+                    .try_call_dunder_get(db, env, None, owner)
+                    .unwrap_or_else(|error| Some(error.fallback()));
+                if let Some((dunder_get_return_ty, _)) = result {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
                         provenance: Provenance::Unknown,

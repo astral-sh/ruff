@@ -2248,12 +2248,14 @@ fn descriptor_decorated_protocol_member<'db>(
     };
 
     let receiver_ty = Type::instance(db, env, protocol);
-    let (read_ty, _) = descriptor_ty.try_call_dunder_get(
-        db,
-        env,
-        Some(receiver_ty),
-        receiver_ty.to_meta_type(db, env),
-    )?;
+    let (read_ty, _) = descriptor_ty
+        .try_call_dunder_get(
+            db,
+            env,
+            Some(receiver_ty),
+            receiver_ty.to_meta_type(db, env),
+        )
+        .unwrap_or_else(|error| Some(error.fallback()))?;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
     let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
