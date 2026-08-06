@@ -907,6 +907,8 @@ def _(x: object):
         reveal_type(x.push)  # revealed: bound method Invariant[Unknown].push(x: Unknown) -> None
         x.push(42)
         x.push("foo")
+    else:
+        reveal_type(x)  # revealed: ~Top[Invariant[Unknown]]
 ```
 
 Narrowing already specialized generics preserves their concrete type arguments:
@@ -1439,8 +1441,9 @@ def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
     assert_never(value)
 ```
 
-When `isinstance()` narrows an unknown value to a tuple subclass, its type argument comes from the
-declared upper bound, not the default. Its element types are inherited from the specialized base.
+When `isinstance()` narrows a value of type `object` to a tuple subclass, its type argument comes
+from the declared upper bound, not the default. Its element types are inherited from the specialized
+base.
 
 ```py
 class DefaultedTuple[T: int = bool](tuple[T, str]): ...
