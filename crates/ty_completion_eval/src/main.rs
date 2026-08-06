@@ -545,6 +545,7 @@ fn copy_project(src_dir: &SystemPath, dst_dir: &SystemPath) -> anyhow::Result<Ve
 
     let mut cursors = vec![];
     let it = walkdir::WalkDir::new(src_dir.as_std_path())
+        .sort_by_file_name()
         .into_iter()
         .filter_entry(|dent| {
             !dent
