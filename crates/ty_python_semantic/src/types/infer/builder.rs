@@ -1485,7 +1485,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-            let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+            let value_type = self.try_expression_type(value).unwrap_or_else(|| {
+                self.infer_maybe_standalone_expression(value, TypeContext::default())
+            });
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
@@ -1505,8 +1507,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         ) = node
         {
-            let value_ty = self.infer_expression(value, TypeContext::default());
-            let slice_ty = self.infer_expression(slice, TypeContext::default());
+            let value_ty = self.get_or_infer_expression(value, TypeContext::default());
+            let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
             Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
         } else {
             None
@@ -3213,13 +3215,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Subscript(subscript_expr) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
+                    let object_ty =
+                        self.infer_expression(&subscript_expr.value, TypeContext::default());
+                    let mut infer_slice_ty = |builder: &mut Self, tcx| {
+                        builder.infer_expression(&subscript_expr.slice, tcx)
+                    };
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
                         let assigned_ty = infer_assigned_ty(builder, tcx);
                         builder.store_expression_type(target, assigned_ty);
                         assigned_ty
                     };
 
-                    self.validate_subscript_assignment(subscript_expr, value, infer_assigned_ty);
+                    self.validate_subscript_assignment(
+                        subscript_expr,
+                        value,
+                        object_ty,
+                        &mut infer_slice_ty,
+                        infer_assigned_ty,
+                    );
                 }
             }
 
@@ -4784,7 +4797,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let target_ty = self.infer_augment_assignment(assignment);
-        self.add_binding(assignment.into(), definition)
+        self.add_binding(assignment.target.as_ref().into(), definition)
             .insert(self, target_ty);
     }
 
@@ -4852,26 +4865,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return result_ty;
                 };
 
-                let is_data_descriptor =
-                    assignment_attribute_members(db, env, object_ty, &attribute.attr.id)
-                        .and_then(AssignmentAttributeMembers::type_member)
-                        .and_then(|member| member.place.ignore_possibly_undefined())
-                        .is_some_and(|ty| ty.may_be_data_descriptor(db, env));
-
-                // Inferred-only attributes can change type across augmented assignments. Concrete
-                // descriptors and qualified attributes still impose independent write contracts.
+                // Inferred-only attributes can change type, but descriptors and qualified
+                // attributes still impose independent write contracts.
                 if !origin.is_declared()
                     && !qualifiers.intersects(
                         TypeQualifiers::FINAL
                             | TypeQualifiers::CLASS_VAR
                             | TypeQualifiers::READ_ONLY,
                     )
-                    && !is_data_descriptor
+                    && !AddBinding::attribute_is_data_descriptor(
+                        db,
+                        env,
+                        object_ty,
+                        &attribute.attr.id,
+                    )
                 {
                     return result_ty;
                 }
 
-                let valid = self.validate_attribute_assignment(
+                self.validate_attribute_assignment(
                     attribute,
                     target,
                     object_ty,
@@ -4879,12 +4891,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut |_, _| result_ty,
                     true,
                 );
-
-                if !valid || is_data_descriptor {
-                    target_type
-                } else {
-                    result_ty
-                }
+                result_ty
             }
             ast::Expr::Subscript(subscript) => {
                 let object_ty = self.expression_type(&subscript.value);
@@ -4900,15 +4907,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return result_ty;
                 }
 
-                if self.validate_augmented_subscript_assignment(
-                    subscript, target, object_ty, slice_ty, result_ty,
-                ) && (object_ty.is_typed_dict()
-                    || AddBinding::is_safe_mutable_class(db, env, object_ty))
-                {
-                    result_ty
-                } else {
-                    target_type
-                }
+                self.validate_subscript_assignment(
+                    subscript,
+                    target,
+                    object_ty,
+                    &mut |_, _| slice_ty,
+                    &mut |_, _| result_ty,
+                );
+                result_ty
             }
             _ => result_ty,
         }
@@ -12487,11 +12493,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
-            if assignment_attribute_members(db, env, value_ty, &attr.id)
-                .and_then(AssignmentAttributeMembers::type_member)
-                .and_then(|member| member.place.ignore_possibly_undefined())
-                .is_some_and(|ty| ty.may_be_data_descriptor(db, env))
-            {
+            if Self::attribute_is_data_descriptor(db, env, value_ty, &attr.id) {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
@@ -12509,6 +12511,19 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         builder.bindings.insert(self.binding, bound_ty);
 
         inferred_ty
+    }
+
+    /// Return whether writes to this attribute are handled by a concrete data descriptor.
+    fn attribute_is_data_descriptor(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        object_ty: Type<'db>,
+        attribute: &str,
+    ) -> bool {
+        assignment_attribute_members(db, env, object_ty, attribute)
+            .and_then(AssignmentAttributeMembers::type_member)
+            .and_then(|member| member.place.ignore_possibly_undefined())
+            .is_some_and(|ty| ty.may_be_data_descriptor(db, env))
     }
 
     /// Arbitrary `__getitem__`/`__setitem__` methods on a class do not
