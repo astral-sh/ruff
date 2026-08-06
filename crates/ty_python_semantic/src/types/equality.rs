@@ -1320,13 +1320,26 @@ fn finite_alternatives<'db>(
                 .then(|| complement.remaining_literal_types(db, env))
         }
         Type::Intersection(intersection) => {
-            let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
-            let complement = match expanded {
-                Type::EnumComplement(complement) => complement,
-                Type::Intersection(intersection) => intersection.enum_complement(db, env)?,
-                _ => return None,
+            let (comparison_type, complement) = if let Some(complement) =
+                intersection.enum_complement(db, env)
+            {
+                (ty, complement)
+            } else {
+                if !intersection.positive(db).iter().any(|positive| {
+                    matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_))
+                }) {
+                    return None;
+                }
+
+                let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
+                let complement = match expanded {
+                    Type::EnumComplement(complement) => complement,
+                    Type::Intersection(intersection) => intersection.enum_complement(db, env)?,
+                    _ => return None,
+                };
+                (expanded, complement)
             };
-            KnownComparisonSemantics::of_type(db, env, expanded, operator)
+            KnownComparisonSemantics::of_type(db, env, comparison_type, operator)
                 .is_some()
                 .then(|| complement.remaining_literal_types(db, env))
         }
