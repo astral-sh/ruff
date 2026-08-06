@@ -28,14 +28,16 @@ impl<'system> Uv<'system> {
                 // query read-only so package selection and `--isolated` aren't overwritten.
                 self.run_metadata(path, &["workspace", "metadata", "--frozen", "--active"])
             }
-            MetadataTarget::Script(path) => {
+            MetadataTarget::Script { path, python } => {
                 let directory = path
                     .parent()
                     .unwrap_or_else(|| self.system.current_directory());
-                self.run_metadata(
-                    directory,
-                    &["workspace", "metadata", "--sync", "--script", path.as_str()],
-                )
+                let mut arguments =
+                    vec!["workspace", "metadata", "--sync", "--script", path.as_str()];
+                if let Some(python) = python {
+                    arguments.extend(["--python", python.as_str()]);
+                }
+                self.run_metadata(directory, &arguments)
             }
         }
     }
@@ -78,7 +80,10 @@ impl<'system> Uv<'system> {
 #[derive(Clone, Copy)]
 pub(super) enum MetadataTarget<'path> {
     Workspace(&'path SystemPath),
-    Script(&'path SystemPath),
+    Script {
+        path: &'path SystemPath,
+        python: Option<&'path SystemPath>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]

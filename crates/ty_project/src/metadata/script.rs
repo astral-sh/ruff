@@ -168,7 +168,18 @@ impl ScriptEnvironments {
                 return ScriptEnvironment::new(db, None, None);
             };
 
-            match Uv::new(db.system()).metadata(MetadataTarget::Script(path)) {
+            let project_metadata = db.project().metadata(db);
+            let python = project_metadata
+                .override_options
+                .as_deref()
+                .and_then(|options| options.environment.as_ref())
+                .and_then(|environment| environment.python.as_ref())
+                .map(|python| python.absolute(project_metadata.root(), db.system()));
+
+            match Uv::new(db.system()).metadata(MetadataTarget::Script {
+                path,
+                python: python.as_deref(),
+            }) {
                 Ok(metadata) => ScriptEnvironment::new(db, Some(metadata), None),
                 Err(error) => {
                     ScriptEnvironment::new(db, None, Some(error.to_string().into_boxed_str()))
@@ -265,6 +276,12 @@ fn resolve_script_options(
     // Merge the options with CLI, LSP, user configuration, and fallback options
     for layer in project_metadata.options_in_precedence_order(&inline, uv_options.as_ref()) {
         options.combine_with(layer.clone());
+    }
+
+    // An explicit Python environment selects uv's interpreter, not the script's site-packages.
+    if let Some(environment) = uv_metadata.and_then(UvMetadata::environment) {
+        options.environment.get_or_insert_default().python =
+            Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
     }
 
     // Unlike Project's, default to `[]` for scripts (unless explicitly specified).

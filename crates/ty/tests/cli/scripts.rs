@@ -1528,6 +1528,64 @@ mod uv_metadata {
     }
 
     #[test]
+    fn cli_python_selects_script_interpreter_without_replacing_its_environment()
+    -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_file(
+            "scripts/script.py",
+            r#"
+            # /// script
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+
+            from attrs import define
+            from typing import reveal_type
+
+            @define
+            class User:
+                value: int
+
+            reveal_type(User(1).value)
+            "#,
+        )?;
+
+        let environment = case.root().join(".venv");
+        let output = Command::new("uv")
+            .args(["venv", "--no-project"])
+            .arg(&environment)
+            .env("UV_CACHE_DIR", case.root().join("cache"))
+            .env("UV_PYTHON_DOWNLOADS", "never")
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "failed to create project environment: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("scripts/script.py")
+                .args(["--python", ".venv"])
+                .env("TY_UV", "scripts")
+                .env("TY_LOG", "ty_project::metadata::uv=debug"),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        scripts/script.py:13:13: info[revealed-type] Revealed type: `int`
+        Found 1 diagnostic
+
+        ----- stderr -----
+        DEBUG Running `uv workspace metadata --sync --script <temp_dir>/scripts/script.py --python <temp_dir>/.venv`
+        DEBUG `uv workspace metadata --sync --script <temp_dir>/scripts/script.py --python <temp_dir>/.venv` completed in 0.000s
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn fixes_script_using_uv_environment() -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
 
