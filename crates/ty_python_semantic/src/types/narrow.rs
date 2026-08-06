@@ -787,6 +787,7 @@ fn filter_generic_narrowing_constraint<'db>(
         (subject, Type::Union(union)) => union.map(db, env, |element| {
             filter_generic_narrowing_constraint(db, env, subject, *element)
         }),
+        (subject @ Type::Callable(_), Type::Callable(_)) => subject,
         (subject, target)
             if is_typed_dict_runtime_domain(db, env, subject)
                 && target.nominal_class(db, env).is_some_and(|class| {

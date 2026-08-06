@@ -110,6 +110,14 @@ def call_with_args(y: object):
         reveal_type(y(1, "foo", keyword_arg="bar"))  # revealed: Unknown
 ```
 
+An already-specialized callable retains its known parameter and return types:
+
+```py
+def preserve_callable_signature(fn: Callable[[int], str]) -> None:
+    if isinstance(fn, Callable):
+        reveal_type(fn)  # revealed: (int, /) -> str
+```
+
 ## Narrowing with named expressions (walrus operator)
 
 When `callable()` is used with a named expression, the target of the named expression should be
