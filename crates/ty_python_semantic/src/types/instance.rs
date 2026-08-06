@@ -693,7 +693,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_arguments = source_alias.specialization(db).types(db);
         if !source_arguments.iter().all(|argument| match argument {
-            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(typevar.identity(db)),
+            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(*typevar),
             argument => !any_over_type_expanding_aliases(db, env, *argument, Type::is_type_var),
         }) {
             return None;
