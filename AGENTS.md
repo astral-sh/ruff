@@ -111,6 +111,18 @@ When the task matches a more specific ty workflow, also read and follow that ski
 - Ecosystem report summaries: `.agents/skills/summarise-ecosystem-results/SKILL.md`.
 - Reproducing, investigating, or minimizing ecosystem or primer differences: `.agents/skills/minimizing-ty-ecosystem-changes/SKILL.md`.
 
+### Completion ranking
+
+When changing ty autocomplete ranking, add or update evaluation fixtures under `crates/ty_completion_eval/truth/`. Extend an existing project when it is a good fit for the behavior being tested; otherwise, add a new one. Use `<CURSOR:expected_name>` directives to assert ranking, and include the expected module for auto-import completions. Add `completion.rs` unit tests only when the evaluation fixtures cannot adequately cover the behavior.
+
+Regenerate and review the committed evaluation results after changing ranking behavior or fixtures:
+
+```sh
+CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_LTO=off CARGO_PROFILE_DEV_DEBUG="line-tables-only" cargo run --package ty_completion_eval -- all --threshold 0.4 --tasks crates/ty_completion_eval/completion-evaluation-tasks.csv
+```
+
+To inspect one evaluation task, run `cargo run --package ty_completion_eval -- show-one <fixture-name> --file-name <file-name> --index <cursor-index>`.
+
 ### Ad hoc reproductions
 
 When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
