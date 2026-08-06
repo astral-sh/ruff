@@ -259,6 +259,22 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
     return False
 ```
 
+A valid boolean return must also be accepted when the predicate's return annotation is an alias of
+`TypeIs` or `TypeGuard`, rather than incorrectly producing an `invalid-return-type` diagnostic.
+
+```py
+from typing_extensions import TypeAliasType
+
+TypeIsAlias = TypeAliasType("TypeIsAlias", TypeIs[int])
+TypeGuardAlias = TypeAliasType("TypeGuardAlias", TypeGuard[int])
+
+def aliased_type_is(value: object) -> TypeIsAlias:
+    return True
+
+def aliased_type_guard(value: object) -> TypeGuardAlias:
+    return True
+```
+
 ## Calls
 
 ```py

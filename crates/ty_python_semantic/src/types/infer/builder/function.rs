@@ -1,16 +1,17 @@
-use crate::Db;
-use crate::ProgramEnvironment;
 use crate::{
+    Db, ProgramEnvironment,
     reachability::ReachabilityConstraintsExtension,
     types::{
         KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner, SubclassOfType, Type,
         TypeContext, TypeVarKind, UnionType,
+        constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
-            INVALID_PARAMSPEC, INVALID_TYPE_FORM, USELESS_OVERLOAD_BODY,
+            INVALID_PARAMSPEC, INVALID_TYPE_FORM, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_implicit_return_type, report_invalid_generator_function_return_type,
             report_invalid_return_type, report_shadowed_type_variable,
+            report_unsound_return_statement,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -28,9 +29,11 @@ use crate::{
             nearest_enclosing_function, original_class_type,
         },
         infer_scope_types,
+        relation::TypeRelation,
         signatures::ReturnCallableTypeVarScope,
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
+        typevar::TypeVarSet,
     },
 };
 use ty_python_core::{
@@ -133,9 +136,9 @@ impl<'db> ExpectedReturnType<'db> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
         ) -> Type<'db> {
-            match ty {
+            match ty.resolve_type_alias(db) {
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
-                ty => ty,
+                _ => ty,
             }
         }
 
@@ -163,8 +166,21 @@ impl<'db> ExpectedReturnType<'db> {
 
     /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
     /// type.
-    fn accepts(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
-        ty.is_assignable_to(db, env, self.public) || ty.is_assignable_to(db, env, self.lexical)
+    fn accepts(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        relation: TypeRelation,
+    ) -> bool {
+        let builder = ConstraintSetBuilder::new();
+
+        let check =
+            |target| ty.has_relation_to(db, env, target, &builder, TypeVarSet::None, relation);
+
+        check(self.public)
+            .or(db, &builder, || check(self.lexical))
+            .is_always_satisfied(db, env)
     }
 }
 
@@ -262,23 +278,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if let Some(expected_return_ty) = declared_ty.generator_return_type(db, env) {
-                    for invalid in
-                        self.return_types_and_ranges
-                            .iter()
-                            .copied()
-                            .filter(|actual_return_ty| {
-                                !actual_return_ty
-                                    .ty
-                                    .is_assignable_to(db, env, expected_return_ty)
-                            })
-                    {
-                        report_invalid_return_type(
-                            &self.context,
-                            invalid.range,
-                            returns.range(),
-                            expected_return_ty,
-                            invalid.ty,
-                        );
+                    for &return_statement in &self.return_types_and_ranges {
+                        if !return_statement
+                            .ty
+                            .is_assignable_to(db, env, expected_return_ty)
+                        {
+                            report_invalid_return_type(
+                                &self.context,
+                                return_statement.range,
+                                returns.range(),
+                                expected_return_ty,
+                                return_statement.ty,
+                            );
+                        } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
+                            && expected_return_ty.is_fully_static(db, env)
+                            && !return_statement.ty.is_pure_redundant_with(
+                                db,
+                                env,
+                                expected_return_ty,
+                            )
+                        {
+                            report_unsound_return_statement(
+                                &self.context,
+                                return_statement.range,
+                                returns.range(),
+                                expected_return_ty,
+                                return_statement.ty,
+                            );
+                        }
                     }
 
                     let use_def = self.index.use_def_map(scope_id);
@@ -301,30 +328,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            for invalid in self
-                .return_types_and_ranges
-                .iter()
-                .copied()
-                .filter_map(|ty_range| match ty_range.ty {
-                    // We skip `is_assignable_to` checks for `NotImplemented`,
-                    // so we remove it beforehand.
-                    Type::Union(union) => Some(TypeAndRange {
-                        ty: union.filter(db, |ty| !ty.is_notimplemented(db)),
-                        range: ty_range.range,
-                    }),
-                    ty if ty.is_notimplemented(db) => None,
-                    _ => Some(ty_range),
-                })
-                .filter(|ty_range| !expected_return.accepts(db, env, ty_range.ty))
+            for return_statement in
+                self.return_types_and_ranges
+                    .iter()
+                    .copied()
+                    .filter_map(|ty_range| match ty_range.ty {
+                        // We skip `is_assignable_to` checks for `NotImplemented`,
+                        // so we remove it beforehand.
+                        Type::Union(union) => Some(TypeAndRange {
+                            ty: union.filter(db, |ty| !ty.is_notimplemented(db)),
+                            range: ty_range.range,
+                        }),
+                        ty if ty.is_notimplemented(db) => None,
+                        _ => Some(ty_range),
+                    })
             {
-                report_invalid_return_type(
-                    &self.context,
-                    invalid.range,
-                    returns.range(),
-                    declared_ty,
-                    invalid.ty,
-                );
+                if !expected_return.accepts(
+                    db,
+                    env,
+                    return_statement.ty,
+                    TypeRelation::Assignability,
+                ) {
+                    report_invalid_return_type(
+                        &self.context,
+                        return_statement.range,
+                        returns.range(),
+                        declared_ty,
+                        return_statement.ty,
+                    );
+                } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
+                    && expected_return.public.is_fully_static(db, env)
+                    && !expected_return.accepts(
+                        db,
+                        env,
+                        return_statement.ty,
+                        TypeRelation::Redundancy { pure: true },
+                    )
+                {
+                    report_unsound_return_statement(
+                        &self.context,
+                        return_statement.range,
+                        returns.range(),
+                        declared_ty,
+                        return_statement.ty,
+                    );
+                }
             }
+
             let use_def = self.index.use_def_map(scope_id);
             if can_implicitly_return_none(db, use_def)
                 && !Type::none(db, env).is_assignable_to(db, env, expected_ty)

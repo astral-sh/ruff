@@ -321,26 +321,31 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
 }
 
 fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
+    // In general (as shown by the initialization of `selection` below), we enable even rules that
+    // are ignored by default in mdtests so that their behaviour is covered alongside the default
+    // rules. There are a few small exceptions to this, however:
+    static DISABLED_IN_MDTESTS: &[&str] = &[
+        // `missing-override-decorator` is an exception: because it is extremely pedantic we have
+        // chosen to keep it opt-in to minimize churn in unrelated tests.
+        "missing-override-decorator",
+        // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+        // negation types in our tests for better readability.
+        "experimental-syntax",
+        // `unsound-return-statement` is also an exception because it is very strict, would result in
+        // lots of additional diagnostics in mdtests, and is not the default behaviour we'll show to
+        // our users.
+        "unsound-return-statement",
+    ];
+
     let registry = default_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
-    // In general (as shown by the initialization of `selection` above), we enable even rules that
-    // are ignored by default in mdtests so that their behaviour is covered alongside the default
-    // rules.
-    //
-    // `missing-override-decorator` is an exception: because it is extremely pedantic we have
-    // chosen to keep it opt-in to minimize churn in unrelated tests.
-    let missing_override_decorator = registry
-        .get("missing-override-decorator")
-        .expect("missing-override-decorator is a known lint rule");
-    selection.disable(missing_override_decorator);
-
-    // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
-    // negation types in our tests for better readability.
-    let experimental_syntax = registry
-        .get("experimental-syntax")
-        .expect("experimental-syntax is a known lint rule");
-    selection.disable(experimental_syntax);
+    for rule in DISABLED_IN_MDTESTS {
+        let lint = registry
+            .get(rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{rule}`: {error}"));
+        selection.disable(lint);
+    }
 
     if let Some(rules) = rules {
         let set_lint_level =

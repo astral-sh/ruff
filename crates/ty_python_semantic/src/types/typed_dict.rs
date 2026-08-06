@@ -1274,18 +1274,20 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    match typed_dict {
-        TypedDictType::Class(defining_class) => {
-            visitor.visit_type(db, defining_class.into());
+    if let TypedDictType::Class(defining_class) = typed_dict {
+        visitor.visit_type(db, defining_class.into());
+
+        if !visitor.should_visit_lazy_type_attributes() {
+            return;
         }
-        TypedDictType::Synthesized(synthesized) => {
-            for field in synthesized.items(db).values() {
-                visitor.visit_type(db, field.declared_ty);
-            }
-            if let Some(extra_items) = synthesized.openness(db).explicit_extra_items() {
-                visitor.visit_type(db, extra_items.declared_ty);
-            }
-        }
+    }
+
+    for field in typed_dict.items(db).values() {
+        visitor.visit_type(db, field.declared_ty);
+    }
+
+    if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+        visitor.visit_type(db, extra_items.declared_ty);
     }
 }
 

@@ -82,6 +82,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
@@ -423,6 +424,16 @@ declare_lint! {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
+    #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
+    pub(crate) static UNSOUND_RETURN_STATEMENT = {
+        summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1990,6 +2001,52 @@ pub(super) fn report_invalid_return_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_return_statement(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_RETURN_STATEMENT, object_range) else {
+        return;
+    };
+
+    let env = &context.program_environment();
+
+    // `TypeIs`-annotated functions are expected to return `bool`;
+    // this needs to be normalized before we figure out the error context
+    // and before we display the types.
+    let expected_ty = match expected_ty.resolve_type_alias(db) {
+        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
+        _ => expected_ty,
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+
+    let mut diag = builder.into_diagnostic("Unsound return statement");
+    let actual_ty_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_ty_display = expected_ty.display_with(db, env, settings);
+
+    diag.set_concise_message(format_args!(
+        "Unsound return statement: `{actual_ty_display}` is not a subtype of `{expected_ty_display}`"
+    ));
+    diag.set_primary_annotation_message(format_args!("Inferred as `{actual_ty_display}`"));
+    diag.annotate(context.secondary(return_type_range).message(format_args!(
+        "Expected a subtype of `{expected_ty_display}` because of the return type",
+    )));
+
+    diag.info(format_args!(
+        "`{actual_ty_display}` is assignable to `{expected_ty_display}`, \
+        but not a subtype of `{expected_ty_display}`",
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diag);
+    diag.help("Consider using an `assert` to narrow the type prior to the `return` statement");
 }
 
 pub(super) fn report_invalid_generator_function_return_type(
