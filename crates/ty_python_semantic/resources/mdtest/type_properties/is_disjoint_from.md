@@ -166,7 +166,7 @@ not: a covariant container can be inhabited by an empty value.
 ```pyi
 from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
-from ty_extensions import static_assert
+from ty_extensions import Bottom, static_assert
 from ty_extensions._internal import is_disjoint_from
 
 T = TypeVar("T")
@@ -204,6 +204,12 @@ static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
 static_assert(is_disjoint_from(Invariant[A & Any], Invariant[B]))
 static_assert(is_disjoint_from(Invariant[B], Invariant[A & Any]))
 static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
+static_assert(is_disjoint_from(Bottom[Invariant[Any]], Invariant[A]))
+static_assert(is_disjoint_from(Invariant[A], Bottom[Invariant[Any]]))
+static_assert(is_disjoint_from(Bottom[Invariant[Any]], Bottom[Invariant[Any]]))
+static_assert(is_disjoint_from(Bottom[Invariant[Any]], object))
+static_assert(is_disjoint_from(Bottom[list[Any]], list[int]))
+static_assert(is_disjoint_from(list[int], Bottom[list[Any]]))
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
 static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
