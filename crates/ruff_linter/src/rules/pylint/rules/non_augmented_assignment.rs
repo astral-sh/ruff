@@ -116,7 +116,7 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         return;
     }
 
-    // Match, e.g., `x = 1 + x`.
+    // If the operator is commutative, match, e.g., `x = 1 + x`.
     if operator.is_commutative()
         && is_number_or_bool_constant(&value.left)
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
