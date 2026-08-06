@@ -1647,6 +1647,8 @@ impl TypeCheckingBlock {
     }
 
     fn is_inside<'db>(&self, db: &'db dyn Db, file: ProgramFile<'db>) -> bool {
+        // Most completions are ranked independently of `TYPE_CHECKING`, so only query the
+        // semantic index when a typing-only completion needs to know the cursor's context.
         *self.is_inside.get_or_init(|| {
             let parsed = parsed_module(db, file.python_file(db)).load(db);
             let index = semantic_index(db, file);
