@@ -2513,6 +2513,7 @@ An invalid index likewise cannot contribute a value constraint.
 ```py
 invalid_index = [1]
 # error: [invalid-argument-type]
+# error: [invalid-assignment]
 invalid_index["value"] /= 2
 reveal_type(invalid_index)  # revealed: list[int]
 ```
