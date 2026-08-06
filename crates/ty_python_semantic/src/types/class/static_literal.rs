@@ -1656,7 +1656,7 @@ impl<'db> StaticClassLiteral<'db> {
                             *default_ty = default_ty
                                 .try_call_dunder_get(db, env, None, Type::from(self))
                                 .unwrap_or_else(|error| Some(error.fallback()))
-                                .map(|(return_ty, _)| return_ty)
+                                .map(|result| result.return_type)
                                 .unwrap_or_else(Type::unknown);
                         }
                     }

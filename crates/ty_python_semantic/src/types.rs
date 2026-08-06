@@ -569,33 +569,39 @@ impl<'db> DescriptorGetCallContext<'db> {
     }
 }
 
+/// The type and descriptor kind produced by an implicit `__get__` call.
+#[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct DescriptorGetResult<'db> {
+    pub(crate) return_type: Type<'db>,
+    kind: AttributeKind,
+}
+
 /// A failed implicit descriptor call together with its recovery value.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DescriptorGetError<'db> {
-    fallback: (Type<'db>, AttributeKind),
+    fallback: DescriptorGetResult<'db>,
     context: DescriptorGetCallContext<'db>,
 }
 
 impl<'db> DescriptorGetError<'db> {
     /// Returns the descriptor's declared return type and kind despite the invalid call.
-    pub(crate) const fn fallback(self) -> (Type<'db>, AttributeKind) {
+    pub(crate) const fn fallback(self) -> DescriptorGetResult<'db> {
         self.fallback
     }
 }
-
-type DescriptorGetResult<'db> = Result<Option<(Type<'db>, AttributeKind)>, DescriptorGetError<'db>>;
 
 fn descriptor_get_result<'db>(
     return_type: Type<'db>,
     kind: AttributeKind,
     error: Option<DescriptorGetCallContext<'db>>,
-) -> DescriptorGetResult<'db> {
+) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
+    let result = DescriptorGetResult { return_type, kind };
     match error {
         Some(context) => Err(DescriptorGetError {
-            fallback: (return_type, kind),
+            fallback: result,
             context,
         }),
-        None => Ok(Some((return_type, kind))),
+        None => Ok(Some(result)),
     }
 }
 
@@ -3705,7 +3711,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
-    ) -> DescriptorGetResult<'db> {
+    ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
@@ -3713,14 +3719,17 @@ impl<'db> Type<'db> {
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
-        ) -> DescriptorGetResult<'db> {
+        ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
             let env = &ProgramEnvironment::from_program(program);
             if let Some(fallback) = ty.materialized_divergent_fallback() {
                 return fallback.try_call_dunder_get(db, env, instance, owner);
             }
 
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
-                return Ok(Some((dynamic, AttributeKind::DataDescriptor)));
+                return Ok(Some(DescriptorGetResult {
+                    return_type: dynamic,
+                    kind: AttributeKind::DataDescriptor,
+                }));
             }
 
             if let Some(union) = ty.as_union_like(db) {
@@ -3736,7 +3745,7 @@ impl<'db> Type<'db> {
                             error = error.or(Some(failure.context));
                             Some(failure.fallback())
                         });
-                    if let Some((return_type, kind)) = result {
+                    if let Some(DescriptorGetResult { return_type, kind }) = result {
                         any_descriptor = true;
                         all_data_descriptors &= kind.is_data();
                         return_types = return_types.add(return_type);
@@ -3765,7 +3774,10 @@ impl<'db> Type<'db> {
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
-                    return Ok(Some((ty, AttributeKind::NormalOrNonDataDescriptor)));
+                    return Ok(Some(DescriptorGetResult {
+                        return_type: ty,
+                        kind: AttributeKind::NormalOrNonDataDescriptor,
+                    }));
                 }
                 Type::Callable(callable)
                     if let is_function_like = callable.is_function_like(db)
@@ -3792,10 +3804,10 @@ impl<'db> Type<'db> {
                         Type::Callable(callable.bind_self(db, env, Some(self_type)))
                     };
 
-                    return Ok(Some((
+                    return Ok(Some(DescriptorGetResult {
                         return_type,
-                        AttributeKind::NormalOrNonDataDescriptor,
-                    )));
+                        kind: AttributeKind::NormalOrNonDataDescriptor,
+                    }));
                 }
                 _ => {}
             }
@@ -3884,10 +3896,10 @@ impl<'db> Type<'db> {
                 self
             };
 
-            return Ok(Some((
+            return Ok(Some(DescriptorGetResult {
                 return_type,
-                AttributeKind::NormalOrNonDataDescriptor,
-            )));
+                kind: AttributeKind::NormalOrNonDataDescriptor,
+            }));
         }
 
         try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
@@ -3971,7 +3983,7 @@ impl<'db> Type<'db> {
                                 Some(failure.fallback())
                             });
                         let ty = match result {
-                            Some((return_type, kind)) => {
+                            Some(DescriptorGetResult { return_type, kind }) => {
                                 all_data_descriptors &= kind.is_data();
                                 return_type
                             }
@@ -4023,7 +4035,7 @@ impl<'db> Type<'db> {
                                     error = error.or(Some(failure.context));
                                     Some(failure.fallback())
                                 })
-                                .map_or(*elem, |(return_type, _)| return_type);
+                                .map_or(*elem, |result| result.return_type);
                             Place::Defined(DefinedPlace {
                                 ty,
                                 origin,
@@ -4061,7 +4073,7 @@ impl<'db> Type<'db> {
                         error = Some(failure.context);
                         Some(failure.fallback())
                     });
-                if let Some((return_type, kind)) = result {
+                if let Some(DescriptorGetResult { return_type, kind }) = result {
                     (
                         Place::Defined(DefinedPlace {
                             ty: return_type,

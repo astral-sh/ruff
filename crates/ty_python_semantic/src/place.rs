@@ -371,9 +371,9 @@ impl<'db> Place<'db> {
                     .ty
                     .try_call_dunder_get(db, env, None, owner)
                     .unwrap_or_else(|error| Some(error.fallback()));
-                if let Some((dunder_get_return_ty, _)) = result {
+                if let Some(result) = result {
                     Place::Defined(DefinedPlace {
-                        ty: dunder_get_return_ty,
+                        ty: result.return_type,
                         provenance: Provenance::Unknown,
                         ..defined
                     })

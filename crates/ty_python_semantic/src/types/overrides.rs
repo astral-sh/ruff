@@ -350,7 +350,7 @@ fn source_method_contract<'db>(
     let ty = Type::FunctionLiteral(function)
         .try_call_dunder_get(db, env, Some(receiver), receiver.to_meta_type(db, env))
         .unwrap_or_else(|error| Some(error.fallback()))?
-        .0;
+        .return_type;
     Some((MethodDecorator::try_from_fn_type(db, function)?, ty))
 }
 
