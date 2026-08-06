@@ -1,7 +1,10 @@
 use std::str::FromStr;
 
 use ruff_python_ast::{self as ast, Expr, StringFlags, StringLiteral};
-use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
+use ruff_python_literal::cformat::{
+    CFormatConversion, CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString, CFormatType,
+    CNumberType,
+};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
@@ -88,17 +91,19 @@ impl FormatType {
     }
 }
 
-impl From<char> for FormatType {
-    fn from(format: char) -> Self {
-        match format {
-            'r' => FormatType::Repr,
-            's' => FormatType::String,
+impl From<&CFormatType> for FormatType {
+    fn from(format_type: &CFormatType) -> Self {
+        match format_type {
+            CFormatType::String(CFormatConversion::Repr) => FormatType::Repr,
+            CFormatType::String(CFormatConversion::Str) => FormatType::String,
             // The python documentation says "d" only works for integers, but it works for floats as
             // well: https://docs.python.org/3/library/string.html#formatstrings
             // I checked the rest of the integer codes, and none of them work with floats
-            'n' | 'd' => FormatType::Number,
-            'b' | 'c' | 'o' | 'x' | 'X' => FormatType::Integer,
-            'e' | 'E' | 'f' | 'F' | 'g' | 'G' | '%' => FormatType::Float,
+            CFormatType::Number(CNumberType::Decimal) => FormatType::Number,
+            CFormatType::String(CFormatConversion::Bytes)
+            | CFormatType::Character
+            | CFormatType::Number(CNumberType::Octal | CNumberType::Hex(_)) => FormatType::Integer,
+            CFormatType::Float(_) => FormatType::Float,
             _ => FormatType::Unknown,
         }
     }
@@ -118,11 +123,11 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 
 /// Return `true` if the format string is equivalent to the constant type
 fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
-    let format_type = FormatType::from(format.format_char);
+    let format_type = FormatType::from(&format.format_type);
     match ResolvedPythonType::from(value) {
         ResolvedPythonType::Atom(atom) => {
             // Special case where `%c` allows single character strings to be formatted
-            if format.format_char == 'c' {
+            if format.format_type == CFormatType::Character {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = value {
                     let mut chars = value.chars();
                     if chars.next().is_some() && chars.next().is_none() {
