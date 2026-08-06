@@ -1705,6 +1705,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.docstring_state =
                         DocstringState::Expected(ExpectedDocstringKind::Attribute);
                 }
+                // Follow Pyright's convention for documenting PEP 695 type aliases:
+                // https://discuss.python.org/t/docstrings-for-new-type-aliases-as-defined-in-pep-695/39816
+                Stmt::TypeAlias(_) => {
+                    self.docstring_state =
+                        DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                }
                 _ => {}
             }
         }

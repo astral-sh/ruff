@@ -31,6 +31,8 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// When [preview] is enabled, this rule also flags standalone string literals
 /// and f-strings that are not docstrings or attribute docstrings.
 ///
+/// Strings following PEP 695 `type` statements are also treated as attribute docstrings.
+///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## Notebook behavior

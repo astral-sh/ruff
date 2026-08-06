@@ -76,9 +76,9 @@ if __name__ == "__main__":
 
 ## Attribute docstrings
 
-Ruff recognizes strings immediately following simple assignments and annotated
-assignments at module or class scope as attribute docstrings. A second string
-is not part of the attribute docstring.
+Ruff recognizes strings immediately following simple assignments, annotated
+assignments, and `type` statements at module or class scope as attribute
+docstrings. A second string is not part of the attribute docstring.
 
 ```py
 module_attribute = 1
@@ -87,6 +87,9 @@ module_attribute = 1
 annotated_module_attribute: int
 "Annotated module attribute docstring."
 
+type ModuleAlias = int
+"Module type alias docstring."
+
 
 class Class:
     attribute = 1
@@ -94,6 +97,15 @@ class Class:
 
     annotated_attribute: int
     "Annotated class attribute docstring."
+
+    type ClassAlias = str
+    "Class type alias docstring."
+
+    "Not an attribute docstring."  # error: [useless-expression]
+
+
+def function():
+    type LocalAlias = bytes
     "Not an attribute docstring."  # error: [useless-expression]
 ```
 
