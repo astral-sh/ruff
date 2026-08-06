@@ -66,7 +66,9 @@ pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
-use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_dunder_get_call};
+use crate::types::diagnostic::{
+    INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_dunder_get_call, report_bad_dunder_getattr_call,
+};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
@@ -609,6 +611,14 @@ fn descriptor_get_result<'db>(
 #[derive(Clone, Debug, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum MemberLookupErrorKind<'db> {
     DescriptorGet(DescriptorGetCallContext<'db>),
+
+    /// An invalid fallback call, represented by its receiver and requested attribute name.
+    ///
+    /// Retaining only these arguments avoids storing call bindings in cached lookup results.
+    GetAttr {
+        receiver: Type<'db>,
+        name: Type<'db>,
+    },
 }
 
 /// A failed member lookup together with the member used to recover from the error.
@@ -652,7 +662,21 @@ impl<'db> MemberLookupError<'db> {
                     target,
                 );
             }
-            MemberLookupErrorKind::DescriptorGet(_) => {}
+            MemberLookupErrorKind::GetAttr { receiver, name }
+                if assigned_type.is_none()
+                    && let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
+                        .try_call_dunder(
+                            db,
+                            env,
+                            "__getattr__",
+                            CallArguments::positional([name]),
+                            TypeContext::default(),
+                        ) =>
+            {
+                let failure = CallError(kind, bindings);
+                report_bad_dunder_getattr_call(context, &failure, object_type, target);
+            }
+            MemberLookupErrorKind::DescriptorGet(_) | MemberLookupErrorKind::GetAttr { .. } => {}
         }
     }
 }
@@ -6528,17 +6552,27 @@ impl<'db> Type<'db> {
                 return MemberLookupResult::from(Place::Undefined);
             }
 
-            self.try_call_dunder(
+            let name_type = Type::string_literal(db, name);
+            match self.try_call_dunder(
                 db,
                 env,
                 "__getattr__",
-                CallArguments::positional([Type::string_literal(db, name)]),
+                CallArguments::positional([name_type]),
                 TypeContext::default(),
-            )
-            .map(|outcome| Place::bound(outcome.return_type(db, env)))
-            // TODO: Handle call errors here.
-            .unwrap_or_default()
-            .into()
+            ) {
+                Ok(outcome) => Place::bound(outcome.return_type(db, env)).into(),
+                Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
+                    db,
+                    Place::bound(bindings.return_type(db, env)).into(),
+                    Some(MemberLookupErrorKind::GetAttr {
+                        receiver: self,
+                        name: name_type,
+                    }),
+                ),
+                Err(
+                    CallDunderError::PossiblyUnbound { .. } | CallDunderError::MethodNotAvailable,
+                ) => Place::Undefined.into(),
+            }
         };
 
         let custom_getattribute = OnceCell::new();
