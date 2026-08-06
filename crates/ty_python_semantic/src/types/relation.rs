@@ -3243,21 +3243,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // This is the same as the branch above --
             // once guard patterns are stabilised, it could be unified with that branch
             // (<https://github.com/rust-lang/rust/issues/129967>)
-            (
-                Type::ProtocolInstance(protocol),
-                ty @ (Type::NominalInstance(_) | Type::NewTypeInstance(_)),
-            )
-            | (
-                ty @ (Type::NominalInstance(_) | Type::NewTypeInstance(_)),
-                Type::ProtocolInstance(protocol),
-            ) if self.perform_expensive_checks
-                && ty
-                    .nominal_class(db, env)
-                    .is_some_and(|class| class.is_final(db)) =>
+            (Type::ProtocolInstance(protocol), Type::NominalInstance(nominal))
+            | (Type::NominalInstance(nominal), Type::ProtocolInstance(protocol))
+                if self.perform_expensive_checks && nominal.class(db, env).is_final(db) =>
             {
                 nontrivial_check(self, || {
                     self.with_recursion_guard(db, left, right, || {
-                        self.any_protocol_members_absent_or_disjoint(db, protocol, ty)
+                        self.any_protocol_members_absent_or_disjoint(
+                            db,
+                            protocol,
+                            Type::NominalInstance(nominal),
+                        )
                     })
                 })
             }

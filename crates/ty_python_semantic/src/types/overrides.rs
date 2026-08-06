@@ -16,7 +16,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db, ProgramEnvironment,
     lint::LintId,
-    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin, place_from_declarations},
+    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::ReachabilityConstraintsExtension,
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
@@ -664,27 +664,16 @@ fn check_class_declaration<'db>(
                 if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
                     continue;
                 }
-            } else if superclass_literal
-                .own_synthesized_member(db, env, superclass_specialization, None, &member.name)
-                .is_some()
-            {
+            } else {
+                if superclass_literal
+                    .own_synthesized_member(db, env, superclass_specialization, None, &member.name)
+                    .is_none()
+                {
+                    continue;
+                }
                 method_kind = CodeGeneratorKind::from_class(db, superclass_literal.into())
                     .map(MethodKind::Synthesized)
                     .unwrap_or_default();
-            } else if !configuration.check_attribute_liskov_violations()
-                || !class
-                    .own_class_member(db, env, None, &member.name)
-                    .inner
-                    .is_class_var()
-                || {
-                    let instance_member = superclass.own_instance_member(db, env, &member.name);
-                    instance_member.is_undefined()
-                        || !instance_member
-                            .qualifiers()
-                            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                }
-            {
-                continue;
             }
 
             let superclass_instance_member =
@@ -796,41 +785,29 @@ fn check_class_declaration<'db>(
                             Some((superclass, superclass_variable_kind));
                     }
 
-                    let subclass_declaration = place_table(db, class_scope)
-                        .symbol_id(&member.name)
-                        .map(|symbol| {
-                            place_from_declarations(
-                                db,
-                                env,
-                                use_def_map(db, class_scope)
-                                    .end_of_scope_symbol_declarations(symbol),
-                            )
-                            .ignore_conflicting_declarations()
-                        });
                     let subclass_kind = *subclass_variable_kind.get_or_insert_with(|| {
-                        if subclass_declaration.is_some_and(|declaration| declaration.is_init_var())
-                        {
-                            return None;
-                        }
-
                         variable_kind(
                             db,
                             env,
                             class.own_class_member(db, env, None, &member.name).inner,
-                            class.own_instance_member(db, env, &member.name).inner,
+                            subclass_instance_member,
                         )
                     });
 
                     if let Some(subclass_kind) = subclass_kind
                         && subclass_kind != superclass_variable_kind
                     {
-                        // An unannotated class-body binding can inherit an overridden `ClassVar`
-                        // declaration instead of introducing a conflicting instance variable.
-                        // Imports establish their own declarations and do not inherit it.
+                        // An unannotated class-body assignment can inherit an overridden `ClassVar`
+                        // declaration instead of introducing a conflicting instance variable. This
+                        // also applies to augmented assignments after the initial class-body
+                        // assignment, e.g. `epilog = "..."; epilog += "..."`.
                         if subclass_kind == VariableKind::Instance
                             && superclass_variable_kind == VariableKind::Class
-                            && subclass_declaration
-                                .is_some_and(|declaration| declaration.is_undefined())
+                            && matches!(
+                                first_reachable_definition.kind(db),
+                                DefinitionKind::Assignment(_)
+                                    | DefinitionKind::AugmentedAssignment(_)
+                            )
                         {
                             continue;
                         }
@@ -1125,7 +1102,7 @@ fn superclass_variable_kind<'db>(
 }
 
 /// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
-/// through unannotated class-body bindings and accounting for instance attributes set in methods.
+/// through unannotated class-body assignments.
 ///
 /// For example, `Intermediate.x = 1` inherits the pure-class-variable declaration from `Base`, so
 /// `Sub.x: ClassVar[int]` should not be reported as overriding an instance variable:
@@ -1173,45 +1150,31 @@ pub(super) fn effective_superclass_variable_kind<'db>(
     };
 
     if has_own_member {
-        let class_member = superclass.own_class_member(db, env, None, &name).inner;
         let superclass_variable_kind = superclass_variable_kind(
             db,
             superclass_scope,
             superclass_symbol_id,
-            class_member,
+            superclass.own_class_member(db, env, None, &name).inner,
             superclass.own_instance_member(db, env, &name).inner,
         );
-        let has_own_declaration = superclass_symbol_id.is_some_and(|symbol| {
-            place_from_declarations(
-                db,
-                env,
-                use_def_map(db, superclass_scope).end_of_scope_symbol_declarations(symbol),
-            )
-            .first_declaration
-            .is_some()
-        });
 
         if superclass_variable_kind == Some(VariableKind::Instance)
-            && !has_own_declaration
+            && superclass_symbol_id.is_some_and(|id| {
+                symbol_definition(db, superclass_scope, id).is_some_and(|definition| {
+                    matches!(
+                        definition.kind(db),
+                        DefinitionKind::Assignment(_) | DefinitionKind::AugmentedAssignment(_)
+                    )
+                })
+            })
             && inherited_variable_kind() == Some(VariableKind::Class)
         {
             return Some(VariableKind::Class);
         }
 
-        if has_own_declaration || superclass_variable_kind.is_some() {
+        if superclass_variable_kind.is_some() {
             return superclass_variable_kind;
         }
-
-        return inherited_variable_kind().filter(|kind| *kind == VariableKind::Class);
-    }
-
-    let instance_member = superclass.own_instance_member(db, env, &name).inner;
-    if instance_member
-        .qualifiers
-        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-        && !instance_member.is_undefined()
-    {
-        return variable_kind(db, env, PlaceAndQualifiers::default(), instance_member);
     }
 
     inherited_variable_kind()
@@ -1263,15 +1226,9 @@ fn variable_kind<'db>(
         return Some(VariableKind::Class);
     }
 
-    // `Final` overrides have their own diagnostic, and `InitVar` declarations describe constructor
-    // parameters rather than attributes. Neither participates in class-variable override checks.
-    if class_member
-        .qualifiers
-        .intersects(TypeQualifiers::FINAL | TypeQualifiers::INIT_VAR)
-        || instance_member
-            .qualifiers
-            .intersects(TypeQualifiers::FINAL | TypeQualifiers::INIT_VAR)
-    {
+    // A `Final` attribute behaves like a class variable, but final overrides are diagnosed by
+    // `override-of-final-variable` instead of this rule.
+    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
         return None;
     }
 

@@ -1873,59 +1873,36 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         ty: Type<'db>,
     ) -> bool {
         let qualifiers = self.qualifiers();
-        if !qualifiers.contains(TypeQualifiers::CLASS_VAR)
-            || qualifiers.contains(TypeQualifiers::FINAL)
-        {
-            return false;
-        }
+        qualifiers.contains(TypeQualifiers::CLASS_VAR)
+            && !qualifiers.contains(TypeQualifiers::FINAL)
+            && ty
+                .nominal_class(db, env)
+                .or_else(|| {
+                    if !is_class_object_type(ty) {
+                        return None;
+                    }
 
-        let class = ty.nominal_class(db, env).or_else(|| {
-            if is_class_object_type(ty) {
-                ty.to_meta_type(db, env)
-                    .to_instance_approximation(db, env)?
-                    .nominal_class(db, env)
-            } else {
-                None
-            }
-        });
-        let Some(class) = class else {
-            return false;
-        };
-
-        let class_declaration =
-            class.class_member(db, env, self.name, MemberLookupPolicy::default());
-        if class_declaration.is_class_var()
-            && class
-                .own_class_member(db, env, None, self.name)
-                .inner
-                .is_class_var()
-        {
-            return false;
-        }
-
-        let has_declaration = |place| {
-            matches!(
-                place,
-                Place::Defined(DefinedPlace {
-                    provenance: Provenance::SingleDefinition(_) | Provenance::MultipleDefinitions,
-                    ..
+                    ty.to_meta_type(db, env)
+                        .to_instance_approximation(db, env)?
+                        .nominal_class(db, env)
                 })
-            )
-        };
-        if !has_declaration(class_declaration.place)
-            && !has_declaration(
-                Type::instance(db, env, class)
-                    .member(db, env, self.name)
-                    .place,
-            )
-        {
-            // Synthesized members and dynamic fallbacks have no declaration whose variable kind
-            // can establish a structural incompatibility.
-            return false;
-        }
-
-        effective_superclass_variable_kind(db, class, Name::new(self.name))
-            == Some(VariableKind::Instance)
+                .is_some_and(|class| {
+                    effective_superclass_variable_kind(db, class, Name::new(self.name))
+                        == Some(VariableKind::Instance)
+                        && [
+                            class
+                                .class_member(db, env, self.name, MemberLookupPolicy::default())
+                                .place,
+                            class.instance_member(db, env, self.name).place,
+                        ]
+                        .into_iter()
+                        .any(|place| {
+                            matches!(
+                                place,
+                                Place::Defined(defined) if defined.provenance != Provenance::Unknown
+                            )
+                        })
+                })
     }
 
     fn is_method(&self) -> bool {
@@ -2492,7 +2469,7 @@ fn protocol_member_read_type<'db>(
 
     // Module-level functions and ordinary methods on class objects are matched through direct
     // member access. Special instance methods still use special-method lookup on the meta-type.
-    let member_place = if access == ProtocolMemberAccessMode::Instance
+    let place = if access == ProtocolMemberAccessMode::Instance
         && member.is_instance_method()
         && !matches!(ty, Type::ModuleLiteral(_))
         && (!is_class_object_type(ty) || member.uses_special_method_lookup())
@@ -2513,11 +2490,12 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
+        .place
     } else {
-        receiver_ty.member(db, env, member.name)
+        receiver_ty.member(db, env, member.name).place
     };
 
-    match member_place.place {
+    match place {
         Place::Defined(DefinedPlace {
             ty: attribute_type,
             definedness: Definedness::AlwaysDefined,

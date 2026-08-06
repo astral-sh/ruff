@@ -2057,9 +2057,9 @@ value in the class body:
 `classvars.py`:
 
 ```py
-from typing import Any, ClassVar, Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of, is_assignable_to
+from typing import Any, ClassVar, Protocol, final
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
 
 class ClassVarXProto(Protocol):
     x: ClassVar[int]
@@ -2101,10 +2101,13 @@ class ClassVarX:
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
 
-class InheritedClassVarX(ClassVarX): ...
+class InheritedClassVarX(ClassVarX):
+    x = 1
 
 static_assert(is_assignable_to(InheritedClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(InheritedClassVarX, ClassVarXProto))
+static_assert(is_assignable_to(TypeOf[InheritedClassVarX], type[ClassVarXProto]))
+static_assert(is_subtype_of(TypeOf[InheritedClassVarX], type[ClassVarXProto]))
 
 class XMeta(type):
     def x(cls) -> str:
@@ -2135,263 +2138,7 @@ class NotHashable:
 
 static_assert(is_assignable_to(NotHashable, NotHashableProto))
 static_assert(is_subtype_of(NotHashable, NotHashableProto))
-```
 
-This is mentioned by the
-[spec](https://typing.python.org/en/latest/spec/protocol.html#protocol-members) and tested in the
-[conformance suite](https://github.com/python/typing/blob/main/conformance/tests/protocols_definition.py)
-as something that must be supported by type checkers:
-
-> To distinguish between protocol class variables and protocol instance variables, the special
-> `ClassVar` annotation should be used.
-
-## Inherited `ClassVar` protocol members
-
-An unannotated assignment in a subclass does not change an inherited `ClassVar` into an instance
-variable. The inherited declaration must remain effective for both structural instance checks and
-`type[Protocol]` assignments.
-
-```py
-from typing import ClassVar, Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
-
-class HasClassValue(Protocol):
-    value: ClassVar[int]
-
-class Base:
-    value: ClassVar[int] = 0
-
-class Child(Base):
-    value = 1
-
-class Grandchild(Child): ...
-
-class Augmented(Base):
-    value = 1
-    value += 1
-
-static_assert(is_assignable_to(Child, HasClassValue))
-static_assert(is_subtype_of(Child, HasClassValue))
-static_assert(is_assignable_to(Grandchild, HasClassValue))
-static_assert(is_subtype_of(Grandchild, HasClassValue))
-static_assert(is_assignable_to(Augmented, HasClassValue))
-static_assert(is_subtype_of(Augmented, HasClassValue))
-
-static_assert(is_assignable_to(TypeOf[Child], type[HasClassValue]))
-static_assert(is_subtype_of(TypeOf[Child], type[HasClassValue]))
-
-implementation: HasClassValue = Child()
-implementation_type: type[HasClassValue] = Child
-```
-
-An explicit instance annotation does change the declaration and remains incompatible with the
-protocol, even though the override itself is also invalid.
-
-```py
-class ExplicitInstance(Base):
-    value: int = 1  # error: [invalid-attribute-override]
-
-class ExplicitAnnotationOnly(Base):
-    value: int  # error: [invalid-attribute-override]
-
-class InheritsExplicitAnnotation(ExplicitAnnotationOnly): ...
-
-static_assert(not is_assignable_to(ExplicitInstance, HasClassValue))
-static_assert(not is_subtype_of(ExplicitInstance, HasClassValue))
-static_assert(not is_assignable_to(ExplicitAnnotationOnly, HasClassValue))
-static_assert(not is_subtype_of(ExplicitAnnotationOnly, HasClassValue))
-static_assert(not is_assignable_to(InheritsExplicitAnnotation, HasClassValue))
-static_assert(not is_subtype_of(InheritsExplicitAnnotation, HasClassValue))
-static_assert(not is_assignable_to(TypeOf[ExplicitAnnotationOnly], type[HasClassValue]))
-static_assert(not is_subtype_of(TypeOf[ExplicitAnnotationOnly], type[HasClassValue]))
-```
-
-An explicit instance annotation is incompatible even when it appears in a conditional branch and
-lookup therefore also sees the inherited class variable.
-
-```py
-def should_override() -> bool:
-    return True
-
-class ConditionalInstance(Base):
-    if should_override():
-        value: int = 1  # error: [invalid-attribute-override]
-
-static_assert(not is_assignable_to(ConditionalInstance, HasClassValue))
-static_assert(not is_subtype_of(ConditionalInstance, HasClassValue))
-static_assert(not is_assignable_to(TypeOf[ConditionalInstance], type[HasClassValue]))
-static_assert(not is_subtype_of(TypeOf[ConditionalInstance], type[HasClassValue]))
-```
-
-A statically unreachable annotation does not replace the inherited declaration, so a subsequent
-unannotated assignment still preserves the class variable.
-
-```py
-class UnreachableInstance(Base):
-    if False:
-        value: int = 1
-    value = 2
-
-static_assert(is_assignable_to(UnreachableInstance, HasClassValue))
-static_assert(is_subtype_of(UnreachableInstance, HasClassValue))
-```
-
-Other unannotated class-body bindings preserve the inherited declaration just like ordinary and
-augmented assignments.
-
-```py
-from contextlib import nullcontext
-
-class ForTarget(Base):
-    for value in (1,):
-        pass
-
-class WithTarget(Base):
-    with nullcontext(1) as value:
-        pass
-
-class MatchCapture(Base):
-    match 1:
-        case value:
-            pass
-
-class NamedExpression(Base):
-    other = (value := 1)
-
-static_assert(is_assignable_to(ForTarget, HasClassValue))
-static_assert(is_subtype_of(ForTarget, HasClassValue))
-static_assert(is_assignable_to(WithTarget, HasClassValue))
-static_assert(is_subtype_of(WithTarget, HasClassValue))
-static_assert(is_assignable_to(MatchCapture, HasClassValue))
-static_assert(is_subtype_of(MatchCapture, HasClassValue))
-static_assert(is_assignable_to(NamedExpression, HasClassValue))
-static_assert(is_subtype_of(NamedExpression, HasClassValue))
-```
-
-An import alias is not an assignment-like rebinding and does not inherit the class-variable
-declaration.
-
-```py
-class ImportAlias(Base):
-    from sys import maxsize as value  # error: [invalid-attribute-override]
-
-static_assert(not is_assignable_to(ImportAlias, HasClassValue))
-static_assert(not is_subtype_of(ImportAlias, HasClassValue))
-```
-
-## `ClassVar` protocol members and instance attribute declarations
-
-An instance attribute initialized in a method remains an instance variable even when a later base
-class provides a class variable with the same name.
-
-```py
-from typing import ClassVar, Protocol, final
-from ty_extensions import Intersection, static_assert
-from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
-
-class HasClassValue(Protocol):
-    value: ClassVar[int]
-
-class InstanceBase:
-    def __init__(self) -> None:
-        self.value: int = 1
-
-class InferredInstanceBase:
-    def __init__(self) -> None:
-        self.value = 1
-
-class ClassBase:
-    value: ClassVar[int] = 1
-
-class InstanceBeforeClass(InstanceBase, ClassBase): ...
-class InferredInstanceBeforeClass(InferredInstanceBase, ClassBase): ...
-class ClassBeforeInstance(ClassBase, InstanceBase): ...
-
-@final
-class FinalInstanceBeforeClass(InstanceBase, ClassBase): ...
-
-static_assert(not is_assignable_to(InstanceBeforeClass, HasClassValue))
-static_assert(not is_subtype_of(InstanceBeforeClass, HasClassValue))
-static_assert(not is_assignable_to(InferredInstanceBeforeClass, HasClassValue))
-static_assert(not is_subtype_of(InferredInstanceBeforeClass, HasClassValue))
-static_assert(is_assignable_to(ClassBeforeInstance, HasClassValue))
-static_assert(is_subtype_of(ClassBeforeInstance, HasClassValue))
-static_assert(not is_assignable_to(TypeOf[InstanceBeforeClass], type[HasClassValue]))
-static_assert(not is_subtype_of(TypeOf[InstanceBeforeClass], type[HasClassValue]))
-static_assert(is_disjoint_from(FinalInstanceBeforeClass, HasClassValue))
-static_assert(not is_disjoint_from(InstanceBeforeClass, HasClassValue))
-
-def impossible(value: Intersection[FinalInstanceBeforeClass, HasClassValue]) -> None:
-    reveal_type(value)  # revealed: Never
-```
-
-A writable metaclass property does not turn instance attributes initialized in a constructor or
-another method into class-variable declarations.
-
-```py
-class Metaclass(type):
-    @property
-    def value(cls) -> int:
-        return 1
-
-    @value.setter
-    def value(cls, value: int) -> None: ...
-
-class InitializedInstance(metaclass=Metaclass):
-    def __init__(self) -> None:
-        self.value: int = 1
-
-class ConfiguredInstance(metaclass=Metaclass):
-    def configure(self) -> None:
-        self.value: int = 1
-
-@final
-class FinalInitializedInstance(metaclass=Metaclass):
-    def __init__(self) -> None:
-        self.value: int = 1
-
-static_assert(not is_assignable_to(InitializedInstance, HasClassValue))
-static_assert(not is_subtype_of(InitializedInstance, HasClassValue))
-static_assert(not is_assignable_to(ConfiguredInstance, HasClassValue))
-static_assert(not is_subtype_of(ConfiguredInstance, HasClassValue))
-static_assert(not is_assignable_to(TypeOf[InitializedInstance], type[HasClassValue]))
-static_assert(not is_subtype_of(TypeOf[InitializedInstance], type[HasClassValue]))
-static_assert(is_disjoint_from(FinalInitializedInstance, HasClassValue))
-```
-
-## `ClassVar` protocol members and descriptors
-
-A writable metaclass descriptor can change the result of class attribute lookup without changing the
-original class-variable declaration.
-
-```py
-from typing import ClassVar, Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-
-class HasClassValue(Protocol):
-    value: ClassVar[int]
-
-class Metaclass(type):
-    @property
-    def value(cls) -> int:
-        return 1
-
-    @value.setter
-    def value(cls, value: int) -> None: ...
-
-class Implementation(metaclass=Metaclass):
-    value: ClassVar[int] = 1
-
-static_assert(is_assignable_to(Implementation, HasClassValue))
-static_assert(is_subtype_of(Implementation, HasClassValue))
-```
-
-A custom descriptor that returns itself also retains the `ClassVar` status of its declaration after
-descriptor-bound lookup.
-
-```py
 class Descriptor:
     def __get__(self, instance: object, owner: type) -> "Descriptor":
         return self
@@ -2406,330 +2153,45 @@ class DescriptorImplementation:
 
 static_assert(is_assignable_to(DescriptorImplementation, HasClassDescriptor))
 static_assert(is_subtype_of(DescriptorImplementation, HasClassDescriptor))
-```
-
-Writing through a descriptor in an instance method does not turn the class-body descriptor into an
-instance-variable declaration.
-
-```py
-class DescriptorWithInstanceAssignment:
-    descriptor = Descriptor()
-
-    def __init__(self) -> None:
-        self.descriptor = Descriptor()
-
-static_assert(is_assignable_to(DescriptorWithInstanceAssignment, HasClassDescriptor))
-static_assert(is_subtype_of(DescriptorWithInstanceAssignment, HasClassDescriptor))
-```
-
-A descriptor can itself require its receiver to satisfy another protocol with the same class
-variable. Both direct and inherited declarations must avoid recursively reclassifying that receiver.
-
-```py
-class RecursiveDescriptor:
-    def __get__(self, instance: "HasRecursiveDescriptor | None", owner: type[object]) -> "RecursiveDescriptor":
-        return self
-
-    def __set__(self, instance: object, value: "RecursiveDescriptor") -> None: ...
-
-class HasRecursiveDescriptor(Protocol):
-    descriptor: ClassVar[RecursiveDescriptor]
-
-class RecursiveBase:
-    descriptor: ClassVar[RecursiveDescriptor] = RecursiveDescriptor()
-
-class RecursiveInherited(RecursiveBase): ...
-
-class RecursiveOverride(RecursiveBase):
-    descriptor = RecursiveDescriptor()
-
-static_assert(is_assignable_to(RecursiveBase, HasRecursiveDescriptor))
-static_assert(is_subtype_of(RecursiveBase, HasRecursiveDescriptor))
-static_assert(is_assignable_to(RecursiveInherited, HasRecursiveDescriptor))
-static_assert(is_subtype_of(RecursiveInherited, HasRecursiveDescriptor))
-static_assert(is_assignable_to(RecursiveOverride, HasRecursiveDescriptor))
-static_assert(is_subtype_of(RecursiveOverride, HasRecursiveDescriptor))
-```
-
-## `ClassVar` protocol disjointness
-
-A final class with an instance-variable declaration can never satisfy a protocol requiring the same
-member to be a class variable. An open class is not disjoint because a subclass could satisfy the
-protocol, and a final class with a matching `ClassVar` remains compatible.
-
-```py
-from typing import ClassVar, Protocol, final
-from ty_extensions import Intersection, static_assert
-from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
-
-class HasClassValue(Protocol):
-    value: ClassVar[int]
 
 @final
-class FinalInstance:
-    value: int = 1
+class FinalInstanceAttrX:
+    x: int = 42
 
 @final
-class AnnotationOnly:
-    value: int
+class FinalClassVarX:
+    x: ClassVar[int] = 42
 
-class OpenInstance:
-    value: int = 1
+static_assert(is_disjoint_from(FinalInstanceAttrX, ClassVarXProto))
+static_assert(not is_disjoint_from(InstanceAttrXWithDefault, ClassVarXProto))
+static_assert(not is_disjoint_from(FinalClassVarX, ClassVarXProto))
 
-@final
-class FinalClassValue:
-    value: ClassVar[int] = 1
-
-class BaseClassValue:
-    value: ClassVar[int] = 1
-
-@final
-class FinalInheritedClassValue(BaseClassValue):
-    value = 2
-
-@final
-class FinalAnnotationOverride(BaseClassValue):
-    value: int  # error: [invalid-attribute-override]
-
-class InstanceMetaclass(type):
-    value: int = 1
-
-class InstanceClass(metaclass=InstanceMetaclass): ...
-
-class ClassMetaclass(type):
-    value: ClassVar[int] = 1
-
-class ClassValueClass(metaclass=ClassMetaclass): ...
-
-static_assert(not is_assignable_to(FinalInstance, HasClassValue))
-static_assert(not is_subtype_of(FinalInstance, HasClassValue))
-static_assert(is_disjoint_from(FinalInstance, HasClassValue))
-static_assert(not is_assignable_to(AnnotationOnly, HasClassValue))
-static_assert(not is_subtype_of(AnnotationOnly, HasClassValue))
-static_assert(is_disjoint_from(AnnotationOnly, HasClassValue))
-static_assert(not is_disjoint_from(OpenInstance, HasClassValue))
-static_assert(not is_disjoint_from(FinalClassValue, HasClassValue))
-static_assert(not is_disjoint_from(FinalInheritedClassValue, HasClassValue))
-static_assert(is_disjoint_from(FinalAnnotationOverride, HasClassValue))
-static_assert(is_disjoint_from(TypeOf[InstanceClass], HasClassValue))
-static_assert(not is_disjoint_from(TypeOf[ClassValueClass], HasClassValue))
-
-def impossible(value: Intersection[FinalInstance, HasClassValue]) -> None:
+def impossible(value: Intersection[FinalInstanceAttrX, ClassVarXProto]) -> None:
     reveal_type(value)  # revealed: Never
 
-def impossible_without_default(value: Intersection[AnnotationOnly, HasClassValue]) -> None:
-    reveal_type(value)  # revealed: Never
-```
-
-A `NewType` wrapping a final class cannot contain a subclass that changes its member contract, so an
-incompatible instance-variable declaration makes it disjoint from a protocol class variable.
-
-```py
-from typing import NewType
-
-NewOpenInstance = NewType("NewOpenInstance", OpenInstance)
-NewFinalInstance = NewType("NewFinalInstance", FinalInstance)
-NewNestedInstance = NewType("NewNestedInstance", NewFinalInstance)
-NewClassValue = NewType("NewClassValue", FinalClassValue)
-
-static_assert(not is_assignable_to(NewOpenInstance, HasClassValue))
-static_assert(not is_subtype_of(NewOpenInstance, HasClassValue))
-static_assert(not is_disjoint_from(NewOpenInstance, HasClassValue))
-static_assert(not is_disjoint_from(HasClassValue, NewOpenInstance))
-static_assert(not is_assignable_to(NewFinalInstance, HasClassValue))
-static_assert(not is_subtype_of(NewFinalInstance, HasClassValue))
-static_assert(is_disjoint_from(NewFinalInstance, HasClassValue))
-static_assert(is_disjoint_from(NewNestedInstance, HasClassValue))
-static_assert(is_assignable_to(NewClassValue, HasClassValue))
-static_assert(not is_disjoint_from(NewClassValue, HasClassValue))
-
-def impossible_final_newtype(value: Intersection[NewFinalInstance, HasClassValue]) -> None:
-    reveal_type(value)  # revealed: Never
-```
-
-A `NewType` wrapping an open class can contain a subclass whose method resolution order places a
-compatible class variable before the base class's instance variable.
-
-```py
-class CompatibleClassBase:
-    value: ClassVar[int] = 1
-
-class ClassBeforeInstance(CompatibleClassBase, OpenInstance): ...
-
-static_assert(is_assignable_to(ClassBeforeInstance, HasClassValue))
-static_assert(is_subtype_of(ClassBeforeInstance, HasClassValue))
-
-wrapped_class_value: NewOpenInstance = NewOpenInstance(ClassBeforeInstance())
-```
-
-A `NewType` can still wrap a subclass of its underlying class. A missing instance member can
-therefore be supplied by such a subclass, so it must not make the wrapped type disjoint.
-
-```py
-class HasInstanceValue(Protocol):
-    value: int
-
-class OpenWithoutValue: ...
-
-class ChildWithValue(OpenWithoutValue):
-    value: int = 1
-
-NewOpenWithoutValue = NewType("NewOpenWithoutValue", OpenWithoutValue)
-
-static_assert(not is_disjoint_from(NewOpenWithoutValue, HasInstanceValue))
-static_assert(not is_disjoint_from(HasInstanceValue, NewOpenWithoutValue))
-
-wrapped_child: NewOpenWithoutValue = NewOpenWithoutValue(ChildWithValue())
-```
-
-Likewise, a subclass can add a setter to an inherited read-only property, so the missing write
-capability on the base class does not make its `NewType` wrapper disjoint.
-
-```py
-class ReadOnlyBase:
-    @property
-    def value(self) -> int:
-        return 1
-
-class WritableChild(ReadOnlyBase):
-    @property
-    def value(self) -> int:
-        return 1
-
-    @value.setter
-    def value(self, value: int) -> None: ...
-
-NewReadOnly = NewType("NewReadOnly", ReadOnlyBase)
-
-static_assert(not is_disjoint_from(NewReadOnly, HasInstanceValue))
-static_assert(not is_disjoint_from(HasInstanceValue, NewReadOnly))
-
-wrapped_writable: NewReadOnly = NewReadOnly(WritableChild())
-```
-
-## `ClassVar` protocol assignment diagnostics
-
-An assignment rejected because a declared member is an instance variable should explain the
-qualifier mismatch rather than incorrectly claiming that the member is missing.
-
-```py
-from typing import ClassVar, Final, Protocol
-
-class HasClassValue(Protocol):
-    value: ClassVar[int]
-
-class InstanceValue:
-    value: int = 1
-
-implementation: HasClassValue = InstanceValue()  # snapshot: invalid-assignment
+implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `InstanceValue` is not assignable to `HasClassValue`
- --> src/mdtest_snippet.py:9:33
-  |
-9 | implementation: HasClassValue = InstanceValue()  # snapshot: invalid-assignment
-  |                 -------------   ^^^^^^^^^^^^^^^ Incompatible value of type `InstanceValue`
-  |                 |
-  |                 Declared type
-info: type `InstanceValue` is not assignable to protocol `HasClassValue`
-info: └── protocol member `value` is incompatible
-info:     └── protocol member `value` is an instance variable on type `InstanceValue`, but a class variable is required
+error[invalid-assignment]: Object of type `InstanceAttrX` is not assignable to `ClassVarXProto`
+   --> src/classvars.py:113:34
+    |
+113 | implementation: ClassVarXProto = InstanceAttrX()  # snapshot: invalid-assignment
+    |                 --------------   ^^^^^^^^^^^^^^^ Incompatible value of type `InstanceAttrX`
+    |                 |
+    |                 Declared type
+info: type `InstanceAttrX` is not assignable to protocol `ClassVarXProto`
+info: └── protocol member `x` is incompatible
+info:     └── protocol member `x` is an instance variable on type `InstanceAttrX`, but a class variable is required
 ```
 
-The explanation is the same when the instance variable has no class-level default, even though class
-attribute lookup itself does not find a value.
+This is mentioned by the
+[spec](https://typing.python.org/en/latest/spec/protocol.html#protocol-members) and tested in the
+[conformance suite](https://github.com/python/typing/blob/main/conformance/tests/protocols_definition.py)
+as something that must be supported by type checkers:
 
-```py
-class AnnotationOnly:
-    value: int
-
-implementation_without_default: HasClassValue = AnnotationOnly()  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `AnnotationOnly` is not assignable to `HasClassValue`
-  --> src/mdtest_snippet.py:13:49
-   |
-13 | implementation_without_default: HasClassValue = AnnotationOnly()  # snapshot: invalid-assignment
-   |                                 -------------   ^^^^^^^^^^^^^^^^ Incompatible value of type `AnnotationOnly`
-   |                                 |
-   |                                 Declared type
-info: type `AnnotationOnly` is not assignable to protocol `HasClassValue`
-info: └── protocol member `value` is incompatible
-info:     └── protocol member `value` is an instance variable on type `AnnotationOnly`, but a class variable is required
-```
-
-An instance attribute initialized in a method is also a declared instance variable, not a missing
-protocol member.
-
-```py
-class InitializedInstance:
-    def __init__(self) -> None:
-        self.value: int = 1
-
-initialized: HasClassValue = InitializedInstance()  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `InitializedInstance` is not assignable to `HasClassValue`
-  --> src/mdtest_snippet.py:18:30
-   |
-18 | initialized: HasClassValue = InitializedInstance()  # snapshot: invalid-assignment
-   |              -------------   ^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `InitializedInstance`
-   |              |
-   |              Declared type
-info: type `InitializedInstance` is not assignable to protocol `HasClassValue`
-info: └── protocol member `value` is incompatible
-info:     └── protocol member `value` is an instance variable on type `InitializedInstance`, but a class variable is required
-```
-
-A `Final` override is rejected because it cannot accept the writes required by the protocol. The
-shadowed instance declaration on its base must not replace that more specific explanation.
-
-```py
-class FinalOverride(InstanceValue):
-    value: Final[int] = 1
-
-final_override: HasClassValue = FinalOverride()  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `FinalOverride` is not assignable to `HasClassValue`
-  --> src/mdtest_snippet.py:22:33
-   |
-22 | final_override: HasClassValue = FinalOverride()  # snapshot: invalid-assignment
-   |                 -------------   ^^^^^^^^^^^^^^^ Incompatible value of type `FinalOverride`
-   |                 |
-   |                 Declared type
-info: type `FinalOverride` is not assignable to protocol `HasClassValue`
-info: └── protocol member `value` is incompatible
-info:     └── the member does not accept writes of type `int`
-```
-
-Likewise, an overriding method is a descriptor rather than the instance variable it replaces. Its
-incompatible readable type should remain visible in the diagnostic.
-
-```py
-class MethodOverride(InstanceValue):
-    def value(self) -> int:
-        return 1
-
-method_override: HasClassValue = MethodOverride()  # snapshot: invalid-assignment
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `MethodOverride` is not assignable to `HasClassValue`
-  --> src/mdtest_snippet.py:27:34
-   |
-27 | method_override: HasClassValue = MethodOverride()  # snapshot: invalid-assignment
-   |                  -------------   ^^^^^^^^^^^^^^^^ Incompatible value of type `MethodOverride`
-   |                  |
-   |                  Declared type
-info: type `MethodOverride` is not assignable to protocol `HasClassValue`
-info: └── protocol member `value` is incompatible
-info:     └── read type `bound method MethodOverride.value() -> int` is not assignable to `int`
-```
+> To distinguish between protocol class variables and protocol instance variables, the special
+> `ClassVar` annotation should be used.
 
 ## Declared instance attribute members
 
