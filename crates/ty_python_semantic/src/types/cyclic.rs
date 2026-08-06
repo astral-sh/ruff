@@ -183,6 +183,26 @@ enum FlowKind {
 
 /// Formal parameters are identified by their [`BoundTypeVarIdentity`], which is unique across
 /// definitions, so parameter identities can serve directly as the flow graph's nodes.
+/// e.g.
+///
+/// definition:
+/// ```py
+/// type A[A1, A2] = B[A2, A1]
+/// type B[B1, B2] = None
+/// ```
+/// produces the flow graph:
+/// ```ignore
+/// FlowEdge {
+///     from: A::A2,
+///     to: B::B1,
+///     kind: FlowKind::Direct,
+/// }
+/// FlowEdge {
+///     from: A::A1,
+///     to: B::B2,
+///     kind: FlowKind::Direct,
+/// }
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct FlowEdge<'db> {
     from: BoundTypeVarIdentity<'db>,
@@ -460,11 +480,19 @@ impl<'db> SpecializationFlowGraph<'db> {
             components
                 .get(&edge.from)
                 .zip(components.get(&edge.to))
-                .is_some_and(|(from, to)| from == to && root_components.contains(from))
+                .is_some_and(|(from_component, to_component)| {
+                    // True if this edge is inside the SCC (a nested cycle is formed).
+                    from_component == to_component
+                    // Only a nested cycle containing a root parameter can grow the root's
+                    // specialization. Helper-only cycles are handled when visiting the helper.
+                    && root_components.contains(from_component)
+                })
         })
     }
 
     /// Assigns each parameter to its strongly connected component.
+    /// This function returns a map from typevar to the index of the SCC to which it belongs.
+    /// This means that typevars with the same index belong to the same SCC.
     fn strongly_connected_parameter_components(
         &self,
         additional_parameters: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
