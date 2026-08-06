@@ -3732,18 +3732,17 @@ impl<'db> StaticClassLiteral<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
         let env = ProgramEnvironment::from_scope(self.body_scope(db));
-        let Some(generic_context) = self.generic_context(db) else {
-            return TypeVarVariance::Bivariant;
-        };
-        if !generic_context.contains(db, typevar) {
+        let typevar_in_generic_context = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.contains(db, typevar));
+
+        if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
 
         if self.is_protocol(db)
             && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
-            && protocol
-                .interface(db)
-                .supports_variance_inference(db, &env, generic_context)
+            && protocol.interface(db).supports_variance_inference(db)
         {
             return protocol.interface(db).variance_of(db, &env, typevar);
         }

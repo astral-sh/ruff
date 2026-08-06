@@ -314,10 +314,7 @@ impl<'db> ProtocolClass<'db> {
         let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
             return;
         };
-        if !protocol
-            .interface(db)
-            .supports_variance_inference(db, &env, *generic_context)
-        {
+        if !protocol.interface(db).supports_variance_inference(db) {
             return;
         }
 
@@ -878,30 +875,18 @@ impl<'db> ProtocolInterface<'db> {
 
     /// Return whether this interface is currently supported by structural variance inference.
     ///
-    /// TODO: Support recursive protocol members, descriptor writes with unrepresentable domains,
-    /// and writable `type[T]` members instead of skipping variance inference for these interfaces.
-    pub(super) fn supports_variance_inference(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        generic_context: GenericContext<'db>,
-    ) -> bool {
+    /// TODO: Support recursive protocol members and descriptor writes with unrepresentable domains
+    /// instead of skipping variance inference for these interfaces.
+    pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
         ProtocolInterfaceView::new(self, None).has_only_finite_members(db)
             && self.members(db).all(|member| {
-                let capabilities = member.capabilities(db, env);
-                !self.includes_generic_writable_instance_member(
-                    db,
-                    env,
-                    member.name,
-                    generic_context,
-                ) && [capabilities.instance, capabilities.class]
-                    .into_iter()
-                    .all(|access| {
-                        !matches!(
-                            access.write,
-                            Some(ProtocolMemberWrite::Descriptor { domain: None, .. })
-                        )
-                    })
+                !matches!(
+                    member.data.kind,
+                    ProtocolMemberKind::Property {
+                        write: Some(ProtocolMemberWrite::Descriptor { domain: None, .. }),
+                        ..
+                    }
+                )
             })
     }
 
