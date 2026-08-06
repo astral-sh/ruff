@@ -107,7 +107,7 @@ impl std::fmt::Display for RuleResolutionError {
             ValueSource::ScriptMetadata(_) => format_args!("script metadata"),
             ValueSource::Cli => format_args!("the CLI"),
             ValueSource::Editor => format_args!("the editor configuration"),
-            ValueSource::UvWorkspace => format_args!("uv workspace metadata"),
+            ValueSource::UvMetadata => format_args!("uv metadata"),
         };
         match kind {
             RuleResolutionErrorKind::Removed => {
