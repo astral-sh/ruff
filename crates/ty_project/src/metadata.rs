@@ -71,7 +71,7 @@ pub struct ProjectMetadata {
     config_file_override: Option<SystemPathBuf>,
 
     #[cfg_attr(test, serde(skip))]
-    uv_workspace: Option<uv::UvWorkspace>,
+    uv_workspace: Option<uv::UvMetadata>,
 }
 
 impl ProjectMetadata {
@@ -181,7 +181,7 @@ impl ProjectMetadata {
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
         {
-            match uv::UvWorkspace::discover(path, system) {
+            match uv::UvMetadata::discover_workspace(path, system) {
                 Ok(workspace) => Some(workspace),
                 Err(error) => {
                     tracing::warn!("{error}");
@@ -206,7 +206,7 @@ impl ProjectMetadata {
     fn discover_with_uv_workspace(
         path: &SystemPath,
         system: &dyn System,
-        uv_workspace: Option<uv::UvWorkspace>,
+        uv_workspace: Option<uv::UvMetadata>,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
@@ -216,7 +216,7 @@ impl ProjectMetadata {
 
         let mut closest_project: Option<ProjectMetadata> = None;
         let mut uv_project: Option<ProjectMetadata> = None;
-        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvWorkspace::root);
+        let uv_workspace_root = uv_workspace.as_ref().map(uv::UvMetadata::workspace_root);
 
         for project_root in path.ancestors() {
             let is_uv_workspace_root = uv_workspace_root == Some(project_root);
@@ -366,7 +366,7 @@ impl ProjectMetadata {
     }
 
     #[must_use]
-    fn with_uv_workspace(mut self, uv_workspace: Option<uv::UvWorkspace>) -> Self {
+    fn with_uv_workspace(mut self, uv_workspace: Option<uv::UvMetadata>) -> Self {
         self.uv_workspace = uv_workspace;
         self
     }
@@ -530,7 +530,7 @@ impl ProjectMetadata {
                     python_version: uv_workspace.python_version().cloned(),
                     python: uv_workspace
                         .environment()
-                        .map(|path| RelativePathBuf::new(path, ValueSource::UvWorkspace)),
+                        .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -651,7 +651,7 @@ mod tests {
     use ty_static::EnvVars;
 
     use crate::metadata::{Options, value::RelativePathBuf};
-    use crate::uv::UvWorkspace;
+    use crate::uv::UvMetadata;
     use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]
@@ -1096,7 +1096,7 @@ unclosed table, expected `]`
                 },
             },
         });
-        let uv_workspace = UvWorkspace::from_metadata(metadata.to_string().as_bytes(), &system)?;
+        let uv_workspace = UvMetadata::from_metadata(metadata.to_string().as_bytes(), &system)?;
         let mut project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, Some(uv_workspace))?;
         project.apply_fallback_options(Options::from_toml_str(
@@ -1128,13 +1128,13 @@ unclosed table, expected `]`
             project_environment
                 .and_then(|environment| environment.python.as_ref())
                 .map(RelativePathBuf::source),
-            Some(ValueSource::UvWorkspace)
+            Some(ValueSource::UvMetadata)
         ));
         assert!(matches!(
             project_environment
                 .and_then(|environment| environment.python_version.as_ref())
                 .map(ruff_ranged_value::RangedValue::source),
-            Some(ValueSource::UvWorkspace)
+            Some(ValueSource::UvMetadata)
         ));
 
         let user_config_directory = root.join("config");
@@ -1629,12 +1629,12 @@ unclosed table, expected `]`
         assert_eq!(format!("{error:#}").replace('\\', "/"), message);
     }
 
-    fn uv_workspace(root: &SystemPathBuf, system: &TestSystem) -> anyhow::Result<UvWorkspace> {
+    fn uv_workspace(root: &SystemPathBuf, system: &TestSystem) -> anyhow::Result<UvMetadata> {
         let metadata = serde_json::json!({
             "workspace_root": root,
         });
 
-        Ok(UvWorkspace::from_metadata(
+        Ok(UvMetadata::from_metadata(
             metadata.to_string().as_bytes(),
             system,
         )?)
