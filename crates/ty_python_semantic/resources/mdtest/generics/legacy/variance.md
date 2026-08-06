@@ -296,11 +296,9 @@ equivalent to) each other.
 
 It is not possible to construct a legacy typevar that is explicitly bivariant.
 
-## Generic protocols require matching variance
+## Generic protocol variance
 
-A protocol's declared type-variable variance must agree with the positions where its interface uses
-that variable. Unlike nominal generic classes, a protocol cannot declare an input-only or
-output-only type variable as invariant.
+A protocol's declared variance must match whether its members consume or produce that type variable.
 
 ```py
 from typing import Protocol, TypeVar
@@ -328,21 +326,18 @@ class ContravariantSource(Protocol[T_contra]):
 class CovariantSource(Protocol[T_co]):
     def read(self) -> T_co: ...
 
-class ContravariantSink(Protocol[T_contra]):
-    def write(self, value: T_contra) -> None: ...
-
 class InvariantReadWrite(Protocol[T]):
     def read(self) -> T: ...
     def write(self, value: T) -> None: ...
 ```
 
-## Protocol property variance
+## Protocol properties and writable attributes
 
-A read-only property uses its type variable covariantly. A writable property uses the same variable
-for both reads and writes, so it requires invariance.
+Read-only properties are covariant. Writable properties and attributes are invariant, including
+underscore-prefixed attributes and annotated special-method attributes.
 
 ```py
-from typing import Protocol, TypeVar
+from typing import Callable, Protocol, TypeVar
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
@@ -356,366 +351,49 @@ class WritableProperty(Protocol[T]):
     def value(self) -> T: ...
     @value.setter
     def value(self, value: T) -> None: ...
-```
 
-Explicit receiver annotations on property accessors identify the object whose property is accessed;
-they do not change the variance of the values accepted by the property.
-
-```py
-T_contra = TypeVar("T_contra", contravariant=True)
-
-class ContravariantProperty(Protocol[T_contra]):
-    @property
-    def value(self: "ContravariantProperty[T_contra]") -> object: ...
-    @value.setter
-    def value(self: "ContravariantProperty[T_contra]", value: T_contra) -> None: ...
-```
-
-## Writable protocol attribute variance
-
-Protocol attributes are writable unless declared otherwise, including attributes whose names begin
-with an underscore. Both public and underscore-prefixed writable attributes require invariance.
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-from typing import Protocol, TypeVar
-
-T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
-
-class MutableAttribute(Protocol[T]):
-    value: T
-
-class UnderscoreAttribute(Protocol[T]):
+class WritableAttribute(Protocol[T]):
     _value: T
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantUnderscoreAttribute` should be invariant, but is covariant"
-class CovariantUnderscoreAttribute(Protocol[T_co]):
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantAttribute` should be invariant, but is covariant"
+class CovariantAttribute(Protocol[T_co]):
     _value: T_co
 
-static_assert(not is_subtype_of(UnderscoreAttribute[int], UnderscoreAttribute[object]))
-static_assert(not is_assignable_to(UnderscoreAttribute[int], UnderscoreAttribute[object]))
-
-def overwrite(value: UnderscoreAttribute[object]) -> None:
-    value._value = object()
-
-def unsound(value: UnderscoreAttribute[int]) -> None:
-    overwrite(value)  # error: [invalid-argument-type]
-```
-
-## Protocol callable attributes and methods
-
-An annotated `__call__` attribute is writable and therefore invariant, while a `__call__` method
-cannot be reassigned through the protocol interface and can return a covariant type variable.
-
-```py
-from typing import Callable, Protocol, TypeVar
-
-T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
-
-class MutableDunderAttribute(Protocol[T]):
+class CallableAttribute(Protocol[T]):
     __call__: Callable[..., T]
 
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantDunderAttribute` should be invariant, but is covariant"
-class CovariantDunderAttribute(Protocol[T_co]):
-    __call__: Callable[..., T_co]
-
-class CovariantDunderMethod(Protocol[T_co]):
+class CallableMethod(Protocol[T_co]):
     def __call__(self) -> T_co: ...
 ```
 
-## Protocol members involving class-object types
+## Protocol constructors and method receivers
 
-The class-object type `type[T]` is covariant in `T`, but a property accepting and returning
-`type[T]` is invariant because the property is writable.
-
-```py
-from typing import Protocol, TypeVar
-
-T = TypeVar("T")
-
-class WritableClassValue(Protocol[T]):
-    @property
-    def value(self) -> type[T]: ...
-    @value.setter
-    def value(self, value: type[T]) -> None: ...
-```
-
-Unlike protocol implementation details such as `__class_getitem__`, an explicitly declared
-`__class__` property remains part of the protocol interface and has the same write requirement.
-
-```py
-class WritableClassAttribute(Protocol[T]):
-    @property
-    def __class__(self) -> type[T]: ...
-    @__class__.setter
-    def __class__(self, value: type[T]) -> None: ...
-```
-
-## Nested invariant protocol return types
-
-A method return position is covariant, but returning a mutable `list[T]` still requires `T` to be
-invariant because the list itself is invariant in its element type.
+Constructors are not protocol members. Explicit receiver annotations do not add another input or
+output position, while an invariant return type retains its own invariance.
 
 ```py
 from typing import Protocol, TypeVar
 
 T = TypeVar("T")
-
-class InvariantReturn(Protocol[T]):
-    def read(self) -> list[T]: ...
-```
-
-## Descriptor-decorated protocol member variance
-
-A descriptor determines the types exposed by its protocol member. A descriptor that reads `T_co` but
-accepts arbitrary objects for writes exposes its type variable only in a covariant position.
-
-```py
-from typing import Callable, Generic, Protocol, TypeVar
-
-T_co = TypeVar("T_co", covariant=True)
-
-class Descriptor(Generic[T_co]):
-    def __init__(self, getter: Callable[..., T_co]) -> None: ...
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__(self, instance: object, value: object) -> None: ...
-
-class DescriptorProtocol(Protocol[T_co]):
-    @Descriptor
-    def value(self) -> T_co: ...
-```
-
-## Descriptor-decorated protocol members with generic setters
-
-A generic descriptor setter can be writable even when its accepted values cannot be represented by a
-single type. Such a setter must still prevent its protocol's parameter from becoming covariant.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Callable, Generic, Protocol, TypeVar
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-
-T_co = TypeVar("T_co", covariant=True)
-
-class GenericSetterDescriptor(Generic[T_co]):
-    def __init__(self, getter: Callable[..., T_co]) -> None: ...
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__[U](self, instance: object, value: tuple[T_co, U]) -> None: ...
-
-# error: [invalid-protocol] "Type variable `T_co` in protocol `IncorrectlyCovariant` should be invariant, but is covariant"
-class IncorrectlyCovariant(Protocol[T_co]):
-    @GenericSetterDescriptor
-    def value(self) -> T_co: ...
-
-class InferredDescriptorProtocol[T](Protocol):
-    @GenericSetterDescriptor
-    def value(self) -> T: ...
-
-static_assert(not is_subtype_of(InferredDescriptorProtocol[int], InferredDescriptorProtocol[object]))
-```
-
-The inferred invariant parameter also prevents a nominal wrapper from accepting an incompatible
-specialization through either subtyping or assignability.
-
-```py
-class WrappedDescriptor[T]:
-    def protocol(self) -> InferredDescriptorProtocol[T]:
-        raise NotImplementedError
-
-static_assert(not is_subtype_of(WrappedDescriptor[int], WrappedDescriptor[object]))
-static_assert(not is_assignable_to(WrappedDescriptor[int], WrappedDescriptor[object]))
-
-def overwrite(value: WrappedDescriptor[object]) -> None:
-    value.protocol().value = (object(), 1)
-
-def unsound(value: WrappedDescriptor[int]) -> None:
-    overwrite(value)  # error: [invalid-argument-type]
-```
-
-If a generic setter's accepted value depends only on its own method-local type variable, the
-protocol's type parameter remains covariant. The method-local variable does not affect protocol
-variance merely because the complete write domain cannot be represented.
-
-```py
-class IndependentSetterDescriptor(Generic[T_co]):
-    def __init__(self, getter: Callable[..., T_co]) -> None: ...
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__[U](self, instance: object, value: tuple[U, object]) -> None: ...
-
-class CovariantIndependentSetter(Protocol[T_co]):
-    @IndependentSetterDescriptor
-    def value(self) -> T_co: ...
-
-class InferredIndependentSetter[T](Protocol):
-    @IndependentSetterDescriptor
-    def value(self) -> T: ...
-
-class WrappedIndependentSetter[T]:
-    def protocol(self) -> InferredIndependentSetter[T]:
-        raise NotImplementedError
-
-static_assert(is_subtype_of(WrappedIndependentSetter[int], WrappedIndependentSetter[object]))
-static_assert(is_assignable_to(WrappedIndependentSetter[int], WrappedIndependentSetter[object]))
-```
-
-The setter's complete value annotation also preserves nested polarity. A callback that accepts the
-protocol parameter is contravariant in that parameter, and passing the callback to a setter flips it
-back to covariance.
-
-```py
-class CallbackSetterDescriptor(Generic[T_co]):
-    def __init__(self, getter: Callable[..., T_co]) -> None: ...
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__[U](self, instance: object, value: Callable[[T_co], U]) -> None: ...
-
-class CovariantCallbackSetter(Protocol[T_co]):
-    @CallbackSetterDescriptor
-    def value(self) -> T_co: ...
-```
-
-An overload that cannot accept the protocol's receiver is not part of its write capability, even if
-that overload mentions the protocol's type parameter.
-
-```py
-from typing import overload
-
-class SelectiveSetterDescriptor(Generic[T_co]):
-    def __init__(self, getter: Callable[..., T_co]) -> None: ...
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-
-    @overload
-    def __set__[U](self, instance: int, value: tuple[T_co, U]) -> None: ...
-    @overload
-    def __set__[U](self, instance: object, value: tuple[U, object]) -> None: ...
-    def __set__(self, instance: object, value: object) -> None: ...
-
-class CovariantSelectiveSetter(Protocol[T_co]):
-    @SelectiveSetterDescriptor
-    def value(self) -> T_co: ...
-```
-
-A variadic setter accepts its assigned value through `*args`. Its element annotation determines
-variance even though there is no second named positional parameter.
-
-```py
-class VariadicSetterDescriptor(Generic[T_co]):
-    def __init__(self, getter: Callable[..., T_co]) -> None: ...
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__[U](self, instance: object, *values: U) -> None: ...
-
-class CovariantVariadicSetter(Protocol[T_co]):
-    @VariadicSetterDescriptor
-    def value(self) -> T_co: ...
-```
-
-When a descriptor may have more than one runtime type, a write must be accepted by every possible
-setter. An unrestricted setter therefore cannot hide another setter that depends on the protocol's
-type parameter.
-
-```py
-class UnrestrictedDescriptor(Generic[T_co]):
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__(self, instance: object, value: object) -> None: ...
-
-class RestrictedDescriptor(Generic[T_co]):
-    def __get__(self, instance: object, owner: type | None = None) -> T_co:
-        raise NotImplementedError
-    def __set__[U](self, instance: object, value: tuple[T_co, U]) -> None: ...
-
-def either_descriptor[U](
-    getter: Callable[..., U],
-) -> UnrestrictedDescriptor[U] | RestrictedDescriptor[U]:
-    raise NotImplementedError
-
-# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantUnionDescriptor` should be invariant, but is covariant"
-class CovariantUnionDescriptor(Protocol[T_co]):
-    @either_descriptor
-    def value(self) -> T_co: ...
-
-class InferredUnionDescriptor[T](Protocol):
-    @either_descriptor
-    def value(self) -> T: ...
-
-class WrappedUnionDescriptor[T]:
-    def protocol(self) -> InferredUnionDescriptor[T]:
-        raise NotImplementedError
-
-static_assert(not is_subtype_of(WrappedUnionDescriptor[int], WrappedUnionDescriptor[object]))
-static_assert(not is_assignable_to(WrappedUnionDescriptor[int], WrappedUnionDescriptor[object]))
-```
-
-## Protocol variance ignores constructors and undeclared instance attributes
-
-Constructors do not belong to a protocol's structural interface. If a type variable appears only in
-a constructor, its inferred variance therefore falls back to covariance.
-
-```py
-from typing import Protocol, TypeVar
-
-T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
 
 # error: [invalid-protocol] "Type variable `T` in protocol `ConstructorOnly` should be covariant, but is invariant"
 class ConstructorOnly(Protocol[T]):
     def __init__(self, value: T) -> None: ...
 
-class CovariantConstructorOnly(Protocol[T_co]):
-    def __init__(self, value: T_co) -> None: ...
-```
-
-Assigning an undeclared attribute inside a constructor does not add that attribute to the protocol
-interface. The assignment is diagnosed separately and does not make the type variable invariant.
-
-```py
-class UndeclaredConstructorAttribute(Protocol[T_co]):
-    def __init__(self, value: T_co) -> None:
-        self.value = value  # error: [ambiguous-protocol-member]
-```
-
-Excluded protocol implementation methods such as `__class_getitem__` likewise do not contribute
-their parameter positions to structural variance.
-
-```py
-class ExcludedClassGetitem(Protocol[T_co]):
-    @classmethod
-    def __class_getitem__(cls, value: T_co) -> object: ...
-```
-
-## Protocol variance ignores explicit receiver annotations
-
-Explicit instance and class receivers identify where a method is bound; they do not make a
-contravariant protocol type variable appear covariantly.
-
-```py
-from typing import Protocol, TypeVar
-
-T_contra = TypeVar("T_contra", contravariant=True)
-
 class ExplicitReceivers(Protocol[T_contra]):
     def send(self: "ExplicitReceivers[T_contra]", value: T_contra) -> None: ...
     @classmethod
     def configure(cls: "type[ExplicitReceivers[T_contra]]") -> None: ...
+
+class InvariantReturn(Protocol[T]):
+    def read(self) -> list[T]: ...
 ```
 
-## Parameter specifications and inferred protocol variance
+## Inferred legacy protocol variance
 
-Protocol variance validation applies only to explicitly declared regular type variables. Parameter
-specifications and variables whose variance is inferred do not need matching declarations.
+Inferred legacy type variables use the same structural interface as explicitly declared protocol
+parameters. An underscore-prefixed protocol attribute remains writable and therefore invariant.
 
 ```toml
 [environment]
@@ -724,94 +402,21 @@ python-version = "3.12"
 
 ```py
 from typing import ParamSpec, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 P = ParamSpec("P")
 R_co = TypeVar("R_co", covariant=True)
-T_infer = TypeVar("T_infer", infer_variance=True)
+T = TypeVar("T", infer_variance=True)
 
 class Callback(Protocol[P, R_co]):
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co: ...
 
-class InferredSource(Protocol[T_infer]):
-    def read(self) -> T_infer: ...
-```
+class WritableProtocol(Protocol[T]):
+    _value: T
 
-Inferred legacy parameters use the same structural interface as explicitly declared protocol
-parameters. An underscore-prefixed protocol attribute remains writable, so its inferred parameter is
-invariant.
-
-```py
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-
-class InferredWritableAttribute(Protocol[T_infer]):
-    _value: T_infer
-
-static_assert(not is_subtype_of(InferredWritableAttribute[int], InferredWritableAttribute[object]))
-static_assert(not is_assignable_to(InferredWritableAttribute[int], InferredWritableAttribute[object]))
-
-def overwrite_inferred(value: InferredWritableAttribute[object]) -> None:
-    value._value = object()
-
-def unsound_inferred(value: InferredWritableAttribute[int]) -> None:
-    overwrite_inferred(value)  # error: [invalid-argument-type]
-```
-
-## Invalid protocol headers do not cause cascading variance diagnostics
-
-Malformed generic parameter ordering, invalid default references, incompatible base variance, and
-invalid generic bases are separate from protocol variance. Ignoring their diagnostics does not turn
-them into protocol-variance errors.
-
-```toml
-[environment]
-python-version = "3.13"
-
-[rules]
-invalid-generic-class = "ignore"
-invalid-base = "ignore"
-not-subscriptable = "ignore"
-shadowed-type-variable = "ignore"
-```
-
-```py
-from typing import Generic, Protocol, TypeVar, TypeVarTuple
-
-DefaultT = TypeVar("DefaultT", default=int)
-T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
-Ts = TypeVarTuple("Ts")
-A = TypeVar("A", default="B")
-B = TypeVar("B", default=int)
-
-class InvariantBase(Protocol[T]):
-    value: T
-
-class InvalidParameterOrder(Protocol[DefaultT, T]): ...
-class DuplicateGenericBase(Protocol[T], Generic[T]): ...
-class InvalidDefaultReference(Protocol[A, B]): ...
-class UnsubscriptedGeneric(Protocol[T], Generic): ...
-class IncompatibleBaseVariance(InvariantBase[T_co], Protocol[T_co]): ...
-class DefaultAfterTypeVarTuple(Protocol[*Ts, DefaultT]): ...
-```
-
-A non-generic protocol cannot be specialized to construct a generic base. Its resulting unknown base
-type does not provide a valid protocol header for variance validation.
-
-```py
-class NonGenericProtocol(Protocol):
-    def read(self) -> int: ...
-
-class NonGenericBase(NonGenericProtocol[T], Protocol[T]): ...
-```
-
-A nested protocol cannot reuse a type variable bound by an enclosing generic class. The invalid
-header must suppress variance validation even when its primary diagnostic is disabled.
-
-```py
-class Outer(Generic[T]):
-    class ShadowedProtocol(Protocol[T]):
-        def read(self) -> T: ...
+static_assert(not is_subtype_of(WritableProtocol[int], WritableProtocol[object]))
+static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[object]))
 ```
 
 ## Inheriting from generic classes with explicit variance

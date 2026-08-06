@@ -2644,7 +2644,7 @@ from __future__ import annotations
 from typing import Generic, Protocol, TypeVar, overload
 
 S = TypeVar("S")
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
 
 class Unit(Protocol):
     def __mul__(self, other: S | Quantity[S]): ...
