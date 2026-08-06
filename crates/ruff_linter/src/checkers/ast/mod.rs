@@ -53,7 +53,7 @@ use ruff_python_parser::semantic_errors::{
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
-use ruff_python_semantic::analyze::{imports, typing};
+use ruff_python_semantic::analyze::{imports, typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
@@ -178,6 +178,10 @@ pub(crate) enum ExpectedDocstringKind {
     /// class Foo:
     ///     b = 1
     ///     """This is the docstring for `Foo.b` class variable."""
+    ///
+    ///     def __init__(self) -> None:
+    ///         self.c = 1
+    ///         """This is the docstring for the `c` instance variable."""
     /// ```
     Attribute,
 }
@@ -664,6 +668,34 @@ impl<'a> Checker<'a> {
     /// `LintContext` in different analysis phases.
     pub(crate) const fn context(&self) -> &'a LintContext<'a> {
         self.context
+    }
+
+    /// Return the instance parameter when visiting a statement directly in an `__init__` method.
+    fn init_instance_parameter(&self) -> Option<&'a str> {
+        let semantic = self.semantic();
+        let scope = semantic.current_scope();
+        let ScopeKind::Function(function) = scope.kind else {
+            return None;
+        };
+
+        if !visibility::is_init(&function.name)
+            || !semantic
+                .first_non_type_parent_scope(scope)
+                .is_some_and(|parent| parent.kind.is_class())
+            || !matches!(
+                semantic.current_statement_parent(),
+                Some(Stmt::FunctionDef(parent)) if std::ptr::eq(parent, function)
+            )
+        {
+            return None;
+        }
+
+        function
+            .parameters
+            .posonlyargs
+            .first()
+            .or_else(|| function.parameters.args.first())
+            .map(|parameter| parameter.name().as_str())
     }
 
     /// Return the current [`DocstringState`].
@@ -1636,20 +1668,33 @@ impl<'a> Visitor<'a> for Checker<'a> {
             _ => visitor::walk_stmt(self, stmt),
         }
 
-        if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
-            match stmt {
-                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let [Expr::Name(_)] = targets.as_slice() {
-                        self.docstring_state =
-                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
-                    }
-                }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if target.is_name_expr() => {
+        let in_module_or_class =
+            self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class();
+        let init_instance_parameter = self.init_instance_parameter();
+        let is_attribute_target = |target: &Expr| {
+            (in_module_or_class && target.is_name_expr())
+                || init_instance_parameter.is_some_and(|instance| {
+                    matches!(
+                        target,
+                        Expr::Attribute(attribute)
+                            if attribute.value.as_name_expr().is_some_and(|name| name.id == instance)
+                    )
+                })
+        };
+
+        match stmt {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                if let [target] = targets.as_slice()
+                    && is_attribute_target(target)
+                {
                     self.docstring_state =
                         DocstringState::Expected(ExpectedDocstringKind::Attribute);
                 }
-                _ => {}
             }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) if is_attribute_target(target) => {
+                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Attribute);
+            }
+            _ => {}
         }
 
         // Step 3: Clean-up

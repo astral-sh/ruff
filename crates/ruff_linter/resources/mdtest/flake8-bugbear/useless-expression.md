@@ -96,3 +96,30 @@ class Class:
     "Annotated class attribute docstring."
     "Not an attribute docstring."  # error: [useless-expression]
 ```
+
+## Instance attribute docstrings
+
+Strings following instance attribute assignments directly in `__init__` are
+attribute docstrings. Local assignments, nested assignments, and assignments in
+other methods do not introduce attribute docstrings.
+
+```py
+class Class:
+    def __init__(this):
+        this.attribute = 1
+        "Instance attribute docstring."
+
+        this.annotated_attribute: int
+        "Annotated instance attribute docstring."
+
+        local = 1
+        "Not an instance attribute docstring."  # error: [useless-expression]
+
+        if local:
+            this.nested_attribute = 1
+            "Not a top-level assignment."  # error: [useless-expression]
+
+    def method(self):
+        self.attribute = 1
+        "Not in an `__init__` method."  # error: [useless-expression]
+```
