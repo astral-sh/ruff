@@ -531,7 +531,7 @@ impl ProjectMetadata {
                     python_version: uv_workspace.python_version().cloned(),
                     python: uv_workspace
                         .environment()
-                        .map(|path| RelativePathBuf::new(path, ValueSource::UvWorkspace)),
+                        .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
                     ..EnvironmentOptions::default()
                 }),
                 ..Options::default()
@@ -1128,13 +1128,13 @@ unclosed table, expected `]`
             project_environment
                 .and_then(|environment| environment.python.as_ref())
                 .map(RelativePathBuf::source),
-            Some(ValueSource::UvWorkspace)
+            Some(ValueSource::UvMetadata)
         ));
         assert!(matches!(
             project_environment
                 .and_then(|environment| environment.python_version.as_ref())
                 .map(ruff_ranged_value::RangedValue::source),
-            Some(ValueSource::UvWorkspace)
+            Some(ValueSource::UvMetadata)
         ));
 
         let user_config_directory = root.join("config");

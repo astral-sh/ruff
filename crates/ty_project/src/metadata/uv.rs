@@ -96,7 +96,7 @@ fn resolve_python_version(
         .parse::<SupportedPythonVersion>()
         .map_err(|_| UvWorkspaceError::InvalidPythonVersion(version.clone()))?;
 
-    Ok(RangedValue::new(version, ValueSource::UvWorkspace))
+    Ok(RangedValue::new(version, ValueSource::UvMetadata))
 }
 
 fn existing_directory(
