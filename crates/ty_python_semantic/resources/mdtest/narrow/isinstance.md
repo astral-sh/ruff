@@ -1032,6 +1032,25 @@ def _(covariant: SubOfCovariant[P], contravariant: SubOfContravariant[P], invari
         reveal_type(invariant)  # revealed: SubOfInvariant[P]
 ```
 
+This also works for runtime-checkable protocols:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+class Concrete[T]:
+    def read(self) -> T:
+        raise NotImplementedError
+
+def _(value: Concrete[int]) -> None:
+    if isinstance(value, Reader):
+        reveal_type(value)  # revealed: Concrete[int]
+        reveal_type(value.read())  # revealed: int
+```
+
 ## Use cases: `isinstance` narrowing and generics
 
 ### Strict mode

@@ -962,18 +962,28 @@ fn specialize_generic_class_for_subject<'db>(
     subject_class: ClassType<'db>,
 ) -> Option<ClassType<'db>> {
     let generic_context = target_class.generic_context(db)?;
-    let target_base = target_class
-        .identity_specialization(db)
+    let target_identity = target_class.identity_specialization(db);
+    let target_base = target_identity
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
-        .find(|base| base.class_literal(db) == subject_class.class_literal(db))?;
+        .find(|base| base.class_literal(db) == subject_class.class_literal(db));
+
+    let (source, target) = if let Some(target_base) = target_base {
+        (target_base, subject_class)
+    } else if target_class.is_protocol(db) {
+        (subject_class, target_identity)
+    } else if subject_class.is_protocol(db) {
+        (target_identity, subject_class)
+    } else {
+        return None;
+    };
 
     let constraints = ConstraintSetBuilder::new();
-    let solutions = Type::instance(db, env, target_base)
+    let solutions = Type::instance(db, env, source)
         .assignable_solutions_with_inferable(
             db,
             env,
-            Type::instance(db, env, subject_class),
+            Type::instance(db, env, target),
             generic_context.inferable_typevars(db),
         )
         .solve(db, env, &constraints);
