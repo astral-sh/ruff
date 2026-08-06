@@ -1465,7 +1465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node)
+            self.fallback_member_declared_type(node, binding)
         } else {
             None
         }
@@ -1482,7 +1482,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// For a member binding without a live place declaration, obtain its declared type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+    fn fallback_member_declared_type(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        binding: Definition<'db>,
+    ) -> Option<Type<'db>> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
@@ -1490,11 +1494,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
             if let Place::Defined(DefinedPlace {
                 ty,
+                origin,
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) = value_type
                 .member(db, self.program_environment(), attr)
                 .place
+                && (!matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_))
+                    || origin.is_declared()
+                    || AddBinding::attribute_is_data_descriptor(
+                        db,
+                        self.program_environment(),
+                        value_type,
+                        attr,
+                    ))
             {
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
@@ -4253,7 +4266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node),
+                declared_ty: self.fallback_member_declared_type(node, definition),
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),
