@@ -25,7 +25,7 @@ pub(crate) fn definitions_for_module_global<'db>(
     ))
 }
 
-/// A set of definitions found by name resolution along with facts about their availability.
+/// A set of definitions found by name resolution.
 pub(crate) struct DefinitionResolution<'db> {
     definitions: SmallVec<[Definition<'db>; 2]>,
 }
@@ -36,13 +36,12 @@ impl<'db> DefinitionResolution<'db> {
         &self.definitions
     }
 
-    fn from_bindings(
+    /// Resolves the definitions supplied by the given bindings.
+    pub(crate) fn from_bindings(
         db: &'db dyn Db,
         mut bindings: BindingWithConstraintsIterator<'db, 'db>,
     ) -> Self {
-        let mut resolution = Self {
-            definitions: SmallVec::new(),
-        };
+        let mut definitions = SmallVec::new();
 
         while let Some(binding) = bindings.next() {
             let reachability = bindings.reachability_constraints().evaluate(
@@ -54,21 +53,14 @@ impl<'db> DefinitionResolution<'db> {
                 continue;
             }
 
-            match binding.binding {
-                DefinitionState::Defined(definition) => {
-                    resolution.push_definition(definition);
-                }
-                DefinitionState::Deleted | DefinitionState::Undefined => {}
+            if let DefinitionState::Defined(definition) = binding.binding
+                && !definitions.contains(&definition)
+            {
+                definitions.push(definition);
             }
         }
 
-        resolution
-    }
-
-    fn push_definition(&mut self, definition: Definition<'db>) {
-        if !self.definitions.contains(&definition) {
-            self.definitions.push(definition);
-        }
+        Self { definitions }
     }
 }
 
