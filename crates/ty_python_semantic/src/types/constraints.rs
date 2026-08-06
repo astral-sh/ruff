@@ -4212,6 +4212,33 @@ impl<'db> PathBound<'db> {
     fn has_only_gradual_evidence(&self) -> bool {
         self.has_only_gradual_evidence
     }
+
+    /// Return the valid specialization obtained by preferring `candidate` on this path.
+    ///
+    /// The candidate must be above the path's existing lower bound. The default solver then
+    /// validates it against the path's upper bound and the type variable's declared bound or
+    /// constraints.
+    pub(crate) fn valid_preferred_solution(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        candidate: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if !self.bound_typevar.is_paramspec(db)
+            && self
+                .lower
+                .is_some_and(|lower| !lower.is_assignable_to(db, env, candidate))
+        {
+            return None;
+        }
+
+        let mut candidate_bound = self.clone();
+        candidate_bound.lower = Some(candidate);
+        PathBounds::default_solve(db, env, builder, &candidate_bound)
+            .ok()
+            .flatten()
+    }
 }
 
 impl<'db> Type<'db> {

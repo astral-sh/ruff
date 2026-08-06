@@ -182,4 +182,22 @@ def check_deep_bound[T, U]():
     static_assert(constraints.implies_subtype_of(T, Deep))
 ```
 
+## Provisional context with many union alternatives
+
+An outer generic call can give an inner call a provisional element type. An unrelated union in the
+inner call's return type must not require enumerating every combination of provisional constraints.
+
+```py
+from collections.abc import Iterable
+from typing import Literal
+
+type Choice = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"]
+
+def consume[T](value: Iterable[T]) -> None: ...
+def value_or_choice[T](value: T) -> Choice | T:
+    raise NotImplementedError
+
+consume(value_or_choice([]))
+```
+
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660
