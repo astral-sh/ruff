@@ -366,6 +366,42 @@ class CallableMethod(Protocol[T_co]):
     def __call__(self) -> T_co: ...
 ```
 
+## Protocol attributes containing class types
+
+Although `type[T]` is covariant, a writable protocol attribute containing `type[T]` must make the
+protocol invariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+class WritableClassAttribute(Protocol[T]):
+    value: type[T]
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantClassAttribute` should be invariant, but is covariant"
+class CovariantClassAttribute(Protocol[T_co]):
+    value: type[T_co]
+
+class InferredClassAttribute[T](Protocol):
+    value: type[T]
+
+class Wrapper[T]:
+    def value(self) -> InferredClassAttribute[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_assignable_to(Wrapper[int], Wrapper[object]))
+```
+
 ## Descriptor-decorated protocol variance
 
 A descriptor with a known setter domain contributes its actual read and write types to protocol
