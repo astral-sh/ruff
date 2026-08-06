@@ -87,6 +87,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::subscript::SubscriptAssignmentKind;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
@@ -3242,6 +3243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.validate_subscript_assignment(
                         subscript_expr,
                         value,
+                        SubscriptAssignmentKind::Ordinary,
                         object_ty,
                         &mut infer_slice_ty,
                         infer_assigned_ty,
@@ -4926,6 +4928,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.validate_subscript_assignment(
                     subscript,
                     target,
+                    SubscriptAssignmentKind::Augmented,
                     object_ty,
                     &mut |_, _| slice_ty,
                     &mut |_, _| result_ty,

@@ -2430,6 +2430,10 @@ An augmented subscript assignment constrains an inferred list using the operator
 right-hand operand.
 
 ```py
+integers = [0]
+integers[0] += 1.0
+reveal_type(integers)  # revealed: list[float]
+
 values = [1]
 values[0] /= 2
 reveal_type(values)  # revealed: list[float]
@@ -2520,6 +2524,38 @@ annotated: list[int] = [1]
 # error: [invalid-assignment]
 annotated[0] /= 2
 reveal_type(annotated)  # revealed: list[int]
+```
+
+## Augmented subscript inference for nested comprehensions
+
+Collections nested inside a comprehension do not yet participate in full-scope inference through the
+outer collection.
+
+```py
+coverage = {key: [0] for key in ["value"]}
+# TODO: Widen the nested list to `list[float]` instead of rejecting the assignment.
+# error: [invalid-assignment]
+coverage["value"][0] += 1.0
+reveal_type(coverage)  # revealed: dict[str, list[int]]
+```
+
+## Rejected ordinary writes do not constrain collections
+
+An invalid ordinary subscript assignment must not widen an inferred collection and introduce
+additional errors at earlier reads or later returns.
+
+```py
+def accepts_strings(first: str, second: str, values: list[str]) -> None: ...
+def example(condition: bool, value: str | None) -> list[str]:
+    if condition:
+        values = ["initial"] + ["second"]
+    else:
+        values = ["initial"]
+
+    accepts_strings(values[0], values[0], [values[0]])
+    # error: [invalid-assignment]
+    values[0] = value
+    return values
 ```
 
 ## Multi-inference diagnostics
