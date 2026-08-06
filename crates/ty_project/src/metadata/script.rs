@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use pep440_rs::VersionSpecifiers;
 use ruff_db::Db as SourceDb;
+use ruff_db::FxDashMap;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
@@ -12,10 +15,13 @@ use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
+use ty_static::EnvVars;
 
-use crate::metadata::options::{Options, OptionsContext};
+use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
+use crate::metadata::uv::{MetadataTarget, Uv, UvMetadata};
+use crate::metadata::value::RelativePathBuf;
 use crate::{Db, ProjectMetadata};
 
 /// A standalone PEP 723 script and its resolved settings.
@@ -76,6 +82,12 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 
     let mut diagnostics = ScriptConfigurationDiagnostics::default();
     let metadata = parse_script_metadata(file, tag, &mut diagnostics);
+    let environment = db.script_environments().get(db, file);
+    let uv_metadata = environment.uv_metadata(db).as_ref();
+
+    if let Some(error) = environment.initialization_error(db) {
+        diagnostics.extend([uv_metadata_diagnostic(file, error)]);
+    }
 
     let configuration_root = file
         .path(db)
@@ -86,7 +98,13 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 
     let project_metadata = db.project().metadata(db);
 
-    let options = resolve_script_options(project_metadata, &metadata, file, &mut diagnostics);
+    let options = resolve_script_options(
+        project_metadata,
+        &metadata,
+        uv_metadata,
+        file,
+        &mut diagnostics,
+    );
     let settings = resolve_script_settings(db, &options, context, &mut diagnostics);
     let program_settings = resolve_script_program_settings(
         db,
@@ -130,6 +148,55 @@ pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>
     ScriptTag::parse(source.as_bytes()).map(Box::new)
 }
 
+/// Lazily initialized script environments shared by database snapshots.
+#[derive(Clone, Default)]
+pub struct ScriptEnvironments {
+    by_file: Arc<FxDashMap<File, ScriptEnvironment>>,
+}
+
+impl ScriptEnvironments {
+    pub(crate) fn get_or_init(&self, db: &dyn Db, file: File) -> ScriptEnvironment {
+        *self.by_file.entry(file).or_insert_with(|| {
+            if !matches!(
+                db.system().env_var(EnvVars::TY_UV).as_deref(),
+                Ok("1" | "true")
+            ) {
+                return ScriptEnvironment::new(db, None, None);
+            }
+
+            let Some(path) = file.path(db).as_system_path() else {
+                return ScriptEnvironment::new(db, None, None);
+            };
+
+            match Uv::new(db.system()).metadata(MetadataTarget::Script(path)) {
+                Ok(metadata) => ScriptEnvironment::new(db, Some(metadata), None),
+                Err(error) => {
+                    ScriptEnvironment::new(db, None, Some(error.to_string().into_boxed_str()))
+                }
+            }
+        })
+    }
+
+    fn get(&self, db: &dyn Db, file: File) -> ScriptEnvironment {
+        *self
+            .by_file
+            .entry(file)
+            .or_insert_with(|| ScriptEnvironment::new(db, None, None))
+    }
+}
+
+impl std::panic::RefUnwindSafe for ScriptEnvironments {}
+
+/// Stable input recording script-specific uv metadata or an initialization failure.
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct ScriptEnvironment {
+    #[returns(ref)]
+    uv_metadata: Option<UvMetadata>,
+
+    #[returns(ref)]
+    initialization_error: Option<Box<str>>,
+}
+
 fn parse_script_metadata(
     file: File,
     tag: &ScriptTag,
@@ -171,6 +238,7 @@ fn parse_script_metadata(
 fn resolve_script_options(
     project_metadata: &ProjectMetadata,
     metadata: &ScriptMetadata,
+    uv_metadata: Option<&UvMetadata>,
     file: File,
     diagnostics: &mut ScriptConfigurationDiagnostics,
 ) -> Options {
@@ -182,9 +250,20 @@ fn resolve_script_options(
         metadata.to_options(file, diagnostics)
     };
 
+    let uv_options = uv_metadata.map(|metadata| Options {
+        environment: Some(EnvironmentOptions {
+            python_version: metadata.python_version().cloned(),
+            python: metadata
+                .environment()
+                .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
     let mut options = Options::default();
     // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.script_options_in_precedence_order(&inline) {
+    for layer in project_metadata.options_in_precedence_order(&inline, uv_options.as_ref()) {
         options.combine_with(layer.clone());
     }
 
@@ -310,6 +389,12 @@ impl ScriptConfigurationDiagnostics {
     fn extend(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
         self.diagnostics.extend(diagnostics);
     }
+}
+
+fn uv_metadata_diagnostic(file: File, message: &str) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, message);
+    diagnostic.annotate(Annotation::primary(Span::from(file)));
+    diagnostic
 }
 
 fn invalid_script_metadata_diagnostic(

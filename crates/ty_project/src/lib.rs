@@ -4,7 +4,7 @@
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::OptionDiagnostic;
-use crate::metadata::script::Script;
+use crate::metadata::script::{Script, script_tag};
 use crate::parallel::ParallelIteratorExt;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
@@ -12,6 +12,7 @@ pub use db::testing::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 
+pub use metadata::script::ScriptEnvironments;
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
@@ -384,6 +385,7 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
+                initialize_script_environment(db, file);
                 let program_file = db.program_file(file);
 
                 match check_file_impl(db, program_file) {
@@ -656,9 +658,17 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
+    initialize_script_environment(db, file);
+
     check_file_impl(db, db.program_file(file))
         .map(<[Diagnostic]>::to_vec)
         .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+}
+
+fn initialize_script_environment(db: &dyn Db, file: File) {
+    if script_tag(db, file).is_some() {
+        db.script_environments().get_or_init(db, file);
+    }
 }
 
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.

@@ -182,7 +182,7 @@ impl ProjectMetadata {
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
         {
-            match uv::Uv::new(system).metadata(path) {
+            match uv::Uv::new(system).metadata(uv::MetadataTarget::Workspace(path)) {
                 Ok(metadata) => Some(metadata),
                 Err(error) => {
                     tracing::warn!("{error}");
@@ -457,45 +457,30 @@ impl ProjectMetadata {
         }
     }
 
-    /// Returns the project's option layers from highest to lowest precedence.
+    /// Returns project or script option layers from highest to lowest precedence.
     ///
-    /// `options` is used as the raw base layer between the uv workspace and user-level options.
+    /// `options` is the raw project or script configuration, and `uv_options` is its corresponding
+    /// uv metadata layer.
     /// Layers can be merged by passing them to [`Options::combine_with`] in iterator order:
     ///
     /// ```ignore
     /// let mut merged = Options::default();
-    /// for layer in metadata.options_in_precedence_order(metadata.options()) {
+    /// for layer in metadata.options_in_precedence_order(
+    ///     metadata.options(),
+    ///     metadata.uv_workspace_options.as_deref(),
+    /// ) {
     ///     merged.combine_with(layer.clone());
     /// }
     /// ```
     fn options_in_precedence_order<'a>(
         &'a self,
         options: &'a Options,
+        uv_options: Option<&'a Options>,
     ) -> impl Iterator<Item = &'a Options> {
         self.override_options
             .as_deref()
             .into_iter()
-            .chain(self.uv_workspace_options.as_deref())
-            .chain(std::iter::once(options))
-            .chain(
-                self.user_configuration
-                    .as_deref()
-                    .map(|(_, options)| options),
-            )
-            .chain(self.fallback_options.as_deref())
-    }
-
-    /// Returns the option layers applicable to a standalone script.
-    ///
-    /// Scripts inherit invocation and user settings, but not the enclosing project's options or
-    /// Python-version settings derived from its uv workspace.
-    fn script_options_in_precedence_order<'a>(
-        &'a self,
-        options: &'a Options,
-    ) -> impl Iterator<Item = &'a Options> {
-        self.override_options
-            .as_deref()
-            .into_iter()
+            .chain(uv_options)
             .chain(std::iter::once(options))
             .chain(
                 self.user_configuration
@@ -545,7 +530,9 @@ impl ProjectMetadata {
     pub fn to_merged_options(&self) -> MergedOptions<'_> {
         let mut options = Options::default();
 
-        for layer in self.options_in_precedence_order(&self.options) {
+        for layer in
+            self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+        {
             options.combine_with(layer.clone());
         }
 

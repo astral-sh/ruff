@@ -1318,3 +1318,307 @@ fn invalid_script_search_paths_do_not_blame_python_environment() -> anyhow::Resu
 
     Ok(())
 }
+
+#[test]
+fn unavailable_uv_reports_metadata_error_and_continues_checking() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        "# /// script\n# dependencies = []\n# ///\nprint(missing)\n",
+    )?
+    .with_filter(
+        "program not found",
+        "No such file or directory (os error 2)",
+    );
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .env("TY_UV", "1")
+            .env("UV", "missing-uv-executable")
+            .env("TY_OUTPUT_FORMAT", "concise"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:4:7: error[unresolved-reference] Name `missing` used when not defined
+    script.py: error[uv-metadata] Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn ordinary_files_do_not_initialize_scripts() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "script.py",
+            "# /// script\n# dependencies = []\n# ///\nvalue = 1\n",
+        ),
+        ("ordinary.py", "value = 1\n"),
+    ])?;
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("ordinary.py")
+            .env("TY_UV", "1")
+            .env("UV", "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn disabled_integration_does_not_initialize_scripts() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        "# /// script\n# dependencies = []\n# ///\nvalue = 1\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("script.py")
+            .env("UV", "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn excluded_scripts_do_not_initialize_their_environments() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("ty.toml", "[src]\nexclude-scripts = true\n"),
+        (
+            "script.py",
+            "# /// script\n# dependencies = []\n# ///\nvalue = 1\n",
+        ),
+        ("ordinary.py", "value = 1\n"),
+    ])?;
+    assert_cmd_snapshot!(
+        case.command()
+            .arg(".")
+            .args(["--config-file", "ty.toml"])
+            .env("TY_UV", "1")
+            .env("UV", "missing-uv-executable"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+mod uv_metadata {
+    use std::{fs, process::Command};
+
+    use insta::assert_snapshot;
+    use insta_cmd::assert_cmd_snapshot;
+
+    use crate::CliTest;
+
+    fn command_with_script_uv(case: &CliTest) -> Command {
+        let mut command = case.command();
+        command
+            .env("TY_UV", "1")
+            .env("UV", "uv")
+            .env("UV_CACHE_DIR", case.root().join("cache"))
+            .env("UV_PYTHON_DOWNLOADS", "never")
+            .env("TY_OUTPUT_FORMAT", "concise")
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default());
+        command
+    }
+
+    fn uv_supports_script_metadata() -> anyhow::Result<bool> {
+        let output = Command::new("uv")
+            .args(["workspace", "metadata", "--help"])
+            .output()?;
+
+        let supported =
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("--script");
+
+        if !supported {
+            eprintln!("Skipping script integration: installed uv does not support script metadata");
+        }
+
+        Ok(supported)
+    }
+
+    #[test]
+    fn uv_script_environment_is_initialized_lazily() -> anyhow::Result<()> {
+        if !uv_supports_script_metadata()? {
+            return Ok(());
+        }
+
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        # [tool.ty.environment]
+        # python-version = "3.10"
+        # ///
+
+        import sys
+        from attrs import define
+        from typing import reveal_type
+
+        @define
+        class User:
+            value: int
+
+        reveal_type(User(1).value)
+        reveal_type(sys.version_info[:2])
+        "#,
+        )?
+        .with_filter(r"Literal\[(?:1[2-9]|[2-9][0-9])\]", "Literal[<uv-minor>]");
+
+        assert!(!case.root().join("cache").exists());
+
+        assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:17:13: info[revealed-type] Revealed type: `int`
+    script.py:18:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[<uv-minor>]]`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+        assert!(case.root().join("cache").is_dir());
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .args(["--python-version", "3.11"])
+                .env("TY_UV", "true"),
+            @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    script.py:17:13: info[revealed-type] Revealed type: `int`
+    script.py:18:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn fixes_script_using_uv_environment() -> anyhow::Result<()> {
+        if !uv_supports_script_metadata()? {
+            return Ok(());
+        }
+
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+
+            from attrs import define
+
+            @define
+            class User:
+                value: int
+
+            User(1)  # ty: ignore[unresolved-reference]
+            "#,
+        )?;
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .arg("--fix")
+                .args(["--warn", "unused-ignore-comment"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        Found 1 diagnostic (1 fixed, 0 remaining).
+
+        ----- stderr -----
+        "
+        );
+
+        assert_snapshot!(fs::read_to_string(case.root().join("script.py"))?, @r#"
+
+        # /// script
+        # requires-python = ">=3.12"
+        # dependencies = ["attrs==25.4.0"]
+        # ///
+
+        from attrs import define
+
+        @define
+        class User:
+            value: int
+
+        User(1)
+        "#);
+
+        Ok(())
+    }
+
+    #[test]
+    fn failed_uv_script_synchronization_reports_an_error() -> anyhow::Result<()> {
+        if !uv_supports_script_metadata()? {
+            return Ok(());
+        }
+
+        let case = CliTest::with_file(
+            "script.py",
+            "# /// script\n# requires-python = '>=3.12'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
+        )?
+        .with_filter(
+            r"(?s)`uv workspace metadata` failed with status.*?missing-script-dependency==99\.0\.0.*?\n(Found 2 diagnostics)",
+            "`uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved\n$1",
+        );
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .env("UV_OFFLINE", "1"),
+            @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:7: error[unresolved-reference] Name `missing` used when not defined
+    script.py: error[uv-metadata] `uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+        );
+
+        Ok(())
+    }
+}

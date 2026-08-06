@@ -18,12 +18,29 @@ impl<'system> Uv<'system> {
         Self { system }
     }
 
-    pub(super) fn metadata(&self, path: &SystemPath) -> Result<UvMetadata, UvMetadataError> {
-        // `uv check` has already selected and synchronized the environment. Keep this
-        // query read-only so package selection and `--isolated` aren't overwritten.
-        self.run_metadata(path, &["workspace", "metadata", "--frozen", "--active"])
+    pub(super) fn metadata(
+        &self,
+        target: MetadataTarget<'_>,
+    ) -> Result<UvMetadata, UvMetadataError> {
+        match target {
+            MetadataTarget::Workspace(path) => {
+                // `uv check` has already selected and synchronized the environment. Keep this
+                // query read-only so package selection and `--isolated` aren't overwritten.
+                self.run_metadata(path, &["workspace", "metadata", "--frozen", "--active"])
+            }
+            MetadataTarget::Script(path) => {
+                let directory = path
+                    .parent()
+                    .unwrap_or_else(|| self.system.current_directory());
+                self.run_metadata(
+                    directory,
+                    &["workspace", "metadata", "--sync", "--script", path.as_str()],
+                )
+            }
+        }
     }
 
+    #[tracing::instrument(name = "Uv::run_metadata", level = "debug", skip(self))]
     fn run_metadata(
         &self,
         directory: &SystemPath,
@@ -34,10 +51,18 @@ impl<'system> Uv<'system> {
             .env_var(EnvVars::UV)
             .unwrap_or_else(|_| "uv".to_string());
 
-        let output = self
-            .system
-            .run_command(&uv, arguments, directory)
-            .map_err(UvMetadataError::Invocation)?;
+        tracing::debug!("Running `{uv} {}`", arguments.join(" "));
+
+        let start = ruff_db::Instant::now();
+        let output = self.system.run_command(&uv, arguments, directory);
+
+        tracing::debug!(
+            "`{uv} {}` completed in {:.3}s",
+            arguments.join(" "),
+            start.elapsed().as_secs_f64()
+        );
+
+        let output = output.map_err(UvMetadataError::Invocation)?;
 
         if !output.status.success() {
             return Err(UvMetadataError::CommandFailed {
@@ -48,6 +73,12 @@ impl<'system> Uv<'system> {
 
         UvMetadata::from_metadata(&output.stdout, self.system)
     }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum MetadataTarget<'path> {
+    Workspace(&'path SystemPath),
+    Script(&'path SystemPath),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
