@@ -3599,7 +3599,6 @@ pub struct PylintOptions {
     /// in addition to the default set.
     ///
     /// This option is used to extend the default set without replacing it.
-    /// If `allow-magic-values` is set, this option is ignored.
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str | int | float]"#,
