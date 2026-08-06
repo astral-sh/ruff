@@ -2,7 +2,7 @@ use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -348,6 +348,23 @@ pub(super) struct ProtocolInterfaceView<'db> {
     materialization: Option<MaterializationKind>,
 }
 
+/// Cache the order shared by every structural comparison against this interface.
+///
+/// Store names rather than member data so materialized views can reuse the same ordering without
+/// duplicating their interface members in Salsa's cache.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn protocol_member_names_by_structural_priority<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+) -> Box<[Name]> {
+    let env = ProgramEnvironment::from_program(interface.program(db));
+    interface
+        .members(db)
+        .sorted_by_cached_key(|member| member.structural_member_priority(db, &env))
+        .map(|member| Name::new(member.name()))
+        .collect()
+}
+
 impl<'db> ProtocolInterfaceView<'db> {
     pub(super) const fn new(
         interface: ProtocolInterface<'db>,
@@ -382,6 +399,25 @@ impl<'db> ProtocolInterfaceView<'db> {
                 data,
                 materialization: self.materialization,
             })
+    }
+
+    /// Checks finite requirements before members that can recursively expand a protocol.
+    pub(super) fn members_by_structural_priority<'a>(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = ProtocolMember<'a, 'db>>
+    where
+        'db: 'a,
+    {
+        if self.member_count(db) < 2 {
+            return Either::Left(self.members(db));
+        }
+
+        Either::Right(
+            protocol_member_names_by_structural_priority(db, self.interface)
+                .iter()
+                .filter_map(move |name| self.member_by_name(db, name)),
+        )
     }
 
     pub(super) fn member_count(self, db: &'db dyn Db) -> usize {
@@ -2422,6 +2458,31 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
+    // Reuse declared protocol members to avoid the generic member lookup, descriptor dispatch,
+    // and Salsa interning otherwise required on this common comparison path.
+    if let Type::ProtocolInstance(source_protocol) = ty
+        && let Some(source_member) = source_protocol
+            .interface(db)
+            .member_by_name(db, member.name)
+    {
+        let read = source_member.access(db, env, access).read?;
+
+        if source_member.is_method() {
+            let Type::Callable(callable) = read.resolve(db, env)?.ty() else {
+                return None;
+            };
+
+            let callable = if member.is_method() {
+                callable
+            } else {
+                protocol_apply_self_with_receiver(db, env.program(db), callable, ty, ty)
+            };
+            return Some(Type::Callable(callable));
+        }
+
+        return read.bind_self(db, env, ty);
+    }
+
     // Module-level functions and ordinary methods on class objects are matched through direct
     // member access. Special instance methods still use special-method lookup on the meta-type.
     let place = if access == ProtocolMemberAccessMode::Instance
@@ -2475,7 +2536,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         let requirement = attribute_write_requirement(db, env, ty, member_name);
-        self.check_property_write_requirement(db, &requirement, member_name, value_ty)
+        let result = self.check_property_write_requirement(db, &requirement, member_name, value_ty);
+
+        if let Some(context) = self.report_context()
+            && result.is_never_satisfied(db, env)
+        {
+            let error = match requirement {
+                AttributeWriteRequirement::ProtocolMember { write: None, .. } => {
+                    ErrorContext::ProtocolMemberNotWritable
+                }
+                _ => ErrorContext::ProtocolMemberWriteTypeIncompatible { target: value_ty },
+            };
+            context.push(error);
+        }
+
+        result
     }
 
     fn check_property_write_requirement(
@@ -2927,22 +3002,39 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && member.is_instance_method()
             && required.read.is_some()
         {
-            // The instance-side check is authoritative for the signature of a method
-            // implementation. Class access only establishes that the member is present. Callable
-            // types and several callable literal forms do not expose a useful `__call__` member
-            // through their meta-type.
+            // The instance-side check establishes the method's signature without expanding its
+            // recursive receiver twice. Class access must additionally distinguish a method
+            // descriptor from a plain callable class attribute, which cannot bind that receiver.
+            if member.name == "__call__" {
+                return self.always();
+            }
+
+            if protocol_member_read_type(
+                db,
+                self.env,
+                ty,
+                receiver_ty,
+                member,
+                ProtocolMemberAccessMode::Class,
+            )
+            .is_none()
+            {
+                return self.never();
+            }
+
+            // TODO special-casing `ClassVar`s shouldn't be necessary here, this should naturally
+            // fall out of more generalised checks.
+            let qualifiers = if let Type::ProtocolInstance(protocol) = ty
+                && let Some(source_member) = protocol.interface(db).member_by_name(db, member.name)
+            {
+                source_member.qualifiers()
+            } else {
+                receiver_ty.member(db, self.env, member.name).qualifiers
+            };
+
             return ConstraintSet::from_bool(
                 self.constraints,
-                member.name == "__call__"
-                    || protocol_member_read_type(
-                        db,
-                        self.env,
-                        ty,
-                        receiver_ty,
-                        member,
-                        ProtocolMemberAccessMode::Class,
-                    )
-                    .is_some(),
+                !qualifiers.contains(TypeQualifiers::CLASS_VAR),
             );
         }
 
@@ -2969,16 +3061,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     write
                         .bind_compatibility_type(db, env, fallback_ty)
                         .when_some_and(db, self.constraints, |write_ty| {
-                            let result =
-                                self.check_property_write(db, receiver_ty, member.name, write_ty);
-                            if let Some(context) = self.report_context()
-                                && result.is_never_satisfied(db, env)
-                            {
-                                context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible {
-                                    target: write_ty,
-                                });
-                            }
-                            result
+                            self.check_property_write(db, receiver_ty, member.name, write_ty)
                         })
                 },
             )
@@ -2993,6 +3076,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
+        let class_receiver_ty = ty
+            .as_protocol_instance()
+            .map(|protocol| protocol.to_meta_type(db, env))
+            .unwrap_or_else(|| ty.to_meta_type(db, env));
         let instance_access =
             member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
@@ -3014,7 +3101,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     db,
                     env,
                     ty,
-                    ty.to_meta_type(db, env),
+                    class_receiver_ty,
                     member,
                     ProtocolMemberAccessMode::Class,
                 )
@@ -3050,7 +3137,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.type_satisfies_protocol_member_access(
                     db,
                     ty,
-                    ty.to_meta_type(db, env),
+                    class_receiver_ty,
                     member,
                     class_access,
                     ProtocolMemberAccessMode::Class,
@@ -3119,157 +3206,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: member.name.into(),
-                    });
-                }
-                result
-            })
-    }
-
-    /// Compares either instance access or class access when relating two protocol members.
-    ///
-    /// Both members bind `Self` to the source protocol type; readable types are compared
-    /// covariantly and writable types contravariantly.
-    fn check_protocol_member_access_pair(
-        &self,
-        db: &'db dyn Db,
-        source_type: Type<'db>,
-        source_member: &ProtocolMember<'_, 'db>,
-        target_member: &ProtocolMember<'_, 'db>,
-        access: ProtocolMemberAccessMode,
-    ) -> ConstraintSet<'db, 'c> {
-        let env = self.env;
-        let source = source_member.access(db, env, access);
-
-        if access == ProtocolMemberAccessMode::Class
-            && source_member.is_method()
-            && target_member.is_instance_method()
-        {
-            // The instance-side check is authoritative for an ordinary method's signature. Class
-            // access only establishes that the source member is also present on the class.
-            return ConstraintSet::from_bool(self.constraints, source.read.is_some());
-        }
-        let target = target_member.access(db, env, access);
-
-        let read_result = match (source.read, target.read) {
-            (_, None) => self.always(),
-            (None, Some(_)) => self.never(),
-            (Some(source), Some(target)) => {
-                let bind_read = |member_type: ProtocolMemberType<'db>,
-                                 member: &ProtocolMember<'_, 'db>| {
-                    let member_type = member_type.resolve(db, env)?;
-                    if member.is_method()
-                        && let Type::Callable(callable) = member_type.ty()
-                    {
-                        Some(Type::Callable(protocol_apply_self_with_receiver(
-                            db,
-                            env.program(db),
-                            callable,
-                            source_type,
-                            source_type,
-                        )))
-                    } else {
-                        member_type.bind_self(db, env, source_type)
-                    }
-                };
-                let (Some(source), Some(target)) = (
-                    bind_read(source, source_member),
-                    bind_read(target, target_member),
-                ) else {
-                    return self.never();
-                };
-                let result = self.check_type_pair(db, source, target);
-                if let Some(context) = self.report_context()
-                    && !target_member.is_method()
-                    && result.is_never_satisfied(db, env)
-                {
-                    context
-                        .push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
-                }
-                result
-            }
-        };
-
-        read_result.and(db, self.constraints, || {
-            match (source.write, target.write) {
-                (_, None) => self.always(),
-                (None, Some(_)) => {
-                    if let Some(context) = self.report_context() {
-                        context.push(ErrorContext::ProtocolMemberNotWritable);
-                    }
-                    self.never()
-                }
-                (Some(source), Some(target)) => {
-                    let (Some(target), Some(source)) = (
-                        target.bind_compatibility_type(db, env, source_type),
-                        source.bind_compatibility_type(db, env, source_type),
-                    ) else {
-                        return self.never();
-                    };
-                    let result = self.check_type_pair(db, target, source);
-                    if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env)
-                    {
-                        context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible { target });
-                    }
-                    result
-                }
-            }
-        })
-    }
-
-    pub(super) fn check_protocol_interface_pair(
-        &self,
-        db: &'db dyn Db,
-        source_type: Type<'db>,
-        source: ProtocolInterfaceView<'db>,
-        target: ProtocolInterfaceView<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        if source.member_count(db) < target.member_count(db)
-            && !self.is_context_collection_enabled()
-        {
-            return self.never();
-        }
-
-        let env = self.env;
-        target
-            .members(db)
-            .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
-            .when_all(db, self.constraints, |target_member| {
-                let source_member = source.member_by_name(db, target_member.name);
-
-                if let Some(context) = self.report_context()
-                    && source_member.is_none()
-                {
-                    context.push(ErrorContext::ProtocolMemberNotDefined {
-                        member_name: target_member.name.into(),
-                        ty: source_type,
-                    });
-                    return self.never();
-                }
-
-                let result = source_member.when_some_and(db, self.constraints, |source_member| {
-                    self.check_protocol_member_access_pair(
-                        db,
-                        source_type,
-                        &source_member,
-                        &target_member,
-                        ProtocolMemberAccessMode::Instance,
-                    )
-                    .and(db, self.constraints, || {
-                        self.check_protocol_member_access_pair(
-                            db,
-                            source_type,
-                            &source_member,
-                            &target_member,
-                            ProtocolMemberAccessMode::Class,
-                        )
-                    })
-                });
-                if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env)
-                {
-                    context.push(ErrorContext::ProtocolMemberIncompatible {
-                        member_name: target_member.name.into(),
                     });
                 }
                 result
@@ -3625,6 +3561,38 @@ fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableT
         && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
 }
 
+/// Count interface members that a protocol can satisfy by inheriting them from `object`.
+///
+/// Walk `object`'s small class scope instead of probing every interface member. Cache the result
+/// because the same target interface is often compared with many source protocols.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn inherited_object_protocol_member_count<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+) -> usize {
+    let env = ProgramEnvironment::from_program(interface.program(db));
+    let object = ClassType::object(db, &env)
+        .class_literal(db)
+        .as_static()
+        .expect("`object` should always be a static class literal");
+
+    place_table(db, object.body_scope(db))
+        .symbols()
+        .filter(|symbol| {
+            let name = symbol.name();
+            name != "__hash__"
+                && interface.includes_member(db, name)
+                && matches!(
+                    Type::object().member(db, &env, name).place,
+                    Place::Defined(DefinedPlace {
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    })
+                )
+        })
+        .count()
+}
+
 /// Protocol compatibility can only succeed if every required member is present.
 ///
 /// Check that necessary condition up front so we can avoid expensive per-member type
@@ -3640,11 +3608,32 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     match ty {
         Type::ProtocolInstance(source_protocol) => {
             let source_interface = source_protocol.interface(db);
+            let source_member_count = source_interface.member_count(db);
+            let target_member_count = target_interface.member_count(db);
 
-            source_interface.member_count(db) >= target_interface.member_count(db)
-                && target_interface
-                    .members(db)
-                    .all(|member| source_interface.includes_member(db, member.name()))
+            // The source count includes declared `object` members, so it can miss an early
+            // rejection. That is safe because the complete member check below still determines
+            // whether the protocols are compatible.
+            if source_member_count < target_member_count
+                && source_member_count.saturating_add(inherited_object_protocol_member_count(
+                    db,
+                    target_interface.base(),
+                )) < target_member_count
+            {
+                return false;
+            }
+
+            target_interface.members(db).all(|member| {
+                source_interface.includes_member(db, member.name())
+                    || member.name() != "__hash__"
+                        && matches!(
+                            Type::object().member(db, env, member.name()).place,
+                            Place::Defined(DefinedPlace {
+                                definedness: Definedness::AlwaysDefined,
+                                ..
+                            })
+                        )
+            })
         }
         _ => target_interface.members(db).all(|member| {
             matches!(

@@ -646,21 +646,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
-                db,
-                ty,
-                source_protocol.interface(db),
-                protocol.interface(db),
-            )
-        } else {
-            protocol
-                .interface(db)
-                .members(db)
-                .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
-                })
-        };
+        let structurally_satisfied =
+            self.check_type_satisfies_protocol_interface(db, ty, protocol.interface(db));
+
         if let Some(context) = self.report_context()
             && structurally_satisfied.is_never_satisfied(db, env)
         {
@@ -670,6 +658,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)
+    }
+
+    /// Checks a complete or filtered protocol interface through ordinary member lookup.
+    fn check_type_satisfies_protocol_interface(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        interface: ProtocolInterfaceView<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        interface
+            .members_by_structural_priority(db)
+            .when_all(db, self.constraints, |member| {
+                self.type_satisfies_protocol_member(db, ty, &member)
+            })
     }
 
     /// Tries to relate the finite members of two specializations of the same protocol.
@@ -726,13 +728,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        Some(self.check_protocol_interface_pair(
+        Some(self.check_type_satisfies_protocol_interface(
             db,
             ty,
-            ProtocolInterfaceView::new(
-                source_non_recursive,
-                source_interface.materialization_kind(),
-            ),
             ProtocolInterfaceView::new(
                 target_non_recursive,
                 target_interface.materialization_kind(),
@@ -888,12 +886,7 @@ fn non_recursive_protocol_constraints<'db>(
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_protocol_interface_pair(
-            db,
-            Type::ProtocolInstance(source),
-            source.interface(db),
-            target,
-        )
+        checker.check_type_satisfies_protocol_interface(db, Type::ProtocolInstance(source), target)
     })
 }
 
