@@ -7,7 +7,6 @@ info:
     - "--no-cache"
     - "--output-format"
     - json-lines
-    - "--preview"
     - "--check"
     - input.py
 ---

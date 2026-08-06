@@ -2616,13 +2616,13 @@ fn add_ignore() -> Result<()> {
             .arg("--select=RUF015")
             .arg("--add-ignore"),
         @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
-        ----- stderr -----
-        Added 1 ignore comment.
-        ",
+    ----- stderr -----
+    Added 1 ignore comment.
+    ",
     );
 
     let test_code = fixture.read_file("noqa.py")?;
@@ -2656,13 +2656,13 @@ fn add_noqa_existing_ignore() -> Result<()> {
             .arg("--select=ANN001,ANN201,ARG001,D103")
             .arg("--add-noqa"),
         @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
+    success: true
+    exit_code: 0
+    ----- stdout -----
 
-        ----- stderr -----
-        Added 1 noqa directive.
-        ",
+    ----- stderr -----
+    Added 1 noqa directive.
+    ",
     );
 
     let test_code = fixture.read_file("noqa.py")?;
@@ -2671,9 +2671,9 @@ fn add_noqa_existing_ignore() -> Result<()> {
         test_code,
         @"
 
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
-            pass
-        ",
+    def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
+        pass
+    ",
     );
 
     Ok(())

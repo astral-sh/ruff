@@ -545,7 +545,7 @@ mod tests {
                 y = 2
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -568,7 +568,7 @@ mod tests {
                 x = lambda: 1
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -586,7 +586,7 @@ mod tests {
                     pass
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -605,7 +605,7 @@ mod tests {
                     pass
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -623,7 +623,7 @@ mod tests {
                 x = [i for i in range(10)]
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -646,7 +646,7 @@ mod tests {
                 z = (i for i in range(10))
             "#;
 
-        assert_snapshot!(UnreachableTest::new().render(source)?, @r"
+        assert_snapshot!(UnreachableTest::new().render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -678,7 +678,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_version(PythonVersion::PY312);
 
-        assert_snapshot!(test.render(source)?, @r"
+        assert_snapshot!(test.render(source)?, @"
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:3:5
           |
@@ -700,7 +700,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_version(PythonVersion::PY310);
 
-        assert_snapshot!(test.render(source)?, @r"
+        assert_snapshot!(test.render(source)?, @"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
@@ -722,7 +722,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_platform(PythonPlatform::Identifier("linux".to_string()));
 
-        assert_snapshot!(test.render(source)?, @r"
+        assert_snapshot!(test.render(source)?, @"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |
@@ -789,7 +789,7 @@ mod tests {
         let mut test = UnreachableTest::new();
         test.with_python_version(PythonVersion::PY310);
 
-        assert_snapshot!(test.render(source)?, @r"
+        assert_snapshot!(test.render(source)?, @"
         info[unreachable-code]: Code is unreachable
          --> src/main.py:5:5
           |

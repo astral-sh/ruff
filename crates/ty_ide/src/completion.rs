@@ -10352,9 +10352,7 @@ class Derived(Par<CURSOR>
                 .complete_function_parentheses()
                 .build()
                 .snapshot(),
-            @"
-        Parent
-        ",
+            @"Parent",
         );
     }
 
@@ -10854,10 +10852,10 @@ bar(y_true=y<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r###"
+            @"
         y_pred
         y_true
-        "###
+        "
         );
     }
 

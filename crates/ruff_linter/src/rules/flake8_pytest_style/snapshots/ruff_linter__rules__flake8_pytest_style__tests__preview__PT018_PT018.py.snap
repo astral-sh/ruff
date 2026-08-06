@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-assertion_line: 389
 ---
 --- Linter settings ---
 -linter.preview = disabled

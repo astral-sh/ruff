@@ -5208,7 +5208,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r#"
+        assert_snapshot!(test.hover(), @"
         def urlparse() -> Unknown
         ---------------------------------------------
         Parse a URL into components:
@@ -5230,7 +5230,7 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-        "#);
+        ");
     }
 
     #[test]

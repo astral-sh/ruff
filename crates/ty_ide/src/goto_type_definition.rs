@@ -262,7 +262,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:12:5
            |
@@ -273,7 +273,7 @@ mod tests {
           |
         6 |     BLUE = 2
           |     ----
-        "#);
+        ");
     }
 
     #[test]
@@ -295,7 +295,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:13:5
            |
@@ -308,7 +308,7 @@ mod tests {
           |     -----
         7 |     BLUE = 3
           |     ----
-        "#);
+        ");
     }
 
     #[test]
@@ -707,7 +707,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:31
           |
@@ -1201,7 +1201,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:LL:17
            |
@@ -1212,7 +1212,7 @@ mod tests {
            |
         LL | class str(Sequence[str]):
            |       ---
-        "#);
+        ");
     }
 
     #[test]
@@ -1240,7 +1240,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:LL:17
            |
@@ -1251,7 +1251,7 @@ mod tests {
            |
         LL | class list(MutableSequence[_T]):
            |       ----
-        "#);
+        ");
     }
 
     #[test]
@@ -1279,7 +1279,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:LL:17
            |
@@ -1290,7 +1290,7 @@ mod tests {
            |
         LL | class str(Sequence[str]):
            |       ---
-        "#);
+        ");
     }
 
     #[test]
@@ -1493,7 +1493,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:38
           |

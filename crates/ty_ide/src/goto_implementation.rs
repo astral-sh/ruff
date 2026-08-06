@@ -383,7 +383,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:5
           |
@@ -506,7 +506,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:7:9
           |
@@ -554,7 +554,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:23:17
            |
@@ -602,7 +602,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:23:10
            |
@@ -704,7 +704,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:8:13
           |
@@ -740,7 +740,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:11:9
            |
@@ -1240,7 +1240,7 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:8:10
           |
@@ -1312,7 +1312,7 @@ class MyClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:4:19
           |
@@ -1354,7 +1354,7 @@ class MyClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:7:9
           |
@@ -1424,7 +1424,7 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:16
           |
@@ -1459,7 +1459,7 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:13
           |
@@ -1735,7 +1735,7 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:12
           |
@@ -1996,7 +1996,7 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:16:12
            |

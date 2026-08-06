@@ -701,7 +701,7 @@ mod tests {
         "#;
         let param_docs = parameter_documentation(docstring);
 
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         param1: The first parameter description
         param2: The second parameter description
           This is a continuation of param2 description.
@@ -757,7 +757,7 @@ Continuation.
         :kwparam seventh: The seventh parameter.
         "#;
         let param_docs = parameter_documentation(docstring);
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         first: The first parameter.
         second: The second parameter.
         third: The third parameter.
@@ -936,7 +936,7 @@ Trailing prose.
             Some("Second parameter.\nContinued::\n\n    literal block")
         );
 
-        assert_snapshot!(field_list_ranges(docstring, &parsed), @r"
+        assert_snapshot!(field_list_ranges(docstring, &parsed), @"
         | Intro paragraph.
         |
         | :param first: First parameter.
@@ -971,7 +971,7 @@ Trailing prose.
         assert_eq!(field_lists(docstring).len(), 1);
         let param_docs = parameter_documentation(docstring);
 
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         first: Parsed before malformed input.
         second: Parsed after malformed and partial fields.
         third: Parsed after an incomplete field marker.
@@ -990,7 +990,7 @@ Trailing prose.
 :param other: Other parameter.",
         );
 
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         value: First paragraph.
 
 
@@ -1008,7 +1008,7 @@ Trailing prose.
 :param second: Real second parameter.",
         );
 
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         first: First line.
           :param fake: This is continuation text, not a new field.
         second: Real second parameter.
@@ -1027,7 +1027,7 @@ Trailing prose.
 :param real: Real parameter.",
         );
 
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         quoted: Example::
         sample: This is sample input.
         real: Real parameter.
@@ -1042,7 +1042,7 @@ Trailing prose.
 :param second: Second parameter.",
         );
 
-        assert_snapshot!(param_docs, @r"
+        assert_snapshot!(param_docs, @"
         first: Explanation::
         second: Second parameter.
         ");
