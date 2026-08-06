@@ -94,7 +94,9 @@ impl FormatType {
 impl From<&CFormatType> for FormatType {
     fn from(format_type: &CFormatType) -> Self {
         match format_type {
-            CFormatType::String(CFormatConversion::Repr) => FormatType::Repr,
+            CFormatType::String(CFormatConversion::Repr | CFormatConversion::Ascii) => {
+                FormatType::Repr
+            }
             CFormatType::String(CFormatConversion::Str) => FormatType::String,
             // The python documentation says "d" only works for integers, but it works for floats as
             // well: https://docs.python.org/3/library/string.html#formatstrings
@@ -103,7 +105,9 @@ impl From<&CFormatType> for FormatType {
             CFormatType::Character
             | CFormatType::Number(CNumberType::Octal | CNumberType::Hex(_)) => FormatType::Integer,
             CFormatType::Float(_) => FormatType::Float,
-            _ => FormatType::Unknown,
+            // 'b' is only supported by bytes formatters,
+            // if it appears within string formatter it will be reported by `bad-string-format-character`.
+            CFormatType::String(CFormatConversion::Bytes) => FormatType::Unknown,
         }
     }
 }
