@@ -1,9 +1,10 @@
+use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::Ranged;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::scope::{FileScopeId, ScopeKind};
+use ty_python_core::scope::{FileScopeId, ScopeId, ScopeKind};
 use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
 
 use crate::Db;
@@ -12,10 +13,10 @@ use crate::types::function::FunctionDecorators;
 use crate::types::ide_support::resolve_definition_targets;
 use crate::types::infer::{function_known_decorator_flags, function_known_decorators};
 
-/// Resolve the same-file pytest fixtures requested by `parameter`.
+/// Resolve the pytest fixtures requested by `parameter`.
 ///
-/// This query models only fixtures declared directly in the parameter's class or module. Imported,
-/// conftest, built-in, and plugin fixtures are added by later provider layers.
+/// This query searches the parameter's class, module, and enclosing conftest hierarchy. Built-in
+/// and plugin fixtures are added by later provider layers.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub fn fixture_bindings_for_parameter<'db>(
     db: &'db dyn Db,
@@ -26,14 +27,30 @@ pub fn fixture_bindings_for_parameter<'db>(
     };
 
     if let Some(class_scope) = request.class_scope {
-        let bindings = bindings_in_provider(db, &request, class_scope);
+        let bindings = bindings_in_provider(
+            db,
+            &request,
+            class_scope.to_scope_id(db, parameter.program_file(db)),
+        );
         if !bindings.is_empty() {
             return bindings;
         }
     }
 
-    let module_scope = global_scope(db, parameter.program_file(db)).file_scope_id(db);
-    bindings_in_provider(db, &request, module_scope)
+    let request_file = parameter.program_file(db);
+    let bindings = bindings_in_provider(db, &request, global_scope(db, request_file));
+    if !bindings.is_empty() {
+        return bindings;
+    }
+
+    for conftest in conftest_files(db, request_file) {
+        let bindings = bindings_in_provider(db, &request, global_scope(db, *conftest));
+        if !bindings.is_empty() {
+            return bindings;
+        }
+    }
+
+    Box::default()
 }
 
 /// A pytest fixture request and the fixture declaration that satisfies it.
@@ -158,11 +175,10 @@ enum FixtureName {
 fn bindings_in_provider<'db>(
     db: &'db dyn Db,
     request: &FixtureRequest<'db>,
-    provider: FileScopeId,
+    provider: ScopeId<'db>,
 ) -> Box<[FixtureBinding<'db>]> {
-    let scope = provider.to_scope_id(db, request.definition.program_file(db));
-    let table = place_table(db, scope);
-    let use_def = use_def_map(db, scope);
+    let table = place_table(db, provider);
+    let use_def = use_def_map(db, provider);
     let mut bindings = Vec::new();
 
     for (symbol_id, definitions) in use_def.all_end_of_scope_symbol_bindings() {
@@ -192,6 +208,39 @@ fn bindings_in_provider<'db>(
     }
 
     bindings.into_boxed_slice()
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn conftest_files<'db>(db: &'db dyn Db, request_file: ProgramFile<'db>) -> Box<[ProgramFile<'db>]> {
+    let file = request_file.file(db);
+    let Some(path) = file.path(db).as_system_path() else {
+        return Box::default();
+    };
+    let Some(file_root) = db.files().root(db, path) else {
+        return Box::default();
+    };
+    let root = file_root.path(db);
+    let Some(request_directory) = path.parent() else {
+        return Box::default();
+    };
+
+    // The current conftest's module scope was already searched above. Starting at its parent avoids
+    // processing the same provider twice and lets same-name overrides continue outward.
+    let start_directory = if path.file_name() == Some("conftest.py") {
+        request_directory.parent()
+    } else {
+        Some(request_directory)
+    };
+    let Some(start_directory) = start_directory else {
+        return Box::default();
+    };
+
+    start_directory
+        .ancestors()
+        .take_while(|directory| directory.starts_with(root))
+        .filter_map(|directory| system_path_to_file(db, directory.join("conftest.py")).ok())
+        .map(|file| ProgramFile::new(db, file, request_file.program(db)))
+        .collect()
 }
 
 fn fixture_exposure<'db>(
@@ -408,6 +457,7 @@ mod tests {
     use anyhow::Result;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::system::DbWithWritableSystem;
     use ruff_python_ast as ast;
     use ty_python_core::definition::Definition;
     use ty_python_core::scope::ScopeKind;
@@ -749,8 +799,218 @@ def test_use(resource): ...
         Ok(())
     }
 
+    #[test]
+    fn resolves_nearest_to_outermost_conftest_providers() -> Result<()> {
+        let db = pytest_db_with_files(&[
+            (
+                "/conftest.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def outside_root(): ...
+"#,
+            ),
+            (
+                "/src/conftest.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def root_fixture(): ...
+
+@pytest.fixture
+def shadowed(): ...
+
+@pytest.fixture
+def module_shadowed(): ...
+"#,
+            ),
+            (
+                "/src/shared_fixtures.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def imported_fixture(): ...
+"#,
+            ),
+            (
+                "/src/project/conftest.py",
+                r#"
+import pytest
+from shared_fixtures import imported_fixture as conftest_alias
+
+@pytest.fixture
+def middle_fixture(): ...
+
+@pytest.fixture
+def shadowed(): ...
+"#,
+            ),
+            (
+                "/src/project/tests/conftest.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def nearest_fixture(): ...
+
+@pytest.fixture
+def shadowed(): ...
+"#,
+            ),
+            (
+                "/src/project/sibling/conftest.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def sibling_fixture(): ...
+"#,
+            ),
+            (
+                "/src/project/tests/test_example.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def module_shadowed(): ...
+
+def test_use(
+    nearest_fixture,
+    middle_fixture,
+    root_fixture,
+    shadowed,
+    module_shadowed,
+    conftest_alias,
+    sibling_fixture,
+    outside_root,
+): ...
+"#,
+            ),
+        ])?;
+
+        let test_file = "/src/project/tests/test_example.py";
+        assert_eq!(
+            fixture_names_in_file(&db, test_file, "test_use", "nearest_fixture"),
+            ["nearest_fixture"]
+        );
+        assert_eq!(
+            fixture_names_in_file(&db, test_file, "test_use", "middle_fixture"),
+            ["middle_fixture"]
+        );
+        assert_eq!(
+            fixture_names_in_file(&db, test_file, "test_use", "root_fixture"),
+            ["root_fixture"]
+        );
+        assert_eq!(
+            fixture_provider_files(&db, test_file, "test_use", "shadowed"),
+            ["/src/project/tests/conftest.py"]
+        );
+        assert_eq!(
+            fixture_provider_files(&db, test_file, "test_use", "module_shadowed"),
+            ["/src/project/tests/test_example.py"]
+        );
+        assert_eq!(
+            fixture_names_in_file(&db, test_file, "test_use", "conftest_alias"),
+            ["imported_fixture"]
+        );
+        assert!(fixture_names_in_file(&db, test_file, "test_use", "sibling_fixture").is_empty());
+        assert!(fixture_names_in_file(&db, test_file, "test_use", "outside_root").is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn same_name_conftest_override_requests_outer_fixture() -> Result<()> {
+        let db = pytest_db_with_files(&[
+            (
+                "/src/conftest.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def value(): ...
+"#,
+            ),
+            (
+                "/src/project/conftest.py",
+                r#"
+import pytest
+
+@pytest.fixture
+def value(value): ...
+"#,
+            ),
+        ])?;
+
+        assert_eq!(
+            fixture_provider_files(&db, "/src/project/conftest.py", "value", "value"),
+            ["/src/conftest.py"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn conftest_discovery_tracks_file_updates() -> Result<()> {
+        let mut db = pytest_db(
+            "/src/project/test_example.py",
+            r#"
+def test_use(resource): ...
+"#,
+        )?;
+
+        assert!(
+            fixture_names_in_file(&db, "/src/project/test_example.py", "test_use", "resource")
+                .is_empty()
+        );
+
+        db.write_file(
+            "/src/project/conftest.py",
+            r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+        )?;
+        assert_eq!(
+            fixture_names_in_file(&db, "/src/project/test_example.py", "test_use", "resource"),
+            ["resource"]
+        );
+
+        db.write_file(
+            "/src/project/conftest.py",
+            r#"
+import pytest
+
+@pytest.fixture
+def replacement(): ...
+"#,
+        )?;
+        assert!(
+            fixture_names_in_file(&db, "/src/project/test_example.py", "test_use", "resource")
+                .is_empty()
+        );
+        Ok(())
+    }
+
     fn fixture_names(db: &TestDb, function: &str, parameter: &str) -> Vec<String> {
-        let parameter = parameter_definition(db, function, parameter);
+        let path = if system_path_to_file(db, "/src/test_example.py").is_ok() {
+            "/src/test_example.py"
+        } else {
+            "/src/example.py"
+        };
+        fixture_names_in_file(db, path, function, parameter)
+    }
+
+    fn fixture_names_in_file(
+        db: &TestDb,
+        path: &str,
+        function: &str,
+        parameter: &str,
+    ) -> Vec<String> {
+        let parameter = parameter_definition(db, path, function, parameter);
         fixture_bindings_for_parameter(db, parameter)
             .iter()
             .map(|binding| {
@@ -763,21 +1023,33 @@ def test_use(resource): ...
     }
 
     fn fixture_provider_scopes(db: &TestDb, function: &str, parameter: &str) -> Vec<ScopeKind> {
-        let parameter = parameter_definition(db, function, parameter);
+        let parameter = parameter_definition(db, "/src/test_example.py", function, parameter);
         fixture_bindings_for_parameter(db, parameter)
             .iter()
             .map(|binding| binding.fixture().scope(db).scope(db).kind())
             .collect()
     }
 
+    fn fixture_provider_files(
+        db: &TestDb,
+        path: &str,
+        function: &str,
+        parameter: &str,
+    ) -> Vec<String> {
+        let parameter = parameter_definition(db, path, function, parameter);
+        fixture_bindings_for_parameter(db, parameter)
+            .iter()
+            .map(|binding| binding.fixture().file(db).path(db).to_string())
+            .collect()
+    }
+
     fn parameter_definition<'db>(
         db: &'db TestDb,
+        path: &str,
         function: &str,
         parameter: &str,
     ) -> Definition<'db> {
-        let file = system_path_to_file(db, "/src/test_example.py")
-            .or_else(|_| system_path_to_file(db, "/src/example.py"))
-            .expect("test file exists");
+        let file = system_path_to_file(db, path).expect("test file exists");
         let file = db.program_file(file);
         let module = parsed_module(db, file.python_file(db)).load(db);
         let function = find_function(module.suite(), function).expect("function exists");
