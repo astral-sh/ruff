@@ -14,7 +14,7 @@ use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number, UnaryOp};
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum AllowedValue {
     String(String),
-    Int(i64),
+    Int(i32),
     Float(AllowedFloatValue),
 }
 
@@ -32,40 +32,23 @@ impl AllowedValue {
             (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
                 match &number_literal.value {
                     Number::Int(i) => {
-                        i.as_i64().and_then(|value| apply_unary_int(value, unary_op)) == Some(*allowed)
+                        i.as_i32()
+                            .and_then(|value| apply_unary_int(value, unary_op))
+                            == Some(*allowed)
                     }
                     _ => false,
                 }
             }
             (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
                 match &number_literal.value {
-                    Number::Float(f) => {
-                        number_to_f64(&number_literal.value)
-                            .and_then(|value| apply_unary_float(value, unary_op))
-                            .is_some_and(|value| value == allowed.value())
-                    }
+                    Number::Float(f) => apply_unary_float(*f, unary_op)
+                        .map(AllowedFloatValue::new)
+                        .is_some_and(|value| value == *allowed),
                     _ => false,
                 }
             }
             _ => false,
         }
-    }
-}
-
-fn number_to_i32(number: &Number) -> Option<i32> {
-    match number {
-        Number::Int(i) => i.as_i32(),
-        #[expect(clippy::cast_possible_truncation)]
-        Number::Float(f) if f.fract() == 0.0 => Some(*f as i32),
-        Number::Float(_) | Number::Complex { .. } => None,
-    }
-}
-
-fn number_to_f64(number: &Number) -> Option<f64> {
-    match number {
-        Number::Int(i) => i.as_i32().map(f64::from),
-        Number::Float(f) => Some(*f),
-        Number::Complex { .. } => None,
     }
 }
 
@@ -196,6 +179,9 @@ impl Default for Settings {
                 AllowedValue::Int(0),
                 AllowedValue::Int(1),
                 AllowedValue::Int(-1),
+                AllowedValue::Float(AllowedFloatValue::new(0.0)),
+                AllowedValue::Float(AllowedFloatValue::new(1.0)),
+                AllowedValue::Float(AllowedFloatValue::new(-1.0)),
                 AllowedValue::String(String::new()),
                 AllowedValue::String("__main__".to_string()),
             ],
