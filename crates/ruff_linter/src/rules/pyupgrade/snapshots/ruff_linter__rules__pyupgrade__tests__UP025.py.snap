@@ -307,6 +307,7 @@ UP025 [*] Remove unicode literals from strings
 33 | """"""""""""""""""""u"hi"
    |                     ^^^^^
 34 | ""U"helloooo"
+35 | # https://github.com/astral-sh/ruff/issues/10586
    |
 help: Remove unicode prefix
    |
@@ -323,9 +324,26 @@ UP025 [*] Remove unicode literals from strings
 33 | """"""""""""""""""""u"hi"
 34 | ""U"helloooo"
    |   ^^^^^^^^^^^
+35 | # https://github.com/astral-sh/ruff/issues/10586
+36 | # A unicode prefix inside a string type definition (forward reference) is part
+   |
 help: Remove unicode prefix
    |
 33 | """"""""""""""""""""u"hi"
    - ""U"helloooo"
 34 + "" "helloooo"
+35 | # https://github.com/astral-sh/ruff/issues/10586
+   |
+
+UP025 [*] Remove unicode literals from strings
+  --> UP025.py:45:12
+   |
+44 | def f(x: "te.Literal[u'x']") -> "te.Literal[u'y']":
+45 |     return u"y"  # UP025 (runtime string, outside the annotation)
+   |            ^^^^
+help: Remove unicode prefix
+   |
+44 | def f(x: "te.Literal[u'x']") -> "te.Literal[u'y']":
+   -     return u"y"  # UP025 (runtime string, outside the annotation)
+45 +     return "y"  # UP025 (runtime string, outside the annotation)
    |

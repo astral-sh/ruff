@@ -32,3 +32,14 @@ f"foo" u"bar"  # OK
 ""u"hi"
 """"""""""""""""""""u"hi"
 ""U"helloooo"
+# https://github.com/astral-sh/ruff/issues/10586
+# A unicode prefix inside a string type definition (forward reference) is part
+# of the type expression and must not be flagged.
+import typing_extensions as te
+
+A: "te.Literal[u'x', '\r\n', '\r']" = "\n"
+B: list["te.Literal[u'x']"] = []
+
+
+def f(x: "te.Literal[u'x']") -> "te.Literal[u'y']":
+    return u"y"  # UP025 (runtime string, outside the annotation)

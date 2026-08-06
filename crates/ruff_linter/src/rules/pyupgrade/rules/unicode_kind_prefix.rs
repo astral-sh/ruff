@@ -41,6 +41,13 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 
 /// UP025
 pub(crate) fn unicode_kind_prefix(checker: &Checker, string: &StringLiteral) {
+    // Don't flag string literals inside a string type definition (forward
+    // reference), e.g. `x: "Literal[u'x']"`. The `u` prefix is part of the
+    // type expression, not a redundant prefix on a runtime string.
+    // https://github.com/astral-sh/ruff/issues/10586
+    if checker.semantic().in_string_type_definition() {
+        return;
+    }
     if string.flags.prefix().is_unicode() {
         let mut diagnostic = checker.report_diagnostic(UnicodeKindPrefix, string.range);
 
