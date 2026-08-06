@@ -22,6 +22,7 @@
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::cmp::Eq;
+use std::collections::hash_map::Entry;
 use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -440,33 +441,97 @@ impl<'db> SpecializationFlowGraph<'db> {
             return true;
         }
 
-        root.parameters(db).any(|root_parameter| {
-            self.edges.iter().any(|edge| {
-                edge.kind == FlowKind::Nested
-                    && self.reachable(root_parameter, edge.from)
-                    && self.reachable(edge.to, root_parameter)
-            })
+        if !self.edges.iter().any(|edge| edge.kind == FlowKind::Nested) {
+            return false;
+        }
+
+        let root_parameters = root.parameters(db).collect::<Vec<_>>();
+        let components =
+            self.strongly_connected_parameter_components(root_parameters.iter().copied());
+        let root_components = root_parameters
+            .iter()
+            .filter_map(|parameter| components.get(parameter).copied())
+            .collect::<FxHashSet<_>>();
+
+        self.edges.iter().any(|edge| {
+            if edge.kind != FlowKind::Nested {
+                return false;
+            }
+            components
+                .get(&edge.from)
+                .zip(components.get(&edge.to))
+                .is_some_and(|(from, to)| from == to && root_components.contains(from))
         })
     }
 
-    fn reachable(&self, from: BoundTypeVarIdentity<'db>, to: BoundTypeVarIdentity<'db>) -> bool {
-        if from == to {
-            return true;
+    /// Assigns each parameter to its strongly connected component.
+    fn strongly_connected_parameter_components(
+        &self,
+        additional_parameters: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> FxHashMap<BoundTypeVarIdentity<'db>, usize> {
+        let mut parameters = additional_parameters.into_iter().collect::<FxHashSet<_>>();
+        let mut outgoing = FxHashMap::<_, SmallVec<[_; 2]>>::default();
+        let mut incoming = FxHashMap::<_, SmallVec<[_; 2]>>::default();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "component membership is independent of traversal order"
+        )]
+        for edge in &self.edges {
+            parameters.insert(edge.from);
+            parameters.insert(edge.to);
+            outgoing.entry(edge.from).or_default().push(edge.to);
+            incoming.entry(edge.to).or_default().push(edge.from);
         }
-        let mut pending = vec![from];
+
         let mut visited = FxHashSet::default();
-        while let Some(current) = pending.pop() {
-            if !visited.insert(current) {
+        let mut finishing_order = Vec::with_capacity(parameters.len());
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "component membership is independent of traversal order"
+        )]
+        for start in parameters {
+            if !visited.insert(start) {
                 continue;
             }
-            for edge in self.edges.iter().filter(|edge| edge.from == current) {
-                if edge.to == to {
-                    return true;
+
+            let mut pending = vec![(start, 0)];
+            while let Some((current, next_index)) = pending.pop() {
+                let next = outgoing
+                    .get(&current)
+                    .and_then(|parameters| parameters.get(next_index))
+                    .copied();
+                if let Some(next) = next {
+                    pending.push((current, next_index + 1));
+                    if visited.insert(next) {
+                        pending.push((next, 0));
+                    }
+                } else {
+                    finishing_order.push(current);
                 }
-                pending.push(edge.to);
             }
         }
-        false
+
+        let mut components = FxHashMap::default();
+        for start in finishing_order.into_iter().rev() {
+            if components.contains_key(&start) {
+                continue;
+            }
+
+            let component = components.len();
+            components.insert(start, component);
+            let mut pending = vec![start];
+            while let Some(current) = pending.pop() {
+                if let Some(previous_parameters) = incoming.get(&current) {
+                    for &previous in previous_parameters {
+                        if let Entry::Vacant(entry) = components.entry(previous) {
+                            entry.insert(component);
+                            pending.push(previous);
+                        }
+                    }
+                }
+            }
+        }
+        components
     }
 
     fn definition_reaches(&self, from: Definition<'db>, to: Definition<'db>) -> bool {
