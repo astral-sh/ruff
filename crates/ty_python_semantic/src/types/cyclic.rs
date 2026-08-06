@@ -125,9 +125,9 @@ struct ParameterSlot<'db> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum FlowKind {
-    /// The actual argument is exactly the source parameter.
+    /// The source parameter is passed directly or only through normalized set operations.
     Direct,
-    /// The source parameter occurs inside another type structure.
+    /// The source parameter occurs inside a type structure that can accumulate.
     Nested,
 }
 
@@ -172,8 +172,9 @@ struct SpecializationFlowVisitor<'db> {
 struct SourceParameterCollector<'a, 'db> {
     source_parameters: &'a FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
     env: &'a ProgramEnvironment<'db>,
-    found: RefCell<FxHashSet<ParameterSlot<'db>>>,
+    found: RefCell<FxHashMap<ParameterSlot<'db>, bool>>,
     visited_types: TypeCollector<'db>,
+    in_nested_type: Cell<bool>,
 }
 
 impl<'db> RecursiveDefinition<'db> {
@@ -247,14 +248,13 @@ impl<'db> RecursiveDefinition<'db> {
         }
     }
 
-    fn parameter_slots(self, db: &'db dyn Db) -> Vec<ParameterSlot<'db>> {
+    fn parameter_slots(self, db: &'db dyn Db) -> impl Iterator<Item = ParameterSlot<'db>> {
         let definition = self.definition(db);
         self.generic_context(db)
             .into_iter()
             .flat_map(|context| context.variables(db))
             .enumerate()
-            .map(|(index, _)| ParameterSlot { definition, index })
-            .collect()
+            .map(move |(index, _)| ParameterSlot { definition, index })
     }
 
     fn source_parameters(
@@ -281,7 +281,7 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     /// Walks the definition with each formal parameter mapped to itself.
-    fn walk_identity_body(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) -> bool {
+    fn walk_type_body(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) -> bool {
         match self {
             Self::TypeAlias(alias) => {
                 let value = alias.raw_value_type(db);
@@ -308,7 +308,21 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
-        may_have_unbounded_specialization_query(db, self.definition(db), self)
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, ()| true,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn may_have_unbounded_specialization_inner<'db>(
+            db: &'db dyn Db,
+            root: RecursiveDefinition<'db>,
+            _: (),
+        ) -> bool {
+            let graph = SpecializationFlowGraph::build(db, root);
+            graph.root_may_have_unbounded_specialization(db, root)
+        }
+
+        may_have_unbounded_specialization_inner(db, self, ())
     }
 }
 
@@ -337,7 +351,7 @@ impl<'db> SpecializationFlowGraph<'db> {
                 graph.inconclusive = true;
                 continue;
             };
-            if !source.walk_identity_body(db, &visitor) {
+            if !source.walk_type_body(db, &visitor) {
                 graph.inconclusive = true;
             }
             let (edges, referenced_definitions, inconclusive) = visitor.finish();
@@ -463,7 +477,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
             return;
         }
 
-        let target_slots = reference.target.parameter_slots(db);
+        let target_slots = reference.target.parameter_slots(db).collect::<Vec<_>>();
         let arguments = specialization.types(db);
         if target_slots.len() != arguments.len() {
             self.inconclusive.set(true);
@@ -527,27 +541,29 @@ impl<'a, 'db> SourceParameterCollector<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         source_parameters: &'a FxHashMap<BoundTypeVarIdentity<'db>, ParameterSlot<'db>>,
         argument: Type<'db>,
-    ) -> Vec<(ParameterSlot<'db>, FlowKind)> {
-        if let Type::TypeVar(typevar) = argument {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
-            if let Some(&parameter) = source_parameters.get(&identity) {
-                return vec![(parameter, FlowKind::Direct)];
-            }
-        }
-
+    ) -> impl Iterator<Item = (ParameterSlot<'db>, FlowKind)> {
         let collector = Self {
             source_parameters,
             env,
             found: RefCell::default(),
             visited_types: TypeCollector::default(),
+            in_nested_type: Cell::default(),
         };
         collector.visit_type(db, argument);
         collector
             .found
             .into_inner()
             .into_iter()
-            .map(|parameter| (parameter, FlowKind::Nested))
-            .collect()
+            .map(|(parameter, nested)| {
+                (
+                    parameter,
+                    if nested {
+                        FlowKind::Nested
+                    } else {
+                        FlowKind::Direct
+                    },
+                )
+            })
     }
 }
 
@@ -564,16 +580,36 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
             if let Some(&parameter) = self.source_parameters.get(&identity) {
-                self.found.borrow_mut().insert(parameter);
+                self.found
+                    .borrow_mut()
+                    .entry(parameter)
+                    .and_modify(|nested| *nested |= self.in_nested_type.get())
+                    .or_insert_with(|| self.in_nested_type.get());
             }
             return;
         }
 
+        // Unions and intersections are normalized set operations. Reapplying the same operation
+        // does not add another structural layer to a parameter.
+        match ty {
+            Type::Union(union) => {
+                self.visit_union_type(db, union);
+                return;
+            }
+            Type::Intersection(intersection) => {
+                self.visit_intersection_type(db, intersection);
+                return;
+            }
+            _ => {}
+        }
+
+        let was_in_nested_type = self.in_nested_type.replace(true);
         if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
             reference.walk_arguments(db, self);
-            return;
+        } else {
+            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
         }
-        walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        self.in_nested_type.set(was_in_nested_type);
     }
 
     fn visit_bound_type_var_type(
@@ -582,22 +618,6 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
         _bound_typevar: BoundTypeVarInstance<'db>,
     ) {
     }
-}
-
-// Salsa requires the first query argument to be a Salsa struct. `root` is always constructed from
-// the same definition by `RecursiveDefinition::may_have_unbounded_specialization`.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|_, _, _, _| true,
-    heap_size=ruff_memory_usage::heap_size,
-)]
-fn may_have_unbounded_specialization_query<'db>(
-    db: &'db dyn Db,
-    _definition: Definition<'db>,
-    root: RecursiveDefinition<'db>,
-) -> bool {
-    let graph = SpecializationFlowGraph::build(db, root);
-    graph.root_may_have_unbounded_specialization(db, root)
 }
 
 impl<'db> TypeAliasType<'db> {
@@ -1194,21 +1214,18 @@ type Helper[U] = U
         let helper = RecursiveDefinition::TypeAlias(
             global_type_alias(&db, &env, "Helper").unspecialized(&db),
         );
-        let one_slots = one.parameter_slots(&db);
-        let [one_t] = one_slots.as_slice() else {
+        let mut one_slots = one.parameter_slots(&db);
+        let Some(one_t) = one_slots.next() else {
             panic!("expected one parameter");
         };
-        let one_t = *one_t;
-        let two_slots = two.parameter_slots(&db);
-        let [two_x, two_y] = two_slots.as_slice() else {
+        let mut two_slots = two.parameter_slots(&db);
+        let (Some(two_x), Some(two_y)) = (two_slots.next(), two_slots.next()) else {
             panic!("expected two parameters");
         };
-        let (two_x, two_y) = (*two_x, *two_y);
-        let helper_slots = helper.parameter_slots(&db);
-        let [helper_u] = helper_slots.as_slice() else {
+        let mut helper_slots = helper.parameter_slots(&db);
+        let Some(helper_u) = helper_slots.next() else {
             panic!("expected one helper parameter");
         };
-        let helper_u = *helper_u;
 
         for (root, edges, expected) in [
             (
@@ -1377,8 +1394,7 @@ type Saturating[T] = tuple[T, Saturating[T | int]]
             ("TransitiveHelper", true),
             ("PeriodicOuter", false),
             ("PeriodicHelper", false),
-            // TODO: Repeated union additions can saturate even though their flow is `Nested`.
-            ("Saturating", true),
+            ("Saturating", false),
         ] {
             let alias = global_type_alias(&db, &env, name);
             assert_eq!(

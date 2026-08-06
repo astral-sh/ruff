@@ -937,7 +937,9 @@ finitely many expansions. This includes shifting arguments to the left and reset
 types that do not depend on the current specialization.
 
 ```py
-from ty_extensions import static_assert
+from typing import Protocol
+
+from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_subtype_of
 
 # Resetting the recursive argument makes these aliases reach a fixed specialization.
@@ -978,15 +980,47 @@ static_assert(is_subtype_of(MutualLeft[str], MutualRight[str]))
 type SaturatingLeft[T] = tuple[T, SaturatingLeft[T | int]]
 type SaturatingRight[T] = tuple[T, SaturatingRight[T | int]]
 
+static_assert(is_subtype_of(SaturatingLeft[bytes], SaturatingRight[bytes]))
+
+# Repeatedly intersecting with the same type also reaches a fixed point.
+type IntersectingLeft[T] = tuple[T, IntersectingLeft[Intersection[T, int]]]
+type IntersectingRight[T] = tuple[T, IntersectingRight[Intersection[T, int]]]
+
+static_assert(is_subtype_of(IntersectingLeft[object], IntersectingRight[object]))
+
+# A structural wrapper still grows when it appears alongside or outside a saturating union.
+type MixedGrowingLeft[T] = tuple[T, MixedGrowingLeft[T | list[T]]]
+type MixedGrowingRight[T] = tuple[T, MixedGrowingRight[T | list[T]]]
+type NestedSetGrowingLeft[T] = tuple[T, NestedSetGrowingLeft[list[T | int]]]
+type NestedSetGrowingRight[T] = tuple[T, NestedSetGrowingRight[list[T | int]]]
+
 # TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(SaturatingLeft[bytes], SaturatingRight[bytes]))
+static_assert(not is_subtype_of(MixedGrowingLeft[int], MixedGrowingRight[int]))
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(NestedSetGrowingLeft[int], NestedSetGrowingRight[int]))
+
+# Alternating normalized set operations also reach a fixed point.
+class SetElementA(Protocol):
+    a: int
+
+class SetElementB(Protocol):
+    b: int
+
+class SetElementC(Protocol):
+    c: int
+
+type AlternatingSetLeft[T] = tuple[T, AlternatingSetLeftHelper[T | SetElementB]]
+type AlternatingSetLeftHelper[U] = tuple[U, AlternatingSetLeft[Intersection[U, SetElementC]]]
+type AlternatingSetRight[T] = tuple[T, AlternatingSetRightHelper[T | SetElementB]]
+type AlternatingSetRightHelper[U] = tuple[U, AlternatingSetRight[Intersection[U, SetElementC]]]
+
+static_assert(is_subtype_of(AlternatingSetLeft[SetElementA], AlternatingSetRight[SetElementA]))
 
 # A specialization can also have a finite period greater than one.
 type PeriodicLeft[A, B] = tuple[A, B, PeriodicLeft[B, A | int]]
 type PeriodicRight[A, B] = tuple[A, B, PeriodicRight[B, A | int]]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
+static_assert(is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
 
 # Neither recursive occurrence grows indefinitely by itself, but alternating between them adds
 # another list layer on every cycle.

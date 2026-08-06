@@ -5509,6 +5509,21 @@ static_assert(
     )
 )
 
+class SaturatingLeftProtocol[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> SaturatingLeftProtocol[T | int]: ...
+
+class SaturatingRightProtocol[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    @property
+    def child(self) -> SaturatingRightProtocol[T | int]: ...
+
+# Repeatedly adding the same union element also reaches an exact repetition.
+static_assert(is_subtype_of(SaturatingLeftProtocol[str], SaturatingRightProtocol[str]))
+
 class FiniteLeft[T](Protocol):
     value: T
 
