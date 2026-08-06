@@ -533,8 +533,8 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                 LintSource::Editor => {
                     format!("rule `{rule}` was selected in the editor settings")
                 }
-                LintSource::UvWorkspace => {
-                    format!("rule `{rule}` was selected by uv workspace metadata")
+                LintSource::UvMetadata => {
+                    format!("rule `{rule}` was selected by uv metadata")
                 }
             });
         }

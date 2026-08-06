@@ -666,6 +666,6 @@ pub enum LintSource {
     /// The rule was enabled from the configuration in the editor.
     Editor,
 
-    /// The rule was enabled by uv workspace metadata.
-    UvWorkspace,
+    /// The rule was enabled by uv metadata.
+    UvMetadata,
 }

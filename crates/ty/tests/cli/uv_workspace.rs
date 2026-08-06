@@ -419,7 +419,7 @@ fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
         assert!(!output.status.success());
         assert!(!stdout.contains("specified on the command line"));
         if output_format == "full" {
-            assert!(stdout.contains("provided by uv workspace metadata"));
+            assert!(stdout.contains("provided by uv metadata"));
         }
     }
 
