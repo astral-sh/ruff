@@ -297,8 +297,7 @@ container[0] += 1
 reveal_type(container[0])  # revealed: Value
 ```
 
-Explicitly annotated lists and dictionaries retain their write contracts, including through one-hop
-aliases and references from enclosing scopes.
+Explicitly annotated lists and dictionaries retain their write contracts.
 
 ```py
 items: list[Value] = [Value()]
@@ -306,30 +305,13 @@ items: list[Value] = [Value()]
 items[0] += 1
 reveal_type(items[0])  # revealed: Value
 
-alias = items
-# error: [invalid-assignment]
-alias[0] += 1
-
-separately_declared: list[Value]
-separately_declared = [Value()]
-# error: [invalid-assignment]
-separately_declared[0] += 1
-
 mapping: dict[str, Value] = {"value": Value()}
 # error: [invalid-assignment]
 mapping["value"] += 1
 reveal_type(mapping["value"])  # revealed: Value
-
-def update_declared_outer() -> None:
-    # error: [invalid-assignment]
-    items[0] += 1
-
-    alias = items
-    # error: [invalid-assignment]
-    alias[0] += 1
 ```
 
-Declared collection-valued attributes also retain their write contracts through immediate aliases.
+Declared collection-valued attributes also retain their write contracts.
 
 ```py
 class Holder:
@@ -338,10 +320,6 @@ class Holder:
 holder = Holder()
 # error: [invalid-assignment]
 holder.values[0] += 1
-
-member_alias = holder.values
-# error: [invalid-assignment]
-member_alias[0] += 1
 ```
 
 Typed dictionary entries validate the value written back to their declared fields.
@@ -427,43 +405,13 @@ def update(value: A | B) -> None:
 
 ## Inferred collection targets
 
-Augmented stores to inferred collection literals must not be treated as writes to an explicitly
-declared element type.
+Augmented assignments do not yet participate in full-scope collection inference.
 
 ```py
 values = [1]
+# TODO: This should widen the inferred element type without reporting an error.
+# error: [invalid-assignment]
 values[0] /= 2
-
-alias = values
-alias[0] /= 2
-
-second_alias = alias
-second_alias[0] /= 2
-
-nested = [[1]]
-nested[0][0] /= 2
-```
-
-The same inference behavior applies to unannotated attributes and values from enclosing scopes.
-
-```py
-class Holder:
-    def __init__(self) -> None:
-        self.values = [1]
-
-    def update(self) -> None:
-        self.values[0] /= 2
-
-        alias = self.values
-        alias[0] /= 2
-
-outer = [1]
-
-def update_outer() -> None:
-    outer[0] /= 2
-
-    alias = outer
-    alias[0] /= 2
 ```
 
 ## Implicit dunder calls on class objects

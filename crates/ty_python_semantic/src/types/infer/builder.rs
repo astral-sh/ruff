@@ -4924,7 +4924,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     || object_ty
                         .subscript(db, env, slice_ty, ExprContext::Load)
                         .is_err()
-                    || self.is_unannotated_mutable_collection(&subscript.value, object_ty)
                 {
                     return result_ty;
                 }
@@ -4941,80 +4940,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => result_ty,
         }
-    }
-
-    /// Return whether this collection lacks a directly declared element-type contract.
-    ///
-    /// Augmented stores must participate in full-scope collection inference before they can
-    /// constrain these collections without rejecting valid element-type changes.
-    fn is_unannotated_mutable_collection(&self, object: &ast::Expr, object_ty: Type<'db>) -> bool {
-        let db = self.db();
-        if !AddBinding::is_safe_mutable_class(db, self.program_environment(), object_ty) {
-            return false;
-        }
-
-        let has_declared_type = |expression: &ast::Expr| match expression {
-            ast::Expr::Name(name) => {
-                let place = PlaceExpr::from_expr_name(name);
-                if matches!(
-                    self.infer_place_load(PlaceExprRef::from(&place), ast::ExprRef::Name(name))
-                        .0
-                        .place,
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
-                        ..
-                    })
-                ) {
-                    return true;
-                }
-
-                let use_id = ast::ExprRef::Name(name).scoped_use_id(db, self.program_file());
-                let use_def = self.index.use_def_map(self.scope.file_scope_id(db));
-                use_def.bindings_at_use(use_id).any(|binding| {
-                    binding.binding.definition().is_some_and(|definition| {
-                        matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-                            || use_def
-                                .declarations_at_binding(definition)
-                                .any(|declaration| declaration.declaration.definition().is_some())
-                    })
-                })
-            }
-            ast::Expr::Attribute(attribute) => {
-                let receiver_ty = self.expression_type(&attribute.value);
-                matches!(
-                    receiver_ty
-                        .member(db, self.program_environment(), &attribute.attr.id)
-                        .place,
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
-                        ..
-                    })
-                )
-            }
-            _ => false,
-        };
-
-        if has_declared_type(object) {
-            return false;
-        }
-
-        let Some(name) = object.as_name_expr() else {
-            return true;
-        };
-        let use_id = ast::ExprRef::Name(name).scoped_use_id(db, self.program_file());
-        let use_def = self.index.use_def_map(self.scope.file_scope_id(db));
-
-        !use_def.bindings_at_use(use_id).any(|binding| {
-            binding
-                .binding
-                .definition()
-                .is_some_and(|definition| match definition.kind(db) {
-                    DefinitionKind::Assignment(assignment) => {
-                        has_declared_type(assignment.value(self.module()))
-                    }
-                    _ => false,
-                })
-        })
     }
 
     fn infer_dict_key_assignment_definition(
