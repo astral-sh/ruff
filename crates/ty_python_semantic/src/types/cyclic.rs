@@ -33,10 +33,11 @@ use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::list_members::all_members;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, StaticClassLiteral, Type,
-    TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, NominalInstanceType,
+    ProtocolInstanceType, StaticClassLiteral, SubclassOfInner, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -45,6 +46,7 @@ use crate::{Db, ProgramEnvironment};
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
+    GrowingNominalInstance(Definition<'db>),
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
@@ -52,6 +54,28 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
+    /// Projects a class-object wrapper onto the instance type whose definition owns its recursion.
+    fn type_identity_owner(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::GenericAlias(alias) => {
+                let class = ClassType::Generic(alias);
+                let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+                Type::instance(db, &env, class)
+            }
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => {
+                    let env =
+                        ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+                    Type::instance(db, &env, class)
+                }
+                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
+                SubclassOfInner::Protocol(protocol) => Type::ProtocolInstance(protocol),
+                SubclassOfInner::TypeVar(typevar) => Type::TypeVar(typevar),
+            },
+            _ => self,
+        }
+    }
+
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::Other(self))
@@ -62,6 +86,13 @@ impl<'db> Type<'db> {
     /// A `true` result is only a candidate match and must be confirmed with
     /// [`Type::to_type_identity`].
     pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        let self_owner = self.type_identity_owner(db);
+        let other_owner = other.type_identity_owner(db);
+
+        if self_owner != self || other_owner != other {
+            return self_owner.may_share_type_identity(db, other_owner);
+        }
+
         if self == other {
             return true;
         }
@@ -69,6 +100,11 @@ impl<'db> Type<'db> {
             (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
             (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
                 a.definition(db) == b.definition(db)
+            }
+            (Type::NominalInstance(a), Type::NominalInstance(b)) => {
+                a.definition(db).is_some_and(|definition| {
+                    b.definition(db).is_some_and(|other| definition == other)
+                })
             }
             (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
                 a.definition(db) == b.definition(db)
@@ -82,6 +118,11 @@ impl<'db> Type<'db> {
     #[allow(clippy::inline_always)]
     #[inline(always)]
     fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
+        let owner = self.type_identity_owner(db);
+        if owner != self {
+            return owner.recursive_identity(db);
+        }
+
         match self {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
@@ -92,18 +133,25 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(newtype) => {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
-            // Recursive aliases, protocols, and TypedDicts whose specialization can keep changing
+            // Recursive nominal instances, aliases, protocols, and TypedDicts whose
+            // specialization can keep changing
             // (e.g. `type Growing[T] = T | Growing[list[T]]`) are collapsed to their definition so
             // that visits stop even though no exact type repeats. Recursion that revisits one
             // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
             // no definition-level identity: the detectors stop on the repeated type itself.
-            Type::TypeAlias(_) | Type::ProtocolInstance(_) | Type::TypedDict(_) => {
+            Type::NominalInstance(_)
+            | Type::TypeAlias(_)
+            | Type::ProtocolInstance(_)
+            | Type::TypedDict(_) => {
                 let target = RecursiveDefinition::from_type(db, self)?.target;
                 if !target.may_have_unbounded_specialization(db) {
                     return None;
                 }
                 let definition = target.definition(db);
                 Some(match target {
+                    RecursiveDefinition::Nominal(_) => {
+                        TypeIdentity::GrowingNominalInstance(definition)
+                    }
                     RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
@@ -117,6 +165,7 @@ impl<'db> Type<'db> {
 /// A definition whose formal parameters can flow through recursive type references.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum RecursiveDefinition<'db> {
+    Nominal(StaticClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
@@ -205,7 +254,17 @@ struct SourceParameterCollector<'a, 'db> {
 
 impl<'db> RecursiveDefinition<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<DefinitionUse<'db>> {
+        let owner = ty.type_identity_owner(db);
+        if owner != ty {
+            return Self::from_type(db, owner);
+        }
+
         let (target, specialization) = match ty {
+            Type::NominalInstance(instance) if instance.own_tuple_spec(db).is_none() => {
+                let (origin, specialization) =
+                    instance.stored_class(db)?.static_class_literal(db)?;
+                (Self::Nominal(origin), specialization)
+            }
             Type::TypeAlias(alias) => (
                 Self::TypeAlias(alias.unspecialized(db)),
                 alias.specialization(db),
@@ -239,14 +298,18 @@ impl<'db> RecursiveDefinition<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
             Self::TypeAlias(alias) => alias.definition(db),
-            Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
+            Self::Nominal(origin) | Self::Protocol(origin) | Self::TypedDict(origin) => {
+                origin.definition(db)
+            }
         }
     }
 
     fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         match self {
             Self::TypeAlias(alias) => alias.generic_context(db),
-            Self::Protocol(origin) | Self::TypedDict(origin) => origin.generic_context(db),
+            Self::Nominal(origin) | Self::Protocol(origin) | Self::TypedDict(origin) => {
+                origin.generic_context(db)
+            }
         }
     }
 
@@ -257,7 +320,9 @@ impl<'db> RecursiveDefinition<'db> {
     ) -> Specialization<'db> {
         let known_class = match self {
             Self::TypeAlias(_) => None,
-            Self::Protocol(origin) | Self::TypedDict(origin) => origin.known(db),
+            Self::Nominal(origin) | Self::Protocol(origin) | Self::TypedDict(origin) => {
+                origin.known(db)
+            }
         };
         generic_context.default_specialization(db, known_class)
     }
@@ -447,6 +512,10 @@ impl<'db> SpecializationFlowVisitor<'db> {
     /// Visits the definition with each formal parameter mapped to itself.
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
         match source {
+            RecursiveDefinition::Nominal(origin) => {
+                let nominal = Type::instance(db, &self.env, origin.identity_specialization(db));
+                self.visit_nominal_members(db, nominal);
+            }
             RecursiveDefinition::TypeAlias(alias) => {
                 self.visit_type(db, alias.raw_value_type(db));
             }
@@ -468,6 +537,39 @@ impl<'db> SpecializationFlowVisitor<'db> {
             }
         }
         true
+    }
+
+    fn visit_nominal_members(&self, db: &'db dyn Db, nominal: Type<'db>) {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "specialization flow is independent of member order"
+        )]
+        for member in all_members(db, &self.env, nominal) {
+            // `all_members` synthesizes `__class__: type[Self]` for every nominal instance.
+            if member.name == "__class__" {
+                continue;
+            }
+            // These hooks determine the effective type of otherwise missing attributes.
+            if matches!(member.name.as_str(), "__getattr__" | "__getattribute__") {
+                self.visit_callable_return_types(db, member.ty);
+            }
+            match member.ty {
+                // Method relations have a separate declaration-based recursion guard.
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
+                ty => self.visit_type(db, ty),
+            }
+        }
+    }
+
+    fn visit_callable_return_types(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let Some(callables) = ty.try_upcast_to_callable(db, &self.env) else {
+            return;
+        };
+        for callable in &callables {
+            for signature in callable.signatures(db) {
+                self.visit_type(db, signature.return_ty);
+            }
+        }
     }
 
     fn record_reference(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
@@ -637,6 +739,12 @@ impl<'db> ProtocolInstanceType<'db> {
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
         Some(origin.definition(db))
+    }
+}
+
+impl<'db> NominalInstanceType<'db> {
+    fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        self.stored_class(db)?.definition(db)
     }
 }
 
