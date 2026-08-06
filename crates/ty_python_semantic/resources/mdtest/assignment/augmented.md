@@ -235,6 +235,20 @@ holder.inplace += 1
 reveal_type(holder.inplace)  # revealed: InplaceValue
 ```
 
+## Inferred attribute targets in loops
+
+An inferred attribute can change type across assignments. Its initial value must not become a
+declaration that pollutes the loop-carried type after the attribute has been reassigned.
+
+```py
+class Counter:
+    def update(self, increment: float) -> None:
+        self.value = None
+        self.value = 0
+        for _ in range(1):
+            self.value += increment
+```
+
 ## Attribute descriptors
 
 Even an in-place operation writes its result back, so a read-only property rejects augmented
