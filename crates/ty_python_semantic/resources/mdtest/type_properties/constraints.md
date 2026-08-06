@@ -97,26 +97,25 @@ def _[T]() -> None:
     ConstraintSet.range(Base, T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Gradual lower and upper bounds are not eagerly simplified to their bottom and top materializations.
 
 ```py
 def _[T]() -> None:
     constraints = ConstraintSet.range(Base, T, Any)
     expected = ConstraintSet.range(Base, T, object)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ConstraintSet.range(Sequence[Base], T, Sequence[object])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ConstraintSet.range(Any, T, Base)
     expected = ConstraintSet.range(Never, T, Base)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ConstraintSet.range(Sequence[Never], T, Sequence[Base])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 ```
 
 ### Negated range
@@ -187,26 +186,25 @@ def _[T]() -> None:
     ~ConstraintSet.range(Base, T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Gradual lower and upper bounds are not eagerly simplified to their bottom and top materializations.
 
 ```pyi
 def _[T]() -> None:
     constraints = ~ConstraintSet.range(Base, T, Any)
     expected = ~ConstraintSet.range(Base, T, object)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ~ConstraintSet.range(Sequence[Base], T, Sequence[object])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ~ConstraintSet.range(Any, T, Base)
     expected = ~ConstraintSet.range(Never, T, Base)
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ~ConstraintSet.range(Sequence[Never], T, Sequence[Base])
-    static_assert(constraints == expected)
+    static_assert(constraints != expected)
 ```
 
 A negated _type_ is not the same thing as a negated _range_.
@@ -1175,6 +1173,150 @@ def quantifier_order[S, T]() -> None:
     # ∃S.∀T.equal(S, T)
     exists_source_forall_target = equal.for_all(tuple[T]).exists(tuple[S])
     static_assert(exists_source_forall_target == ConstraintSet.never())
+```
+
+## Gradual constraints
+
+Constraint-set assignability preserves gradual types. Constraints on the materializations of gradual
+types themselves are represented by opaque existential variables, while constraints involving
+gradual types are recorded on inferable type variables.
+
+```py
+from typing import Any, Never
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import (
+    ConstraintSet,
+    is_assignable_to,
+    is_constraint_set_assignable_to,
+)
+
+gradual = is_constraint_set_assignable_to(Any, int)
+
+# revealed: ConstraintSet[bool]
+reveal_type(gradual)
+
+# revealed: ConstraintSet[(gradual@0)]
+reveal_type(gradual.with_detailed_display())
+
+static_assert(gradual == gradual)
+static_assert(gradual != ConstraintSet.always())
+static_assert(gradual != ConstraintSet.never())
+static_assert(gradual.satisfies(gradual))
+static_assert(not gradual.satisfies(ConstraintSet.never()))
+static_assert(not ConstraintSet.always().satisfies(gradual))
+static_assert((gradual | ConstraintSet.never()) == gradual)
+static_assert((ConstraintSet.never() | gradual) == gradual)
+static_assert((gradual & ConstraintSet.always()) == gradual)
+static_assert((ConstraintSet.always() & gradual) == gradual)
+static_assert(gradual)
+static_assert(is_assignable_to(Any, int))
+static_assert(is_constraint_set_assignable_to(Any, object) == ConstraintSet.always())
+static_assert(is_constraint_set_assignable_to(Never, Any) == ConstraintSet.always())
+static_assert(is_constraint_set_assignable_to(Intersection[Any, bool], int) == ConstraintSet.always())
+static_assert(is_constraint_set_assignable_to(bool, Any | int) == ConstraintSet.always())
+
+def _[T]() -> None:
+    other = ConstraintSet.range(int, T, object)
+    static_assert(gradual.satisfies(other) == other)
+    static_assert((gradual | other) != other)
+    static_assert((other | gradual) != other)
+    static_assert((gradual & other) != other)
+    static_assert((other & gradual) != other)
+    static_assert((gradual & (other | ~other)) == gradual)
+    static_assert((gradual | (other & ~other)) == gradual)
+```
+
+Distinct existential variables are created for each constraint on a gradual type in a given
+assignability check.
+
+```py
+from typing import Any
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+union_constraint = is_constraint_set_assignable_to(Any, int | str)
+
+# revealed: ConstraintSet[(gradual@0)]
+reveal_type(union_constraint.with_detailed_display())
+
+def _[T]() -> None:
+    distributed = is_constraint_set_assignable_to(Any, T | int)
+    # revealed: ConstraintSet[((Any ≤ T@_) ∧ ?(gradual@0)) ∨ (gradual@0)]
+    reveal_type(distributed.with_detailed_display())
+
+    nested = is_constraint_set_assignable_to(Any, tuple[T] | None)
+    # revealed: ConstraintSet[((Any ≤ T@_) ∧ (gradual@0) ∧ ?(gradual@1)) ∨ (gradual@1)]
+    reveal_type(nested.with_detailed_display())
+
+first = is_constraint_set_assignable_to(Any, int)
+second = is_constraint_set_assignable_to(Any, str)
+
+# revealed: ConstraintSet[((gradual@0) ∧ (gradual@1))]
+reveal_type((first & second).with_detailed_display())
+```
+
+Recursive protocol checks retain their gradual variables instead of falling back to `Unknown`.
+
+```py
+from typing import Any, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class Recursive[T](Protocol):
+    def item(self) -> T | "Recursive[T]": ...
+
+def _[T]() -> None:
+    gradual = is_constraint_set_assignable_to(Any, Recursive[T])
+    informative = ConstraintSet.range(Any, T, object)
+
+    # revealed: ConstraintSet[(gradual@0)]
+    reveal_type(gradual.with_detailed_display())
+    static_assert(gradual != ConstraintSet.always())
+    static_assert((gradual | informative) != ConstraintSet.always())
+```
+
+Constraint-set implication uses subtyping instead of assignability, and so does not make assumptions
+about the materialization of a given gradual type.
+
+```py
+from typing import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class A(Any): ...
+class B(Any): ...
+
+def _[T]() -> None:
+    a = ConstraintSet.range(A, T, A)
+    b = ConstraintSet.range(B, T, B)
+    static_assert(not a.satisfies(b))
+    static_assert(not b.satisfies(a))
+
+def gradual_bounds_are_not_materialized[T]() -> None:
+    gradual_lower = ConstraintSet.range(Any, T, object)
+    int_lower = ConstraintSet.range(int, T, object)
+    object_lower = ConstraintSet.range(object, T, object)
+    static_assert(not int_lower.satisfies(gradual_lower))
+    static_assert(not gradual_lower.satisfies(int_lower))
+    static_assert(object_lower.satisfies(gradual_lower))
+    static_assert((gradual_lower | object_lower) == gradual_lower)
+
+    gradual_upper = ConstraintSet.range(Never, T, Any)
+    int_upper = ConstraintSet.range(Never, T, int)
+    static_assert(not int_upper.satisfies(gradual_upper))
+    static_assert(not gradual_upper.satisfies(int_upper))
+```
+
+Unrelated instances of gradual types may materialize to distinct types, and so cannot establish
+transitive subtyping relationships.
+
+```py
+from typing import Any, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def independent_gradual_pivots[T, U]() -> None:
+    constraints = ConstraintSet.range(Never, T, Any) & ConstraintSet.range(Any, U, object)
+    static_assert(not constraints.implies_subtype_of(T, U))
 ```
 
 ## Displaying constraints

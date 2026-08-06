@@ -1368,7 +1368,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
         if parameter_type.is_unknown()
-            || parameter_type.has_unspecialized_type_var(db, self.program_environment())
+            || parameter_type.has_provisional_marker(db, self.program_environment())
         {
             None
         } else {

@@ -744,8 +744,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
 
 A constrained outer return type should remain visible in an invalid callback diagnostic. The
 callback itself is still invalid, but replacing its expected result with `Unknown` loses useful
-information. The false-positive return diagnostic is pending
-[#26680](https://github.com/astral-sh/ruff/pull/26680).
+information.
 
 ```py
 from collections.abc import Callable
@@ -763,8 +762,6 @@ class CallbackInterface(Generic[C]):
         self.callback = callback
 
     def view(self) -> CallbackView[C]:
-        # TODO(#26680): no [invalid-return-type] error
-        # error: [invalid-return-type]
         # error: [invalid-argument-type] "Expected `(int, /) -> C@CallbackInterface`, found `Selector@__init__`"
         return CallbackView(self.callback)
 ```
@@ -772,8 +769,8 @@ class CallbackInterface(Generic[C]):
 ## Callable factories retain contextual outer element types
 
 Narrowing a union to a callable should not replace its outer iterable element type with `Unknown`.
-The factory argument remains invalid, but its expected result should preserve the outer `CT`. The
-false-positive return diagnostic and separate narrowed-sequence constructor diagnostics are pending
+The factory argument remains invalid, but its expected result should preserve the outer `CT`.
+Separate narrowed-sequence constructor diagnostics are pending
 [#26680](https://github.com/astral-sh/ruff/pull/26680).
 
 ```py
@@ -799,14 +796,11 @@ class SequenceView(Iterable[RT], Generic[RT]):
 
 def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Iterable[CT]:
     if callable(matches):
-        # TODO(#26680): no [invalid-return-type] error
-        # error: [invalid-return-type]
         # error: [invalid-argument-type] "Expected `() -> Iterable[CT@build_iter_view]`"
         return FactoryView(matches)
     if not isinstance(matches, Sequence):
         matches = list(matches)
     # TODO(#26680): no errors
-    # error: [invalid-return-type]
     # error: [invalid-argument-type] "Expected `Sequence[CT@build_iter_view]`"
     return SequenceView(matches)
 ```
@@ -2085,6 +2079,8 @@ def _(dtype: FloatDtype):
     reveal_type(x)  # revealed: float
 ```
 
+Intersection bindings are similarly evaluated under fixpoint iteration:
+
 ```py
 from typing import Protocol, runtime_checkable
 
@@ -2115,6 +2111,21 @@ def _(callback: TakesInt) -> None:
         # TODO: Perform fixpoint iteration when evaluating callable intersections.
         x2 = callback("str", lambda value: reveal_type(value) + "!")  # revealed: Unknown
         reveal_type(x2)  # revealed: str
+```
+
+Type context specialized to a gradual type should not be ignored:
+
+```py
+from ty_extensions._internal import Unknown
+
+def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def _(dynamic: Unknown):
+    # TODO: This should not error.
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]
 ```
 
 Note that long chains of callables with constraint dependencies in reverse source-order may require
@@ -2598,6 +2609,19 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+A lambda's provisional parameter type must not prevent its callable type from constraining the keys
+of an unannotated dictionary:
+
+```py
+def _():
+    values = {}
+    values["first"] = 1
+    key = lambda value: value
+    reveal_type(values)  # revealed: dict[str | ((value) -> Unknown), int]
+    values[key] = 2
+    reveal_type(values[key])  # revealed: int
 ```
 
 ## Multi-inference diagnostics

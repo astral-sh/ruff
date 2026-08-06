@@ -1048,7 +1048,14 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> TypeVarVariance {
-        self.class(db, env).variance_of(db, env, typevar)
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => tuple.variance_of(db, env, typevar),
+            NominalInstanceInner::Object
+            | NominalInstanceInner::NonTuple(_)
+            | NominalInstanceInner::SysVersionInfo => {
+                self.class(db, env).variance_of(db, env, typevar)
+            }
+        }
     }
 }
 
