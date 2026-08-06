@@ -39,6 +39,7 @@
 use std::cmp::Ordering;
 
 use itertools::Either;
+use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
 use rustc_hash::FxHashSet;
@@ -79,6 +80,9 @@ use crate::{Db, FxIndexSet};
 /// def consumer(dependency): ...  # B
 /// ```
 ///
+/// At present, we search the parameter's class hierarchy, module, and enclosing
+/// conftest hierarchy. Built-in and plugin fixtures are not yet supported.
+///
 /// The resolution implemented here matches what pytest will actually resolve at
 /// runtime for context A, but not necessarily for context B. To see why,
 /// consider this example:
@@ -118,6 +122,7 @@ pub fn fixture_bindings_for_parameter<'db>(
         return Box::default();
     };
 
+    // First, resolve bindings from the containing class scope, if any.
     let containing_scope = request.function_definition.scope(db);
     let class_scope = containing_scope
         .node(db)
@@ -142,8 +147,30 @@ pub fn fixture_bindings_for_parameter<'db>(
         }
     }
 
-    let module_scope = global_scope(db, parameter.program_file(db));
-    bindings_in_search_scope(db, &request, FixtureSearchScope::Scope(module_scope))
+    // Second, resolve bindings from the module scope.
+    let request_file = parameter.program_file(db);
+    let bindings = bindings_in_search_scope(
+        db,
+        &request,
+        FixtureSearchScope::Scope(global_scope(db, request_file)),
+    );
+    if !bindings.is_empty() {
+        return bindings;
+    }
+
+    // Third, resolve bindings from the conftest hierarchy.
+    for conftest in conftest_files(db, request_file) {
+        let bindings = bindings_in_search_scope(
+            db,
+            &request,
+            FixtureSearchScope::Scope(global_scope(db, conftest)),
+        );
+        if !bindings.is_empty() {
+            return bindings;
+        }
+    }
+
+    Box::default()
 }
 
 /// A pytest fixture request and the declaration selected by static fixture lookup.
@@ -538,6 +565,45 @@ fn bindings_in_search_scope<'db>(
             request: request.parameter_definition,
             fixture,
         })
+        .collect()
+}
+
+/// Returns applicable `conftest.py` files from nearest to outermost.
+fn conftest_files<'db>(db: &'db dyn Db, request_file: ProgramFile<'db>) -> Vec<ProgramFile<'db>> {
+    let Some(path) = request_file.file(db).path(db).as_system_path() else {
+        return Vec::new();
+    };
+
+    let program = request_file.program(db);
+    let Some(root) = program
+        .search_paths(db)
+        .first_party_roots()
+        .filter(|root| path.starts_with(*root))
+        .min_by_key(|root| root.components().count())
+    else {
+        return Vec::new();
+    };
+    let Some(request_directory) = path.parent() else {
+        return Vec::new();
+    };
+
+    let start_directory = if path.file_name() == Some("conftest.py") {
+        // The caller already searched the request file as a module search scope.
+        // Start in its parent when it is itself a conftest to avoid searching
+        // the same search scope twice.
+        request_directory.parent()
+    } else {
+        Some(request_directory)
+    };
+    let Some(start_directory) = start_directory else {
+        return Vec::new();
+    };
+
+    start_directory
+        .ancestors()
+        .take_while(|directory| directory.starts_with(root))
+        .filter_map(|directory| system_path_to_file(db, directory.join("conftest.py")).ok())
+        .map(|file| ProgramFile::new(db, file, program))
         .collect()
 }
 
@@ -1041,6 +1107,7 @@ mod tests {
     };
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast as ast;
     use ty_python_core::definition::Definition;
     use ty_python_core::semantic_index;
@@ -2271,6 +2338,212 @@ def test_use(unreachable, typing_only, typing_only_declaration, typing_only_reex
         assert_snapshot!(test_use.fixture_resolution("typing_only_reexport"), @"No fixture resolved for parameter `typing_only_reexport`");
     }
 
+    #[test]
+    fn resolves_conftest_fixtures_from_request_directory_to_first_party_root() {
+        let test = PytestTestCase::with_files(
+            "/src/tests/test_example.py",
+            &[
+                (
+                    "/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def outside_root(): ...
+"#,
+                ),
+                (
+                    "/src/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def root_fixture(): ...
+
+@pytest.fixture
+def shadowed(): ...
+"#,
+                ),
+                (
+                    "/src/tests/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def shadowed(): ...
+"#,
+                ),
+                (
+                    "/src/sibling/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def sibling_fixture(): ...
+"#,
+                ),
+                (
+                    "/src/tests/test_example.py",
+                    r#"
+def test_use(
+    root_fixture,
+    shadowed,
+    outside_root,
+    sibling_fixture,
+): ...
+"#,
+                ),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+
+        assert_snapshot!(test_use.fixture_resolution("root_fixture"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/tests/test_example.py:3:5
+          |
+        3 |     root_fixture,
+          |     ^^^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/conftest.py:5:5
+          |
+        5 | def root_fixture(): ...
+          |     ------------
+        ");
+
+        assert_snapshot!(test_use.fixture_resolution("shadowed"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/tests/test_example.py:4:5
+          |
+        4 |     shadowed,
+          |     ^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/tests/conftest.py:5:5
+          |
+        5 | def shadowed(): ...
+          |     --------
+        ");
+
+        assert_snapshot!(test_use.fixture_resolution("outside_root"), @"No fixture resolved for parameter `outside_root`");
+
+        assert_snapshot!(test_use.fixture_resolution("sibling_fixture"), @"No fixture resolved for parameter `sibling_fixture`");
+    }
+
+    #[test]
+    fn resolves_conftest_providers_from_outermost_matching_first_party_root() {
+        let test = PytestTestCase::with_files_and_src_roots(
+            "/src/tests/test_example.py",
+            &[
+                (
+                    "/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def outer_fixture(): ...
+"#,
+                ),
+                (
+                    "/src/tests/test_example.py",
+                    r#"
+def test_use(outer_fixture): ...
+"#,
+                ),
+            ],
+            // The relative environment roots `["src", "."]` resolve to these absolute paths.
+            vec![SystemPathBuf::from("/src"), SystemPathBuf::from("/")],
+        );
+
+        assert_snapshot!(test.function("test_use").fixture_resolution("outer_fixture"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/tests/test_example.py:2:14
+          |
+        2 | def test_use(outer_fixture): ...
+          |              ^^^^^^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> conftest.py:5:5
+          |
+        5 | def outer_fixture(): ...
+          |     -------------
+        ");
+    }
+
+    #[test]
+    fn resolves_conftest_fixture_dependency_from_parent_conftest() {
+        let test = PytestTestCase::with_files(
+            "/src/project/conftest.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+                ),
+                (
+                    "/src/project/conftest.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def consumer(resource): ...
+"#,
+                ),
+            ],
+        );
+
+        let fixture = test.function("consumer");
+
+        assert_snapshot!(fixture.fixture_resolution("resource"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/project/conftest.py:5:14
+          |
+        5 | def consumer(resource): ...
+          |              ^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/conftest.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+        ");
+    }
+
+    #[test]
+    fn creating_conftest_updates_fixture_resolution() {
+        let mut test = PytestTestCase::new(
+            "/src/project/test_example.py",
+            r#"
+def test_use(resource): ...
+"#,
+        );
+
+        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"No fixture resolved for parameter `resource`");
+
+        test.write_file(
+            "/src/project/conftest.py",
+            r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+        );
+        assert_snapshot!(test.function("test_use").fixture_resolution("resource"), @"
+        info[pytest-fixture]: Resolve fixture for parameter
+         --> src/project/test_example.py:2:14
+          |
+        2 | def test_use(resource): ...
+          |              ^^^^^^^^ fixture requested here
+        info: Found 1 fixture
+         --> src/project/conftest.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+        ");
+    }
+
     struct PytestTestCase {
         db: TestDb,
         path: &'static str,
@@ -2289,6 +2562,23 @@ def test_use(unreachable, typing_only, typing_only_declaration, typing_only_reex
                 db: pytest_db_with_files(files),
                 path,
             }
+        }
+
+        fn with_files_and_src_roots(
+            path: &'static str,
+            files: &[(&'static str, &'static str)],
+            src_roots: Vec<SystemPathBuf>,
+        ) -> Self {
+            Self {
+                db: pytest_db_with_files_and_src_roots(files, src_roots),
+                path,
+            }
+        }
+
+        fn write_file(&mut self, path: &'static str, source: &'static str) {
+            self.db
+                .write_file(path, source)
+                .expect("valid pytest test file update");
         }
 
         fn function<'test>(&'test self, name: &str) -> PytestTestFunction<'test> {
@@ -2398,7 +2688,15 @@ def test_use(unreachable, typing_only, typing_only_declaration, typing_only_reex
     }
 
     fn pytest_db_with_files(files: &[(&'static str, &'static str)]) -> TestDb {
+        pytest_db_with_files_and_src_roots(files, vec![SystemPathBuf::from("/src")])
+    }
+
+    fn pytest_db_with_files_and_src_roots(
+        files: &[(&'static str, &'static str)],
+        src_roots: Vec<SystemPathBuf>,
+    ) -> TestDb {
         let mut builder = TestDbBuilder::new()
+            .with_src_roots(src_roots)
             .with_third_party_packages()
             .with_file(
                 "/.venv/lib/python3.13/site-packages/_pytest/__init__.pyi",
