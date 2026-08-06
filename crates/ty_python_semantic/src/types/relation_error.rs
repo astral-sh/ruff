@@ -152,6 +152,10 @@ pub(crate) enum ErrorContext<'db> {
         member_name: Name,
         ty: Type<'db>,
     },
+    ProtocolMemberClassVarMismatch {
+        member_name: Name,
+        ty: Type<'db>,
+    },
     ProtocolSpecialMethodNotDefinedOnMetaType,
     ProtocolMemberIncompatible {
         member_name: Name,
@@ -426,6 +430,10 @@ impl<'db> ErrorContext<'db> {
             }
             Self::ProtocolMemberNotDefined { member_name, ty } => format!(
                 "protocol member `{member_name}` is not defined on type `{}`",
+                ty.display(db, env),
+            ),
+            Self::ProtocolMemberClassVarMismatch { member_name, ty } => format!(
+                "protocol member `{member_name}` is an instance variable on type `{}`, but a class variable is required",
                 ty.display(db, env),
             ),
             Self::ProtocolSpecialMethodNotDefinedOnMetaType => {
