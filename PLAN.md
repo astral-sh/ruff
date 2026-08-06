@@ -186,15 +186,18 @@ Replace each `Option<Type>` inside `ConstraintBounds` with a provenance-aware en
 
 ```rust
 enum ConstraintBound<'db> {
-    None,
     Validity(Type<'db>),
     Evidence(Type<'db>),
 }
 ```
 
-`None` remains a genuinely absent bound. `Validity` restricts which specializations are legal;
-`Evidence` additionally represents an inference preference supplied by the original relationship.
-Record the distinction independently for the lower and upper sides:
+`Validity` restricts which specializations are legal; `Evidence` additionally represents an
+inference preference supplied by the original relationship. A missing lower bound is represented as
+`Validity(Never)`, and a missing upper bound as `Validity(object)`. This preserves the important
+distinction from explicitly inferred logical defaults, which are represented as `Evidence(Never)`
+or `Evidence(object)`. Existing behavior for absent bounds therefore validates the same
+validity/evidence combination rules used for nontrivial declaration restrictions. Record the
+distinction independently for the lower and upper sides:
 
 ```text
 argument evidence: Evidence(bool) <= T
@@ -226,9 +229,10 @@ T <= Evidence(bool)  and  T <= Validity(int)  =>  T <= Evidence(bool)
 ```
 
 This prevents a weaker evidence bound from relabeling a stronger declaration-imposed restriction
-as evidence. Incomparable same-side bounds do not require a merged provenance rule: upper-bound
-intersections and lower-bound unions are represented as separate constraints, preserving each
-bound's original `Validity` or `Evidence` tag independently.
+as evidence. When both restrictions are equivalent, prefer evidence: it retains the restriction
+while also preserving the inference information. Incomparable same-side bounds do not require a
+merged provenance rule: upper-bound intersections and lower-bound unions are represented as
+separate constraints, preserving each bound's original `Validity` or `Evidence` tag independently.
 
 Preserve provenance through bound normalization, type-variable reorientation, intersection,
 sequent derivation, type mapping, owned-set compaction/loading, and path extraction. Validity and
@@ -247,11 +251,14 @@ Propagate provenance through accumulated `PathBound` values and factored `UpperB
 inspect validity versus evidence directly. Do not erase provenance merely to preserve the existing
 `PathBound` field types.
 
-Provide narrow helpers or constructors so callers can extract effective types, inspect provenance,
-check presence, materialize logical defaults, and construct ordinary evidence bounds without
-unnecessary API churn. Keep existing external constructors accepting `Option<Type>` where
-practical, converting those inputs to evidence internally; update actual `PathBound` consumers as
-needed.
+Provide narrow helpers or constructors so callers can extract underlying types, inspect
+provenance, and construct ordinary evidence bounds. Process both bounds directly: logical-default
+validity bounds behave as mathematical identities rather than as a hidden optional-bound variant.
+Update existing constructors and callers to use provenance-aware bounds directly, and update
+actual `PathBound` consumers as needed. The internal `ty_extensions` testing API should offer
+`ConstraintSet.lower_bound(lower, typevar)` and `ConstraintSet.upper_bound(typevar, upper)` for
+one-sided evidence; `ConstraintSet.range(lower, typevar, upper)` continues to record explicit
+evidence on both sides, including `Never` and `object`.
 
 Do not add witness flags to `InteriorNodeData`, propagate booleans through `PathAssignments`, or
 introduce separate witness-specific fuel accounting. Bound-side provenance supersedes that earlier
@@ -350,7 +357,7 @@ expanding `Solutions`:
 ## Phase status and dependencies
 
 - [x] Phase 1: retain bound type-variable instances in constraint-set arenas.
-- [ ] Phase 2: replace optional constraint bounds with validity/evidence bounds.
+- [x] Phase 2: replace optional constraint bounds with validity/evidence bounds.
 - [ ] Phase 3: reintroduce support-derived validity-domain construction.
 - [ ] Phase 4: preserve evidence-derived variance and add complete-solution pruning.
 - [ ] Phase 5: solve the domain-conjoined TDD and simplify default solving.
@@ -378,12 +385,13 @@ Suggested revision description: `[π] Retain bound type-variable instances in co
 
 Suggested revision description: `[π] Distinguish constraint validity from inference evidence`.
 
-1. Introduce the `None`/`Validity(Type)`/`Evidence(Type)` bound enum and replace the two optional
-    sides of `ConstraintBounds`.
+1. Introduce the `Validity(Type)`/`Evidence(Type)` bound enum and replace the two optional sides
+    of `ConstraintBounds`. Represent missing lower and upper bounds as `Validity(Never)` and
+    `Validity(object)`, respectively.
 1. Convert every existing relationship constraint to evidence bounds so current behavior remains
     unchanged.
-1. Preserve explicit `Never` and `object`, optional public constructor inputs where practical,
-    logical-default materialization, support collection, source ordering, and type traversal.
+1. Preserve explicit `Evidence(Never)` and `Evidence(object)`, logical-default materialization,
+    support collection, source ordering, and type traversal.
 1. Update normalization, bound projection, intersection, sequent derivation, type-variable
     reorientation, owned-set compaction/loading, and type mapping to preserve or combine per-side
     provenance correctly. For comparable bounds on the same side, inherit the provenance of the

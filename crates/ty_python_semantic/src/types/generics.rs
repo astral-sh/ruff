@@ -12,8 +12,8 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
-    PathBounds, Solution, Solutions,
+    ConstraintBound, ConstraintBounds, ConstraintSet, ConstraintSetBuilder,
+    IteratorConstraintsExtension, PathBound, PathBounds, Solution, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -2979,8 +2979,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         let bounds = match variance {
-            TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
-            TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
+            TypeVarVariance::Covariant => ConstraintBounds::new(
+                ConstraintBound::Evidence(ty),
+                ConstraintBound::missing_upper(),
+            ),
+            TypeVarVariance::Contravariant => ConstraintBounds::new(
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Evidence(ty),
+            ),
             TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };

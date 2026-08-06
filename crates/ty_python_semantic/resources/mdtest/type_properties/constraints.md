@@ -101,7 +101,7 @@ their bottom and top materializations, respectively.
 ```py
 def _[T]() -> None:
     constraints = ConstraintSet.range(Base, T, Any)
-    expected = ConstraintSet.lower_bound(Base, T)
+    expected = ConstraintSet.range(Base, T, object)
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
@@ -109,7 +109,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Any, T, Base)
-    expected = ConstraintSet.upper_bound(T, Base)
+    expected = ConstraintSet.range(Never, T, Base)
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
@@ -248,7 +248,7 @@ their bottom and top materializations, respectively.
 ```pyi
 def _[T]() -> None:
     constraints = ~ConstraintSet.range(Base, T, Any)
-    expected = ~ConstraintSet.lower_bound(Base, T)
+    expected = ~ConstraintSet.range(Base, T, object)
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
@@ -256,7 +256,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Any, T, Base)
-    expected = ~ConstraintSet.upper_bound(T, Base)
+    expected = ~ConstraintSet.range(Never, T, Base)
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
