@@ -414,6 +414,21 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.includes_member(db, name)
     }
 
+    /// Includes inherited `object` members except `__hash__`, which subclasses can disable.
+    fn includes_member_or_object_fallback(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> bool {
+        self.includes_member(db, name)
+            || name != "__hash__"
+                && matches!(
+                    Type::object().member(db, env, name).place,
+                    Place::Defined(place) if place.is_definitely_defined()
+                )
+    }
+
     /// Compare the original and materialized forms of members required by `required`.
     ///
     /// An unrelated materialized member must not prevent a protocol from retaining its
@@ -3226,6 +3241,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         if source.member_count(db) < target.member_count(db)
             && !self.is_context_collection_enabled()
+            && target.members(db).any(|member| {
+                !source.includes_member_or_object_fallback(db, self.env, member.name())
+            })
         {
             return self.never();
         }
@@ -3236,6 +3254,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
+
+                if source_member.is_none()
+                    && source.includes_member_or_object_fallback(db, env, target_member.name)
+                {
+                    return self.type_satisfies_protocol_member(db, source_type, &target_member);
+                }
 
                 if let Some(context) = self.report_context()
                     && source_member.is_none()
@@ -3641,10 +3665,9 @@ pub(super) fn has_all_protocol_members_defined<'db>(
         Type::ProtocolInstance(source_protocol) => {
             let source_interface = source_protocol.interface(db);
 
-            source_interface.member_count(db) >= target_interface.member_count(db)
-                && target_interface
-                    .members(db)
-                    .all(|member| source_interface.includes_member(db, member.name()))
+            target_interface.members(db).all(|member| {
+                source_interface.includes_member_or_object_fallback(db, env, member.name())
+            })
         }
         _ => target_interface.members(db).all(|member| {
             matches!(
