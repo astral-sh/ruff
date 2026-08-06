@@ -991,14 +991,30 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             return TypeTransformerVisit::Ready(*result);
         }
 
-        let identity = ty.to_type_identity(db);
         let seen = self.seen.borrow();
-        if seen
-            .iter()
-            .any(|active| active.ty == ty || active.identity == identity)
-        {
+        if seen.iter().any(|active| active.ty == ty) {
             return TypeTransformerVisit::Ready(ty);
         }
+        // Computing an identity can require walking a recursive definition. Only do so when an
+        // active type could share it.
+        let mut candidates = seen
+            .iter()
+            .filter(|active| ty.may_share_type_identity(db, active.ty))
+            .peekable();
+        let identity = if candidates.peek().is_none() {
+            OnceCell::new()
+        } else {
+            let identity = ty.to_type_identity(db);
+            if candidates.any(|active| {
+                active
+                    .identity
+                    .get_or_init(|| active.ty.to_type_identity(db))
+                    == &identity
+            }) {
+                return TypeTransformerVisit::Ready(ty);
+            }
+            OnceCell::from(identity)
+        };
         drop(seen);
 
         self.seen
@@ -1015,10 +1031,10 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 struct ActiveTypeTransformation<'db> {
     ty: Type<'db>,
-    identity: TypeIdentity<'db>,
+    identity: OnceCell<TypeIdentity<'db>>,
 }
 
 enum TypeTransformerVisit<'db> {
