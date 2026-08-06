@@ -45,16 +45,16 @@ use crate::{Db, ProgramEnvironment};
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
-    RecursiveProtocol(Definition<'db>),
-    RecursiveTypeAlias(Definition<'db>),
-    RecursiveTypedDict(Definition<'db>),
-    NonRecursive(Type<'db>),
+    GrowingProtocol(Definition<'db>),
+    GrowingTypeAlias(Definition<'db>),
+    GrowingTypedDict(Definition<'db>),
+    Other(Type<'db>),
 }
 
 impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
-            .unwrap_or(TypeIdentity::NonRecursive(self))
+            .unwrap_or(TypeIdentity::Other(self))
     }
 
     /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
@@ -104,13 +104,9 @@ impl<'db> Type<'db> {
                 }
                 let definition = target.definition(db);
                 Some(match target {
-                    RecursiveDefinition::TypeAlias(_) => {
-                        TypeIdentity::RecursiveTypeAlias(definition)
-                    }
-                    RecursiveDefinition::Protocol(_) => TypeIdentity::RecursiveProtocol(definition),
-                    RecursiveDefinition::TypedDict(_) => {
-                        TypeIdentity::RecursiveTypedDict(definition)
-                    }
+                    RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
+                    RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
+                    RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
                 })
             }
             _ => None,
@@ -1179,7 +1175,7 @@ type Alternating[X, Y] = tuple[
 
         assert!(matches!(
             Type::TypeAlias(global_type_alias(&db, &env, "Alternating")).recursive_identity(&db),
-            Some(TypeIdentity::RecursiveTypeAlias(_))
+            Some(TypeIdentity::GrowingTypeAlias(_))
         ));
     }
 
@@ -1340,7 +1336,7 @@ class RecursiveOuter[T](Protocol):
         );
         assert!(matches!(
             global_instance_type(&db, &env, "RecursiveOuter").recursive_identity(&db),
-            Some(TypeIdentity::RecursiveProtocol(_))
+            Some(TypeIdentity::GrowingProtocol(_))
         ));
     }
 
@@ -1431,11 +1427,11 @@ class RecursivePropertySetter[T](Protocol):
         );
         assert!(matches!(
             global_instance_type(&db, &env, "RecursiveProperty").recursive_identity(&db),
-            Some(TypeIdentity::RecursiveProtocol(_))
+            Some(TypeIdentity::GrowingProtocol(_))
         ));
         assert!(matches!(
             global_instance_type(&db, &env, "RecursivePropertySetter").recursive_identity(&db),
-            Some(TypeIdentity::RecursiveProtocol(_))
+            Some(TypeIdentity::GrowingProtocol(_))
         ));
     }
 
