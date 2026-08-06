@@ -100,8 +100,7 @@ impl From<&CFormatType> for FormatType {
             // well: https://docs.python.org/3/library/string.html#formatstrings
             // I checked the rest of the integer codes, and none of them work with floats
             CFormatType::Number(CNumberType::Decimal) => FormatType::Number,
-            CFormatType::String(CFormatConversion::Bytes)
-            | CFormatType::Character
+            CFormatType::Character
             | CFormatType::Number(CNumberType::Octal | CNumberType::Hex(_)) => FormatType::Integer,
             CFormatType::Float(_) => FormatType::Float,
             _ => FormatType::Unknown,
