@@ -104,6 +104,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         }
         PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
+        | PredicateNode::OrPatternAlternative(_)
         | PredicateNode::StarImportPlaceholder(_) => (None, None),
     };
 
@@ -1143,6 +1144,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
+            PredicateNode::OrPatternAlternative(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -2788,6 +2790,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::OrPatternAlternative(scope) => scope,
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
             }
