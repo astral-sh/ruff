@@ -982,11 +982,23 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(&self.ty_binary_path);
-        command.current_dir(&self.project_dir).arg("check");
+        let mut command = self.command_inheriting_environment();
 
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
+        // Point user config discovery at a test-local directory to avoid picking up host config.
+        command.env(
+            user_config_directory_env_var(),
+            self.user_config_directory(),
+        );
+
+        command
+    }
+
+    pub(crate) fn command_inheriting_environment(&self) -> Command {
+        let mut command = Command::new(&self.ty_binary_path);
+        command.current_dir(&self.project_dir).arg("check");
+
         // Point user config discovery at a test-local directory to avoid picking up host config.
         command.env(
             user_config_directory_env_var(),

@@ -1441,14 +1441,12 @@ mod uv_metadata {
     use crate::CliTest;
 
     fn command_with_script_uv(case: &CliTest) -> Command {
-        let mut command = case.command();
+        let mut command = case.command_inheriting_environment();
         command
             .env("TY_UV", "1")
             .env("UV", "uv")
             .env("UV_CACHE_DIR", case.root().join("cache"))
-            .env("UV_PYTHON_DOWNLOADS", "never")
-            .env("TY_OUTPUT_FORMAT", "concise")
-            .env("PATH", std::env::var_os("PATH").unwrap_or_default());
+            .env("TY_OUTPUT_FORMAT", "concise");
         command
     }
 
@@ -1555,7 +1553,6 @@ mod uv_metadata {
             .args(["venv", "--no-project"])
             .arg(&environment)
             .env("UV_CACHE_DIR", case.root().join("cache"))
-            .env("UV_PYTHON_DOWNLOADS", "never")
             .output()?;
         anyhow::ensure!(
             output.status.success(),
@@ -1647,7 +1644,7 @@ mod uv_metadata {
 
         let case = CliTest::with_file(
             "script.py",
-            "# /// script\n# requires-python = '>=3.12'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
+            "# /// script\n# requires-python = '>=3.8'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
         )?
         .with_filter(
             r"(?s)`uv workspace metadata` failed with status.*?missing-script-dependency==99\.0\.0.*?\n(Found 2 diagnostics)",
