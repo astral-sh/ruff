@@ -77,6 +77,20 @@ pub(crate) struct CheckCommand {
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
+    /// Only report diagnostics introduced since a Git revision.
+    ///
+    /// The project is checked at the merge base and again at the current working tree. Existing
+    /// diagnostics are matched across unchanged lines, including lines moved by other edits.
+    /// If no revision is provided, the remote's default branch is used when available.
+    #[arg(
+        long,
+        value_name = "REVISION",
+        num_args = 0..=1,
+        default_missing_value = "",
+        conflicts_with_all = ["watch", "fix", "add_ignore"]
+    )]
+    pub(crate) diff: Option<String>,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
