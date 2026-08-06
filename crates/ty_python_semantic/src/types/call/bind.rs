@@ -5529,9 +5529,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let tcx =
                 tcx.filter_disjoint_elements(db, self.env, return_ty, self.inferable_typevars);
             filtered_return_context = Some((return_ty, tcx));
-            let return_constraints = return_ty
-                .when_constraint_set_assignable_to(db, self.env, tcx, constraints)
-                .remove_provisional_marker_constraints(db, self.env, constraints);
+            let return_constraints =
+                return_ty.when_constraint_set_assignable_to(db, self.env, tcx, constraints);
             declared_constraints = Some(return_constraints);
             builder.intersect_declared_constraints(return_constraints);
             true

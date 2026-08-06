@@ -6,7 +6,8 @@ use crate::types::constraints::{
     ConstraintSetStorage, Node, NodeId, PathAssignments, PathBounds,
 };
 use crate::types::typevar::TypeVarSet;
-use crate::types::{BoundTypeVarInstance, Type};
+use crate::types::visitor::any_over_type;
+use crate::types::{BoundTypeVarInstance, DynamicType, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 pub(super) struct SolutionWalker<'db> {
@@ -266,6 +267,11 @@ impl<'db> SolutionWalker<'db> {
             ty.as_typevar()
                 .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
         };
+        let contains_unspecialized_typevar = |ty: Type<'db>| {
+            any_over_type(db, env, ty, false, |nested| {
+                matches!(nested, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            })
+        };
 
         for path in self.sorted_paths {
             mappings.clear();
@@ -292,7 +298,12 @@ impl<'db> SolutionWalker<'db> {
                     continue;
                 }
 
-                if let Some(lower) = constraint.bounds.lower {
+                // An unspecialized outer type variable carries neither an identity nor concrete
+                // inference evidence. A provisional lambda parameter is different: its enclosing
+                // callable still provides a useful concrete bound and must be preserved.
+                if let Some(lower) = constraint.bounds.lower
+                    && !contains_unspecialized_typevar(lower)
+                {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
 
@@ -302,7 +313,9 @@ impl<'db> SolutionWalker<'db> {
                     }
                 }
 
-                if let Some(upper) = constraint.bounds.upper {
+                if let Some(upper) = constraint.bounds.upper
+                    && !contains_unspecialized_typevar(upper)
+                {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, env, upper);
 

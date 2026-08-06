@@ -739,43 +739,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
-    /// Remove constraints that involve a provisional type-variable marker.
-    ///
-    /// A provisional marker carries no type-variable identity or concrete type information.
-    /// Treating those constraints existentially preserves independent concrete constraints on the
-    /// same path.
-    pub(crate) fn remove_provisional_marker_constraints(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> Self {
-        self.verify_builder(builder);
-        let mut storage = builder.storage.borrow_mut();
-        let should_remove = |storage: &ConstraintSetStorage<'_>, constraint| {
-            storage
-                .constraint_data(constraint)
-                .as_typevar()
-                .is_some_and(|constraint| {
-                    constraint
-                        .bounds
-                        .lower
-                        .into_iter()
-                        .chain(constraint.bounds.upper)
-                        .any(|bound| bound.has_provisional_marker(db, env))
-                })
-        };
-        let (node, derived_source_order) = match self.node.node() {
-            Node::AlwaysTrue => (ALWAYS_TRUE, None),
-            Node::AlwaysFalse => (ALWAYS_FALSE, None),
-            Node::Interior(interior) => {
-                interior.abstract_inner(db, env, &mut storage, self.source_order, should_remove)
-            }
-        };
-        let source_order = storage.ordered_source_order(self.source_order, derived_source_order);
-        Self::from_node(builder, node, source_order)
-    }
-
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
