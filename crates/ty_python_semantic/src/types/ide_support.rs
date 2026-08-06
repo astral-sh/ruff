@@ -1289,6 +1289,25 @@ pub fn definitions_for_imported_symbol<'db>(
     )
 }
 
+/// Resolve a binding to its canonical definitions, following imports recursively.
+pub(crate) fn resolve_definition_targets<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    symbol_name: &str,
+) -> Vec<Definition<'db>> {
+    let env = ProgramEnvironment::from_definition(definition);
+    resolve_definition(
+        db,
+        &env,
+        definition,
+        Some(symbol_name),
+        ImportAliasResolution::ResolveAliases,
+    )
+    .into_iter()
+    .filter_map(|resolved| resolved.definition())
+    .collect()
+}
+
 /// Returns the definition and overload co-definitions for a function declaration.
 ///
 /// For overloaded functions this includes sibling overload declarations and the
