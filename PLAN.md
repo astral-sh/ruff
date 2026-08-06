@@ -349,7 +349,7 @@ expanding `Solutions`:
 
 ## Phase status and dependencies
 
-- [ ] Phase 1: retain bound type-variable instances in constraint-set arenas.
+- [x] Phase 1: retain bound type-variable instances in constraint-set arenas.
 - [ ] Phase 2: replace optional constraint bounds with validity/evidence bounds.
 - [ ] Phase 3: reintroduce support-derived validity-domain construction.
 - [ ] Phase 4: preserve evidence-derived variance and add complete-solution pruning.

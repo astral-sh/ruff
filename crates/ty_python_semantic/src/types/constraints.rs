@@ -257,7 +257,7 @@ struct OwnedConstraintSetInner<'db> {
     constraints: Box<[Constraint<'db>]>,
     constraint_supports: Box<[SupportId]>,
     constraint_indices: RankBitBox,
-    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
+    typevars: IndexVec<TypeVarId, BoundTypeVarInstance<'db>>,
     nodes: Box<[InteriorNodeData]>,
     node_supports: Box<[SupportId]>,
     node_indices: RankBitBox,
@@ -959,7 +959,7 @@ struct ConstraintSetStorage<'db> {
     ///
     /// The ordering of typevars within this arena defines which typevars can be the lower/upper
     /// bounds of another (e.g., whether we encode `T ≤ U` as `Never ≤ T ≤ U` or `T ≤ U ≤ object`).
-    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
+    typevars: IndexVec<TypeVarId, BoundTypeVarInstance<'db>>,
 
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
@@ -1003,7 +1003,7 @@ struct ConstraintSetStorage<'db> {
     constraint_set_subtype_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
 }
 
-impl ConstraintSetStorage<'_> {
+impl<'db> ConstraintSetStorage<'db> {
     fn ensure_overlay_identity_caches(&mut self) {
         let Some(compacted) = &self.compacted else {
             return;
@@ -1012,12 +1012,6 @@ impl ConstraintSetStorage<'_> {
             return;
         }
 
-        self.typevar_cache.extend(
-            compacted
-                .typevars
-                .iter_enumerated()
-                .map(|(id, typevar)| (*typevar, id)),
-        );
         self.constraint_cache.extend(
             compacted
                 .constraint_indices
@@ -1039,6 +1033,23 @@ impl ConstraintSetStorage<'_> {
                 .copied()
                 .enumerate()
                 .map(|(index, source_order)| (source_order, SourceOrderId::from_usize(index))),
+        );
+    }
+
+    // This is a separate method from `ensure_overlay_identity_caches` because it requires a `db`.
+    fn ensure_overlay_typevar_identity_cache(&mut self, db: &'db dyn Db) {
+        let Some(compacted) = &self.compacted else {
+            return;
+        };
+        if !self.typevar_cache.is_empty() {
+            return;
+        }
+
+        self.typevar_cache.extend(
+            compacted
+                .typevars
+                .iter_enumerated()
+                .map(|(id, typevar)| (typevar.identity(db), id)),
         );
     }
 
@@ -1253,10 +1264,11 @@ impl<'db> ConstraintSetStorage<'db> {
     fn intern_typevar(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
         let identity = typevar.identity(db);
         self.ensure_overlay_identity_caches();
+        self.ensure_overlay_typevar_identity_cache(db);
         if let Some(id) = self.typevar_cache.get(&identity) {
             return *id;
         }
-        let id = self.typevars.push(identity);
+        let id = self.typevars.push(typevar);
         let id = self.adjusted_typevar_id(id);
         self.typevar_cache.insert(identity, id);
         id
@@ -1383,6 +1395,7 @@ impl<'db> ConstraintSetStorage<'db> {
     fn typevar_id(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
         let identity = typevar.identity(db);
         self.ensure_overlay_identity_caches();
+        self.ensure_overlay_typevar_identity_cache(db);
         self.typevar_cache
             .get(&identity)
             .copied()
@@ -1566,7 +1579,7 @@ impl<'db> ConstraintSetStorage<'db> {
         self.adjusted_support_id(id)
     }
 
-    fn typevar_data(&self, typevar: TypeVarId) -> BoundTypeVarIdentity<'db> {
+    fn typevar_data(&self, typevar: TypeVarId) -> BoundTypeVarInstance<'db> {
         if let Some(compacted) = &self.compacted {
             let index = typevar.index();
             let split = compacted.typevars.len();
@@ -7204,7 +7217,7 @@ mod tests {
             .map(|typevar| storage.typevar_data(typevar))
             .collect::<Vec<_>>();
 
-        assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
+        assert_eq!(mentioned, vec![t, u]);
         assert!(support.is_complete());
     }
 
@@ -7252,7 +7265,7 @@ mod tests {
                 .map(|typevar| storage.typevar_data(typevar))
                 .collect::<Vec<_>>();
 
-            assert_eq!(mentioned, vec![t.identity(db), u.identity(db)]);
+            assert_eq!(mentioned, vec![t, u]);
             assert!(support.is_complete());
         }
     }
