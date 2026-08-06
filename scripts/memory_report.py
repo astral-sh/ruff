@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -244,36 +245,43 @@ def render_summary(projects: list[ProjectComparison]) -> str:
     return "\n".join(lines)
 
 
-def setup_project(*, name: str, dest: Path) -> Path:
+def setup_project(*, name: str, dest: Path) -> tuple[Path, list[str]]:
     """Clone a project and install its mypy-primer dependencies."""
     project_path = dest / name
+    setup_script = Path(__file__).with_name("setup_primer_project.py")
+    setup_command = [
+        "uv",
+        "run",
+        "--locked",
+        "--python",
+        sys.executable,
+        "--script",
+        str(setup_script),
+    ]
+
     if project_path.exists():
         print(f"Project {name} already exists at {project_path}", file=sys.stderr)
-        return project_path
+    else:
+        print(f"Setting up {name} and its dependencies...", file=sys.stderr)
+        subprocess.run(
+            [*setup_command, name, str(project_path)],
+            check=True,
+            stdout=sys.stderr,
+        )
 
-    setup_script = Path(__file__).with_name("setup_primer_project.py")
-    print(f"Setting up {name} and its dependencies...", file=sys.stderr)
-    subprocess.run(
-        [
-            "uv",
-            "run",
-            "--locked",
-            "--python",
-            sys.executable,
-            "--script",
-            str(setup_script),
-            name,
-            str(project_path),
-        ],
+    ty_command = subprocess.run(
+        [*setup_command, "--print-ty-command", name, str(project_path)],
         check=True,
-        stdout=sys.stderr,
+        capture_output=True,
+        text=True,
     )
-    return project_path
+    return project_path, shlex.split(ty_command.stdout)
 
 
 def run_ty_memory_check(
     *,
     ty_path: str,
+    ty_command: list[str],
     project_path: Path,
     output_path: Path,
 ) -> None:
@@ -283,8 +291,14 @@ def run_ty_memory_check(
     env["TY_MAX_PARALLELISM"] = "1"  # For deterministic memory numbers
 
     print(f"Running {ty_path} on {project_path.name}...", file=sys.stderr)
+    command = [
+        str(Path(ty_path).resolve()) if argument == "{ty}" else argument
+        for argument in ty_command
+    ]
     result = subprocess.run(
-        [ty_path, "check", "--project", str(project_path), "--exit-zero"],
+        command,
+        cwd=project_path,
+        check=True,
         capture_output=True,
         text=True,
         env=env,
@@ -306,18 +320,24 @@ def run_memory_tests(
     new_reports_dir.mkdir(parents=True, exist_ok=True)
 
     for project_name in KNOWN_PROJECTS:
-        project_path = setup_project(name=project_name, dest=projects_dir)
+        project_path, ty_command = setup_project(name=project_name, dest=projects_dir)
 
         # Run old ty
         old_report_path = old_reports_dir / f"{project_name}.json"
         run_ty_memory_check(
-            ty_path=old_ty, project_path=project_path, output_path=old_report_path
+            ty_path=old_ty,
+            ty_command=ty_command,
+            project_path=project_path,
+            output_path=old_report_path,
         )
 
         # Run new ty
         new_report_path = new_reports_dir / f"{project_name}.json"
         run_ty_memory_check(
-            ty_path=new_ty, project_path=project_path, output_path=new_report_path
+            ty_path=new_ty,
+            ty_command=ty_command,
+            project_path=project_path,
+            output_path=new_report_path,
         )
 
 

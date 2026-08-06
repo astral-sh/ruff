@@ -93,12 +93,20 @@ def main() -> None:
         "--exclude-newer",
         help="Limit dependency resolution to packages uploaded before this timestamp",
     )
+    parser.add_argument(
+        "--print-ty-command",
+        action="store_true",
+        help="Print the project-specific ty command without setting up the project",
+    )
     args = parser.parse_args()
 
     project = find_project(args.project)
     revision = args.revision or project.revision
 
     target_dir = Path(args.directory or project.name).resolve()
+    if args.print_ty_command:
+        print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
+        return
 
     # Use a full clone only when a historical ecosystem report revision must be checked out.
     clone_cmd = [
