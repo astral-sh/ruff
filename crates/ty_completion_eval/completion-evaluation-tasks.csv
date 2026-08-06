@@ -21,6 +21,8 @@ import-deprioritizes-type_check_only,main.py,1,1
 import-deprioritizes-type_check_only,main.py,2,1
 import-deprioritizes-type_check_only,main.py,3,2
 import-deprioritizes-type_check_only,main.py,4,3
+import-deprioritizes-type_check_only,main.pyi,0,1
+import-deprioritizes-type_check_only,main.pyi,1,1
 import-keyword-completion,main.py,0,1
 internal-typeshed-hidden,main.py,0,1
 local-over-auto-import,main.py,0,1
@@ -46,3 +48,12 @@ typing-gets-priority,main.py,1,1
 typing-gets-priority,main.py,2,1
 typing-gets-priority,main.py,3,1
 typing-gets-priority,main.py,4,1
+typing-only-auto-import-ranking,main.py,0,1
+typing-only-auto-import-ranking,main.py,1,1
+typing-only-auto-import-ranking,main.py,2,1
+typing-only-auto-import-ranking,main.py,3,2
+typing-only-auto-import-ranking,main.py,4,1
+typing-only-auto-import-ranking,main.py,5,1
+typing-only-auto-import-ranking,main.pyi,0,1
+typing-only-auto-import-ranking,main.pyi,1,1
+typing-only-auto-import-ranking,main.pyi,2,1

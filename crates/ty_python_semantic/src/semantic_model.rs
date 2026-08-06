@@ -12,7 +12,6 @@ use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, list_modules, resolve_module,
-    resolve_real_shadowable_module,
 };
 
 use crate::Db;
@@ -146,22 +145,10 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
-        let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
-        let file = self.file();
         let resolver_environment = self.program_environment().resolver_environment(self.db);
-        let is_typing_extensions_available = file.is_stub(self.db)
-            || resolve_real_shadowable_module(
-                self.db,
-                ImportingFile::File(file, resolver_environment),
-                &typing_extensions,
-            )
-            .is_some();
         list_modules(self.db, resolver_environment)
             .iter()
             .copied()
-            .filter(|module| {
-                is_typing_extensions_available || module.name(self.db) != &typing_extensions
-            })
             .map(|module| {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);
                 let ty = Type::module_literal(self.db, self.program_file(), module);

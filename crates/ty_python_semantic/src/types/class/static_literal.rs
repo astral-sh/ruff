@@ -1655,7 +1655,8 @@ impl<'db> StaticClassLiteral<'db> {
                         if let Some(ref mut default_ty) = default_ty {
                             *default_ty = default_ty
                                 .try_call_dunder_get(db, env, None, Type::from(self))
-                                .map(|(return_ty, _)| return_ty)
+                                .unwrap_or_else(|error| Some(error.fallback()))
+                                .map(|result| result.return_type)
                                 .unwrap_or_else(Type::unknown);
                         }
                     }

@@ -1739,6 +1739,97 @@ pub(super) fn report_invalid_attribute_assignment(
     error_context.attach_to(db, env, &mut diag);
 }
 
+/// Reports an invalid implicit call to a descriptor's `__get__` method.
+pub(super) fn report_bad_dunder_get_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+    if let Some(property) = failure.as_attempt_to_get_property_with_no_getter() {
+        let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
+            return;
+        };
+        let object_type = object_type.display(db, env);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot read property `{attribute}` on object of type `{object_type}` because it has no getter",
+        ));
+        if let Some(file_range) = property
+            .setter(db)
+            .and_then(|setter| setter.definition(db, env))
+            .or_else(|| {
+                property
+                    .deleter(db)
+                    .and_then(|deleter| deleter.definition(db, env))
+            })
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no getter"),
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Attempted access to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ATTRIBUTE_ACCESS,
+                message: format!(
+                    "Invalid access to descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db, env),
+                ),
+                info: &format!(
+                    "This access implicitly calls `__get__` on a descriptor of type `{}`",
+                    descriptor_type.display(db, env),
+                ),
+                argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+            },
+        );
+    }
+}
+
+/// Reports an invalid implicit `__getattr__` call at the original attribute access.
+///
+/// ```python
+/// class C:
+///     def __getattr__(self) -> int: ...
+///
+/// C().missing  # Invalid: Python passes the attribute name to __getattr__.
+/// ```
+///
+/// Preserves the underlying call diagnostic and explains why attribute access invoked the method.
+pub(super) fn report_bad_dunder_getattr_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_ATTRIBUTE_ACCESS,
+            message: format!(
+                "Invalid access to attribute `{attribute}` on type `{}`",
+                object_type.display(db, env),
+            ),
+            info: "This access implicitly calls `__getattr__`",
+            argument_ranges: &[target.range()],
+        },
+    );
+}
+
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
