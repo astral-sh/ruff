@@ -19,6 +19,7 @@ on:
       # And when we change this workflow itself...
       - .github/workflows/build-binaries.yml
       - scripts/build_ruff_pgo.py
+      - scripts/build_ruff_bolt.py
 
 concurrency:
   group: build-binaries-${{ github.ref }}
@@ -283,6 +284,39 @@ jobs:
       - name: "Install LLVM profiling tools"
         if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
         run: rustup component add llvm-tools-preview
+      - name: "Install LLVM BOLT"
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
+        run: |
+          set -euo pipefail
+
+          BOLT_ROOT="${RUNNER_TEMP}/llvm-bolt"
+          BOLT_VERSION="22.1.8~++20260714014902+ca7933e47d3a-1~exp1~20260714135019.80"
+          BOLT_BASE_URL="https://apt.llvm.org/noble/pool/main/l/llvm-toolchain-22"
+
+          mkdir -p "${BOLT_ROOT}"
+
+          curl --fail --location --retry 3 \
+            --output "${BOLT_ROOT}/bolt-22.deb" \
+            "${BOLT_BASE_URL}/bolt-22_${BOLT_VERSION}_amd64.deb"
+          curl --fail --location --retry 3 \
+            --output "${BOLT_ROOT}/libbolt-22-dev.deb" \
+            "${BOLT_BASE_URL}/libbolt-22-dev_${BOLT_VERSION}_amd64.deb"
+
+          printf '%s  %s\n' \
+            '97a9e4e8d2b2219757c38abef93e913793ebc64580aa51207bd23941c44ec070' \
+            "${BOLT_ROOT}/bolt-22.deb" \
+            '48639dafeb45892eec58f5d8a2d0d612ce791a2f713f06c794b71d6a72fa582d' \
+            "${BOLT_ROOT}/libbolt-22-dev.deb" \
+            | sha256sum --check
+
+          dpkg-deb --extract "${BOLT_ROOT}/bolt-22.deb" "${BOLT_ROOT}"
+          dpkg-deb --extract "${BOLT_ROOT}/libbolt-22-dev.deb" "${BOLT_ROOT}"
+
+          "${BOLT_ROOT}/usr/lib/llvm-22/bin/llvm-bolt" --version
+          "${BOLT_ROOT}/usr/lib/llvm-22/bin/merge-fdata" --version
+          test -f "${BOLT_ROOT}/usr/lib/llvm-22/lib/libbolt_rt_instr.a"
+
+          echo "${BOLT_ROOT}/usr/lib/llvm-22/bin" >> "${GITHUB_PATH}"
       - name: "Train PGO Ruff"
         if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
         run: |
@@ -291,7 +325,8 @@ jobs:
             --target-dir "${{ github.workspace }}/target/ruff-pgo" \
             --train-only
 
-          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata -C link-arg=-Wl,--emit-relocs" >> "$GITHUB_ENV"
+          echo "MATURIN_STRIP=false" >> "$GITHUB_ENV"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
@@ -301,6 +336,14 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: 2_17
           args: --release --locked --out dist --compatibility pypi
+      - name: "Optimize Ruff with BOLT"
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
+        run: |
+          python scripts/build_ruff_bolt.py \
+            --target "${{ matrix.target }}" \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --wheels-dir "${{ github.workspace }}/dist" \
+            --binary "${{ github.workspace }}/target/${{ matrix.target }}/release/ruff"
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
