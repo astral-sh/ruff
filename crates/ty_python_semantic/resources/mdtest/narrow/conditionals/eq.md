@@ -1118,8 +1118,8 @@ def _(answer: CoupledInequality):
 
 ## Recursive aliases containing enum domains
 
-Enum domains nested in a recursive alias fall back to general comparison inference. Comparisons
-against specific enum members preserve the `NewType`:
+Comparisons involving recursive enum aliases remain valid. Comparing against a specific enum member
+narrows both branches to their remaining members while preserving any `NewType` tag.
 
 ```toml
 [environment]
@@ -1144,8 +1144,53 @@ type RecursiveBrand = BrandedEnumValue | RecursiveBrand
 
 def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
     if left == EnumValue.VALUE:
-        # TODO: Ideally, this would narrow to `BrandedEnumValue & Literal[EnumValue.VALUE]`.
-        reveal_type(left)  # revealed: BrandedEnumValue
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.VALUE]
+    else:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.OTHER]
+
+    if left != EnumValue.VALUE:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.OTHER]
+    else:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.VALUE]
+```
+
+A recursive alias with changing type arguments may introduce values outside its original enum
+domain. Here, `True` compares equal to the integer-valued enum member, so the `bool` alternative
+must remain reachable.
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+BrandedNumber = NewType("BrandedNumber", Number)
+type Changing[T] = T | Changing[bool]
+
+def compare_changing_specialization(value: Changing[BrandedNumber]) -> None:
+    if value == Number.ONE:
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+    else:
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
+```
+
+Mutually recursive aliases can likewise admit values outside their enum domain. Intersecting the
+aliases does not remove their shared `bool` alternative.
+
+```py
+from ty_extensions import Intersection
+
+type RecursiveWithBool = RecursiveWithBrand | bool
+type RecursiveWithBrand = RecursiveWithBool | BrandedNumber
+
+def compare_mutually_recursive_intersection(
+    value: Intersection[RecursiveWithBool, RecursiveWithBrand],
+) -> None:
+    if value == Number.ONE:
+        reveal_type(value)  # revealed: bool | BrandedNumber
+    else:
+        reveal_type(value)  # revealed: bool | BrandedNumber
 ```
 
 ## Known built-in equality behavior

@@ -5,14 +5,16 @@
 //! methods.
 
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
 
 use super::{
-    CallArguments, CycleDetector, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType,
-    KnownClass, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type,
-    TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
+    cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -999,8 +1001,13 @@ pub(super) fn is_same_enum_domain<'db>(
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
-    struct EnumDomain;
-    type EnumDomainVisitor<'db> = CycleDetector<'db, EnumDomain, Type<'db>, bool, 3>;
+    // A proof made while another alias is active can still be disproved by a later union arm, so
+    // completed visits must not be cached.
+    #[derive(Default)]
+    struct EnumDomainVisitor<'db> {
+        active_specializations: ActiveRecursionDetector<Type<'db>>,
+        active_definitions: ActiveRecursionDetector<Definition<'db>>,
+    }
 
     fn visit<'db>(
         db: &'db dyn Db,
@@ -1010,9 +1017,19 @@ pub(super) fn is_same_enum_domain<'db>(
         visitor: &EnumDomainVisitor<'db>,
     ) -> bool {
         match ty {
-            Type::TypeAlias(alias) => visitor.visit(db, ty, || {
-                visit(db, env, alias.value_type(db), right, visitor)
-            }),
+            // The same specialization preserves the domain; different arguments can introduce
+            // values outside it even when the alias definition is the same.
+            Type::TypeAlias(alias) => visitor.active_specializations.visit(
+                &ty,
+                || true,
+                || {
+                    visitor.active_definitions.visit(
+                        &alias.definition(db),
+                        || false,
+                        || visit(db, env, alias.value_type(db), right, visitor),
+                    )
+                },
+            ),
             Type::LiteralValue(literal) => matches!(
                 literal.kind(),
                 LiteralValueTypeKind::Enum(left)
@@ -1037,7 +1054,7 @@ pub(super) fn is_same_enum_domain<'db>(
         }
     }
 
-    visit(db, env, ty, right, &EnumDomainVisitor::new(false))
+    visit(db, env, ty, right, &EnumDomainVisitor::default())
 }
 
 /// Evaluate each alternative of the union being constrained and combine their branch results.

@@ -3666,6 +3666,49 @@ def test_match_alias_ignores_custom_ne(flag: bool) -> str:
             return item
 ```
 
+## Recursive enum aliases in value patterns
+
+An enum value pattern narrows a recursive alias to the matching member while preserving its
+`NewType` tag.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import IntEnum
+from typing import NewType
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+BrandedNumber = NewType("BrandedNumber", Number)
+type RecursiveNumber = BrandedNumber | RecursiveNumber
+
+def match_recursive_branded_enum(value: RecursiveNumber) -> None:
+    match value:
+        case Number.ONE:
+            reveal_type(value)  # revealed: BrandedNumber & Literal[Number.ONE]
+        case Number.TWO:
+            reveal_type(value)  # revealed: BrandedNumber & Literal[Number.TWO]
+```
+
+A recursive alias that changes its specialization can also contain values outside the enum. Since
+`True` compares equal to `Number.ONE`, both branches preserve the possible boolean values.
+
+```py
+type Changing[T] = T | Changing[bool]
+
+def match_changing_specialization(value: Changing[BrandedNumber]) -> None:
+    match value:
+        case Number.ONE:
+            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+        case _:
+            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
+```
+
 ## Value patterns with guard
 
 ```py
