@@ -197,8 +197,42 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 99 |     cast(val=3.0, typ=int)  # TC006
    |                       ^^^
 help: Add quotes
-   |
-98 |     cast(typ=int, val=3.0)  # TC006
-   -     cast(val=3.0, typ=int)  # TC006
-99 +     cast(val=3.0, typ="int")  # TC006
-   |
+    |
+98  |     cast(typ=int, val=3.0)  # TC006
+    -     cast(val=3.0, typ=int)  # TC006
+99  +     cast(val=3.0, typ="int")  # TC006
+100 |
+    |
+
+TC006 Add quotes to type expression in `typing.cast()`
+   --> TC006.py:106:10
+    |
+104 |     from typing import cast, Literal
+105 |
+106 |     cast(Literal["\n"], "\n")  # TC006
+    |          ^^^^^^^^^^^^^
+help: Add quotes
+
+TC006 [*] Add quotes to type expression in `typing.cast()`
+   --> TC006.py:113:10
+    |
+111 |     from typing import cast, Literal
+112 |
+113 |     cast(Literal["it's"] | "(", "")  # TC006
+    |          ^^^^^^^^^^^^^^^^^^^^^
+help: Add quotes
+    |
+112 |
+    -     cast(Literal["it's"] | "(", "")  # TC006
+113 +     cast('''Literal["it's"] | "("''', "")  # TC006
+114 |
+    |
+
+TC006 Add quotes to type expression in `typing.cast()`
+   --> TC006.py:120:10
+    |
+118 |     from typing import cast, Literal
+119 |
+120 |     cast(Literal["'''"] | "(", "")  # TC006
+    |          ^^^^^^^^^^^^^^^^^^^^
+help: Add quotes
