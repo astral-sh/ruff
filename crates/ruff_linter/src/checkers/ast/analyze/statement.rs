@@ -1242,6 +1242,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, while_stmt.into());
             }
+            if checker.is_rule_enabled(Rule::WhileOne) {
+                pyupgrade::rules::while_one(checker, while_stmt);
+            }
         }
         Stmt::For(
             for_stmt @ ast::StmtFor {

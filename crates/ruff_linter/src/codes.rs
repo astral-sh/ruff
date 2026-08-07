@@ -588,6 +588,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "045") => rules::pyupgrade::rules::NonPEP604AnnotationOptional,
         (Pyupgrade, "046") => rules::pyupgrade::rules::NonPEP695GenericClass,
         (Pyupgrade, "047") => rules::pyupgrade::rules::NonPEP695GenericFunction,
+        (Pyupgrade, "048") => rules::pyupgrade::rules::WhileOne,
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
         (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
