@@ -138,7 +138,7 @@ def bounded[T: Base]():
 
     # Never is the only type that satisfies both (T ≤ Base) and (T ≤ Unrelated). So there is no
     # valid specialization that satisfies (T ≤ Unrelated ∧ T ≠ Never).
-    constraints = constraints & ~ConstraintSet.range(Never, T, Never)
+    constraints = constraints & ~ConstraintSet.equality(T, Never)
     static_assert(not constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     static_assert(not constraints.satisfied_by_all_typevars())
 ```
@@ -182,7 +182,7 @@ def bounded_by_gradual[T: Any]():
 
     # If we choose Unrelated as the materialization, then (T = Unrelated) is a valid specialization,
     # which satisfies (T ≤ Unrelated ∧ T ≠ Never).
-    constraints = constraints & ~ConstraintSet.range(Never, T, Never)
+    constraints = constraints & ~ConstraintSet.equality(T, Never)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # There is no upper bound that we can choose to satisfy this constraint set in non-inferable
     # position. (T = Never) will be a valid assignment no matter what, and that does not satisfy
@@ -226,7 +226,7 @@ def bounded_by_gradual[T: list[Any]]():
 
     # If we choose Unrelated as the materialization, then (T = list[Unrelated]) is a valid
     # specialization, which satisfies (T ≤ list[Unrelated] ∧ T ≠ Never).
-    constraints = constraints & ~ConstraintSet.range(Never, T, Never)
+    constraints = constraints & ~ConstraintSet.equality(T, Never)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # There is no upper bound that we can choose to satisfy this constraint set in non-inferable
     # position. (T = Never) will be a valid assignment no matter what, and that does not satisfy
@@ -296,18 +296,18 @@ def constrained[T: (Base, Unrelated)]():
     static_assert(not constraints.satisfied_by_all_typevars())
 
     # (T = Unrelated) is a valid specialization, which satisfies (T = Super ∨ T = Unrelated).
-    constraints = ConstraintSet.range(Super, T, Super) | ConstraintSet.range(Unrelated, T, Unrelated)
+    constraints = ConstraintSet.equality(T, Super) | ConstraintSet.equality(T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T = Super ∨ T = Unrelated).
     static_assert(not constraints.satisfied_by_all_typevars())
 
     # (T = Base) and (T = Unrelated) both satisfy (T = Base ∨ T = Unrelated).
-    constraints = ConstraintSet.range(Base, T, Base) | ConstraintSet.range(Unrelated, T, Unrelated)
+    constraints = ConstraintSet.equality(T, Base) | ConstraintSet.equality(T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     static_assert(constraints.satisfied_by_all_typevars())
 
     # (T = Unrelated) is a valid specialization, which satisfies (T = Sub ∨ T = Unrelated).
-    constraints = ConstraintSet.range(Sub, T, Sub) | ConstraintSet.range(Unrelated, T, Unrelated)
+    constraints = ConstraintSet.equality(T, Sub) | ConstraintSet.equality(T, Unrelated)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # (T = Base) is a valid specialization, which does not satisfy (T = Sub ∨ T = Unrelated).
     static_assert(not constraints.satisfied_by_all_typevars())
@@ -425,7 +425,7 @@ def constrained_by_gradual[T: (list[Base], list[Any])]():
 
     # If we choose list[Unrelated] as the materialization, then (T = list[Unrelated]) is a valid
     # specialization, which satisfies (T ≤ list[Unrelated] ∧ T ≠ Never).
-    constraints = constraints & ~ConstraintSet.range(Never, T, Never)
+    constraints = constraints & ~ConstraintSet.equality(T, Never)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # There is no materialization that we can choose to satisfy this constraint set in non-inferable
     # position. (T = Never) will be a valid assignment no matter what, and that does not satisfy
@@ -476,7 +476,7 @@ def constrained_by_two_gradual[T: (list[Any], list[Any])]():
 
     # If we choose list[Unrelated] as the materialization, then (T = list[Unrelated]) is a valid
     # specialization, which satisfies (T ≤ list[Unrelated] ∧ T ≠ Never).
-    constraints = constraints & ~ConstraintSet.range(Never, T, Never)
+    constraints = constraints & ~ConstraintSet.equality(T, Never)
     static_assert(constraints.satisfied_by_all_typevars(inferable=tuple[T]))
     # There is no constraint that we can choose to satisfy this constraint set in non-inferable
     # position. (T = Never) will be a valid assignment no matter what, and that does not satisfy

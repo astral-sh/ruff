@@ -260,6 +260,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::StrStartswith(_)
                 | KnownBoundMethodType::ConstraintSetLowerBound
                 | KnownBoundMethodType::ConstraintSetUpperBound
+                | KnownBoundMethodType::ConstraintSetEquality
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever

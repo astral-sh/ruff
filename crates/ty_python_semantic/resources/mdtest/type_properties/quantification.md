@@ -41,7 +41,7 @@ class Invariant[T]:
 
 def grounded[X, A]() -> None:
     # ∃X. X = int ∧ A ≤ Invariant[X]
-    body = ConstraintSet.range(int, X, int) & ConstraintSet.upper_bound(A, Invariant[X])
+    body = ConstraintSet.equality(X, int) & ConstraintSet.upper_bound(A, Invariant[X])
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, A=list[int]]]
@@ -67,7 +67,7 @@ from ty_extensions._internal import ConstraintSet
 
 def relational_bridge[X, U, V]() -> None:
     # ∃X. U ≤ X ∧ X = V
-    body = ConstraintSet.upper_bound(U, X) & ConstraintSet.range(V, X, V)
+    body = ConstraintSet.upper_bound(U, X) & ConstraintSet.equality(X, V)
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[V=object, U=object]]
@@ -183,12 +183,12 @@ class Invariant[T]:
 
 def correlated_outputs[X, Y, Z]() -> None:
     # C₁(X, Y) = (X = int ∧ Y = int) ∨ (X = str ∧ Y = str)
-    c1_int = ConstraintSet.range(int, X, int) & ConstraintSet.range(int, Y, int)
-    c1_str = ConstraintSet.range(str, X, str) & ConstraintSet.range(str, Y, str)
+    c1_int = ConstraintSet.equality(X, int) & ConstraintSet.equality(Y, int)
+    c1_str = ConstraintSet.equality(X, str) & ConstraintSet.equality(Y, str)
     c1 = c1_int | c1_str
 
     # C₂(X, Z) = (Z = Invariant[X])
-    c2 = ConstraintSet.range(Invariant[X], Z, Invariant[X])
+    c2 = ConstraintSet.equality(Z, Invariant[X])
 
     # ∃X. C₁(X, Y) ∧ C₂(X, Z)
     body = c1 & c2
@@ -201,14 +201,14 @@ def correlated_outputs[X, Y, Z]() -> None:
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
 
     # (Y = int ∧ Z = Invariant[int]) ∨ (Y = str ∧ Z = Invariant[str])
-    expected_int = ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])
-    expected_str = ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
+    expected_int = ConstraintSet.equality(Y, int) & ConstraintSet.equality(Z, Invariant[int])
+    expected_str = ConstraintSet.equality(Y, str) & ConstraintSet.equality(Z, Invariant[str])
     expected = expected_int | expected_str
     static_assert(quantified == expected)
     static_assert(~quantified == ~expected)
 
     # (Y = int ∧ Z = Invariant[str])
-    invalid_cross = ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
+    invalid_cross = ConstraintSet.equality(Y, int) & ConstraintSet.equality(Z, Invariant[str])
     static_assert(not (quantified & invalid_cross))
     # revealed: None
     reveal_type((quantified & invalid_cross).solutions(inferable=tuple[Y, Z]))
@@ -233,7 +233,7 @@ class Invariant[T]:
 def finite_domain[X: (int, str), Y, Z]() -> None:
     # ∃X ∈ {int, str}. C(X, Y, Z)
     # C(X, Y, Z) = (Y = X) ∧ (Z = Invariant[X])
-    body = ConstraintSet.range(X, Y, X) & ConstraintSet.range(Invariant[X], Z, Invariant[X])
+    body = ConstraintSet.equality(Y, X) & ConstraintSet.equality(Z, Invariant[X])
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
@@ -244,8 +244,8 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
 
     # (Y = int ∧ Z = Invariant[int]) ∨ (Y = str ∧ Z = Invariant[str])
-    expected_int = ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[int], Z, Invariant[int])
-    expected_str = ConstraintSet.range(str, Y, str) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
+    expected_int = ConstraintSet.equality(Y, int) & ConstraintSet.equality(Z, Invariant[int])
+    expected_str = ConstraintSet.equality(Y, str) & ConstraintSet.equality(Z, Invariant[str])
     expected = expected_int | expected_str
     # TODO: no error
     # error: [static-assert-error]
@@ -255,13 +255,13 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     static_assert(~quantified == ~expected)
 
     # (Y = int ∧ Z = Invariant[str])
-    invalid_cross = ConstraintSet.range(int, Y, int) & ConstraintSet.range(Invariant[str], Z, Invariant[str])
+    invalid_cross = ConstraintSet.equality(Y, int) & ConstraintSet.equality(Z, Invariant[str])
     static_assert(not (quantified & invalid_cross))
     # revealed: None
     reveal_type((quantified & invalid_cross).solutions(inferable=tuple[Y, Z]))
 
     # (Y = bytes ∧ Z = Invariant[bytes])
-    invalid_domain = ConstraintSet.range(bytes, Y, bytes) & ConstraintSet.range(Invariant[bytes], Z, Invariant[bytes])
+    invalid_domain = ConstraintSet.equality(Y, bytes) & ConstraintSet.equality(Z, Invariant[bytes])
     static_assert(not (quantified & invalid_domain))
     # TODO: revealed: None
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain] | Invariant[bytes], Y=bytes]]
@@ -281,10 +281,10 @@ from ty_extensions._internal import ConstraintSet
 
 def alternation[X: (int, str), Y: (int, str)]() -> None:
     # R(X, Y) = (X = int ∧ Y = int) ∨ (X = str ∧ Y = str)
-    x_int = ConstraintSet.range(int, X, int)
-    x_str = ConstraintSet.range(str, X, str)
-    y_int = ConstraintSet.range(int, Y, int)
-    y_str = ConstraintSet.range(str, Y, str)
+    x_int = ConstraintSet.equality(X, int)
+    x_str = ConstraintSet.equality(X, str)
+    y_int = ConstraintSet.equality(Y, int)
+    y_str = ConstraintSet.equality(Y, str)
     relation = (x_int & y_int) | (x_str & y_str)
 
     # ∀Y. ∃X. R(X, Y)

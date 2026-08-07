@@ -2835,10 +2835,20 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
-                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
-                        let [Some(lower), Some(typevar), Some(upper)] = overload.parameter_types()
-                        else {
-                            return;
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetEquality
+                        | KnownBoundMethodType::ConstraintSetRange),
+                    ) => {
+                        let (lower, typevar, upper) = match (method, overload.parameter_types()) {
+                            (
+                                KnownBoundMethodType::ConstraintSetEquality,
+                                [Some(typevar), Some(value)],
+                            ) => (value, typevar, value),
+                            (
+                                KnownBoundMethodType::ConstraintSetRange,
+                                [Some(lower), Some(typevar), Some(upper)],
+                            ) => (lower, typevar, upper),
+                            _ => return,
                         };
                         let lower = lower.project_type_form(db, env);
                         let typevar = typevar.project_type_form(db, env);

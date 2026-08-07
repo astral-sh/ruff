@@ -86,13 +86,13 @@ def _[T]() -> None:
     static_assert(not ConstraintSet.range(Base, T, Unrelated))
 ```
 
-The lower and upper bound can be the same type, in which case the typevar can only be specialized to
+When the lower and upper bounds are the same type, `equality` requires the typevar to specialize to
 that specific type.
 
 ```py
 def _[T]() -> None:
     # (T@_ = Base)
-    ConstraintSet.range(Base, T, Base)
+    ConstraintSet.equality(T, Base)
 ```
 
 Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
@@ -159,6 +159,23 @@ def inferred_solution[T]() -> None:
     reveal_type(ConstraintSet.range(Never, T, int).solutions_for(T, inferable=tuple[T]))
 ```
 
+### Equality
+
+An equality constraint requires the type variable to specialize exactly to the specified type. It is
+equivalent to an explicit range with that type as both bounds.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def _[T]() -> None:
+    equality = ConstraintSet.equality(T, int)
+    static_assert(equality == ConstraintSet.range(int, T, int))
+
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(equality.solutions_for(T, inferable=tuple[T]))
+```
+
 ### Negated range
 
 A _negated range_ constraint is the opposite of a range constraint: it requires the typevar to _not_
@@ -222,7 +239,7 @@ type other than that specific type.
 ```pyi
 def _[T]() -> None:
     # (T@_ ≠ Base)
-    ~ConstraintSet.range(Base, T, Base)
+    ~ConstraintSet.equality(T, Base)
 ```
 
 Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
@@ -308,7 +325,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sub, T, Base) & ConstraintSet.range(Base, T, Super)
-    expected = ConstraintSet.range(Base, T, Base)
+    expected = ConstraintSet.equality(T, Base)
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sub, T, Super) & ConstraintSet.range(Sub, T, Super)
@@ -564,7 +581,7 @@ def union[T]():
     union_constraint = ConstraintSet.upper_bound(T, Base) | ConstraintSet.upper_bound(T, Other)
 
     # (T = Base | Other) satisfies (T ≤ Base | Other) but not (T ≤ Base ∨ T ≤ Other)
-    specialization = ConstraintSet.range(Base | Other, T, Base | Other)
+    specialization = ConstraintSet.equality(T, Base | Other)
     static_assert(specialization.satisfies(union_type))
     static_assert(not specialization.satisfies(union_constraint))
 
@@ -585,7 +602,7 @@ def union[T]():
     union_constraint = ConstraintSet.lower_bound(Base, T) | ConstraintSet.lower_bound(Other, T)
 
     # (T = Base) satisfies (Base ≤ T ∨ Other ≤ T) but not (Base | Other ≤ T)
-    specialization = ConstraintSet.range(Base, T, Base)
+    specialization = ConstraintSet.equality(T, Base)
     static_assert(not specialization.satisfies(union_type))
     static_assert(specialization.satisfies(union_constraint))
 
@@ -677,7 +694,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sub, T, Base) | ~ConstraintSet.range(Base, T, Super)
-    expected = ~ConstraintSet.range(Base, T, Base)
+    expected = ~ConstraintSet.equality(T, Base)
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sub, T, Super) | ~ConstraintSet.range(Sub, T, Super)
@@ -789,14 +806,14 @@ the constraint, and the other the bound.
 ```py
 def f[S, T]():
     # (S@f = T@f)
-    c1 = ConstraintSet.range(T, S, T)
-    c2 = ConstraintSet.range(S, T, S)
+    c1 = ConstraintSet.equality(S, T)
+    c2 = ConstraintSet.equality(T, S)
     static_assert(c1 == c2)
 
 def f[T, S]():
     # (S@f = T@f)
-    c1 = ConstraintSet.range(T, S, T)
-    c2 = ConstraintSet.range(S, T, S)
+    c1 = ConstraintSet.equality(S, T)
+    c2 = ConstraintSet.equality(T, S)
     static_assert(c1 == c2)
 ```
 
@@ -855,7 +872,7 @@ def same_typevar[T]():
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 
-    constraints = ConstraintSet.range(T, T, T)
+    constraints = ConstraintSet.equality(T, T)
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 ```
@@ -904,14 +921,14 @@ from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def preserves_remaining_conjunct[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int & u_str).exists(tuple[U])
     static_assert(quantified == t_int)
 
 def satisfies_uncertain_disjunct[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int | u_str).exists(tuple[U])
     static_assert(quantified == ConstraintSet.always())
 
@@ -931,14 +948,14 @@ from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def preserves_uncertain_disjunct[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int | u_str).for_all(tuple[U])
     static_assert(quantified == t_int)
 
 def removes_multiple_typevars[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int | u_str).for_all(tuple[T, U])
     static_assert(quantified == ConstraintSet.never())
 
@@ -956,8 +973,8 @@ from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def quantifier_order[S, T]() -> None:
-    source_is_int = ConstraintSet.range(int, S, int)
-    target_is_int = ConstraintSet.range(int, T, int)
+    source_is_int = ConstraintSet.equality(S, int)
+    target_is_int = ConstraintSet.equality(T, int)
     equal = source_is_int.satisfies(target_is_int) & target_is_int.satisfies(source_is_int)
 
     # ∀T.∃S.equal(S, T)

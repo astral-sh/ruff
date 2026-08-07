@@ -53,19 +53,19 @@ from ty_extensions._internal import ConstraintSet
 
 def bindings_tuv[T, U, V]() -> None:
     # (T = int) ∧ (U = str) ∧ (V = bytes)
-    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.equality(U, str) & ConstraintSet.equality(V, bytes)
     # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_vtu[V, T, U]() -> None:
     # (T = int) ∧ (U = str) ∧ (V = bytes)
-    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.equality(U, str) & ConstraintSet.equality(V, bytes)
     # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_reverse_source[T, U, V]() -> None:
     # (V = bytes) ∧ (U = str) ∧ (T = int)
-    constraints = ConstraintSet.range(bytes, V, bytes) & ConstraintSet.range(str, U, str) & ConstraintSet.range(int, T, int)
+    constraints = ConstraintSet.equality(V, bytes) & ConstraintSet.equality(U, str) & ConstraintSet.equality(T, int)
     # revealed: tuple[Solution[V=bytes, U=str, T=int]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
@@ -189,8 +189,8 @@ def orientation_st[S, T]() -> None:
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(lower == upper)
 
-    equality_st = ConstraintSet.range(T, S, T)
-    equality_ts = ConstraintSet.range(S, T, S)
+    equality_st = ConstraintSet.equality(S, T)
+    equality_ts = ConstraintSet.equality(T, S)
     static_assert(equality_st == equality_ts)
 
 def orientation_ts[T, S]() -> None:
@@ -199,8 +199,8 @@ def orientation_ts[T, S]() -> None:
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(lower == upper)
 
-    equality_st = ConstraintSet.range(T, S, T)
-    equality_ts = ConstraintSet.range(S, T, S)
+    equality_st = ConstraintSet.equality(S, T)
+    equality_ts = ConstraintSet.equality(T, S)
     static_assert(equality_st == equality_ts)
 
 def chain_stu[S, T, U]() -> None:
@@ -323,7 +323,7 @@ def listify[T](value: T) -> list[T]:
     return [value]
 
 def invariant_callable[U, V]() -> None:
-    constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.range(int, V, int)
+    constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.equality(V, int)
     # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
     # TODO: sometimes: no error
     # error: [static-assert-error]
