@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::side_effect;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -29,7 +29,7 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 ///
 /// ## Preview
 /// When [preview] is enabled, this rule also flags standalone string literals
-/// and f-strings that are not docstrings or attribute docstrings.
+/// and side-effect-free f-strings that are not docstrings or attribute docstrings.
 ///
 /// Strings following PEP 695 `type` statements are also treated as attribute docstrings.
 ///
@@ -111,8 +111,9 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
-    // Ignore statements that have side effects.
-    if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
+    // Formatting an interpolated value can invoke user-defined `__format__` or `__str__` methods.
+    let effect = side_effect(value, |id| checker.semantic().has_builtin_binding(id));
+    if effect.is_present() || (value.is_f_string_expr() && !effect.is_absent()) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if value.is_attribute_expr() {

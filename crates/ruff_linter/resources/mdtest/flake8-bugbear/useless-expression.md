@@ -7,30 +7,47 @@ lint.select = ["B018"]
 
 ## String literals
 
-In preview, string literals and f-strings are useless expressions unless Ruff
-recognizes them as docstrings.
+In preview, string literals and side-effect-free f-strings are useless
+expressions unless Ruff recognizes them as docstrings.
 
 ```py
 """Module docstring."""
 
 "Standalone module string."  # error: [useless-expression]
 
-value = 1
-f"Useless module f-string: {value}"  # error: [useless-expression]
+f"Useless module f-string: {1}"  # error: [useless-expression]
 
 
 class Class:
     """Class docstring."""
 
     "Standalone class string."  # error: [useless-expression]
-    f"Useless class f-string: {value}"  # error: [useless-expression]
+    f"Useless class f-string: {1}"  # error: [useless-expression]
 
     def method(self):
         """Method docstring."""
 
-        local = 1
         "Standalone function string."  # error: [useless-expression]
-        f"Useless function f-string: {local}"  # error: [useless-expression]
+        f"Useless function f-string: {1}"  # error: [useless-expression]
+```
+
+## F-string formatting side effects
+
+Interpolating a value can call a user-defined `__format__` method, including
+when the value appears inside another interpolation's format specification.
+These f-strings are not useless expressions because formatting the value has
+an observable side effect.
+
+```py
+class Formatted:
+    def __format__(self, spec: str) -> str:
+        print("formatted")
+        return "1"
+
+
+value = Formatted()
+f"{value}"
+f"{1:{value}}"
 ```
 
 ## Strings after overloads
