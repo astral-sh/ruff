@@ -1138,6 +1138,37 @@ def _(left: Recursive, right: EnumValue):
     reveal_type(left == right)  # revealed: bool
 ```
 
+## Recursive aliases containing gradual generic branches
+
+Equality narrowing must terminate when a recursive sequence alias contains a mapping with a gradual
+key.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+type RecursiveMappingKey = Sequence[RecursiveMappingKey] | Mapping[Any, int]
+
+def narrow_recursive_mapping_key(value: RecursiveMappingKey) -> None:
+    assert value == 0
+    _ = value
+```
+
+A gradual mapping value also must not cause recursive materialization to unfold indefinitely.
+
+```py
+type RecursiveMappingValue = Sequence[RecursiveMappingValue] | Mapping[int, Any]
+
+def narrow_recursive_mapping_value(value: RecursiveMappingValue) -> None:
+    assert value == 0
+    _ = value
+```
+
 ## Known built-in equality behavior
 
 `bool`, `LiteralString`, `TypedDict`, and final classes that inherit `object.__eq__` have known

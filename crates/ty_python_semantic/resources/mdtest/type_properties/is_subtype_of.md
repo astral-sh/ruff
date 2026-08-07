@@ -977,6 +977,16 @@ static_assert(not is_subtype_of(type[Any], type[Arbitrary]))
 static_assert(is_subtype_of(type[Any], type[object]))
 ```
 
+A covariant specialization whose argument is a recursive alias remains a subtype of the same
+specialization with `object`. A gradual invariant branch must not cause recursive materialization to
+unfold indefinitely.
+
+```pyi
+type RecursiveGradual = Covariant[RecursiveGradual] | Invariant[Any]
+
+static_assert(is_subtype_of(Covariant[RecursiveGradual], Covariant[object]))
+```
+
 ## Callable
 
 The general principle is that a callable type is a subtype of another if it's more flexible in what
