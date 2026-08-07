@@ -3010,7 +3010,7 @@ class C:
 "#,
         );
 
-        assert_snapshot!(test.rename("amount"), @r#"
+        assert_snapshot!(test.rename("amount"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:5:24
           |
@@ -3018,7 +3018,7 @@ class C:
           |                        ^^^^^
         6 |         self.value = value
           |                      -----
-        "#);
+        ");
     }
 
     #[test]
@@ -3036,12 +3036,12 @@ class Outer:
 "#,
         );
 
-        assert_snapshot!(test.rename("amount"), @r#"
+        assert_snapshot!(test.rename("amount"), @"
         info[rename]: Rename symbol (found 1 locations)
          --> main.py:7:18
           |
         7 |             self.value = 1
           |                  ^^^^^
-        "#);
+        ");
     }
 }

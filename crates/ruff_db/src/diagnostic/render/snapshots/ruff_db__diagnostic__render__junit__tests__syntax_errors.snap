@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_db/src/diagnostic/render/junit.rs
-assertion_line: 209
 expression: env.render_diagnostics(&diagnostics)
 ---
 <?xml version="1.0" encoding="UTF-8"?>

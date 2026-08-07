@@ -7,7 +7,6 @@ info:
     - "--no-cache"
     - "--output-format"
     - pylint
-    - "--preview"
     - "--check"
     - input.py
 ---

@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef, UnaryOp};
 use ruff_python_semantic::SemanticModel;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -8,21 +8,21 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::settings::ConstantType;
+use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 
 /// ## What it does
-/// Checks for the use of unnamed numerical constants ("magic") values in
-/// comparisons.
+/// Checks for the use of unnamed hard-coded ("magic") values in comparisons.
 ///
 /// ## Why is this bad?
-/// The use of "magic" values can make code harder to read and maintain, as
+/// The use of magic values can make code harder to read and maintain, as
 /// readers will have to infer the meaning of the value from the context.
-/// Such values are discouraged by [PEP 8].
+/// Such values are discouraged by [PEP 8] and should be replaced with variables
+/// or named constants.
 ///
-/// For convenience, this rule excludes a variety of common values from the
-/// "magic" value definition, such as `0`, `1`, `""`, and `"__main__"`. It
-/// also exempts comparisons against `sys.version`, `sys.version_info`, and
-/// `sys.implementation.version`.
+/// By default, this rule excludes a variety of common values from the
+/// magic value definition, namely `0`, `1`, `0.0`, `1.0`, `""`, and
+/// `"__main__"`. It also exempts comparisons against `sys.version`,
+/// `sys.version_info`, and `sys.implementation.version`.
 ///
 /// ## Example
 /// ```python
@@ -47,6 +47,8 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// ## Options
 /// - `lint.pylint.allow-magic-value-types`
+/// - `lint.pylint.allow-magic-values`
+/// - `lint.pylint.extend-allow-magic-values`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
@@ -65,42 +67,47 @@ impl Violation for MagicValueComparison {
     }
 }
 
-/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`].
-fn as_literal(expr: &Expr) -> Option<LiteralExpressionRef<'_>> {
+/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`]
+/// and the unary operand, if any.
+fn as_literal(expr: &Expr) -> Option<(LiteralExpressionRef<'_>, Option<&UnaryOp>)> {
     match expr {
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
-            operand,
-            ..
-        }) => operand.as_literal_expr(),
-        _ => expr.as_literal_expr(),
+        Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. })
+            if matches!(op, UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert) =>
+        {
+            operand.as_literal_expr().map(|literal| (literal, Some(op)))
+        }
+        _ => expr.as_literal_expr().map(|literal| (literal, None)),
     }
 }
 
-fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantType]) -> bool {
+fn is_magic_value(
+    literal_expr: LiteralExpressionRef,
+    unary_op: Option<&UnaryOp>,
+    allowed_types: &[ConstantType],
+    allowed_values: &[AllowedValue],
+) -> bool {
+    // Check if the literal type is in the allowed types list
     if let Some(constant_type) = ConstantType::try_from_literal_expr(literal_expr) {
         if allowed_types.contains(&constant_type) {
             return false;
         }
     }
 
-    match literal_expr {
-        // Ignore `None`, `Bool`, and `Ellipsis` constants.
-        LiteralExpressionRef::NoneLiteral(_)
-        | LiteralExpressionRef::BooleanLiteral(_)
-        | LiteralExpressionRef::EllipsisLiteral(_) => false,
-        // Special-case some common string and integer types.
-        LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            !matches!(value.to_str(), "" | "__main__")
-        }
-        LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-            #[expect(clippy::float_cmp)]
-            ast::Number::Float(value) => !(*value == 0.0 || *value == 1.0),
-            ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
-            ast::Number::Complex { .. } => true,
-        },
-        LiteralExpressionRef::BytesLiteral(_) => true,
+    // Check if the literal value is in the allowed values list
+    if allowed_values
+        .iter()
+        .any(|value| value.matches_value(literal_expr, unary_op))
+    {
+        return false;
     }
+
+    // Ignore `None`, `Bool`, and `Ellipsis` constants.
+    !matches!(
+        literal_expr,
+        LiteralExpressionRef::NoneLiteral(_)
+            | LiteralExpressionRef::BooleanLiteral(_)
+            | LiteralExpressionRef::EllipsisLiteral(_)
+    )
 }
 
 /// Returns `true` if `expr` is a comparand whose value is derived from the
@@ -128,11 +135,14 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
         }
     }
 
+    let allowed_types: &[ConstantType] = &checker.settings().pylint.allow_magic_value_types;
+    let allowed_values: &[AllowedValue] = &checker.settings().pylint.allow_magic_values;
+
     let mut previous = None;
     let mut operands = std::iter::once(left).chain(comparators).peekable();
     while let Some(comparison_expr) = operands.next() {
-        if let Some(value) = as_literal(comparison_expr)
-            && is_magic_value(value, &checker.settings().pylint.allow_magic_value_types)
+        if let Some((value, unary_op)) = as_literal(comparison_expr)
+            && is_magic_value(value, unary_op, allowed_types, allowed_values)
             && !previous.is_some_and(|expr| is_sys_version_comparand(expr, checker.semantic()))
             && !operands
                 .peek()

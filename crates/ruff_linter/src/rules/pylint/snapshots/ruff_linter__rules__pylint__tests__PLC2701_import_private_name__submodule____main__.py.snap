@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-assertion_line: 256
 ---
 PLC2701 Private name import `_a`
  --> __main__.py:2:6

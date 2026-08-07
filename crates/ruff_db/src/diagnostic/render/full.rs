@@ -400,7 +400,7 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
@@ -443,13 +443,13 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "###);
+        "#);
     }
 
     #[test]
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[invalid-syntax]: Expected one or more symbol names after import
          --> syntax_errors.py:1:15
           |
@@ -542,7 +542,7 @@ mod tests {
         let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
         env.hide_severity(true);
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         invalid-syntax: Expected one or more symbol names after import
          --> syntax_errors.py:1:15
           |
@@ -601,7 +601,7 @@ print()
             .primary("example.py", "3:0", "3:0", "")
             .build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[no-indented-block]: Expected an indented block
          --> example.py:3:1
           |
@@ -686,7 +686,7 @@ print()
 
         let diagnostic = env.err().primary("example.py", "2:1", "2:9", "").build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:2:2
           |
@@ -710,7 +710,7 @@ print()
         annotation.hide_snippet(true);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
         --> example.py:1:1
         ");
@@ -790,7 +790,7 @@ print()
                 .build(),
         ];
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[unused-import]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
@@ -883,7 +883,7 @@ print()
         let annotation = Annotation::primary(span);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:2:1
           |
@@ -910,7 +910,7 @@ print()
         let annotation = Annotation::primary(span);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:1:1
           |
@@ -930,7 +930,7 @@ print()
         let annotation = Annotation::primary(span);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:1:1
           |
@@ -956,7 +956,7 @@ print()
         let annotation = Annotation::primary(span);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic]: main diagnostic message
          --> example.py:1:16
           |

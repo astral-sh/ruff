@@ -7,7 +7,6 @@ info:
     - "--no-cache"
     - "--output-format"
     - grouped
-    - "--preview"
     - "--check"
     - input.py
 ---

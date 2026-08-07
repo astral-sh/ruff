@@ -7,7 +7,6 @@ info:
     - "--no-cache"
     - "--output-format"
     - gitlab
-    - "--preview"
     - "--check"
     - input.py
 ---

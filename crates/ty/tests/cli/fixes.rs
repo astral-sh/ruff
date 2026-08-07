@@ -235,7 +235,8 @@ fn fix_unfixable() -> anyhow::Result<()> {
 
     assert_snapshot!(
         fs::read_to_string(case.root().join("unused_ignore.py"))?,
-        @r"
+        @"
+
     x = 1
     "
     );
