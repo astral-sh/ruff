@@ -1,10 +1,15 @@
-#!/usr/bin/env python3
 """Build Ruff with profile-guided optimization using pinned ecosystem projects."""
+
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -17,12 +22,23 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_DIRECTORIES = frozenset({"_tests", "_vendor", "test", "tests"})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EcosystemProject:
     name: str
     repository: str
     revision: str
     source_directories: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"[0-9a-f]{40}", self.revision) is None:
+            raise ValueError(
+                f"{self.repository} must be pinned to a full Git commit SHA, "
+                f"got {self.revision!r}"
+            )
+
+    @property
+    def url(self) -> str:
+        return f"https://github.com/{self.repository}.git"
 
 
 CORPUS_PROJECTS = (
@@ -114,20 +130,18 @@ def main() -> None:
         type=Path,
         help="Override the active Rust toolchain's llvm-profdata executable",
     )
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--train-only",
         action="store_true",
         help="Only produce <target-dir>/ruff.profdata for a subsequent release build",
     )
-    parser.add_argument(
+    mode.add_argument(
         "--prepare-corpus",
         action="store_true",
         help="Only download and prepare the pinned ecosystem training corpus",
     )
     args = parser.parse_args()
-
-    if args.prepare_corpus and args.train_only:
-        parser.error("--prepare-corpus and --train-only cannot be used together")
 
     target_dir = (
         args.target_dir
@@ -182,62 +196,14 @@ def main() -> None:
     if not instrumented_binary.is_file():
         raise RuntimeError(f"Instrumented Ruff binary not found: {instrumented_binary}")
 
-    training_environment = instrumented_environment | {
-        "LLVM_PROFILE_FILE": str(profile_dir / "ruff-%m-%p.profraw")
-    }
-    common_arguments = [
-        "--isolated",
-        "--target-version",
-        "py314",
-        "--no-cache",
-        "--silent",
-    ]
-    print(f"Training on {len(corpus)} ecosystem Python files", flush=True)
-    run(
-        [
-            str(instrumented_binary),
-            "check",
-            *common_arguments,
-            "--exit-zero",
-            f"@{corpus_arguments}",
-        ],
-        environment=training_environment,
+    profiles = train_ruff(
+        instrumented_binary,
+        corpus_arguments,
+        profile_dir,
+        corpus_size=len(corpus),
+        environment=instrumented_environment,
     )
-    run(
-        [
-            str(instrumented_binary),
-            "format",
-            *common_arguments,
-            "--check",
-            f"@{corpus_arguments}",
-        ],
-        environment=training_environment,
-        allowed_exit_codes=(0, 1),
-    )
-
-    profiles = sorted(profile_dir.glob("ruff-*.profraw"))
-    if not profiles or any(profile.stat().st_size == 0 for profile in profiles):
-        raise RuntimeError(f"No complete Ruff profiling data found in {profile_dir}")
-
-    with tempfile.NamedTemporaryFile(
-        dir=target_dir, prefix="ruff-", suffix=".profdata", delete=False
-    ) as temporary_file:
-        temporary_profile = Path(temporary_file.name)
-    try:
-        run(
-            [
-                str(profiler),
-                "merge",
-                "--output",
-                str(temporary_profile),
-                *map(str, profiles),
-            ],
-            environment=environment,
-        )
-        temporary_profile.replace(merged_profile)
-    finally:
-        temporary_profile.unlink(missing_ok=True)
-    print(f"Merged PGO profile: {merged_profile}", flush=True)
+    merge_profiles(profiler, profiles, merged_profile, environment=environment)
 
     if args.train_only:
         return
@@ -252,6 +218,91 @@ def main() -> None:
     run(cargo_command(target), environment=optimized_environment)
     print(
         f"Optimized Ruff: {target_dir / target / 'release' / binary_name}", flush=True
+    )
+
+
+def train_ruff(
+    binary: Path,
+    corpus_arguments: Path,
+    profile_directory: Path,
+    *,
+    corpus_size: int,
+    environment: dict[str, str],
+) -> list[Path]:
+    common_arguments = [
+        "--isolated",
+        "--target-version",
+        "py314",
+        "--no-cache",
+        "--silent",
+    ]
+    workloads = (
+        ("check", "--exit-zero", (0,)),
+        ("format", "--check", (0, 1)),
+    )
+    print(f"Training on {corpus_size} ecosystem Python files", flush=True)
+    profiles = []
+
+    for mode, mode_argument, allowed_exit_codes in workloads:
+        run(
+            [
+                str(binary),
+                mode,
+                *common_arguments,
+                mode_argument,
+                f"@{corpus_arguments}",
+            ],
+            environment=environment
+            | {
+                "LLVM_PROFILE_FILE": str(
+                    profile_directory / f"ruff-{mode}-%m-%p.profraw"
+                )
+            },
+            allowed_exit_codes=allowed_exit_codes,
+        )
+
+        workload_profiles = sorted(profile_directory.glob(f"ruff-{mode}-*.profraw"))
+        if not workload_profiles or any(
+            profile.stat().st_size == 0 for profile in workload_profiles
+        ):
+            raise RuntimeError(
+                f"No complete Ruff {mode} profiling data found in {profile_directory}"
+            )
+        profiles.extend(workload_profiles)
+
+    return profiles
+
+
+def merge_profiles(
+    profiler: Path,
+    profiles: list[Path],
+    destination: Path,
+    *,
+    environment: dict[str, str],
+) -> None:
+    profile_size = sum(profile.stat().st_size for profile in profiles)
+
+    with tempfile.NamedTemporaryFile(
+        dir=destination.parent, prefix="ruff-", suffix=".profdata", delete=False
+    ) as temporary_file:
+        temporary_profile = Path(temporary_file.name)
+    try:
+        run(
+            [
+                str(profiler),
+                "merge",
+                "--output",
+                str(temporary_profile),
+                *map(str, profiles),
+            ],
+            environment=environment,
+        )
+        temporary_profile.replace(destination)
+    finally:
+        temporary_profile.unlink(missing_ok=True)
+    print(
+        f"Merged {len(profiles)} PGO profiles ({profile_size:,} bytes): {destination}",
+        flush=True,
     )
 
 
@@ -316,9 +367,23 @@ def ecosystem_python_files(
                     "remote",
                     "add",
                     "origin",
-                    f"https://github.com/{project.repository}.git",
+                    project.url,
                 ],
                 environment=git_environment,
+            )
+
+        remote = subprocess.run(
+            [*git, "config", "--local", "--get", "remote.origin.url"],
+            cwd=REPOSITORY_ROOT,
+            env=git_environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if remote != project.url:
+            raise RuntimeError(
+                f"Unexpected origin for cached {project.name} checkout: "
+                f"expected {project.url}, got {remote}"
             )
 
         run(
