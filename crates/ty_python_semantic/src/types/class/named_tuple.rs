@@ -286,15 +286,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
 
         let field_types = self.fields(db).iter().map(|field| field.ty);
-        TupleType::heterogeneous(db, env, field_types)
-            .map(|tuple| tuple.to_class_type(db))
-            .unwrap_or_else(|| {
-                KnownClass::Tuple
-                    .to_class_literal(db, env)
-                    .as_class_literal()
-                    .expect("tuple should be a class literal")
-                    .default_specialization(db)
-            })
+        TupleType::heterogeneous(db, env, field_types).to_class_type(db)
     }
 
     /// Look up an instance member defined directly on this class (not inherited).

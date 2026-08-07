@@ -169,7 +169,7 @@ type C2 = Callable[[int, tuple[int | Any]], tuple[Any]]
 
 def _(top: Top[C2], bottom: Bottom[C2]) -> None:
     reveal_type(top)  # revealed: (int, tuple[int], /) -> tuple[object]
-    reveal_type(bottom)  # revealed: (int, tuple[object], /) -> Never
+    reveal_type(bottom)  # revealed: (int, tuple[object], /) -> tuple[Never]
 ```
 
 But, if the callable itself is in a contravariant position, then the variance is flipped i.e., if
@@ -294,13 +294,13 @@ from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Top[tuple[Any, int]], tuple[object, int]))
-static_assert(is_equivalent_to(Bottom[tuple[Any, int]], Never))
+static_assert(is_equivalent_to(Bottom[tuple[Any, int]], tuple[Never, int]))
 
 static_assert(is_equivalent_to(Top[tuple[Unknown, int]], tuple[object, int]))
-static_assert(is_equivalent_to(Bottom[tuple[Unknown, int]], Never))
+static_assert(is_equivalent_to(Bottom[tuple[Unknown, int]], tuple[Never, int]))
 
 static_assert(is_equivalent_to(Top[tuple[Any, int, Unknown]], tuple[object, int, object]))
-static_assert(is_equivalent_to(Bottom[tuple[Any, int, Unknown]], Never))
+static_assert(is_equivalent_to(Bottom[tuple[Any, int, Unknown]], tuple[Never, int, Never]))
 ```
 
 Except for when the tuple itself is in a contravariant position, then all positions in the tuple
@@ -313,7 +313,7 @@ from ty_extensions._internal import TypeOf
 type C = Callable[[tuple[Any, int], tuple[str, Unknown]], None]
 
 def _(top: Top[C], bottom: Bottom[C]) -> None:
-    reveal_type(top)  # revealed: (Never, Never, /) -> None
+    reveal_type(top)  # revealed: (tuple[Never, int], tuple[str, Never], /) -> None
     reveal_type(bottom)  # revealed: (tuple[object, int], tuple[str, object], /) -> None
 ```
 
@@ -469,9 +469,9 @@ from ty_extensions._internal import Unknown, is_equivalent_to
 static_assert(is_equivalent_to(Top[~Any], object))
 static_assert(is_equivalent_to(Bottom[~Any], Never))
 
-# tuple[Any, int] is in a contravariant position, so the
-# top materialization is Never and the negation of it
-static_assert(is_equivalent_to(Top[~tuple[Any, int]], object))
+# tuple[Any, int] is in a contravariant position, so its top
+# materialization negates the tuple's bottom materialization.
+static_assert(is_equivalent_to(Top[~tuple[Any, int]], ~tuple[Never, int]))
 static_assert(is_equivalent_to(Bottom[~tuple[Any, int]], ~tuple[object, int]))
 ```
 

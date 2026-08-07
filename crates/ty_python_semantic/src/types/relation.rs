@@ -1605,11 +1605,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             {
                 self.check_type_pair(
                     db,
-                    Type::tuple(Some(TupleType::unpacked_typevartuple(
-                        db,
-                        env,
-                        bound_typevar,
-                    ))),
+                    Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
                     target,
                 )
             }
@@ -1621,11 +1617,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(
                     db,
                     source,
-                    Type::tuple(Some(TupleType::unpacked_typevartuple(
-                        db,
-                        env,
-                        bound_typevar,
-                    ))),
+                    Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
                 )
             }
 

@@ -99,11 +99,8 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Type::tuple_instance(tuple)
+    pub(crate) fn tuple(tuple: TupleType<'db>) -> Self {
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
     pub fn homogeneous_tuple(
@@ -111,7 +108,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         element: Type<'db>,
     ) -> Self {
-        Type::tuple_instance(TupleType::homogeneous(db, env, element))
+        Type::tuple(TupleType::homogeneous(db, env, element))
     }
 
     pub(crate) fn heterogeneous_tuple<I, T>(
@@ -131,12 +128,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn empty_tuple(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
-        Type::tuple_instance(TupleType::empty(db, env))
-    }
-
-    /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
-    fn tuple_instance(tuple: TupleType<'db>) -> Self {
-        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
+        Type::tuple(TupleType::empty(db, env))
     }
 
     pub(crate) const fn sys_version_info() -> Self {
