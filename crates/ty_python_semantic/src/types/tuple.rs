@@ -11,8 +11,7 @@
 //! The description of which elements can appear in a `tuple` is called a [`TupleSpec`]. Other
 //! things besides `tuple` instances can be described by a tuple spec — for instance, the targets
 //! of an unpacking assignment. A `tuple` specialization can include `Never` as a fixed-length
-//! element because a user-defined tuple subclass can inhabit that type. A tuple expression cannot
-//! produce such a subclass, so it instead reduces to `Never` when a required element is `Never`.
+//! element because a user-defined tuple subclass can inhabit that type.
 
 use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
