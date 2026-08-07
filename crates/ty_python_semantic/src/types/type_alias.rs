@@ -5,7 +5,7 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext,
-        KnownInstanceType, Type, TypeContext, TypeMapping, TypeVarVariance,
+        KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
@@ -33,6 +33,10 @@ pub struct PEP695TypeAliasType<'db> {
 
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
+
+    /// Keeps recursive references stable while their alias body is materialized lazily.
+    #[returns(copy)]
+    pub(super) materialization_kind: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -43,7 +47,7 @@ pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value_type(db));
+    visitor.visit_type(db, TypeAliasType::PEP695(type_alias).value_type(db));
 }
 
 #[salsa::tracked]
@@ -106,6 +110,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                     self.name(db),
                     self.rhs_scope(db),
                     Some(specialization),
+                    self.materialization_kind(db),
                 )
             }
         }
@@ -144,6 +149,10 @@ pub struct ManualPEP695TypeAliasType<'db> {
 
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
+
+    /// Keeps recursive references stable while their alias body is materialized lazily.
+    #[returns(copy)]
+    pub(super) materialization_kind: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -154,7 +163,7 @@ pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> +
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value_type(db));
+    visitor.visit_type(db, TypeAliasType::ManualPEP695(type_alias).value_type(db));
 }
 
 #[salsa::tracked]
@@ -215,6 +224,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             self.name(db),
             self.definition(db),
             Some(f(generic_context)),
+            self.materialization_kind(db),
         )
     }
 
@@ -330,10 +340,38 @@ impl<'db> TypeAliasType<'db> {
     }
 
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        if let Some(materialization_kind) = self.materialization_kind(db) {
+            return self.materialized_value_type(db, materialization_kind);
+        }
+
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
+    }
+
+    /// Materialize the alias body lazily, keeping this alias as the recursive fallback.
+    ///
+    /// Comparing a recursive specialization with its materialization can request this same body
+    /// before it has finished materializing. Returning the already-marked alias closes that cycle
+    /// without losing its materialization polarity.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn materialized_value_type(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
+        let value_type = self.with_materialization_kind(db, None).value_type(db);
+        let env = ProgramEnvironment::from_definition(self.definition(db));
+        value_type.materialize(
+            db,
+            materialization_kind,
+            &ApplyTypeMappingVisitor::new(&env),
+        )
     }
 
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -343,7 +381,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    /// Returns the alias without an applied specialization.
+    /// Returns the alias without an applied specialization or pending materialization.
     pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
         match self {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
@@ -351,10 +389,53 @@ impl<'db> TypeAliasType<'db> {
                 alias.name(db),
                 alias.rhs_scope(db),
                 None,
+                None,
             )),
-            TypeAliasType::ManualPEP695(alias) => TypeAliasType::ManualPEP695(
-                ManualPEP695TypeAliasType::new(db, alias.name(db), alias.definition(db), None),
-            ),
+            TypeAliasType::ManualPEP695(alias) => {
+                TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                    db,
+                    alias.name(db),
+                    alias.definition(db),
+                    None,
+                    None,
+                ))
+            }
+        }
+    }
+
+    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+        match self {
+            TypeAliasType::PEP695(alias) => alias.materialization_kind(db),
+            TypeAliasType::ManualPEP695(alias) => alias.materialization_kind(db),
+        }
+    }
+
+    pub(super) fn with_materialization_kind(
+        self,
+        db: &'db dyn Db,
+        materialization_kind: Option<MaterializationKind>,
+    ) -> Self {
+        if self.materialization_kind(db) == materialization_kind {
+            return self;
+        }
+
+        match self {
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                alias.specialization(db),
+                materialization_kind,
+            )),
+            TypeAliasType::ManualPEP695(alias) => {
+                TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                    db,
+                    alias.name(db),
+                    alias.definition(db),
+                    alias.specialization(db),
+                    materialization_kind,
+                ))
+            }
         }
     }
 
