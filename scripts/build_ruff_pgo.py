@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -337,7 +338,7 @@ def ecosystem_python_files(
             current_revision.returncode != 0
             or current_revision.stdout.strip() != project.revision
         ):
-            run(
+            run_git_with_retry(
                 [
                     *git,
                     "fetch",
@@ -352,7 +353,7 @@ def ecosystem_python_files(
                 environment=git_environment,
             )
 
-        run(
+        run_git_with_retry(
             [
                 *git,
                 "checkout",
@@ -400,6 +401,23 @@ def ecosystem_python_files(
         print(f"  {project.name}: {len(project_paths)} Python files", flush=True)
 
     return paths
+
+
+def run_git_with_retry(command: list[str], *, environment: dict[str, str]) -> None:
+    for attempt in range(3):
+        try:
+            run(command, environment=environment)
+            return
+        except subprocess.CalledProcessError:
+            if attempt == 2:
+                raise
+            delay = 2**attempt
+            print(
+                f"Git command failed; retrying in {delay}s (attempt {attempt + 2} of 3)",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
 
 
 def write_corpus_arguments(target_directory: Path, corpus: list[str]) -> Path:
