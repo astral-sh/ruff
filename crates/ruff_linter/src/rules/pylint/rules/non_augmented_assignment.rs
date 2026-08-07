@@ -123,10 +123,9 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
         return;
     }
 
-    // If the operator is commutative, match, e.g., `x = 1 + x`, but limit such matches to primitive
-    // types.
+    // If the operator is commutative, match, e.g., `x = 1 + x`.
     if operator.is_commutative()
-        && (value.left.is_number_literal_expr() || value.left.is_boolean_literal_expr())
+        && is_number_or_bool_constant(&value.left)
         && ComparableExpr::from(target) == ComparableExpr::from(&value.right)
     {
         let mut diagnostic =
@@ -140,6 +139,16 @@ pub(crate) fn non_augmented_assignment(checker: &Checker, assign: &ast::StmtAssi
             assign.range,
         )));
     }
+}
+
+/// Returns `true` if `expr` evaluates to a number or a boolean, looking through
+/// any unary operators applied to a number or boolean literal.
+fn is_number_or_bool_constant(mut expr: &Expr) -> bool {
+    while let Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) = expr {
+        expr = operand;
+    }
+
+    expr.is_number_literal_expr() || expr.is_boolean_literal_expr()
 }
 
 /// Generate a fix to convert an assignment statement to an augmented assignment.
