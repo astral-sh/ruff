@@ -558,12 +558,185 @@ pub(super) mod testing {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+    use std::sync::Barrier;
+
     use tempfile::TempDir;
 
-    use crate::system::DirectoryEntry;
     use crate::system::walk_directory::tests::DirectoryEntryToString;
+    use crate::system::{DirectoryEntry, TestSystem};
 
     use super::*;
+
+    fn assert_concurrent_cache_writes(system: &dyn WritableSystem, cache_path: &SystemPath) {
+        let barrier = Barrier::new(2);
+        let expected_contents = "fully written vendored cache contents\n".repeat(1024);
+
+        std::thread::scope(|scope| {
+            let workers = (0..2)
+                .map(|_| {
+                    scope.spawn(|| {
+                        let cached_path = system
+                            .get_or_cache(cache_path, &|| {
+                                barrier.wait();
+                                Ok(expected_contents.clone())
+                            })
+                            .unwrap()
+                            .unwrap();
+
+                        assert_eq!(cached_path.as_path(), cache_path);
+                        assert_eq!(
+                            std::fs::read_to_string(cached_path.as_std_path()).unwrap(),
+                            expected_contents
+                        );
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            for worker in workers {
+                worker.join().unwrap();
+            }
+        });
+    }
+
+    #[test]
+    fn get_or_cache_concurrent_writers() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let cache_path = root.join("vendored/typeshed/cached.pyi");
+
+        assert_concurrent_cache_writes(&system, &cache_path);
+
+        assert_eq!(
+            std::fs::read_dir(cache_path.parent().unwrap().as_std_path())
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn get_or_cache_forwards_to_inner_system() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = TestSystem::new(OsSystem::new(root));
+        let cache_path = root.join("vendored/typeshed/cached.pyi");
+
+        assert_concurrent_cache_writes(&system, &cache_path);
+    }
+
+    #[test]
+    fn get_or_cache_interrupted_write() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let cache_path = root.join("cached.pyi");
+        let expected_contents = b"fully written vendored cache contents";
+
+        let error = system
+            .write_cache_file(&cache_path, expected_contents, |file, contents| {
+                file.write_all(&contents[..7])?;
+                Err(std::io::Error::new(
+                    ErrorKind::Interrupted,
+                    "interrupted cache write",
+                ))
+            })
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::Interrupted);
+        assert!(!cache_path.as_std_path().exists());
+        assert_eq!(std::fs::read_dir(tempdir.path()).unwrap().count(), 0);
+
+        let cached_path = system
+            .get_or_cache(&cache_path, &|| {
+                Ok(String::from_utf8(expected_contents.to_vec()).unwrap())
+            })
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read(cached_path.as_std_path()).unwrap(),
+            expected_contents
+        );
+    }
+
+    #[test]
+    fn get_or_cache_existing_complete_file() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let cache_path = root.join("cached.pyi");
+        let expected_contents = "fully written vendored cache contents";
+        std::fs::write(cache_path.as_std_path(), expected_contents).unwrap();
+
+        let cached_path = system
+            .get_or_cache(&cache_path, &|| {
+                Err(std::io::Error::other("cache hit unexpectedly read source"))
+            })
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(cached_path, cache_path);
+        assert_eq!(
+            std::fs::read_to_string(cached_path.as_std_path()).unwrap(),
+            expected_contents
+        );
+    }
+
+    #[test]
+    fn get_or_cache_rejects_incomplete_concurrent_file() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let cache_path = root.join("cached.pyi");
+
+        let result = system.get_or_cache(&cache_path, &|| {
+            std::fs::write(cache_path.as_std_path(), "partial")?;
+            Ok("fully written vendored cache contents".to_owned())
+        });
+
+        assert!(result.is_err());
+        assert_eq!(
+            std::fs::read_to_string(cache_path.as_std_path()).unwrap(),
+            "partial"
+        );
+    }
+
+    #[test]
+    fn get_or_cache_rejects_directory() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let cache_path = root.join("cached.pyi");
+        std::fs::create_dir(cache_path.as_std_path()).unwrap();
+
+        let result = system.get_or_cache(&cache_path, &|| Ok("complete contents".to_owned()));
+
+        assert!(result.is_err());
+        assert!(cache_path.as_std_path().is_dir());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn get_or_cache_rejects_dangling_symlink() {
+        let tempdir = TempDir::new().unwrap();
+        let root = SystemPath::from_std_path(tempdir.path()).unwrap();
+        let system = OsSystem::new(root);
+        let cache_path = root.join("cached.pyi");
+        symlink(tempdir.path().join("missing.pyi"), cache_path.as_std_path()).unwrap();
+
+        let result = system.get_or_cache(&cache_path, &|| Ok("complete contents".to_owned()));
+
+        assert!(result.is_err());
+        assert!(
+            std::fs::symlink_metadata(cache_path.as_std_path())
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+    }
 
     #[test]
     fn read_directory() {
