@@ -228,9 +228,5 @@ to_multiply = -a_number * 2 * to_multiply
 index = -a_number + index
 flags = ~a_number | 0x2 | flags
 
-# `not 0` is a number too, but `not` is left out of the numeric-literal check: it only reaches this
-# position when parenthesized, since `not 0 + index` parses as `not (0 + index)`.
-index = (not 0) + index
-
 # The target is in the middle of the chain; rewriting would require reordering the operands.
 to_multiply = 2 * to_multiply * 3

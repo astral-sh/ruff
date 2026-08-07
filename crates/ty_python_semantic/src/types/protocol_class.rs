@@ -13,6 +13,7 @@ use crate::types::attribute_write::{
     ProtocolMemberWriteRequirement, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
+use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type;
 use crate::types::{TypeContext, UpcastPolicy};
@@ -412,6 +413,22 @@ impl<'db> ProtocolInterfaceView<'db> {
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.interface.includes_member(db, name)
+    }
+
+    /// Includes inherited `object` members except `__hash__`, which subclasses can disable.
+    fn includes_member_or_object_fallback(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> bool {
+        self.includes_member(db, name)
+            || name != "__hash__"
+                && object_member_names(db, self.interface.program(db)).contains(name)
+                && matches!(
+                    Type::object().member(db, env, name).place,
+                    Place::Defined(place) if place.is_definitely_defined()
+                )
     }
 
     /// Compare the original and materialized forms of members required by `required`.
@@ -1860,6 +1877,65 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.qualifiers
     }
 
+    /// Returns whether an instance declaration conflicts with a required writable class variable.
+    ///
+    /// An unannotated assignment preserves an inherited `ClassVar`; an explicit instance
+    /// annotation does not:
+    ///
+    /// ```python
+    /// from typing import ClassVar
+    ///
+    /// class Base:
+    ///     value: ClassVar[int]
+    ///
+    /// class Valid(Base):
+    ///     value = 1
+    ///
+    /// class Invalid(Base):
+    ///     value: int = 1
+    /// ```
+    ///
+    /// Inspect declarations before descriptor binding, and ignore synthesized members without
+    /// source provenance.
+    pub(super) fn has_incompatible_class_variable_declaration(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        let qualifiers = self.qualifiers();
+        qualifiers.contains(TypeQualifiers::CLASS_VAR)
+            && !qualifiers.contains(TypeQualifiers::FINAL)
+            && ty
+                .nominal_class(db, env)
+                .or_else(|| {
+                    if !is_class_object_type(ty) {
+                        return None;
+                    }
+
+                    ty.to_meta_type(db, env)
+                        .to_instance_approximation(db, env)?
+                        .nominal_class(db, env)
+                })
+                .is_some_and(|class| {
+                    effective_superclass_variable_kind(db, class, Name::new(self.name))
+                        == Some(VariableKind::Instance)
+                        && [
+                            class
+                                .class_member(db, env, self.name, MemberLookupPolicy::default())
+                                .place,
+                            class.instance_member(db, env, self.name).place,
+                        ]
+                        .into_iter()
+                        .any(|place| {
+                            matches!(
+                                place,
+                                Place::Defined(defined) if defined.provenance != Provenance::Unknown
+                            )
+                        })
+                })
+    }
+
     fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
@@ -2188,12 +2264,15 @@ fn descriptor_decorated_protocol_member<'db>(
     };
 
     let receiver_ty = Type::instance(db, env, protocol);
-    let (read_ty, _) = descriptor_ty.try_call_dunder_get(
-        db,
-        env,
-        Some(receiver_ty),
-        receiver_ty.to_meta_type(db, env),
-    )?;
+    let read_ty = descriptor_ty
+        .try_call_dunder_get(
+            db,
+            env,
+            Some(receiver_ty),
+            receiver_ty.to_meta_type(db, env),
+        )
+        .unwrap_or_else(|error| Some(error.fallback()))?
+        .return_type;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
     let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
@@ -2445,6 +2524,7 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
+        .unwrap_or_else(|error| error.fallback_member(db))
         .place
     } else {
         receiver_ty.member(db, env, member.name).place
@@ -2924,6 +3004,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         if access == ProtocolMemberAccessMode::Class
+            && member.has_incompatible_class_variable_declaration(db, self.env, ty)
+        {
+            if let Some(context) = self.report_context() {
+                context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                    member_name: member.name.into(),
+                    ty,
+                });
+            }
+            return self.never();
+        }
+
+        if access == ProtocolMemberAccessMode::Class
             && member.is_instance_method()
             && required.read.is_some()
         {
@@ -2996,6 +3088,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let instance_access =
             member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
+            if member.has_incompatible_class_variable_declaration(db, env, ty) {
+                context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                    member_name: member.name.into(),
+                    ty,
+                });
+                context.push(ErrorContext::ProtocolMemberIncompatible {
+                    member_name: member.name.into(),
+                });
+                return self.never();
+            }
+
             let instance_read_missing = instance_access.read.is_some()
                 && protocol_member_read_type(
                     db,
@@ -3226,6 +3329,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         if source.member_count(db) < target.member_count(db)
             && !self.is_context_collection_enabled()
+            && source.member_count(db) < non_object_protocol_member_count(db, target.interface)
         {
             return self.never();
         }
@@ -3236,6 +3340,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
+
+                if source_member.is_none()
+                    && source.includes_member_or_object_fallback(db, env, target_member.name)
+                {
+                    return self.type_satisfies_protocol_member(db, source_type, &target_member);
+                }
 
                 if let Some(context) = self.report_context()
                     && source_member.is_none()
@@ -3482,6 +3592,35 @@ impl<'db> ProtocolMemberCandidate<'db> {
     }
 }
 
+/// Cache `object` member names so missing protocol members can be rejected without member lookup.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn object_member_names<'db>(db: &'db dyn Db, program: Program<'db>) -> FxHashSet<Name> {
+    let env = ProgramEnvironment::from_program(program);
+    let Some((object, _)) = ClassType::object(db, &env).static_class_literal(db) else {
+        return FxHashSet::default();
+    };
+
+    let mut names = place_table(db, object.body_scope(db))
+        .symbols()
+        .map(|symbol| symbol.name().clone())
+        .collect::<FxHashSet<_>>();
+    names.shrink_to_fit();
+    names
+}
+
+/// Count protocol requirements that cannot be supplied by inherited `object` members.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn non_object_protocol_member_count<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+) -> usize {
+    let inherited_member_count = object_member_names(db, interface.program(db))
+        .iter()
+        .filter(|name| name.as_str() != "__hash__" && interface.includes_member(db, name))
+        .count();
+    interface.member_count(db) - inherited_member_count
+}
+
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
     returns(copy),
@@ -3641,10 +3780,12 @@ pub(super) fn has_all_protocol_members_defined<'db>(
         Type::ProtocolInstance(source_protocol) => {
             let source_interface = source_protocol.interface(db);
 
-            source_interface.member_count(db) >= target_interface.member_count(db)
-                && target_interface
-                    .members(db)
-                    .all(|member| source_interface.includes_member(db, member.name()))
+            (source_interface.member_count(db) >= target_interface.member_count(db)
+                || source_interface.member_count(db)
+                    >= non_object_protocol_member_count(db, target_interface.interface))
+                && target_interface.members(db).all(|member| {
+                    source_interface.includes_member_or_object_fallback(db, env, member.name())
+                })
         }
         _ => target_interface.members(db).all(|member| {
             matches!(

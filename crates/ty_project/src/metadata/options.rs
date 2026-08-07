@@ -1438,6 +1438,32 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// Whether ty should use strict narrowing for unspecialized generic classes in
+    /// `isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+    ///
+    /// When enabled, ty narrows to the top materialization of the class. For example,
+    /// `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+    /// representing the (infinite) union of all possible `list` specializations. Iterating
+    /// over the list would yield values of type `object`.
+    ///
+    /// When disabled, ty uses gradual generic narrowing, preserving compatible type
+    /// arguments from the original type where possible. For example,
+    /// `isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.
+    /// If no specialization is available, the same check narrows a value of type `object`
+    /// to `list[Unknown]`; items of any type can then be appended to the list. Class
+    /// patterns such as `case list():` follow the same behavior.
+    ///
+    /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            # Use the top materialization when narrowing to an unspecialized generic class
+            strict-generic-narrowing = true
+        "#
+    )]
+    pub strict_generic_narrowing: Option<bool>,
+
     /// Configure ty's behavior regarding type inference and narrowing of equality
     /// checks. Defaults to `false`.
     ///
@@ -1604,6 +1630,7 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
@@ -1611,6 +1638,7 @@ impl AnalysisOptions {
         } = self;
 
         let AnalysisSettings {
+            strict_generic_narrowing: strict_generic_narrowing_default,
             strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
@@ -1640,6 +1668,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            strict_generic_narrowing: strict_generic_narrowing
+                .unwrap_or(strict_generic_narrowing_default),
             strict_equality_semantics: strict_equality_semantics
                 .unwrap_or(strict_equality_semantics_default),
             respect_type_ignore_comments: respect_type_ignore_comments

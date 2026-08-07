@@ -2454,8 +2454,47 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
+        let mut source_parameters = source.parameters.expand_starred_variadic_annotations(db);
+        let mut target_parameters = target.parameters.expand_starred_variadic_annotations(db);
+
+        // Gradual variadics and TypeVarTuples need their original suffix boundaries for
+        // materialization and inference. Named source prefixes must also remain visible when a
+        // target keyword could fill the same parameter.
+        if let (Some((_, source_variadic)), Some((_, target_variadic))) =
+            (source_parameters.variadic(), target_parameters.variadic())
+            && !source_variadic.has_starred_annotation()
+            && !target_variadic.has_starred_annotation()
+            && source_variadic.annotated_type().resolve_type_alias(db)
+                == target_variadic.annotated_type().resolve_type_alias(db)
+            && !source_variadic
+                .annotated_type()
+                .resolve_type_alias(db)
+                .is_dynamic()
+            && source_parameters.positional().all(|source_parameter| {
+                source_parameter.is_positional_only()
+                    || source_parameter.name().is_none_or(|name| {
+                        match target_parameters.keyword_by_name(name) {
+                            Some((_, parameter)) => {
+                                !parameter.is_keyword_only()
+                                    || parameter.annotated_type().resolve_type_alias(db).is_never()
+                            }
+                            None => {
+                                target_parameters
+                                    .keyword_variadic()
+                                    .is_none_or(|(_, parameter)| {
+                                        parameter.annotated_type().resolve_type_alias(db).is_never()
+                                    })
+                            }
+                        }
+                    })
+            })
+        {
+            source_parameters = source_parameters.with_homogeneous_variadic_suffix_in_prefix(db);
+            target_parameters = target_parameters.with_homogeneous_variadic_suffix_in_prefix(db);
+        }
+
         let target_typevartuple = if self.typevar_evaluation == TypeVarEvaluation::Lazy {
-            target.parameters.variadic().and_then(|(index, parameter)| {
+            target_parameters.variadic().and_then(|(index, parameter)| {
                 if parameter.has_starred_annotation()
                     && let Type::TypeVar(typevartuple) = parameter.annotated_type()
                     && typevartuple.is_typevartuple(db)
@@ -2474,14 +2513,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // comparison below reaches the same result, but only after doing work that is expensive for
         // large overload sets. An unpacked target TypeVarTuple bypasses this fast path so it can be
         // constrained from the source parameters.
-        if source.parameters.is_standard()
-            && target.parameters.is_standard()
-            && source.parameters.variadic().is_none()
+        if source_parameters.is_standard()
+            && target_parameters.is_standard()
+            && source_parameters.variadic().is_none()
             && target_typevartuple.is_none()
         {
-            let source_positional = source.parameters.positional().count();
-            let target_positional = target.parameters.positional().count();
-            let target_variadic = target.parameters.variadic();
+            let source_positional = source_parameters.positional().count();
+            let target_positional = target_parameters.positional().count();
+            let target_variadic = target_parameters.variadic();
 
             // A subdiagnostic telling the user that `source` is missing a `*args` parameter
             // is only guaranteed to be correct when `target` has a plain, open-ended variadic tail.
@@ -2494,8 +2533,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let target_has_open_ended_variadic = || {
                 target_variadic.is_some_and(|(index, parameter)| {
                     !parameter.has_starred_annotation()
-                        && !target
-                            .parameters
+                        && !target_parameters
                             .iter()
                             .skip(index)
                             .any(Parameter::is_positional)
@@ -2510,8 +2548,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && (target_positional > source_positional || target_has_open_ended_variadic())
                 {
                     let error_context = if target_positional > source_positional {
-                        let source_parameter_kind = source
-                            .parameters
+                        let source_parameter_kind = source_parameters
                             .get(source_positional)
                             .map(Parameter::kind);
 
@@ -2522,8 +2559,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                             }
                             Some(ParameterKind::KeywordVariadic { .. }) | None => {
-                                let parameter = target
-                                    .parameters
+                                let parameter = target_parameters
                                     .get_positional(source_positional)
                                     .and_then(Parameter::name);
                                 ErrorContext::MissingParameter {
@@ -2622,8 +2658,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
-            let source_paramspec = source.parameters.as_paramspec_with_prefix();
-            let target_paramspec = target.parameters.as_paramspec_with_prefix();
+            let source_paramspec = source_parameters.as_paramspec_with_prefix();
+            let target_paramspec = target_parameters.as_paramspec_with_prefix();
 
             // If either signature is a ParamSpec, the constraint set should bind the ParamSpec to
             // the other signature before the return-type and gradual/top fast paths can return
@@ -2887,7 +2923,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableSignature::single(
                             Signature::new_generic(
                                 source.generic_context,
-                                source.parameters.clone(),
+                                source_parameters.clone(),
                                 Type::unknown(),
                             )
                             .with_source_overload_index(source.source_overload_index()),
@@ -2909,8 +2945,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
-                    let source_parameters =
-                        source.parameters.expand_starred_variadic_annotations(db);
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
@@ -3029,9 +3063,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
 
                     let (source_params, _) = parameters.into_remaining();
-                    let source_params = source
-                        .parameters
-                        .with_transformed_parameters(source_params.cloned());
+                    let source_params =
+                        source_parameters.with_transformed_parameters(source_params.cloned());
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(
@@ -3065,7 +3098,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableSignature::single(
                             Signature::new_generic(
                                 target.generic_context,
-                                target.parameters.clone(),
+                                target_parameters.clone(),
                                 Type::unknown(),
                             )
                             .with_source_overload_index(target.source_overload_index()),
@@ -3091,10 +3124,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         current_source: None,
                         current_target: None,
                         source_iter: source_prefix_params.iter(),
-                        target_iter: target.parameters.iter(),
+                        target_iter: target_parameters.iter(),
                     };
 
-                    if target.parameters.kind() != ParametersKind::Gradual {
+                    if target_parameters.kind() != ParametersKind::Gradual {
                         let mut target_index = 0usize;
                         while let Some(next_parameter) = parameters.next() {
                             match next_parameter {
@@ -3175,9 +3208,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
 
                     let (_, target_params) = parameters.into_remaining();
-                    let target_params = target
-                        .parameters
-                        .with_transformed_parameters(target_params.cloned());
+                    let target_params =
+                        target_parameters.with_transformed_parameters(target_params.cloned());
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(
@@ -3214,16 +3246,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
-        if target.parameters.is_gradual()
-            && (matches!(target.parameters.kind(), ParametersKind::Gradual)
+        if target_parameters.is_gradual()
+            && (matches!(target_parameters.kind(), ParametersKind::Gradual)
                 || self.typevar_evaluation == TypeVarEvaluation::Lazy)
-            && !source.parameters.is_top()
-            && source
-                .parameters
+            && !source_parameters.is_top()
+            && source_parameters
                 .variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
-            && source
-                .parameters
+            && source_parameters
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
@@ -3232,9 +3262,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // The top signature is supertype of (and assignable from) all other signatures. It is a
         // subtype of no signature except itself, and assignable only to the gradual signature.
-        if target.parameters.is_top() {
+        if target_parameters.is_top() {
             return result;
-        } else if source.parameters.is_top() && !target.parameters.is_gradual() {
+        } else if source_parameters.is_top() && !target_parameters.is_gradual() {
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::TopCallableAssignedToNonTop {
                     return_type: source.return_ty,
@@ -3248,9 +3278,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // unpacked target TypeVarTuple instead continues to the ordinary parameter comparison so it
         // can be constrained from the source parameters.
         if target_typevartuple.is_none()
-            && (source.parameters.is_gradual() || target.parameters.is_gradual())
+            && (source_parameters.is_gradual() || target_parameters.is_gradual())
         {
-            match (source.parameters.kind(), target.parameters.kind()) {
+            match (source_parameters.kind(), target_parameters.kind()) {
                 // Both parameter lists are `Concatenate` with gradual forms. All prefix parameters
                 // are going to be positional-only.
                 (
@@ -3258,9 +3288,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
                     let source_prefix_params =
-                        &source.parameters.as_slice()[..source.parameters.len().saturating_sub(2)];
+                        &source_parameters.as_slice()[..source_parameters.len().saturating_sub(2)];
                     let target_prefix_params =
-                        &target.parameters.as_slice()[..target.parameters.len().saturating_sub(2)];
+                        &target_parameters.as_slice()[..target_parameters.len().saturating_sub(2)];
 
                     for (target_index, (source_param, target_param)) in source_prefix_params
                         .iter()
@@ -3286,11 +3316,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Standard,
                 ) => {
                     let source_prefix_params =
-                        &source.parameters.as_slice()[..source.parameters.len().saturating_sub(2)];
+                        &source_parameters.as_slice()[..source_parameters.len().saturating_sub(2)];
 
                     for (target_index, param) in source_prefix_params
                         .iter()
-                        .zip_longest(target.parameters.iter())
+                        .zip_longest(target_parameters.iter())
                         .enumerate()
                     {
                         match param {
@@ -3343,12 +3373,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
                     let target_prefix_params =
-                        &target.parameters.as_slice()[..target.parameters.len().saturating_sub(2)];
+                        &target_parameters.as_slice()[..target_parameters.len().saturating_sub(2)];
 
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: source.parameters.iter(),
+                        source_iter: source_parameters.iter(),
                         target_iter: target_prefix_params.iter(),
                     };
 
@@ -3426,6 +3456,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         target_index += 1;
                     }
+
+                    // Once every fixed source parameter matches the target prefix, an
+                    // object-variadic tail accepts every materialization of the gradual remainder.
+                    // Reject additional fixed or keyword-only parameters: they would make the
+                    // source more restrictive than at least one possible target signature.
+                    if let [source_prefix @ .., variadic, keyword_variadic] =
+                        source_parameters.as_slice()
+                        && source_prefix.len() <= target_prefix_params.len()
+                        && variadic.is_variadic()
+                        && variadic.annotated_type().is_object()
+                        && keyword_variadic.is_keyword_variadic()
+                        && keyword_variadic.annotated_type().is_object()
+                    {
+                        return result;
+                    }
                 }
 
                 _ => {}
@@ -3438,21 +3483,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.constraints,
                     ConstraintSet::from_bool(
                         self.constraints,
-                        source.parameters.is_gradual() && target.parameters.is_gradual(),
+                        source_parameters.is_gradual() && target_parameters.is_gradual(),
                     ),
                 ),
                 TypeRelation::Assignability => result,
             };
         }
 
-        // TODO: Normalize starred variadic annotations for all signature comparisons. Restricting
-        // expansion to target TypeVarTuple inference means equivalent nested unpackings such as
-        // `*tuple[*tuple[str, ...], bytes]` and `*tuple[str, ...], bytes` are not related correctly.
-        let source_parameters = if target_typevartuple.is_some() {
-            source.parameters.expand_starred_variadic_annotations(db)
-        } else {
-            source.parameters.clone()
-        };
         // Align the fixed target prefix and suffix before entering the parameter loop so that the
         // target TypeVarTuple captures only the source parameter entries between them.
         let typevartuple_source_parameter_count = if let Some((typevartuple_index, _)) =
@@ -3462,7 +3499,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .iter()
                 .take_while(|parameter| parameter.is_positional() || parameter.is_variadic())
                 .count();
-            let target_suffix_len = target.parameters.as_slice()[typevartuple_index + 1..]
+            let target_suffix_len = target_parameters.as_slice()[typevartuple_index + 1..]
                 .iter()
                 .take_while(|parameter| parameter.is_positional())
                 .count();
@@ -3511,7 +3548,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             current_source: None,
             current_target: None,
             source_iter: source_parameters.iter(),
-            target_iter: target.parameters.iter(),
+            target_iter: target_parameters.iter(),
         };
 
         // Collect all the standard parameters that have only been matched against a variadic
@@ -3605,27 +3642,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // If there are more parameters in `target` than in `source`, then `source` is
                     // not a subtype of `target`.
                     if let Some(context) = self.report_context()
-                        && target.parameters.as_paramspec_with_prefix().is_none()
+                        && target_parameters.as_paramspec_with_prefix().is_none()
                     {
                         let error_context = match target_parameter.kind() {
                             ParameterKind::PositionalOnly { .. }
-                            | ParameterKind::PositionalOrKeyword { .. } => unreachable!(
-                                "unmatched target positional parameters \
-                                are rejected by the positional fast path"
-                            ),
-                            ParameterKind::Variadic { .. } => {
-                                unreachable!(
-                                    "an unmatched target `*args` is impossible: \
-                                    a source without `*args` is rejected by the positional fast path, \
-                                    while a source with `*args` consumes the target during matching"
-                                )
-                            }
-                            ParameterKind::KeywordOnly { .. } => ErrorContext::MissingParameter {
+                            | ParameterKind::PositionalOrKeyword { .. }
+                            | ParameterKind::KeywordOnly { .. } => ErrorContext::MissingParameter {
                                 parameter: ParameterDescription::new(
                                     target_index,
                                     target_parameter.name(),
                                 ),
                             },
+                            ParameterKind::Variadic { .. } => {
+                                ErrorContext::MissingVariadicPositionalParameter
+                            }
                             ParameterKind::KeywordVariadic { .. } => {
                                 ErrorContext::MissingVariadicKeywordParameter
                             }
@@ -3832,7 +3862,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 }
                                 target_index += 1;
 
-                                if source.parameters.is_gradual() {
+                                if source_parameters.is_gradual() {
                                     return match self.relation {
                                         TypeRelation::Assignability => result,
                                         TypeRelation::Subtyping
@@ -3845,7 +3875,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                             if !source_param.is_variadic() {
                                 if let Some(context) = self.report_context()
-                                    && target.parameters.as_paramspec_with_prefix().is_none()
+                                    && target_parameters.as_paramspec_with_prefix().is_none()
                                 {
                                     let parameter = ParameterDescription::new(
                                         target_index,
@@ -3864,6 +3894,37 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 target_index,
                             ) {
                                 return result;
+                            }
+
+                            // Align fixed suffixes from the end, reusing the source variadic for
+                            // any additional target suffix elements.
+                            let source_suffix_len = parameters
+                                .source_iter
+                                .as_slice()
+                                .iter()
+                                .take_while(|parameter| parameter.is_positional())
+                                .count();
+                            let target_suffix_len = parameters
+                                .target_iter
+                                .as_slice()
+                                .iter()
+                                .take_while(|parameter| parameter.is_positional())
+                                .count();
+                            for _ in source_suffix_len..target_suffix_len {
+                                let Some(target_parameter) = parameters.peek_target() else {
+                                    break;
+                                };
+                                target_index += 1;
+                                if !check_types(
+                                    &mut result,
+                                    target_parameter.annotated_type(),
+                                    source_param.annotated_type(),
+                                    target_parameter.name(),
+                                    target_index,
+                                ) {
+                                    return result;
+                                }
+                                parameters.next_target();
                             }
                         }
 
@@ -3945,8 +4006,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if default_type.is_none() {
                         if let Some(context) = self.report_context() {
                             if let Some(source_name) = source_param.name()
-                                && target
-                                    .parameters
+                                && target_parameters
                                     .iter()
                                     .any(|target_param| target_param.name() == Some(source_name))
                             {
@@ -4034,7 +4094,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // For a `source <: target` relationship, if `target` has a keyword variadic
                         // parameter, `source` must also have a keyword variadic parameter.
                         if let Some(context) = self.report_context()
-                            && target.parameters.as_paramspec_with_prefix().is_none()
+                            && target_parameters.as_paramspec_with_prefix().is_none()
                         {
                             context.push(ErrorContext::MissingVariadicKeywordParameter);
                         }
@@ -4864,6 +4924,35 @@ impl<'db> Parameters<'db> {
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
 
+    /// Moves required suffix elements that match a homogeneous variadic into its prefix.
+    fn with_homogeneous_variadic_suffix_in_prefix(self, db: &'db dyn Db) -> Self {
+        let Some((variadic_index, variadic)) = self.variadic() else {
+            return self;
+        };
+
+        let matching_suffix_len = self.as_slice()[variadic_index + 1..]
+            .iter()
+            .take_while(|parameter| {
+                parameter.is_positional_only()
+                    && parameter.annotated_type().resolve_type_alias(db)
+                        == variadic.annotated_type().resolve_type_alias(db)
+            })
+            .count();
+
+        if matching_suffix_len == 0
+            || self
+                .as_slice()
+                .get(variadic_index + matching_suffix_len + 1)
+                .is_some_and(Parameter::is_positional)
+        {
+            return self;
+        }
+
+        let mut parameters = self.as_slice().to_vec();
+        parameters[variadic_index..=variadic_index + matching_suffix_len].rotate_left(1);
+        self.with_transformed_parameters(parameters)
+    }
+
     /// Expands an unpacked `*args` annotation into its logical callable parameters.
     ///
     /// Preserve the original `*args` definition and source position on every expanded parameter
@@ -4909,14 +4998,17 @@ impl<'db> Parameters<'db> {
                             .name()
                             .cloned()
                             .unwrap_or_else(|| Name::new_static("args"));
+                        let variadic = Parameter::variadic(name);
+                        let variadic = match variable.variable() {
+                            VariableSegment::Homogeneous(element) => {
+                                variadic.with_annotated_type(element)
+                            }
+                            VariableSegment::TypeVarTuple(typevartuple) => variadic
+                                .with_annotated_type(Type::TypeVar(typevartuple))
+                                .with_starred_annotation(),
+                        };
                         parameters.push(
-                            Parameter::variadic(name)
-                                .with_annotated_type(match variable.variable() {
-                                    VariableSegment::Homogeneous(element) => element,
-                                    VariableSegment::TypeVarTuple(typevartuple) => {
-                                        Type::TypeVar(typevartuple)
-                                    }
-                                })
+                            variadic
                                 .with_definition(parameter.definition())
                                 .with_source_parameter_index(parameter.source_parameter_index()),
                         );
@@ -4930,7 +5022,7 @@ impl<'db> Parameters<'db> {
         }
 
         if expanded {
-            Self::from_annotation(db, parameters)
+            self.with_transformed_parameters(parameters)
         } else {
             self.clone()
         }

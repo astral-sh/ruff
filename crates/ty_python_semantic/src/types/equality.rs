@@ -5,6 +5,7 @@
 //! methods.
 
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
 
@@ -13,6 +14,7 @@ use super::{
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
+    cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -999,23 +1001,60 @@ pub(super) fn is_same_enum_domain<'db>(
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::LiteralValue(literal) => matches!(
-            literal.kind(),
-            LiteralValueTypeKind::Enum(left)
-                if left.enum_class(db) == right.enum_class(db)
-        ),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_same_enum_domain(db, env, *element, right)),
-        Type::NominalInstance(instance) => instance.class_literal(db, env) == right.enum_class(db),
-        Type::EnumComplement(complement) => complement.enum_class(db) == right.enum_class(db),
-        Type::Intersection(intersection) => intersection
-            .enum_complement(db, env)
-            .is_some_and(|complement| complement.enum_class(db) == right.enum_class(db)),
-        _ => false,
+    // A proof made while another alias is active can still be disproved by a later union arm, so
+    // completed visits must not be cached.
+    #[derive(Default)]
+    struct EnumDomainVisitor<'db> {
+        active_specializations: ActiveRecursionDetector<Type<'db>>,
+        active_definitions: ActiveRecursionDetector<Definition<'db>>,
     }
+
+    fn visit<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        right: EnumLiteralType<'db>,
+        visitor: &EnumDomainVisitor<'db>,
+    ) -> bool {
+        match ty {
+            // The same specialization preserves the domain; different arguments can introduce
+            // values outside it even when the alias definition is the same.
+            Type::TypeAlias(alias) => visitor.active_specializations.visit(
+                &ty,
+                || true,
+                || {
+                    visitor.active_definitions.visit(
+                        &alias.definition(db),
+                        || false,
+                        || visit(db, env, alias.value_type(db), right, visitor),
+                    )
+                },
+            ),
+            Type::LiteralValue(literal) => matches!(
+                literal.kind(),
+                LiteralValueTypeKind::Enum(left)
+                    if left.enum_class(db) == right.enum_class(db)
+            ),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|&element| visit(db, env, element, right, visitor)),
+            Type::NewTypeInstance(newtype) => {
+                visit(db, env, newtype.concrete_base_type(db), right, visitor)
+            }
+            Type::NominalInstance(instance) => {
+                instance.class_literal(db, env) == right.enum_class(db)
+            }
+            Type::EnumComplement(complement) => complement.enum_class(db) == right.enum_class(db),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|&element| visit(db, env, element, right, visitor)),
+            _ => false,
+        }
+    }
+
+    visit(db, env, ty, right, &EnumDomainVisitor::default())
 }
 
 /// Evaluate each alternative of the union being constrained and combine their branch results.
@@ -1298,10 +1337,41 @@ fn finite_alternatives<'db>(
                 .then(|| complement.remaining_literal_types(db, env))
         }
         Type::Intersection(intersection) => {
-            let complement = intersection.enum_complement(db, env)?;
-            KnownComparisonSemantics::of_type(db, env, ty, operator)
+            let (comparison_type, complement) = if let Some(complement) =
+                intersection.enum_complement(db, env)
+            {
+                (ty, complement)
+            } else {
+                if !intersection.positive(db).iter().any(|positive| {
+                    matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_))
+                }) {
+                    return None;
+                }
+
+                let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
+                let complement = match expanded {
+                    Type::LiteralValue(literal) if literal.is_enum() => {
+                        return KnownComparisonSemantics::of_type(db, env, expanded, operator)
+                            .is_some()
+                            .then(|| vec![expanded]);
+                    }
+                    Type::EnumComplement(complement) => complement,
+                    Type::Intersection(intersection) => intersection.enum_complement(db, env)?,
+                    _ => return None,
+                };
+                (expanded, complement)
+            };
+            KnownComparisonSemantics::of_type(db, env, comparison_type, operator)
                 .is_some()
                 .then(|| complement.remaining_literal_types(db, env))
+        }
+        Type::NewTypeInstance(newtype) => {
+            let base = newtype.concrete_base_type(db);
+            if base.is_enum(db, env) {
+                finite_alternatives(db, env, base, operator)
+            } else {
+                None
+            }
         }
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])

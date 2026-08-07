@@ -10,12 +10,14 @@ use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName};
+use ty_module_resolver::{
+    ImportingFile, KnownModule, Module, ModuleName, resolve_real_shadowable_module,
+};
 use ty_python_core::ProgramFile;
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
@@ -523,7 +525,12 @@ impl<'db> CompletionBuilder<'db> {
         let kind = self
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
-        let relevance = Relevance::new(collection_context, query, &self);
+        let relevance = Relevance::new(
+            collection_context,
+            query,
+            &self,
+            program_file.file(db).source_type(db),
+        );
         let (label, insert, insert_text_format, command) =
             if collection_context.should_complete_callable_parentheses(kind) {
                 let label = self.insert.unwrap_or_else(|| self.name.clone());
@@ -1767,7 +1774,7 @@ struct Relevance {
     /// the user's project.
     is_module: Sort,
     /// Sorts based on whether this symbol is only available during
-    /// type checking and not at runtime.
+    /// type checking and not at runtime. This does not lower its rank in a stub file.
     type_check_only: Sort,
     /// Deprecated symbols appear lower in the completion result.
     deprecated: Sort,
@@ -1788,7 +1795,12 @@ impl Relevance {
     ///
     /// A smaller rank means the completion should appear higher in the
     /// results shown to end users.
-    fn new(_ctx: &CollectionContext, query: &UserQuery, c: &CompletionBuilder) -> Relevance {
+    fn new(
+        _ctx: &CollectionContext,
+        query: &UserQuery,
+        c: &CompletionBuilder,
+        source_type: PySourceType,
+    ) -> Relevance {
         Relevance {
             definitively_usable: if c.is_context_specific {
                 Sort::Higher
@@ -1825,7 +1837,7 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            type_check_only: if c.is_type_check_only {
+            type_check_only: if c.is_type_check_only && !source_type.is_stub() {
                 Sort::Lower
             } else {
                 Sort::Even
@@ -1954,6 +1966,32 @@ impl ModuleDependencyKind {
             ModuleDependencyKind::Project
         }
     }
+}
+
+/// Returns whether importing this module would require a typing-only runtime context.
+fn is_type_check_only_module<'db>(
+    db: &'db dyn Db,
+    importing_from: ProgramFile<'db>,
+    module: Module<'db>,
+) -> bool {
+    if !module.is_type_check_only(db) {
+        return false;
+    }
+
+    if module.name(db).first_component() != "typing_extensions" {
+        return true;
+    }
+
+    // typeshed bundles `typing_extensions` with its standard-library stubs even
+    // though the actual module is a third-party package. Since the bundled stub
+    // takes precedence during module resolution, look past it to check whether a
+    // corresponding runtime module is also available from the project or site-packages.
+    let importing_file = ImportingFile::File(
+        importing_from.file(db),
+        importing_from.resolver_environment(db),
+    );
+    resolve_real_shadowable_module(db, importing_file, &KnownModule::TypingExtensions.name())
+        .is_none()
 }
 
 /// An instruction to indicate an ordering preference.
@@ -2338,6 +2376,7 @@ fn add_unimported_completions<'db>(
                 .module_name(module_name)
                 .import(import_action.import().cloned())
                 .deprecated(symbol.deprecated())
+                .type_check_only(is_type_check_only_module(db, file, symbol.module()))
                 .module_dependency_kind(ModuleDependencyKind::from_module(db, symbol.module())),
         );
     }
@@ -3085,7 +3124,15 @@ fn add_import_completions_impl<'db>(
     let env = ProgramEnvironment::from_file(completions.program_file);
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
+        let is_from_type_check_only_module = matches!(
+            semantic.ty,
+            Some(Type::ModuleLiteral(module))
+                if is_type_check_only_module(db, completions.program_file, module.module(db))
+        );
         let mut builder = CompletionBuilder::from_semantic_completion(db, &env, semantic);
+        if is_from_type_check_only_module {
+            builder = builder.type_check_only(true);
+        }
         if let Some(module_dependency_kind) = module_dependency_kind {
             builder = builder.module_dependency_kind(module_dependency_kind);
         }
@@ -9406,7 +9453,10 @@ if foo:
     #[test]
     fn from_import_no_space_not_suggests_import() {
         let builder = completion_test_builder("from typing<CURSOR>");
-        assert_snapshot!(builder.build().snapshot(), @"typing");
+        assert_snapshot!(builder.build().snapshot(), @"
+        typing
+        typing_extensions
+        ");
     }
 
     #[test]
@@ -9617,19 +9667,111 @@ from .imp<CURSOR>
     }
 
     #[test]
-    fn typing_extensions_excluded_from_import() {
+    fn bundled_typing_extensions_module_completion() {
         let builder = completion_test_builder("from typing<CURSOR>").module_names();
-        assert_snapshot!(builder.build().snapshot(), @"typing :: <no import required>");
+        let completions = builder.build();
+        assert!(completions.completions().iter().any(|completion| {
+            completion.name == "typing_extensions" && completion.is_type_check_only
+        }));
+        assert_snapshot!(completions.snapshot(), @"
+        typing :: <no import required>
+        typing_extensions :: <no import required>
+        ");
     }
 
     #[test]
-    fn typing_extensions_excluded_from_auto_import() {
-        let builder = completion_test_builder("deprecated<CURSOR>").module_names();
-        assert_snapshot!(builder.build().snapshot(), @"deprecated :: warnings");
+    fn bundled_ty_extensions_module_completion() {
+        let builder = completion_test_builder("from ty_ex<CURSOR>")
+            .module_names()
+            .filter(|completion| completion.name == "ty_extensions");
+        let completions = builder.build();
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .all(|completion| completion.is_type_check_only)
+        );
+        assert_snapshot!(completions.snapshot(), @"ty_extensions :: <no import required>");
     }
 
     #[test]
-    fn typing_extensions_included_from_import() {
+    fn bundled_typeshed_module_completion() {
+        let builder = completion_test_builder("from _type<CURSOR>")
+            .module_names()
+            .filter(|completion| completion.name == "_typeshed");
+        let completions = builder.build();
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .all(|completion| completion.is_type_check_only)
+        );
+        assert_snapshot!(completions.snapshot(), @"_typeshed :: <no import required>");
+    }
+
+    #[test]
+    fn runtime_ty_extensions_auto_import_is_not_type_check_only() {
+        let builder = CursorTest::builder()
+            .source("ty_extensions.py", "static_assert = 1")
+            .source("main.py", "static_ass<CURSOR>")
+            .completion_test_builder()
+            .module_names()
+            .filter(|completion| completion.name == "static_assert");
+        let completions = builder.build();
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .all(|completion| !completion.is_type_check_only)
+        );
+        assert_snapshot!(completions.snapshot(), @"static_assert :: ty_extensions");
+    }
+
+    #[test]
+    fn ty_extensions_pydantic_auto_import_generates_import_edit() {
+        let builder = completion_test_builder("LaxDa<CURSOR>")
+            .module_names()
+            .imports()
+            .filter(|completion| completion.name == "LaxDate");
+        assert_snapshot!(builder.build().snapshot(), @"LaxDate :: ty_extensions.pydantic :: from ty_extensions.pydantic import LaxDate");
+    }
+
+    #[test]
+    fn ty_extensions_auto_import_is_type_check_only_in_stub() {
+        let builder = CursorTest::builder()
+            .source("main.pyi", "static_ass<CURSOR>")
+            .completion_test_builder()
+            .module_names()
+            .filter(|completion| completion.name == "static_assert");
+        let completions = builder.build();
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .all(|completion| completion.is_type_check_only)
+        );
+        assert_snapshot!(completions.snapshot(), @"static_assert :: ty_extensions");
+    }
+
+    #[test]
+    fn typeshed_auto_import_is_type_check_only_in_stub() {
+        let builder = CursorTest::builder()
+            .source("main.pyi", "TypedDictFall<CURSOR>")
+            .completion_test_builder()
+            .module_names()
+            .filter(|completion| completion.name == "TypedDictFallback");
+        let completions = builder.build();
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .all(|completion| completion.is_type_check_only)
+        );
+        assert_snapshot!(completions.snapshot(), @"TypedDictFallback :: _typeshed._type_checker_internals");
+    }
+
+    #[test]
+    fn runtime_typing_extensions_module_completion() {
         let builder = CursorTest::builder()
             .source("typing_extensions.py", "deprecated = 1")
             .source("foo.py", "from typing<CURSOR>")
@@ -9642,37 +9784,54 @@ from .imp<CURSOR>
     }
 
     #[test]
-    fn typing_extensions_included_from_auto_import() {
+    fn runtime_typing_extensions_auto_import_is_not_type_check_only() {
         let builder = CursorTest::builder()
             .source("typing_extensions.py", "deprecated = 1")
             .source("foo.py", "deprecated<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @"
+        let completions = builder.build();
+        assert!(
+            completions.completions().iter().any(|completion| {
+                completion.module_name.map(ModuleName::as_str) == Some("typing_extensions")
+                    && !completion.is_type_check_only
+            }),
+            "runtime `typing_extensions` should not be downranked",
+        );
+        assert_snapshot!(completions.snapshot(), @"
         deprecated :: typing_extensions
         deprecated :: warnings
         ");
     }
 
     #[test]
-    fn typing_extensions_included_from_import_in_stub() {
+    fn typing_extensions_module_completion_is_type_check_only_in_stub() {
         let builder = CursorTest::builder()
             .source("foo.pyi", "from typing<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @"
+        let completions = builder.build();
+        assert!(completions.completions().iter().any(|completion| {
+            completion.name == "typing_extensions" && completion.is_type_check_only
+        }));
+        assert_snapshot!(completions.snapshot(), @"
         typing :: <no import required>
         typing_extensions :: <no import required>
         ");
     }
 
     #[test]
-    fn typing_extensions_included_from_auto_import_in_stub() {
+    fn typing_extensions_auto_import_is_type_check_only_in_stub() {
         let builder = CursorTest::builder()
             .source("foo.pyi", "deprecated<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @"
+        let completions = builder.build();
+        assert!(completions.completions().iter().any(|completion| {
+            completion.module_name.map(ModuleName::as_str) == Some("typing_extensions")
+                && completion.is_type_check_only
+        }));
+        assert_snapshot!(completions.snapshot(), @"
         deprecated :: typing_extensions
         deprecated :: warnings
         ");
@@ -10495,15 +10654,17 @@ import typing
 from typing import Callable
 TypedDi<CURSOR>
 ",
-        );
+        )
+        .imports()
+        .filter(|completion| matches!(completion.name.as_str(), "TypedDict" | "is_typeddict"));
         assert_snapshot!(
-            builder.imports().build().snapshot(),
+            builder.build().snapshot(),
             @"
         TypedDict :: , TypedDict
         is_typeddict :: , is_typeddict
-        _FilterConfigurationTypedDict :: from logging.config import _FilterConfigurationTypedDict
+        TypedDict :: from typing_extensions import TypedDict
 
-        _FormatterConfigurationTypedDict :: from logging.config import _FormatterConfigurationTypedDict
+        is_typeddict :: from typing_extensions import is_typeddict
         ",
         );
     }

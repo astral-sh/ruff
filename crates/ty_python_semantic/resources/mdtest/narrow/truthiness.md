@@ -141,7 +141,7 @@ def bar(world: str, *args, **kwargs) -> float:
 x = foo if flag() else bar
 
 if x:
-    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> int | float)
+    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> float)
 else:
     reveal_type(x)  # revealed: Never
 ```
@@ -589,7 +589,7 @@ def f(floaty: FloatNewType, complexy: ComplexNewType):
 
     if complexy:
         reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
-        reveal_type(complexy.real)  # revealed: int | float
+        reveal_type(complexy.real)  # revealed: float
         expects_complex(complexy)  # fine
         expects_float(complexy)  # error: [invalid-argument-type]
 ```

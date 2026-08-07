@@ -1,9 +1,7 @@
 use compact_str::CompactString;
 use rayon::prelude::*;
 use ruff_db::files::File;
-use ty_module_resolver::{
-    ImportingFile, Module, ModuleName, all_modules, resolve_real_shadowable_module,
-};
+use ty_module_resolver::{Module, all_modules};
 use ty_project::{Db, parallel::ParallelIteratorExt};
 use ty_python_core::ProgramFile;
 
@@ -29,12 +27,8 @@ pub fn all_symbols<'db>(
     let all_symbols_span = tracing::debug_span!("all_symbols");
     let _span = all_symbols_span.enter();
 
-    let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
     let program = importing_from.program(db);
     let resolver_environment = importing_from.resolver_environment(db);
-    let importing_file = ImportingFile::File(importing_from.file(db), resolver_environment);
-    let is_typing_extensions_available = importing_from.file(db).is_stub(db)
-        || resolve_real_shadowable_module(db, importing_file, &typing_extensions).is_some();
 
     let results = all_modules(db, resolver_environment)
         .into_par_iter()
@@ -49,15 +43,11 @@ pub fn all_symbols<'db>(
             // namespace packages in auto-import anyway.)
             let is_non_first_party = module.search_path(db).is_none_or(|sp| !sp.is_first_party());
 
-            // Filter out non-first-party modules that are conventionally
-            // regarded as private or tests.
-            if is_non_first_party && (name.is_private() || name.is_test_module()) {
-                return Vec::new();
-            }
-
-            // TODO: also make it available in `TYPE_CHECKING` blocks
-            // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
-            if !is_typing_extensions_available && name == &typing_extensions {
+            // Filter out non-first-party test and private modules, while retaining private
+            // typeshed packages that are useful when writing type annotations.
+            if is_non_first_party
+                && (name.is_test_module() || name.is_private() && !module.is_type_check_only(db))
+            {
                 return Vec::new();
             }
 

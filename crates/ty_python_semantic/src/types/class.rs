@@ -14,7 +14,9 @@ pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
 };
-pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+pub(super) use self::typed_dict::{
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
+};
 use super::dedicated::pydantic;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,

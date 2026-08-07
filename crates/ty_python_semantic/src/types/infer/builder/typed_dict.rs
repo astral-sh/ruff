@@ -449,6 +449,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             callable_type,
             Type::ClassLiteral(class_literal) if class_literal.generic_context(db).is_some()
         );
+        if is_generic && arguments.args.is_empty() {
+            for keyword in &arguments.keywords {
+                if keyword.arg.is_none() && !keyword.value.is_dict_expr() {
+                    self.get_or_infer_expression(&keyword.value, TypeContext::default());
+                }
+            }
+        }
         let can_infer = is_generic
             && self.can_infer_generic_typed_dict_constructor(class, arguments, call_expression_tcx);
 
@@ -560,17 +567,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         arguments.args.is_empty()
             && !has_gradual_class_context
             && arguments.keywords.iter().all(|keyword| {
-                let Some(name) = keyword.arg.as_ref() else {
-                    return false;
+                let permits_field_inference = |name: &str| {
+                    typed_dict.item(db, name).is_none_or(|field| {
+                        !contains_generic_typed_dict(
+                            db,
+                            env,
+                            field.declared_ty,
+                            &ActiveRecursionDetector::default(),
+                        )
+                    })
                 };
-                typed_dict.item(db, name.id.as_str()).is_none_or(|field| {
-                    !contains_generic_typed_dict(
-                        db,
-                        env,
-                        field.declared_ty,
-                        &ActiveRecursionDetector::default(),
-                    )
-                })
+
+                if let Some(name) = keyword.arg.as_ref() {
+                    return permits_field_inference(name.id.as_str());
+                }
+
+                self.try_expression_type(&keyword.value)
+                    .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
+                    .is_some_and(|unpacked| {
+                        unpacked.items(db).iter().all(|(name, field)| {
+                            field.is_required() && permits_field_inference(name.as_str())
+                        })
+                    })
             })
     }
 

@@ -23,14 +23,24 @@ impl<'db> Type<'db> {
     /// Upcast `self` to a type that conservatively describes its possible runtime objects in an
     /// identity comparison.
     ///
-    /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
-    /// type here while remaining distinct for ordinary type relations and intersections.
+    /// A `NewType` constructor returns its argument unchanged, so its tag can differ between two
+    /// views of the same object: upcast a `NewType` to its concrete base. In contrast, preserve
+    /// invariant generic arguments because the same mutable object cannot satisfy incompatible
+    /// commitments such as `list[int]` and `list[str]` without some other code already being
+    /// unsound.
     ///
-    /// Negative intersection elements are generally omitted. A static exclusion does not imply a
-    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `~Literal[True]`, but evaluates
-    /// to the `True` singleton at runtime. However, excluding an entire nominal instance type is
-    /// stable under `NewType` erasure, so constraints such as `~None` and `~SomeClass` are
-    /// preserved.
+    /// Preserve negations that constrain the object itself, such as `~None`, `~SomeClass`, and
+    /// `~Literal[1]`. A `NewType` tag, type-variable selection, or type-guard proof can differ
+    /// between views. Retain the existing conservative handling of negated string types.
+    ///
+    /// A type variable can also hide a `NewType` tag: even a variable bounded by `int` can be
+    /// instantiated as an integer `NewType`. Expand variables to their upcast bounds or constraints
+    /// instead of transferring that potentially tagged relationship; an unbounded variable becomes
+    /// `object`.
+    ///
+    /// Use this upcast both to decide whether identity is possible and to narrow the other
+    /// operand when it succeeds. Each operand retains its own existing tags and type-variable
+    /// relationships when the resulting constraint is applied.
     pub(crate) fn identity_comparison_type(
         self,
         db: &'db dyn Db,
@@ -48,13 +58,15 @@ impl<'db> Type<'db> {
                 Type::TypeAlias(alias) => {
                     visitor.visit_type(db, ty, || upcast(db, env, alias.value_type(db), visitor))
                 }
-                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+                Type::NewTypeInstance(newtype) => {
+                    upcast(db, env, newtype.concrete_base_type(db), visitor)
+                }
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
                     match typevar.typevar(db).bound_or_constraints(db, env) {
                         Some(bound_or_constraints) => {
                             upcast(db, env, bound_or_constraints.as_type(db, env), visitor)
                         }
-                        None => ty,
+                        None => KnownClass::Object.to_instance(db, env),
                     }
                 }),
                 Type::Union(union) => {
@@ -66,8 +78,19 @@ impl<'db> Type<'db> {
                         builder = builder.add_positive(upcast(db, env, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        if element.resolve_type_alias(db).is_nominal_instance() {
-                            builder = builder.add_negative(*element);
+                        // Static tags and predicate proofs can differ between views. Retain the
+                        // existing conservative handling of negated string types.
+                        match element.resolve_type_alias(db) {
+                            Type::NewTypeInstance(_)
+                            | Type::TypeVar(_)
+                            | Type::TypeIs(_)
+                            | Type::TypeGuard(_) => continue,
+                            Type::LiteralValue(literal)
+                                if literal.is_literal_string() || literal.is_string() =>
+                            {
+                                continue;
+                            }
+                            _ => builder.add_negative_in_place(*element),
                         }
                     }
                     builder.build()
@@ -1035,6 +1058,16 @@ fn infer_membership_test_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
     let env = &context.program_environment();
+
+    if let Some(key) = left.as_string_literal()
+        && let Some(typed_dict) = right.as_typed_dict()
+    {
+        let truthiness = typed_dict
+            .key_membership_truthiness(db, key.value(db))
+            .negate_if(op.is_not_in());
+        return Ok(Type::from_truthiness(db, env, truthiness));
+    }
+
     let compare_result_opt = match right.try_call_dunder(
         db,
         env,

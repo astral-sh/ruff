@@ -3,8 +3,11 @@
 
 # Enable off-by-default rules.
 [rules]
+blanket-ignore-comment = "warn"
 division-by-zero = "warn"
+missing-type-argument = "warn"
 possibly-missing-attribute = "warn"
 possibly-missing-import = "warn"
 possibly-unresolved-reference = "warn"
+unsound-return-statement = "warn"
 unsupported-dynamic-base = "warn"

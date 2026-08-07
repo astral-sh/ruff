@@ -207,24 +207,20 @@ fn innermost_chain_link<'a>(tokens: &Tokens, value: &'a ExprBinOp) -> &'a ExprBi
 }
 
 /// Returns `true` if `expr` is a literal number or boolean, or an operation over such literals,
-/// e.g. `1`, `True`, `-2`, or `2 * 3`.
+/// e.g. `1`, `True`, `-2`, `(not 0)`, or `2 * 3`.
 ///
 /// Any operator applied to numbers either produces a number or raises, so the whole expression is
 /// known to be a number without having to infer any types. That includes nonsense like `2 @ 3`,
 /// which is accepted here: it raises either way, so the rewrite doesn't change the behavior.
 ///
-/// [`ast::UnaryOp::Not`] is left out because it can only appear here parenthesized, as in
-/// `x = (not 0) + x`; `not 0 + x` parses as `not (0 + x)` instead. The extra case isn't worth
-/// supporting for a form nobody writes.
+/// `not` is included even though it says nothing about its operand's type, because it always
+/// evaluates to a boolean. The operand still has to be a literal here: `x = (not "") + x` would be
+/// just as safe to rewrite, but the check deliberately stays narrow. Note that `not` can only reach
+/// this point parenthesized, as in `x = (not 0) + x`; `not 0 + x` parses as `not (0 + x)` instead.
 fn is_numeric_constant(expr: &Expr) -> bool {
     match expr {
         Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) => true,
-        Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => {
-            matches!(
-                op,
-                ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert
-            ) && is_numeric_constant(operand)
-        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_constant(operand),
         Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
             is_numeric_constant(left) && is_numeric_constant(right)
         }

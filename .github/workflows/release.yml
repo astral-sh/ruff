@@ -117,7 +117,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
-    uses: ./.github/workflows/build-binaries.yml
+    uses: $/.github/workflows/build-binaries.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -127,7 +127,7 @@ jobs:
       - plan
       - release-gate
     if: ${{ always() && needs.plan.result == 'success' && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped') && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run') }}
-    uses: ./.github/workflows/build-docker.yml
+    uses: $/.github/workflows/build-docker.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -141,7 +141,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
-    uses: ./.github/workflows/build-wasm.yml
+    uses: $/.github/workflows/build-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -248,7 +248,7 @@ jobs:
       - host
       - release-gate
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-pypi.yml
+    uses: $/.github/workflows/publish-pypi.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -263,7 +263,7 @@ jobs:
       - host
       - release-gate
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-wasm.yml
+    uses: $/.github/workflows/publish-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -281,7 +281,7 @@ jobs:
       - custom-publish-pypi # DIRTY: see #16989
       - custom-publish-wasm # DIRTY: see #16989
     if: ${{ !fromJson(needs.plan.outputs.val).announcement_is_prerelease || fromJson(needs.plan.outputs.val).publish_prereleases }}
-    uses: ./.github/workflows/publish-crates.yml
+    uses: $/.github/workflows/publish-crates.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -352,7 +352,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/notify-dependents.yml
+    uses: $/.github/workflows/notify-dependents.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -361,7 +361,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-docs.yml
+    uses: $/.github/workflows/publish-docs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -370,7 +370,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-playground.yml
+    uses: $/.github/workflows/publish-playground.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -379,7 +379,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-versions.yml
+    uses: $/.github/workflows/publish-versions.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
@@ -388,7 +388,7 @@ jobs:
     needs:
       - plan
       - announce
-    uses: ./.github/workflows/publish-mirror.yml
+    uses: $/.github/workflows/publish-mirror.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit

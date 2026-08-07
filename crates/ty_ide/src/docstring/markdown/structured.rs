@@ -7,7 +7,8 @@ use super::general;
 use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
 use crate::docstring::document::syntax::{
-    is_wrapped_in_markdown_code_span, starts_with_markdown_list_item,
+    InlineMarkupScanner, InlineMarkupToken, is_wrapped_in_markdown_code_span,
+    starts_with_markdown_list_item,
 };
 
 mod google;
@@ -374,12 +375,96 @@ fn description_block_start(description: &str) -> Option<usize> {
 fn render_type_code_span_into(output: &mut String, ty: &str) {
     let normalized = normalize_type_for_code_span(ty);
 
-    if is_wrapped_in_markdown_code_span(&normalized) {
+    // Preserve existing code spans, except for abbreviated Sphinx references
+    // such as "`~pkg.Model`" (whose display should be normalized to "Model").
+    if is_wrapped_in_markdown_code_span(&normalized) && !normalized.starts_with("`~") {
         output.push_str(&normalized);
         return;
     }
 
+    let normalized = normalize_embedded_type_markup(&normalized);
     render_code_span_into(output, normalized.as_ref());
+}
+
+/// Removes embedded markup before wrapping the normalize type label in a code span.
+///
+/// For example:
+///     - ``"str or :class:`pkg.Type` or `pkg.Other`"`` becomes `"str or pkg.Type or pkg.Other"`
+///     - `"-\\|>"` becomes `"-|>"`.
+fn normalize_embedded_type_markup(ty: &str) -> Cow<'_, str> {
+    if !ty.contains('`') && !ty.contains('\\') {
+        return Cow::Borrowed(ty);
+    }
+
+    let mut normalized = String::with_capacity(ty.len());
+    for token in InlineMarkupScanner::new(ty) {
+        match token {
+            InlineMarkupToken::Text(text) => push_unescaped(&mut normalized, text),
+            InlineMarkupToken::Code(span) => {
+                let markup = span.content();
+
+                // "`~pkg.Widget`" becomes "Widget"
+                // "``literal`tick``" becomes "literal`tick".
+                let display_text = if span.is_single() {
+                    interpreted_text_label(markup, false)
+                } else {
+                    markup
+                };
+
+                push_unescaped(&mut normalized, display_text);
+            }
+            InlineMarkupToken::RestPrefixRole(role) => {
+                let markup = role.content();
+
+                // ":class:`Model <pkg.Model>`" becomes "Model"
+                // ":obj:`.lines.line`" becomes "lines.line".
+                let display_text = role.explicit_title().unwrap_or_else(|| {
+                    interpreted_text_label(markup, role.is_python_domain_cross_reference())
+                });
+
+                push_unescaped(&mut normalized, display_text);
+            }
+        }
+    }
+
+    Cow::Owned(normalized)
+}
+
+/// Returns the display label for reStructuredText interpreted text.
+///
+/// For example, "~pkg.Widget" becomes "Widget"; a Python role target like
+/// ".lines.line" becomes "lines.line".
+fn interpreted_text_label(text: &str, is_python_role_target: bool) -> &str {
+    let (is_abbreviated, target) = text
+        .strip_prefix('~')
+        .map_or((false, text), |target| (true, target));
+    let target = if is_python_role_target {
+        target.strip_prefix('.').unwrap_or(target)
+    } else {
+        target
+    };
+    if target.is_empty() {
+        return text;
+    }
+
+    if is_abbreviated {
+        target.rsplit_once('.').map_or(target, |(_, label)| label)
+    } else {
+        target
+    }
+}
+
+fn push_unescaped(output: &mut String, text: &str) {
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character == '\\'
+            && let Some(escaped) = characters.next_if(char::is_ascii_punctuation)
+        {
+            output.push(escaped);
+        } else {
+            output.push(character);
+        }
+    }
 }
 
 /// Normalizes type text so it fits in a single Markdown code span.
@@ -602,6 +687,109 @@ mod tests {
 
         **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**<HB>
         Escaped name.
+        ");
+    }
+
+    #[test]
+    fn section_items_normalize_source_markup_in_types() {
+        let _snap = bind_markdown_snapshot_filters();
+        let section = section_block(vec![
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("rng"),
+                Some("{None, int, `numpy.random.Generator`, `numpy.random.RandomState`}, optional"),
+                "Random number generator.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("arrowstyle"),
+                Some(r"str (default='-\|>')"),
+                "Arrow style.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("model"),
+                Some("str or :class:`pkg.Model`"),
+                "Model type.",
+            ),
+        ]);
+
+        assert_snapshot!(render_markdown(&section), @"
+        ## Parameters
+        **rng**: `{None, int, numpy.random.Generator, numpy.random.RandomState}, optional`<HB>
+        Random number generator.
+
+        **arrowstyle**: `str (default='-|>')`<HB>
+        Arrow style.
+
+        **model**: `str or pkg.Model`<HB>
+        Model type.
+        ");
+    }
+
+    #[test]
+    fn section_items_remove_rest_roles_from_types() {
+        let _snap = bind_markdown_snapshot_filters();
+        let section = section_block(vec![
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("colormap"),
+                Some(
+                    "str or :class:`~matplotlib.colors.Colormap` or :mod:`matplotlib.colors` or `~.pandas.Index`",
+                ),
+                "Color mapping.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("model"),
+                Some("`~astropy.modeling.core.Model`"),
+                "Model.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("extension"),
+                Some("`.py`"),
+                "File extension.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("config"),
+                Some("str or `.env` or `.Figure` or `.lines.Line2D`"),
+                "Configuration source.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("line"),
+                Some(":py:obj:`.lines.line`"),
+                "Line helper.",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
+                Some("model"),
+                Some(":class:`Model <pkg.Model>`"),
+                "Named model.",
+            ),
+        ]);
+
+        assert_snapshot!(render_markdown(&section), @"
+        ## Parameters
+        **colormap**: `str or Colormap or matplotlib.colors or Index`<HB>
+        Color mapping.
+
+        **model**: `Model`<HB>
+        Model.
+
+        **extension**: `.py`<HB>
+        File extension.
+
+        **config**: `str or .env or .Figure or .lines.Line2D`<HB>
+        Configuration source.
+
+        **line**: `lines.line`<HB>
+        Line helper.
+
+        **model**: `Model`<HB>
+        Named model.
         ");
     }
 

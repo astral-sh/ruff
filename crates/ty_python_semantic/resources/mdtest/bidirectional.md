@@ -174,7 +174,7 @@ takes_float_sequence([1])
 
 mutable_floats = [1.0]
 mutable_floats.append(1)
-reveal_type(mutable_floats)  # revealed: list[int | float]
+reveal_type(mutable_floats)  # revealed: list[float]
 ```
 
 ### Exact complex types in covariant contexts
@@ -1671,11 +1671,10 @@ reveal_type(f7)  # revealed: (*args) -> None
 f8: Callable[[int], None] = lambda *, x=1: None
 reveal_type(f8)  # revealed: (int, /) -> None
 
-# `Callable` annotations only describe positional parameters, so the keyword-only `x` is not
-# compatible with the positional suffix in the annotation.
-# error: [invalid-assignment]
+# An optional keyword-only parameter does not prevent `*args` from accepting the positional
+# suffix in a `Callable` annotation.
 f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f9)  # revealed: (*tuple[int, ...], int) -> None
+reveal_type(f9)  # revealed: (*args, *, x=1) -> None
 
 f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
 reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
@@ -1907,7 +1906,7 @@ def overloaded_call(data: object, dtype: object) -> object:
 
 def _(dtype: FloatDtype):
     x = overloaded_call([1.0], dtype)
-    reveal_type(x)  # revealed: int | float
+    reveal_type(x)  # revealed: float
 ```
 
 ```py
@@ -2279,7 +2278,7 @@ def _() -> int:
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]
-reveal_type(x7)  # revealed: list[int | str | float]
+reveal_type(x7)  # revealed: list[float | str]
 ```
 
 ```py
@@ -2416,7 +2415,7 @@ x23 = [None, None, None]
 x23[0] = 1
 x23[1] = "2"
 x23[2] = 3.0
-reveal_type(x23)  # revealed: list[int | str | float | None]
+reveal_type(x23)  # revealed: list[float | str | None]
 ```
 
 ```py

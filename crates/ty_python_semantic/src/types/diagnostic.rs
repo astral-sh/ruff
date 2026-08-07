@@ -82,6 +82,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
@@ -423,6 +424,16 @@ declare_lint! {
         summary: "detects returned values that can't be assigned to the function's annotated return type",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
+    #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
+    pub(crate) static UNSOUND_RETURN_STATEMENT = {
+        summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1739,6 +1750,97 @@ pub(super) fn report_invalid_attribute_assignment(
     error_context.attach_to(db, env, &mut diag);
 }
 
+/// Reports an invalid implicit call to a descriptor's `__get__` method.
+pub(super) fn report_bad_dunder_get_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+    if let Some(property) = failure.as_attempt_to_get_property_with_no_getter() {
+        let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
+            return;
+        };
+        let object_type = object_type.display(db, env);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot read property `{attribute}` on object of type `{object_type}` because it has no getter",
+        ));
+        if let Some(file_range) = property
+            .setter(db)
+            .and_then(|setter| setter.definition(db, env))
+            .or_else(|| {
+                property
+                    .deleter(db)
+                    .and_then(|deleter| deleter.definition(db, env))
+            })
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no getter"),
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Attempted access to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ATTRIBUTE_ACCESS,
+                message: format!(
+                    "Invalid access to descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db, env),
+                ),
+                info: &format!(
+                    "This access implicitly calls `__get__` on a descriptor of type `{}`",
+                    descriptor_type.display(db, env),
+                ),
+                argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+            },
+        );
+    }
+}
+
+/// Reports an invalid implicit `__getattr__` call at the original attribute access.
+///
+/// ```python
+/// class C:
+///     def __getattr__(self) -> int: ...
+///
+/// C().missing  # Invalid: Python passes the attribute name to __getattr__.
+/// ```
+///
+/// Preserves the underlying call diagnostic and explains why attribute access invoked the method.
+pub(super) fn report_bad_dunder_getattr_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_ATTRIBUTE_ACCESS,
+            message: format!(
+                "Invalid access to attribute `{attribute}` on type `{}`",
+                object_type.display(db, env),
+            ),
+            info: "This access implicitly calls `__getattr__`",
+            argument_ranges: &[target.range()],
+        },
+    );
+}
+
 pub(super) fn report_bad_dunder_set_call<'db>(
     context: &InferContext<'db, '_>,
     dunder_set_failure: &CallError<'db>,
@@ -1899,6 +2001,52 @@ pub(super) fn report_invalid_return_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_return_statement(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_RETURN_STATEMENT, object_range) else {
+        return;
+    };
+
+    let env = &context.program_environment();
+
+    // `TypeIs`-annotated functions are expected to return `bool`;
+    // this needs to be normalized before we figure out the error context
+    // and before we display the types.
+    let expected_ty = match expected_ty.resolve_type_alias(db) {
+        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
+        _ => expected_ty,
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+
+    let mut diag = builder.into_diagnostic("Unsound return statement");
+    let actual_ty_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_ty_display = expected_ty.display_with(db, env, settings);
+
+    diag.set_concise_message(format_args!(
+        "Unsound return statement: `{actual_ty_display}` is not a subtype of `{expected_ty_display}`"
+    ));
+    diag.set_primary_annotation_message(format_args!("Inferred as `{actual_ty_display}`"));
+    diag.annotate(context.secondary(return_type_range).message(format_args!(
+        "Expected a subtype of `{expected_ty_display}` because of the return type",
+    )));
+
+    diag.info(format_args!(
+        "`{actual_ty_display}` is assignable to `{expected_ty_display}`, \
+        but not a subtype of `{expected_ty_display}`",
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diag);
+    diag.help("Consider using an `assert` to narrow the type prior to the `return` statement");
 }
 
 pub(super) fn report_invalid_generator_function_return_type(

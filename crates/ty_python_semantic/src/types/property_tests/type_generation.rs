@@ -9,6 +9,7 @@ use crate::types::{
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use crate::{Program, ProgramEnvironment};
+use itertools::Either;
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
 use ruff_python_ast::name::Name;
@@ -119,6 +120,39 @@ impl CallableParams {
             ),
         }
     }
+
+    fn shrink(self) -> impl Iterator<Item = Self> {
+        match self {
+            // If the failure does not depend on accepting arbitrary arguments, replace `...`
+            // with the simplest concrete signature: one that accepts no arguments.
+            Self::GradualForm => Either::Left(std::iter::once(Self::List(Vec::new()))),
+            Self::List(params) => {
+                // Removing one parameter at a time preserves the ordering and names of all
+                // remaining parameters, so each candidate is still a valid signature.
+                let removed_parameters = (0..params.len()).map({
+                    let params = params.clone();
+                    move |index| {
+                        let mut shrunk = params.clone();
+                        shrunk.remove(index);
+                        Self::List(shrunk)
+                    }
+                });
+
+                // If a parameter cannot be removed without losing the failure, try simplifying its
+                // name, default, or annotation while preserving the rest of the signature.
+                let shrunk_parameters = (0..params.len()).flat_map(move |index| {
+                    let params = params.clone();
+                    params[index].clone().shrink().map(move |parameter| {
+                        let mut shrunk = params.clone();
+                        shrunk[index] = parameter;
+                        Self::List(shrunk)
+                    })
+                });
+
+                Either::Right(removed_parameters.chain(shrunk_parameters))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -127,6 +161,44 @@ pub(crate) struct Param {
     name: Option<Name>,
     annotated_ty: Ty,
     default_ty: Option<Ty>,
+}
+
+impl Param {
+    fn shrink(self) -> impl Iterator<Item = Self> {
+        let without_name =
+            (self.kind == ParamKind::PositionalOnly && self.name.is_some()).then(|| Self {
+                name: None,
+                ..self.clone()
+            });
+
+        let shrunk_defaults = self.default_ty.shrink().map({
+            let parameter = self.clone();
+            move |default_ty| Self {
+                default_ty,
+                ..parameter.clone()
+            }
+        });
+
+        let shrunk_annotations = shrink_callable_component(&self.annotated_ty).map({
+            let parameter = self.clone();
+            move |annotated_ty| Self {
+                annotated_ty,
+                ..parameter.clone()
+            }
+        });
+
+        without_name
+            .into_iter()
+            .chain(shrunk_defaults)
+            .chain(shrunk_annotations)
+    }
+}
+
+fn shrink_callable_component(ty: &Ty) -> impl Iterator<Item = Ty> + use<> {
+    let object = Ty::KnownClassInstance(KnownClass::Object);
+    let simplified = (ty != &object).then_some(object);
+
+    simplified.into_iter().chain(ty.shrink())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -624,6 +696,23 @@ impl Arbitrary for Ty {
                         }),
                 )
             }
+            Ty::Callable { params, returns } => {
+                let shrunk_parameters = params.clone().shrink().map({
+                    let returns = returns.clone();
+                    move |params| Ty::Callable {
+                        params,
+                        returns: returns.clone(),
+                    }
+                });
+
+                let shrunk_return_type =
+                    shrink_callable_component(&returns).map(move |returns| Ty::Callable {
+                        params: params.clone(),
+                        returns: Box::new(returns),
+                    });
+
+                Box::new(shrunk_parameters.chain(shrunk_return_type))
+            }
             _ => Box::new(std::iter::empty()),
         }
     }
@@ -654,4 +743,76 @@ pub(crate) fn union<'db>(
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
     UnionType::from_elements(db, env, tys)
+}
+
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum CallableShrink {
+        Parameter,
+        ParameterName,
+        ParameterDefault,
+        ParameterAnnotation,
+        ReturnType,
+    }
+
+    // Test each independently removable signature detail separately so a failure identifies the
+    // exact shrink candidate that is missing.
+    #[test_case(CallableShrink::Parameter; "removes a parameter")]
+    #[test_case(CallableShrink::ParameterName; "removes a positional only parameter name")]
+    #[test_case(CallableShrink::ParameterDefault; "removes a parameter default")]
+    #[test_case(CallableShrink::ParameterAnnotation; "simplifies a parameter annotation")]
+    #[test_case(CallableShrink::ReturnType; "simplifies the return type")]
+    fn callable_shrinks_parameters_and_return_type(shrink: CallableShrink) {
+        let parameter = Param {
+            kind: ParamKind::PositionalOnly,
+            name: Some(Name::new_static("argument")),
+            annotated_ty: Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::None]),
+            default_ty: Some(Ty::IntLiteral(1)),
+        };
+        let callable = Ty::Callable {
+            params: CallableParams::List(vec![parameter.clone()]),
+            returns: Box::new(Ty::FixedLengthTuple(vec![])),
+        };
+
+        let mut expected_parameters = vec![parameter];
+        let mut expected_return = Ty::FixedLengthTuple(vec![]);
+        match shrink {
+            CallableShrink::Parameter => expected_parameters.clear(),
+            CallableShrink::ParameterName => expected_parameters[0].name = None,
+            CallableShrink::ParameterDefault => expected_parameters[0].default_ty = None,
+            CallableShrink::ParameterAnnotation => {
+                expected_parameters[0].annotated_ty = Ty::KnownClassInstance(KnownClass::Object);
+            }
+            CallableShrink::ReturnType => {
+                expected_return = Ty::KnownClassInstance(KnownClass::Object);
+            }
+        }
+
+        let expected = Ty::Callable {
+            params: CallableParams::List(expected_parameters),
+            returns: Box::new(expected_return),
+        };
+        assert!(callable.shrink().any(|candidate| candidate == expected));
+    }
+
+    // A gradual `...` parameter list can become an empty concrete signature when accepting
+    // arbitrary arguments is not essential to the failing property.
+    #[test]
+    fn gradual_callable_shrinks_to_empty_parameter_list() {
+        let callable = Ty::Callable {
+            params: CallableParams::GradualForm,
+            returns: Box::new(Ty::KnownClassInstance(KnownClass::Object)),
+        };
+
+        assert_eq!(
+            callable.shrink().collect::<Vec<_>>(),
+            vec![Ty::Callable {
+                params: CallableParams::List(vec![]),
+                returns: Box::new(Ty::KnownClassInstance(KnownClass::Object)),
+            }]
+        );
+    }
 }

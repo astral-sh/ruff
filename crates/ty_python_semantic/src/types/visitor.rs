@@ -5,6 +5,7 @@ use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
+use ty_python_core::definition::Definition;
 
 use crate::types::{
     BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
@@ -392,12 +393,12 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     }
 }
 
-/// Whether a type contains a non-`Any` dynamic type.
+/// Whether a type contains a dynamic type matching the requested filter.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum DynamicContent {
-    /// The type was fully inspected and contains no non-`Any` dynamic type.
+    /// The type was fully inspected and contains no matching dynamic type.
     Absent,
-    /// The type contains a non-`Any` dynamic type.
+    /// The type contains a matching dynamic type.
     Present,
     /// Recursive specialization prevented the type from being fully inspected.
     Indeterminate,
@@ -407,6 +408,15 @@ impl DynamicContent {
     pub(super) const fn is_absent(self) -> bool {
         matches!(self, Self::Absent)
     }
+}
+
+/// Determine whether `ty` contains any dynamic type.
+pub(super) fn dynamic_content<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> DynamicContent {
+    dynamic_content_impl(db, env, ty, true)
 }
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
@@ -430,11 +440,23 @@ pub(super) fn non_any_dynamic_content<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
+    dynamic_content_impl(db, env, ty, false)
+}
+
+fn dynamic_content_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    include_any: bool,
+) -> DynamicContent {
     struct DynamicContentVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         recursion_guard: TypeCollector<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         content: Cell<DynamicContent>,
+        include_any: bool,
     }
 
     impl DynamicContentVisitor<'_, '_> {
@@ -459,12 +481,23 @@ pub(super) fn non_any_dynamic_content<'db>(
                 return;
             }
 
-            if ty.is_dynamic() && !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)) {
+            if ty.is_dynamic()
+                && (self.include_any
+                    || !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)))
+            {
                 self.record(DynamicContent::Present);
                 return;
             }
 
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            self.active_type_aliases.visit(
+                &alias.definition(db),
+                || self.record(DynamicContent::Indeterminate),
+                || walk_type_alias_type(db, alias, self),
+            );
         }
 
         fn visit_protocol_instance_type(
@@ -501,13 +534,33 @@ pub(super) fn non_any_dynamic_content<'db>(
                 },
             );
         }
+
+        fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+            let Some(class) = typed_dict.defining_class() else {
+                walk_typed_dict_type(db, typed_dict, self);
+                return;
+            };
+            let Some((origin, _)) = class.static_class_literal(db) else {
+                walk_typed_dict_type(db, typed_dict, self);
+                return;
+            };
+
+            self.active_class_typed_dicts.visit(
+                &origin,
+                || self.record(DynamicContent::Indeterminate),
+                || walk_typed_dict_type(db, typed_dict, self),
+            );
+        }
     }
 
     let visitor = DynamicContentVisitor {
         env,
         recursion_guard: TypeCollector::default(),
         active_class_protocols: ActiveRecursionDetector::default(),
+        active_class_typed_dicts: ActiveRecursionDetector::default(),
+        active_type_aliases: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
+        include_any,
     };
     visitor.visit_type(db, ty);
     visitor.content.get()

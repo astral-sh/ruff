@@ -1708,21 +1708,11 @@ impl<'db> Bindings<'db> {
                             },
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    if let Ok(return_ty) = getter
-                                        .try_call(db, env, &CallArguments::positional([*instance]))
-                                        .map(|binding| binding.return_type(db, env))
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    } else {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the getter failed",
-                                        ));
-                                        overload.set_return_type(Type::unknown());
-                                    }
+                                    overload.check_property_getter(db, env, getter, *instance, 1);
                                 } else {
                                     overload
                                         .errors
-                                        .push(BindingError::PropertyHasNoSetter(*property));
+                                        .push(BindingError::PropertyHasNoGetter(*property));
                                     overload.set_return_type(Type::Never);
                                 }
                             }
@@ -1737,22 +1727,12 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    if let Ok(return_ty) = getter
-                                        .try_call(db, env, &CallArguments::positional([*instance]))
-                                        .map(|binding| binding.return_type(db, env))
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    } else {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the getter failed",
-                                        ));
-                                        overload.set_return_type(Type::unknown());
-                                    }
+                                    overload.check_property_getter(db, env, getter, *instance, 0);
                                 } else {
                                     overload.set_return_type(Type::Never);
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "property has no getter",
-                                    ));
+                                    overload
+                                        .errors
+                                        .push(BindingError::PropertyHasNoGetter(property));
                                 }
                             }
                             _ => {}
@@ -2809,6 +2789,82 @@ impl<'db> Bindings<'db> {
                             }
                         }
                     },
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetLowerBound) => {
+                        let [Some(lower), Some(typevar)] = overload.parameter_types() else {
+                            return;
+                        };
+                        let lower = lower.project_type_form(db, env);
+                        let typevar = typevar.project_type_form(db, env);
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            ConstraintSet::constrain_typevar_lower_bound(
+                                db,
+                                env,
+                                constraints,
+                                typevar,
+                                lower,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetUpperBound) => {
+                        let [Some(typevar), Some(upper)] = overload.parameter_types() else {
+                            return;
+                        };
+                        let typevar = typevar.project_type_form(db, env);
+                        let upper = upper.project_type_form(db, env);
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            ConstraintSet::constrain_typevar_upper_bound(
+                                db,
+                                env,
+                                constraints,
+                                typevar,
+                                upper,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetEquality) => {
+                        let [Some(typevar), Some(value)] = overload.parameter_types() else {
+                            return;
+                        };
+                        let typevar = typevar.project_type_form(db, env);
+                        let value = value.project_type_form(db, env);
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            ConstraintSet::constrain_typevar(
+                                db,
+                                env,
+                                constraints,
+                                typevar,
+                                value,
+                                value,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
 
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
                         let [Some(lower), Some(typevar), Some(upper)] = overload.parameter_types()
@@ -6718,6 +6774,29 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
+    fn check_property_getter(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        getter: Type<'db>,
+        instance: Type<'db>,
+        argument_index_offset: usize,
+    ) {
+        match getter.try_call(db, env, &CallArguments::positional([instance])) {
+            Ok(bindings) => self.set_return_type(bindings.return_type(db, env)),
+            Err(CallError(_, bindings)) => {
+                self.set_return_type(bindings.return_type(db, env));
+                self.errors.push(BindingError::PropertyGetterCallError(
+                    PropertyAccessorCallError {
+                        bindings,
+                        argument_index_offset,
+                    },
+                ));
+            }
+        }
+    }
+
     fn check_property_setter(
         &mut self,
         db: &'db dyn Db,
@@ -6740,7 +6819,7 @@ impl<'db> Binding<'db> {
             }
             Err(CallError(_, bindings)) => {
                 self.errors.push(BindingError::PropertySetterCallError(
-                    PropertySetterCallError {
+                    PropertyAccessorCallError {
                         bindings,
                         argument_index_offset,
                     },
@@ -7963,12 +8042,14 @@ pub(crate) enum BindingError<'db> {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
     },
+    PropertyHasNoGetter(PropertyInstanceType<'db>),
     PropertyHasNoSetter(PropertyInstanceType<'db>),
     PropertyHasNoDeleter(PropertyInstanceType<'db>),
-    PropertySetterCallError(PropertySetterCallError<'db>),
+    PropertyGetterCallError(PropertyAccessorCallError<'db>),
+    PropertySetterCallError(PropertyAccessorCallError<'db>),
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
-    /// We use this variant to report errors in `property.__get__` and `property.__delete__`,
-    /// which can occur when the call to the underlying getter/deleter fails.
+    /// We use this variant to report errors in `property.__delete__`, which can occur when the
+    /// call to the underlying deleter fails.
     InternalCallError(&'static str),
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
@@ -7984,12 +8065,12 @@ pub(crate) enum BindingError<'db> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PropertySetterCallError<'db> {
+pub(crate) struct PropertyAccessorCallError<'db> {
     bindings: Box<Bindings<'db>>,
     argument_index_offset: usize,
 }
 
-impl PartialEq for PropertySetterCallError<'_> {
+impl PartialEq for PropertyAccessorCallError<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.argument_index_offset == other.argument_index_offset
             && self.bindings.callable_type() == other.bindings.callable_type()
@@ -8006,7 +8087,7 @@ impl PartialEq for PropertySetterCallError<'_> {
     }
 }
 
-impl Eq for PropertySetterCallError<'_> {}
+impl Eq for PropertyAccessorCallError<'_> {}
 
 impl BindingError<'_> {
     /// Returns whether this error is relevant to `functools.partial(...)` construction.
@@ -8092,8 +8173,10 @@ impl BindingError<'_> {
             | BindingError::InvalidDataclassArgument(..)
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
+            | BindingError::PropertyHasNoGetter(..)
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..)
+            | BindingError::PropertyGetterCallError(..)
             | BindingError::PropertySetterCallError(..) => {}
         }
     }
@@ -8152,8 +8235,10 @@ impl<'db> BindingError<'db> {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
             | Self::InvalidDataclassArgument(_)
+            | Self::PropertyHasNoGetter(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
+            | Self::PropertyGetterCallError(_)
             | Self::PropertySetterCallError(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
@@ -8622,6 +8707,18 @@ impl<'db> BindingError<'db> {
                 }
             }
 
+            Self::PropertyHasNoGetter(_) => {
+                BindingError::InternalCallError("property has no getter").report_diagnostic(
+                    context,
+                    node,
+                    callable_ty,
+                    callable_description,
+                    compound_diag,
+                    matching_overload,
+                    source_parameter_index_offset,
+                );
+            }
+
             Self::PropertyHasNoSetter(_) => {
                 BindingError::InternalCallError("property has no setter").report_diagnostic(
                     context,
@@ -8646,7 +8743,7 @@ impl<'db> BindingError<'db> {
                 );
             }
 
-            Self::PropertySetterCallError(error) => {
+            Self::PropertyGetterCallError(error) | Self::PropertySetterCallError(error) => {
                 let context = CallDiagnosticContext {
                     context: context.context,
                     overrides: context.overrides,

@@ -1321,7 +1321,6 @@ PLR6104 [*] Use `|=` to perform an augmented assignment directly
 180 | to_multiply = +2 * -3 * to_multiply
 181 | flags = ~0x1 | 0x2 | flags
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with augmented assignment
     |
 180 | to_multiply = +2 * -3 * to_multiply
@@ -1338,7 +1337,6 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
 185 |     def u(self):
 186 |         self.a = self.a + 1 + 2
     |         ^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with augmented assignment
     |
 185 |     def u(self):

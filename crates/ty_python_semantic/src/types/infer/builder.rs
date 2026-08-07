@@ -2081,7 +2081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None),
+                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
             )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);
@@ -3849,7 +3849,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.deferred.insert(definition);
 
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
-            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(db, name, definition, None)),
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                db, name, definition, None, None,
+            )),
         ))
     }
 
@@ -9644,7 +9646,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Still not found? It might be `reveal_type`...
             .or_fall_back_to(db, env, || {
                 if symbol_name == "reveal_type" {
-                    if let Some(builder) = self.context.report_lint(&UNDEFINED_REVEAL, name_node) {
+                    if !self.in_stub()
+                        && !self.is_in_type_checking_block(self.scope(), name_node)
+                        && let Some(builder) =
+                            self.context.report_lint(&UNDEFINED_REVEAL, name_node)
+                    {
                         let mut diag =
                             builder.into_diagnostic("`reveal_type` used without importing it");
                         diag.info(
@@ -10313,9 +10319,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type.member(db, env, &attr.id).map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-        });
+        let fallback_place = value_type
+            .try_member_lookup(db, env, &attr.id)
+            .unwrap_or_else(|error| {
+                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
+                error.fallback_member(db)
+            })
+            .map_type(|ty| {
+                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            });
 
         let attr_name = &attr.id;
         let resolved_type =

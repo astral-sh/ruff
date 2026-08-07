@@ -174,8 +174,8 @@ class IntDiag(DeferredDiagBase[int]): ...
 class StrDiag(DeferredDiagBase[str]): ...
 
 def _(factory: type[IntDiag] | type[StrDiag]):
-    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `int`, found `float`"
-    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `str`, found `float`"
+    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `int`, found `float*`"
+    # error: [invalid-argument-type] "Argument to `DeferredDiagBase.__init__` is incorrect: Expected `str`, found `float*`"
     factory(1.2)
 ```
 
