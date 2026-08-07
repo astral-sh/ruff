@@ -55,6 +55,9 @@ Incompatible invariant specializations cannot describe the same object in soundl
 ```py
 def incompatible_generic_types(integers: list[int], strings: list[str]) -> None:
     reveal_type(integers is strings)  # revealed: Literal[False]
+    if integers is strings:
+        reveal_type(integers)  # revealed: Never
+        reveal_type(strings)  # revealed: Never
 ```
 
 ## `is` with covariant generic types
@@ -71,8 +74,9 @@ def covariant_generic_type(value: object, items: tuple[int, ...]) -> None:
 def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...]) -> None:
     reveal_type(integers is strings)  # revealed: bool
     if integers is strings:
-        # TODO: Ideally, this intersection would simplify to tuple[()].
+        # TODO: Ideally, these intersections would simplify to tuple[()].
         reveal_type(integers)  # revealed: tuple[int, ...] & tuple[str, ...]
+        reveal_type(strings)  # revealed: tuple[str, ...] & tuple[int, ...]
 ```
 
 ## `is` with a `NewType`
@@ -517,6 +521,7 @@ Unlike a negated `NewType`, a negated runtime class genuinely rules out identity
 def excluded_runtime_class(not_int: Not[int], other: UserId) -> None:
     if not_int is other:
         reveal_type(not_int)  # revealed: Never
+        reveal_type(other)  # revealed: Never
 ```
 
 ## `is` does not transfer `LiteralString`

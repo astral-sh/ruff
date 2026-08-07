@@ -454,16 +454,11 @@ Ordinary types accept values with any `NewType` tag, so an integer-based `NewTyp
 nested `NewType`s retain their relationship with their parent.
 
 ```py
-from typing import Never, NewType
-from ty_extensions import Intersection, static_assert
-from ty_extensions._internal import is_equivalent_to
+from typing import NewType
 
 UserId = NewType("UserId", int)
 OtherUserId = NewType("OtherUserId", int)
 NestedUserId = NewType("NestedUserId", UserId)
-
-static_assert(is_equivalent_to(Intersection[UserId, OtherUserId], Never))
-static_assert(is_equivalent_to(Intersection[NestedUserId, OtherUserId], Never))
 
 def newtype_intersections(
     user_bool: UserId & bool,

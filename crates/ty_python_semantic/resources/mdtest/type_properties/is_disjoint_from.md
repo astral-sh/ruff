@@ -1434,15 +1434,15 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import Any, final
 from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class GenericClass[T]:
     x: T  # invariant
 
-static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [missing-type-argument]
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[Any]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
@@ -1450,11 +1450,8 @@ static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]
 class GenericClassIntBound[T: int]:
     x: T  # invariant
 
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))  # error: [missing-type-argument]
-static_assert(
-    # error: [missing-type-argument]
-    not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound])
-)
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[Any]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
@@ -1462,8 +1459,8 @@ static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[Gener
 class GenericFinalClass[T]:
     x: T  # invariant
 
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))  # error: [missing-type-argument]
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [missing-type-argument]
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[Any]]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[Any]]))
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
