@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::constraints::ConstraintSet;
-use crate::types::relation::TypeRelationChecker;
+use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
@@ -231,6 +231,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
         self.never()
+    }
+}
+
+impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    pub(super) fn check_newtype_pair(
+        &self,
+        db: &'db dyn Db,
+        left: NewType<'db>,
+        right: NewType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Different NewTypes are disjoint unless one is derived from the other.
+        let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
+        relation_checker
+            .check_newtype_pair(db, left, right)
+            .or(db, self.constraints, || {
+                relation_checker.check_newtype_pair(db, right, left)
+            })
+            .negate(db, self.constraints)
     }
 }
 

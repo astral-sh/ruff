@@ -1,7 +1,10 @@
 # Disjointness relation
 
-Two types `S` and `T` are disjoint if their intersection `S & T` is empty (equivalent to `Never`).
-This means that it is known that no possible runtime object inhabits both types simultaneously.
+Two types `S` and `T` are disjoint if their intersection `S & T` is empty (equivalent to `Never`). A
+type's inhabitants include both runtime objects and any invisible `NewType` tags. Two types can
+therefore be disjoint even when they describe the same runtime object with different tags.
+Similarly, `list[int]` and `list[str]` are disjoint even though the same empty list can be viewed
+through either specialization.
 
 ## Basic builtin types
 
@@ -25,9 +28,10 @@ static_assert(not is_disjoint_from(str, LiteralString))
 
 ## NewTypes and literal types
 
-A `NewType` overlaps with any literal compatible with its concrete base. Because `bool` is a subtype
-of `int`, type checkers correctly accept `UserId(True)`, and an integer-based `NewType` also
-overlaps boolean literals.
+A `NewType` overlaps with any literal compatible with its concrete base: ordinary types and literal
+types admit runtime values with any `NewType` tag. Because `bool` is a subtype of `int`, type
+checkers correctly accept `UserId(True)`, and an integer-based `NewType` also overlaps boolean
+literals.
 
 ```py
 from typing import Literal, NewType
@@ -77,31 +81,49 @@ static_assert(not is_disjoint_from(BoolId, bool))
 
 ## Distinct NewTypes
 
-Distinct `NewType`s are not assignable to each other, but they overlap whenever their concrete bases
-overlap. They are disjoint only when their concrete bases are disjoint.
+Unrelated `NewType` tags are mutually exclusive, even when their constructors return the same
+runtime object. A nested `NewType` remains a subtype of its parent. Overlap is not transitive: two
+unrelated `NewType`s can each overlap `int`, `bool`, and `Literal[True]` while remaining disjoint
+from each other.
 
 ```py
-from typing import NewType
+from typing import Literal, NewType
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, is_disjoint_from, is_subtype_of
 
 First = NewType("First", int)
 Second = NewType("Second", int)
 NestedFirst = NewType("NestedFirst", First)
+OtherNestedFirst = NewType("OtherNestedFirst", First)
 Numeric = NewType("Numeric", float)
 Text = NewType("Text", str)
 
-static_assert(not is_disjoint_from(First, Second))
-static_assert(not is_disjoint_from(Second, First))
-static_assert(not is_disjoint_from(NestedFirst, Second))
-static_assert(not is_disjoint_from(First, Numeric))
+static_assert(is_disjoint_from(First, Second))
+static_assert(is_disjoint_from(Second, First))
+static_assert(is_disjoint_from(NestedFirst, Second))
+static_assert(is_disjoint_from(NestedFirst, OtherNestedFirst))
+static_assert(is_disjoint_from(First, Numeric))
 static_assert(is_disjoint_from(First, Text))
 static_assert(is_disjoint_from(Text, First))
+
+static_assert(not is_disjoint_from(NestedFirst, First))
+static_assert(not is_disjoint_from(First, NestedFirst))
+static_assert(not is_disjoint_from(OtherNestedFirst, First))
+static_assert(not is_disjoint_from(First, int))
+static_assert(not is_disjoint_from(Second, int))
+static_assert(not is_disjoint_from(First, bool))
+static_assert(not is_disjoint_from(Second, bool))
+static_assert(not is_disjoint_from(First, Literal[True]))
+static_assert(not is_disjoint_from(Second, Literal[True]))
+static_assert(is_disjoint_from(list[int], list[str]))
 
 static_assert(not is_subtype_of(First, Second))
 static_assert(not is_subtype_of(Second, First))
 static_assert(not is_assignable_to(First, Second))
 static_assert(not is_assignable_to(Second, First))
+static_assert(is_subtype_of(NestedFirst, First))
+static_assert(is_assignable_to(NestedFirst, First))
+static_assert(not is_assignable_to(First, NestedFirst))
 ```
 
 ## NewTypes and nominal subclasses
@@ -179,7 +201,8 @@ static_assert(not is_disjoint_from(BaseId, Base[str]))
 static_assert(not is_disjoint_from(BaseId, Child[object]))
 ```
 
-Gradual type arguments can overlap even when strict subtyping does not hold.
+An ordinary gradual specialization can overlap a `NewType` even when strict subtyping does not hold.
+Independently defined `NewType`s remain disjoint.
 
 ```py
 AnyListId = NewType("AnyListId", list[Any])
@@ -190,7 +213,7 @@ static_assert(not is_subtype_of(AnyListId, list[int]))
 static_assert(not is_disjoint_from(AnyListId, list[int]))
 static_assert(not is_disjoint_from(IntListId, list[Any]))
 static_assert(is_disjoint_from(IntListId, list[str]))
-static_assert(not is_disjoint_from(IntListId, AnyListId))
+static_assert(is_disjoint_from(IntListId, AnyListId))
 static_assert(is_disjoint_from(IntListId, StrListId))
 ```
 

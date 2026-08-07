@@ -67,8 +67,9 @@ def f(x: str, y: int):
     reveal_type(x is not y)  # revealed: Literal[True]
 ```
 
-Distinct `NewType`s with compatible bases are not disjoint: their constructors return their
-arguments unchanged, so `B(True)` and `C(True)` share the same memory address.
+Distinct `NewType` tags are mutually exclusive, so their types are disjoint. Their constructors
+still return their arguments unchanged: `B(True)` and `C(True)` have different tags but share the
+same memory address, so an identity comparison can succeed.
 
 ```py
 from typing import NewType, Literal
@@ -77,8 +78,9 @@ from ty_extensions._internal import is_disjoint_from
 B = NewType("B", bool)
 C = NewType("C", bool)
 
-reveal_type(is_disjoint_from(B, C))  # revealed: ConstraintSet[Literal[False]]
+reveal_type(is_disjoint_from(B, C))  # revealed: ConstraintSet[Literal[True]]
 reveal_type(is_disjoint_from(B, Literal[True]))  # revealed: ConstraintSet[Literal[False]]
+reveal_type(is_disjoint_from(C, Literal[True]))  # revealed: ConstraintSet[Literal[False]]
 
 def f(x: B, y: C):
     reveal_type(x is y)  # revealed: bool

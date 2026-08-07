@@ -449,28 +449,39 @@ def example_type_bool_type_str(
     reveal_type(i)  # revealed: Never
 ```
 
-An integer-based `NewType` can contain a boolean value or the same object as another integer-based
-`NewType`. Intersections retain overlapping brands and simplify brands with disjoint bases.
+Ordinary types accept values with any `NewType` tag, so an integer-based `NewType` can overlap
+`bool`. Distinct `NewType` tags are mutually exclusive even when their runtime values overlap;
+nested `NewType`s retain their relationship with their parent.
 
 ```py
-from typing import NewType
+from typing import Never, NewType
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_disjoint_from, is_equivalent_to, is_subtype_of
 
 UserId = NewType("UserId", int)
 OtherUserId = NewType("OtherUserId", int)
+NestedUserId = NewType("NestedUserId", UserId)
 StringId = NewType("StringId", str)
+
+static_assert(is_subtype_of(NestedUserId, UserId))
+static_assert(not is_disjoint_from(UserId, NestedUserId))
+static_assert(is_equivalent_to(Intersection[UserId, OtherUserId], Never))
+static_assert(is_equivalent_to(Intersection[OtherUserId, UserId], Never))
+static_assert(is_equivalent_to(Intersection[NestedUserId, OtherUserId], Never))
+static_assert(is_equivalent_to(Intersection[UserId, StringId], Never))
 
 def newtype_intersections(
     user_bool: UserId & bool,
     bool_user: bool & UserId,
     user_other: UserId & OtherUserId,
-    other_user: OtherUserId & UserId,
-    user_string: UserId & StringId,
+    user_nested: UserId & NestedUserId,
+    nested_user: NestedUserId & UserId,
 ) -> None:
     reveal_type(user_bool)  # revealed: UserId & bool
     reveal_type(bool_user)  # revealed: bool & UserId
-    reveal_type(user_other)  # revealed: UserId & OtherUserId
-    reveal_type(other_user)  # revealed: OtherUserId & UserId
-    reveal_type(user_string)  # revealed: Never
+    reveal_type(user_nested)  # revealed: NestedUserId
+    reveal_type(nested_user)  # revealed: NestedUserId
+    reveal_type(user_other)  # revealed: Never
 ```
 
 #### Positive and negative contributions

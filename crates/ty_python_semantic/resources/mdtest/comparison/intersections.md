@@ -121,8 +121,8 @@ def f(value: Not[E]) -> None:
         value.does_not_exist  # no error (unreachable branch)
 ```
 
-A `NewType` exclusion cannot exclude the runtime objects of its base: an unbranded integer can still
-be identical to the integer passed into the `NewType` constructor.
+A `NewType` exclusion removes its static tag, not the runtime objects of its base: an integer
+without that tag can still be identical to the integer passed into the `NewType` constructor.
 
 ```py
 from typing import NewType

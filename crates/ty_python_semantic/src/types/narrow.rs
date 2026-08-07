@@ -3506,6 +3506,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     /// `UserId` directly would incorrectly make this reachable branch `Never`. Instead, retain the
     /// static exclusion and narrow `value` to the underlying runtime type, yielding `int & ~UserId`.
     ///
+    /// Distinct `NewType`s can also describe the same runtime object even though their static
+    /// types are disjoint. In that case, preserve each operand's own `NewType` instead of combining
+    /// the incompatible static types.
+    ///
     /// The same distinction applies to excluded type variables and `LiteralString` provenance.
     /// Handle each union alternative independently so that genuinely incompatible alternatives
     /// remain excluded without dropping values that can still identify the same runtime object.
@@ -3520,29 +3524,34 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ => std::slice::from_ref(&rhs_ty),
         };
 
-        let may_have_static_only_exclusion = |ty: &Type<'db>| match ty.resolve_type_alias(db) {
-            Type::TypeVar(_) => true,
+        let may_have_static_only_distinction = |ty: &Type<'db>| match ty.resolve_type_alias(db) {
+            Type::NewTypeInstance(_) | Type::TypeVar(_) => true,
             Type::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .any(|positive| matches!(positive.resolve_type_alias(db), Type::TypeVar(_)))
-                    || intersection.iter_negative(db).any(|negative| {
-                        match negative.resolve_type_alias(db) {
-                            Type::NewTypeInstance(_) | Type::TypeVar(_) => true,
-                            Type::LiteralValue(literal) => literal.is_literal_string(),
-                            _ => false,
-                        }
-                    })
+                intersection.positive(db).iter().any(|positive| {
+                    matches!(
+                        positive.resolve_type_alias(db),
+                        Type::NewTypeInstance(_) | Type::TypeVar(_)
+                    )
+                }) || intersection.iter_negative(db).any(|negative| {
+                    match negative.resolve_type_alias(db) {
+                        Type::NewTypeInstance(_) | Type::TypeVar(_) => true,
+                        Type::LiteralValue(literal) => literal.is_literal_string(),
+                        _ => false,
+                    }
+                })
             }
             _ => false,
         };
-        if !left.iter().chain(right).any(may_have_static_only_exclusion) {
+        if !left
+            .iter()
+            .chain(right)
+            .any(may_have_static_only_distinction)
+        {
             return rhs_ty;
         }
 
-        // Excluding a NewType, type variable, or LiteralString does not exclude the
-        // same runtime object. Restore those alternatives without weakening other cases.
+        // Distinct NewTypes and excluded NewTypes, type variables, or LiteralString can still
+        // describe the same runtime object. Restore those alternatives without weakening others.
         let mut builder = UnionBuilder::new(db, &self.env).add(rhs_ty);
         for &left in left {
             for &right in right {

@@ -341,8 +341,9 @@ def f(value: int | None | EllipsisType, other: T) -> None:
 
 ## Static exclusions and runtime identity
 
-Excluding a `NewType` does not exclude the objects accepted by its constructor. An identity
-comparison must preserve that exclusion without making a reachable branch disappear.
+Excluding a `NewType` removes its invisible tag, not the runtime objects accepted by its
+constructor. An identity comparison must preserve that exclusion without making a reachable branch
+disappear.
 
 ```py
 from typing import Literal, NewType, TypeVar
@@ -429,9 +430,9 @@ def excluded_runtime_values(value: Not[Literal["hello"]], not_int: Not[int], oth
 
 ### Distinct `NewType`s with the same base
 
-Calling a `NewType` returns its argument unchanged. Values with distinct `NewType`s over `Foo` can
-therefore be the same object, and their types are not disjoint. The examples below cover direct
-comparisons and narrowing through unions and intersections.
+Distinct `NewType` tags are mutually exclusive, so their types are disjoint even when they have the
+same concrete base. Their constructors still return their arguments unchanged: an identity
+comparison can succeed, but each operand retains only its own tag.
 
 ```py
 from typing import NewType
@@ -446,23 +447,32 @@ FooNewType2 = NewType("FooNewType2", Foo)
 def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     reveal_type(foo1 is foo2)  # revealed: bool
     if foo1 is foo2:
-        reveal_type(foo1)  # revealed: FooNewType1 & FooNewType2
-        reveal_type(foo2)  # revealed: FooNewType2 & FooNewType1
+        reveal_type(foo1)  # revealed: FooNewType1
+        reveal_type(foo2)  # revealed: FooNewType2
+
+def same_object(value: Foo) -> None:
+    first = FooNewType1(value)
+    second = FooNewType2(value)
+    if first is second:
+        reveal_type(first)  # revealed: FooNewType1
+        reveal_type(second)  # revealed: FooNewType2
 
 def union(value: FooNewType1 | None, other: FooNewType2) -> None:
     if value is other:
-        reveal_type(value)  # revealed: FooNewType1 & FooNewType2
+        reveal_type(value)  # revealed: FooNewType1
+        reveal_type(other)  # revealed: FooNewType2
 
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
     if left is right:
-        reveal_type(right)  # revealed: FooNewType2 & FooNewType1 & FooSub
+        reveal_type(left)  # revealed: FooNewType1 & FooSub
+        reveal_type(right)  # revealed: FooNewType2 & FooSub
 ```
 
 ### `NewType`s in `TypeVar` bounds and constraints
 
 `NewType`s inside `TypeVar` bounds and constraints can likewise refer to the same runtime object.
-Comparing the distinct `TypeVar`s below is not always false, and a true branch narrows to their
-intersection.
+Comparing distinct type variables is not always false, but a successful comparison preserves each
+operand's own type variable and tag.
 
 ```py
 from typing import NewType, TypeVar
@@ -477,27 +487,27 @@ FooNewType4 = NewType("FooNewType4", Foo)
 BoundedT = TypeVar("BoundedT", bound=FooNewType1)
 BoundedU = TypeVar("BoundedU", bound=FooNewType2)
 
-def bounded_typevars(left: BoundedT, right: BoundedU) -> tuple[BoundedU, BoundedU]:
+def bounded_typevars(left: BoundedT, right: BoundedU) -> tuple[BoundedT, BoundedU]:
     reveal_type(left is right)  # revealed: bool
     if left is right:
-        reveal_type(left)  # revealed: BoundedT@bounded_typevars & BoundedU@bounded_typevars
-        return (left, left)
-    return (right, right)
+        reveal_type(left)  # revealed: BoundedT@bounded_typevars
+        reveal_type(right)  # revealed: BoundedU@bounded_typevars
+    return (left, right)
 
 ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
 ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
 
-def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> tuple[ConstrainedU, ConstrainedU]:
+def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> tuple[ConstrainedT, ConstrainedU]:
     reveal_type(left is right)  # revealed: bool
     if left is right:
-        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars & ConstrainedU@constrained_typevars
-        return (left, left)
-    return (right, right)
+        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
+        reveal_type(right)  # revealed: ConstrainedU@constrained_typevars
+    return (left, right)
 ```
 
-Every constraint below is a `NewType` based on `EllipsisType`, so `other` always refers to the same
-`...` object as a `SingletonC` value. After an `is not` check, repeating the opposite check must be
-unreachable.
+Every constraint below is a `NewType` based on `EllipsisType`. Although their tags are mutually
+exclusive, all of these values refer to the same `...` object. After an `is not` check, repeating
+the opposite check must be unreachable.
 
 ```py
 from types import EllipsisType
@@ -509,6 +519,12 @@ SingletonB = NewType("SingletonB", EllipsisType)
 SingletonC = NewType("SingletonC", EllipsisType)
 
 SingletonT = TypeVar("SingletonT", SingletonA, SingletonB)
+
+def same_singleton(first: SingletonA, second: SingletonB) -> None:
+    reveal_type(first is second)  # revealed: Literal[True]
+    if first is second:
+        reveal_type(first)  # revealed: SingletonA
+        reveal_type(second)  # revealed: SingletonB
 
 def direct(value: SingletonC | int, other: SingletonT) -> None:
     if value is not other:
@@ -566,6 +582,10 @@ SingletonB = NewType("SingletonB", EllipsisType)
 def singleton_is_not(value: SingletonA | int, other: SingletonB) -> None:
     if value is not other:
         reveal_type(value)  # revealed: int
+
+    if value is other:
+        reveal_type(value)  # revealed: SingletonA
+        reveal_type(other)  # revealed: SingletonB
 ```
 
 ### Comparisons that are always false

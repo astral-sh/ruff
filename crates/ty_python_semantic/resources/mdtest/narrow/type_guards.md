@@ -519,8 +519,9 @@ def _(x: Unrelated | Invariant[int]):
 
 ## `TypeIs` narrowing of `NewType` instances
 
-`NewType` constructors return compatible subclass instances unchanged. A `TypeIs` guard for such a
-subclass must therefore preserve the possibility of a branded value matching it.
+`NewType` constructors return compatible subclass instances unchanged, and runtime subclass checks
+ignore their static tags. A `TypeIs` guard for such a subclass must therefore preserve the
+possibility of a `NewType` value matching it.
 
 ```py
 from typing import NewType

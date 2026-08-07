@@ -334,9 +334,10 @@ else:
 
 ## `NewType` instances and concrete-base subclasses
 
-A `NewType` constructor returns its argument unchanged at runtime, so the resulting value can still
-be an instance of a subclass of its concrete base. For example, `UserId(True)` is valid because
-`bool` is a subtype of `int`, and the returned value remains a `bool`.
+A `NewType` constructor returns its argument unchanged at runtime, and runtime class checks ignore
+its static tag. The resulting value can therefore still be an instance of a subclass of its concrete
+base. For example, `UserId(True)` is valid because `bool` is a subtype of `int`, and the returned
+value remains a `bool`.
 
 ```py
 from typing import NewType
