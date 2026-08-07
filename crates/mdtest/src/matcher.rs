@@ -13,7 +13,7 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_db::source::{SourceTextRef, line_index, source_text};
 use ruff_python_ast::PythonVersion;
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
@@ -101,7 +101,7 @@ pub fn match_file(
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
     let line_index = line_index(db, file);
     let (assertions, diagnostics) = if file.path(db).extension() == Some("toml") {
         let assertions =
@@ -314,7 +314,7 @@ fn normalize_paths(ty: &str) -> Cow<'_, str> {
 
 struct Matcher {
     line_index: LineIndex,
-    source: SourceText,
+    source: SourceTextRef,
     options: RunOptions,
 }
 
@@ -322,7 +322,7 @@ impl Matcher {
     fn from_file(db: &dyn Db, file: File, options: RunOptions) -> Self {
         Self {
             line_index: line_index(db, file),
-            source: source_text(db, file),
+            source: source_text(db, file).load(),
             options,
         }
     }

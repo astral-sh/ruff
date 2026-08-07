@@ -299,7 +299,7 @@ pub fn inlay_hints(
     let ast = parsed_module(db, file.python_file(db)).load(db);
     let source_file = file.file(db);
 
-    let source = source_text(db, source_file);
+    let source = source_text(db, source_file).load();
     let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
 
@@ -890,7 +890,7 @@ mod tests {
                 settings,
             );
 
-            let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
+            let mut inlay_hint_buf = source_text(&self.db, self.file).load().as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();
             let source_has_errors =
                 parse_unchecked_source(&text_edit_buf, PySourceType::Python).has_invalid_syntax();

@@ -941,7 +941,7 @@ fn changed_file() -> anyhow::Result<()> {
     let foo_path = case.project_path("foo.py");
 
     let foo = case.system_file(&foo_path)?;
-    assert_eq!(source_text(case.db(), foo).as_str(), foo_source);
+    assert_eq!(source_text(case.db(), foo).load().as_str(), foo_source);
     case.assert_indexed_project_files([foo]);
 
     update_file(&foo_path, "print('Version 2')")?;
@@ -952,7 +952,10 @@ fn changed_file() -> anyhow::Result<()> {
 
     case.apply_changes(&changes);
 
-    assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
+    assert_eq!(
+        source_text(case.db(), foo).load().as_str(),
+        "print('Version 2')"
+    );
     case.assert_indexed_project_files([foo]);
 
     Ok(())
@@ -1582,8 +1585,14 @@ fn hard_links_in_project() -> anyhow::Result<()> {
     let bar_path = case.project_path("bar.py");
     let bar = case.system_file(&bar_path).unwrap();
 
-    assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 1')");
-    assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 1')");
+    assert_eq!(
+        source_text(case.db(), foo).load().as_str(),
+        "print('Version 1')"
+    );
+    assert_eq!(
+        source_text(case.db(), bar).load().as_str(),
+        "print('Version 1')"
+    );
     case.assert_indexed_project_files([bar, foo]);
 
     // Write to the hard link target.
@@ -1593,11 +1602,17 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 
     case.apply_changes(&changes);
 
-    assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
+    assert_eq!(
+        source_text(case.db(), foo).load().as_str(),
+        "print('Version 2')"
+    );
 
     // macOS is the only platform that emits events for every hardlink.
     if cfg!(target_os = "macos") {
-        assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 2')");
+        assert_eq!(
+            source_text(case.db(), bar).load().as_str(),
+            "print('Version 2')"
+        );
     }
 
     Ok(())
@@ -1654,8 +1669,14 @@ fn hard_links_to_target_outside_project() -> anyhow::Result<()> {
     let bar_path = case.project_path("bar.py");
     let bar = case.system_file(&bar_path).unwrap();
 
-    assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 1')");
-    assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 1')");
+    assert_eq!(
+        source_text(case.db(), foo).load().as_str(),
+        "print('Version 1')"
+    );
+    assert_eq!(
+        source_text(case.db(), bar).load().as_str(),
+        "print('Version 1')"
+    );
 
     // Write to the hard link target.
     update_file(foo_path, "print('Version 2')").context("Failed to update foo.py")?;
@@ -1664,7 +1685,10 @@ fn hard_links_to_target_outside_project() -> anyhow::Result<()> {
 
     case.apply_changes(&changes);
 
-    assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 2')");
+    assert_eq!(
+        source_text(case.db(), bar).load().as_str(),
+        "print('Version 2')"
+    );
 
     Ok(())
 }
@@ -1767,7 +1791,10 @@ mod unix {
         let baz_project = case.project_path("bar/baz.py");
         let baz_file = baz.file(case.db()).unwrap();
 
-        assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
+        assert_eq!(
+            source_text(case.db(), baz_file).load().as_str(),
+            "def baz(): ..."
+        );
         assert_eq!(
             baz_file.path(case.db()).as_system_path(),
             Some(&*baz_project)
@@ -1784,7 +1811,7 @@ mod unix {
         case.apply_changes(&changes);
 
         assert_eq!(
-            source_text(case.db(), baz_file).as_str(),
+            source_text(case.db(), baz_file).load().as_str(),
             "def baz(): print('Version 2')"
         );
 
@@ -1797,7 +1824,7 @@ mod unix {
         case.apply_changes(&changes);
 
         assert_eq!(
-            source_text(case.db(), baz_file).as_str(),
+            source_text(case.db(), baz_file).load().as_str(),
             "def baz(): print('Version 3')"
         );
 
@@ -1847,11 +1874,14 @@ mod unix {
         let patched_bar_baz_file = case.system_file(&patched_bar_baz).unwrap();
 
         assert_eq!(
-            source_text(case.db(), patched_bar_baz_file).as_str(),
+            source_text(case.db(), patched_bar_baz_file).load().as_str(),
             "def baz(): ..."
         );
 
-        assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
+        assert_eq!(
+            source_text(case.db(), baz_file).load().as_str(),
+            "def baz(): ..."
+        );
         assert_eq!(baz_file.path(case.db()).as_system_path(), Some(&*bar_baz));
 
         case.assert_indexed_project_files([patched_bar_baz_file]);
@@ -1878,10 +1908,10 @@ mod unix {
         //
         // That's why I think it's fine to not support this case for now.
 
-        let patched_baz_text = source_text(case.db(), patched_bar_baz_file);
+        let patched_baz_text = source_text(case.db(), patched_bar_baz_file).load();
         let did_update_patched_baz = patched_baz_text.as_str() == "def baz(): print('Version 2')";
 
-        let bar_baz_text = source_text(case.db(), baz_file);
+        let bar_baz_text = source_text(case.db(), baz_file).load();
         let did_update_bar_baz = bar_baz_text.as_str() == "def baz(): print('Version 2')";
 
         assert!(
@@ -1952,12 +1982,12 @@ mod unix {
         let baz_original_file = case.system_file(&baz_original).unwrap();
 
         assert_eq!(
-            source_text(case.db(), baz_original_file).as_str(),
+            source_text(case.db(), baz_original_file).load().as_str(),
             "def baz(): ..."
         );
 
         assert_eq!(
-            source_text(case.db(), baz_site_packages).as_str(),
+            source_text(case.db(), baz_site_packages).load().as_str(),
             "def baz(): ..."
         );
         assert_eq!(
@@ -1979,7 +2009,7 @@ mod unix {
         case.apply_changes(&changes);
 
         assert_eq!(
-            source_text(case.db(), baz_original_file).as_str(),
+            source_text(case.db(), baz_original_file).load().as_str(),
             "def baz(): print('Version 2')"
         );
 
@@ -1991,7 +2021,7 @@ mod unix {
         // it doesn't seem worth doing considering that as prominent tools like PyCharm don't support it.
         // Pyright does support it, thanks to chokidar.
         assert_ne!(
-            source_text(case.db(), baz_site_packages).as_str(),
+            source_text(case.db(), baz_site_packages).load().as_str(),
             "def baz(): print('Version 2')"
         );
 

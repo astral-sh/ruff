@@ -188,7 +188,7 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
     }
 
     let trivia = TriviaRanges::from(parsed.tokens());
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
 
     let formatted = format_node(&parsed, &trivia, &source, options)?;
     let printed = formatted.print()?;

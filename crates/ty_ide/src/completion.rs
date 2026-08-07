@@ -4,7 +4,7 @@ use ty_python_semantic::ProgramEnvironment;
 
 use compact_str::{CompactString, CompactStringExt};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_db::source::{SourceText, source_text};
+use ruff_db::source::{SourceTextRef, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
@@ -42,7 +42,7 @@ pub fn completion<'db>(
     let program_file = file;
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let file = file.file(db);
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
 
     let Some(context) = Context::new(db, program_file, &parsed, &source, offset) else {
         return vec![];
@@ -803,7 +803,7 @@ impl<'m> Context<'m> {
         db: &'_ dyn Db,
         file: ProgramFile<'_>,
         parsed: &'m ParsedModuleRef,
-        source: &'m SourceText,
+        source: &'m SourceTextRef,
         offset: TextSize,
     ) -> Option<Context<'m>> {
         let cursor = ContextCursor::new(parsed, source, offset);
@@ -884,7 +884,7 @@ struct ContextCursor<'m> {
     /// The parsed module containing the cursor.
     parsed: &'m ParsedModuleRef,
     /// The source code of the module containing the cursor.
-    source: &'m SourceText,
+    source: &'m SourceTextRef,
     /// The typed text up to the cursor offset.
     ///
     /// When `Some`, the text is guaranteed to be non-empty.
@@ -935,7 +935,7 @@ impl<'m> ContextCursor<'m> {
     /// Returns information about the context of the cursor.
     fn new(
         parsed: &'m ParsedModuleRef,
-        source: &'m SourceText,
+        source: &'m SourceTextRef,
         offset: TextSize,
     ) -> ContextCursor<'m> {
         let tokens_before = tokens_start_before(parsed.tokens(), offset);
@@ -2339,7 +2339,7 @@ fn add_unimported_completions<'db>(
     }
 
     let source_file = file.file(db);
-    let source = source_text(db, source_file);
+    let source = source_text(db, source_file).load();
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());

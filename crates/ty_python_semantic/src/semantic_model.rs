@@ -517,7 +517,7 @@ impl<'db> SemanticModel<'db> {
         // The string_annotation will be used as the expr/node for any query that needs
         // to look up a node in the AST to prevent panics, because these sub-AST nodes
         // are not in the File's AST!
-        let source = source_text(self.db, self.file());
+        let source = source_text(self.db, self.file()).load();
         let string_literal = string_expr.as_single_part_string()?;
         let ast = parsed_string_annotation(source.as_str(), string_literal).ok()?;
         let model = Self {

@@ -130,7 +130,7 @@ pub(crate) fn references(
             .into_par_iter()
             .with_min_len(minimum_job_len)
             .map_with_db(db, |db, other_file| {
-                let source = ruff_db::source::source_text(db, other_file);
+                let source = ruff_db::source::source_text(db, other_file).load();
                 if !contains_identifier(&source, &target_text) {
                     return Vec::new();
                 }

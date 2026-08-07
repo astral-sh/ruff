@@ -2041,6 +2041,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "lz4_flex"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90071f8077f8e40adfc4b7fe9cd495ce316263f19e75c2211eeff3fdf475a3d9"
+
+[[package]]
 name = "manyhow"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3194,6 +3200,7 @@ dependencies = [
  "get-size2",
  "ignore",
  "insta",
+ "lz4_flex",
  "matchit",
  "path-slash",
  "pathdiff",

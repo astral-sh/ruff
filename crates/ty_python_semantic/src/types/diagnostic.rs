@@ -2994,7 +2994,7 @@ pub(super) fn abstract_method_span<'db>(
     let file = function.file(db);
     let module = parsed_module(db, function.python_file(db)).load(db);
     let node = implementation.node(db, file, &module);
-    let source_text = source_text(db, file);
+    let source_text = source_text(db, file).load();
 
     if policy == AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         && source_text.line_start(node.name.end()) != source_text.line_start(node.end())

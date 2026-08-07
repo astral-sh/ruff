@@ -79,7 +79,7 @@ pub(crate) fn is_unused_ignore_comment_lint(name: LintName) -> bool {
 pub(crate) fn suppressions(db: &dyn Db, file: PythonFile<'_>) -> Suppressions {
     let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
-    let source = source_text(db, source_file);
+    let source = source_text(db, source_file).load();
 
     let respect_type_ignore = db
         .analysis_settings(source_file)

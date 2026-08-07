@@ -37,7 +37,7 @@ pub(crate) fn suppress_all(
     ids_with_range: &[(LintName, TextRange)],
 ) -> Vec<SuppressFix> {
     let suppressions = suppressions(db, file);
-    let source = source_text(db, file.file(db));
+    let source = source_text(db, file.file(db)).load();
     let parsed = parsed_module(db, file).load(db);
     let tokens = parsed.tokens();
 
@@ -170,7 +170,7 @@ pub fn suppress_single(db: &dyn Db, file: PythonFile<'_>, id: LintId, range: Tex
     let suppression_range = suppression_range(db, file, range);
 
     let suppressions = suppressions(db, file);
-    let source = source_text(db, file.file(db));
+    let source = source_text(db, file.file(db)).load();
     let codes = &[id.name()];
 
     if let Some(existing) = find_existing_suppression(suppressions, &source, range) {

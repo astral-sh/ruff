@@ -166,7 +166,7 @@ where
                 source,
                 source_map,
                 applied_fixes,
-            } = apply_fixes(&staged_source, fixes);
+            } = apply_fixes(&staged_source.load(), fixes);
 
             let fixed_source = staged_source.with_text(source, &source_map);
             source_texts.set_unstaged(db, file.file, fixed_source.clone());
@@ -1689,7 +1689,7 @@ class B(A):
         // For this test, we intentionally keep renaming a variable form `a` -> `b` and
         // from `b` -> `a`. This ensures that the fix never converges.
         let check_file = |db: &dyn Db, file: File| {
-            let text = source_text(db, file);
+            let text = source_text(db, file).load();
 
             let message = if text.contains('a') {
                 "Variable `a` should be named `b`."
@@ -1746,7 +1746,7 @@ class B(A):
         assert_snapshot!(convergence_diagnostic.headline_message(), @"Fixes failed to converge after 10 iterations.");
 
         // It should keep the source text from the last allowed fix iteration.
-        assert_eq!(&*source_text(&db, file), "a = 10");
+        assert_eq!(&*source_text(&db, file).load(), "a = 10");
     }
 
     /// Tests that `fix_all` reverts fixes that introduce a syntax error.
@@ -1764,7 +1764,7 @@ class B(A):
         // For this test, we intentionally keep renaming a variable form `a` -> `b` and
         // from `b` -> `a`. This ensures that the fix never converges.
         let check_file = |db: &dyn Db, file: File| {
-            let text = source_text(db, file);
+            let text = source_text(db, file).load();
 
             let message = if text.contains('a') {
                 "Variable `a` should be named `b`."
@@ -1823,7 +1823,7 @@ class B(A):
         assert_snapshot!(syntax_error.headline_message(), @"Applying fixes introduced a syntax error. Reverting changes.");
 
         // It should revert the source to the last known error free version.
-        assert_eq!(&*source_text(&db, file), "b = 10");
+        assert_eq!(&*source_text(&db, file).load(), "b = 10");
     }
 
     #[test]
@@ -1879,7 +1879,7 @@ class B(A):
         assert!(matches!(result, Err(ruff_db::cancellation::Canceled)));
 
         // Cancellation should revert any staged or unstaged source text overrides.
-        assert_eq!(&*source_text(&db, file), "a = 10");
+        assert_eq!(&*source_text(&db, file).load(), "a = 10");
     }
 
     #[test]
@@ -1902,7 +1902,7 @@ class B(A):
         // removes the now-unused `List` import. Because `List[int]` is nested inside
         // `Optional[List[int]]`, only the outer rewrite can apply in the first iteration.
         let check_file = |db: &dyn Db, file: File| {
-            let text = source_text(db, file);
+            let text = source_text(db, file).load();
 
             let range_of = |needle: &str| {
                 let start = TextSize::try_from(text.find(needle).unwrap_or_else(|| {
@@ -1982,7 +1982,7 @@ class B(A):
         assert!(fixes.diagnostics.is_empty());
         assert_eq!(fixes.count, 2);
         assert_eq!(
-            &*source_text(&db, file),
+            &*source_text(&db, file).load(),
             "from typing import Optional\n\
              value: list[int] | None = None\n\
             "
@@ -2052,7 +2052,7 @@ class B(A):
 
         File::sync_path(&mut db, SystemPath::new("test.py"));
 
-        let fixed = source_text(&db, file);
+        let fixed = source_text(&db, file).load();
 
         let parsed = parsed_module(&db, db.program_file(file).python_file(&db));
         let parsed = parsed.load(&db);

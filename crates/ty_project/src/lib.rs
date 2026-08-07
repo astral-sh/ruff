@@ -904,7 +904,7 @@ mod tests {
         db.memory_file_system().remove_file(path)?;
         file.sync(&mut db);
 
-        assert_eq!(source_text(&db, file).as_str(), "");
+        assert_eq!(source_text(&db, file).load().as_str(), "");
         assert_eq!(
             check_file_impl(&db, db.program_file(file))
                 .as_ref()
@@ -921,7 +921,7 @@ mod tests {
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.
         db.write_file(path, "").unwrap();
 
-        assert_eq!(source_text(&db, file).as_str(), "");
+        assert_eq!(source_text(&db, file).load().as_str(), "");
         assert_eq!(
             check_file_impl(&db, db.program_file(file))
                 .as_ref()

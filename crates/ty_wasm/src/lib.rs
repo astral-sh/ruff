@@ -4,7 +4,7 @@ use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
-use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_db::source::{SourceTextRef, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
@@ -320,7 +320,7 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "sourceText")]
     pub fn source_text(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let source_text = ruff_db::source::source_text(&self.db, file_id.file);
+        let source_text = ruff_db::source::source_text(&self.db, file_id.file).load();
 
         Ok(source_text.to_string())
     }
@@ -331,7 +331,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -357,7 +357,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -382,7 +382,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -407,7 +407,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -448,7 +448,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Option<Range>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -472,7 +472,7 @@ impl Workspace {
         position: Position,
         new_name: &str,
     ) -> Result<Vec<RenameEdit>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -502,7 +502,7 @@ impl Workspace {
 
     #[wasm_bindgen]
     pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -532,7 +532,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<Completion>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -584,7 +584,7 @@ impl Workspace {
     #[wasm_bindgen(js_name = "inlayHints")]
     pub fn inlay_hints(&self, file_id: &FileHandle, range: Range) -> Result<Vec<InlayHint>, Error> {
         let index = line_index(&self.db, file_id.file);
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
 
         let result = inlay_hints(
             &self.db,
@@ -643,7 +643,7 @@ impl Workspace {
     #[wasm_bindgen(js_name = "semanticTokens")]
     pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<Vec<SemanticToken>, Error> {
         let index = line_index(&self.db, file_id.file);
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
 
         let semantic_token =
             ty_ide::semantic_tokens(&self.db, self.db.program_file(file_id.file), None);
@@ -667,7 +667,7 @@ impl Workspace {
         range: Range,
     ) -> Result<Vec<SemanticToken>, Error> {
         let index = line_index(&self.db, file_id.file);
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
@@ -738,7 +738,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Option<SignatureHelp>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -787,7 +787,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<DocumentHighlight>, Error> {
-        let source = source_text(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file).load();
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
@@ -835,7 +835,7 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 fn map_targets_to_links(
     db: &dyn Db,
     targets: RangedValue<NavigationTargets>,
-    source: &SourceText,
+    source: &SourceTextRef,
     index: &LineIndex,
     position_encoding: PositionEncoding,
 ) -> Vec<LocationLink> {
@@ -898,7 +898,7 @@ impl Hint {
             range: Range::from_text_range(
                 hint.range,
                 &line_index(db, file),
-                &source_text(db, file),
+                &source_text(db, file).load(),
                 position_encoding,
             ),
         }
@@ -1074,7 +1074,7 @@ pub struct Location {
 }
 
 fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
-    let source = source_text(&workspace.db, file);
+    let source = source_text(&workspace.db, file).load();
     let index = line_index(&workspace.db, file);
 
     TextEdit {
@@ -1116,7 +1116,7 @@ impl Range {
         position_encoding: PositionEncoding,
     ) -> Self {
         let index = line_index(db, file_range.file());
-        let source = source_text(db, file_range.file());
+        let source = source_text(db, file_range.file()).load();
 
         Self::from_text_range(file_range.range(), &index, &source, position_encoding)
     }

@@ -2683,7 +2683,7 @@ impl KnownFunction {
                                     let value_precedence = OperatorPrecedence::from_expr(value);
                                     OperatorPrecedence::from_expr_ref(parent) >= value_precedence
                                 });
-                            let value_text = &source_text(db, context.file())[value.range()];
+                            let value_text = &source_text(db, context.file()).load()[value.range()];
                             let replacement = if needs_parens {
                                 format!("({value_text})")
                             } else {

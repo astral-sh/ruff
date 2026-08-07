@@ -61,7 +61,7 @@ pub fn folding_ranges(
 ) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
     let file = file.file(db);
-    let source = source_text(db, file);
+    let source = source_text(db, file).load();
 
     let mut visitor = FoldingRangeVisitor {
         source: source.as_str(),

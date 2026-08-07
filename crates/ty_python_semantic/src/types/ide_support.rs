@@ -645,7 +645,7 @@ fn class_implementations_for_file<'db>(
     file: ProgramFile<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    if !contains_identifier(&source_text(db, file.file(db)), "class") {
+    if !contains_identifier(&source_text(db, file.file(db)).load(), "class") {
         return Vec::new();
     }
 
@@ -762,7 +762,7 @@ fn member_implementations_for_file<'db>(
 
     // A file can only contribute an override if it contains a class and spells the member name,
     // whether as a method name, a class-body target, or a `self.member` assignment.
-    let source = source_text(db, file.file(db));
+    let source = source_text(db, file.file(db)).load();
     if !contains_identifier(&source, "class") || !contains_identifier(&source, member_name) {
         return definitions;
     }
@@ -2867,7 +2867,7 @@ fn direct_subtypes<'db>(
             continue;
         }
 
-        let source = source_text(db, file);
+        let source = source_text(db, file).load();
         if !contains_identifier(&source, "class") {
             continue;
         }

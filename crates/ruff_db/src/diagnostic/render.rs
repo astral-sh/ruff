@@ -14,7 +14,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use crate::{
     Db,
     files::File,
-    source::{SourceText, line_index, source_text},
+    source::{SourceTextRef, line_index, source_text},
 };
 
 use super::{
@@ -825,7 +825,7 @@ where
 
     fn input(&self, file: File) -> Input {
         Input {
-            text: source_text(self, file),
+            text: source_text(self, file).load(),
             line_index: line_index(self, file),
         }
     }
@@ -861,7 +861,7 @@ impl FileResolver for &dyn Db {
 
     fn input(&self, file: File) -> Input {
         Input {
-            text: source_text(*self, file),
+            text: source_text(*self, file).load(),
             line_index: line_index(*self, file),
         }
     }
@@ -897,7 +897,7 @@ impl FileResolver for &dyn Db {
 /// line index for efficiently querying its contents.
 #[derive(Clone, Debug)]
 pub struct Input {
-    pub(crate) text: SourceText,
+    pub(crate) text: SourceTextRef,
     pub(crate) line_index: LineIndex,
 }
 
@@ -2637,7 +2637,7 @@ watermelon
             let span = self.path(path);
 
             let file = span.expect_ty_file();
-            let text = source_text(&self.db, file);
+            let text = source_text(&self.db, file).load();
             let line_index = line_index(&self.db, file);
             let source = SourceCode::new(text.as_str(), &line_index);
 

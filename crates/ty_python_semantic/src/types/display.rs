@@ -769,7 +769,7 @@ fn fmt_file_location<'db>(
         FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
     };
     let line_index = line_index(db, file);
-    let LineColumn { line, column } = line_index.line_column(offset, &source_text(db, file));
+    let LineColumn { line, column } = line_index.line_column(offset, &source_text(db, file).load());
     f.set_invalid_type_annotation();
     write!(f, " @ {path}:{line}:{column}")
 }
