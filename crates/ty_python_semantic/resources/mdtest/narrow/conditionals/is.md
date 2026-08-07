@@ -462,7 +462,7 @@ def f(value: int | None | EllipsisType, other: T) -> None:
 ## `is` with a negated `NewType`
 
 Excluding a `NewType` removes its invisible tag, not the runtime objects accepted by its
-constructor. An identity comparison must preserve that negation without making a reachable branch
+constructor. An identity comparison preserves that negation without making a reachable branch
 disappear.
 
 ```py
@@ -627,7 +627,8 @@ def excluded_literal_string_with_shared_alternative(
         reveal_type(other)  # revealed: Literal["hello"] | bytes
 ```
 
-In contrast, excluding a concrete literal genuinely rules out identity with that value.
+In contrast, excluding a concrete literal genuinely rules out identity with string literals that
+have that value.
 
 ```py
 def excluded_literal(value: Not[Literal["hello"]]) -> None:

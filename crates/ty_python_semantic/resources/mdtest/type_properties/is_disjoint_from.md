@@ -1140,7 +1140,7 @@ static_assert(not is_disjoint_from(Foo[A], Foo[B]))
 static_assert(not is_disjoint_from(Foo[A], Foo[Any]))
 static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 
-# `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
+# `Foo[Never]` is inhabited (`get` can raise) and is a subtype of both `Foo[int]` and `Foo[str]`.
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 

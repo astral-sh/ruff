@@ -1144,6 +1144,7 @@ type RecursiveBrand = BrandedEnumValue | RecursiveBrand
 
 def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
     if left == EnumValue.VALUE:
+        # TODO: Ideally, this would narrow to `BrandedEnumValue & Literal[EnumValue.VALUE]`.
         reveal_type(left)  # revealed: BrandedEnumValue
 ```
 

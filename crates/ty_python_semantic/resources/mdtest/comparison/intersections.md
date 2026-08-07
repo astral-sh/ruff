@@ -147,7 +147,7 @@ def f(value: Not[LiteralString], nonliteral_string: Intersection[str, Not[Litera
 ```
 
 A string literal determines its value, not the identity of its runtime object. Negating that literal
-excludes every object with the same value, so the identity comparison is definite.
+excludes every other string literal with the same value, so the identity comparison is definite.
 
 ```py
 from typing import Literal
