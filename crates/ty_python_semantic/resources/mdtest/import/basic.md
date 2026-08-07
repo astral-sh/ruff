@@ -16,6 +16,27 @@ os = normalize(os)
 reveal_type(os)  # revealed: ModuleType
 ```
 
+## Imported names can be rebound by match patterns in loops
+
+Checking whether an imported name is `Final` must not recursively infer synthetic loop or
+comprehension bindings when a match pattern rebinds that name.
+
+```py
+import os as x
+
+class C:
+    x = object()
+
+items = [object()]
+
+for _ in items:
+    match (x for _ in items):
+        case C.x as x:
+            pass
+        case C():
+            x = 0
+```
+
 ## Imported names can be rebound by context managers
 
 An imported name is an ordinary binding, so a context-manager target may replace it with a value of
