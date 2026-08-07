@@ -10702,7 +10702,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 CallArguments::none(),
                 TypeContext::default(),
             ) {
-                Ok(outcome) => outcome.return_type(db, env),
+                Ok(outcome) => {
+                    for callable in outcome.iter_flat() {
+                        self.check_deprecated(unary, callable.callable_type);
+                    }
+                    outcome.return_type(db, env)
+                }
                 Err(e) => {
                     self.report_unsupported_unary_operator(
                         unary,
