@@ -220,6 +220,25 @@ def overwrite_wildcard() -> None:
     wildcard_value = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
 ```
 
+### Imported `Final` qualifiers survive loop bindings
+
+An imported `Final` value remains protected when a loop introduces synthetic bindings for its name.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+```py
+from source import VALUE
+
+for _ in range(2):
+    VALUE = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+```
+
 ### Reassignment after conditional assignment
 
 If a `Final` symbol is conditionally assigned, a subsequent unconditional assignment is still a
