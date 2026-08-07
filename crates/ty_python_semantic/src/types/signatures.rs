@@ -978,6 +978,18 @@ impl<'db> Signature<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let env = visitor.env;
+        let signature_mapping = if let (
+            TypeMapping::ReplaceOutOfScopeTypevars(in_scope_typevars),
+            Some(generic_context),
+        ) = (type_mapping, self.generic_context)
+        {
+            Some(TypeMapping::ReplaceOutOfScopeTypevars(
+                in_scope_typevars.with_generic_context(db, generic_context),
+            ))
+        } else {
+            None
+        };
+        let type_mapping = signature_mapping.as_ref().unwrap_or(type_mapping);
         Self {
             generic_context: self
                 .generic_context

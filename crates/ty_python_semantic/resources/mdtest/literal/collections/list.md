@@ -31,6 +31,28 @@ The inferred `Callable` type is function-like, i.e. we can still access attribut
 reveal_type(x[0].__name__)  # revealed: str
 ```
 
+## Generic functions appended to lists
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def int_identity(value: int) -> int:
+    return value
+
+def identity[T](value: T) -> T:
+    return value
+
+functions = []
+functions.append(int_identity)
+functions.append(identity)
+
+reveal_type(functions)  # revealed: list[(value: int) -> int]
+reveal_type(functions[0](1))  # revealed: int
+```
+
 ## Mixed list
 
 ```py

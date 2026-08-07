@@ -7763,6 +7763,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::ReplaceOutOfScopeTypevars(_) |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
@@ -7782,6 +7783,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::ReplaceOutOfScopeTypevars(_) |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -8959,12 +8961,39 @@ pub enum TypeMapping<'a, 'db> {
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
+    /// Replace typevars that are not bound by an enclosing generic context with `Unknown`.
+    ///
+    /// These typevars should not escape the inference context that owns them. This mapping is used
+    /// when a type has already escaped that context and needs to become stable outside of it.
+    ReplaceOutOfScopeTypevars(TypeVarScope<'db>),
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+}
+
+/// Typevars that can remain bound after a type escapes its current inference context.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub struct TypeVarScope<'db>(TypeVarSet<'db>);
+
+impl<'db> TypeVarScope<'db> {
+    pub(crate) const fn new(typevars: TypeVarSet<'db>) -> Self {
+        Self(typevars)
+    }
+
+    pub(crate) fn with_generic_context(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Self {
+        Self(self.0.merge(db, generic_context.inferable_typevars(db)))
+    }
+
+    pub(crate) fn contains(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> bool {
+        typevar.is_inferable(db, self.0)
+    }
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -9011,6 +9040,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::ReplaceOutOfScopeTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
@@ -9058,6 +9088,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::ReplaceOutOfScopeTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
