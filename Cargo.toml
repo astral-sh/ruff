@@ -300,6 +300,12 @@ inherits = "release"
 opt-level = "z"
 codegen-units = 1
 
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+# Avoid the local ThinLTO that Cargo enables at nonzero optimization levels.
+lto = "off"
+
 [profile.dev.package.insta]
 opt-level = 3
 
@@ -352,6 +358,8 @@ lto = "off"
 inherits = "dev"
 opt-level = 0
 debug = "line-tables-only"
+# Preserve Cargo's default LTO behavior for optimized dependencies.
+lto = false
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]
