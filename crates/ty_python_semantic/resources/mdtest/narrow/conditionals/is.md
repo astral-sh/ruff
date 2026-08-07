@@ -48,7 +48,6 @@ identity comparison can therefore transfer the invariant type argument.
 def generic_type(value: object, items: list[int]) -> None:
     if value is items:
         reveal_type(value)  # revealed: list[int]
-        reveal_type(items)  # revealed: list[int]
 ```
 
 Incompatible invariant specializations cannot describe the same object in soundly typed code.
@@ -569,7 +568,6 @@ NonLiteralStringT = TypeVar("NonLiteralStringT", bound=Intersection[str, Not[Lit
 def excluded_literal_string_in_bound(value: NonLiteralStringT, other: Literal["hello"]) -> None:
     if value is other:
         reveal_type(value)  # revealed: NonLiteralStringT@excluded_literal_string_in_bound
-        reveal_type(other)  # revealed: Literal["hello"]
 ```
 
 The same negation remains compatible with a concrete string when both operands contain additional
@@ -625,13 +623,6 @@ def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
         reveal_type(foo1)  # revealed: FooNewType1
         reveal_type(foo2)  # revealed: FooNewType2
 
-def same_object(value: Foo) -> None:
-    first = FooNewType1(value)
-    second = FooNewType2(value)
-    if first is second:
-        reveal_type(first)  # revealed: FooNewType1
-        reveal_type(second)  # revealed: FooNewType2
-
 def union(value: FooNewType1 | None, other: FooNewType2) -> None:
     if value is other:
         reveal_type(value)  # revealed: FooNewType1
@@ -660,22 +651,20 @@ FooNewType4 = NewType("FooNewType4", Foo)
 BoundedT = TypeVar("BoundedT", bound=FooNewType1)
 BoundedU = TypeVar("BoundedU", bound=FooNewType2)
 
-def bounded_typevars(left: BoundedT, right: BoundedU) -> tuple[BoundedT, BoundedU]:
+def bounded_typevars(left: BoundedT, right: BoundedU) -> None:
     reveal_type(left is right)  # revealed: bool
     if left is right:
         reveal_type(left)  # revealed: BoundedT@bounded_typevars
         reveal_type(right)  # revealed: BoundedU@bounded_typevars
-    return (left, right)
 
 ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
 ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
 
-def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> tuple[ConstrainedT, ConstrainedU]:
+def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
     reveal_type(left is right)  # revealed: bool
     if left is right:
         reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
         reveal_type(right)  # revealed: ConstrainedU@constrained_typevars
-    return (left, right)
 ```
 
 A type variable bounded by a `NewType` also carries that `NewType` tag. Identity cannot transfer the

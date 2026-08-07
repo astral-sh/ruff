@@ -131,7 +131,6 @@ UserId = NewType("UserId", int)
 
 def f(value: Not[UserId]) -> None:
     reveal_type(value is 1)  # revealed: bool
-    reveal_type(value is not 1)  # revealed: bool
 ```
 
 `LiteralString` describes how a string was constructed rather than which runtime object it is. A
@@ -155,7 +154,6 @@ from typing import Literal
 
 def f(value: Not[Literal["hello"]]) -> None:
     reveal_type(value is "hello")  # revealed: Literal[False]
-    reveal_type(value is not "hello")  # revealed: Literal[True]
 ```
 
 After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true

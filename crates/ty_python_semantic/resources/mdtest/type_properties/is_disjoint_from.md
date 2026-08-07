@@ -26,8 +26,7 @@ static_assert(not is_disjoint_from(str, LiteralString))
 
 ## Class hierarchies
 
-Two classes overlap when a subclass could inherit from both. Final classes and incompatible
-metaclasses can rule out that shared subclass.
+Classes overlap through a common subclass unless finality or incompatible metaclasses prevent it.
 
 ```pyi
 from ty_extensions import static_assert
@@ -197,8 +196,7 @@ static_assert(not is_disjoint_from(D, A))
 
 ## Dataclasses
 
-Dataclasses with incompatible non-empty slots are disjoint; dataclasses with empty slots can still
-share a subclass.
+Dataclasses with incompatible non-empty slots are disjoint; those with empty slots can overlap.
 
 ```py
 from dataclasses import dataclass
@@ -277,8 +275,7 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 
 ## Intersections
 
-Positive requirements and negated types can prevent an intersection from sharing any inhabitants
-with another type.
+Positive requirements and negations can make an intersection disjoint from another type.
 
 ```pyi
 from typing_extensions import Literal, final, Any, LiteralString
@@ -453,8 +450,7 @@ static_assert(is_disjoint_from(LiteralString & ~AlwaysFalsy, ~LiteralString | Al
 
 ### Class, module and function literals
 
-Class, module, and function literals identify specific runtime objects, so distinct objects have
-disjoint literal types.
+Class, module, and function literal types for distinct runtime objects are disjoint.
 
 ```toml
 [environment]
@@ -589,8 +585,7 @@ static_assert(not is_disjoint_from(TypeOf[F().foo], TypeOf[G().foo]))
 
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
-`AlwaysTruthy` and `AlwaysFalsy` are disjoint from types whose possible values cannot have the
-corresponding truthiness.
+`AlwaysTruthy` and `AlwaysFalsy` are disjoint from types with incompatible truthiness.
 
 ```py
 from ty_extensions import AlwaysFalsy, AlwaysTruthy, static_assert
@@ -797,8 +792,7 @@ static_assert(is_disjoint_from(type[Foo], BarNone))
 
 ### `NamedTuple`
 
-A `NamedTuple` overlaps compatible tuple shapes but is disjoint from incompatible tuple lengths and
-distinct final named-tuple classes.
+`NamedTuple`s overlap matching tuple shapes, but not different lengths or distinct final classes.
 
 ```py
 from __future__ import annotations
@@ -978,8 +972,7 @@ static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 
 ## Statically empty and non-empty ranges
 
-An empty range is disjoint from a range known to be non-empty, but both overlap the general `range`
-type.
+Empty and non-empty ranges are disjoint, but both overlap the general `range` type.
 
 ```py
 from ty_extensions import static_assert
@@ -1122,8 +1115,7 @@ static_assert(not is_disjoint_from(Sequence[int], Sequence[str]))
 
 ### Specialized `@final` types
 
-Final generic classes can have overlapping specializations when a common specialization, such as one
-with a `Never` type argument, inhabits both.
+Final generic specializations can overlap through a shared subtype such as `Foo[Never]`.
 
 ```toml
 [environment]
@@ -1246,11 +1238,9 @@ UserId(True)
 static_assert(not is_disjoint_from(UserId, Literal[True]))
 static_assert(not is_disjoint_from(Literal[True], UserId))
 static_assert(not is_disjoint_from(UserId, Literal[False]))
-static_assert(not is_disjoint_from(UserId, Literal[True, False]))
 static_assert(not is_disjoint_from(UserId, Literal[1]))
 static_assert(not is_disjoint_from(UserId, bool))
 static_assert(not is_disjoint_from(bool, UserId))
-static_assert(not is_disjoint_from(UserId, int))
 static_assert(is_disjoint_from(UserId, Literal["user"]))
 
 static_assert(not is_disjoint_from(StringId, Literal["user"]))

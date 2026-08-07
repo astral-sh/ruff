@@ -31,7 +31,7 @@ o: Not[()]
 p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    # Excluding a literal excludes that exact runtime object.
+    # Negating a literal rules out every object with that value.
     reveal_type(not_one is not 1)  # revealed: Literal[True]
     reveal_type(not_one is 1)  # revealed: Literal[False]
 

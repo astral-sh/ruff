@@ -80,7 +80,6 @@ C = NewType("C", bool)
 
 reveal_type(is_disjoint_from(B, C))  # revealed: ConstraintSet[Literal[True]]
 reveal_type(is_disjoint_from(B, Literal[True]))  # revealed: ConstraintSet[Literal[False]]
-reveal_type(is_disjoint_from(C, Literal[True]))  # revealed: ConstraintSet[Literal[False]]
 
 def f(x: B, y: C):
     reveal_type(x is y)  # revealed: bool

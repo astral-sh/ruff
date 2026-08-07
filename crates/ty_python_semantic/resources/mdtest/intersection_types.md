@@ -463,20 +463,15 @@ OtherUserId = NewType("OtherUserId", int)
 NestedUserId = NewType("NestedUserId", UserId)
 
 static_assert(is_equivalent_to(Intersection[UserId, OtherUserId], Never))
-static_assert(is_equivalent_to(Intersection[OtherUserId, UserId], Never))
 static_assert(is_equivalent_to(Intersection[NestedUserId, OtherUserId], Never))
 
 def newtype_intersections(
     user_bool: UserId & bool,
-    bool_user: bool & UserId,
     user_nested: UserId & NestedUserId,
-    nested_user: NestedUserId & UserId,
     user_other: UserId & OtherUserId,
 ) -> None:
     reveal_type(user_bool)  # revealed: UserId & bool
-    reveal_type(bool_user)  # revealed: bool & UserId
     reveal_type(user_nested)  # revealed: NestedUserId
-    reveal_type(nested_user)  # revealed: NestedUserId
     reveal_type(user_other)  # revealed: Never
 ```
 

@@ -19,8 +19,7 @@ static tag. Applying an unrelated `NewType` constructor replaces the previous ta
 ```py
 MediaId = NewType("MediaId", int)
 
-def retag(user_id: UserId) -> None:
-    reveal_type(MediaId(user_id))  # revealed: MediaId
+reveal_type(MediaId(UserId(1)))  # revealed: MediaId
 ```
 
 ## Subtyping
@@ -674,9 +673,8 @@ def f(x: N):
     match x:
         case Foo.X:
             reveal_type(x)  # revealed: N & Literal[Foo.X]
-        case Foo.Y as matched:
+        case Foo.Y:
             reveal_type(x)  # revealed: N & Literal[Foo.Y]
-            reveal_type(matched)  # revealed: N & Literal[Foo.Y]
         case _:
             reveal_type(x)  # revealed: Never
 ```

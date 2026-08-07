@@ -3544,7 +3544,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 intersection
                     .positive(db)
                     .iter()
-                    .any(|positive| matches!(positive.resolve_type_alias(db), Type::TypeVar(_)))
+                    .any(|positive| positive.resolve_type_alias(db).is_type_var())
                     || intersection.iter_negative(db).any(|negative| {
                         match negative.resolve_type_alias(db) {
                             Type::TypeVar(_) => true,
@@ -3579,7 +3579,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         literal.fallback_instance(db, env),
                     );
                     if !overlap.is_never() {
-                        builder = builder.add(overlap);
+                        builder.add_in_place(overlap);
                     }
                 }
             }

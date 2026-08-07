@@ -82,19 +82,16 @@ impl<'db> Type<'db> {
                         builder = builder.add_positive(upcast(db, env, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        // Tags, type-variable selections, string provenance, and predicate proofs
-                        // belong to one static view rather than the shared object. Keep every
+                        // Tags, type-variable selections, `LiteralString` provenance, and predicate
+                        // proofs belong to one static view rather than the shared object. Keep every
                         // negation that describes the object itself instead.
-                        let preserve_negation = match element.resolve_type_alias(db) {
+                        match element.resolve_type_alias(db) {
                             Type::NewTypeInstance(_)
                             | Type::TypeVar(_)
                             | Type::TypeIs(_)
-                            | Type::TypeGuard(_) => false,
-                            Type::LiteralValue(literal) => !literal.is_literal_string(),
-                            _ => true,
-                        };
-                        if preserve_negation {
-                            builder = builder.add_negative(*element);
+                            | Type::TypeGuard(_) => continue,
+                            Type::LiteralValue(literal) if literal.is_literal_string() => continue,
+                            _ => builder.add_negative_in_place(*element),
                         }
                     }
                     builder.build()
