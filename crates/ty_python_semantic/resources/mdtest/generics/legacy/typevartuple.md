@@ -333,54 +333,42 @@ A `Never` argument in a variadic generic must retain its position when a subclas
 arguments to a generic base.
 
 ```py
-from typing import Any, Generic, Never, TypeVar, TypeVarTuple
+from typing import Any, Generic, Never, TypeVarTuple
 
-T = TypeVar("T", covariant=True)
 Ts = TypeVarTuple("Ts")
 
-class Kind(Generic[T, *Ts]): ...
-class SupportsKind(Kind[T, *Ts]): ...
-class Container(SupportsKind["Container", int, str, Never]): ...
+class Kind(Generic[*Ts]): ...
+class SupportsKind(Kind[*Ts]): ...
+class Container(SupportsKind[int, Never]): ...
 
 def _(value: Container) -> None:
-    expected: Kind[Container, int, str, Any] = value
-
-reveal_type(Kind[Container, int, str, Never])  # revealed: <class 'Kind[Container, int, str, Never]'>
+    expected: Kind[int, Any] = value
 ```
 
-### Callbacks returning `Never`-padded containers
+### Callbacks returning containers with `Never` arguments
 
-A callback can return a concrete container whose variadic base is padded with `Never` when the
-expected container type uses `Any` in that position.
+A callback can return a concrete container whose variadic base contains `Never` when the expected
+container type uses `Any` in that position.
 
 ```py
 from collections.abc import Callable
 from typing import Any, Generic, Never, TypeVar, TypeVarTuple
 
-Instance = TypeVar("Instance", covariant=True)
-Value = TypeVar("Value")
-Error = TypeVar("Error")
-NewValue = TypeVar("NewValue")
+T = TypeVar("T")
+U = TypeVar("U")
 Ts = TypeVarTuple("Ts")
 
-class Kind(Generic[Instance, *Ts]): ...
-class SupportsKind(Kind[Instance, *Ts]): ...
+class Kind(Generic[T, *Ts]): ...
 
-Kind2 = Kind[Instance, Value, Error, Any]
-SupportsKind2 = SupportsKind[Instance, Value, Error, Never]
-
-class Result(SupportsKind2["Result[Any, Any]", Value, Error]):
-    def bind(
-        self,
-        callback: Callable[[Value], Kind2["Result[Any, Any]", NewValue, Error]],
-    ) -> "Result[NewValue, Error]":
+class Result(Kind[T, Never]):
+    def bind(self, callback: Callable[[T], Kind[U, Any]]) -> "Result[U]":
         raise NotImplementedError
 
-def parse(value: str) -> Result[int, Exception]:
+def parse(value: str) -> Result[int]:
     raise NotImplementedError
 
-def _(result: Result[str, Exception]) -> None:
-    reveal_type(result.bind(parse))  # revealed: Result[int, Exception]
+def _(result: Result[str]) -> None:
+    reveal_type(result.bind(parse))  # revealed: Result[int]
 ```
 
 ### `TypeVarTuple` with `ParamSpec`

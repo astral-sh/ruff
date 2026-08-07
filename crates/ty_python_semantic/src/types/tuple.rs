@@ -773,10 +773,6 @@ fn to_class_type_cycle_initial<'db>(
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
-///
-/// Tuple specs are used for more than just `tuple` instances, so they allow `Never` to appear as a
-/// fixed-length element type. [`TupleType`] adds that additional invariant (since a tuple that
-/// must contain an element that can't be instantiated, can't be instantiated itself).
 pub(crate) type TupleSpec<'db> = Tuple<Type<'db>, VariableSegment<'db>>;
 
 /// The variable-length portion of a [`TupleSpec`].
