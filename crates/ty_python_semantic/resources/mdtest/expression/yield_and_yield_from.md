@@ -186,6 +186,59 @@ def iterator_yield_from() -> Generator[int, None, int]:
     return 1
 ```
 
+## Generator type aliases
+
+ty "sees through" type aliases used as return annotations when inferring a generator's yield type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import AsyncGenerator, Generator, Iterator
+
+type GeneratorAlias[T] = Generator[T]
+
+def invalid_yield() -> GeneratorAlias[int]:
+    yield "foo"  # error: [invalid-yield]
+
+def invalid_return() -> GeneratorAlias[int]:
+    yield 42
+    return "foo"  # error: [invalid-return-type]
+
+type NestedGeneratorAlias[T] = GeneratorAlias[T]
+
+def invalid_nested_yield() -> NestedGeneratorAlias[int]:
+    yield "foo"  # error: [invalid-yield]
+
+type IteratorAlias[T] = Iterator[T]
+
+def invalid_iterator_return() -> IteratorAlias[int]:
+    yield 42
+    return "foo"  # error: [invalid-return-type]
+
+type AsyncGeneratorAlias[T] = AsyncGenerator[T]
+
+async def invalid_async_yield() -> AsyncGeneratorAlias[int]:
+    yield "foo"  # error: [invalid-yield]
+```
+
+The same applies when inferring a generator's return type and send type:
+
+```py
+type FullGeneratorAlias[YieldT, SendT, ReturnT] = Generator[YieldT, SendT, ReturnT]
+
+def inner_aliased_generator() -> FullGeneratorAlias[int, bytes, str]:
+    sent = yield 42
+    reveal_type(sent)  # revealed: bytes
+    return "done"
+
+def outer_aliased_generator() -> FullGeneratorAlias[int, bytes, None]:
+    result = yield from inner_aliased_generator()
+    reveal_type(result)  # revealed: str
+```
+
 ## Error cases
 
 ### Non-iterable type
