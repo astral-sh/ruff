@@ -6961,15 +6961,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let tuple = builder.build();
-
-        // Unlike a tuple annotation, a tuple expression cannot produce a user-defined subclass.
-        // A required `Never` element therefore makes the entire expression impossible.
-        if tuple.fixed_elements().any(Type::is_never) {
-            Type::Never
-        } else {
-            Type::tuple(TupleType::new(db, env, &tuple))
-        }
+        Type::tuple(TupleType::new(db, env, &builder.build()))
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList, tcx: TypeContext<'db>) -> Type<'db> {

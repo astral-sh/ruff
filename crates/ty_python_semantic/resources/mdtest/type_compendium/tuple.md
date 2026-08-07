@@ -241,6 +241,14 @@ static_assert(not is_equivalent_to(tuple[int, Never], Never))
 static_assert(not is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
 ```
 
+Tuple expressions also preserve their element types when an element has type `Never`.
+
+```py
+def tuple_from_never(value: Never) -> None:
+    reveal_type((value,))  # revealed: tuple[Never]
+    reveal_type((1, value))  # revealed: tuple[Literal[1], Never]
+```
+
 If the variable-length portion of a tuple is `Never`, then that portion of the tuple must always be
 empty. This means that the tuple is not actually variable-length!
 
@@ -253,35 +261,6 @@ static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
 static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...], int], tuple[int, int]))
 static_assert(is_equivalent_to(tuple[*tuple[Never, ...], int], tuple[int]))
-```
-
-## Tuple expressions containing `Never`
-
-A tuple annotation can describe a user-defined subclass, but a tuple expression always creates an
-exact builtin tuple. If evaluating a required element is impossible, evaluating the entire tuple
-expression is impossible too.
-
-```py
-from typing_extensions import Never
-
-def impossible_tuple(value: Never, values: tuple[int, ...]) -> None:
-    reveal_type((value,))  # revealed: Never
-    reveal_type((1, value))  # revealed: Never
-    reveal_type((*values, value))  # revealed: Never
-    reveal_type("%s=%s" % (value, value))  # revealed: Never
-```
-
-Propagating `Never` through the formatting arguments also prevents an impossible append inside a
-loop over an empty tuple from producing a false positive.
-
-```py
-class Formatter:
-    args = keywords = ()
-
-    def format(self) -> None:
-        arguments = list(self.args)
-        for key in self.keywords:
-            arguments.append("%s=%s" % (key, key))
 ```
 
 ## Homogeneous non-empty tuples
