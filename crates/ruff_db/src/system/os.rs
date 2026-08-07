@@ -14,7 +14,11 @@ use crate::system::{
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use std::fs::File;
+use std::io::{ErrorKind, Write};
 use std::num::NonZeroUsize;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -64,6 +68,38 @@ impl OsSystem {
     #[cfg(not(unix))]
     fn permissions(_metadata: &std::fs::Metadata) -> Option<u32> {
         None
+    }
+
+    fn write_cache_file(
+        &self,
+        cache_path: &SystemPath,
+        contents: &[u8],
+        write_contents: impl FnOnce(&mut File, &[u8]) -> Result<()>,
+    ) -> Result<()> {
+        let parent = cache_path.parent().ok_or_else(|| {
+            std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "cache file has no parent directory",
+            )
+        })?;
+
+        let mut builder = tempfile::Builder::new();
+
+        #[cfg(unix)]
+        builder.permissions(std::fs::Permissions::from_mode(0o666));
+
+        let mut temporary_file = builder.tempfile_in(parent.as_std_path())?;
+        write_contents(temporary_file.as_file_mut(), contents)?;
+
+        match temporary_file.persist_noclobber(cache_path.as_std_path()) {
+            Ok(_) => Ok(()),
+            Err(error)
+                if error.error.kind() == ErrorKind::AlreadyExists && self.is_file(cache_path) =>
+            {
+                Ok(())
+            }
+            Err(error) => Err(error.error),
+        }
     }
 }
 
@@ -234,6 +270,33 @@ impl WritableSystem for OsSystem {
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
+    }
+
+    fn get_or_cache(
+        &self,
+        path: &SystemPath,
+        read_contents: &dyn Fn() -> Result<String>,
+    ) -> Result<Option<SystemPathBuf>> {
+        let Some(cache_dir) = self.cache_dir() else {
+            return Ok(None);
+        };
+
+        let cache_path = cache_dir.join(path);
+        if self.is_file(&cache_path) {
+            return Ok(Some(cache_path));
+        }
+
+        let contents = read_contents()?;
+        let parent = cache_path.parent().ok_or_else(|| {
+            std::io::Error::new(
+                ErrorKind::InvalidInput,
+                "cache file has no parent directory",
+            )
+        })?;
+        self.create_directory_all(parent)?;
+        self.write_cache_file(&cache_path, contents.as_bytes(), File::write_all)?;
+
+        Ok(Some(cache_path))
     }
 
     fn dyn_clone(&self) -> Box<dyn WritableSystem> {

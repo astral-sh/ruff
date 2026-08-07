@@ -44,6 +44,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 similar = { workspace = true }
 supports-hyperlinks = { workspace = true }
+tempfile = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
@@ -63,7 +64,7 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 junit = ["dep:quick-junit"]
-os = ["ignore", "dep:etcetera", "dep:same-file", "dep:which"]
+os = ["ignore", "dep:etcetera", "dep:same-file", "dep:tempfile", "dep:which"]
 serde = [
     "camino/serde1",
     "dep:serde",

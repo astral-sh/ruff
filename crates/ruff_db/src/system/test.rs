@@ -199,6 +199,14 @@ impl WritableSystem for TestSystem {
         self.system().create_directory_all(path)
     }
 
+    fn get_or_cache(
+        &self,
+        path: &SystemPath,
+        read_contents: &dyn Fn() -> Result<String>,
+    ) -> Result<Option<SystemPathBuf>> {
+        self.system().get_or_cache(path, read_contents)
+    }
+
     fn dyn_clone(&self) -> Box<dyn WritableSystem> {
         Box::new(self.clone())
     }
