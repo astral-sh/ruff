@@ -4915,6 +4915,53 @@ static_assert(not is_assignable_to(MethodPSuper, MethodPUnrelated))
 static_assert(not is_assignable_to(MethodPSuper, MethodPSub))
 ```
 
+## Object members in protocol-to-protocol comparisons
+
+A protocol inherits ordinary `object` members even when they are not part of its declared interface.
+Those inherited members can satisfy compatible requirements on another protocol.
+
+```py
+from collections.abc import Hashable, Iterator
+from typing import Literal, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class HasValue(Protocol):
+    value: int
+
+class HasValueAndRepr(Protocol):
+    value: int
+
+    def __repr__(self) -> str: ...
+
+static_assert(is_assignable_to(HasValue, HasValueAndRepr))
+static_assert(is_subtype_of(HasValue, HasValueAndRepr))
+```
+
+An inherited method must still have a compatible signature.
+
+```py
+class HasValueAndPreciseRepr(Protocol):
+    value: int
+
+    def __repr__(self) -> Literal["precise"]: ...
+
+static_assert(not is_assignable_to(HasValue, HasValueAndPreciseRepr))
+```
+
+Unlike other inherited `object` methods, `__hash__` can be disabled by a subclass. Protocols must
+explicitly require a callable `__hash__` before they can satisfy a hashability requirement.
+
+```py
+class HasValueAndHash(Protocol):
+    value: int
+
+    def __hash__(self) -> int: ...
+
+static_assert(not is_assignable_to(HasValue, HasValueAndHash))
+static_assert(not is_assignable_to(Iterator[int], Hashable))
+```
+
 ## Subtyping between protocols with method members and protocols with non-method members
 
 A protocol with a method member can be considered a subtype of a protocol with a read-only
