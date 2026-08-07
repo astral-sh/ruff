@@ -14,6 +14,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
         Rule::BuiltinAttributeShadowing,
+        Rule::ConditionalGlobalOrNonlocal,
         Rule::FunctionCallInDataclassDefaultArgument,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
@@ -243,6 +244,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
+            if checker.is_rule_enabled(Rule::ConditionalGlobalOrNonlocal) {
+                ruff::rules::conditional_global_or_nonlocal(checker, scope_id, scope);
+            }
+
             if checker.is_rule_enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope);
             }
