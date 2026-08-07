@@ -44,6 +44,24 @@ match x:
 reveal_type(x)  # revealed: object
 ```
 
+## Class patterns on `NewType` instances
+
+A `NewType` does not change its argument's runtime class, so an integer-based `NewType` can match a
+`bool` class pattern.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+
+def match_newtype_boolean(value: UserId) -> None:
+    match value:
+        case bool():
+            reveal_type(value)  # revealed: UserId & bool
+        case _:
+            reveal_type(value)  # revealed: UserId & ~bool
+```
+
 ## Class pattern with guard
 
 ```py
@@ -3326,7 +3344,8 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, IntEnum, StrEnum, auto
-from typing import Literal, assert_never
+from typing import Literal, NewType, assert_never
+from ty_extensions import Intersection
 from ty_extensions._internal import Unknown
 
 class Color(StrEnum):
@@ -3380,6 +3399,37 @@ class First(IntEnum):
 class Second(IntEnum):
     ONE = 1
     TWO = 2
+
+BrandedFirst = NewType("BrandedFirst", First)
+BrandedSecond = NewType("BrandedSecond", Second)
+
+def branded_int_enum_literal_pattern_is_exhaustive(value: Intersection[BrandedFirst, Literal[First.ONE]]) -> int:
+    match value:
+        case 1:
+            return 1
+
+def branded_int_enum_integer_patterns_are_exhaustive(value: BrandedFirst) -> int:
+    match value:
+        case 1:
+            reveal_type(value)  # revealed: BrandedFirst & Literal[First.ONE]
+            return 1
+        case 2:
+            reveal_type(value)  # revealed: BrandedFirst & Literal[First.TWO]
+            return 2
+
+def branded_int_enum_member_patterns_are_exhaustive(value: BrandedFirst) -> int:
+    match value:
+        case First.ONE:
+            return 1
+        case First.TWO:
+            return 2
+
+def branded_cross_int_enum_member_patterns(value: BrandedFirst | BrandedSecond) -> None:
+    match value:
+        case First.ONE:
+            reveal_type(value)  # revealed: (BrandedFirst & Literal[First.ONE]) | (BrandedSecond & Literal[Second.ONE])
+        case _:
+            reveal_type(value)  # revealed: (BrandedFirst & Literal[First.TWO]) | (BrandedSecond & Literal[Second.TWO])
 
 def cross_int_enum_members(value: First | Second) -> None:
     match value:
@@ -3614,6 +3664,49 @@ def test_match_alias_ignores_custom_ne(flag: bool) -> str:
         case _ as item:
             reveal_type(item)  # revealed: Literal["fallback"]
             return item
+```
+
+## Recursive enum aliases in value patterns
+
+An enum value pattern narrows a recursive alias to the matching member while preserving its
+`NewType` tag.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import IntEnum
+from typing import NewType
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+BrandedNumber = NewType("BrandedNumber", Number)
+type RecursiveNumber = BrandedNumber | RecursiveNumber
+
+def match_recursive_branded_enum(value: RecursiveNumber) -> None:
+    match value:
+        case Number.ONE:
+            reveal_type(value)  # revealed: BrandedNumber & Literal[Number.ONE]
+        case Number.TWO:
+            reveal_type(value)  # revealed: BrandedNumber & Literal[Number.TWO]
+```
+
+A recursive alias that changes its specialization can also contain values outside the enum. Since
+`True` compares equal to `Number.ONE`, both branches preserve the possible boolean values.
+
+```py
+type Changing[T] = T | Changing[bool]
+
+def match_changing_specialization(value: Changing[BrandedNumber]) -> None:
+    match value:
+        case Number.ONE:
+            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+        case _:
+            reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
 ```
 
 ## Value patterns with guard

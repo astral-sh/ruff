@@ -121,6 +121,18 @@ def f(value: Not[E]) -> None:
         value.does_not_exist  # no error (unreachable branch)
 ```
 
+A `NewType` negation removes its static tag, not the runtime objects of its base: an integer without
+that tag can still be identical to the integer passed into the `NewType` constructor.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+
+def f(value: Not[UserId]) -> None:
+    reveal_type(value is 1)  # revealed: bool
+```
+
 After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true
 when `value` has also been narrowed to `A`, so the inner branch is unreachable.
 

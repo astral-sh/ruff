@@ -533,6 +533,25 @@ def _(x: Unrelated | Invariant[int]):
         reveal_type(x)  # revealed: Unrelated
 ```
 
+## `TypeIs` narrowing of `NewType` instances
+
+`NewType` constructors return their arguments unchanged, so an integer-based `NewType` can contain a
+`bool`. A `TypeIs[bool]` guard preserves both the `NewType` and its runtime class.
+
+```py
+from typing import NewType
+from typing_extensions import TypeIs
+
+UserId = NewType("UserId", int)
+
+def is_bool(value: object) -> TypeIs[bool]:
+    return isinstance(value, bool)
+
+def _(value: UserId):
+    if is_bool(value):
+        reveal_type(value)  # revealed: UserId & bool
+```
+
 ## `TypeGuard` special cases
 
 ```py

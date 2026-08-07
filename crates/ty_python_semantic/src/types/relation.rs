@@ -3521,6 +3521,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (
+                Type::NewTypeInstance(newtype),
+                other @ (Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_)),
+            )
+            | (
+                other @ (Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_)),
+                Type::NewTypeInstance(newtype),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, newtype.concrete_base_type(db), other)
+            }),
+
             (Type::TypeIs(_) | Type::TypeGuard(_), _)
             | (_, Type::TypeIs(_) | Type::TypeGuard(_)) => self.always(),
 
