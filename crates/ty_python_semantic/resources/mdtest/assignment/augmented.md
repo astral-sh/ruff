@@ -187,74 +187,63 @@ def f(flag: bool, flag2: bool):
     reveal_type(f)  # revealed: float | str
 ```
 
-## Annotated name targets
+## Declared attributes with in-place operators
 
-An augmented assignment to an annotated name must validate its result against the declaration. An
-unannotated name can instead change type.
+`+=` assigns the value returned by `__iadd__` back to its target. That value must be compatible with
+the attribute's declared type.
 
 ```py
 class Value:
-    def __add__(self, other: int) -> object:
-        return other
-
-annotated: Value = Value()
-# error: [invalid-assignment]
-annotated += 1
-reveal_type(annotated)  # revealed: Value
-
-inferred = Value()
-inferred += 1
-reveal_type(inferred)  # revealed: object
-```
-
-## Attribute targets
-
-The result must satisfy the attribute's write contract, whether the operation uses `__iadd__` or
-falls back to `__add__`.
-
-```py
-class AddValue:
-    def __add__(self, other: int) -> object:
-        return other
-
-class InplaceValue:
-    def __iadd__(self, other: int) -> object:
-        return other
+    def __iadd__(self, other: int) -> str:
+        return "updated"
 
 class Holder:
-    add: AddValue
-    inplace: InplaceValue
+    value: Value
 
 holder = Holder()
 # error: [invalid-assignment]
-holder.add += 1
-reveal_type(holder.add)  # revealed: AddValue
-
-# error: [invalid-assignment]
-holder.inplace += 1
-reveal_type(holder.inplace)  # revealed: InplaceValue
+holder.value += 1
+reveal_type(holder.value)  # revealed: Value
 ```
 
-## Inferred attribute targets in loops
+## Declared attributes without in-place operators
 
-An inferred attribute can change type across assignments. Its initial value must not become a
-declaration that pollutes the loop-carried type after the attribute has been reassigned.
+When an object does not define `__iadd__`, `+=` falls back to `__add__`. Its result must still be
+compatible with the attribute's declared type.
+
+```py
+class Value:
+    def __add__(self, other: int) -> str:
+        return "updated"
+
+class Holder:
+    value: Value
+
+holder = Holder()
+# error: [invalid-assignment]
+holder.value += 1
+```
+
+## Inferred attributes in loops
+
+An unannotated instance attribute may change type. After its initial `None` value is replaced, an
+augmented assignment inside a loop must also contribute its result to the inferred attribute type.
 
 ```py
 class Counter:
-    def update(self, increment: float) -> None:
+    def update(self) -> None:
         self.value = None
         self.value = 0
         for _ in range(1):
-            self.value += increment
+            self.value += 1.0
 
 reveal_type(Counter().value)  # revealed: None | float
 ```
 
-## Inferred public attribute targets
+## Inferred class attributes
 
-An inferred class attribute has the same public write contract for augmented and ordinary
-assignments.
+An unannotated class attribute still has an inferred type that restricts assignments through an
+instance.
 
 ```py
 class Holder:
@@ -265,10 +254,10 @@ holder = Holder()
 holder.value += 0.5
 ```
 
-## Attribute descriptors
+## Read-only properties
 
-Even an in-place operation writes its result back, so a read-only property rejects augmented
-assignment.
+`+=` writes its result back to the attribute. A property without a setter therefore cannot be the
+target of an augmented assignment.
 
 ```py
 class ReadOnly:
@@ -279,32 +268,32 @@ class ReadOnly:
 read_only = ReadOnly()
 # error: [invalid-assignment]
 read_only.value += 1
-reveal_type(read_only.value)  # revealed: int
 ```
 
-A property's setter can accept a different type than its getter returns. The operation's result must
-satisfy the setter, while later reads continue to use the getter type.
+## Properties with different getter and setter types
+
+A property can accept a wider type in its setter than it returns from its getter. The result of `/=`
+is checked against the setter, while subsequent reads still use the getter's return type.
 
 ```py
-class ReadValue:
-    def __iadd__(self, other: int) -> str:
-        return "updated"
-
-class Writable:
+class Counter:
     @property
-    def value(self) -> ReadValue:
-        return ReadValue()
+    def value(self) -> int:
+        return 1
 
     @value.setter
-    def value(self, value: str) -> None:
+    def value(self, value: float) -> None:
         pass
 
-writable = Writable()
-writable.value += 1
-reveal_type(writable.value)  # revealed: ReadValue
+counter = Counter()
+counter.value /= 2
+reveal_type(counter.value)  # revealed: int
 ```
 
-Unannotated data descriptors still impose the write contract declared by their setter.
+## Attributes defined by descriptors
+
+When an unannotated class attribute is a data descriptor, its `__set__` method determines which
+values may be assigned.
 
 ```py
 class Descriptor:
@@ -314,94 +303,98 @@ class Descriptor:
     def __set__(self, instance: object, value: str) -> None:
         pass
 
-class Custom:
+class Holder:
     value = Descriptor()
 
-custom = Custom()
+holder = Holder()
 # error: [invalid-assignment]
-custom.value += 1
+holder.value += 1
 ```
 
-## Subscript targets
+## Custom subscript assignments
 
-An augmented subscript assignment must pass its result, not the operator's right-hand operand, to
-the target's `__setitem__` method.
+`/=` first reads an item, then writes the result back through `__setitem__`. The assigned value is
+the result of the operation, not the right-hand operand.
 
 ```py
-class Value:
-    def __iadd__(self, other: int) -> object:
-        return other
-
 class Container:
-    def __getitem__(self, key: int) -> Value:
-        return Value()
+    def __getitem__(self, key: int) -> int:
+        return 1
 
-    def __setitem__(self, key: int, value: Value) -> None:
+    def __setitem__(self, key: int, value: int) -> None:
         pass
 
 container = Container()
 # error: [invalid-assignment]
-container[0] += 1
-reveal_type(container[0])  # revealed: Value
+container[0] /= 2
+reveal_type(container[0])  # revealed: int
 ```
 
-A custom setter may accept a broader type than its getter returns.
+## Subscript setters with different value types
+
+A collection can accept a wider type in `__setitem__` than `__getitem__` returns. After a valid
+assignment, subsequent reads still use the return type of `__getitem__`.
 
 ```py
-class PermissiveContainer:
-    def __getitem__(self, key: int) -> Value:
-        return Value()
+class Container:
+    def __getitem__(self, key: int) -> int:
+        return 1
 
-    def __setitem__(self, key: int, value: object) -> None:
+    def __setitem__(self, key: int, value: float) -> None:
         pass
 
-permissive = PermissiveContainer()
-permissive[0] += 1
-reveal_type(permissive[0])  # revealed: Value
+container = Container()
+container[0] /= 2
+reveal_type(container[0])  # revealed: int
 ```
 
-Explicitly annotated lists and dictionaries retain their write contracts.
+## Annotated collection entries
+
+An annotation fixes the element type of a list, so `/=` cannot write a `float` into a `list[int]`.
 
 ```py
-items: list[Value] = [Value()]
+values: list[int] = [1]
 # error: [invalid-assignment]
-items[0] += 1
-reveal_type(items[0])  # revealed: Value
-
-mapping: dict[str, Value] = {"value": Value()}
-# error: [invalid-assignment]
-mapping["value"] += 1
-reveal_type(mapping["value"])  # revealed: Value
+values[0] /= 2
 ```
 
-Declared collection-valued attributes also retain their write contracts.
+The same rule applies to the value type of an annotated dictionary.
+
+```py
+mapping: dict[str, int] = {"value": 1}
+# error: [invalid-assignment]
+mapping["value"] /= 2
+```
+
+An annotated collection remains constrained when it is accessed through an attribute.
 
 ```py
 class Holder:
-    values: list[Value]
+    values: list[int]
 
 holder = Holder()
 # error: [invalid-assignment]
-holder.values[0] += 1
+holder.values[0] /= 2
 ```
 
-Typed dictionary entries validate the value written back to their declared fields.
+## Typed dictionary entries
+
+A `TypedDict` field can only be assigned a value compatible with its declared type.
 
 ```py
 from typing import TypedDict
 
 class Payload(TypedDict):
-    value: Value
+    value: int
 
-payload: Payload = {"value": Value()}
+payload: Payload = {"value": 1}
 # error: [invalid-assignment]
-payload["value"] += 1
-reveal_type(payload["value"])  # revealed: Value
+payload["value"] /= 2
 ```
 
 ## Read-only subscripts
 
-A readable subscript is not necessarily writable.
+A readable item cannot be reassigned when its container does not implement `__setitem__`.
 
 ```py
 values: tuple[int] = (1,)
@@ -409,10 +402,10 @@ values: tuple[int] = (1,)
 values[0] += 1
 ```
 
-## Failed attribute loads
+## Missing attributes
 
-A missing attribute prevents the assignment from reaching its write phase, so the failed read is
-reported only once.
+If an augmented assignment cannot read its target, it must report that failure only once; no
+assignment is attempted.
 
 ```py
 class Missing: ...
@@ -422,20 +415,7 @@ missing = Missing()
 missing.value += 1
 ```
 
-Missing attributes on functions and classes also fail before the write phase.
-
-```py
-def callback() -> None:
-    pass
-
-# error: [unresolved-attribute]
-callback.count += 1
-
-# error: [unresolved-attribute]
-Missing.value += 1
-```
-
-An attribute that is missing from one union alternative likewise cannot be written.
+The same applies when an attribute is missing from one member of a union.
 
 ```py
 class Counter:
@@ -446,24 +426,29 @@ def update(counter: Counter | None) -> None:
     counter.count += 1
 ```
 
-## Failed subscript loads
+## Invalid subscript reads
 
-A failed subscript read also prevents the assignment from reaching its write phase.
+An invalid key prevents an item from being read, so the failed assignment must not produce a second
+error.
 
 ```py
 mapping: dict[str, int] = {}
 # error: [invalid-argument-type]
 mapping[1] += 1
+```
 
+A value without `__getitem__` also fails before assignment can be attempted.
+
+```py
 value = 1
 # error: [not-subscriptable]
 value[0] += 1
 ```
 
-## Failed loads still infer the right-hand side
+## Right-hand-side errors after failed reads
 
-The right-hand side is still inferred after a failed read so that its independent errors are
-reported.
+Even when an attribute cannot be read, the right-hand side must still be checked for unrelated
+errors.
 
 ```py
 class Missing: ...
@@ -472,21 +457,25 @@ missing = Missing()
 # error: [unresolved-attribute]
 # error: [unresolved-reference]
 missing.value += missing_attribute_operand
+```
 
+The same rule applies when a subscript cannot be read.
+
+```py
 mapping: dict[str, int] = {}
 # error: [invalid-argument-type]
 # error: [unresolved-reference]
 mapping[1] += missing_subscript_operand
 ```
 
-## Failed augmented operations
+## Failed in-place operations
 
-An operation that cannot run does not perform a store.
+If `__iadd__` rejects its operand, its return type must not be treated as a value to assign.
 
 ```py
 class Value:
-    def __iadd__(self, other: int) -> object:
-        return other
+    def __iadd__(self, other: int) -> str:
+        return "updated"
 
 class Holder:
     value: Value
@@ -496,10 +485,11 @@ holder = Holder()
 holder.value += "invalid"
 ```
 
-## Correlated union targets
+## Union attribute assignments
 
-The result of an operation on one union member must not be checked against another member's write
-contract.
+When objects in a union have different attribute types, each operator result should be checked
+against the attribute from the same object. Ordinary assignments already lose this relationship, so
+augmented assignments currently report the same false positive.
 
 ```py
 class AValue:
@@ -517,14 +507,15 @@ class B:
     value: BValue
 
 def update(value: A | B) -> None:
-    # TODO: Preserve receiver correlation, which is also lost in ordinary assignments.
+    # TODO: Check each result against the attribute it came from.
     # error: [invalid-assignment]
     value.value += 1
 ```
 
-## Union subscript targets
+## Collections that may be read-only
 
-An augmented assignment must reject a union alternative that does not support the write.
+When a collection could be a writable list or a read-only tuple, an item assignment is invalid
+because it cannot be performed on every possible value.
 
 ```py
 def update(value: list[int] | tuple[int, ...]) -> None:
@@ -532,32 +523,31 @@ def update(value: list[int] | tuple[int, ...]) -> None:
     value[0] += 1
 ```
 
-## Union subscript keys
+## Typed dictionary assignments with multiple possible keys
 
-Each possible typed-dictionary key must accept the value written by the augmented assignment.
+A key that can select fields with different value types must only be assigned a value accepted by
+every possible field.
 
 ```py
 from typing import Literal, TypedDict
 
 class Payload(TypedDict):
-    first: int
-    second: int
+    whole: int
+    fractional: float
 
-def update(value: Payload, key: Literal["first", "second"]) -> None:
-    value[key] += 1
-
-    # error: [invalid-assignment]
+def update(value: Payload, key: Literal["whole", "fractional"]) -> None:
     # error: [invalid-assignment]
     value[key] /= 2
 ```
 
-## Inferred collection targets
+## Inferred collection entries
 
-Augmented assignments do not yet participate in full-scope collection inference.
+Augmented assignments are not yet included when inferring the element type of an unannotated
+collection.
 
 ```py
 values = [1]
-# TODO: This should widen the inferred element type without reporting an error.
+# TODO: Infer `list[float]` instead of rejecting the assignment.
 # error: [invalid-assignment]
 values[0] /= 2
 ```
