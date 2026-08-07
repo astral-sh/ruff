@@ -1,7 +1,6 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::ScopeId;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -72,14 +71,10 @@ impl Violation for MutableDataclassDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(
-    checker: &Checker,
-    class_def: &ast::StmtClassDef,
-    scope_id: ScopeId,
-) {
+pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic, scope_id) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 

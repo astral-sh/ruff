@@ -101,7 +101,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
     match current_scope.kind {
         ScopeKind::Class(class_def) => {
             if !matches!(
-                dataclass_kind(class_def, checker.semantic(), checker.semantic().scope_id),
+                dataclass_kind(class_def, checker.semantic()),
                 Some((DataclassKind::Stdlib, _))
             ) {
                 return;

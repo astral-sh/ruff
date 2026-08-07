@@ -63,9 +63,7 @@ impl Violation for DataclassEnum {
 pub(crate) fn dataclass_enum(checker: &Checker, class_def: &StmtClassDef) {
     let semantic = checker.semantic();
 
-    let Some((DataclassKind::Stdlib, decorator)) =
-        dataclass_kind(class_def, semantic, semantic.scope_id)
-    else {
+    let Some((DataclassKind::Stdlib, decorator)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
