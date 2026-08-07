@@ -4706,6 +4706,8 @@ struct ArgumentMatcher<'a, 'db> {
     next_positional: usize,
     first_excess_positional: Option<usize>,
     num_synthetic_args: usize,
+    /// Forwarded argument indices and the lengths of their fixed tuple prefixes and suffixes.
+    variable_length_positional_arguments: SmallVec<[(usize, usize, usize); 1]>,
     variadic_argument_matched_to_variadic_parameter: bool,
 
     /// Parameter indices that have explicit keyword arguments (e.g., `foo=value`).
@@ -4741,6 +4743,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             next_positional: 0,
             first_excess_positional: None,
             num_synthetic_args: 0,
+            variable_length_positional_arguments: SmallVec::new(),
             variadic_argument_matched_to_variadic_parameter: false,
             explicit_keyword_parameters,
         }
@@ -4803,6 +4806,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         matched_argument.parameters.push(MatchedParameter {
             index: parameter_index,
             argument_type,
+            expected_type: None,
             provenance,
         });
         matched_argument.matched = true;
@@ -5034,6 +5038,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // `variable_element.is_some()`) or if we have a union of different fixed-length tuples (in
         // which case `variable_element.is_none()`).
         let is_variable = length.is_variable();
+        if let TupleLength::Variable(prefix, suffix) = length {
+            self.variable_length_positional_arguments
+                .push((argument_index, prefix, suffix));
+        }
         let has_fixed_union_tail = is_variable && variable_element.is_none();
 
         // We must be able to match up the fixed-length portion of the argument with positional
@@ -5214,6 +5222,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 matched_argument.parameters.push(MatchedParameter {
                     index: parameter_index,
                     argument_type: Some(extra_items_ty),
+                    expected_type: None,
                     provenance: InvalidArgumentTypeProvenance::Argument,
                 });
             }
@@ -5242,7 +5251,121 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
-    fn finish(self) -> Box<[MatchedArgument<'db>]> {
+    /// Checks the positional requirements encoded inside an unpacked variadic annotation.
+    ///
+    /// Unlike ordinary `*args`, an unpacked tuple can require arguments and prescribe a different
+    /// type for each position:
+    ///
+    /// ```python
+    /// def callback(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
+    ///
+    /// callback(1, b"last")
+    /// callback(1, "middle", b"last")
+    /// ```
+    ///
+    /// Store each matched tuple element separately so ordinary argument checking and inference can
+    /// use its type instead of the complete tuple annotation.
+    fn match_unpacked_variadic(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        missing: &mut Vec<ParameterContext>,
+    ) {
+        let Some((parameter_index, parameter)) = self.parameters.variadic() else {
+            return;
+        };
+        if !parameter.has_starred_annotation() {
+            return;
+        }
+        let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db) else {
+            return;
+        };
+
+        let matched_arguments = || {
+            self.argument_matches
+                .iter()
+                .enumerate()
+                .flat_map(|(argument_index, argument)| {
+                    let match_count = argument.parameters.len();
+                    argument
+                        .parameters
+                        .iter()
+                        .enumerate()
+                        .filter(move |(_, matched)| matched.index == parameter_index)
+                        .map(move |(position, _)| (argument_index, position, match_count))
+                })
+        };
+        let is_variable_match = |argument_index, position, match_count: usize| {
+            self.variable_length_positional_arguments
+                .iter()
+                .find(|(index, _, _)| *index == argument_index)
+                .is_some_and(|(_, prefix, suffix)| {
+                    position >= *prefix && position < match_count.saturating_sub(*suffix)
+                })
+        };
+        let argument_count = matched_arguments().count();
+        let first_variable = matched_arguments().position(|(argument_index, position, count)| {
+            is_variable_match(argument_index, position, count)
+        });
+        let last_variable = matched_arguments()
+            .enumerate()
+            .filter_map(|(index, (argument_index, position, count))| {
+                is_variable_match(argument_index, position, count).then_some(index)
+            })
+            .last();
+        let argument_length = first_variable
+            .zip(last_variable)
+            .map_or(TupleLength::Fixed(argument_count), |(first, last)| {
+                TupleLength::Variable(first, argument_count.saturating_sub(last + 1))
+            });
+
+        if !argument_length.is_variable() && argument_count < tuple.len().minimum() {
+            missing.push(ParameterContext::new(parameter, parameter_index, false));
+            return;
+        }
+
+        if let Some(maximum) = tuple.len().maximum()
+            && argument_length.minimum() > maximum
+        {
+            let first_excess_argument_index = matched_arguments()
+                .nth(maximum)
+                .and_then(|(argument_index, _, _)| self.get_argument_index(argument_index));
+            self.errors.push(BindingError::TooManyPositionalArguments {
+                first_excess_argument_index,
+                expected_positional_count: self.parameters.positional().count() + maximum,
+                provided_positional_count: self.next_positional,
+            });
+            return;
+        }
+
+        let Ok(expected) = tuple.resize(db, env, argument_length) else {
+            return;
+        };
+        let variable_type = expected.variable_element_type(db);
+        let mut expected_types = expected.iter_element_types(db);
+        for (position, matched) in self
+            .argument_matches
+            .iter_mut()
+            .flat_map(|argument| argument.parameters.iter_mut())
+            .filter(|matched| matched.index == parameter_index)
+            .enumerate()
+        {
+            matched.expected_type = if first_variable
+                .zip(last_variable)
+                .is_some_and(|(first, last)| position > first && position <= last)
+            {
+                variable_type
+            } else {
+                expected_types.next()
+            };
+        }
+    }
+
+    fn finish(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Box<[MatchedArgument<'db>]> {
         if let Some(first_excess_argument_index) = self.first_excess_positional {
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
@@ -5280,6 +5403,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 missing.push(ParameterContext::new(param, index, false));
             }
         }
+        self.match_unpacked_variadic(db, env, &mut missing);
         if !missing.is_empty() {
             self.errors.push(BindingError::MissingArguments {
                 parameters: ParameterContexts(missing),
@@ -5833,7 +5957,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             continue;
                         }
 
-                        let formal = parameters[parameter_index].annotated_type();
+                        let formal = matched_parameter
+                            .expected_type
+                            .unwrap_or_else(|| parameters[parameter_index].annotated_type());
                         let actual = matched_parameter
                             .argument_type
                             .unwrap_or_else(|| argument_types.get_for_declared_type(formal));
@@ -5865,15 +5991,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
                 let parameter = &parameters[parameter_index];
-                let declared_type = parameter.annotated_type();
+                let parameter_type = parameter.annotated_type();
                 // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
-                // tuple. Until then, skip per-argument inference.
+                // tuple. Fixed elements beside that pack can still infer ordinary type variables.
                 if parameter.has_starred_annotation()
+                    && matched_parameter.expected_type.is_none()
                     && (matches!(
-                        declared_type,
+                        parameter_type,
                         Type::TypeVar(typevar) if typevar.is_typevartuple(db)
                     ) || matches!(
-                        declared_type.exact_tuple_instance_spec(db).as_deref(),
+                        parameter_type.exact_tuple_instance_spec(db).as_deref(),
                         Some(TupleSpec::Variable(variable))
                             if matches!(
                                 variable.variable(),
@@ -5887,6 +6014,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 }
 
+                let declared_type = matched_parameter.expected_type.unwrap_or(parameter_type);
                 let argument_type = argument_types.get_for_declared_type(declared_type);
                 let specialization_result = builder.infer(
                     declared_type,
@@ -5968,7 +6096,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 Type::SubclassOf(subclass_of) if subclass_of.into_type_var().is_some()
             );
 
-        let mut expected_ty = parameter.annotated_type();
+        let mut expected_ty = matched_parameter
+            .expected_type
+            .unwrap_or_else(|| parameter.annotated_type());
         if let Some(specialization) = self.specialization() {
             if !constructor_receiver {
                 argument_type = argument_type.apply_specialization(db, specialization);
@@ -6005,10 +6135,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // constraint set that we get from this assignability check, instead of inferring and
         // building them in an earlier separate step.
         //
-        // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
+        // An unresolved `*Ts` still has no per-element expected type.
         if !self.constraint_set_errors[argument_index]
             && !constructor_receiver
-            && !parameter.has_starred_annotation()
+            && (!parameter.has_starred_annotation() || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
             && argument_type
                 .when_assignable_to(
@@ -6530,6 +6660,9 @@ pub struct MatchedParameter<'db> {
     /// matching runs.
     argument_type: Option<Type<'db>>,
 
+    /// The tuple element expected at this position in an unpacked variadic parameter.
+    expected_type: Option<Type<'db>>,
+
     /// Why this parameter match exists.
     provenance: InvalidArgumentTypeProvenance,
 }
@@ -7034,13 +7167,15 @@ impl<'db> Binding<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Option<ArgumentTypeContext<'db>> {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
-        let [parameter] = argument_matches.parameters.as_slice() else {
+        let [matched_parameter] = argument_matches.parameters.as_slice() else {
             return None;
         };
 
-        let parameter = &self.signature.parameters()[parameter.index];
-        let mut parameter_type = parameter.annotated_type();
-        let original_parameter_type = parameter_type;
+        let parameter = &self.signature.parameters()[matched_parameter.index];
+        let original_parameter_type = parameter.annotated_type();
+        let mut parameter_type = matched_parameter
+            .expected_type
+            .unwrap_or(original_parameter_type);
         let paramspec_callable = |paramspec| {
             let Type::Callable(callable) = self
                 .specialization(db)
@@ -7268,7 +7403,7 @@ impl<'db> Binding<'db> {
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
-        self.argument_matches = matcher.finish();
+        self.argument_matches = matcher.finish(db, env);
     }
 
     fn check_types(
