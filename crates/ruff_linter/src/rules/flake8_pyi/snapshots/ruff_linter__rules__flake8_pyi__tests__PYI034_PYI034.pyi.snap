@@ -13,10 +13,11 @@ PYI034 [*] `__new__` methods in classes like `Bad` usually return `self` at runt
    |
 help: Use `Self` as return type
    |
+ 7 ~ import typing
+ 8 | from abc import ABCMeta, abstractmethod
+ …
 21 |         cls, *args: Any, **kwargs: Any
-   -     ) -> Bad: ...  # Y034 "__new__" methods usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__new__", e.g. "def __new__(cls, *args: Any, **kwargs: Any) -> Self: ..."
-22 +     ) -> typing.Self: ...  # Y034 "__new__" methods usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__new__", e.g. "def __new__(cls, *args: Any, **kwargs: Any) -> Self: ..."
-23 |     def __repr__(
+22 ~     ) -> typing.Self: ...  # Y034 "__new__" methods usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__new__", e.g. "def __new__(cls, *args: Any, **kwargs: Any) -> Self: ..."
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +33,11 @@ PYI034 [*] `__enter__` methods in classes like `Bad` usually return `self` at ru
    |
 help: Use `Self` as return type
    |
+ 7 ~ import typing
+ 8 | from abc import ABCMeta, abstractmethod
+ …
 36 |         self,
-   -     ) -> Bad: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
-37 +     ) -> typing.Self: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
-38 |     async def __aenter__(
+37 ~     ) -> typing.Self: ...  # Y034 "__enter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__enter__", e.g. "def __enter__(self) -> Self: ..."
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +53,11 @@ PYI034 [*] `__aenter__` methods in classes like `Bad` usually return `self` at r
    |
 help: Use `Self` as return type
    |
+ 7 ~ import typing
+ 8 | from abc import ABCMeta, abstractmethod
+ …
 39 |         self,
-   -     ) -> Bad: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
-40 +     ) -> typing.Self: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
-41 |     def __iadd__(
+40 ~     ) -> typing.Self: ...  # Y034 "__aenter__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__aenter__", e.g. "async def __aenter__(self) -> Self: ..."
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,10 +73,11 @@ PYI034 [*] `__iadd__` methods in classes like `Bad` usually return `self` at run
    |
 help: Use `Self` as return type
    |
+ 7 ~ import typing
+ 8 | from abc import ABCMeta, abstractmethod
+ …
 42 |         self, other: Bad
-   -     ) -> Bad: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
-43 +     ) -> typing.Self: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
-44 |
+43 ~     ) -> typing.Self: ...  # Y034 "__iadd__" methods in classes like "Bad" usually return "self" at runtime. Consider using "typing_extensions.Self" in "Bad.__iadd__", e.g. "def __iadd__(self, other: Bad) -> Self: ..."
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,12 +92,11 @@ PYI034 [*] `__iter__` methods in classes like `BadIterator1` usually return `sel
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 105 |         self,
-    -     ) -> Iterator[
-    -         int
-    -     ]: ...  # Y034 "__iter__" methods in classes like "BadIterator1" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator1.__iter__", e.g. "def __iter__(self) -> Self: ..."
-106 +     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator1" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator1.__iter__", e.g. "def __iter__(self) -> Self: ..."
-107 |
+106 ~     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator1" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator1.__iter__", e.g. "def __iter__(self) -> Self: ..."
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -109,12 +112,11 @@ PYI034 [*] `__iter__` methods in classes like `BadIterator2` usually return `sel
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 114 |         self,
-    -     ) -> Iterator[
-    -         int
-    -     ]: ...  # Y034 "__iter__" methods in classes like "BadIterator2" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator2.__iter__", e.g. "def __iter__(self) -> Self: ..."
-115 +     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator2" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator2.__iter__", e.g. "def __iter__(self) -> Self: ..."
-116 |
+115 ~     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator2" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator2.__iter__", e.g. "def __iter__(self) -> Self: ..."
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -130,12 +132,11 @@ PYI034 [*] `__iter__` methods in classes like `BadIterator3` usually return `sel
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 123 |         self,
-    -     ) -> collections.abc.Iterator[
-    -         int
-    -     ]: ...  # Y034 "__iter__" methods in classes like "BadIterator3" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator3.__iter__", e.g. "def __iter__(self) -> Self: ..."
-124 +     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator3" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator3.__iter__", e.g. "def __iter__(self) -> Self: ..."
-125 |
+124 ~     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator3" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator3.__iter__", e.g. "def __iter__(self) -> Self: ..."
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -151,12 +152,11 @@ PYI034 [*] `__iter__` methods in classes like `BadIterator4` usually return `sel
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 131 |         self,
-    -     ) -> Iterable[
-    -         int
-    -     ]: ...  # Y034 "__iter__" methods in classes like "BadIterator4" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator4.__iter__", e.g. "def __iter__(self) -> Self: ..."
-132 +     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator4" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator4.__iter__", e.g. "def __iter__(self) -> Self: ..."
-133 |
+132 ~     ) -> typing.Self: ...  # Y034 "__iter__" methods in classes like "BadIterator4" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadIterator4.__iter__", e.g. "def __iter__(self) -> Self: ..."
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -171,12 +171,11 @@ PYI034 [*] `__aiter__` methods in classes like `BadAsyncIterator` usually return
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 145 |         self,
-    -     ) -> typing.AsyncIterator[
-    -         str
-    -     ]: ...  # Y034 "__aiter__" methods in classes like "BadAsyncIterator" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadAsyncIterator.__aiter__", e.g. "def __aiter__(self) -> Self: ..."  # Y022 Use "collections.abc.AsyncIterator[T]" instead of "typing.AsyncIterator[T]" (PEP 585 syntax)
-146 +     ) -> typing.Self: ...  # Y034 "__aiter__" methods in classes like "BadAsyncIterator" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadAsyncIterator.__aiter__", e.g. "def __aiter__(self) -> Self: ..."  # Y022 Use "collections.abc.AsyncIterator[T]" instead of "typing.AsyncIterator[T]" (PEP 585 syntax)
-147 |
+146 ~     ) -> typing.Self: ...  # Y034 "__aiter__" methods in classes like "BadAsyncIterator" usually return "self" at runtime. Consider using "typing_extensions.Self" in "BadAsyncIterator.__aiter__", e.g. "def __aiter__(self) -> Self: ..."  # Y022 Use "collections.abc.AsyncIterator[T]" instead of "typing.AsyncIterator[T]" (PEP 585 syntax)
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -190,10 +189,11 @@ PYI034 [*] `__new__` methods in classes like `NonGeneric1` usually return `self`
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 220 | class NonGeneric1(tuple):
-    -     def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
-221 +     def __new__(cls, *args, **kwargs) -> typing.Self: ...
-222 |     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
+221 ~     def __new__(cls, *args, **kwargs) -> typing.Self: ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -209,10 +209,11 @@ PYI034 [*] `__enter__` methods in classes like `NonGeneric1` usually return `sel
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 221 |     def __new__(cls: type[NonGeneric1], *args, **kwargs) -> NonGeneric1: ...
-    -     def __enter__(self: NonGeneric1) -> NonGeneric1: ...
-222 +     def __enter__(self) -> typing.Self: ...
-223 |
+222 ~     def __enter__(self) -> typing.Self: ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -227,10 +228,11 @@ PYI034 [*] `__new__` methods in classes like `NonGeneric2` usually return `self`
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 224 | class NonGeneric2(tuple):
-    -     def __new__(cls: Type[NonGeneric2]) -> NonGeneric2: ...
-225 +     def __new__(cls) -> typing.Self: ...
-226 |
+225 ~     def __new__(cls) -> typing.Self: ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -244,10 +246,11 @@ PYI034 [*] `__new__` methods in classes like `Generic1` usually return `self` at
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 227 | class Generic1[T](list):
-    -     def __new__(cls: type[Generic1]) -> Generic1: ...
-228 +     def __new__(cls) -> typing.Self: ...
-229 |     def __enter__(self: Generic1) -> Generic1: ...
+228 ~     def __new__(cls) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -260,10 +263,11 @@ PYI034 [*] `__enter__` methods in classes like `Generic1` usually return `self` 
     |         ^^^^^^^^^
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 228 |     def __new__(cls: type[Generic1]) -> Generic1: ...
-    -     def __enter__(self: Generic1) -> Generic1: ...
-229 +     def __enter__(self) -> typing.Self: ...
-230 |
+229 ~     def __enter__(self) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -277,10 +281,11 @@ PYI034 [*] `__new__` methods in classes like `Generic2` usually return `self` at
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 238 | class Generic2(Generic[T]):
-    -     def __new__(cls: type[Generic2]) -> Generic2: ...
-239 +     def __new__(cls) -> typing.Self: ...
-240 |     def __enter__(self: Generic2) -> Generic2: ...
+239 ~     def __new__(cls) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -296,10 +301,11 @@ PYI034 [*] `__enter__` methods in classes like `Generic2` usually return `self` 
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 239 |     def __new__(cls: type[Generic2]) -> Generic2: ...
-    -     def __enter__(self: Generic2) -> Generic2: ...
-240 +     def __enter__(self) -> typing.Self: ...
-241 |
+240 ~     def __enter__(self) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -313,10 +319,11 @@ PYI034 [*] `__new__` methods in classes like `Generic3` usually return `self` at
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 242 | class Generic3(tuple[*Ts]):
-    -     def __new__(cls: type[Generic3]) -> Generic3: ...
-243 +     def __new__(cls) -> typing.Self: ...
-244 |     def __enter__(self: Generic3) -> Generic3: ...
+243 ~     def __new__(cls) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -332,10 +339,11 @@ PYI034 [*] `__enter__` methods in classes like `Generic3` usually return `self` 
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 243 |     def __new__(cls: type[Generic3]) -> Generic3: ...
-    -     def __enter__(self: Generic3) -> Generic3: ...
-244 +     def __enter__(self) -> typing.Self: ...
-245 |
+244 ~     def __enter__(self) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -349,10 +357,11 @@ PYI034 [*] `__new__` methods in classes like `Generic4` usually return `self` at
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 246 | class Generic4(collections.abc.Callable[P, ...]):
-    -     def __new__(cls: type[Generic4]) -> Generic4: ...
-247 +     def __new__(cls) -> typing.Self: ...
-248 |     def __enter__(self: Generic4) -> Generic4: ...
+247 ~     def __new__(cls) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -368,10 +377,11 @@ PYI034 [*] `__enter__` methods in classes like `Generic4` usually return `self` 
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 247 |     def __new__(cls: type[Generic4]) -> Generic4: ...
-    -     def __enter__(self: Generic4) -> Generic4: ...
-248 +     def __enter__(self) -> typing.Self: ...
-249 |
+248 ~     def __enter__(self) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -385,10 +395,11 @@ PYI034 [*] `__new__` methods in classes like `Generic5` usually return `self` at
     |
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 252 | class Generic5(list[PotentialTypeVar]):
-    -     def __new__(cls: type[Generic5]) -> Generic5: ...
-253 +     def __new__(cls) -> typing.Self: ...
-254 |     def __enter__(self: Generic5) -> Generic5: ...
+253 ~     def __new__(cls) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -401,9 +412,10 @@ PYI034 [*] `__enter__` methods in classes like `Generic5` usually return `self` 
     |         ^^^^^^^^^
 help: Use `Self` as return type
     |
+  7 ~ import typing
+  8 | from abc import ABCMeta, abstractmethod
+  …
 253 |     def __new__(cls: type[Generic5]) -> Generic5: ...
-    -     def __enter__(self: Generic5) -> Generic5: ...
-254 +     def __enter__(self) -> typing.Self: ...
-255 |
+254 ~     def __enter__(self) -> typing.Self: ...
     |
 note: This is a display-only fix and is likely to be incorrect

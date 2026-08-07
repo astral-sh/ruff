@@ -12,10 +12,7 @@ D413 [*] Missing blank line after last section ("Returns")
 26 |     """
    |
 help: Add blank line after "Returns"
-   |
-25 |         None
-26 +
-27 |     """
+26 -     """
    |
 
 D413 [*] Missing blank line after last section ("Returns")
@@ -29,10 +26,7 @@ D413 [*] Missing blank line after last section ("Returns")
 52 |     """
    |
 help: Add blank line after "Returns"
-   |
-51 |         None
-52 +
-53 |     """
+52 -     """
    |
 
 D413 [*] Missing blank line after last section ("Notes")
@@ -46,8 +40,5 @@ D413 [*] Missing blank line after last section ("Notes")
 64 |     """
    |
 help: Add blank line after "Notes"
-   |
-63 |         This IS a real section and should still be detected.
-64 +
-65 |     """
+64 -     """
    |

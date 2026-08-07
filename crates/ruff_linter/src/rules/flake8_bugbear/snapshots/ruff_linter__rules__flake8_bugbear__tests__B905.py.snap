@@ -12,11 +12,8 @@ B905 [*] `zip()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-3 | # Errors
-  - zip("a", "b")
-4 + zip("a", "b", strict=False)
-5 | zip("a", "b", *zip("c"))
-  |
+4 | zip("a", "b", strict=False)
+  |             ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -31,11 +28,8 @@ B905 [*] `zip()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-4 | zip("a", "b")
-  - zip("a", "b", *zip("c"))
-5 + zip("a", "b", *zip("c"), strict=False)
-6 | zip(zip("a", "b"), strict=False)
-  |
+5 | zip("a", "b", *zip("c"), strict=False)
+  |                        ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -49,11 +43,8 @@ B905 [*] `zip()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-5 | zip("a", "b", *zip("c"))
-  - zip(zip("a", "b"), strict=False)
-6 + zip(zip("a", "b", strict=False), strict=False)
-7 | zip(zip("a", strict=True),"b")
-  |
+6 | zip(zip("a", "b", strict=False), strict=False)
+  |                 ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -68,11 +59,8 @@ B905 [*] `zip()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-6 | zip(zip("a", "b"), strict=False)
-  - zip(zip("a", strict=True),"b")
-7 + zip(zip("a", strict=True),"b", strict=False)
-8 |
-  |
+7 | zip(zip("a", strict=True),"b", strict=False)
+  |                              ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -85,11 +73,8 @@ B905 [*] `zip()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
    |
-21 | # Errors (limited iterators).
-   - zip([1, 2, 3], repeat(1, 1))
-22 + zip([1, 2, 3], repeat(1, 1), strict=False)
-23 | zip([1, 2, 3], repeat(1, times=4))
-   |
+22 | zip([1, 2, 3], repeat(1, 1), strict=False)
+   |                            ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -104,11 +89,8 @@ B905 [*] `zip()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
    |
-22 | zip([1, 2, 3], repeat(1, 1))
-   - zip([1, 2, 3], repeat(1, times=4))
-23 + zip([1, 2, 3], repeat(1, times=4), strict=False)
-24 |
-   |
+23 | zip([1, 2, 3], repeat(1, times=4), strict=False)
+   |                                  ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B905 [*] `zip()` without an explicit `strict=` parameter
@@ -120,8 +102,6 @@ B905 [*] `zip()` without an explicit `strict=` parameter
    | ^^^^^^^^^^^^^^^^^^^^^^
 help: Add explicit value for parameter `strict=`
    |
-33 | # Error
-   - zip(*lot_of_iterators)
-34 + zip(*lot_of_iterators, strict=False)
-   |
+34 | zip(*lot_of_iterators, strict=False)
+   |                      ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior

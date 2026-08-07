@@ -13,9 +13,7 @@ PYI018 [*] Private TypeVar `_T` is never used
   |
 help: Remove unused private TypeVar `_T`
   |
-5 |
-  - _T = typing.TypeVar("_T")
-6 | _Ts = typing_extensions.TypeVarTuple("_Ts")
+6 - _T = typing.TypeVar("_T")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,9 +28,7 @@ PYI018 [*] Private TypeVarTuple `_Ts` is never used
   |
 help: Remove unused private TypeVarTuple `_Ts`
   |
-6 | _T = typing.TypeVar("_T")
-  - _Ts = typing_extensions.TypeVarTuple("_Ts")
-7 | _P = ParamSpec("_P")
+7 - _Ts = typing_extensions.TypeVarTuple("_Ts")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,9 +44,7 @@ PYI018 [*] Private ParamSpec `_P` is never used
    |
 help: Remove unused private ParamSpec `_P`
   |
-7 | _Ts = typing_extensions.TypeVarTuple("_Ts")
-  - _P = ParamSpec("_P")
-8 | _P2 = typing.ParamSpec("_P2")
+8 - _P = ParamSpec("_P")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -64,11 +58,9 @@ PYI018 [*] Private ParamSpec `_P2` is never used
 10 | _Ts2 = TypeVarTuple("_Ts2")
    |
 help: Remove unused private ParamSpec `_P2`
-  |
-8 | _P = ParamSpec("_P")
-  - _P2 = typing.ParamSpec("_P2")
-9 | _Ts2 = TypeVarTuple("_Ts2")
-  |
+   |
+ 9 - _P2 = typing.ParamSpec("_P2")
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI018 [*] Private TypeVarTuple `_Ts2` is never used
@@ -83,8 +75,6 @@ PYI018 [*] Private TypeVarTuple `_Ts2` is never used
    |
 help: Remove unused private TypeVarTuple `_Ts2`
    |
-9  | _P2 = typing.ParamSpec("_P2")
-   - _Ts2 = TypeVarTuple("_Ts2")
-10 |
+10 - _Ts2 = TypeVarTuple("_Ts2")
    |
 note: This is an unsafe fix and may change runtime behavior

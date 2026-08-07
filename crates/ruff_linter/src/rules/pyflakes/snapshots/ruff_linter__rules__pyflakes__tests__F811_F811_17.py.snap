@@ -17,9 +17,7 @@ F811 [*] Redefinition of unused `fu` from line 2
   |        -- previous definition of `fu` here
 help: Remove definition: `fu`
   |
-5 | def bar():
-  -     import fu
-6 |
+6 -     import fu
   |
 
 F811 Redefinition of unused `fu` from line 6

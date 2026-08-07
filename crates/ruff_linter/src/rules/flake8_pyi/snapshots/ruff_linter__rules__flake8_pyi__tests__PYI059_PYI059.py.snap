@@ -13,10 +13,8 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
   |
-7 |
-  - class LinkedList(Generic[T], Sized):  # PYI059
+8 - class LinkedList(Generic[T], Sized):  # PYI059
 8 + class LinkedList(Sized, Generic[T]):  # PYI059
-9 |     def __init__(self) -> None:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -36,12 +34,8 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
    |
-15 | class MyMapping(  # PYI059
-   -     t.Generic[K, V],
-16 |     Iterable[Tuple[K, V]],
-   -     Container[Tuple[K, V]],
-17 +     Container[Tuple[K, V]], t.Generic[K, V],
-18 | ):
+16 ~     Iterable[Tuple[K, V]],
+17 ~     Container[Tuple[K, V]], t.Generic[K, V],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -56,10 +50,8 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
    |
-25 | # the Generic's position issue persists.
-   - class Foo(Generic, LinkedList):  # PYI059
+26 - class Foo(Generic, LinkedList):  # PYI059
 26 + class Foo(LinkedList, Generic):  # PYI059
-27 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -83,16 +75,10 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
    |
-32 |     # Part 2 of multiline comment 1
-   -     Generic[T]  # comment about Generic[T]  # PYI059
-   -     # another comment?
-   -     ,  # comment about the comma?
-33 +     # comment about the comma?
+33 ~     # comment about the comma?
 34 |     # part 1 of multiline comment 2
 35 |     # part 2 of multiline comment 2
-   -     int,  # comment about int
-36 +     int, Generic[T],  # comment about int
-37 |     # yet another comment?
+36 ~     int, Generic[T],  # comment about int
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -115,10 +101,8 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
    |
-58 | # https://github.com/astral-sh/ruff/issues/18602
-   - class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
+59 - class C1(Generic[T], str, **{"metaclass": type}):  # PYI059
 59 + class C1(str, Generic[T], **{"metaclass": type}):  # PYI059
-60 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -133,10 +117,8 @@ PYI059 [*] `Generic[]` should always be the last base class
    |
 help: Move `Generic[]` to the end
    |
-61 |
-   - class C2(Generic[T], str, metaclass=type):  # PYI059
+62 - class C2(Generic[T], str, metaclass=type):  # PYI059
 62 + class C2(str, Generic[T], metaclass=type):  # PYI059
-63 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 

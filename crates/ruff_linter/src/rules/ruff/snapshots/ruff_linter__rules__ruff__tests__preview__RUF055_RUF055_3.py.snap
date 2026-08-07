@@ -12,10 +12,8 @@ RUF055 [*] Plain string pattern passed to `re` function
   |
 help: Replace with `b_src.replace(rb"x", b"y")`
   |
-5 | # Should be replaced with `b_src.replace(rb"x", b"y")`
-  - re.sub(rb"x", b"y", b_src)
+6 - re.sub(rb"x", b"y", b_src)
 6 + b_src.replace(rb"x", b"y")
-7 |
   |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -27,12 +25,10 @@ RUF055 [*] Plain string pattern passed to `re` function
 10 |     pass
    |
 help: Replace with `b_src.startswith(rb"abc")`
-   |
-8  | # Should be replaced with `b_src.startswith(rb"abc")`
-   - if re.match(rb"abc", b_src):
-9  + if b_src.startswith(rb"abc"):
-10 |     pass
-   |
+  |
+9 - if re.match(rb"abc", b_src):
+9 + if b_src.startswith(rb"abc"):
+  |
 
 RUF055 [*] Plain string pattern passed to `re` function
   --> RUF055_3.py:13:4
@@ -44,10 +40,8 @@ RUF055 [*] Plain string pattern passed to `re` function
    |
 help: Replace with `rb"x" in b_src`
    |
-12 | # Should be replaced with `rb"x" in b_src`
-   - if re.search(rb"x", b_src):
+13 - if re.search(rb"x", b_src):
 13 + if rb"x" in b_src:
-14 |     pass
    |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -61,8 +55,6 @@ RUF055 [*] Plain string pattern passed to `re` function
    |
 help: Replace with `b_src.split(rb"abc")`
    |
-16 | # Should be replaced with `b_src.split(rb"abc")`
-   - re.split(rb"abc", b_src)
+17 - re.split(rb"abc", b_src)
 17 + b_src.split(rb"abc")
-18 |
    |

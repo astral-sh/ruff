@@ -11,14 +11,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
    |
 help: Replace with `Path("file.txt").read_text()`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 12 | # FURB101
-   - with open("file.txt") as f:
-   -     x = f.read()
 13 + x = pathlib.Path("file.txt").read_text()
-14 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
@@ -31,14 +29,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_bytes
    |
 help: Replace with `Path("file.txt").read_bytes()`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 16 | # FURB101
-   - with open("file.txt", "rb") as f:
-   -     x = f.read()
 17 + x = pathlib.Path("file.txt").read_bytes()
-18 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
@@ -51,14 +47,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_bytes
    |
 help: Replace with `Path("file.txt").read_bytes()`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 20 | # FURB101
-   - with open("file.txt", mode="rb") as f:
-   -     x = f.read()
 21 + x = pathlib.Path("file.txt").read_bytes()
-22 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf8")`
@@ -71,14 +65,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
    |
 help: Replace with `Path("file.txt").read_text(encoding="utf8")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 24 | # FURB101
-   - with open("file.txt", encoding="utf8") as f:
-   -     x = f.read()
 25 + x = pathlib.Path("file.txt").read_text(encoding="utf8")
-26 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(errors="ignore")`
@@ -91,14 +83,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
    |
 help: Replace with `Path("file.txt").read_text(errors="ignore")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 28 | # FURB101
-   - with open("file.txt", errors="ignore") as f:
-   -     x = f.read()
 29 + x = pathlib.Path("file.txt").read_text(errors="ignore")
-30 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text()`
@@ -111,14 +101,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
    |
 help: Replace with `Path("file.txt").read_text()`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 32 | # FURB101
-   - with open("file.txt", mode="r") as f:  # noqa: FURB120
-   -     x = f.read()
 33 + x = pathlib.Path("file.txt").read_text()
-34 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -176,14 +164,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
    |
 help: Replace with `Path("file.txt").read_text(newline="\r\n")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 85 | # FURB101 (newline is supported in read_text on Python 3.13+)
-   - with open("file.txt", newline="\r\n") as f:
-   -     x = f.read()
 86 + x = pathlib.Path("file.txt").read_text(newline="\r\n")
-87 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(newline="b")`
@@ -196,14 +182,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
    |
 help: Replace with `Path("file.txt").read_text(newline="b")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 89 | # FURB101 (dont mistake "newline" for "mode")
-   - with open("file.txt", newline="b") as f:
-   -     x = f.read()
 90 + x = pathlib.Path("file.txt").read_text(newline="b")
-91 |
    |
 
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8")`
@@ -216,14 +200,12 @@ FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(
     |
 help: Replace with `Path("file.txt").read_text(encoding="utf-8")`
     |
-1   + import pathlib
-2   | def foo():
---------------------------------------------------------------------------------
+  1 + import pathlib
+  2 | def foo():
+  3 |     ...
+  …
 130 | # FURB101
-    - with open("file.txt", encoding="utf-8") as f:
-    -     contents: str = f.read()
 131 + contents: str = pathlib.Path("file.txt").read_text(encoding="utf-8")
-132 |
     |
 
 FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8")`

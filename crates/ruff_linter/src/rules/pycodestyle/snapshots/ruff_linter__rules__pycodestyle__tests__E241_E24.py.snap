@@ -12,11 +12,8 @@ E241 [*] Multiple spaces after comma
   |
 help: Replace with single space
   |
-1 | #: E241
-  - a = (1,  2)
-2 + a = (1, 2)
-3 | #: Okay
-  |
+2 | a = (1, 2)
+  |        +
 
 E241 [*] Multiple spaces after comma
   --> E24.py:11:18
@@ -30,11 +27,8 @@ E241 [*] Multiple spaces after comma
    |
 help: Replace with single space
    |
-10 | # issue 135
-   - more_spaces = [a,    b,
-11 + more_spaces = [a, b,
-12 |                ef,  +h,
-   |
+11 | more_spaces = [a, b,
+   |                  +
 
 E241 [*] Multiple spaces after comma
   --> E24.py:12:19
@@ -47,11 +41,8 @@ E241 [*] Multiple spaces after comma
    |
 help: Replace with single space
    |
-11 | more_spaces = [a,    b,
-   -                ef,  +h,
-12 +                ef, +h,
-13 |                c,   -d]
-   |
+12 |                ef, +h,
+   |                   +
 
 E241 [*] Multiple spaces after comma
   --> E24.py:13:18
@@ -62,7 +53,5 @@ E241 [*] Multiple spaces after comma
    |                  ^^^
 help: Replace with single space
    |
-12 |                ef,  +h,
-   -                c,   -d]
-13 +                c, -d]
-   |
+13 |                c, -d]
+   |                  +

@@ -12,10 +12,8 @@ F541 [*] f-string without any placeholders
   |
 help: Remove extraneous `f` prefix
   |
-5 | # Errors
-  - c = f"def"
+6 - c = f"def"
 6 + c = "def"
-7 | d = f"def" + "ghi"
   |
 
 F541 [*] f-string without any placeholders
@@ -30,10 +28,8 @@ F541 [*] f-string without any placeholders
   |
 help: Remove extraneous `f` prefix
   |
-6 | c = f"def"
-  - d = f"def" + "ghi"
+7 - d = f"def" + "ghi"
 7 + d = "def" + "ghi"
-8 | e = (
   |
 
 F541 [*] f-string without any placeholders
@@ -47,12 +43,10 @@ F541 [*] f-string without any placeholders
 11 | )
    |
 help: Remove extraneous `f` prefix
-   |
-8  | e = (
-   -     f"def" +
-9  +     "def" +
-10 |     "ghi"
-   |
+  |
+9 -     f"def" +
+9 +     "def" +
+  |
 
 F541 [*] f-string without any placeholders
   --> F541.py:13:5
@@ -66,10 +60,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-12 | f = (
-   -     f"a"
+13 -     f"a"
 13 +     "a"
-14 |     F"b"
    |
 
 F541 [*] f-string without any placeholders
@@ -84,10 +76,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-13 |     f"a"
-   -     F"b"
+14 -     F"b"
 14 +     "b"
-15 |     "c"
    |
 
 F541 [*] f-string without any placeholders
@@ -102,10 +92,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-15 |     "c"
-   -     rf"d"
+16 -     rf"d"
 16 +     r"d"
-17 |     fr"e"
    |
 
 F541 [*] f-string without any placeholders
@@ -120,10 +108,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-16 |     rf"d"
-   -     fr"e"
+17 -     fr"e"
 17 +     r"e"
-18 | )
    |
 
 F541 [*] f-string without any placeholders
@@ -138,10 +124,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-18 | )
-   - g = f""
+19 - g = f""
 19 + g = ""
-20 |
    |
 
 F541 [*] f-string without any placeholders
@@ -155,10 +139,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-24 | # Error
-   - h = "x" "y" f"z"
+25 - h = "x" "y" f"z"
 25 + h = "x" "y" "z"
-26 |
    |
 
 F541 [*] f-string without any placeholders
@@ -172,10 +154,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-33 | # Errors
-   - f"{v:{f'0.2f'}}"
+34 - f"{v:{f'0.2f'}}"
 34 + f"{v:{'0.2f'}}"
-35 | f"{f''}"
    |
 
 F541 [*] f-string without any placeholders
@@ -190,10 +170,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-34 | f"{v:{f'0.2f'}}"
-   - f"{f''}"
+35 - f"{f''}"
 35 + f"{''}"
-36 | f"{{test}}"
    |
 
 F541 [*] f-string without any placeholders
@@ -208,10 +186,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-35 | f"{f''}"
-   - f"{{test}}"
+36 - f"{{test}}"
 36 + "{test}"
-37 | f'{{ 40 }}'
    |
 
 F541 [*] f-string without any placeholders
@@ -226,10 +202,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-36 | f"{{test}}"
-   - f'{{ 40 }}'
+37 - f'{{ 40 }}'
 37 + '{ 40 }'
-38 | f"{{a {{x}}"
    |
 
 F541 [*] f-string without any placeholders
@@ -244,10 +218,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-37 | f'{{ 40 }}'
-   - f"{{a {{x}}"
+38 - f"{{a {{x}}"
 38 + "{a {x}"
-39 | f"{{{{x}}}}"
    |
 
 F541 [*] f-string without any placeholders
@@ -262,10 +234,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-38 | f"{{a {{x}}"
-   - f"{{{{x}}}}"
+39 - f"{{{{x}}}}"
 39 + "{{x}}"
-40 | ""f""
    |
 
 F541 [*] f-string without any placeholders
@@ -280,10 +250,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-39 | f"{{{{x}}}}"
-   - ""f""
+40 - ""f""
 40 + "" ""
-41 | ''f""
    |
 
 F541 [*] f-string without any placeholders
@@ -298,10 +266,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-40 | ""f""
-   - ''f""
+41 - ''f""
 41 + ''""
-42 | (""f""r"")
    |
 
 F541 [*] f-string without any placeholders
@@ -316,10 +282,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-41 | ''f""
-   - (""f""r"")
+42 - (""f""r"")
 42 + ("" ""r"")
-43 | f"{v:{f"0.2f"}}"
    |
 
 F541 [*] f-string without any placeholders
@@ -333,10 +297,8 @@ F541 [*] f-string without any placeholders
    |
 help: Remove extraneous `f` prefix
    |
-42 | (""f""r"")
-   - f"{v:{f"0.2f"}}"
+43 - f"{v:{f"0.2f"}}"
 43 + f"{v:{"0.2f"}}"
-44 | f"\{{x}}"
    |
 
 F541 [*] f-string without any placeholders
@@ -348,7 +310,6 @@ F541 [*] f-string without any placeholders
    | ^^^^^^^^^
 help: Remove extraneous `f` prefix
    |
-43 | f"{v:{f"0.2f"}}"
-   - f"\{{x}}"
+44 - f"\{{x}}"
 44 + "\{x}"
    |

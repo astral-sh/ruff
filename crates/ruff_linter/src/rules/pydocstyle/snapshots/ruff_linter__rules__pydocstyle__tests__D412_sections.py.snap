@@ -11,8 +11,5 @@ D412 [*] No blank lines allowed between a section header and its content ("Short
 219 |     -------------
     |
 help: Remove blank line(s)
-    |
-219 |     -------------
-    -
-220 |     This is the function's description, which will also specify what it
+220 - 
     |

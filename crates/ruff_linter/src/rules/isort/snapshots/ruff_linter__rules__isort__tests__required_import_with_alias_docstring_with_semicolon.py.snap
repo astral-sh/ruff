@@ -5,6 +5,5 @@ I002 [*] Missing required import: `from __future__ import annotations as _annota
 --> docstring_with_semicolon.py:1:1
 help: Insert required import: `from __future__ import annotations as _annotations`
   |
-  - """Hello, world!"""; x = 1
-1 + """Hello, world!"""; from __future__ import annotations as _annotations; x = 1
-  |
+1 | """Hello, world!"""; from __future__ import annotations as _annotations; x = 1
+  |                      +++++++++++++++++++++++++++++++++++++++++++++++++++

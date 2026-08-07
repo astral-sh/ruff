@@ -13,11 +13,8 @@ E228 [*] Missing whitespace around modulo operator
     |
 help: Add missing whitespace
     |
-130 | #: E228
-    - a = b%c
-131 + a = b % c
-132 | #: E228
-    |
+131 | a = b % c
+    |      + +
 
 E228 [*] Missing whitespace around modulo operator
    --> E22.py:133:10
@@ -31,11 +28,8 @@ E228 [*] Missing whitespace around modulo operator
     |
 help: Add missing whitespace
     |
-132 | #: E228
-    - msg = fmt%(errno, errmsg)
-133 + msg = fmt % (errno, errmsg)
-134 | #: E228
-    |
+133 | msg = fmt % (errno, errmsg)
+    |          + +
 
 E228 [*] Missing whitespace around modulo operator
    --> E22.py:135:26
@@ -48,8 +42,5 @@ E228 [*] Missing whitespace around modulo operator
     |
 help: Add missing whitespace
     |
-134 | #: E228
-    - msg = "Error %d occurred"%errno
-135 + msg = "Error %d occurred" % errno
-136 | #:
-    |
+135 | msg = "Error %d occurred" % errno
+    |                          + +

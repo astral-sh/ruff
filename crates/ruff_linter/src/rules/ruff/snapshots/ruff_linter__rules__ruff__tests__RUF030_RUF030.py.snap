@@ -13,10 +13,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
   |
 help: Remove `print`
   |
-5 | # - single StringLiteral
-  - assert True, print("This print is not intentional.")
+6 - assert True, print("This print is not intentional.")
 6 + assert True, "This print is not intentional."
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-10 | # - single StringLiteral
-   - assert True, print("This print" " is not intentional.")
+11 - assert True, print("This print" " is not intentional.")
 11 + assert True, "This print is not intentional."
-12 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +47,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-15 | # - single StringLiteral concatenated with " "
-   - assert True, print("This print", "is not intentional")
+16 - assert True, print("This print", "is not intentional")
 16 + assert True, "This print is not intentional"
-17 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,10 +64,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-20 | # - single stringliteral concatenated with " " only between `print` and `is`
-   - assert True, print("This " "print", "is not intentional.")
+21 - assert True, print("This " "print", "is not intentional.")
 21 + assert True, "This print is not intentional."
-22 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -89,10 +81,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-25 | # - single FString concatenated with " "
-   - assert True, print("This", print.__name__, "is not intentional.")
+26 - assert True, print("This", print.__name__, "is not intentional.")
 26 + assert True, f"This {print.__name__} is not intentional."
-27 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,10 +98,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-30 | # - single StringLiteral concatenated with " "
-   - assert True, print("This print", 'is not intentional', """and should be removed""")
+31 - assert True, print("This print", 'is not intentional', """and should be removed""")
 31 + assert True, "This print is not intentional and should be removed"
-32 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -127,10 +115,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-35 | # - single StringLiteral concatenated with " " and escaped brackets
-   - assert True, print("This print", 'is not "intentional"', """and "should" be 'removed'""")
+36 - assert True, print("This print", 'is not "intentional"', """and "should" be 'removed'""")
 36 + assert True, "This print is not \"intentional\" and \"should\" be 'removed'"
-37 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -146,10 +132,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-40 | # - single StringLiteral concatenated with "|"
-   - assert True, print("This print", "is not intentional", sep="|")
+41 - assert True, print("This print", "is not intentional", sep="|")
 41 + assert True, "This print|is not intentional"
-42 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -165,10 +149,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-45 | # - single StringLiteral concatenated with " "
-   - assert True, print("This print", "is not intentional", sep=None)
+46 - assert True, print("This print", "is not intentional", sep=None)
 46 + assert True, "This print is not intentional"
-47 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -184,10 +166,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-50 | # - single FString concatenated with "{U00A0}"
-   - assert True, print("This print", "is not intentional", sep=U00A0)
+51 - assert True, print("This print", "is not intentional", sep=U00A0)
 51 + assert True, f"This print{U00A0}is not intentional"
-52 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -203,10 +183,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-55 | # - single StringLiteral
-   - assert True, print(f"This f-string is just a literal.")
+56 - assert True, print(f"This f-string is just a literal.")
 56 + assert True, "This f-string is just a literal."
-57 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -222,10 +200,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-60 | # - single FString concatenated with " "
-   - assert True, print("This print", f"is not {'intentional':s}")
+61 - assert True, print("This print", f"is not {'intentional':s}")
 61 + assert True, f"This print is not {'intentional':s}"
-62 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -241,10 +217,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-65 | # - single FString concatenated with "|"
-   - assert True, print("This print", f"is not {'intentional':s}", sep="|")
+66 - assert True, print("This print", f"is not {'intentional':s}", sep="|")
 66 + assert True, f"This print|is not {'intentional':s}"
-67 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -260,10 +234,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-70 | # - single FString
-   - assert True, print(f"This print is not {'intentional':s}")
+71 - assert True, print(f"This print is not {'intentional':s}")
 71 + assert True, f"This print is not {'intentional':s}"
-72 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -279,10 +251,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-75 | # - single FString
-   - assert True, print(f"This print is not {'intentional':s}", sep="|")
+76 - assert True, print(f"This print is not {'intentional':s}", sep="|")
 76 + assert True, f"This print is not {'intentional':s}"
-77 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -298,10 +268,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-82 | maintainer = "John Doe"
-   - assert True, print("Unreachable due to", condition, f", ask {maintainer} for advice", sep=U00A0)
+83 - assert True, print("Unreachable due to", condition, f", ask {maintainer} for advice", sep=U00A0)
 83 + assert True, f"Unreachable due to{U00A0}{condition}{U00A0}, ask {maintainer} for advice"
-84 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -317,10 +285,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-87 | # - `msg` entirely removed from assertion
-   - assert True, print()
+88 - assert True, print()
 88 + assert True
-89 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -336,10 +302,8 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
    |
 help: Remove `print`
    |
-92 | # - `msg` entirely removed from assertion
-   - assert True, print(sep=" ")
+93 - assert True, print(sep=" ")
 93 + assert True
-94 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -352,8 +316,7 @@ RUF030 [*] `print()` call in `assert` statement is likely unintentional
     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove `print`
     |
-107 | # - single StringLiteral
-    - assert True, builtins.print("This print should be removed.")
+108 - assert True, builtins.print("This print should be removed.")
 108 + assert True, "This print should be removed."
     |
 note: This is an unsafe fix and may change runtime behavior

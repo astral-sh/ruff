@@ -10,10 +10,8 @@ UP044 [*] Use `*` for unpacking
   |
 help: Convert to `*` for unpacking
   |
-5 |
-  - class C(Generic[Unpack[Shape]]):
+6 - class C(Generic[Unpack[Shape]]):
 6 + class C(Generic[*Shape]):
-7 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -26,10 +24,8 @@ UP044 [*] Use `*` for unpacking
    |
 help: Convert to `*` for unpacking
    |
-9  |
-   - class D(Generic[Unpack[Shape]]):
+10 - class D(Generic[Unpack[Shape]]):
 10 + class D(Generic[*Shape]):
-11 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -42,10 +38,8 @@ UP044 [*] Use `*` for unpacking
    |
 help: Convert to `*` for unpacking
    |
-13 |
-   - def f(*args: Unpack[tuple[int, ...]]):
+14 - def f(*args: Unpack[tuple[int, ...]]):
 14 + def f(*args: *tuple[int, ...]):
-15 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -58,10 +52,8 @@ UP044 [*] Use `*` for unpacking
    |
 help: Convert to `*` for unpacking
    |
-17 |
-   - def f(*args: Unpack[other.Type]):
+18 - def f(*args: Unpack[other.Type]):
 18 + def f(*args: *other.Type):
-19 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -74,9 +66,7 @@ UP044 [*] Use `*` for unpacking
    |
 help: Convert to `*` for unpacking
    |
-21 |
-   - def f(*args: Generic[int, Unpack[int]]):
+22 - def f(*args: Generic[int, Unpack[int]]):
 22 + def f(*args: Generic[int, *int]):
-23 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior

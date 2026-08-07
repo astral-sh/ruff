@@ -15,11 +15,6 @@ help: Move module level imports to top of file
   |
 1 + import last
 2 | import os
-3 |
-4 | print("something")
-5 |
-  - import last
-6 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -37,10 +32,6 @@ help: Move module level imports to top of file
   |
 1 + import late  # comment-late
 2 | import os
---------------------------------------------------------------------------------
-7 |
-  - import late  # comment-late
-8 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -58,16 +49,10 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  + from late_paren1 import (  # comment-late_paren1
-2  +     value
-3  + )
-4  | import os
---------------------------------------------------------------------------------
-11 |
-   - from late_paren1 import (  # comment-late_paren1
-   -     value
-   - )
-12 |
+ 1 + from late_paren1 import (  # comment-late_paren1
+ 2 +     value
+ 3 + )
+ 4 | import os
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -85,16 +70,10 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  + from late_paren2 import (
-2  +     value  # comment-late_paren2
-3  + )
-4  | import os
---------------------------------------------------------------------------------
-15 |
-   - from late_paren2 import (
-   -     value  # comment-late_paren2
-   - )
-16 |
+ 1 + from late_paren2 import (
+ 2 +     value  # comment-late_paren2
+ 3 + )
+ 4 | import os
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -112,16 +91,10 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  + from late_paren3 import (
-2  +     value
-3  + )  # comment-late_paren3
-4  | import os
---------------------------------------------------------------------------------
-19 |
-   - from late_paren3 import (
-   -     value
-   - )  # comment-late_paren3
-20 |
+ 1 + from late_paren3 import (
+ 2 +     value
+ 3 + )  # comment-late_paren3
+ 4 | import os
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -138,18 +111,11 @@ E402 [*] Module level import not at top of file
    | |_^
 help: Move module level imports to top of file
    |
-1  + from late_paren4 import (
-2  +     value1,
-3  +     value2,  # comment-late_paren4
-4  +     value3,
-5  + )
-6  | import os
---------------------------------------------------------------------------------
-25 |
-   - from late_paren4 import (
-   -     value1,
-   -     value2,  # comment-late_paren4
-   -     value3,
-   - )
+ 1 + from late_paren4 import (
+ 2 +     value1,
+ 3 +     value2,  # comment-late_paren4
+ 4 +     value3,
+ 5 + )
+ 6 | import os
    |
 note: This is an unsafe fix and may change runtime behavior

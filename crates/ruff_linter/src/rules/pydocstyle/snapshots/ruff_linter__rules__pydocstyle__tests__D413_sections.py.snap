@@ -10,12 +10,9 @@ D413 [*] Missing blank line after last section ("Returns")
    |     ^^^^^^^
 help: Add blank line after "Returns"
    |
-66 |
-   -     Returns"""
-67 +     Returns
-68 +
-69 +     """
-70 |
+67 ~     Returns
+68 + 
+69 ~     """
    |
 
 D413 [*] Missing blank line after last section ("Returns")
@@ -29,10 +26,7 @@ D413 [*] Missing blank line after last section ("Returns")
 124 |     A value of some sort.
     |
 help: Add blank line after "Returns"
-    |
-124 |     A value of some sort.
-125 +
-126 |     """
+125 -     """
     |
 
 D413 [*] Missing blank line after last section ("Returns")
@@ -46,10 +40,7 @@ D413 [*] Missing blank line after last section ("Returns")
 174 |     """
     |
 help: Add blank line after "Returns"
-    |
-173 |         -------
-174 +
-175 |     """
+174 -     """
     |
 
 D413 [*] Missing blank line after last section ("Parameters")
@@ -63,10 +54,7 @@ D413 [*] Missing blank line after last section ("Parameters")
 523 |     """
     |
 help: Add blank line after "Parameters"
-    |
-522 |     ==========
-523 +
-524 |     """
+523 -     """
     |
 
 D413 [*] Missing blank line after last section ("Parameters")
@@ -80,10 +68,7 @@ D413 [*] Missing blank line after last section ("Parameters")
 531 |     """
     |
 help: Add blank line after "Parameters"
-    |
-530 |     ===========
-531 +
-532 |     """
+531 -     """
     |
 
 D413 [*] Missing blank line after last section ("Args")
@@ -96,10 +81,7 @@ D413 [*] Missing blank line after last section ("Args")
 551 |         Here's a note.
     |
 help: Add blank line after "Args"
-    |
-553 |         returns:
-554 +
-555 |     """
+554 -     """
     |
 
 D413 [*] Missing blank line after last section ("Returns")
@@ -112,10 +94,7 @@ D413 [*] Missing blank line after last section ("Returns")
 564 |     """
     |
 help: Add blank line after "Returns"
-    |
-563 |         Returns:
-564 +
-565 |     """
+564 -     """
     |
 
 D413 [*] Missing blank line after last section ("returns")
@@ -129,10 +108,7 @@ D413 [*] Missing blank line after last section ("returns")
 575 |     """
     |
 help: Add blank line after "returns"
-    |
-574 |         Here's another note.
-575 +
-576 |     """
+575 -     """
     |
 
 D413 [*] Missing blank line after last section ("Parameters")
@@ -146,8 +122,5 @@ D413 [*] Missing blank line after last section ("Parameters")
 603 |     parameters:
     |
 help: Add blank line after "Parameters"
-    |
-606 |         Some value
-607 +
-608 |     """
+607 -     """
     |

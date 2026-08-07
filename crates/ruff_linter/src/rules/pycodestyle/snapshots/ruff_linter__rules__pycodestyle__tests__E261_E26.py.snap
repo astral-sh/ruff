@@ -12,8 +12,5 @@ E261 [*] Insert at least two spaces before an inline comment
   |
 help: Insert spaces
   |
-1 | #: E261:1:5
-  - pass # an inline comment
-2 + pass  # an inline comment
-3 | #: E262:1:12
-  |
+2 | pass  # an inline comment
+  |      +

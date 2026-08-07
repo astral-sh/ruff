@@ -10,11 +10,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
   |     ^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
   |
-2 |     # E731
-  -     f = lambda x: 2 * x
-3 +     def f(x):
+3 ~     def f(x):
 4 +         return 2 * x
-5 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -26,13 +23,10 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 8 |     f = lambda x: 2 * x
   |     ^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
-   |
-7  |     # E731
-   -     f = lambda x: 2 * x
-8  +     def f(x):
-9  +         return 2 * x
-10 |
-   |
+  |
+8 ~     def f(x):
+9 +         return 2 * x
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 E731 [*] Do not assign a `lambda` expression, use a `def`
@@ -44,11 +38,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `this` as a `def`
    |
-13 |     while False:
-   -         this = lambda y, z: 2 * x
-14 +         def this(y, z):
+14 ~         def this(y, z):
 15 +             return 2 * x
-16 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -61,11 +52,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |     ^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
    |
-18 |     # E731
-   -     f = lambda: (yield 1)
-19 +     def f():
+19 ~     def f():
 20 +         return (yield 1)
-21 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -78,11 +66,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
    |
-23 |     # E731
-   -     f = lambda: (yield from g())
-24 +     def f():
+24 ~     def f():
 25 +         return (yield from g())
-26 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -95,11 +80,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |     ^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
    |
-56 |     # E731
-   -     f = lambda x: 2 * x
-57 +     def f(x):
+57 ~     def f(x):
 58 +         return 2 * x
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -115,11 +97,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 help: Rewrite `x` as a `def`
    |
-72 |     if True:
-   -         x = lambda: 1
-73 +         def x():
+73 ~         def x():
 74 +             return 1
-75 |     else:
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -134,11 +113,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |
 help: Rewrite `x` as a `def`
    |
-74 |     else:
-   -         x = lambda: 2
-75 +         def x():
+75 ~         def x():
 76 +             return 2
-77 |     return x
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -151,11 +127,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
    |
-85 |     P = ParamSpec("P")
-   -     f: Callable[P, int] = lambda *args: len(args)
-86 +     def f(*args) -> int:
+86 ~     def f(*args) -> int:
 87 +         return len(args)
-88 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -168,11 +141,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
    |
-93 |
-   -     f: Callable[[], None] = lambda: None
-94 +     def f() -> None:
+94 ~     def f() -> None:
 95 +         return None
-96 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -185,11 +155,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
     |
-101 |
-    -     f: Callable[..., None] = lambda a, b: None
-102 +     def f(a, b) -> None:
+102 ~     def f(a, b) -> None:
 103 +         return None
-104 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -202,11 +169,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
     |
-109 |
-    -     f: Callable[[int], int] = lambda x: 2 * x
-110 +     def f(x: int) -> int:
+110 ~     def f(x: int) -> int:
 111 +         return 2 * x
-112 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -219,11 +183,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
     |
-118 |
-    -     f: Callable[[str, int], str] = lambda a, b: a * b
-119 +     def f(a: str, b: int) -> str:
+119 ~     def f(a: str, b: int) -> str:
 120 +         return a * b
-121 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -236,11 +197,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
     |
-126 |
-    -     f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
-127 +     def f(a: str, b: int) -> tuple[str, int]:
+127 ~     def f(a: str, b: int) -> tuple[str, int]:
 128 +         return (a, b)
-129 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -253,11 +211,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f` as a `def`
     |
-134 |
-    -     f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
-135 +     def f(a: str, b: int, /, c: list[str]) -> list[str]:
+135 ~     def f(a: str, b: int, /, c: list[str]) -> list[str]:
 136 +         return [*c, a * b]
-137 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -271,11 +226,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `CELSIUS` as a `def`
     |
-138 | class TemperatureScales(Enum):
-    -     CELSIUS = (lambda deg_c: deg_c)
-139 +     def CELSIUS(deg_c):
+139 ~     def CELSIUS(deg_c):
 140 +         return (deg_c)
-141 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -288,11 +240,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `FAHRENHEIT` as a `def`
     |
-139 |     CELSIUS = (lambda deg_c: deg_c)
-    -     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
-140 +     def FAHRENHEIT(deg_c):
+140 ~     def FAHRENHEIT(deg_c):
 141 +         return (deg_c * 9 / 5 + 32)
-142 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -307,15 +256,10 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     | |_____^
 help: Rewrite `f` as a `def`
     |
-146 |
-    -     f = lambda: (
-    -         i := 1,
-    -     )
-147 +     def f():
+147 ~     def f():
 148 +         return (
 149 +             i := 1,
 150 +         )
-151 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -334,11 +278,11 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `x` as a `def`
     |
-162 | # * https://github.com/astral-sh/ruff/issues/7720
-    - x = lambda: """
 163 + def x():
 164 +     return """
-165 |         a
+165 +         a
+166 +     b
+167 + """
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -353,11 +297,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `at_least_one_million` as a `def`
     |
-168 | # * https://github.com/astral-sh/ruff/issues/10277
-    - at_least_one_million = lambda _: _ >= 1_000_000
 169 + def at_least_one_million(_):
 170 +     return _ >= 1_000_000
-171 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -376,11 +317,11 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `x` as a `def`
     |
-170 |
-    - x = lambda: (
 171 + def x():
 172 +     return (
-173 |     # comment
+173 +     # comment
+174 +     5 + 10
+175 + )
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -399,11 +340,11 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `x` as a `def`
     |
-175 |
-    - x = lambda: (
 176 + def x():
 177 +     return (
-178 |     # comment
+178 +     # comment
+179 +     y := 10
+180 + )
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -422,16 +363,10 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `foo_tooltip` as a `def`
     |
-181 | # https://github.com/astral-sh/ruff/issues/18475
-    - foo_tooltip = (
-    -     lambda x, data: f"\nfoo: {data['foo'][int(x)]}"
 182 + def foo_tooltip(x, data):
 183 +     return (f"\nfoo: {data['foo'][int(x)]}"
-184 |     if data["foo"] is not None
-    -     else ""
-    - )
+184 +     if data["foo"] is not None
 185 +     else "")
-186 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -451,16 +386,9 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `foo_tooltip` as a `def`
     |
-187 |
-    - foo_tooltip = (
-    -     lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
-    -     more
-    -
-    - )
 188 + def foo_tooltip(x, data):
 189 +     return (f"\nfoo: {data['foo'][int(x)]}" +
 190 +     more)
-191 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -474,11 +402,8 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |
 help: Rewrite `f1` as a `def`
     |
-199 |     P = ParamSpec("P")
-    -     f1: Callable[P, str] = lambda x: str(x)
-200 +     def f1(x) -> str:
+200 ~     def f1(x) -> str:
 201 +         return str(x)
-202 |     f2: Callable[..., str] = lambda x: str(x)
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -491,9 +416,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite `f2` as a `def`
     |
-200 |     f1: Callable[P, str] = lambda x: str(x)
-    -     f2: Callable[..., str] = lambda x: str(x)
-201 +     def f2(x) -> str:
+201 ~     def f2(x) -> str:
 202 +         return str(x)
     |
 note: This is an unsafe fix and may change runtime behavior

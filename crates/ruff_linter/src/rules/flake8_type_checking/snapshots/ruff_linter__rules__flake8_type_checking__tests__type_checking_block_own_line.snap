@@ -13,11 +13,11 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
   |
 help: Move into type-checking block
   |
+4 ~ from typing import TYPE_CHECKING
 5 |
-  - import pandas as pd
-6 |
-7 | if TYPE_CHECKING:
-8 +     import pandas as pd
-9 |     import os
+6 + 
+7 |
+8 | if TYPE_CHECKING:
+9 +     import pandas as pd
   |
 note: This is an unsafe fix and may change runtime behavior

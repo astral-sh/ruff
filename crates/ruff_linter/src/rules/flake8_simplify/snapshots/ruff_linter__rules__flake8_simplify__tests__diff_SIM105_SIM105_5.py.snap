@@ -24,12 +24,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
   |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
   |
-3 | # SIM105
-  - try:
-  -     pass
-  - except* ValueError:
 4 + import contextlib
-5 + with contextlib.suppress(ValueError):
-6 |     pass
+5 ~ with contextlib.suppress(ValueError):
   |
 note: This is an unsafe fix and may change runtime behavior

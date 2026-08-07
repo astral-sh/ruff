@@ -12,13 +12,11 @@ TC001 [*] Move application import `.first_party` into a type-checking block
   |
 help: Move into type-checking block
   |
-  - def f():
 1 + from typing import TYPE_CHECKING
-2 +
+2 ~ 
 3 + if TYPE_CHECKING:
-4 |     from . import first_party
-5 + def f():
-6 |
+4 +     from . import first_party
+5 | def f():
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -33,16 +31,10 @@ TC001 [*] Move application import `.foo` into a type-checking block
    |
 help: Move into type-checking block
    |
-52 | # unions
-   - from typing import Union
-53 + from typing import Union, TYPE_CHECKING
-54 +
+53 ~ from typing import Union, TYPE_CHECKING
+54 + 
 55 + if TYPE_CHECKING:
 56 +     from . import foo
-57 |
-58 |
-59 | def n():
-   -     from . import foo
-60 |
+57 + 
    |
 note: This is an unsafe fix and may change runtime behavior

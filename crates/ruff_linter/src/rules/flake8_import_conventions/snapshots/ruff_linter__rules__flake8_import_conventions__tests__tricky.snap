@@ -13,11 +13,7 @@ ICN001 [*] `pandas` should be imported as `pd`
   |
 help: Alias `pandas` to `pd`
   |
-5 |     try:
-  -         global pandas
-  -         import pandas
-6 +         global pd
-7 +         import pandas as pd
-8 |     except ImportError:
+6 ~         global pd
+7 ~         import pandas as pd
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -11,9 +11,8 @@ C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-  - t = tuple()
+1 - t = tuple()
 1 + t = ()
-2 | l = list()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,10 +27,8 @@ C408 [*] Unnecessary `list()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-1 | t = tuple()
-  - l = list()
+2 - l = list()
 2 + l = []
-3 | d1 = dict()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,10 +44,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-2 | l = list()
-  - d1 = dict()
+3 - d1 = dict()
 3 + d1 = {}
-4 | d2 = dict(a=1)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,10 +60,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-3 | d1 = dict()
-  - d2 = dict(a=1)
+4 - d2 = dict(a=1)
 4 + d2 = {"a": 1}
-5 | d3 = dict(**d2)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -84,10 +77,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-13 |
-   - f"{dict(x='y')}"
+14 - f"{dict(x='y')}"
 14 + f"{ {'x': 'y'} }"
-15 | f'{dict(x="y")}'
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,10 +93,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-14 | f"{dict(x='y')}"
-   - f'{dict(x="y")}'
+15 - f'{dict(x="y")}'
 15 + f'{ {"x": "y"} }'
-16 | f"{dict()}"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -120,10 +109,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-15 | f'{dict(x="y")}'
-   - f"{dict()}"
+16 - f"{dict()}"
 16 + f"{ {} }"
-17 | f"a {dict()} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -139,10 +126,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-16 | f"{dict()}"
-   - f"a {dict()} b"
+17 - f"a {dict()} b"
 17 + f"a { {} } b"
-18 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -158,10 +143,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-18 |
-   - f"{dict(x='y') | dict(y='z')}"
+19 - f"{dict(x='y') | dict(y='z')}"
 19 + f"{ {'x': 'y'} | dict(y='z')}"
-20 | f"{ dict(x='y') | dict(y='z') }"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -177,10 +160,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-18 |
-   - f"{dict(x='y') | dict(y='z')}"
+19 - f"{dict(x='y') | dict(y='z')}"
 19 + f"{dict(x='y') | {'y': 'z'} }"
-20 | f"{ dict(x='y') | dict(y='z') }"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -195,10 +176,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-19 | f"{dict(x='y') | dict(y='z')}"
-   - f"{ dict(x='y') | dict(y='z') }"
+20 - f"{ dict(x='y') | dict(y='z') }"
 20 + f"{ {'x': 'y'} | dict(y='z') }"
-21 | f"a {dict(x='y') | dict(y='z')} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -213,10 +192,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-19 | f"{dict(x='y') | dict(y='z')}"
-   - f"{ dict(x='y') | dict(y='z') }"
+20 - f"{ dict(x='y') | dict(y='z') }"
 20 + f"{ dict(x='y') | {'y': 'z'} }"
-21 | f"a {dict(x='y') | dict(y='z')} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -231,10 +208,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-20 | f"{ dict(x='y') | dict(y='z') }"
-   - f"a {dict(x='y') | dict(y='z')} b"
+21 - f"a {dict(x='y') | dict(y='z')} b"
 21 + f"a { {'x': 'y'} | dict(y='z')} b"
-22 | f"a { dict(x='y') | dict(y='z') } b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -249,10 +224,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-20 | f"{ dict(x='y') | dict(y='z') }"
-   - f"a {dict(x='y') | dict(y='z')} b"
+21 - f"a {dict(x='y') | dict(y='z')} b"
 21 + f"a {dict(x='y') | {'y': 'z'} } b"
-22 | f"a { dict(x='y') | dict(y='z') } b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -268,10 +241,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-21 | f"a {dict(x='y') | dict(y='z')} b"
-   - f"a { dict(x='y') | dict(y='z') } b"
+22 - f"a { dict(x='y') | dict(y='z') } b"
 22 + f"a { {'x': 'y'} | dict(y='z') } b"
-23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -287,10 +258,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-21 | f"a {dict(x='y') | dict(y='z')} b"
-   - f"a { dict(x='y') | dict(y='z') } b"
+22 - f"a { dict(x='y') | dict(y='z') } b"
 22 + f"a { dict(x='y') | {'y': 'z'} } b"
-23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -308,13 +277,9 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-23 |
-   - dict(
 24 + {
 25 |     # comment
-   - )
 26 + }
-27 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -331,10 +296,8 @@ C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-27 |
-   - tuple(  # comment
-28 + (  # comment
-29 | )
+28 ~ (  # comment
+29 ~ )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -350,10 +313,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-30 |
-   - t"{dict(x='y')}"
+31 - t"{dict(x='y')}"
 31 + t"{ {'x': 'y'} }"
-32 | t'{dict(x="y")}'
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -368,10 +329,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-31 | t"{dict(x='y')}"
-   - t'{dict(x="y")}'
+32 - t'{dict(x="y")}'
 32 + t'{ {"x": "y"} }'
-33 | t"{dict()}"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -386,10 +345,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-32 | t'{dict(x="y")}'
-   - t"{dict()}"
+33 - t"{dict()}"
 33 + t"{ {} }"
-34 | t"a {dict()} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -405,10 +362,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-33 | t"{dict()}"
-   - t"a {dict()} b"
+34 - t"a {dict()} b"
 34 + t"a { {} } b"
-35 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -424,10 +379,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-35 |
-   - t"{dict(x='y') | dict(y='z')}"
+36 - t"{dict(x='y') | dict(y='z')}"
 36 + t"{ {'x': 'y'} | dict(y='z')}"
-37 | t"{ dict(x='y') | dict(y='z') }"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -443,10 +396,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-35 |
-   - t"{dict(x='y') | dict(y='z')}"
+36 - t"{dict(x='y') | dict(y='z')}"
 36 + t"{dict(x='y') | {'y': 'z'} }"
-37 | t"{ dict(x='y') | dict(y='z') }"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -461,10 +412,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-36 | t"{dict(x='y') | dict(y='z')}"
-   - t"{ dict(x='y') | dict(y='z') }"
+37 - t"{ dict(x='y') | dict(y='z') }"
 37 + t"{ {'x': 'y'} | dict(y='z') }"
-38 | t"a {dict(x='y') | dict(y='z')} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -479,10 +428,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-36 | t"{dict(x='y') | dict(y='z')}"
-   - t"{ dict(x='y') | dict(y='z') }"
+37 - t"{ dict(x='y') | dict(y='z') }"
 37 + t"{ dict(x='y') | {'y': 'z'} }"
-38 | t"a {dict(x='y') | dict(y='z')} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -497,10 +444,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-37 | t"{ dict(x='y') | dict(y='z') }"
-   - t"a {dict(x='y') | dict(y='z')} b"
+38 - t"a {dict(x='y') | dict(y='z')} b"
 38 + t"a { {'x': 'y'} | dict(y='z')} b"
-39 | t"a { dict(x='y') | dict(y='z') } b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -515,10 +460,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-37 | t"{ dict(x='y') | dict(y='z') }"
-   - t"a {dict(x='y') | dict(y='z')} b"
+38 - t"a {dict(x='y') | dict(y='z')} b"
 38 + t"a {dict(x='y') | {'y': 'z'} } b"
-39 | t"a { dict(x='y') | dict(y='z') } b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -534,10 +477,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-38 | t"a {dict(x='y') | dict(y='z')} b"
-   - t"a { dict(x='y') | dict(y='z') } b"
+39 - t"a { dict(x='y') | dict(y='z') } b"
 39 + t"a { {'x': 'y'} | dict(y='z') } b"
-40 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -553,10 +494,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-38 | t"a {dict(x='y') | dict(y='z')} b"
-   - t"a { dict(x='y') | dict(y='z') } b"
+39 - t"a { dict(x='y') | dict(y='z') } b"
 39 + t"a { dict(x='y') | {'y': 'z'} } b"
-40 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -572,10 +511,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-44 | # to "π", and "ſ" normalizes to "s".
-   - dict(ℼ=3.14)
+45 - dict(ℼ=3.14)
 45 + {"π": 3.14}
-46 | dict(ſ=1)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -591,10 +528,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-45 | dict(ℼ=3.14)
-   - dict(ſ=1)
+46 - dict(ſ=1)
 46 + {"s": 1}
-47 | dict(𝕒=1, b=2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -609,10 +544,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-46 | dict(ſ=1)
-   - dict(𝕒=1, b=2)
+47 - dict(𝕒=1, b=2)
 47 + {"a": 1, "b": 2}
-48 | dict(a=1, b=2)  # already NFKC-normalized: unchanged
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -625,8 +558,7 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    | ^^^^^^^^^^^^^^
 help: Rewrite as a literal
    |
-47 | dict(𝕒=1, b=2)
-   - dict(a=1, b=2)  # already NFKC-normalized: unchanged
+48 - dict(a=1, b=2)  # already NFKC-normalized: unchanged
 48 + {"a": 1, "b": 2}  # already NFKC-normalized: unchanged
    |
 note: This is an unsafe fix and may change runtime behavior

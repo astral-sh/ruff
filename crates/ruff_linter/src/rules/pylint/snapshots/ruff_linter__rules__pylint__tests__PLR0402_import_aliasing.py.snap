@@ -12,12 +12,10 @@ PLR0402 [*] Use `from os import path` in lieu of alias
 11 | import foo.bar.foobar as foobar  # [consider-using-from-import]
    |
 help: Replace with `from os import path`
-   |
-8  | from collections import OrderedDict as o_dict
-   - import os.path as path  # [consider-using-from-import]
-9  + from os import path  # [consider-using-from-import]
-10 | import os.path as p
-   |
+  |
+9 - import os.path as path  # [consider-using-from-import]
+9 + from os import path  # [consider-using-from-import]
+  |
 
 PLR0402 [*] Use `from foo.bar import foobar` in lieu of alias
   --> import_aliasing.py:11:8
@@ -31,10 +29,8 @@ PLR0402 [*] Use `from foo.bar import foobar` in lieu of alias
    |
 help: Replace with `from foo.bar import foobar`
    |
-10 | import os.path as p
-   - import foo.bar.foobar as foobar  # [consider-using-from-import]
+11 - import foo.bar.foobar as foobar  # [consider-using-from-import]
 11 + from foo.bar import foobar  # [consider-using-from-import]
-12 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
    |
 
 PLR0402 Use `from foo.bar import foobar` in lieu of alias

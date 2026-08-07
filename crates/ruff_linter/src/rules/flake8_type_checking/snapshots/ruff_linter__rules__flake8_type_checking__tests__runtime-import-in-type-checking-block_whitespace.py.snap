@@ -12,12 +12,8 @@ TC004 [*] Move import `builtins` out of type-checking block. Import is used for 
   | -------- Used at runtime here
 help: Move out of type-checking block
   |
-2 | # there is a (potentially invisible) unicode formfeed character (000C) between `TYPE_CHECKING` and the backslash
-  - from typing import TYPE_CHECKING\
-3 + from typing import TYPE_CHECKING; import builtins\
+3 ~ from typing import TYPE_CHECKING; import builtins␌\
 4 |
-  - if TYPE_CHECKING: import builtins
-5 + if TYPE_CHECKING: pass
-6 | builtins.print("!")
+5 ~ if TYPE_CHECKING: pass
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -9,10 +9,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    | ^^^^^^^^^^^
 help: Replace with `clear()`
    |
-10 | # FURB131
-   - del nums[:]
+11 - del nums[:]
 11 + nums.clear()
-12 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -24,10 +22,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    | ^^^^^^^^^^^^
 help: Replace with `clear()`
    |
-14 | # FURB131
-   - del names[:]
+15 - del names[:]
 15 + names.clear()
-16 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -56,10 +52,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    |     ^^^^^^^^
 help: Replace with `clear()`
    |
-27 |     # FURB131
-   -     del x[:]
+28 -     del x[:]
 28 +     x.clear()
-29 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -72,10 +66,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    |     ^^^^^^^^
 help: Replace with `clear()`
    |
-32 |     # FURB131
-   -     del x[:]
+33 -     del x[:]
 33 +     x.clear()
-34 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    |     ^^^^^^^^
 help: Replace with `clear()`
    |
-37 |     # FURB131
-   -     del x[:]
+38 -     del x[:]
 38 +     x.clear()
-39 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -104,10 +94,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    |     ^^^^^^^^
 help: Replace with `clear()`
    |
-42 |     # FURB131
-   -     del x[:]
+43 -     del x[:]
 43 +     x.clear()
-44 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -123,10 +111,8 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    |
 help: Replace with `clear()`
    |
-47 |     # FURB131
-   -     del x[:]
+48 -     del x[:]
 48 +     x.clear()
-49 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -142,9 +128,7 @@ FURB131 [*] Prefer `clear` over deleting a full slice
    |
 help: Replace with `clear()`
    |
-57 | # FURB131
-   - del sneaky[:]
+58 - del sneaky[:]
 58 + sneaky.clear()
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior

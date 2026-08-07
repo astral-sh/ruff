@@ -11,9 +11,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
 help: Change outer quotes to avoid escaping inner quotes
   |
-  - this_should_raise_Q003 = 'This is a \'string\''
+1 - this_should_raise_Q003 = 'This is a \'string\''
 1 + this_should_raise_Q003 = "This is a 'string'"
-2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
   |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -27,10 +26,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
 help: Change outer quotes to avoid escaping inner quotes
   |
-1 | this_should_raise_Q003 = 'This is a \'string\''
-  - this_should_raise_Q003 = 'This is \\ a \\\'string\''
+2 - this_should_raise_Q003 = 'This is \\ a \\\'string\''
 2 + this_should_raise_Q003 = "This is \\ a \\'string'"
-3 | this_is_fine = '"This" is a \'string\''
   |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -44,10 +41,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-9  |     'This is a'
-   -     '\'string\''
+10 -     '\'string\''
 10 +     "'string'"
-11 | )
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -61,10 +56,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-13 | # Same as above, but with f-strings
-   - f'This is a \'string\''  # Q003
+14 - f'This is a \'string\''  # Q003
 14 + f"This is a 'string'"  # Q003
-15 | f'This is \\ a \\\'string\''  # Q003
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -79,10 +72,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-14 | f'This is a \'string\''  # Q003
-   - f'This is \\ a \\\'string\''  # Q003
+15 - f'This is \\ a \\\'string\''  # Q003
 15 + f"This is \\ a \\'string'"  # Q003
-16 | f'"This" is a \'string\''
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -96,10 +87,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-22 |     f'This is a'
-   -     f'\'string\''  # Q003
+23 -     f'\'string\''  # Q003
 23 +     f"'string'"  # Q003
-24 | )
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -113,10 +102,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-45 | # Same as above, but with t-strings
-   - t'This is a \'string\''  # Q003
+46 - t'This is a \'string\''  # Q003
 46 + t"This is a 'string'"  # Q003
-47 | t'This is \\ a \\\'string\''  # Q003
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -131,10 +118,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-46 | t'This is a \'string\''  # Q003
-   - t'This is \\ a \\\'string\''  # Q003
+47 - t'This is \\ a \\\'string\''  # Q003
 47 + t"This is \\ a \\'string'"  # Q003
-48 | t'"This" is a \'string\''
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -149,10 +134,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-54 |     t'This is a'
-   -     t'\'string\''  # Q003
+55 -     t'\'string\''  # Q003
 55 +     t"'string'"  # Q003
-56 | )
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -167,10 +150,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-56 | )
-   - t'\'foo\' {'nested'}'  # Q003
+57 - t'\'foo\' {'nested'}'  # Q003
 57 + t"'foo' {'nested'}"  # Q003
-58 | t'\'foo\' {t'nested'}'  # Q003
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -184,10 +165,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-57 | t'\'foo\' {'nested'}'  # Q003
-   - t'\'foo\' {t'nested'}'  # Q003
+58 - t'\'foo\' {t'nested'}'  # Q003
 58 + t"'foo' {t'nested'}"  # Q003
-59 | t'\'foo\' {t'\'nested\''} \'\''  # Q003
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -202,10 +181,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-58 | t'\'foo\' {t'nested'}'  # Q003
-   - t'\'foo\' {t'\'nested\''} \'\''  # Q003
+59 - t'\'foo\' {t'\'nested\''} \'\''  # Q003
 59 + t"'foo' {t'\'nested\''} ''"  # Q003
-60 |
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -220,10 +197,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-58 | t'\'foo\' {t'nested'}'  # Q003
-   - t'\'foo\' {t'\'nested\''} \'\''  # Q003
+59 - t'\'foo\' {t'\'nested\''} \'\''  # Q003
 59 + t'\'foo\' {t"'nested'"} \'\''  # Q003
-60 |
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -237,10 +212,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-61 | t'normal {t'nested'} normal'
-   - t'\'normal\' {t'nested'} normal'  # Q003
+62 - t'\'normal\' {t'nested'} normal'  # Q003
 62 + t"'normal' {t'nested'} normal"  # Q003
-63 | t'\'normal\' {t'nested'} "double quotes"'
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -254,10 +227,8 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 help: Change outer quotes to avoid escaping inner quotes
    |
-63 | t'\'normal\' {t'nested'} "double quotes"'
-   - t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
+64 - t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
 64 + t'\'normal\' {t"'nested' {'other'} normal"} "double quotes"'  # Q003
-65 | t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
    |
 
 Q003 [*] Change outer quotes to avoid escaping inner quotes
@@ -269,7 +240,6 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Change outer quotes to avoid escaping inner quotes
    |
-64 | t'\'normal\' {t'\'nested\' {'other'} normal'} "double quotes"'  # Q003
-   - t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
+65 - t'\'normal\' {t'\'nested\' {'other'} "double quotes"'} normal'  # Q00l
 65 + t"'normal' {t'\'nested\' {'other'} "double quotes"'} normal"  # Q00l
    |

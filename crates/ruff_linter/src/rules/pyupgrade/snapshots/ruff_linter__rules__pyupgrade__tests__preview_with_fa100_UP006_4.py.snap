@@ -20,7 +20,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,7 +34,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -56,9 +54,7 @@ help: Replace with `list`
 3 | from typing import List
 4 |
 5 |
-  - def f(x: typing.List[str]) -> None:
-6 + def f(x: list[str]) -> None:
-7 |     ...
+6 ~ def f(x: list[str]) -> None:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -72,12 +68,11 @@ UP006 [*] Use `list` instead of `List` for type annotation
    |
 help: Replace with `list`
    |
-1  + from __future__ import annotations
-2  | import typing
---------------------------------------------------------------------------------
-9  |
-   - def g(x: List[str]) -> None:
-10 + def g(x: list[str]) -> None:
-11 |     ...
+ 1 + from __future__ import annotations
+ 2 | import typing
+ 3 | from typing import List
+ …
+ 9 |
+10 ~ def g(x: list[str]) -> None:
    |
 note: This is an unsafe fix and may change runtime behavior

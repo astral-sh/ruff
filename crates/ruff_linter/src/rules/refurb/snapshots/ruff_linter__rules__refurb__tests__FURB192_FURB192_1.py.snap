@@ -11,12 +11,10 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
 11 |     sorted((yield l))[-1]
    |
 help: Replace with `min`
-   |
-8  | def f(l, key_fn):
-   -     sorted((yield))[0]
-9  +     min((yield))
-10 |
-   |
+  |
+9 -     sorted((yield))[0]
+9 +     min((yield))
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
@@ -31,10 +29,8 @@ FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a seque
    |
 help: Replace with `max`
    |
-10 |
-   -     sorted((yield l))[-1]
+11 -     sorted((yield l))[-1]
 11 +     max((yield l))
-12 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
    |
 help: Replace with `min`
    |
-12 |
-   -     sorted((yield), key=key_fn)[0]
+13 -     sorted((yield), key=key_fn)[0]
 13 +     min((yield), key=key_fn)
-14 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
    |
 help: Replace with `min`
    |
-14 |
-   -     sorted((yield from l))[0]
+15 -     sorted((yield from l))[0]
 15 +     min((yield from l))
-16 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -85,8 +77,7 @@ FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a seque
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `min`
    |
-16 |
-   -     sorted((yield), reverse=True)[-1]
+17 -     sorted((yield), reverse=True)[-1]
 17 +     min((yield))
    |
 note: This is an unsafe fix and may change runtime behavior

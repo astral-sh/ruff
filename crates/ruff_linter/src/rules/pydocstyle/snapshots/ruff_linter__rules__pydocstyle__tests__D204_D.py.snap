@@ -13,9 +13,7 @@ D204 [*] 1 blank line required after class docstring
 help: Insert 1 blank line after class docstring
     |
 181 |     """TrailingSpace."""
-182 +
-183 |     pass
-    |
+    |                         +
 
 D204 [*] 1 blank line required after class docstring
    --> D.py:192:5
@@ -28,9 +26,7 @@ D204 [*] 1 blank line required after class docstring
 help: Insert 1 blank line after class docstring
     |
 192 |     """Leading and trailing space missing."""
-193 +
-194 |     pass
-    |
+    |                                              +
 
 D204 [*] 1 blank line required after class docstring
    --> D.py:649:5
@@ -43,12 +39,9 @@ D204 [*] 1 blank line required after class docstring
     |
 help: Insert 1 blank line after class docstring
     |
-648 | class StatementOnSameLineAsDocstring:
-    -     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
-649 +     "After this docstring there's another statement on the same line separated by a semicolon."
-650 +
+649 ~     "After this docstring there's another statement on the same line separated by a semicolon."
+650 + 
 651 +     priorities=1
-652 |     def sort_services(self):
     |
 
 D204 [*] 1 blank line required after class docstring
@@ -59,12 +52,9 @@ D204 [*] 1 blank line required after class docstring
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Insert 1 blank line after class docstring
     |
-653 | class StatementOnSameLineAsDocstring:
-    -     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
-654 +     "After this docstring there's another statement on the same line separated by a semicolon."
-655 +
+654 ~     "After this docstring there's another statement on the same line separated by a semicolon."
+655 + 
 656 +     priorities=1
-657 |
     |
 
 D204 [*] 1 blank line required after class docstring
@@ -79,6 +69,4 @@ D204 [*] 1 blank line required after class docstring
 help: Insert 1 blank line after class docstring
     |
 658 |     "After this docstring there's a comment."  # priorities=1
-659 +
-660 |     def sort_services(self):
-    |
+    |                                                              +

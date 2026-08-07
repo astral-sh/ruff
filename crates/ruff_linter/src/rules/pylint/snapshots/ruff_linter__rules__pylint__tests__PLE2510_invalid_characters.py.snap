@@ -12,10 +12,8 @@ PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
 help: Replace with escape sequence
    |
-14 | #foo = 'hi'
-   - b = '␈'
+15 - b = '␈'
 15 + b = '\b'
-16 | b = f'␈'
    |
 
 PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
@@ -30,10 +28,8 @@ PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
 help: Replace with escape sequence
    |
-15 | b = '␈'
-   - b = f'␈'
+16 - b = f'␈'
 16 + b = f'\b'
-17 |
    |
 
 PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
@@ -48,10 +44,8 @@ PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
 help: Replace with escape sequence
    |
-54 |
-   - nested_fstrings = f'␈{f'{f'␛'}'}'
-55 + nested_fstrings = f'\b{f'{f'␛'}'}'
-56 |
+55 - nested_fstrings = f'␈{f'␚{f'␛'}'}'
+55 + nested_fstrings = f'\b{f'␚{f'␛'}'}'
    |
 
 PLE2510 Invalid unescaped character backspace, use "\b" instead
@@ -110,10 +104,8 @@ PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |
 help: Replace with escape sequence
    |
-79 | esc = t'esc esc ␛'
-   - nested_tstrings = t'␈{t'{t'␛'}'}'
-80 + nested_tstrings = t'\b{t'{t'␛'}'}'
-81 | nested_ftstrings = t'␈{f'{t'␛'}'}'
+80 - nested_tstrings = t'␈{t'␚{t'␛'}'}'
+80 + nested_tstrings = t'\b{t'␚{t'␛'}'}'
    |
 
 PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
@@ -125,8 +117,6 @@ PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
    |                      ^
 help: Replace with escape sequence
    |
-80 | nested_tstrings = t'␈{t'{t'␛'}'}'
-   - nested_ftstrings = t'␈{f'{t'␛'}'}'
-81 + nested_ftstrings = t'\b{f'{t'␛'}'}'
-82 |
+81 - nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+81 + nested_ftstrings = t'\b{f'␚{t'␛'}'}'
    |

@@ -12,10 +12,8 @@ E712 [*] Avoid equality comparisons to `True`; use `res:` for truth checks
   |
 help: Replace with `res`
   |
-1 | #: E712
-  - if res == True:
+2 - if res == True:
 2 + if res:
-3 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,10 +29,8 @@ E712 [*] Avoid inequality comparisons to `False`; use `res:` for truth checks
   |
 help: Replace with `res`
   |
-4 | #: E712
-  - if res != False:
+5 - if res != False:
 5 + if res:
-6 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ E712 [*] Avoid inequality comparisons to `True`; use `not res:` for false checks
    |
 help: Replace with `not res`
   |
-7 | #: E712
-  - if True != res:
+8 - if True != res:
 8 + if not res:
-9 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ E712 [*] Avoid equality comparisons to `False`; use `not res:` for false checks
    |
 help: Replace with `not res`
    |
-10 | #: E712
-   - if False == res:
+11 - if False == res:
 11 + if not res:
-12 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ E712 [*] Avoid equality comparisons to `True`; use `res[1]:` for truth checks
    |
 help: Replace with `res[1]`
    |
-13 | #: E712
-   - if res[1] == True:
+14 - if res[1] == True:
 14 + if res[1]:
-15 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ E712 [*] Avoid inequality comparisons to `False`; use `res[1]:` for truth checks
    |
 help: Replace with `res[1]`
    |
-16 | #: E712
-   - if res[1] != False:
+17 - if res[1] != False:
 17 + if res[1]:
-18 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -126,10 +114,8 @@ E712 [*] Avoid equality comparisons to `True`; use `cond:` for truth checks
    |
 help: Replace with `cond`
    |
-19 | #: E712
-   - var = 1 if cond == True else -1 if cond == False else cond
+20 - var = 1 if cond == True else -1 if cond == False else cond
 20 + var = 1 if cond else -1 if cond == False else cond
-21 | #: E712
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,10 +131,8 @@ E712 [*] Avoid equality comparisons to `False`; use `not cond:` for false checks
    |
 help: Replace with `not cond`
    |
-19 | #: E712
-   - var = 1 if cond == True else -1 if cond == False else cond
+20 - var = 1 if cond == True else -1 if cond == False else cond
 20 + var = 1 if cond == True else -1 if not cond else cond
-21 | #: E712
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -163,10 +147,8 @@ E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth chec
    |
 help: Replace with `TrueElement`
    |
-21 | #: E712
-   - if (True) == TrueElement or x == TrueElement:
+22 - if (True) == TrueElement or x == TrueElement:
 22 + if (TrueElement) or x == TrueElement:
-23 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -181,10 +163,8 @@ E712 [*] Avoid equality comparisons to `True` or `False`
    |
 help: Replace comparison
    |
-24 |
-   - if res == True != False:
+25 - if res == True != False:
 25 + if res is True is not False:
-26 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -199,10 +179,8 @@ E712 [*] Avoid equality comparisons to `True` or `False`
    |
 help: Replace comparison
    |
-24 |
-   - if res == True != False:
+25 - if res == True != False:
 25 + if res is True is not False:
-26 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -217,10 +195,8 @@ E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth chec
    |
 help: Replace with `TrueElement`
    |
-27 |
-   - if(True) == TrueElement or x == TrueElement:
+28 - if(True) == TrueElement or x == TrueElement:
 28 + if(TrueElement) or x == TrueElement:
-29 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -235,10 +211,8 @@ E712 [*] Avoid equality comparisons to `True`; use `yield i:` for truth checks
    |
 help: Replace with `yield i`
    |
-30 |
-   - if (yield i) == True:
+31 - if (yield i) == True:
 31 + if (yield i):
-32 |       print("even")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -252,9 +226,7 @@ E712 [*] Avoid equality comparisons to `True`; use `True:` for truth checks
    |
 help: Replace with `True`
    |
-57 | # https://github.com/astral-sh/ruff/issues/17582
-   - if True == True: # No duplicated diagnostic
+58 - if True == True: # No duplicated diagnostic
 58 + if True: # No duplicated diagnostic
-59 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior

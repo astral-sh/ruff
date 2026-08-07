@@ -13,10 +13,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-14 | b: TypeAlias = Dict  # OK
-   - c: TypeAlias = Foo   # TC007
+15 - c: TypeAlias = Foo   # TC007
 15 + c: TypeAlias = "Foo"   # TC007
-16 | d: TypeAlias = Foo | None  # TC007
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-15 | c: TypeAlias = Foo   # TC007
-   - d: TypeAlias = Foo | None  # TC007
+16 - d: TypeAlias = Foo | None  # TC007
 16 + d: TypeAlias = "Foo | None"  # TC007
-17 | e: TypeAlias = OptStr   # TC007
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +47,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-16 | d: TypeAlias = Foo | None  # TC007
-   - e: TypeAlias = OptStr   # TC007
+17 - e: TypeAlias = OptStr   # TC007
 17 + e: TypeAlias = "OptStr"   # TC007
-18 | f: TypeAlias = Bar   # TC007
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,10 +64,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-17 | e: TypeAlias = OptStr   # TC007
-   - f: TypeAlias = Bar   # TC007
+18 - f: TypeAlias = Bar   # TC007
 18 + f: TypeAlias = "Bar"   # TC007
-19 | g: TypeAlias = Foo | Bar  # TC007 x2
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -89,10 +81,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-18 | f: TypeAlias = Bar   # TC007
-   - g: TypeAlias = Foo | Bar  # TC007 x2
+19 - g: TypeAlias = Foo | Bar  # TC007 x2
 19 + g: TypeAlias = "Foo | Bar"  # TC007 x2
-20 | h: TypeAlias = Foo[str]  # TC007
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,10 +98,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-18 | f: TypeAlias = Bar   # TC007
-   - g: TypeAlias = Foo | Bar  # TC007 x2
+19 - g: TypeAlias = Foo | Bar  # TC007 x2
 19 + g: TypeAlias = "Foo | Bar"  # TC007 x2
-20 | h: TypeAlias = Foo[str]  # TC007
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -127,10 +115,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-19 | g: TypeAlias = Foo | Bar  # TC007 x2
-   - h: TypeAlias = Foo[str]  # TC007
+20 - h: TypeAlias = Foo[str]  # TC007
 20 + h: TypeAlias = "Foo[str]"  # TC007
-21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,11 +131,9 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-20 | h: TypeAlias = Foo[str]  # TC007
-   - i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
-   -     Bar)
+21 - i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 -     Bar)
 21 + i: TypeAlias = ("Foo | Bar")
-22 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -165,10 +149,8 @@ TC007 [*] Add quotes to type alias
    |
 help: Add quotes
    |
-20 | h: TypeAlias = Foo[str]  # TC007
-   - i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
-   -     Bar)
+21 - i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 -     Bar)
 21 + i: TypeAlias = ("Foo | Bar")
-22 |
    |
 note: This is an unsafe fix and may change runtime behavior

@@ -13,9 +13,7 @@ UP029 [*] Unnecessary builtin import: `pow`
    |
 help: Remove unnecessary builtin import
    |
-18 |     from math import *
-   -     from builtins import pow  # UP029, false positive due to the star import
-19 |
+19 -     from builtins import pow  # UP029, false positive due to the star import
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ UP029 [*] Unnecessary builtin import: `str`
    |
 help: Remove unnecessary builtin import
    |
-24 | def unsafe_fix():
-   -     from builtins import (
-   -         str,  # UP029, removes this comment
-   -     )
-25 |
+25 -     from builtins import (
+26 -         str,  # UP029, removes this comment
+27 -     )
    |
 note: This is an unsafe fix and may change runtime behavior

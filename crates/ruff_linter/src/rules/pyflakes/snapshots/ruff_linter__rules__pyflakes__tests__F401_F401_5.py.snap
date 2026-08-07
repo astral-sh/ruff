@@ -12,9 +12,7 @@ F401 [*] `a.b.c` imported but unused
   |
 help: Remove unused import: `a.b.c`
   |
-1 | """Test: removal of multi-segment and aliases imports."""
-  - from a.b import c
-2 | from d.e import f as g
+2 - from a.b import c
   |
 
 F401 [*] `d.e.f` imported but unused
@@ -29,9 +27,7 @@ F401 [*] `d.e.f` imported but unused
   |
 help: Remove unused import: `d.e.f`
   |
-2 | from a.b import c
-  - from d.e import f as g
-3 | import h.i
+3 - from d.e import f as g
   |
 
 F401 [*] `h.i` imported but unused
@@ -45,9 +41,7 @@ F401 [*] `h.i` imported but unused
   |
 help: Remove unused import: `h.i`
   |
-3 | from d.e import f as g
-  - import h.i
-4 | import j.k as l
+4 - import h.i
   |
 
 F401 [*] `j.k` imported but unused
@@ -59,6 +53,5 @@ F401 [*] `j.k` imported but unused
   |               ^
 help: Remove unused import: `j.k`
   |
-4 | import h.i
-  - import j.k as l
+5 - import j.k as l
   |

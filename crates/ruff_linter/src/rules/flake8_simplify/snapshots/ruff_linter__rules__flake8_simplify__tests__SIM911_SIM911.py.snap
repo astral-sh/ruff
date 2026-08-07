@@ -11,10 +11,8 @@ SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values())`
   |
 help: Replace `zip(d.keys(), d.values())` with `d.items()`
   |
-1 | def foo(d: dict[str, str]) -> None:
-  -     for k, v in zip(d.keys(), d.values()):  # SIM911
+2 -     for k, v in zip(d.keys(), d.values()):  # SIM911
 2 +     for k, v in d.items():  # SIM911
-3 |         ...
   |
 
 SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values(), strict=True)`
@@ -28,10 +26,8 @@ SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values(), strict=True)`
   |
 help: Replace `zip(d.keys(), d.values(), strict=True)` with `d.items()`
   |
-4 |
-  -     for k, v in zip(d.keys(), d.values(), strict=True):  # SIM911
+5 -     for k, v in zip(d.keys(), d.values(), strict=True):  # SIM911
 5 +     for k, v in d.items():  # SIM911
-6 |         ...
   |
 
 SIM911 [*] Use `d2.items()` instead of `zip(d2.keys(), d2.values())`
@@ -45,10 +41,8 @@ SIM911 [*] Use `d2.items()` instead of `zip(d2.keys(), d2.values())`
    |
 help: Replace `zip(d2.keys(), d2.values())` with `d2.items()`
    |
-19 |
-   - for k, v in zip(d2.keys(), d2.values()):  # SIM911
+20 - for k, v in zip(d2.keys(), d2.values()):  # SIM911
 20 + for k, v in d2.items():  # SIM911
-21 |     ...
    |
 
 SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
@@ -62,10 +56,8 @@ SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
    |
 help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
    |
-29 |     dict = {}
-   -     for country, stars in zip(dict.keys(), dict.values()):
+30 -     for country, stars in zip(dict.keys(), dict.values()):
 30 +     for country, stars in dict.items():
-31 |         ...
    |
 
 SIM911 [*] Use ` flag_stars.items()` instead of `(zip)(flag_stars.keys(), flag_stars.values())`
@@ -80,10 +72,8 @@ SIM911 [*] Use ` flag_stars.items()` instead of `(zip)(flag_stars.keys(), flag_s
    |
 help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.items()`
    |
-35 | flag_stars = {}
-   - for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
+36 - for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
 36 + for country, stars in flag_stars.items():...
-37 |
    |
 
 SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
@@ -102,13 +92,11 @@ SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
    |
 help: Replace `zip(dict.keys(), dict.values())` with `dict.items()`
    |
-44 |
-   - for country, stars in zip(
-   -         flag_stars.keys(),
-   -         # text
-   -         flag_stars.values(),
-   - ):
+45 - for country, stars in zip(
+46 -         flag_stars.keys(),
+47 -         # text
+48 -         flag_stars.values(),
+49 - ):
 45 + for country, stars in flag_stars.items():
-46 |     print(f"{country}'s flag has {stars} stars.")
    |
 note: This is an unsafe fix and may change runtime behavior

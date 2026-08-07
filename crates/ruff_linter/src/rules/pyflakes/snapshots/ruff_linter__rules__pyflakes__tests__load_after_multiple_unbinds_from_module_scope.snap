@@ -12,10 +12,8 @@ F841 [*] Local variable `x` is assigned to but never used
   |
 help: Remove assignment to unused variable `x`
   |
-6 |         pass
-  -     except ValueError as x:
+7 -     except ValueError as x:
 7 +     except ValueError:
-8 |         pass
   |
 
 F841 [*] Local variable `x` is assigned to but never used
@@ -29,8 +27,6 @@ F841 [*] Local variable `x` is assigned to but never used
    |
 help: Remove assignment to unused variable `x`
    |
-11 |         pass
-   -     except ValueError as x:
+12 -     except ValueError as x:
 12 +     except ValueError:
-13 |         pass
    |

@@ -8,8 +8,7 @@ F401 [*] `os` imported but unused
   |        ^^
 help: Remove unused import: `os`
   |
-  - import os  # ruff: noqa: F401
-1 |
+1 - import os  # ruff: noqa: F401
   |
 
 F841 [*] Local variable `x` is assigned to but never used
@@ -20,8 +19,7 @@ F841 [*] Local variable `x` is assigned to but never used
   |     ^
 help: Remove assignment to unused variable `x`
   |
-4 | def f():
-  -     x = 1
+5 -     x = 1
 5 +     pass
   |
 note: This is an unsafe fix and may change runtime behavior

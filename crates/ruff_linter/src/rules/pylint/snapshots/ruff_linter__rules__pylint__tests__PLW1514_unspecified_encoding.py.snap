@@ -12,11 +12,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
   |
-7 | # Errors.
-  - open("test.txt")
-8 + open("test.txt", encoding="utf-8")
-9 | io.TextIOWrapper(io.FileIO("test.txt"))
-  |
+8 | open("test.txt", encoding="utf-8")
+  |                ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
@@ -30,12 +27,9 @@ PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
 11 | tempfile.NamedTemporaryFile("w")
    |
 help: Add explicit `encoding` argument
-   |
-8  | open("test.txt")
-   - io.TextIOWrapper(io.FileIO("test.txt"))
-9  + io.TextIOWrapper(io.FileIO("test.txt"), encoding="utf-8")
-10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-   |
+  |
+9 | io.TextIOWrapper(io.FileIO("test.txt"), encoding="utf-8")
+  |                                       ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
@@ -50,11 +44,8 @@ PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-9  | io.TextIOWrapper(io.FileIO("test.txt"))
-   - hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-10 + hugo.TextIOWrapper(hugo.FileIO("test.txt"), encoding="utf-8")
-11 | tempfile.NamedTemporaryFile("w")
-   |
+10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"), encoding="utf-8")
+   |                                           ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
@@ -69,11 +60,8 @@ PLW1514 [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encodin
    |
 help: Add explicit `encoding` argument
    |
-10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
-   - tempfile.NamedTemporaryFile("w")
-11 + tempfile.NamedTemporaryFile("w", encoding="utf-8")
-12 | tempfile.TemporaryFile("w")
-   |
+11 | tempfile.NamedTemporaryFile("w", encoding="utf-8")
+   |                                ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
@@ -88,11 +76,8 @@ PLW1514 [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` ar
    |
 help: Add explicit `encoding` argument
    |
-11 | tempfile.NamedTemporaryFile("w")
-   - tempfile.TemporaryFile("w")
-12 + tempfile.TemporaryFile("w", encoding="utf-8")
-13 | codecs.open("test.txt")
-   |
+12 | tempfile.TemporaryFile("w", encoding="utf-8")
+   |                           ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `codecs.open` in text mode without explicit `encoding` argument
@@ -106,11 +91,8 @@ PLW1514 [*] `codecs.open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-12 | tempfile.TemporaryFile("w")
-   - codecs.open("test.txt")
-13 + codecs.open("test.txt", encoding="utf-8")
-14 | tempfile.SpooledTemporaryFile(0, "w")
-   |
+13 | codecs.open("test.txt", encoding="utf-8")
+   |                       ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
@@ -125,11 +107,8 @@ PLW1514 [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encod
    |
 help: Add explicit `encoding` argument
    |
-13 | codecs.open("test.txt")
-   - tempfile.SpooledTemporaryFile(0, "w")
-14 + tempfile.SpooledTemporaryFile(0, "w", encoding="utf-8")
-15 |
-   |
+14 | tempfile.SpooledTemporaryFile(0, "w", encoding="utf-8")
+   |                                     ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -144,11 +123,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-45 |
-   - open("test.txt",)
-46 + open("test.txt", encoding="utf-8",)
-47 | open()
-   |
+46 | open("test.txt", encoding="utf-8",)
+   |                ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -162,11 +138,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-46 | open("test.txt",)
-   - open()
-47 + open(encoding="utf-8")
-48 | open(
-   |
+47 | open(encoding="utf-8")
+   |      ++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -181,11 +154,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-48 | open(
-   -     "test.txt",  # comment
-49 +     "test.txt", encoding="utf-8",  # comment
-50 | )
-   |
+49 |     "test.txt", encoding="utf-8",  # comment
+   |               ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -200,11 +170,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-51 | open(
-   -     "test.txt",
-52 +     "test.txt", encoding="utf-8",
-53 |     # comment
-   |
+52 |     "test.txt", encoding="utf-8",
+   |               ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -219,11 +186,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-54 | )
-   - open(("test.txt"),)
-55 + open(("test.txt"), encoding="utf-8",)
-56 | open(
-   |
+55 | open(("test.txt"), encoding="utf-8",)
+   |                  ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -238,11 +202,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-56 | open(
-   -     ("test.txt"),  # comment
-57 +     ("test.txt"), encoding="utf-8",  # comment
-58 | )
-   |
+57 |     ("test.txt"), encoding="utf-8",  # comment
+   |                 ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -257,11 +218,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-59 | open(
-   -     ("test.txt"),
-60 +     ("test.txt"), encoding="utf-8",
-61 |     # comment
-   |
+60 |     ("test.txt"), encoding="utf-8",
+   |                 ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -276,11 +234,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-63 |
-   - open((("test.txt")),)
-64 + open((("test.txt")), encoding="utf-8",)
-65 | open(
-   |
+64 | open((("test.txt")), encoding="utf-8",)
+   |                    ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -294,11 +249,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-65 | open(
-   -     (("test.txt")),  # comment
-66 +     (("test.txt")), encoding="utf-8",  # comment
-67 | )
-   |
+66 |     (("test.txt")), encoding="utf-8",  # comment
+   |                   ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `open` in text mode without explicit `encoding` argument
@@ -313,11 +265,8 @@ PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-68 | open(
-   -     (("test.txt")),
-69 +     (("test.txt")), encoding="utf-8",
-70 |     # comment
-   |
+69 |     (("test.txt")), encoding="utf-8",
+   |                   ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
@@ -331,11 +280,8 @@ PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` ar
    |
 help: Add explicit `encoding` argument
    |
-76 | # Errors.
-   - Path("foo.txt").open()
-77 + Path("foo.txt").open(encoding="utf-8")
-78 | Path("foo.txt").open("w")
-   |
+77 | Path("foo.txt").open(encoding="utf-8")
+   |                      ++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
@@ -350,11 +296,8 @@ PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` ar
    |
 help: Add explicit `encoding` argument
    |
-77 | Path("foo.txt").open()
-   - Path("foo.txt").open("w")
-78 + Path("foo.txt").open("w", encoding="utf-8")
-79 | text = Path("foo.txt").read_text()
-   |
+78 | Path("foo.txt").open("w", encoding="utf-8")
+   |                         ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
@@ -368,11 +311,8 @@ PLW1514 [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-78 | Path("foo.txt").open("w")
-   - text = Path("foo.txt").read_text()
-79 + text = Path("foo.txt").read_text(encoding="utf-8")
-80 | Path("foo.txt").write_text(text)
-   |
+79 | text = Path("foo.txt").read_text(encoding="utf-8")
+   |                                  ++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
@@ -387,11 +327,8 @@ PLW1514 [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
    |
 help: Add explicit `encoding` argument
    |
-79 | text = Path("foo.txt").read_text()
-   - Path("foo.txt").write_text(text)
-80 + Path("foo.txt").write_text(text, encoding="utf-8")
-81 |
-   |
+80 | Path("foo.txt").write_text(text, encoding="utf-8")
+   |                                ++++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
@@ -406,11 +343,8 @@ PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` ar
    |
 help: Add explicit `encoding` argument
    |
-95 | x = Path("foo.txt")
-   - x.open()
-96 + x.open(encoding="utf-8")
-97 |
-   |
+96 | x.open(encoding="utf-8")
+   |        ++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
@@ -423,9 +357,6 @@ PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` ar
     |
 help: Add explicit `encoding` argument
     |
-104 | def format_file(file: Path):
-    -     with file.open() as f:
-105 +     with file.open(encoding="utf-8") as f:
-106 |         contents = f.read()
-    |
+105 |     with file.open(encoding="utf-8") as f:
+    |                    ++++++++++++++++
 note: This is an unsafe fix and may change runtime behavior

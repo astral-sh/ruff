@@ -13,10 +13,8 @@ RET506 [*] Unnecessary `elif` after `raise` statement
    |
 help: Remove unnecessary `elif`
   |
-7 |         raise Exception(y)
-  -     elif z:
+8 -     elif z:
 8 +     if z:
-9 |         b = 2
   |
 
 RET506 [*] Unnecessary `elif` after `raise` statement
@@ -31,10 +29,8 @@ RET506 [*] Unnecessary `elif` after `raise` statement
    |
 help: Remove unnecessary `elif`
    |
-22 |         raise Exception(x)
-   -     elif z:
+23 -     elif z:
 23 +     if z:
-24 |         raise Exception(y)
    |
 
 RET506 [*] Unnecessary `else` after `raise` statement
@@ -49,13 +45,8 @@ RET506 [*] Unnecessary `else` after `raise` statement
    |
 help: Remove unnecessary `else`
    |
-33 |         raise Exception(y)
-   -     else:
-   -         b = 2
-   -         raise Exception(z)
 34 +     b = 2
 35 +     raise Exception(z)
-36 |
    |
 
 RET506 [*] Unnecessary `else` after `raise` statement
@@ -70,13 +61,8 @@ RET506 [*] Unnecessary `else` after `raise` statement
    |
 help: Remove unnecessary `else`
    |
-44 |             raise Exception(y)
-   -         else:
-   -             c = 3
-   -             raise Exception(x)
 45 +         c = 3
 46 +         raise Exception(x)
-47 |     else:
    |
 
 RET506 [*] Unnecessary `else` after `raise` statement
@@ -91,11 +77,9 @@ RET506 [*] Unnecessary `else` after `raise` statement
    |
 help: Remove unnecessary `else`
    |
-59 |         raise Exception(x)
-   -     else:
-   -         c = 3
+60 -     else:
+61 -         c = 3
 60 +     c = 3
-61 |     raise Exception(y)
    |
 
 RET506 [*] Unnecessary `else` after `raise` statement
@@ -110,11 +94,9 @@ RET506 [*] Unnecessary `else` after `raise` statement
    |
 help: Remove unnecessary `else`
    |
-69 |             raise Exception(x)
-   -         else:
-   -             b = 2
+70 -         else:
+71 -             b = 2
 70 +         b = 2
-71 |     else:
    |
 
 RET506 [*] Unnecessary `else` after `raise` statement
@@ -129,15 +111,8 @@ RET506 [*] Unnecessary `else` after `raise` statement
    |
 help: Remove unnecessary `else`
    |
-79 |         raise Exception(True)
-   -     else:
-   -         try:
-   -             raise Exception(False)
-   -         except ValueError:
-   -             raise Exception(None)
 80 +     try:
 81 +         raise Exception(False)
 82 +     except ValueError:
 83 +         raise Exception(None)
-84 |
    |

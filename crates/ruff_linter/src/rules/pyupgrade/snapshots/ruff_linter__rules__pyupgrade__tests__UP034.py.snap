@@ -12,10 +12,8 @@ UP034 [*] Avoid extraneous parentheses
   |
 help: Remove extraneous parentheses
   |
-1 | # UP034
-  - print(("foo"))
+2 - print(("foo"))
 2 + print("foo")
-3 |
   |
 
 UP034 [*] Avoid extraneous parentheses
@@ -29,10 +27,8 @@ UP034 [*] Avoid extraneous parentheses
   |
 help: Remove extraneous parentheses
   |
-4 | # UP034
-  - print(("hell((goodbye))o"))
+5 - print(("hell((goodbye))o"))
 5 + print("hell((goodbye))o")
-6 |
   |
 
 UP034 [*] Avoid extraneous parentheses
@@ -46,10 +42,8 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
   |
-7 | # UP034
-  - print((("foo")))
+8 - print((("foo")))
 8 + print(("foo"))
-9 |
   |
 
 UP034 [*] Avoid extraneous parentheses
@@ -63,10 +57,8 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-10 | # UP034
-   - print((((1))))
+11 - print((((1))))
 11 + print(((1)))
-12 |
    |
 
 UP034 [*] Avoid extraneous parentheses
@@ -80,10 +72,8 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-13 | # UP034
-   - print(("foo{}".format(1)))
+14 - print(("foo{}".format(1)))
 14 + print("foo{}".format(1))
-15 |
    |
 
 UP034 [*] Avoid extraneous parentheses
@@ -97,10 +87,8 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-17 | print(
-   -     ("foo{}".format(1))
+18 -     ("foo{}".format(1))
 18 +     "foo{}".format(1)
-19 | )
    |
 
 UP034 [*] Avoid extraneous parentheses
@@ -116,13 +104,9 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-22 | print(
-   -     (
-23 +     
-24 |         "foo"
-   -     )
+23 ~     
+24 +         "foo"
 25 +     
-26 | )
    |
 
 UP034 [*] Avoid extraneous parentheses
@@ -137,10 +121,8 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-29 | def f():
-   -     x = int(((yield 1)))
+30 -     x = int(((yield 1)))
 30 +     x = int((yield 1))
-31 |
    |
 
 UP034 [*] Avoid extraneous parentheses
@@ -154,10 +136,8 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-34 |     print(
-   -         ("foo{}".format(1))
+35 -         ("foo{}".format(1))
 35 +         "foo{}".format(1)
-36 |     )
    |
 
 UP034 [*] Avoid extraneous parentheses
@@ -171,8 +151,6 @@ UP034 [*] Avoid extraneous parentheses
    |
 help: Remove extraneous parentheses
    |
-38 | # UP034
-   - print((x for x in range(3)))
+39 - print((x for x in range(3)))
 39 + print(x for x in range(3))
-40 |
    |

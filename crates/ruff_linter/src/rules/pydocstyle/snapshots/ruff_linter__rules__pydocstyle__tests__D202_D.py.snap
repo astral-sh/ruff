@@ -14,8 +14,6 @@ D202 [*] No blank lines allowed after function docstring (found 1)
 help: Remove blank line(s) after function docstring
     |
 142 |     """Leading space."""
-    -
-143 |     pass
     |
 
 D202 [*] No blank lines allowed after function docstring (found 1)
@@ -31,8 +29,6 @@ D202 [*] No blank lines allowed after function docstring (found 1)
 help: Remove blank line(s) after function docstring
     |
 151 |     """Trailing and leading space."""
-    -
-152 |     pass
     |
 
 D202 [*] No blank lines allowed after function docstring (found 1)
@@ -51,8 +47,6 @@ D202 [*] No blank lines allowed after function docstring (found 1)
 help: Remove blank line(s) after function docstring
     |
 558 |     """
-    -
-559 |     pass
     |
 
 D202 [*] No blank lines allowed after function docstring (found 1)
@@ -71,8 +65,6 @@ D202 [*] No blank lines allowed after function docstring (found 1)
 help: Remove blank line(s) after function docstring
     |
 571 |     """
-    -
-572 |     pass
     |
 
 D202 No blank lines allowed after function docstring (found 1)

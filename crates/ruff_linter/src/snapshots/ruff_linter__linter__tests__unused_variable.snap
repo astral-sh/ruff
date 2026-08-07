@@ -10,12 +10,10 @@ F841 [*] Local variable `foo1` is assigned to but never used
 3 |     foo2: list[str] = %matplotlib --list
   |
 help: Remove assignment to unused variable `foo1`
- ::: cell 1
+ ::: cell 1:1:5
   |
-1 | def f():
-  -     foo1 = %matplotlib --list
-2 +     %matplotlib --list
-3 |     foo2: list[str] = %matplotlib --list
+1 -     foo1 = %matplotlib --list
+1 +     %matplotlib --list
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,11 +25,10 @@ F841 [*] Local variable `foo2` is assigned to but never used
 3 |     foo2: list[str] = %matplotlib --list
   |     ^^^^
 help: Remove assignment to unused variable `foo2`
- ::: cell 1
+ ::: cell 1:2:5
   |
-2 |     foo1 = %matplotlib --list
-  -     foo2: list[str] = %matplotlib --list
-3 +     %matplotlib --list
+2 -     foo2: list[str] = %matplotlib --list
+2 +     %matplotlib --list
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -44,12 +41,10 @@ F841 [*] Local variable `bar1` is assigned to but never used
 3 |     bar2: str = !pwd
   |
 help: Remove assignment to unused variable `bar1`
- ::: cell 2
+ ::: cell 2:1:5
   |
-1 | def f():
-  -     bar1 = !pwd
-2 +     !pwd
-3 |     bar2: str = !pwd
+1 -     bar1 = !pwd
+1 +     !pwd
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -61,10 +56,9 @@ F841 [*] Local variable `bar2` is assigned to but never used
 3 |     bar2: str = !pwd
   |     ^^^^
 help: Remove assignment to unused variable `bar2`
- ::: cell 2
+ ::: cell 2:2:5
   |
-2 |     bar1 = !pwd
-  -     bar2: str = !pwd
-3 +     !pwd
+2 -     bar2: str = !pwd
+2 +     !pwd
   |
 note: This is an unsafe fix and may change runtime behavior

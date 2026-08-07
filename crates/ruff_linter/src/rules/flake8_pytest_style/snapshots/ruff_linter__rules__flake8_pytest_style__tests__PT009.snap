@@ -13,10 +13,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 help: Replace `assertTrue(...)` with `assert ...`
    |
-10 |         msg = "Must be True"
-   -         self.assertTrue(expr)  # Error
+11 -         self.assertTrue(expr)  # Error
 11 +         assert expr  # Error
-12 |         self.assertTrue(expr=expr)  # Error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 help: Replace `assertTrue(...)` with `assert ...`
    |
-11 |         self.assertTrue(expr)  # Error
-   -         self.assertTrue(expr=expr)  # Error
+12 -         self.assertTrue(expr=expr)  # Error
 12 +         assert expr  # Error
-13 |         self.assertTrue(expr, msg)  # Error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +47,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 help: Replace `assertTrue(...)` with `assert ...`
    |
-12 |         self.assertTrue(expr=expr)  # Error
-   -         self.assertTrue(expr, msg)  # Error
+13 -         self.assertTrue(expr, msg)  # Error
 13 +         assert expr, msg  # Error
-14 |         self.assertTrue(expr=expr, msg=msg)  # Error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,10 +64,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 help: Replace `assertTrue(...)` with `assert ...`
    |
-13 |         self.assertTrue(expr, msg)  # Error
-   -         self.assertTrue(expr=expr, msg=msg)  # Error
+14 -         self.assertTrue(expr=expr, msg=msg)  # Error
 14 +         assert expr, msg  # Error
-15 |         self.assertTrue(msg=msg, expr=expr)  # Error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -89,10 +81,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 help: Replace `assertTrue(...)` with `assert ...`
    |
-14 |         self.assertTrue(expr=expr, msg=msg)  # Error
-   -         self.assertTrue(msg=msg, expr=expr)  # Error
+15 -         self.assertTrue(msg=msg, expr=expr)  # Error
 15 +         assert expr, msg  # Error
-16 |         self.assertTrue(*(expr, msg))  # Error, unfixable
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -191,10 +181,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertFalse`
    |
 help: Replace `assertFalse(...)` with `assert ...`
    |
-27 |     def test_assert_false(self):
-   -         self.assertFalse(True)  # Error
+28 -         self.assertFalse(True)  # Error
 28 +         assert not True  # Error
-29 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -209,10 +197,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertEqual`
    |
 help: Replace `assertEqual(...)` with `assert ...`
    |
-30 |     def test_assert_equal(self):
-   -         self.assertEqual(1, 2)  # Error
+31 -         self.assertEqual(1, 2)  # Error
 31 +         assert 1 == 2  # Error
-32 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -227,10 +213,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotEqual`
    |
 help: Replace `assertNotEqual(...)` with `assert ...`
    |
-33 |     def test_assert_not_equal(self):
-   -         self.assertNotEqual(1, 1)  # Error
+34 -         self.assertNotEqual(1, 1)  # Error
 34 +         assert 1 != 1  # Error
-35 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -245,10 +229,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertGreater`
    |
 help: Replace `assertGreater(...)` with `assert ...`
    |
-36 |     def test_assert_greater(self):
-   -         self.assertGreater(1, 2)  # Error
+37 -         self.assertGreater(1, 2)  # Error
 37 +         assert 1 > 2  # Error
-38 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -263,10 +245,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertGreaterEqual`
    |
 help: Replace `assertGreaterEqual(...)` with `assert ...`
    |
-39 |     def test_assert_greater_equal(self):
-   -         self.assertGreaterEqual(1, 2)  # Error
+40 -         self.assertGreaterEqual(1, 2)  # Error
 40 +         assert 1 >= 2  # Error
-41 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -281,10 +261,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertLess`
    |
 help: Replace `assertLess(...)` with `assert ...`
    |
-42 |     def test_assert_less(self):
-   -         self.assertLess(2, 1)  # Error
+43 -         self.assertLess(2, 1)  # Error
 43 +         assert 2 < 1  # Error
-44 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -299,10 +277,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertLessEqual`
    |
 help: Replace `assertLessEqual(...)` with `assert ...`
    |
-45 |     def test_assert_less_equal(self):
-   -         self.assertLessEqual(1, 2)  # Error
+46 -         self.assertLessEqual(1, 2)  # Error
 46 +         assert 1 <= 2  # Error
-47 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -317,10 +293,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertIn`
    |
 help: Replace `assertIn(...)` with `assert ...`
    |
-48 |     def test_assert_in(self):
-   -         self.assertIn(1, [2, 3])  # Error
+49 -         self.assertIn(1, [2, 3])  # Error
 49 +         assert 1 in [2, 3]  # Error
-50 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -335,10 +309,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIn`
    |
 help: Replace `assertNotIn(...)` with `assert ...`
    |
-51 |     def test_assert_not_in(self):
-   -         self.assertNotIn(2, [2, 3])  # Error
+52 -         self.assertNotIn(2, [2, 3])  # Error
 52 +         assert 2 not in [2, 3]  # Error
-53 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -353,10 +325,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNone`
    |
 help: Replace `assertIsNone(...)` with `assert ...`
    |
-54 |     def test_assert_is_none(self):
-   -         self.assertIsNone(0)  # Error
+55 -         self.assertIsNone(0)  # Error
 55 +         assert 0 is None  # Error
-56 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -371,10 +341,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNotNone`
    |
 help: Replace `assertIsNotNone(...)` with `assert ...`
    |
-57 |     def test_assert_is_not_none(self):
-   -         self.assertIsNotNone(0)  # Error
+58 -         self.assertIsNotNone(0)  # Error
 58 +         assert 0 is not None  # Error
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -389,10 +357,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertIs`
    |
 help: Replace `assertIs(...)` with `assert ...`
    |
-60 |     def test_assert_is(self):
-   -         self.assertIs([], [])  # Error
+61 -         self.assertIs([], [])  # Error
 61 +         assert [] is []  # Error
-62 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -407,10 +373,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNot`
    |
 help: Replace `assertIsNot(...)` with `assert ...`
    |
-63 |     def test_assert_is_not(self):
-   -         self.assertIsNot(1, 1)  # Error
+64 -         self.assertIsNot(1, 1)  # Error
 64 +         assert 1 is not 1  # Error
-65 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -425,10 +389,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertIsInstance`
    |
 help: Replace `assertIsInstance(...)` with `assert ...`
    |
-66 |     def test_assert_is_instance(self):
-   -         self.assertIsInstance(1, str)  # Error
+67 -         self.assertIsInstance(1, str)  # Error
 67 +         assert isinstance(1, str)  # Error
-68 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -443,10 +405,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIsInstance`
    |
 help: Replace `assertNotIsInstance(...)` with `assert ...`
    |
-69 |     def test_assert_is_not_instance(self):
-   -         self.assertNotIsInstance(1, int)  # Error
+70 -         self.assertNotIsInstance(1, int)  # Error
 70 +         assert not isinstance(1, int)  # Error
-71 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -461,10 +421,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertRegex`
    |
 help: Replace `assertRegex(...)` with `assert ...`
    |
-72 |     def test_assert_regex(self):
-   -         self.assertRegex("abc", r"def")  # Error
+73 -         self.assertRegex("abc", r"def")  # Error
 73 +         assert re.search(r"def", "abc")  # Error
-74 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -479,10 +437,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 help: Replace `assertNotRegex(...)` with `assert ...`
    |
-75 |     def test_assert_not_regex(self):
-   -         self.assertNotRegex("abc", r"abc")  # Error
+76 -         self.assertNotRegex("abc", r"abc")  # Error
 76 +         assert not re.search(r"abc", "abc")  # Error
-77 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -497,10 +453,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertRegexpMatches`
    |
 help: Replace `assertRegexpMatches(...)` with `assert ...`
    |
-78 |     def test_assert_regexp_matches(self):
-   -         self.assertRegexpMatches("abc", r"def")  # Error
+79 -         self.assertRegexpMatches("abc", r"def")  # Error
 79 +         assert re.search(r"def", "abc")  # Error
-80 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -515,10 +469,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 help: Replace `assertNotRegex(...)` with `assert ...`
    |
-81 |     def test_assert_not_regexp_matches(self):
-   -         self.assertNotRegex("abc", r"abc")  # Error
+82 -         self.assertNotRegex("abc", r"abc")  # Error
 82 +         assert not re.search(r"abc", "abc")  # Error
-83 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -533,10 +485,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `failIf`
    |
 help: Replace `failIf(...)` with `assert ...`
    |
-84 |     def test_fail_if(self):
-   -         self.failIf("abc")  # Error
+85 -         self.failIf("abc")  # Error
 85 +         assert not "abc"  # Error
-86 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -551,10 +501,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `failUnless`
    |
 help: Replace `failUnless(...)` with `assert ...`
    |
-87 |     def test_fail_unless(self):
-   -         self.failUnless("abc")  # Error
+88 -         self.failUnless("abc")  # Error
 88 +         assert "abc"  # Error
-89 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -569,10 +517,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `failUnlessEqual`
    |
 help: Replace `failUnlessEqual(...)` with `assert ...`
    |
-90 |     def test_fail_unless_equal(self):
-   -         self.failUnlessEqual(1, 2)  # Error
+91 -         self.failUnlessEqual(1, 2)  # Error
 91 +         assert 1 == 2  # Error
-92 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -584,10 +530,8 @@ PT009 [*] Use a regular `assert` instead of unittest-style `failIfEqual`
    |         ^^^^^^^^^^^^^^^^
 help: Replace `failIfEqual(...)` with `assert ...`
    |
-93 |     def test_fail_if_equal(self):
-   -         self.failIfEqual(1, 2)  # Error
+94 -         self.failIfEqual(1, 2)  # Error
 94 +         assert 1 != 2  # Error
-95 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -601,11 +545,10 @@ PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
 100 |         self.model.piAx_piAy_beta[r][x][y])))
     |
 help: Replace `assertTrue(...)` with `assert ...`
-   |
-97 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459517
-   - (self.assertTrue(
-   -     "piAx_piAy_beta[r][x][y] = {17}".format(
-   -         self.model.piAx_piAy_beta[r][x][y])))
-98 + assert "piAx_piAy_beta[r][x][y] = {17}".format(self.model.piAx_piAy_beta[r][x][y])
-   |
+    |
+ 98 - (self.assertTrue(
+ 99 -     "piAx_piAy_beta[r][x][y] = {17}".format(
+100 -         self.model.piAx_piAy_beta[r][x][y])))
+ 98 + assert "piAx_piAy_beta[r][x][y] = {17}".format(self.model.piAx_piAy_beta[r][x][y])
+    |
 note: This is an unsafe fix and may change runtime behavior

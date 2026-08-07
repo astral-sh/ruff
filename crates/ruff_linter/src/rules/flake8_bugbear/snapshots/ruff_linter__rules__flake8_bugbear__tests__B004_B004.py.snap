@@ -13,10 +13,8 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
   |
 help: Replace with `callable()`
   |
-2 |     o = object()
-  -     if hasattr(o, "__call__"):
+3 -     if hasattr(o, "__call__"):
 3 +     if callable(o):
-4 |         print("Ooh, callable! Or is it?")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -43,10 +41,8 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
    |
 help: Replace with `callable()`
    |
-11 |     o = object()
-   -     if builtins.hasattr(o, "__call__"):
+12 -     if builtins.hasattr(o, "__call__"):
 12 +     if callable(o):
-13 |         print("B U G")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -72,13 +68,12 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
    |
 help: Replace with `callable()`
    |
-1  + import builtins
-2  | def this_is_a_bug():
---------------------------------------------------------------------------------
+ 1 + import builtins
+ 2 | def this_is_a_bug():
+ 3 |     o = object()
+ …
 24 |
-   -     if hasattr(o, "__call__"):
-25 +     if builtins.callable(o):
-26 |         print("STILL a bug!")
+25 ~     if builtins.callable(o):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -100,16 +95,14 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
    |
 help: Replace with `callable()`
    |
-34 | # The autofix for this is unsafe due to the comments.
-   - hasattr(
-   -     # comment 1
-   -     obj,  # comment 2
-   -     # comment 3
-   -     "__call__",  # comment 4
-   -     # comment 5
-   - )
+35 - hasattr(
+36 -     # comment 1
+37 -     obj,  # comment 2
+38 -     # comment 3
+39 -     "__call__",  # comment 4
+40 -     # comment 5
+41 - )
 35 + callable(obj)
-36 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -124,10 +117,8 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
    |
 help: Replace with `callable()`
    |
-44 |
-   - assert hasattr(operator, "__call__")
+45 - assert hasattr(operator, "__call__")
 45 + assert callable(operator)
-46 | assert callable(operator) is False
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -140,9 +131,7 @@ B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is unreliable. 
    |
 help: Replace with `callable()`
    |
-52 |
-   - assert hasattr(A(), "__call__")
+53 - assert hasattr(A(), "__call__")
 53 + assert callable(A())
-54 | assert callable(A()) is False
    |
 note: This is an unsafe fix and may change runtime behavior

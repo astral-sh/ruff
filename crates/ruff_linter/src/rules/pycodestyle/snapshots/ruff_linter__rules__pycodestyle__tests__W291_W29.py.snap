@@ -13,10 +13,7 @@ W291 [*] Trailing whitespace
   |
 help: Remove trailing whitespace
   |
-3 | #: W291:1:6
-  - print 
-4 + print
-5 | #: W293:2:1
+4 | print
   |
 
 W291 [*] Trailing whitespace
@@ -31,10 +28,7 @@ W291 [*] Trailing whitespace
    |
 help: Remove trailing whitespace
    |
-10 | '''multiline
-   - string with trailing whitespace'''   
-11 + string with trailing whitespace'''
-12 | #: W291 W292 noeol
+11 | string with trailing whitespace'''
    |
 
 W291 [*] Trailing whitespace
@@ -49,8 +43,5 @@ W291 [*] Trailing whitespace
    |
 help: Remove trailing whitespace
    |
-12 | #: W291 W292 noeol
-   - x = 1   
-13 + x = 1
-14 | #: W191 W292 noeol
+13 | x = 1
    |

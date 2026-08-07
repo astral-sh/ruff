@@ -10,9 +10,8 @@ SIM208 [*] Use `a` instead of `not (not a)`
   |
 help: Replace with `a`
   |
-  - if not (not a):  # SIM208
+1 - if not (not a):  # SIM208
 1 + if a:  # SIM208
-2 |     pass
   |
 
 SIM208 [*] Use `a == b` instead of `not (not a == b)`
@@ -26,10 +25,8 @@ SIM208 [*] Use `a == b` instead of `not (not a == b)`
   |
 help: Replace with `a == b`
   |
-3 |
-  - if not (not (a == b)):  # SIM208
+4 - if not (not (a == b)):  # SIM208
 4 + if a == b:  # SIM208
-5 |     pass
   |
 
 SIM208 [*] Use `b` instead of `not (not b)`
@@ -44,10 +41,8 @@ SIM208 [*] Use `b` instead of `not (not b)`
    |
 help: Replace with `b`
    |
-15 |
-   - a = not not b  # SIM208
+16 - a = not not b  # SIM208
 16 + a = bool(b)  # SIM208
-17 |
    |
 
 SIM208 [*] Use `a` instead of `not (not a)`
@@ -62,10 +57,8 @@ SIM208 [*] Use `a` instead of `not (not a)`
    |
 help: Replace with `a`
    |
-17 |
-   - f(not not a)  # SIM208
+18 - f(not not a)  # SIM208
 18 + f(bool(a))  # SIM208
-19 |
    |
 
 SIM208 [*] Use `a` instead of `not (not a)`
@@ -79,8 +72,6 @@ SIM208 [*] Use `a` instead of `not (not a)`
    |
 help: Replace with `a`
    |
-19 |
-   - if 1 + (not (not a)):  # SIM208
+20 - if 1 + (not (not a)):  # SIM208
 20 + if 1 + (bool(a)):  # SIM208
-21 |     pass
    |

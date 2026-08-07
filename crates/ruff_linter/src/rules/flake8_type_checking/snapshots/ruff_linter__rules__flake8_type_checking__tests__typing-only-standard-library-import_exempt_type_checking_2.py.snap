@@ -13,12 +13,9 @@ TC003 [*] Move standard library import `typing.Final` into a type-checking block
   |
 help: Move into type-checking block
   |
-4 |
-  - from typing import Final, TYPE_CHECKING
 5 + from typing import TYPE_CHECKING
-6 +
+6 + 
 7 + if TYPE_CHECKING:
 8 +     from typing import Final
-9 |
   |
 note: This is an unsafe fix and may change runtime behavior

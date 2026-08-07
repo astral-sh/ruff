@@ -12,8 +12,6 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
   |
-4 | def f():
-  -     import os
+5 -     import os
 5 +     pass
-6 |
   |

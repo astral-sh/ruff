@@ -171,12 +171,10 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
 9 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove the unused suppression comment
-   |
-8  |   # snapshot
-   -   + 2)  # ty:ignore[division-by-zero] # fmt: skip
-9  +   + 2)  # fmt: skip
-10 | a = (3
-   |
+  |
+9 -   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+9 +   + 2)  # fmt: skip
+  |
 ```
 
 ```py
@@ -193,8 +191,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove the unused suppression comment
    |
-11 |   # snapshot
-   -   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+12 -   + 2)  # fmt: skip # ty:ignore[division-by-zero]
 12 +   + 2)  # fmt: skip
    |
 ```
@@ -319,8 +316,7 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-
   |                                       ^^^^^^^^^^^^^^^^^^^
 help: Remove the unused suppression code
   |
-1 | # snapshot
-  - a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
+2 - a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
 2 + a = 10 / 2  # type: ignore[mypy-code]
   |
 ```
@@ -340,8 +336,7 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove the unused suppression comment
   |
-1 | # snapshot
-  - a = 10 / 2  # type: ignore[ty:division-by-zero]
+2 - a = 10 / 2  # type: ignore[ty:division-by-zero]
 2 + a = 10 / 2
   |
 ```

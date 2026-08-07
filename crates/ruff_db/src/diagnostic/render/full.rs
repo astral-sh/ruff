@@ -331,8 +331,7 @@ mod tests {
           |        ^^
         help: Remove unused import: `os`
           |
-          - import os
-        1 |
+        1 - import os
           |
         note: This is an unsafe fix and may change runtime behavior
 
@@ -348,10 +347,7 @@ mod tests {
           |
         help: Remove assignment to unused variable `x`
           |
-        5 |     """Compute the nth number in the Fibonacci sequence."""
-          -     x = 1
-        6 +     
-        7 |     if n == 0:
+        6 -     x = 1
           |
         note: This is an unsafe fix and may change runtime behavior
 
@@ -573,10 +569,9 @@ print()
         2 | import os
           |        ^^
         help: Remove unused import: `os`
-         ::: cell 1
+         ::: cell 1:1:1
           |
-        1 | # cell 1
-          - import os
+        1 - import os
           |
 
         error[F401][*]: `math` imported but unused
@@ -589,11 +584,9 @@ print()
         4 | print('hello world')
           |
         help: Remove unused import: `math`
-         ::: cell 2
+         ::: cell 2:1:1
           |
-        1 | # cell 2
-          - import math
-        2 |
+        1 - import math
           |
 
         error[F841]: Local variable `x` is assigned to but never used
@@ -868,11 +861,8 @@ line 10
           |
         help: Start of diff:
           |
-        6 | line 6
-          - line 7
-        7 + fixed line 7
-        8 | line 8
-          |
+        7 | fixed line 7
+          | +++++
         note: This is an unsafe fix and may change runtime behavior
         ");
     }
@@ -923,20 +913,15 @@ line 13
           | ^^^^^^
         help: Replace three lines
            |
-        1  | line 1
-           - line 2
-        2  + fixed line 2
-        3  | line 3
-        4  | line 4
-        5  | line 5
-        6  | line 6
-           - line 7
-        7  + fixed line 7
-        8  | line 8
-        --------------------------------------------------------------------------------
+         2 ~ fixed line 2
+         3 | line 3
+         …
+         6 | line 6
+         7 ~ fixed line 7
+         8 | line 8
+         …
         12 | line 12
-           - line 13
-        13 + fixed line 13
+        13 ~ fixed line 13
            |
         ");
     }

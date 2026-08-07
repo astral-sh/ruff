@@ -33,11 +33,11 @@ error[UP051]: Use `@classmethod` and `@abstractmethod` instead of `abstractclass
   |     ^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `@classmethod` and `abstractmethod`
   |
+1 ~ import abc
+2 |
 3 | class Foo(abc.ABC):
-  -     @abc.abstractclassmethod  # snapshot: deprecated-abc-decorator
-4 +     @classmethod
-5 +     @abc.abstractmethod  # snapshot: deprecated-abc-decorator
-6 |     def class_method(cls, arg1): ...
+4 ~     @classmethod
+5 ~     @abc.abstractmethod  # snapshot: deprecated-abc-decorator
   |
 
 
@@ -48,11 +48,12 @@ error[UP051]: Use `@staticmethod` and `@abstractmethod` instead of `abstractstat
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `@staticmethod` and `abstractmethod`
   |
+1 ~ import abc
+2 |
+…
 6 |
-  -     @abc.abstractstaticmethod  # snapshot: deprecated-abc-decorator
-7 +     @staticmethod
-8 +     @abc.abstractmethod  # snapshot: deprecated-abc-decorator
-9 |     def static_method(arg1): ...
+7 ~     @staticmethod
+8 ~     @abc.abstractmethod  # snapshot: deprecated-abc-decorator
   |
 
 
@@ -63,10 +64,11 @@ error[UP051]: Use `@property` and `@abstractmethod` instead of `abstractproperty
    |     ^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `@property` and `abstractmethod`
    |
-9  |
-   -     @abc.abstractproperty  # snapshot: deprecated-abc-decorator
-10 +     @property
-11 +     @abc.abstractmethod  # snapshot: deprecated-abc-decorator
-12 |     def prop(self): ...
+ 1 ~ import abc
+ 2 |
+ …
+ 9 |
+10 ~     @property
+11 ~     @abc.abstractmethod  # snapshot: deprecated-abc-decorator
    |
 ```

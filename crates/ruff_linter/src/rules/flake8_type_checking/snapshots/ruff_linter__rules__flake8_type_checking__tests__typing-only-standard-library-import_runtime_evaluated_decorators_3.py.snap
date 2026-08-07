@@ -13,15 +13,13 @@ TC003 [*] Move standard library import `uuid.UUID` into a type-checking block
   |
 help: Move into type-checking block
    |
-5  | from dataclasses import dataclass
-   - from uuid import UUID  # TC003
-6  | from collections.abc import Sequence
---------------------------------------------------------------------------------
-10 | from attrs import frozen
-11 + from typing import TYPE_CHECKING
-12 +
-13 + if TYPE_CHECKING:
-14 +     from uuid import UUID
-15 |
+ 6 + 
+ 7 | from collections.abc import Sequence
+ …
+11 | from attrs import frozen
+12 + from typing import TYPE_CHECKING
+13 ~ 
+14 + if TYPE_CHECKING:
+15 +     from uuid import UUID
    |
 note: This is an unsafe fix and may change runtime behavior

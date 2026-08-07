@@ -15,12 +15,9 @@ TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is u
    |         --------- Used at runtime here
 help: Move out of type-checking block
   |
-3 | from typing_extensions import TYPE_CHECKING
 4 + from pandas import DataFrame
-5 |
+5 + 
 6 | if TYPE_CHECKING:
-  -     from pandas import DataFrame
-7 +     pass
-8 |
+7 ~     pass
   |
 note: This is an unsafe fix and may change runtime behavior

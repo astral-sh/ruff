@@ -11,9 +11,7 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
   |
-1 |
-  - import os
-2 |
+2 - import os
   |
 
 F811 Redefinition of unused `os` from line 2

@@ -12,10 +12,8 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
   |
 help: Convert to `tuple`
   |
-2 |
-  - for item in {1}:
+3 - for item in {1}:
 3 + for item in (1,):
-4 |     print(f"I can count to {item}!")
   |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
@@ -29,10 +27,8 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
   |
 help: Convert to `tuple`
   |
-5 |
-  - for item in {"apples", "lemons", "water"}:  # flags in-line set literals
+6 - for item in {"apples", "lemons", "water"}:  # flags in-line set literals
 6 + for item in ("apples", "lemons", "water"):  # flags in-line set literals
-7 |     print(f"I like {item}.")
   |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
@@ -45,12 +41,10 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
 10 |     print(f"I can count to {item}!")
    |
 help: Convert to `tuple`
-   |
-8  |
-   - for item in {1,}:
-9  + for item in (1,):
-10 |     print(f"I can count to {item}!")
-   |
+  |
+9 - for item in {1,}:
+9 + for item in (1,):
+  |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
   --> iteration_over_set.py:12:13
@@ -66,13 +60,9 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 help: Convert to `tuple`
    |
-11 |
-   - for item in {
-12 + for item in (
-13 |     "apples", "lemons", "water"
-   - }:  # flags in-line set literals
-14 + ):  # flags in-line set literals
-15 |     print(f"I like {item}.")
+12 ~ for item in (
+13 +     "apples", "lemons", "water"
+14 ~ ):  # flags in-line set literals
    |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
@@ -87,10 +77,8 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 help: Convert to `tuple`
    |
-16 |
-   - numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
+17 - numbers_list = [i for i in {1, 2, 3}]  # flags sets in list comprehensions
 17 + numbers_list = [i for i in (1, 2, 3)]  # flags sets in list comprehensions
-18 |
    |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
@@ -105,10 +93,8 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 help: Convert to `tuple`
    |
-18 |
-   - numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
+19 - numbers_set = {i for i in {1, 2, 3}}  # flags sets in set comprehensions
 19 + numbers_set = {i for i in (1, 2, 3)}  # flags sets in set comprehensions
-20 |
    |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
@@ -123,10 +109,8 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 help: Convert to `tuple`
    |
-20 |
-   - numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
+21 - numbers_dict = {str(i): i for i in {1, 2, 3}}  # flags sets in dict comprehensions
 21 + numbers_dict = {str(i): i for i in (1, 2, 3)}  # flags sets in dict comprehensions
-22 |
    |
 
 PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
@@ -141,8 +125,6 @@ PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
    |
 help: Convert to `tuple`
    |
-22 |
-   - numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
+23 - numbers_gen = (i for i in {1, 2, 3})  # flags sets in generator expressions
 23 + numbers_gen = (i for i in (1, 2, 3))  # flags sets in generator expressions
-24 |
    |

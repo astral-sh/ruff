@@ -13,10 +13,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-14 |
-   - a: TypeAlias = 'int'  # TC008
+15 - a: TypeAlias = 'int'  # TC008
 15 + a: TypeAlias = int  # TC008
-16 | b: TypeAlias = 'Dict'  # OK
    |
 
 TC008 [*] Remove quotes from type alias
@@ -31,10 +29,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-16 | b: TypeAlias = 'Dict'  # OK
-   - c: TypeAlias = 'Foo'   # TC008
+17 - c: TypeAlias = 'Foo'   # TC008
 17 + c: TypeAlias = Foo   # TC008
-18 | d: TypeAlias = 'Foo[str]'  # OK
    |
 
 TC008 [*] Remove quotes from type alias
@@ -49,10 +45,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-19 | e: TypeAlias = 'Foo.bar'  # OK
-   - f: TypeAlias = 'Foo | None'  # TC008
+20 - f: TypeAlias = 'Foo | None'  # TC008
 20 + f: TypeAlias = Foo | None  # TC008
-21 | g: TypeAlias = 'OptStr'   # OK
    |
 
 TC008 [*] Remove quotes from type alias
@@ -67,10 +61,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-21 | g: TypeAlias = 'OptStr'   # OK
-   - h: TypeAlias = 'Bar'   # TC008
+22 - h: TypeAlias = 'Bar'   # TC008
 22 + h: TypeAlias = Bar   # TC008
-23 | i: TypeAlias = Foo['str']   # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -85,10 +77,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-22 | h: TypeAlias = 'Bar'   # TC008
-   - i: TypeAlias = Foo['str']   # TC008
+23 - i: TypeAlias = Foo['str']   # TC008
 23 + i: TypeAlias = Foo[str]   # TC008
-24 | j: TypeAlias = 'Baz'   # OK
    |
 
 TC008 [*] Remove quotes from type alias
@@ -103,10 +93,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-25 | k: TypeAlias = 'k | None'  # OK
-   - l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
+26 - l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
 26 + l: TypeAlias = int | None  # TC008 (because TC010 is not enabled)
-27 | m: TypeAlias = ('int'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -121,10 +109,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-26 | l: TypeAlias = 'int' | None  # TC008 (because TC010 is not enabled)
-   - m: TypeAlias = ('int'  # TC008
+27 - m: TypeAlias = ('int'  # TC008
 27 + m: TypeAlias = (int  # TC008
-28 |     | None)
    |
 
 TC008 [*] Remove quotes from type alias
@@ -141,11 +127,9 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-28 |     | None)
-   - n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
-   -     ' | None')
+29 - n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
+30 -     ' | None')
 29 + n: TypeAlias = (int | None)
-30 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -161,10 +145,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-31 |
-   - type B = 'Dict'  # TC008
+32 - type B = 'Dict'  # TC008
 32 + type B = Dict  # TC008
-33 | type D = 'Foo[str]'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -178,10 +160,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-32 | type B = 'Dict'  # TC008
-   - type D = 'Foo[str]'  # TC008
+33 - type D = 'Foo[str]'  # TC008
 33 + type D = Foo[str]  # TC008
-34 | type E = 'Foo.bar'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -196,10 +176,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-33 | type D = 'Foo[str]'  # TC008
-   - type E = 'Foo.bar'  # TC008
+34 - type E = 'Foo.bar'  # TC008
 34 + type E = Foo.bar  # TC008
-35 | type G = 'OptStr'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -214,10 +192,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-34 | type E = 'Foo.bar'  # TC008
-   - type G = 'OptStr'  # TC008
+35 - type G = 'OptStr'  # TC008
 35 + type G = OptStr  # TC008
-36 | type I = Foo['str']  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -232,10 +208,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-35 | type G = 'OptStr'  # TC008
-   - type I = Foo['str']  # TC008
+36 - type I = Foo['str']  # TC008
 36 + type I = Foo[str]  # TC008
-37 | type J = 'Baz'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -250,10 +224,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-36 | type I = Foo['str']  # TC008
-   - type J = 'Baz'  # TC008
+37 - type J = 'Baz'  # TC008
 37 + type J = Baz  # TC008
-38 | type K = 'K | None'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -268,10 +240,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-37 | type J = 'Baz'  # TC008
-   - type K = 'K | None'  # TC008
+38 - type K = 'K | None'  # TC008
 38 + type K = K | None  # TC008
-39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
    |
 
 TC008 [*] Remove quotes from type alias
@@ -286,10 +256,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-38 | type K = 'K | None'  # TC008
-   - type L = 'int' | None  # TC008 (because TC010 is not enabled)
+39 - type L = 'int' | None  # TC008 (because TC010 is not enabled)
 39 + type L = int | None  # TC008 (because TC010 is not enabled)
-40 | type M = ('int'  # TC008
    |
 
 TC008 [*] Remove quotes from type alias
@@ -304,10 +272,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-39 | type L = 'int' | None  # TC008 (because TC010 is not enabled)
-   - type M = ('int'  # TC008
+40 - type M = ('int'  # TC008
 40 + type M = (int  # TC008
-41 |     | None)
    |
 
 TC008 [*] Remove quotes from type alias
@@ -321,11 +287,9 @@ TC008 [*] Remove quotes from type alias
    | |_____________^
 help: Remove quotes
    |
-41 |     | None)
-   - type N = ('int'  # TC008 (fix removes comment currently)
-   -     ' | None')
+42 - type N = ('int'  # TC008 (fix removes comment currently)
+43 -     ' | None')
 42 + type N = (int | None)
-43 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -341,10 +305,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-47 |     a: TypeAlias = 'Baz'  # OK
-   -     type A = 'Baz'  # TC008
+48 -     type A = 'Baz'  # TC008
 48 +     type A = Baz  # TC008
-49 |
    |
 
 TC008 [*] Remove quotes from type alias
@@ -359,10 +321,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-51 |         a: TypeAlias = 'Baz'  # OK
-   -         type A = 'Baz'  # TC008
+52 -         type A = 'Baz'  # TC008
 52 +         type A = Baz  # TC008
-53 |
    |
 
 TC008 [*] Remove quotes from type alias
@@ -378,12 +338,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-54 | # O should have parenthesis added
-   - o: TypeAlias = """int
-   - | None"""
-55 + o: TypeAlias = (int
+55 ~ o: TypeAlias = (int
 56 + | None)
-57 | type O = """int
    |
 
 TC008 [*] Remove quotes from type alias
@@ -400,12 +356,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-56 | | None"""
-   - type O = """int
-   - | None"""
-57 + type O = (int
+57 ~ type O = (int
 58 + | None)
-59 |
    |
 
 TC008 [*] Remove quotes from type alias
@@ -421,12 +373,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-60 | # P, Q, and R should not have parenthesis added
-   - p: TypeAlias = ("""int
-   - | None""")
-61 + p: TypeAlias = (int
-62 + | None)
-63 | type P = ("""int
+61 ~ p: TypeAlias = (int
+62 ~ | None)
    |
 
 TC008 [*] Remove quotes from type alias
@@ -443,12 +391,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-62 | | None""")
-   - type P = ("""int
-   - | None""")
-63 + type P = (int
-64 + | None)
-65 |
+63 ~ type P = (int
+64 ~ | None)
    |
 
 TC008 [*] Remove quotes from type alias
@@ -465,12 +409,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-65 |
-   - q: TypeAlias = """(int
-   - | None)"""
-66 + q: TypeAlias = (int
+66 ~ q: TypeAlias = (int
 67 + | None)
-68 | type Q = """(int
    |
 
 TC008 [*] Remove quotes from type alias
@@ -487,12 +427,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-67 | | None)"""
-   - type Q = """(int
-   - | None)"""
-68 + type Q = (int
+68 ~ type Q = (int
 69 + | None)
-70 |
    |
 
 TC008 [*] Remove quotes from type alias
@@ -506,10 +442,8 @@ TC008 [*] Remove quotes from type alias
    |
 help: Remove quotes
    |
-70 |
-   - r: TypeAlias = """int | None"""
+71 - r: TypeAlias = """int | None"""
 71 + r: TypeAlias = int | None
-72 | type R = """int | None"""
    |
 
 TC008 [*] Remove quotes from type alias
@@ -520,7 +454,6 @@ TC008 [*] Remove quotes from type alias
    |          ^^^^^^^^^^^^^^^^
 help: Remove quotes
    |
-71 | r: TypeAlias = """int | None"""
-   - type R = """int | None"""
+72 - type R = """int | None"""
 72 + type R = int | None
    |

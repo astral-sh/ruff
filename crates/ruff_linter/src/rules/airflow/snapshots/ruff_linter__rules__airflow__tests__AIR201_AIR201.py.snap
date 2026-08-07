@@ -12,10 +12,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-17 |     task_id="task_2",
-   -     bash_command="{{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
+18 -     bash_command="{{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
 18 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-19 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +28,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-23 |     task_id="task_3",
-   -     bash_command="{{ task_instance.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
+24 -     bash_command="{{ task_instance.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
 24 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-25 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,10 +44,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-29 |     task_id="task_4",
-   -     bash_command="{{ ti.xcom_pull('task_1') }}",  # AIR201 (fix: task_1.output)
+30 -     bash_command="{{ ti.xcom_pull('task_1') }}",  # AIR201 (fix: task_1.output)
 30 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-31 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -66,10 +60,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-35 |     task_id="task_5",
-   -     bash_command='{{ ti.xcom_pull(task_ids="task_1") }}',  # AIR201 (fix: task_1.output)
+36 -     bash_command='{{ ti.xcom_pull(task_ids="task_1") }}',  # AIR201 (fix: task_1.output)
 36 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-37 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -84,10 +76,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-41 |     task_id="task_6",
-   -     bash_command="{{ti.xcom_pull(task_ids='task_1')}}",  # AIR201 (fix: task_1.output)
+42 -     bash_command="{{ti.xcom_pull(task_ids='task_1')}}",  # AIR201 (fix: task_1.output)
 42 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-43 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,10 +92,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-47 |     task_id="task_7",
-   -     bash_command="{{ ti.xcom_pull(task_id='task_1') }}",  # AIR201 (fix: task_1.output)
+48 -     bash_command="{{ ti.xcom_pull(task_id='task_1') }}",  # AIR201 (fix: task_1.output)
 48 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-49 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -120,10 +108,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-53 |     task_id="task_8",
-   -     external_task_id="{{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
+54 -     external_task_id="{{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
 54 +     external_task_id=task_1.output,  # AIR201 (fix: task_1.output)
-55 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -138,10 +124,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-59 |     task_id="task_9",
-   -     endpoint="{{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
+60 -     endpoint="{{ ti.xcom_pull(task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
 60 +     endpoint=task_1.output,  # AIR201 (fix: task_1.output)
-61 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -156,10 +140,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-66 |     task_id="task_18",
-   -     bash_command="{{ ti.xcom_pull(task_ids=['task_1']) }}",  # AIR201 (fix: task_1.output)
+67 -     bash_command="{{ ti.xcom_pull(task_ids=['task_1']) }}",  # AIR201 (fix: task_1.output)
 67 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-68 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -174,10 +156,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-72 |     task_id="task_19",
-   -     bash_command="{{ ti.xcom_pull(task_ids=('task_1',)) }}",  # AIR201 (fix: task_1.output)
+73 -     bash_command="{{ ti.xcom_pull(task_ids=('task_1',)) }}",  # AIR201 (fix: task_1.output)
 73 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-74 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -192,10 +172,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-78 |     task_id="task_20",
-   -     bash_command="{{ ti.xcom_pull(task_ids='task_1', key='return_value') }}",  # AIR201 (fix: task_1.output)
+79 -     bash_command="{{ ti.xcom_pull(task_ids='task_1', key='return_value') }}",  # AIR201 (fix: task_1.output)
 79 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-80 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -210,10 +188,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-84 |     task_id="task_21",
-   -     bash_command="{{ ti.xcom_pull(task_ids=['task_1'], key='return_value') }}",  # AIR201 (fix: task_1.output)
+85 -     bash_command="{{ ti.xcom_pull(task_ids=['task_1'], key='return_value') }}",  # AIR201 (fix: task_1.output)
 85 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-86 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -228,10 +204,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-90 |     task_id="task_22",
-   -     bash_command='{{ task_instance.xcom_pull(task_ids=["task_1"], key="return_value") }}',  # AIR201 (fix: task_1.output)
+91 -     bash_command='{{ task_instance.xcom_pull(task_ids=["task_1"], key="return_value") }}',  # AIR201 (fix: task_1.output)
 91 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-92 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -246,10 +220,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "task_1" instead o
    |
 help: Replace with `task_1.output`
    |
-96 |     task_id="task_25",
-   -     bash_command="{{ ti.xcom_pull(key='return_value', task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
+97 -     bash_command="{{ ti.xcom_pull(key='return_value', task_ids='task_1') }}",  # AIR201 (fix: task_1.output)
 97 +     bash_command=task_1.output,  # AIR201 (fix: task_1.output)
-98 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -264,10 +236,8 @@ AIR201 [*] Use the `.output` attribute on the task object for "extract_data" ins
     |
 help: Replace with `extract_data.output`
     |
-107 |     task_id="task_16",
-    -     bash_command="{{ ti.xcom_pull(task_ids='extract_data') }}",  # AIR201 (fix: extract_data.output)
+108 -     bash_command="{{ ti.xcom_pull(task_ids='extract_data') }}",  # AIR201 (fix: extract_data.output)
 108 +     bash_command=extract_data.output,  # AIR201 (fix: extract_data.output)
-109 | )
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -315,9 +285,7 @@ AIR201 [*] Use the `.output` attribute on the task object for "len" instead of `
     |
 help: Replace with `len.output`
     |
-133 |     task_id="task_28",
-    -     op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (fix: len.output)
+134 -     op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (fix: len.output)
 134 +     op_args=len.output,  # AIR201 (fix: len.output)
-135 | )
     |
 note: This is an unsafe fix and may change runtime behavior

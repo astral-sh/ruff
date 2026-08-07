@@ -7,5 +7,6 @@ help: Insert required import: `import os`
   |
 1 | """Hello, world!"""
 2 + import os
-3 |
+3 + 
+4 | x = 1
   |

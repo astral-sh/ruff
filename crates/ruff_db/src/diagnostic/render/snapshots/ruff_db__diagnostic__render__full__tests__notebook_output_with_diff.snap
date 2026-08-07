@@ -9,10 +9,9 @@ error[F401][*]: `os` imported but unused
 2 | import os
   |        ^^
 help: Remove unused import: `os`
- ::: cell 1
+ ::: cell 1:1:1
   |
-1 | # cell 1
-  - import os
+1 - import os
   |
 
 error[F401][*]: `math` imported but unused
@@ -25,11 +24,9 @@ error[F401][*]: `math` imported but unused
 4 | print('hello world')
   |
 help: Remove unused import: `math`
- ::: cell 2
+ ::: cell 2:1:1
   |
-1 | # cell 2
-  - import math
-2 |
+1 - import math
   |
 
 error[F841][*]: Local variable `x` is assigned to but never used
@@ -40,10 +37,8 @@ error[F841][*]: Local variable `x` is assigned to but never used
 4 |     x = 1
   |     ^
 help: Remove assignment to unused variable `x`
- ::: cell 3
+ ::: cell 3:3:1
   |
-3 |     print()
-  -     x = 1
-4 |
+3 -     x = 1
   |
 note: This is an unsafe fix and may change runtime behavior

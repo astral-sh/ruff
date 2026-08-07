@@ -14,12 +14,9 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
   |
 1 + import short
-2 | import mediuuuuuum
-  - import short
-3 | import looooooooooooooooong
-  - from looooooooooooooong import a
+2 + import mediuuuuuum
+3 + import looooooooooooooooong
 4 + from short import b
-5 | from mediuuuum import c
-  - from short import b
+5 + from mediuuuum import c
 6 + from looooooooooooooong import a
   |

@@ -12,10 +12,8 @@ F401 [*] `functools` imported but unused
   |
 help: Remove unused import: `functools`
   |
-1 | from __future__ import all_feature_names
-  - import functools, os
+2 - import functools, os
 2 + import os
-3 | from datetime import datetime
   |
 
 F401 [*] `collections.OrderedDict` imported but unused
@@ -30,9 +28,10 @@ F401 [*] `collections.OrderedDict` imported but unused
   |
 help: Remove unused import: `collections.OrderedDict`
   |
-5 |     Counter,
-  -     OrderedDict,
-6 |     namedtuple,
+4 + from collections import (
+5 +     Counter,
+6 +     namedtuple,
+7 + )
   |
 
 F401 [*] `logging.handlers` imported but unused
@@ -47,9 +46,7 @@ F401 [*] `logging.handlers` imported but unused
    |
 help: Remove unused import: `logging.handlers`
    |
-11 | import logging.config
-   - import logging.handlers
-12 | from typing import (
+12 - import logging.handlers
    |
 
 F401 [*] `shelve` imported but unused
@@ -62,9 +59,7 @@ F401 [*] `shelve` imported but unused
    |
 help: Remove unused import: `shelve`
    |
-31 | if TYPE_CHECKING:
-   -     import shelve
-32 |     import importlib
+32 -     import shelve
    |
 
 F401 [*] `importlib` imported but unused
@@ -79,9 +74,7 @@ F401 [*] `importlib` imported but unused
    |
 help: Remove unused import: `importlib`
    |
-32 |     import shelve
-   -     import importlib
-33 |
+33 -     import importlib
    |
 
 F401 [*] `pathlib` imported but unused
@@ -96,9 +89,7 @@ F401 [*] `pathlib` imported but unused
    |
 help: Remove unused import: `pathlib`
    |
-36 |     """Hello, world!"""
-   -     import pathlib
-37 |
+37 -     import pathlib
    |
 
 F401 [*] `pickle` imported but unused
@@ -109,10 +100,8 @@ F401 [*] `pickle` imported but unused
    |                ^^^^^^
 help: Remove unused import: `pickle`
    |
-51 |     def b(self) -> None:
-   -         import pickle
+52 -         import pickle
 52 +         pass
-53 |
    |
 
 F401 [*] `x` imported but unused
@@ -126,9 +115,7 @@ F401 [*] `x` imported but unused
    |
 help: Remove unused import: `x`
    |
-92 |     case 0,:
-   -         import x
-93 |         import y
+93 -         import x
    |
 
 F401 [*] `y` imported but unused
@@ -140,9 +127,7 @@ F401 [*] `y` imported but unused
    |                ^
 help: Remove unused import: `y`
    |
-93 |         import x
-   -         import y
-94 |
+94 -         import y
    |
 
 F401 [*] `foo.bar.baz` imported but unused
@@ -156,11 +141,9 @@ F401 [*] `foo.bar.baz` imported but unused
 101 | print(bop.baz.read_csv("test.csv"))
     |
 help: Remove unused import: `foo.bar.baz`
-   |
-98 | import foo.bar as bop
-   - import foo.bar.baz
-99 |
-   |
+    |
+ 99 - import foo.bar.baz
+    |
 
 F401 [*] `a1` imported but unused
    --> F401_0.py:105:12
@@ -174,9 +157,7 @@ F401 [*] `a1` imported but unused
     |
 help: Remove unused import: `a1`
     |
-104 | if TYPE_CHECKING:
-    -     import a1
-105 |
+105 -     import a1
     |
 
 F401 [*] `a2` imported but unused
@@ -188,9 +169,7 @@ F401 [*] `a2` imported but unused
     |            ^^
 help: Remove unused import: `a2`
     |
-106 |
-    -     import a2
-107 |
+107 -     import a2
     |
 
 F401 [*] `b1` imported but unused
@@ -205,9 +184,7 @@ F401 [*] `b1` imported but unused
     |
 help: Remove unused import: `b1`
     |
-111 |     case 0,:
-    -         import b1
-112 |
+112 -         import b1
     |
 
 F401 [*] `b2` imported but unused
@@ -219,9 +196,7 @@ F401 [*] `b2` imported but unused
     |                ^^
 help: Remove unused import: `b2`
     |
-113 |
-    -         import b2
-114 |
+114 -         import b2
     |
 
 F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
@@ -232,7 +207,6 @@ F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
     | ^^^^
 help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
     |
-120 |
-    - from datameta_client_lib.model_helpers import (
-    - noqa )
+121 - from datameta_client_lib.model_helpers import (
+122 - noqa )
     |

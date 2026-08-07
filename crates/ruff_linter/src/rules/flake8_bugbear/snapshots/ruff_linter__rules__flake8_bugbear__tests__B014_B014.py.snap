@@ -13,10 +13,8 @@ B014 [*] Exception handler with duplicate exception: `OSError`
    |
 help: De-duplicate exceptions
    |
-16 |     pass
-   - except (OSError, OSError) as err:
+17 - except (OSError, OSError) as err:
 17 + except OSError as err:
-18 |     # Duplicate exception types are useless
    |
 
 B014 [*] Exception handler with duplicate exception: `MyError`
@@ -31,10 +29,8 @@ B014 [*] Exception handler with duplicate exception: `MyError`
    |
 help: De-duplicate exceptions
    |
-27 |     pass
-   - except (MyError, MyError):
+28 - except (MyError, MyError):
 28 + except MyError:
-29 |     # Detect duplicate non-builtin errors
    |
 
 B014 [*] Exception handler with duplicate exception: `re.error`
@@ -49,10 +45,8 @@ B014 [*] Exception handler with duplicate exception: `re.error`
    |
 help: De-duplicate exceptions
    |
-48 |     pass
-   - except (re.error, re.error):
+49 - except (re.error, re.error):
 49 + except re.error:
-50 |     # Duplicate exception types as attributes
    |
 
 B014 [*] Exception handler with duplicate exception: `ValueError`
@@ -66,10 +60,8 @@ B014 [*] Exception handler with duplicate exception: `ValueError`
    |
 help: De-duplicate exceptions
    |
-81 |     pass
-   - except (ValueError, ValueError, TypeError):
+82 - except (ValueError, ValueError, TypeError):
 82 + except (ValueError, TypeError):
-83 |     pass
    |
 
 B014 [*] Exception handler with duplicate exception: `re.error`
@@ -83,10 +75,8 @@ B014 [*] Exception handler with duplicate exception: `re.error`
    |
 help: De-duplicate exceptions
    |
-88 |     pas
-   - except(re.error, re.error):
+89 - except(re.error, re.error):
 89 + except re.error:
-90 |     p
    |
 
 B014 [*] Exception handler with duplicate exception: `ValueError`
@@ -105,15 +95,13 @@ B014 [*] Exception handler with duplicate exception: `ValueError`
 101 |       pass
     |
 help: De-duplicate exceptions
-   |
-94 |     pass
-   - except (
-   -     ValueError,
-   -     ValueError,
-   -     # text
-   -     TypeError,
-   - ):
-95 + except (ValueError, TypeError):
-96 |     pass
-   |
+    |
+ 95 - except (
+ 96 -     ValueError,
+ 97 -     ValueError,
+ 98 -     # text
+ 99 -     TypeError,
+100 - ):
+ 95 + except (ValueError, TypeError):
+    |
 note: This is an unsafe fix and may change runtime behavior

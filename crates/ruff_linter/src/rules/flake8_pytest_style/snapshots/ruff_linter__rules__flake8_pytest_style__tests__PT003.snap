@@ -11,10 +11,8 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-13 |
-   - @pytest.fixture(scope="function")
+14 - @pytest.fixture(scope="function")
 14 + @pytest.fixture()
-15 | def error():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,10 +26,8 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-18 |
-   - @pytest.fixture(scope="function", name="my_fixture")
+19 - @pytest.fixture(scope="function", name="my_fixture")
 19 + @pytest.fixture(name="my_fixture")
-20 | def error_multiple_args():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,10 +41,8 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-23 |
-   - @pytest.fixture(name="my_fixture", scope="function")
+24 - @pytest.fixture(name="my_fixture", scope="function")
 24 + @pytest.fixture(name="my_fixture")
-25 | def error_multiple_args():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -62,10 +56,8 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-28 |
-   - @pytest.fixture(name="my_fixture", scope="function", **kwargs)
+29 - @pytest.fixture(name="my_fixture", scope="function", **kwargs)
 29 + @pytest.fixture(name="my_fixture", **kwargs)
-30 | def error_second_arg():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -81,10 +73,8 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-36 | # work for all cases.
-   - @pytest.fixture("my_fixture", scope="function")
+37 - @pytest.fixture("my_fixture", scope="function")
 37 + @pytest.fixture("my_fixture")
-38 | def error_arg():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -99,9 +89,7 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-42 | @pytest.fixture(
-   -     scope="function",
-43 |     name="my_fixture",
+43 -     scope="function",
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -117,9 +105,9 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-51 |     name="my_fixture",
-   -     scope="function",
-52 | )
+51 -     name="my_fixture",
+52 -     scope="function",
+51 +     name="my_fixture",
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -135,11 +123,9 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 help: Remove implied `scope` argument
    |
-65 |     
-   -     scope=\
-   -         "function"  # some comment ),
-   -     ,
-   -     
-66 |     name2=name, name3="my_fixture", **kwargs
+66 -     scope=\
+67 -         "function"  # some comment ),
+68 -     ,
+69 -     
    |
 note: This is an unsafe fix and may change runtime behavior

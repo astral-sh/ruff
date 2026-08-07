@@ -12,12 +12,9 @@ ANN201 [*] Missing return type annotation for public function `foo`
   |
 help: Add return type annotation: `builtins.str`
   |
-2 | from typing import override
 3 + import builtins
-4 |
-  - def foo():
-5 + def foo() -> builtins.str:
-6 |     return "!"
+4 + 
+5 ~ def foo() -> builtins.str:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,15 +29,12 @@ ANN202 [*] Missing return type annotation for private function `_foo`
   |
 help: Add return type annotation: `builtins.str`
   |
-2 | from typing import override
 3 + import builtins
-4 |
+4 + 
 5 | def foo():
 6 |     return "!"
 7 |
-  - def _foo():
-8 + def _foo() -> builtins.str:
-9 |     return "!"
+8 ~ def _foo() -> builtins.str:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -55,14 +49,12 @@ ANN204 [*] Missing return type annotation for special method `__str__`
    |
 help: Add return type annotation: `str`
    |
-2  | from typing import override
-3  + import builtins
-4  |
---------------------------------------------------------------------------------
+ 3 + import builtins
+ 4 + 
+ 5 | def foo():
+ …
 12 |     @override
-   -     def __str__(self):
-13 +     def __str__(self) -> builtins.str:
-14 |         return "!"
+13 ~     def __str__(self) -> builtins.str:
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -76,14 +68,12 @@ ANN205 [*] Missing return type annotation for staticmethod `foo`
    |
 help: Add return type annotation: `builtins.str`
    |
-2  | from typing import override
-3  + import builtins
-4  |
---------------------------------------------------------------------------------
+ 3 + import builtins
+ 4 + 
+ 5 | def foo():
+ …
 16 |     @staticmethod
-   -     def foo():
-17 +     def foo() -> builtins.str:
-18 |         return "!"
+17 ~     def foo() -> builtins.str:
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -97,13 +87,11 @@ ANN206 [*] Missing return type annotation for classmethod `bar`
    |
 help: Add return type annotation: `builtins.str`
    |
-2  | from typing import override
-3  + import builtins
-4  |
---------------------------------------------------------------------------------
+ 3 + import builtins
+ 4 + 
+ 5 | def foo():
+ …
 20 |     @classmethod
-   -     def bar(cls):
-21 +     def bar(cls) -> builtins.str:
-22 |         return "!"
+21 ~     def bar(cls) -> builtins.str:
    |
 note: This is an unsafe fix and may change runtime behavior

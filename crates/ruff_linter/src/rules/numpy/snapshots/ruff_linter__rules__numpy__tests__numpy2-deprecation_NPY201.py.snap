@@ -17,9 +17,7 @@ help: Replace with `numpy.lib.add_docstring`
 2 | def func():
 3 |     import numpy as np
 4 |
-  -     np.add_docstring
-5 +     add_docstring
-6 |
+5 ~     add_docstring
   |
 
 NPY201 [*] `np.add_newdoc` will be removed in NumPy 2.0. Use `numpy.lib.add_newdoc` instead.
@@ -36,11 +34,10 @@ help: Replace with `numpy.lib.add_newdoc`
   |
 1 + from numpy.lib import add_newdoc
 2 | def func():
---------------------------------------------------------------------------------
+3 |     import numpy as np
+…
 6 |
-  -     np.add_newdoc
-7 +     add_newdoc
-8 |
+7 ~     add_newdoc
   |
 
 NPY201 `np.add_newdoc_ufunc` will be removed in NumPy 2.0. `add_newdoc_ufunc` is an internal function.
@@ -77,13 +74,12 @@ NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `numpy.lib.array_u
    |
 help: Replace with `numpy.lib.array_utils.byte_bounds` (requires NumPy 2.0 or greater)
    |
-1  + from numpy.lib.array_utils import byte_bounds
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from numpy.lib.array_utils import byte_bounds
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 12 |
-   -     np.byte_bounds(np.array([1,2,3]))
-13 +     byte_bounds(np.array([1,2,3]))
-14 |
+13 ~     byte_bounds(np.array([1,2,3]))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -110,10 +106,11 @@ NPY201 [*] `np.cfloat` will be removed in NumPy 2.0. Use `numpy.complex128` inst
    |
 help: Replace with `numpy.complex128`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 15 |
-   -     np.cfloat(12+34j)
-16 +     np.complex128(12+34j)
-17 |
+16 ~     np.complex128(12+34j)
    |
 
 NPY201 [*] `np.clongfloat` will be removed in NumPy 2.0. Use `numpy.clongdouble` instead.
@@ -128,10 +125,11 @@ NPY201 [*] `np.clongfloat` will be removed in NumPy 2.0. Use `numpy.clongdouble`
    |
 help: Replace with `numpy.clongdouble`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 17 |
-   -     np.clongfloat(12+34j)
-18 +     np.clongdouble(12+34j)
-19 |
+18 ~     np.clongdouble(12+34j)
    |
 
 NPY201 `np.compat` will be removed in NumPy 2.0. Python 2 is no longer supported.
@@ -157,10 +155,11 @@ NPY201 [*] `np.complex_` will be removed in NumPy 2.0. Use `numpy.complex128` in
    |
 help: Replace with `numpy.complex128`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 21 |
-   -     np.complex_(12+34j)
-22 +     np.complex128(12+34j)
-23 |
+22 ~     np.complex128(12+34j)
    |
 
 NPY201 [*] `np.DataSource` will be removed in NumPy 2.0. Use `numpy.lib.npyio.DataSource` instead.
@@ -175,13 +174,12 @@ NPY201 [*] `np.DataSource` will be removed in NumPy 2.0. Use `numpy.lib.npyio.Da
    |
 help: Replace with `numpy.lib.npyio.DataSource`
    |
-1  + from numpy.lib.npyio import DataSource
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from numpy.lib.npyio import DataSource
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 24 |
-   -     np.DataSource
-25 +     DataSource
-26 |
+25 ~     DataSource
    |
 
 NPY201 `np.deprecate` will be removed in NumPy 2.0. Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.
@@ -262,10 +260,11 @@ NPY201 [*] `np.float_` will be removed in NumPy 2.0. Use `numpy.float64` instead
    |
 help: Replace with `numpy.float64`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 37 |
-   -     np.float_
-38 +     np.float64
-39 |
+38 ~     np.float64
    |
 
 NPY201 `np.geterrobj` will be removed in NumPy 2.0. Use the `np.errstate` context manager instead.
@@ -291,10 +290,11 @@ NPY201 [*] `np.Inf` will be removed in NumPy 2.0. Use `numpy.inf` instead.
    |
 help: Replace with `numpy.inf`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 41 |
-   -     np.Inf
-42 +     np.inf
-43 |
+42 ~     np.inf
    |
 
 NPY201 [*] `np.Infinity` will be removed in NumPy 2.0. Use `numpy.inf` instead.
@@ -309,10 +309,11 @@ NPY201 [*] `np.Infinity` will be removed in NumPy 2.0. Use `numpy.inf` instead.
    |
 help: Replace with `numpy.inf`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 43 |
-   -     np.Infinity
-44 +     np.inf
-45 |
+44 ~     np.inf
    |
 
 NPY201 [*] `np.infty` will be removed in NumPy 2.0. Use `numpy.inf` instead.
@@ -327,10 +328,11 @@ NPY201 [*] `np.infty` will be removed in NumPy 2.0. Use `numpy.inf` instead.
    |
 help: Replace with `numpy.inf`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 45 |
-   -     np.infty
-46 +     np.inf
-47 |
+46 ~     np.inf
    |
 
 NPY201 `np.issctype` will be removed without replacement in NumPy 2.0
@@ -356,10 +358,8 @@ NPY201 [*] `np.issubclass_` will be removed in NumPy 2.0. Use `issubclass` inste
    |
 help: Replace with `issubclass`
    |
-49 |
-   -     np.issubclass_(np.int32, np.integer)
+50 -     np.issubclass_(np.int32, np.integer)
 50 +     issubclass(np.int32, np.integer)
-51 |
    |
 
 NPY201 [*] `np.issubsctype` will be removed in NumPy 2.0. Use `numpy.issubdtype` instead.
@@ -374,10 +374,11 @@ NPY201 [*] `np.issubsctype` will be removed in NumPy 2.0. Use `numpy.issubdtype`
    |
 help: Replace with `numpy.issubdtype`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 51 |
-   -     np.issubsctype
-52 +     np.issubdtype
-53 |
+52 ~     np.issubdtype
    |
 
 NPY201 [*] `np.mat` will be removed in NumPy 2.0. Use `numpy.asmatrix` instead.
@@ -392,10 +393,11 @@ NPY201 [*] `np.mat` will be removed in NumPy 2.0. Use `numpy.asmatrix` instead.
    |
 help: Replace with `numpy.asmatrix`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 53 |
-   -     np.mat
-54 +     np.asmatrix
-55 |
+54 ~     np.asmatrix
    |
 
 NPY201 `np.maximum_sctype` will be removed without replacement in NumPy 2.0
@@ -421,10 +423,11 @@ NPY201 [*] `np.NaN` will be removed in NumPy 2.0. Use `numpy.nan` instead.
    |
 help: Replace with `numpy.nan`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 57 |
-   -     np.NaN
-58 +     np.nan
-59 |
+58 ~     np.nan
    |
 
 NPY201 `np.nbytes` will be removed in NumPy 2.0. Use `np.dtype(<dtype>).itemsize` instead.
@@ -450,10 +453,8 @@ NPY201 [*] `np.NINF` will be removed in NumPy 2.0. Use `-np.inf` instead.
    |
 help: Replace with `-np.inf`
    |
-61 |
-   -     np.NINF
+62 -     np.NINF
 62 +     -np.inf
-63 |
    |
 
 NPY201 [*] `np.NZERO` will be removed in NumPy 2.0. Use `-0.0` instead.
@@ -468,10 +469,8 @@ NPY201 [*] `np.NZERO` will be removed in NumPy 2.0. Use `-0.0` instead.
    |
 help: Replace with `-0.0`
    |
-63 |
-   -     np.NZERO
+64 -     np.NZERO
 64 +     -0.0
-65 |
    |
 
 NPY201 [*] `np.longcomplex` will be removed in NumPy 2.0. Use `numpy.clongdouble` instead.
@@ -486,10 +485,11 @@ NPY201 [*] `np.longcomplex` will be removed in NumPy 2.0. Use `numpy.clongdouble
    |
 help: Replace with `numpy.clongdouble`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 65 |
-   -     np.longcomplex(12+34j)
-66 +     np.clongdouble(12+34j)
-67 |
+66 ~     np.clongdouble(12+34j)
    |
 
 NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `numpy.longdouble` instead.
@@ -504,10 +504,11 @@ NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `numpy.longdouble` i
    |
 help: Replace with `numpy.longdouble`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 67 |
-   -     np.longfloat(12+34j)
-68 +     np.longdouble(12+34j)
-69 |
+68 ~     np.longdouble(12+34j)
    |
 
 NPY201 `np.lookfor` will be removed in NumPy 2.0. Search NumPy’s documentation directly.
@@ -533,8 +534,9 @@ NPY201 [*] `np.NAN` will be removed in NumPy 2.0. Use `numpy.nan` instead.
    |
 help: Replace with `numpy.nan`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 71 |
-   -     np.NAN
-72 +     np.nan
-73 |
+72 ~     np.nan
    |

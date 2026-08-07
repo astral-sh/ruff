@@ -9,8 +9,7 @@ E303 [*] Too many blank lines (3)
 6 |     pass
   |
 help: Remove extraneous blank line(s)
-  |
-3 |
-  -
-4 | def fn():
+2 - 
+3 - 
+4 - 
   |

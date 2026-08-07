@@ -11,9 +11,7 @@ UP045 [*] Use `X | None` for type annotations
    |
 help: Convert to `X | None`
    |
-39 |
-   - x: Optional[int] = None
+40 - x: Optional[int] = None
 40 + x: int | None = None
-41 |
    |
 note: This is an unsafe fix and may change runtime behavior

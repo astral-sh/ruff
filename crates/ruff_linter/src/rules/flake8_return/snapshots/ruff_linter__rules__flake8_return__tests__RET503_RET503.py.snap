@@ -13,9 +13,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    |
 help: Add explicit `return` statement
    |
-22 |         return 1
+22 ~         return 1
 23 +     return None
-24 |     # error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,9 +29,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    | |________________^
 help: Add explicit `return` statement
    |
-30 |         return 2
+30 ~         return 2
 31 +     return None
-32 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,9 +45,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    | |___________^
 help: Add explicit `return` statement
    |
-37 |     print()  # error
+37 ~     print()  # error
 38 +     return None
-39 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -66,9 +63,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    |
 help: Add explicit `return` statement
    |
-44 |             return i
+44 ~             return i
 45 +     return None
-46 |     # error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -84,9 +80,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    | |_______________^
 help: Add explicit `return` statement
    |
-53 |         print()  # error
+53 ~         print()  # error
 54 +     return None
-55 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -101,9 +96,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    | |______________________^
 help: Add explicit `return` statement
    |
-60 |     no_such_function()  # error
+60 ~     no_such_function()  # error
 61 +     return None
-62 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -118,9 +112,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    | |_____________________^
 help: Add explicit `return` statement
    |
-67 |     print("", end="")  # error
+67 ~     print("", end="")  # error
 68 +     return None
-69 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -136,9 +129,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
    | |______________^
 help: Add explicit `return` statement
    |
-86 |         y += 1
+86 ~         y += 1
 87 +     return None
-88 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -154,9 +146,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |________________^
 help: Add explicit `return` statement
     |
-117 |         return z
+117 ~         return z
 118 +     return None
-119 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -174,9 +165,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |___________________^
 help: Add explicit `return` statement
     |
-127 |         return None
+127 ~         return None
 128 +     return None
-129 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -191,9 +181,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |________________^
 help: Add explicit `return` statement
     |
-134 |         return z
+134 ~         return z
 135 +     return None
-136 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -211,9 +200,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |___________________^
 help: Add explicit `return` statement
     |
-144 |         return None
+144 ~         return None
 145 +     return None
-146 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -229,9 +217,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |____________________^
 help: Add explicit `return` statement
     |
-276 |         print(value)
+276 ~         print(value)
 277 +     return None
-278 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -248,9 +235,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |___________________^
 help: Add explicit `return` statement
     |
-292 |             print()  # error
+292 ~             print()  # error
 293 +     return None
-294 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -264,9 +250,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_____________________^
 help: Add explicit `return` statement
     |
-302 |             return ""
+302 ~             return ""
 303 +         return None
-304 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -279,9 +264,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_____________________^
 help: Add explicit `return` statement
     |
-307 |             return ""
+307 ~             return ""
 308 +         return None
-309 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -294,9 +278,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_____________________^
 help: Add explicit `return` statement
     |
-312 |             return ""  # type: ignore
+312 ~             return ""  # type: ignore
 313 +         return None
-314 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -309,9 +292,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_____________________^
 help: Add explicit `return` statement
     |
-317 |             return ""  ;
+317 ~             return ""  ;
 318 +         return None
-319 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -326,9 +308,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     |
 help: Add explicit `return` statement
     |
-323 |                 ;  # type: ignore
+323 ~                 ;  # type: ignore
 324 +         return None
-325 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -342,9 +323,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_________^
 help: Add explicit `return` statement
     |
-330 |
+330 + 
 331 +     return None
-332 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -360,9 +340,8 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_____________^
 help: Add explicit `return` statement
     |
-403 |             d
+403 ~             d
 404 +     return None
-405 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -380,9 +359,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
     | |_________^
 help: Add explicit `return` statement
     |
-417 |         return 5
-    -     bar()
-418 +     bar()
+418 ~     bar()
 419 +     return None
     |
 note: This is an unsafe fix and may change runtime behavior

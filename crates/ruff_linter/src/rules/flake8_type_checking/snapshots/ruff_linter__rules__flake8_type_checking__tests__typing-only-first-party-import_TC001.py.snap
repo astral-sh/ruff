@@ -12,15 +12,10 @@ TC001 [*] Move application import `.TYP001` into a type-checking block
    |
 help: Move into type-checking block
    |
-4  | """
-5  + from typing import TYPE_CHECKING
-6  +
-7  + if TYPE_CHECKING:
-8  +     from . import TYP001
-9  |
---------------------------------------------------------------------------------
-23 | def f():
-   -     from . import TYP001
-24 |
+ 5 + from typing import TYPE_CHECKING
+ 6 ~ 
+ 7 + if TYPE_CHECKING:
+ 8 +     from . import TYP001
+ 9 + 
    |
 note: This is an unsafe fix and may change runtime behavior

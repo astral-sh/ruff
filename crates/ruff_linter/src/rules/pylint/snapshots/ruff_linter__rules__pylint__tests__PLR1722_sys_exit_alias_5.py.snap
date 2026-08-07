@@ -12,12 +12,9 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
 help: Replace `exit` with `sys.exit()`
   |
-1 | from sys import *
 2 + import sys
-3 |
-  - exit(0)
-4 + sys.exit(0)
-5 | quit(0)
+3 + 
+4 ~ sys.exit(0)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,13 +26,10 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
   | ^^^^
 help: Replace `quit` with `sys.exit()`
   |
-1 | from sys import *
 2 + import sys
-3 |
+3 + 
 4 | exit(0)
-  - quit(0)
-5 + sys.exit(0)
-6 |
+5 ~ sys.exit(0)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,16 +42,14 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 9 |     quit(1)
   |
 help: Replace `exit` with `sys.exit()`
-   |
-1  | from sys import *
-2  + import sys
-3  |
---------------------------------------------------------------------------------
-8  | def main():
-   -     exit(1)
-9  +     sys.exit(1)
-10 |     quit(1)
-   |
+  |
+2 + import sys
+3 + 
+4 | exit(0)
+…
+8 | def main():
+9 ~     sys.exit(1)
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR1722 [*] Use `sys.exit()` instead of `quit`
@@ -69,12 +61,11 @@ PLR1722 [*] Use `sys.exit()` instead of `quit`
   |     ^^^^
 help: Replace `quit` with `sys.exit()`
    |
-1  | from sys import *
-2  + import sys
-3  |
---------------------------------------------------------------------------------
-9  |     exit(1)
-   -     quit(1)
-10 +     sys.exit(1)
+ 2 + import sys
+ 3 + 
+ 4 | exit(0)
+ …
+ 9 |     exit(1)
+10 ~     sys.exit(1)
    |
 note: This is an unsafe fix and may change runtime behavior

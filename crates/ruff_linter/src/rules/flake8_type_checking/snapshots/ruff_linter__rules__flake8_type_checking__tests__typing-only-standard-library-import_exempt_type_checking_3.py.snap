@@ -12,14 +12,11 @@ TC003 [*] Move standard library import `typing.Final` into a type-checking block
 7 | Const: Final[dict] = {}
   |
 help: Move into type-checking block
-   |
-4  |
-   - from typing import Final, Mapping
-5  + from typing import Mapping
-6  + from typing import TYPE_CHECKING
-7  +
-8  + if TYPE_CHECKING:
-9  +     from typing import Final
-10 |
-   |
+  |
+5 + from typing import Mapping
+6 + from typing import TYPE_CHECKING
+7 ~ 
+8 + if TYPE_CHECKING:
+9 +     from typing import Final
+  |
 note: This is an unsafe fix and may change runtime behavior

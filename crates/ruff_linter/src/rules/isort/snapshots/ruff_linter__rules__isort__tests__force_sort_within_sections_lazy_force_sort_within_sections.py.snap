@@ -13,8 +13,6 @@ help: Organize imports
   |
 1 + from math import pi
 2 + import os
-3 | lazy from math import pi
-  - from math import pi
-4 | lazy import os
-  - import os
+3 + lazy from math import pi
+4 + lazy import os
   |

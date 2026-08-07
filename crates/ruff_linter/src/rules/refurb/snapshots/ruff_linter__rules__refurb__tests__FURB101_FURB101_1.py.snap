@@ -12,11 +12,9 @@ FURB101 [*] `Path.open()` followed by `read()` can be replaced by `Path("file.tx
   |
 help: Replace with `Path("file.txt").read_text()`
   |
+2 ~ from pathlib import Path
 3 |
-  - with Path("file.txt").open() as f:
-  -     contents = f.read()
 4 + contents = Path("file.txt").read_text()
-5 |
   |
 
 FURB101 [*] `Path.open()` followed by `read()` can be replaced by `Path("file.txt").read_text()`
@@ -30,8 +28,9 @@ FURB101 [*] `Path.open()` followed by `read()` can be replaced by `Path("file.tx
   |
 help: Replace with `Path("file.txt").read_text()`
   |
+2 ~ from pathlib import Path
+3 |
+…
 6 |
-  - with Path("file.txt").open("r") as f:
-  -     contents = f.read()
 7 + contents = Path("file.txt").read_text()
   |

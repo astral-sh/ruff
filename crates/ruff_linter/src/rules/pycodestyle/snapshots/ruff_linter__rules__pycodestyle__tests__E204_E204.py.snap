@@ -12,10 +12,7 @@ E204 [*] Whitespace after decorator
    |
 help: Remove whitespace
    |
-13 | # E204
-   - @ foo
-14 + @foo
-15 | def baz():
+14 | @foo
    |
 
 E204 [*] Whitespace after decorator
@@ -29,10 +26,7 @@ E204 [*] Whitespace after decorator
    |
 help: Remove whitespace
    |
-24 |     # E204
-   -     @ foo
-25 +     @foo
-26 |     def baz(self):
+25 |     @foo
    |
 
 E204 [*] Whitespace after decorator
@@ -46,9 +40,7 @@ E204 [*] Whitespace after decorator
    |
 help: Remove whitespace
    |
-30 | # E204
-   - @ \
-   - foo
-31 + @foo
-32 | def baz():
+31 - @ \
+32 - foo
+31 + @
    |

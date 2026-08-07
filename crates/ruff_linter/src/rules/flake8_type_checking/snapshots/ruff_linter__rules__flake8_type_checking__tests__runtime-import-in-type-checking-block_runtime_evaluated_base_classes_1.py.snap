@@ -16,12 +16,8 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
    |        -------- Used at runtime here
 help: Move out of type-checking block
    |
-7  | from pydantic import BaseModel
-8  + import datetime
-9  |
-10 | if TYPE_CHECKING:
-   -     import datetime  # TC004
-11 |     from array import array  # TC004
+ 8 + import datetime
+ 9 + 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -42,13 +38,8 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
    |        ----- Used at runtime here
 help: Move out of type-checking block
    |
-7  | from pydantic import BaseModel
-8  + from array import array
-9  |
-10 | if TYPE_CHECKING:
-11 |     import datetime  # TC004
-   -     from array import array  # TC004
-12 |
+ 8 + from array import array
+ 9 + 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -68,12 +59,7 @@ TC004 [*] Move import `pandas` out of type-checking block. Import is used for mo
    |        ------ Used at runtime here
 help: Move out of type-checking block
    |
-7  | from pydantic import BaseModel
-8  + import pandas
-9  |
---------------------------------------------------------------------------------
-13 |
-   -     import pandas  # TC004
-14 |     import pyproj
+ 8 + import pandas
+ 9 + 
    |
 note: This is an unsafe fix and may change runtime behavior

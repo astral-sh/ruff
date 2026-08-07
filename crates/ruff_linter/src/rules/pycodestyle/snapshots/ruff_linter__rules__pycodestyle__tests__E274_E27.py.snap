@@ -13,11 +13,8 @@ E274 [*] Tab before keyword
    |
 help: Replace with single space
    |
-28 | #: E274
-   - a		and b
-29 + a and b
-30 | #: E273 E274
-   |
+29 | a and b
+   |  +
 
 E274 [*] Tab before keyword
   --> E27.py:31:5
@@ -31,8 +28,5 @@ E274 [*] Tab before keyword
    |
 help: Replace with single space
    |
-30 | #: E273 E274
-   - this		and	False
-31 + this and	False
-32 | #: Okay
-   |
+31 | this and    False
+   |     +

@@ -10,9 +10,7 @@ AIR302 [*] `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `zendesk` prov
   | ^^^^^^^^^^^
 help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `ZendeskHook` from `airflow.providers.zendesk.hooks.zendesk` instead.
   |
-2 |
-  - from airflow.hooks.zendesk_hook import ZendeskHook
-3 + from airflow.providers.zendesk.hooks.zendesk import ZendeskHook
-4 |
+3 + 
+4 + from airflow.providers.zendesk.hooks.zendesk import ZendeskHook
   |
 note: This is an unsafe fix and may change runtime behavior

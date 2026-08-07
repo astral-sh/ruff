@@ -8,6 +8,5 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F841`)
   | ^^^^^^^^^^^^^^^^^^
 help: Remove unused `noqa` directive
   |
-  - # ruff: noqa: F841 -- intentional unused file directive; will be removed
-1 +
+1 - # ruff: noqa: F841 -- intentional unused file directive; will be removed
   |

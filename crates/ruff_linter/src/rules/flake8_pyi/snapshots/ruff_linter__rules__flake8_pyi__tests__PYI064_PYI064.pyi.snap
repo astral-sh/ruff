@@ -13,10 +13,8 @@ PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Final`
   |
 help: Replace with `Final`
   |
-2 |
-  - x: Final[Literal[True]]  # PYI064
+3 - x: Final[Literal[True]]  # PYI064
 3 + x: Final = True  # PYI064
-4 | y: Final[Literal[None]] = None  # PYI064
   |
 
 PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
@@ -29,10 +27,8 @@ PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
   |
 help: Replace with `Final`
   |
-3 | x: Final[Literal[True]]  # PYI064
-  - y: Final[Literal[None]] = None  # PYI064
+4 - y: Final[Literal[None]] = None  # PYI064
 4 + y: Final = None  # PYI064
-5 | z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
   |
 
 PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
@@ -47,10 +43,8 @@ PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
   |
 help: Replace with `Final`
   |
-4 | y: Final[Literal[None]] = None  # PYI064
-  - z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
+5 - z: Final[Literal["this is a really long literal, that won't be rendered in the issue text"]]  # PYI064
 5 + z: Final = "this is a really long literal, that won't be rendered in the issue text"  # PYI064
-6 |
   |
 
 PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Final`
@@ -64,10 +58,8 @@ PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Final`
    |
 help: Replace with `Final`
   |
-7 | # This should be fixable, and marked as safe
-  - w1: Final[Literal[123]]  # PYI064
+8 - w1: Final[Literal[123]]  # PYI064
 8 + w1: Final = 123  # PYI064
-9 |
   |
 
 PYI064 `Final[Literal[123]]` can be replaced with a bare `Final`

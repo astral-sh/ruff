@@ -11,10 +11,8 @@ PERF102 [*] When using only the values of a dict use the `values()` method
   |
 help: Replace `.items()` with `.values()`
   |
-4 | def f():
-  -     for _, value in some_dict.items():  # PERF102
+5 -     for _, value in some_dict.items():  # PERF102
 5 +     for value in some_dict.values():  # PERF102
-6 |         print(value)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,10 +26,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-9  | def f():
-   -     for key, _ in some_dict.items():  # PERF102
+10 -     for key, _ in some_dict.items():  # PERF102
 10 +     for key in some_dict.keys():  # PERF102
-11 |         print(key)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,10 +41,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-14 | def f():
-   -     for weird_arg_name, _ in some_dict.items():  # PERF102
+15 -     for weird_arg_name, _ in some_dict.items():  # PERF102
 15 +     for weird_arg_name in some_dict.keys():  # PERF102
-16 |         print(weird_arg_name)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -62,10 +56,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-19 | def f():
-   -     for name, (_, _) in some_dict.items():  # PERF102
+20 -     for name, (_, _) in some_dict.items():  # PERF102
 20 +     for name in some_dict.keys():  # PERF102
-21 |         print(name)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,10 +71,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-29 | def f():
-   -     for (key1, _), (_, _) in some_dict.items():  # PERF102
+30 -     for (key1, _), (_, _) in some_dict.items():  # PERF102
 30 +     for (key1, _) in some_dict.keys():  # PERF102
-31 |         print(key1)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -96,10 +86,8 @@ PERF102 [*] When using only the values of a dict use the `values()` method
    |
 help: Replace `.items()` with `.values()`
    |
-34 | def f():
-   -     for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
+35 -     for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
 35 +     for (value, _) in some_dict.values():  # PERF102
-36 |         print(value)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -113,10 +101,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-49 | def f():
-   -     for ((_, key2), (_, _)) in some_dict.items():  # PERF102
+50 -     for ((_, key2), (_, _)) in some_dict.items():  # PERF102
 50 +     for (_, key2) in some_dict.keys():  # PERF102
-51 |         print(key2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -130,10 +116,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-84 | def f():
-   -     for name, (_, _) in (some_function()).items():  # PERF102
+85 -     for name, (_, _) in (some_function()).items():  # PERF102
 85 +     for name in (some_function()).keys():  # PERF102
-86 |         print(name)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -147,10 +131,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-89 | def f():
-   -     for name, (_, _) in (some_function().some_attribute).items():  # PERF102
+90 -     for name, (_, _) in (some_function().some_attribute).items():  # PERF102
 90 +     for name in (some_function().some_attribute).keys():  # PERF102
-91 |         print(name)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -164,10 +146,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
    |
 help: Replace `.items()` with `.keys()`
    |
-94 | def f():
-   -     for name, unused_value in some_dict.items():  # PERF102
+95 -     for name, unused_value in some_dict.items():  # PERF102
 95 +     for name in some_dict.keys():  # PERF102
-96 |         print(name)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -181,10 +161,8 @@ PERF102 [*] When using only the values of a dict use the `values()` method
     |
 help: Replace `.items()` with `.values()`
     |
-99  | def f():
-    -     for unused_name, value in some_dict.items():  # PERF102
+100 -     for unused_name, value in some_dict.items():  # PERF102
 100 +     for value in some_dict.values():  # PERF102
-101 |         print(value)
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -199,10 +177,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
 help: Replace `.items()` with `.keys()`
     |
-105 | def _create_context(name_to_value):
-    -     for(B,D)in A.items():
+106 -     for(B,D)in A.items():
 106 +     for B in A.keys():
-107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -217,10 +193,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
 help: Replace `.items()` with `.keys()`
     |
-110 | # Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
-    - _ = [k for k, _ in some_dict.items()]  # PERF102
+111 - _ = [k for k, _ in some_dict.items()]  # PERF102
 111 + _ = [k for k in some_dict.keys()]  # PERF102
-112 | _ = {k for k, _ in some_dict.items()}  # PERF102
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -236,10 +210,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
 help: Replace `.items()` with `.keys()`
     |
-111 | _ = [k for k, _ in some_dict.items()]  # PERF102
-    - _ = {k for k, _ in some_dict.items()}  # PERF102
+112 - _ = {k for k, _ in some_dict.items()}  # PERF102
 112 + _ = {k for k in some_dict.keys()}  # PERF102
-113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -255,10 +227,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
 help: Replace `.items()` with `.keys()`
     |
-112 | _ = {k for k, _ in some_dict.items()}  # PERF102
-    - _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+113 - _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
 113 + _ = {k: "v" for k in some_dict.keys()}  # PERF102
-114 | _ = (k for k, _ in some_dict.items())  # PERF102
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -274,10 +244,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
 help: Replace `.items()` with `.keys()`
     |
-113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
-    - _ = (k for k, _ in some_dict.items())  # PERF102
+114 - _ = (k for k, _ in some_dict.items())  # PERF102
 114 + _ = (k for k in some_dict.keys())  # PERF102
-115 | _ = [v for _, v in some_dict.items()]  # PERF102
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -293,10 +261,8 @@ PERF102 [*] When using only the values of a dict use the `values()` method
     |
 help: Replace `.items()` with `.values()`
     |
-114 | _ = (k for k, _ in some_dict.items())  # PERF102
-    - _ = [v for _, v in some_dict.items()]  # PERF102
+115 - _ = [v for _, v in some_dict.items()]  # PERF102
 115 + _ = [v for v in some_dict.values()]  # PERF102
-116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -311,10 +277,8 @@ PERF102 [*] When using only the keys of a dict use the `keys()` method
     |
 help: Replace `.items()` with `.keys()`
     |
-115 | _ = [v for _, v in some_dict.items()]  # PERF102
-    - _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+116 - _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
 116 + _ = [k for k in some_dict.keys()]  # PERF102 (v unused)
-117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -330,9 +294,7 @@ PERF102 [*] When using only the values of a dict use the `values()` method
     |
 help: Replace `.items()` with `.values()`
     |
-116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
-    - _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+117 - _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
 117 + _ = [v for x in range(1) for v in some_dict.values()]  # PERF102
-118 |
     |
 note: This is an unsafe fix and may change runtime behavior

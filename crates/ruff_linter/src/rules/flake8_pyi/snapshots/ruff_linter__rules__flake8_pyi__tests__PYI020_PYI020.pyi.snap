@@ -13,10 +13,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
   |
 help: Remove quotes
   |
-6 |
-  - def f(x: "int"): ...  # Y020 Quoted annotations should never be used in stubs
+7 - def f(x: "int"): ...  # Y020 Quoted annotations should never be used in stubs
 7 + def f(x: int): ...  # Y020 Quoted annotations should never be used in stubs
-8 | def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
   |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -29,10 +27,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
   |
 help: Remove quotes
   |
-7 | def f(x: "int"): ...  # Y020 Quoted annotations should never be used in stubs
-  - def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
+8 - def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
 8 + def g(x: list[int]): ...  # Y020 Quoted annotations should never be used in stubs
-9 | _T = TypeVar("_T", bound="int")  # Y020 Quoted annotations should never be used in stubs
   |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -46,12 +42,10 @@ PYI020 [*] Quoted annotations should not be included in stubs
 11 | def h(w: Literal["a", "b"], x: typing.Literal["c"], y: typing_extensions.Literal["d"], z: _T) -> _T: ...
    |
 help: Remove quotes
-   |
-8  | def g(x: list["int"]): ...  # Y020 Quoted annotations should never be used in stubs
-   - _T = TypeVar("_T", bound="int")  # Y020 Quoted annotations should never be used in stubs
-9  + _T = TypeVar("_T", bound=int)  # Y020 Quoted annotations should never be used in stubs
-10 |
-   |
+  |
+9 - _T = TypeVar("_T", bound="int")  # Y020 Quoted annotations should never be used in stubs
+9 + _T = TypeVar("_T", bound=int)  # Y020 Quoted annotations should never be used in stubs
+  |
 
 PYI020 [*] Quoted annotations should not be included in stubs
   --> PYI020.pyi:13:12
@@ -64,10 +58,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
    |
 help: Remove quotes
    |
-12 |
-   - def j() -> "int": ...  # Y020 Quoted annotations should never be used in stubs
+13 - def j() -> "int": ...  # Y020 Quoted annotations should never be used in stubs
 13 + def j() -> int: ...  # Y020 Quoted annotations should never be used in stubs
-14 | Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
    |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -81,10 +73,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
    |
 help: Remove quotes
    |
-13 | def j() -> "int": ...  # Y020 Quoted annotations should never be used in stubs
-   - Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
+14 - Alias: TypeAlias = list["int"]  # Y020 Quoted annotations should never be used in stubs
 14 + Alias: TypeAlias = list[int]  # Y020 Quoted annotations should never be used in stubs
-15 |
    |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -98,10 +88,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
    |
 help: Remove quotes
    |
-15 |
-   - class Child(list["int"]):  # Y020 Quoted annotations should never be used in stubs
+16 - class Child(list["int"]):  # Y020 Quoted annotations should never be used in stubs
 16 + class Child(list[int]):  # Y020 Quoted annotations should never be used in stubs
-17 |     """Documented and guaranteed useful."""  # Y021 Docstrings should not be included in stubs
    |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -115,10 +103,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
    |
 help: Remove quotes
    |
-19 | if sys.platform == "linux":
-   -     f: "int"  # Y020 Quoted annotations should never be used in stubs
+20 -     f: "int"  # Y020 Quoted annotations should never be used in stubs
 20 +     f: int  # Y020 Quoted annotations should never be used in stubs
-21 | elif sys.platform == "win32":
    |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -133,10 +119,8 @@ PYI020 [*] Quoted annotations should not be included in stubs
    |
 help: Remove quotes
    |
-21 | elif sys.platform == "win32":
-   -     f: "str"  # Y020 Quoted annotations should never be used in stubs
+22 -     f: "str"  # Y020 Quoted annotations should never be used in stubs
 22 +     f: str  # Y020 Quoted annotations should never be used in stubs
-23 | else:
    |
 
 PYI020 [*] Quoted annotations should not be included in stubs
@@ -151,8 +135,6 @@ PYI020 [*] Quoted annotations should not be included in stubs
    |
 help: Remove quotes
    |
-23 | else:
-   -     f: "bytes"  # Y020 Quoted annotations should never be used in stubs
+24 -     f: "bytes"  # Y020 Quoted annotations should never be used in stubs
 24 +     f: bytes  # Y020 Quoted annotations should never be used in stubs
-25 |
    |

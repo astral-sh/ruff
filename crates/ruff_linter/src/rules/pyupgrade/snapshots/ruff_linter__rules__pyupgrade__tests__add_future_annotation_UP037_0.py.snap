@@ -10,10 +10,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-17 |
-   - def foo(var: "MyClass") -> "MyClass":
+18 - def foo(var: "MyClass") -> "MyClass":
 18 + def foo(var: MyClass) -> "MyClass":
-19 |     x: "MyClass"
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -25,10 +23,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-17 |
-   - def foo(var: "MyClass") -> "MyClass":
+18 - def foo(var: "MyClass") -> "MyClass":
 18 + def foo(var: "MyClass") -> MyClass:
-19 |     x: "MyClass"
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -39,10 +35,8 @@ UP037 [*] Remove quotes from type annotation
    |        ^^^^^^^^^
 help: Remove quotes
    |
-18 | def foo(var: "MyClass") -> "MyClass":
-   -     x: "MyClass"
+19 -     x: "MyClass"
 19 +     x: MyClass
-20 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -54,10 +48,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-21 |
-   - def foo(*, inplace: "bool"):
+22 - def foo(*, inplace: "bool"):
 22 + def foo(*, inplace: bool):
-23 |     pass
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -69,10 +61,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-25 |
-   - def foo(*args: "str", **kwargs: "int"):
+26 - def foo(*args: "str", **kwargs: "int"):
 26 + def foo(*args: str, **kwargs: "int"):
-27 |     pass
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -84,10 +74,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-25 |
-   - def foo(*args: "str", **kwargs: "int"):
+26 - def foo(*args: "str", **kwargs: "int"):
 26 + def foo(*args: "str", **kwargs: int):
-27 |     pass
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -100,10 +88,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-29 |
-   - x: Tuple["MyClass"]
+30 - x: Tuple["MyClass"]
 30 + x: Tuple[MyClass]
-31 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -115,10 +101,8 @@ UP037 [*] Remove quotes from type annotation
    |              ^^^^^^^^^
 help: Remove quotes
    |
-31 |
-   - x: Callable[["MyClass"], None]
+32 - x: Callable[["MyClass"], None]
 32 + x: Callable[[MyClass], None]
-33 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -129,10 +113,8 @@ UP037 [*] Remove quotes from type annotation
    |        ^^^^^^^^^
 help: Remove quotes
    |
-35 | class Foo(NamedTuple):
-   -     x: "MyClass"
+36 -     x: "MyClass"
 36 +     x: MyClass
-37 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -143,10 +125,8 @@ UP037 [*] Remove quotes from type annotation
    |                           ^^^^^
 help: Remove quotes
    |
-39 | class D(TypedDict):
-   -     E: TypedDict("E", foo="int", total=False)
+40 -     E: TypedDict("E", foo="int", total=False)
 40 +     E: TypedDict("E", foo=int, total=False)
-41 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -157,10 +137,8 @@ UP037 [*] Remove quotes from type annotation
    |                               ^^^^^
 help: Remove quotes
    |
-43 | class D(TypedDict):
-   -     E: TypedDict("E", {"foo": "int"})
+44 -     E: TypedDict("E", {"foo": "int"})
 44 +     E: TypedDict("E", {"foo": int})
-45 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -173,10 +151,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-46 |
-   - x: Annotated["str", "metadata"]
+47 - x: Annotated["str", "metadata"]
 47 + x: Annotated[str, "metadata"]
-48 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -191,10 +167,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-48 |
-   - x: Arg("str", "name")
+49 - x: Arg("str", "name")
 49 + x: Arg(str, "name")
-50 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -209,10 +183,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-50 |
-   - x: DefaultArg("str", "name")
+51 - x: DefaultArg("str", "name")
 51 + x: DefaultArg(str, "name")
-52 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -227,10 +199,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-52 |
-   - x: NamedArg("str", "name")
+53 - x: NamedArg("str", "name")
 53 + x: NamedArg(str, "name")
-54 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -245,10 +215,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-54 |
-   - x: DefaultNamedArg("str", "name")
+55 - x: DefaultNamedArg("str", "name")
 55 + x: DefaultNamedArg(str, "name")
-56 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -263,10 +231,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-56 |
-   - x: DefaultNamedArg("str", name="name")
+57 - x: DefaultNamedArg("str", name="name")
 57 + x: DefaultNamedArg(str, name="name")
-58 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -281,10 +247,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-58 |
-   - x: VarArg("str")
+59 - x: VarArg("str")
 59 + x: VarArg(str)
-60 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -299,10 +263,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-60 |
-   - x: List[List[List["MyClass"]]]
+61 - x: List[List[List["MyClass"]]]
 61 + x: List[List[List[MyClass]]]
-62 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -317,10 +279,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-62 |
-   - x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+63 - x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 63 + x: NamedTuple("X", [("foo", int), ("bar", "str")])
-64 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -335,10 +295,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-62 |
-   - x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+63 - x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 63 + x: NamedTuple("X", [("foo", "int"), ("bar", str)])
-64 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -353,10 +311,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-64 |
-   - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+65 - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 65 + x: NamedTuple("X", fields=[(foo, "int"), ("bar", "str")])
-66 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -371,10 +327,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-64 |
-   - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+65 - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 65 + x: NamedTuple("X", fields=[("foo", int), ("bar", "str")])
-66 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -389,10 +343,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-64 |
-   - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+65 - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 65 + x: NamedTuple("X", fields=[("foo", "int"), (bar, "str")])
-66 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -407,10 +359,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-64 |
-   - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+65 - x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 65 + x: NamedTuple("X", fields=[("foo", "int"), ("bar", str)])
-66 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -425,10 +375,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-66 |
-   - x: NamedTuple(typename="X", fields=[("foo", "int")])
+67 - x: NamedTuple(typename="X", fields=[("foo", "int")])
 67 + x: NamedTuple(typename=X, fields=[("foo", "int")])
-68 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -443,10 +391,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-66 |
-   - x: NamedTuple(typename="X", fields=[("foo", "int")])
+67 - x: NamedTuple(typename="X", fields=[("foo", "int")])
 67 + x: NamedTuple(typename="X", fields=[(foo, "int")])
-68 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -461,10 +407,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-66 |
-   - x: NamedTuple(typename="X", fields=[("foo", "int")])
+67 - x: NamedTuple(typename="X", fields=[("foo", "int")])
 67 + x: NamedTuple(typename="X", fields=[("foo", int)])
-68 |
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -478,11 +422,8 @@ UP037 [*] Remove quotes from type annotation
     |
 help: Remove quotes
     |
-111 | # See https://github.com/astral-sh/ruff/issues/15816
-    - def f() -> "Literal[0]#":
-112 + def f() -> (Literal[0]#
-113 + ):
-114 |     return 0
+112 ~ def f() -> (Literal[0]#
+113 ~ ):
     |
 
 UP037 [*] Remove quotes from type annotation
@@ -496,11 +437,8 @@ UP037 [*] Remove quotes from type annotation
     |
 help: Remove quotes
     |
-114 |
-    - def g(x: "Literal['abc']#") -> None:
-115 + def g(x: (Literal['abc']#
-116 + )) -> None:
-117 |     return
+115 ~ def g(x: (Literal['abc']#
+116 ~ )) -> None:
     |
 
 UP037 [*] Remove quotes from type annotation
@@ -518,15 +456,11 @@ UP037 [*] Remove quotes from type annotation
     |
 help: Remove quotes
     |
-117 |
-    - def f() -> """Literal[0]
-118 + def f() -> (Literal[0]
-119 |     #
-120 |     
-    -     """:
+118 ~ def f() -> (Literal[0]
+119 +     #
+120 +     
 121 +     
-122 + ):
-123 |     return 0
+122 ~ ):
     |
 
 UP037 [*] Remove quotes from type annotation
@@ -539,12 +473,9 @@ UP037 [*] Remove quotes from type annotation
     |
 help: Remove quotes
     |
-124 | # https://github.com/astral-sh/ruff/issues/19835
-    - def foo(bar: "A\n#"): ...
-125 + def foo(bar: (A
+125 ~ def foo(bar: (A
 126 + #
-127 + )): ...
-128 | def foo(bar: "A\n#\n"): ...
+127 ~ )): ...
     |
 
 UP037 [*] Remove quotes from type annotation
@@ -556,10 +487,8 @@ UP037 [*] Remove quotes from type annotation
     |              ^^^^^^^^
 help: Remove quotes
     |
-125 | def foo(bar: "A\n#"): ...
-    - def foo(bar: "A\n#\n"): ...
-126 + def foo(bar: (A
+126 ~ def foo(bar: (A
 127 + #
-128 +
-129 + )): ...
+128 + 
+129 ~ )): ...
     |

@@ -12,10 +12,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
   |
 help: Replace with `0`
   |
-4 | # Errors
-  - Decimal("0")
+5 - Decimal("0")
 5 + Decimal(0)
-6 | Decimal("-42")
   |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -30,10 +28,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
   |
 help: Replace with `-42`
   |
-5 | Decimal("0")
-  - Decimal("-42")
+6 - Decimal("-42")
 6 + Decimal(-42)
-7 | Decimal(float("Infinity"))
   |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -48,10 +44,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
   |
 help: Replace with `"Infinity"`
   |
-6 | Decimal("-42")
-  - Decimal(float("Infinity"))
+7 - Decimal(float("Infinity"))
 7 + Decimal("Infinity")
-8 | Decimal(float("-Infinity"))
   |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -66,10 +60,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"-Infinity"`
   |
-7 | Decimal(float("Infinity"))
-  - Decimal(float("-Infinity"))
+8 - Decimal(float("-Infinity"))
 8 + Decimal("-Infinity")
-9 | Decimal(float("inf"))
   |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -83,12 +75,10 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 11 | Decimal(float("nan"))
    |
 help: Replace with `"inf"`
-   |
-8  | Decimal(float("-Infinity"))
-   - Decimal(float("inf"))
-9  + Decimal("inf")
-10 | Decimal(float("-inf"))
-   |
+  |
+9 - Decimal(float("inf"))
+9 + Decimal("inf")
+  |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
   --> FURB157.py:10:9
@@ -102,10 +92,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"-inf"`
    |
-9  | Decimal(float("inf"))
-   - Decimal(float("-inf"))
+10 - Decimal(float("-inf"))
 10 + Decimal("-inf")
-11 | Decimal(float("nan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -119,10 +107,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-10 | Decimal(float("-inf"))
-   - Decimal(float("nan"))
+11 - Decimal(float("nan"))
 11 + Decimal("nan")
-12 | decimal.Decimal("0")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -137,10 +123,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `0`
    |
-11 | Decimal(float("nan"))
-   - decimal.Decimal("0")
+12 - decimal.Decimal("0")
 12 + decimal.Decimal(0)
-13 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -153,10 +137,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `1_000`
    |
-22 | # Errors
-   - Decimal("1_000")
+23 - Decimal("1_000")
 23 + Decimal(1_000)
-24 | Decimal("__1____000") 
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -171,10 +153,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `1_000`
    |
-23 | Decimal("1_000")
-   - Decimal("__1____000") 
+24 - Decimal("__1____000") 
 24 + Decimal(1_000) 
-25 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -189,10 +169,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" nan "`
    |
-47 | # https://github.com/astral-sh/ruff/issues/14587
-   - Decimal(float(" nan "))          # Decimal(" nan ") 
+48 - Decimal(float(" nan "))          # Decimal(" nan ") 
 48 + Decimal(" nan ")          # Decimal(" nan ") 
-49 | Decimal(float(" +nan "))         # Decimal(" +nan ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -207,10 +185,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" +nan "`
    |
-48 | Decimal(float(" nan "))          # Decimal(" nan ") 
-   - Decimal(float(" +nan "))         # Decimal(" +nan ")
+49 - Decimal(float(" +nan "))         # Decimal(" +nan ")
 49 + Decimal(" +nan ")         # Decimal(" +nan ")
-50 | # In this one case, " -nan ", the fix has to be
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -225,10 +201,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-51 | # `Decimal(" nan ")`` because `Decimal("-nan") != Decimal(float("-nan"))`
-   - Decimal(float(" -nan "))         # Decimal("nan")
+52 - Decimal(float(" -nan "))         # Decimal("nan")
 52 + Decimal("nan")         # Decimal("nan")
-53 | Decimal(float(" inf "))          # Decimal(" inf ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -243,10 +217,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" inf "`
    |
-52 | Decimal(float(" -nan "))         # Decimal("nan")
-   - Decimal(float(" inf "))          # Decimal(" inf ")
+53 - Decimal(float(" inf "))          # Decimal(" inf ")
 53 + Decimal(" inf ")          # Decimal(" inf ")
-54 | Decimal(float(" +inf "))         # Decimal(" +inf ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -261,10 +233,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" +inf "`
    |
-53 | Decimal(float(" inf "))          # Decimal(" inf ")
-   - Decimal(float(" +inf "))         # Decimal(" +inf ")
+54 - Decimal(float(" +inf "))         # Decimal(" +inf ")
 54 + Decimal(" +inf ")         # Decimal(" +inf ")
-55 | Decimal(float(" -inf "))         # Decimal(" -inf ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -279,10 +249,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" -inf "`
    |
-54 | Decimal(float(" +inf "))         # Decimal(" +inf ")
-   - Decimal(float(" -inf "))         # Decimal(" -inf ")
+55 - Decimal(float(" -inf "))         # Decimal(" -inf ")
 55 + Decimal(" -inf ")         # Decimal(" -inf ")
-56 | Decimal(float(" infinity "))     # Decimal(" infinity ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -297,10 +265,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" infinity "`
    |
-55 | Decimal(float(" -inf "))         # Decimal(" -inf ")
-   - Decimal(float(" infinity "))     # Decimal(" infinity ")
+56 - Decimal(float(" infinity "))     # Decimal(" infinity ")
 56 + Decimal(" infinity ")     # Decimal(" infinity ")
-57 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -314,10 +280,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" +infinity "`
    |
-56 | Decimal(float(" infinity "))     # Decimal(" infinity ")
-   - Decimal(float(" +infinity "))    # Decimal(" +infinity ")
+57 - Decimal(float(" +infinity "))    # Decimal(" +infinity ")
 57 + Decimal(" +infinity ")    # Decimal(" +infinity ")
-58 | Decimal(float(" -infinity "))    # Decimal(" -infinity ")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -332,10 +296,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `" -infinity "`
    |
-57 | Decimal(float(" +infinity "))    # Decimal(" +infinity ")
-   - Decimal(float(" -infinity "))    # Decimal(" -infinity ")
+58 - Decimal(float(" -infinity "))    # Decimal(" -infinity ")
 58 + Decimal(" -infinity ")    # Decimal(" -infinity ")
-59 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -350,10 +312,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-63 | # https://github.com/astral-sh/ruff/issues/16771
-   - Decimal(float("\x2dnan"))
+64 - Decimal(float("\x2dnan"))
 64 + Decimal("nan")
-65 | Decimal(float("\x20\x2dnan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -368,10 +328,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-64 | Decimal(float("\x2dnan"))
-   - Decimal(float("\x20\x2dnan"))
+65 - Decimal(float("\x20\x2dnan"))
 65 + Decimal("nan")
-66 | Decimal(float("\x20\u002dnan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -386,10 +344,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-65 | Decimal(float("\x20\x2dnan"))
-   - Decimal(float("\x20\u002dnan"))
+66 - Decimal(float("\x20\u002dnan"))
 66 + Decimal("nan")
-67 | Decimal(float("\x20\U0000002dnan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -404,10 +360,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-66 | Decimal(float("\x20\u002dnan"))
-   - Decimal(float("\x20\U0000002dnan"))
+67 - Decimal(float("\x20\U0000002dnan"))
 67 + Decimal("nan")
-68 | Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -422,10 +376,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-67 | Decimal(float("\x20\U0000002dnan"))
-   - Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
+68 - Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
 68 + Decimal("nan")
-69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -440,10 +392,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-68 | Decimal(float("\N{space}\N{hyPHen-MINus}nan"))
-   - Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
+69 - Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
 69 + Decimal("nan")
-70 | Decimal(float("   -" "nan"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -457,10 +407,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-69 | Decimal(float("\x20\N{character tabulation}\N{hyphen-minus}nan"))
-   - Decimal(float("   -" "nan"))
+70 - Decimal(float("   -" "nan"))
 70 + Decimal("nan")
-71 | Decimal(float("-nAn"))
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -475,10 +423,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `"nan"`
    |
-70 | Decimal(float("   -" "nan"))
-   - Decimal(float("-nAn"))
+71 - Decimal(float("-nAn"))
 71 + Decimal("nan")
-72 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -493,10 +439,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `15_000_000`
    |
-74 | # https://github.com/astral-sh/ruff/issues/20572
-   - Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
+75 - Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
 75 + Decimal(15_000_000)  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
-76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -511,10 +455,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `1_234_567`
    |
-75 | Decimal("15_000_000")  # Safe fix: normalizes separators, becomes Decimal(15_000_000)
-   - Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
+76 - Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
 76 + Decimal(1_234_567)   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
-77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -528,10 +470,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `-5_000`
    |
-76 | Decimal("1_234_567")   # Safe fix: normalizes separators, becomes Decimal(1_234_567)
-   - Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
+77 - Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
 77 + Decimal(-5_000)      # Safe fix: normalizes separators, becomes Decimal(-5_000)
-78 | Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -546,10 +486,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `+9_999`
    |
-77 | Decimal("-5_000")      # Safe fix: normalizes separators, becomes Decimal(-5_000)
-   - Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
+78 - Decimal("+9_999")      # Safe fix: normalizes separators, becomes Decimal(+9_999)
 78 + Decimal(+9_999)      # Safe fix: normalizes separators, becomes Decimal(+9_999)
-79 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -562,10 +500,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `12_34_56_78`
    |
-80 | # Test cases for non-thousands separators
-   - Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
+81 - Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
 81 + Decimal(12_34_56_78)  # Safe fix: preserves non-thousands separators
-82 | Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -580,10 +516,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `1234_5678`
    |
-81 | Decimal("12_34_56_78")  # Safe fix: preserves non-thousands separators
-   - Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
+82 - Decimal("1234_5678")    # Safe fix: preserves non-thousands separators
 82 + Decimal(1234_5678)    # Safe fix: preserves non-thousands separators
-83 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -597,10 +531,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `1_2345`
    |
-84 | # Separators _and_ leading zeros
-   - Decimal("0001_2345")
+85 - Decimal("0001_2345")
 85 + Decimal(1_2345)
-86 | Decimal("000_1_2345")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -614,10 +546,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `1_2345`
    |
-85 | Decimal("0001_2345")
-   - Decimal("000_1_2345")
+86 - Decimal("000_1_2345")
 86 + Decimal(1_2345)
-87 | Decimal("000_000")
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -632,10 +562,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `0`
    |
-86 | Decimal("000_1_2345")
-   - Decimal("000_000")
+87 - Decimal("000_000")
 87 + Decimal(0)
-88 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -650,10 +578,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `-1`
    |
-90 | # https://github.com/astral-sh/ruff/issues/21186
-   - Decimal("_-1")      # Should flag as verbose
+91 - Decimal("_-1")      # Should flag as verbose
 91 + Decimal(-1)      # Should flag as verbose
-92 | Decimal("_+1")      # Should flag as verbose
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -667,10 +593,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |
 help: Replace with `+1`
    |
-91 | Decimal("_-1")      # Should flag as verbose
-   - Decimal("_+1")      # Should flag as verbose
+92 - Decimal("_+1")      # Should flag as verbose
 92 + Decimal(+1)      # Should flag as verbose
-93 | Decimal("_-1_000")  # Should flag as verbose
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -682,10 +606,8 @@ FURB157 [*] Verbose expression in `Decimal` constructor
    |         ^^^^^^^^^
 help: Replace with `-1_000`
    |
-92 | Decimal("_+1")      # Should flag as verbose
-   - Decimal("_-1_000")  # Should flag as verbose
+93 - Decimal("_-1_000")  # Should flag as verbose
 93 + Decimal(-1_000)  # Should flag as verbose
-94 |
    |
 
 FURB157 [*] Verbose expression in `Decimal` constructor
@@ -700,13 +622,11 @@ FURB157 [*] Verbose expression in `Decimal` constructor
 101 |   )
     |
 help: Replace with `"Infinity"`
-   |
-96 | Decimal(
-   -     float(
-   -         # text
-   -         "Infinity"
-   -     )
-97 +     "Infinity"
-98 | )
-   |
+    |
+ 97 -     float(
+ 98 -         # text
+ 99 -         "Infinity"
+100 -     )
+ 97 +     "Infinity"
+    |
 note: This is an unsafe fix and may change runtime behavior

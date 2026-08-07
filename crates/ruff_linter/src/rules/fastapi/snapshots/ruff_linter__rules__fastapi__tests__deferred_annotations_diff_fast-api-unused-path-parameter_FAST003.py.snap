@@ -21,11 +21,8 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `single` sign
     |
 help: Add `thing_id` to function signature
     |
-158 | @app.get("/things/{thing_id}")
-    - async def single(other: Annotated[str, Depends(something_else)]): ...
-159 + async def single(other: Annotated[str, Depends(something_else)], thing_id): ...
-160 | @app.get("/things/{thing_id}")
-    |
+159 | async def single(other: Annotated[str, Depends(something_else)], thing_id): ...
+    |                                                                ++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -40,11 +37,8 @@ FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_fu
     |
 help: Add `id` to function signature
     |
-198 | async def get_id_pydantic_full(
-    -     params: Annotated[PydanticParams, Depends(PydanticParams)],
-199 +     params: Annotated[PydanticParams, Depends(PydanticParams)], id,
-200 | ): ...
-    |
+199 |     params: Annotated[PydanticParams, Depends(PydanticParams)], id,
+    |                                                               ++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -60,11 +54,8 @@ FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_sh
     |
 help: Add `id` to function signature
     |
-201 | @app.get("/{id}")
-    - async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
-202 + async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()], id): ...
-203 | @app.get("/{id}")
-    |
+202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()], id): ...
+    |                                                                             ++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -77,11 +68,8 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_c
     |
 help: Add `thing_id` to function signature
     |
-314 | @app.get("/things/{thing_id}")
-    - async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
-315 + async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)], thing_id): ...
-316 |
-    |
+315 | async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)], thing_id): ...
+    |                                                                                ++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -94,11 +82,8 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_c
     |
 help: Add `thing_id` to function signature
     |
-345 | @app.get("/things/{thing_id}")
-    - async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
-346 + async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)], thing_id): ...
-347 |
-    |
+346 | async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)], thing_id): ...
+    |                                                                                             ++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -113,11 +98,8 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_i
     |
 help: Add `thing_id` to function signature
     |
-351 | @app.get("/things/{thing_id}")
-    - async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
-352 + async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
-353 |
-    |
+352 | async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
+    |                                                                                               ++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -130,9 +112,6 @@ FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_e
     |
 help: Add `thing_id` to function signature
     |
-361 | @app.get("/things/{thing_id}")
-    - async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
-362 + async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
-363 |
-    |
+362 | async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
+    |                                                                                ++++++++++
 note: This is an unsafe fix and may change runtime behavior

@@ -10,10 +10,8 @@ FURB187 [*] Use of assignment of `reversed` on list `l`
   |     ^^^^^^^^^^^^^^^
 help: Replace with `l.reverse()`
   |
-5 |     l = []
-  -     l = reversed(l)
+6 -     l = reversed(l)
 6 +     l.reverse()
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -26,10 +24,8 @@ FURB187 [*] Use of assignment of `reversed` on list `l`
    |     ^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `l.reverse()`
    |
-10 |     l = []
-   -     l = list(reversed(l))
+11 -     l = list(reversed(l))
 11 +     l.reverse()
-12 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -42,9 +38,7 @@ FURB187 [*] Use of assignment of `reversed` on list `l`
    |     ^^^^^^^^^^^
 help: Replace with `l.reverse()`
    |
-15 |     l = []
-   -     l = l[::-1]
+16 -     l = l[::-1]
 16 +     l.reverse()
-17 |
    |
 note: This is an unsafe fix and may change runtime behavior

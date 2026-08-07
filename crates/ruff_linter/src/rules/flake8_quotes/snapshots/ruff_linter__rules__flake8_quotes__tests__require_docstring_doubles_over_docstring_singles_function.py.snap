@@ -12,10 +12,8 @@ Q002 [*] Single quote docstring found but double quotes preferred
   |
 help: Replace single quotes docstring with double quotes
   |
-1 | def foo():
-  -     '''function without params, single line docstring'''
+2 -     '''function without params, single line docstring'''
 2 +     """function without params, single line docstring"""
-3 |     ''' not a docstring'''
   |
 
 Q002 [*] Single quote docstring found but double quotes preferred
@@ -31,13 +29,9 @@ Q002 [*] Single quote docstring found but double quotes preferred
    |
 help: Replace single quotes docstring with double quotes
    |
-7  | def foo2():
-   -     '''
-8  +     """
-9  |         function without params, multiline docstring
-   -     '''
+ 8 ~     """
+ 9 +         function without params, multiline docstring
 10 +     """
-11 |     ''' not a docstring'''
    |
 
 Q002 [*] Single quote docstring found but double quotes preferred
@@ -48,8 +42,6 @@ Q002 [*] Single quote docstring found but double quotes preferred
    |     ^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace single quotes docstring with double quotes
    |
-26 | def function_with_single_docstring(a):
-   -     'Single line docstring'
+27 -     'Single line docstring'
 27 +     "Single line docstring"
-28 |
    |

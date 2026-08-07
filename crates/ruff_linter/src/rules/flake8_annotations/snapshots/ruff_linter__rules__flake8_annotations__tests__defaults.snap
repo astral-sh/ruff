@@ -11,11 +11,8 @@ ANN201 [*] Missing return type annotation for public function `foo`
   |
 help: Add return type annotation: `None`
   |
-4 | # Error
-  - def foo(a, b):
-5 + def foo(a, b) -> None:
-6 |     pass
-  |
+5 | def foo(a, b) -> None:
+  |               +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN001 Missing type annotation for function argument `a`
@@ -46,11 +43,8 @@ ANN201 [*] Missing return type annotation for public function `foo`
    |
 help: Add return type annotation: `None`
    |
-9  | # Error
-   - def foo(a: int, b):
-10 + def foo(a: int, b) -> None:
-11 |     pass
-   |
+10 | def foo(a: int, b) -> None:
+   |                    +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN001 Missing type annotation for function argument `b`
@@ -81,11 +75,8 @@ ANN201 [*] Missing return type annotation for public function `foo`
    |
 help: Add return type annotation: `None`
    |
-19 | # Error
-   - def foo(a: int, b: int):
-20 + def foo(a: int, b: int) -> None:
-21 |     pass
-   |
+20 | def foo(a: int, b: int) -> None:
+   |                         +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `foo`
@@ -98,11 +89,8 @@ ANN201 [*] Missing return type annotation for public function `foo`
    |
 help: Add return type annotation: `None`
    |
-24 | # Error
-   - def foo():
-25 + def foo() -> None:
-26 |     pass
-   |
+25 | def foo() -> None:
+   |           +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
@@ -285,11 +273,8 @@ ANN204 [*] Missing return type annotation for special method `__init__`
     |
 help: Add return type annotation: `None`
     |
-158 |     @decorator()
-    -     def __init__(self: "Foo", foo: int):
-159 +     def __init__(self: "Foo", foo: int) -> None:
-160 |        ...
-    |
+159 |     def __init__(self: "Foo", foo: int) -> None:
+    |                                         +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__init__`
@@ -303,11 +288,8 @@ ANN204 [*] Missing return type annotation for special method `__init__`
     |
 help: Add return type annotation: `None`
     |
-164 | class Class:
-    -     def __init__(self):
-165 +     def __init__(self) -> None:
-166 |         print(f"{self.attr=}")
-    |
+165 |     def __init__(self) -> None:
+    |                        +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `quoted_escape`
@@ -319,10 +301,8 @@ ANN201 [*] Missing return type annotation for public function `quoted_escape`
     |     ^^^^^^^^^^^^^
 help: Add return type annotation: `None`
     |
-171 | # should not cause a stack overflow.
-    - def quoted_escape(x: "'in\x74'"): pass
-172 + def quoted_escape(x: "'in\x74'") -> None: pass
-    |
+172 | def quoted_escape(x: "'in\x74'") -> None: pass
+    |                                  +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`

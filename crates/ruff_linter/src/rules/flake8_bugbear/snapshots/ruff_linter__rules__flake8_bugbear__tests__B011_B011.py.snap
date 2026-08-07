@@ -12,10 +12,8 @@ B011 [*] Do not `assert False` (`python -O` removes these calls), raise `Asserti
    |
 help: Replace `assert False`
   |
-7 | assert 1 != 2
-  - assert False
+8 - assert False
 8 + raise AssertionError()
-9 | assert 1 != 2, "message"
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,8 +26,7 @@ B011 [*] Do not `assert False` (`python -O` removes these calls), raise `Asserti
    |        ^^^^^
 help: Replace `assert False`
    |
-9  | assert 1 != 2, "message"
-   - assert False, "message"
+10 - assert False, "message"
 10 + raise AssertionError("message")
    |
 note: This is an unsafe fix and may change runtime behavior

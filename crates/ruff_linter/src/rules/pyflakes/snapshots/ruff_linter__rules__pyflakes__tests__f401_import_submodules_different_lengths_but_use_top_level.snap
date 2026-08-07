@@ -11,7 +11,5 @@ F401 [*] `a.b.d` imported but unused
   |
 help: Remove unused import: `a.b.d`
   |
-2 | import a.c
-  - import a.b.d
-3 | a.foo()
+3 - import a.b.d
   |

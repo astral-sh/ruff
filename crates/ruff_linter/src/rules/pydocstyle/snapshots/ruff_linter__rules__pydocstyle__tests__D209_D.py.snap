@@ -12,11 +12,8 @@ D209 [*] Multi-line docstring closing quotes should be on a separate line
     | |___________________^
 help: Move closing quotes to new line
     |
-282 |
-    -     Description."""
-283 +     Description.
-284 +     """
-285 |
+283 ~     Description.
+284 ~     """
     |
 
 D209 [*] Multi-line docstring closing quotes should be on a separate line
@@ -30,9 +27,6 @@ D209 [*] Multi-line docstring closing quotes should be on a separate line
     | |_____________________^
 help: Move closing quotes to new line
     |
-589 |
-    -     Description.  """
-590 +     Description.
-591 +     """
-592 |
+590 ~     Description.
+591 ~     """
     |

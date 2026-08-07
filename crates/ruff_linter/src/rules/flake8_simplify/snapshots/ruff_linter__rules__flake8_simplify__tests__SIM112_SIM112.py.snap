@@ -12,10 +12,8 @@ SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
   |
 help: Replace `foo` with `FOO`
   |
-3 | # Bad
-  - os.environ['foo']
+4 - os.environ['foo']
 4 + os.environ['FOO']
-5 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,10 +77,8 @@ SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
    |
 help: Replace `foo` with `FOO`
    |
-13 |
-   - env = os.environ['foo']
+14 - env = os.environ['foo']
 14 + env = os.environ['FOO']
-15 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,9 +104,7 @@ SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
    |
 help: Replace `foo` with `FOO`
    |
-18 |
-   - if env := os.environ['foo']:
+19 - if env := os.environ['foo']:
 19 + if env := os.environ['FOO']:
-20 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior

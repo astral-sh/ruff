@@ -11,12 +11,10 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
 11 | dict.fromkeys(pierogi_fillings, {})
    |
 help: Replace with comprehension
-   |
-8  | # Errors.
-   - dict.fromkeys(pierogi_fillings, [])
-9  + {key: [] for key in pierogi_fillings}
-10 | dict.fromkeys(pierogi_fillings, list())
-   |
+  |
+9 - dict.fromkeys(pierogi_fillings, [])
+9 + {key: [] for key in pierogi_fillings}
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
@@ -31,10 +29,8 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
    |
-9  | dict.fromkeys(pierogi_fillings, [])
-   - dict.fromkeys(pierogi_fillings, list())
+10 - dict.fromkeys(pierogi_fillings, list())
 10 + {key: list() for key in pierogi_fillings}
-11 | dict.fromkeys(pierogi_fillings, {})
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
    |
-10 | dict.fromkeys(pierogi_fillings, list())
-   - dict.fromkeys(pierogi_fillings, {})
+11 - dict.fromkeys(pierogi_fillings, {})
 11 + {key: {} for key in pierogi_fillings}
-12 | dict.fromkeys(pierogi_fillings, set())
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
    |
-11 | dict.fromkeys(pierogi_fillings, {})
-   - dict.fromkeys(pierogi_fillings, set())
+12 - dict.fromkeys(pierogi_fillings, set())
 12 + {key: set() for key in pierogi_fillings}
-13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
    |
-12 | dict.fromkeys(pierogi_fillings, set())
-   - dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
+13 - dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
 13 + {key: {"pre": "populated!"} for key in pierogi_fillings}
-14 | dict.fromkeys(pierogi_fillings, dict())
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
    |
-13 | dict.fromkeys(pierogi_fillings, {"pre": "populated!"})
-   - dict.fromkeys(pierogi_fillings, dict())
+14 - dict.fromkeys(pierogi_fillings, dict())
 14 + {key: dict() for key in pierogi_fillings}
-15 | import builtins
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -126,10 +114,8 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    |
 help: Replace with comprehension
    |
-15 | import builtins
-   - builtins.dict.fromkeys(pierogi_fillings, dict())
+16 - builtins.dict.fromkeys(pierogi_fillings, dict())
 16 + {key: dict() for key in pierogi_fillings}
-17 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -142,8 +128,7 @@ RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with comprehension
    |
-38 | key_0 = "z"
-   - dict.fromkeys("ABC", list(key))
+39 - dict.fromkeys("ABC", list(key))
 39 + {key_1: list(key) for key_1 in "ABC"}
    |
 note: This is an unsafe fix and may change runtime behavior

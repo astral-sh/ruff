@@ -13,11 +13,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-13 |     p.with_suffix(".")
-   -     p.with_suffix("py")
-14 +     p.with_suffix(".py")
-15 |     p.with_suffix(r"s")
-   |
+14 |     p.with_suffix(".py")
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -32,11 +29,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-14 |     p.with_suffix("py")
-   -     p.with_suffix(r"s")
-15 +     p.with_suffix(r".s")
-16 |     p.with_suffix(u'' "json")
-   |
+15 |     p.with_suffix(r".s")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -50,11 +44,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-15 |     p.with_suffix(r"s")
-   -     p.with_suffix(u'' "json")
-16 +     p.with_suffix(u'.' "json")
-17 |     p.with_suffix(suffix="js")
-   |
+16 |     p.with_suffix(u'.' "json")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -69,11 +60,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-16 |     p.with_suffix(u'' "json")
-   -     p.with_suffix(suffix="js")
-17 +     p.with_suffix(suffix=".js")
-18 |
-   |
+17 |     p.with_suffix(suffix=".js")
+   |                           +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -88,11 +76,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-31 |     p.with_suffix(".")
-   -     p.with_suffix("py")
-32 +     p.with_suffix(".py")
-33 |     p.with_suffix(r"s")
-   |
+32 |     p.with_suffix(".py")
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -107,11 +92,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-32 |     p.with_suffix("py")
-   -     p.with_suffix(r"s")
-33 +     p.with_suffix(r".s")
-34 |     p.with_suffix(u'' "json")
-   |
+33 |     p.with_suffix(r".s")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -125,11 +107,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-33 |     p.with_suffix(r"s")
-   -     p.with_suffix(u'' "json")
-34 +     p.with_suffix(u'.' "json")
-35 |     p.with_suffix(suffix="js")
-   |
+34 |     p.with_suffix(u'.' "json")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -144,11 +123,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-34 |     p.with_suffix(u'' "json")
-   -     p.with_suffix(suffix="js")
-35 +     p.with_suffix(suffix=".js")
-36 |
-   |
+35 |     p.with_suffix(suffix=".js")
+   |                           +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -163,11 +139,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-49 |     p.with_suffix(".")
-   -     p.with_suffix("py")
-50 +     p.with_suffix(".py")
-51 |     p.with_suffix(r"s")
-   |
+50 |     p.with_suffix(".py")
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -182,11 +155,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-50 |     p.with_suffix("py")
-   -     p.with_suffix(r"s")
-51 +     p.with_suffix(r".s")
-52 |     p.with_suffix(u'' "json")
-   |
+51 |     p.with_suffix(r".s")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -200,11 +170,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-51 |     p.with_suffix(r"s")
-   -     p.with_suffix(u'' "json")
-52 +     p.with_suffix(u'.' "json")
-53 |     p.with_suffix(suffix="js")
-   |
+52 |     p.with_suffix(u'.' "json")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -219,11 +186,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-52 |     p.with_suffix(u'' "json")
-   -     p.with_suffix(suffix="js")
-53 +     p.with_suffix(suffix=".js")
-54 |
-   |
+53 |     p.with_suffix(suffix=".js")
+   |                           +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -238,11 +202,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-67 |     p.with_suffix(".")
-   -     p.with_suffix("py")
-68 +     p.with_suffix(".py")
-69 |     p.with_suffix(r"s")
-   |
+68 |     p.with_suffix(".py")
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -257,11 +218,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-68 |     p.with_suffix("py")
-   -     p.with_suffix(r"s")
-69 +     p.with_suffix(r".s")
-70 |     p.with_suffix(u'' "json")
-   |
+69 |     p.with_suffix(r".s")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -275,11 +233,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-69 |     p.with_suffix(r"s")
-   -     p.with_suffix(u'' "json")
-70 +     p.with_suffix(u'.' "json")
-71 |     p.with_suffix(suffix="js")
-   |
+70 |     p.with_suffix(u'.' "json")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -294,11 +249,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-70 |     p.with_suffix(u'' "json")
-   -     p.with_suffix(suffix="js")
-71 +     p.with_suffix(suffix=".js")
-72 |
-   |
+71 |     p.with_suffix(suffix=".js")
+   |                           +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -313,11 +265,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-85 |     p.with_suffix(".")
-   -     p.with_suffix("py")
-86 +     p.with_suffix(".py")
-87 |     p.with_suffix(r"s")
-   |
+86 |     p.with_suffix(".py")
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -332,11 +281,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-86 |     p.with_suffix("py")
-   -     p.with_suffix(r"s")
-87 +     p.with_suffix(r".s")
-88 |     p.with_suffix(u'' "json")
-   |
+87 |     p.with_suffix(r".s")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -350,11 +296,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-87 |     p.with_suffix(r"s")
-   -     p.with_suffix(u'' "json")
-88 +     p.with_suffix(u'.' "json")
-89 |     p.with_suffix(suffix="js")
-   |
+88 |     p.with_suffix(u'.' "json")
+   |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -369,11 +312,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
 help: Add a leading dot
    |
-88 |     p.with_suffix(u'' "json")
-   -     p.with_suffix(suffix="js")
-89 +     p.with_suffix(suffix=".js")
-90 |
-   |
+89 |     p.with_suffix(suffix=".js")
+   |                           +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -388,11 +328,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
     |
 help: Add a leading dot
     |
-103 |     p.with_suffix(".")
-    -     p.with_suffix("py")
-104 +     p.with_suffix(".py")
-105 |     p.with_suffix(r"s")
-    |
+104 |     p.with_suffix(".py")
+    |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -407,11 +344,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
     |
 help: Add a leading dot
     |
-104 |     p.with_suffix("py")
-    -     p.with_suffix(r"s")
-105 +     p.with_suffix(r".s")
-106 |     p.with_suffix(u'' "json")
-    |
+105 |     p.with_suffix(r".s")
+    |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -425,11 +359,8 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
     |
 help: Add a leading dot
     |
-105 |     p.with_suffix(r"s")
-    -     p.with_suffix(u'' "json")
-106 +     p.with_suffix(u'.' "json")
-107 |     p.with_suffix(suffix="js")
-    |
+106 |     p.with_suffix(u'.' "json")
+    |                     +
 note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
@@ -444,9 +375,6 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
     |
 help: Add a leading dot
     |
-106 |     p.with_suffix(u'' "json")
-    -     p.with_suffix(suffix="js")
-107 +     p.with_suffix(suffix=".js")
-108 |
-    |
+107 |     p.with_suffix(suffix=".js")
+    |                           +
 note: This is an unsafe fix and may change runtime behavior

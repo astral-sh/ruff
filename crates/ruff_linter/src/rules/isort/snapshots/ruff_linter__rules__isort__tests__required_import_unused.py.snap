@@ -12,9 +12,7 @@ F401 [*] `sys` imported but unused
   |
 help: Remove unused import: `sys`
   |
-4 | # Unused, _not_ marked as required.
-  - import sys
-5 |
+5 - import sys
   |
 
 F401 [*] `pathlib` imported but unused
@@ -28,7 +26,5 @@ F401 [*] `pathlib` imported but unused
    |
 help: Remove unused import: `pathlib`
   |
-7 | # Unused, _not_ marked as required (due to the alias).
-  - import pathlib as non_alias
-8 |
+8 - import pathlib as non_alias
   |

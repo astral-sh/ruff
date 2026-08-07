@@ -13,10 +13,8 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   |
 help: Replace with `capture_output` keyword argument
   |
-3 |
-  - output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+4 - output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 4 + output = run(["foo"], capture_output=True)
-5 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   |
 help: Replace with `capture_output` keyword argument
   |
-5 |
-  - output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+6 - output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 6 + output = subprocess.run(["foo"], capture_output=True)
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +47,8 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 help: Replace with `capture_output` keyword argument
   |
-7 |
-  - output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+8 - output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 8 + output = subprocess.run(capture_output=True, args=["foo"])
-9 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -73,10 +67,8 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 help: Replace with `capture_output` keyword argument
    |
-10 | output = subprocess.run(
-   -     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
+11 -     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
 11 +     ["foo"], capture_output=True, check=True
-12 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -95,10 +87,8 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 help: Replace with `capture_output` keyword argument
    |
-14 | output = subprocess.run(
-   -     ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
+15 -     ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
 15 +     ["foo"], capture_output=True, check=True
-16 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -123,12 +113,9 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 help: Replace with `capture_output` keyword argument
    |
-19 |     ["foo"],
-   -     stdout=subprocess.PIPE,
-20 +     capture_output=True,
+20 ~     capture_output=True,
 21 |     check=True,
-   -     stderr=subprocess.PIPE,
-22 |     text=True,
+22 ~     text=True,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -151,12 +138,9 @@ UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 help: Replace with `capture_output` keyword argument
    |
-30 |         ["foo"],
-   -         stdout=subprocess.PIPE,
-31 +         capture_output=True,
+31 ~         capture_output=True,
 32 |         check=True,
-   -         stderr=subprocess.PIPE,
-33 |         text=True,
+33 ~         text=True,
    |
 note: This is an unsafe fix and may change runtime behavior
 

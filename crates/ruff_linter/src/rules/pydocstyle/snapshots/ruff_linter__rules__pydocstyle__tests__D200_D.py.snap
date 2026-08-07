@@ -12,12 +12,10 @@ D200 [*] One-line docstring should fit on one line
     | |_______^
 help: Reformat to one line
     |
-128 | def asdlkfasd():
-    -     """
-    -     Wrong.
-    -     """
+129 -     """
+130 -     Wrong.
+131 -     """
 129 +     """Wrong."""
-130 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,12 +30,10 @@ D200 [*] One-line docstring should fit on one line
     | |_____________^
 help: Reformat to one line
     |
-596 | def one_liner():
-    -     """
-    -
-    -     Wrong."""
+597 -     """
+598 - 
+599 -     Wrong."""
 597 +     """Wrong."""
-598 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -52,12 +48,10 @@ D200 [*] One-line docstring should fit on one line
     | |_______^
 help: Reformat to one line
     |
-605 | def one_liner():
-    -     r"""Wrong.
-    -
-    -     """
+606 -     r"""Wrong.
+607 - 
+608 -     """
 606 +     r"""Wrong."""
-607 |
     |
 note: This is an unsafe fix and may change runtime behavior
 

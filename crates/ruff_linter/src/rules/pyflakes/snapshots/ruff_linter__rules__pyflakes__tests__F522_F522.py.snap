@@ -11,9 +11,8 @@ F522 [*] `.format` call has unused named argument(s): bar
   |
 help: Remove extra named arguments: bar
   |
-  - "{}".format(1, bar=2)  # F522
+1 - "{}".format(1, bar=2)  # F522
 1 + "{}".format(1, )  # F522
-2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
   |
 
 F522 [*] `.format` call has unused named argument(s): spam
@@ -27,10 +26,8 @@ F522 [*] `.format` call has unused named argument(s): spam
   |
 help: Remove extra named arguments: spam
   |
-1 | "{}".format(1, bar=2)  # F522
-  - "{bar}{}".format(1, bar=2, spam=3)  # F522
+2 - "{bar}{}".format(1, bar=2, spam=3)  # F522
 2 + "{bar}{}".format(1, bar=2, )  # F522
-3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
   |
 
 F522 [*] `.format` call has unused named argument(s): eggs, ham
@@ -45,10 +42,8 @@ F522 [*] `.format` call has unused named argument(s): eggs, ham
   |
 help: Remove extra named arguments: eggs, ham
   |
-3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
-  - "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+4 - "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
 4 + "{bar:{spam}}".format(bar=2, spam=3, )  # F522
-5 | (''
   |
 
 F522 [*] `.format` call has unused named argument(s): x
@@ -65,10 +60,8 @@ F522 [*] `.format` call has unused named argument(s): x
   |
 help: Remove extra named arguments: x
   |
-5 | (''
-  -  .format(x=2))  # F522
-6 +  .format())  # F522
-7 |
+5 ~ (''
+6 ~  .format())  # F522
   |
 
 F522 [*] `.format` call has unused named argument(s): greeting
@@ -83,10 +76,8 @@ F522 [*] `.format` call has unused named argument(s): greeting
    |
 help: Remove extra named arguments: greeting
    |
-9  | # The fix here is unsafe because the unused argument has side effect
-   - "Hello, {name}".format(greeting=print(1), name="World")
+10 - "Hello, {name}".format(greeting=print(1), name="World")
 10 + "Hello, {name}".format(name="World")
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -99,7 +90,6 @@ F522 [*] `.format` call has unused named argument(s): greeting
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove extra named arguments: greeting
    |
-13 | # even though the used argument has a side effect
-   - "Hello, {name}".format(greeting="Pikachu", name=print(1))
+14 - "Hello, {name}".format(greeting="Pikachu", name=print(1))
 14 + "Hello, {name}".format(name=print(1))
    |

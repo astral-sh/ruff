@@ -13,14 +13,10 @@ RUF031 [*] Use parentheses for tuples in subscripts
 11 |   d[(2,4)]
    |
 help: Parenthesize tuple
-   |
-7  | d[
-   -     1,
-   -     2
-8  +     (1,
-9  +     2)
-10 | ]
-   |
+  |
+8 ~     (1,
+9 +     2)
+  |
 
 RUF031 [*] Use parentheses for tuples in subscripts
   --> RUF031_prefer_parens.py:16:3
@@ -34,10 +30,8 @@ RUF031 [*] Use parentheses for tuples in subscripts
    |
 help: Parenthesize tuple
    |
-15 | d[tuple(8)]
-   - d[1,2]
+16 - d[1,2]
 16 + d[(1,2)]
-17 | d[3,4]
    |
 
 RUF031 [*] Use parentheses for tuples in subscripts
@@ -52,10 +46,8 @@ RUF031 [*] Use parentheses for tuples in subscripts
    |
 help: Parenthesize tuple
    |
-16 | d[1,2]
-   - d[3,4]
+17 - d[3,4]
 17 + d[(3,4)]
-18 | d[5,6,7]
    |
 
 RUF031 [*] Use parentheses for tuples in subscripts
@@ -70,10 +62,8 @@ RUF031 [*] Use parentheses for tuples in subscripts
    |
 help: Parenthesize tuple
    |
-17 | d[3,4]
-   - d[5,6,7]
+18 - d[5,6,7]
 18 + d[(5,6,7)]
-19 | e = {((1,2),(3,4)):"a"}
    |
 
 RUF031 [*] Use parentheses for tuples in subscripts
@@ -88,10 +78,8 @@ RUF031 [*] Use parentheses for tuples in subscripts
    |
 help: Parenthesize tuple
    |
-20 | e[((1,2),(3,4))]
-   - e[(1,2),(3,4)]
+21 - e[(1,2),(3,4)]
 21 + e[((1,2),(3,4))]
-22 |
    |
 
 RUF031 [*] Use parentheses for tuples in subscripts
@@ -106,9 +94,6 @@ RUF031 [*] Use parentheses for tuples in subscripts
    |
 help: Parenthesize tuple
    |
-25 | ] = self._extract_raw_features_from_token
-   - d[1,]
-26 | d[(1,)]
-27 + d[(1,)]
-28 | d[()] # empty tuples should be ignored
+26 - d[1,]
+26 + d[(1,)]
    |

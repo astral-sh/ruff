@@ -19,9 +19,8 @@ Q000 [*] Single quotes found but double quotes preferred
   |
 help: Replace single quotes with double quotes
   |
-  - s = ''"Start with empty string" ' and lint docstring safely'
+1 - s = ''"Start with empty string" ' and lint docstring safely'
 1 + s = ''"Start with empty string" " and lint docstring safely"
-2 | s = 'Do not'" start with empty string" ' and lint docstring safely'
   |
 
 Q000 [*] Single quotes found but double quotes preferred
@@ -32,8 +31,7 @@ Q000 [*] Single quotes found but double quotes preferred
   |     ^^^^^^^^
 help: Replace single quotes with double quotes
   |
-1 | s = ''"Start with empty string" ' and lint docstring safely'
-  - s = 'Do not'" start with empty string" ' and lint docstring safely'
+2 - s = 'Do not'" start with empty string" ' and lint docstring safely'
 2 + s = "Do not"" start with empty string" ' and lint docstring safely'
   |
 
@@ -45,7 +43,6 @@ Q000 [*] Single quotes found but double quotes preferred
   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace single quotes with double quotes
   |
-1 | s = ''"Start with empty string" ' and lint docstring safely'
-  - s = 'Do not'" start with empty string" ' and lint docstring safely'
+2 - s = 'Do not'" start with empty string" ' and lint docstring safely'
 2 + s = 'Do not'" start with empty string" " and lint docstring safely"
   |

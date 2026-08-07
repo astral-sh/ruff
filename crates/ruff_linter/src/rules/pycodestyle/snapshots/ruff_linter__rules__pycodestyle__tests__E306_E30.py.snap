@@ -12,10 +12,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 856 | # end
     |
 help: Add missing blank line
-    |
-853 |     x = 1
-854 +
-855 |     def b():
+854 -     def b():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -29,10 +26,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 864 | # end
     |
 help: Add missing blank line
-    |
-861 |     x = 1
-862 +
-863 |     def b():
+862 -     def b():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -46,10 +40,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 872 |         def c():
     |
 help: Add missing blank line
-    |
-869 |     x = 2
-870 +
-871 |     def b():
+870 -     def b():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -63,10 +54,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 874 | # end
     |
 help: Add missing blank line
-    |
-871 |         x = 1
-872 +
-873 |         def c():
+872 -         def c():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -80,10 +68,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 882 |     x = 2
     |
 help: Add missing blank line
-    |
-879 |     x = 1
-880 +
-881 |     class C:
+880 -     class C:
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -97,10 +82,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 885 | # end
     |
 help: Add missing blank line
-    |
-882 |     x = 2
-883 +
-884 |     def b():
+883 -     def b():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -113,10 +95,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 893 | # end
     |
 help: Add missing blank line
-    |
-891 |         pass
-892 +
-893 |     def baz(): pass
+892 -     def baz(): pass
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -130,10 +109,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 901 | # end
     |
 help: Add missing blank line
-    |
-898 |     def bar(): pass
-899 +
-900 |     def baz():
+899 -     def baz():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -147,10 +123,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 909 |         pass
     |
 help: Add missing blank line
-    |
-906 |     x = 2
-907 +
-908 |     @decorator
+907 -     @decorator
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -164,10 +137,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 918 |         pass
     |
 help: Add missing blank line
-    |
-915 |     x = 2
-916 +
-917 |     @decorator
+916 -     @decorator
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -181,10 +151,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 927 | # end
     |
 help: Add missing blank line
-    |
-924 |     x = 2
-925 +
-926 |     async def b():
+925 -     async def b():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -198,10 +165,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 985 |         loop.add_reader(self._fd, callback)
     |
 help: Add missing blank line
-    |
-982 |         loop = asyncio.get_event_loop()
-983 +
-984 |         def callback():
+983 -         def callback():
     |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -215,10 +179,7 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 1004 |         return 2
      |
 help: Add missing blank line
-     |
-1001 |         x = 1
-1002 +
-1003 |         def g():
+1002 -         def g():
      |
 
 E306 [*] Expected 1 blank line before a nested definition, found 0
@@ -232,8 +193,5 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 1011 |             return 2
      |
 help: Add missing blank line
-     |
-1008 |             x = 1
-1009 +
-1010 |             def g():
+1009 -             def g():
      |

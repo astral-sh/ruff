@@ -12,8 +12,5 @@ E306 [*] Expected 1 blank line before a nested definition, found 0
 62 | # end
    |
 help: Add missing blank line
-   |
-59 |     x = 1
-60 +
-61 |     def b():
+60 -     def b():
    |

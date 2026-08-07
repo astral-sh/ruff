@@ -10,8 +10,6 @@ UP015 [*] Unnecessary mode argument
   |                 ^^^
 help: Remove mode argument
   |
-2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-  - x: 'open("foo", "r")'
+3 - x: 'open("foo", "r")'
 3 + x: 'open("foo")'
-4 |
   |

@@ -10,9 +10,8 @@ F632 [*] Use `==` to compare constant literals
   |
 help: Replace `is` with `==`
   |
-  - if x is "abc":
+1 - if x is "abc":
 1 + if x == "abc":
-2 |     pass
   |
 
 F632 [*] Use `!=` to compare constant literals
@@ -26,10 +25,8 @@ F632 [*] Use `!=` to compare constant literals
   |
 help: Replace `is not` with `!=`
   |
-3 |
-  - if 123 is not y:
+4 - if 123 is not y:
 4 + if 123 != y:
-5 |     pass
   |
 
 F632 [*] Use `!=` to compare constant literals
@@ -45,11 +42,9 @@ F632 [*] Use `!=` to compare constant literals
   |
 help: Replace `is not` with `!=`
   |
-6 |
-  - if 123 is \
-  -         not y:
+7 - if 123 is \
+8 -         not y:
 7 + if 123 != y:
-8 |     pass
   |
 
 F632 [*] Use `==` to compare constant literals
@@ -63,10 +58,8 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
    |
-10 |
-   - if "123" is x < 3:
+11 - if "123" is x < 3:
 11 + if "123" == x < 3:
-12 |     pass
    |
 
 F632 [*] Use `==` to compare constant literals
@@ -80,10 +73,8 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
    |
-13 |
-   - if "123" != x is 3:
+14 - if "123" != x is 3:
 14 + if "123" != x == 3:
-15 |     pass
    |
 
 F632 [*] Use `==` to compare constant literals
@@ -97,10 +88,8 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
    |
-16 |
-   - if ("123" != x) is 3:
+17 - if ("123" != x) is 3:
 17 + if ("123" != x) == 3:
-18 |     pass
    |
 
 F632 [*] Use `==` to compare constant literals
@@ -114,10 +103,8 @@ F632 [*] Use `==` to compare constant literals
    |
 help: Replace `is` with `==`
    |
-19 |
-   - if "123" != (x is 3):
+20 - if "123" != (x is 3):
 20 + if "123" != (x == 3):
-21 |     pass
    |
 
 F632 [*] Use `!=` to compare constant literals
@@ -134,11 +121,9 @@ F632 [*] Use `!=` to compare constant literals
    |
 help: Replace `is not` with `!=`
    |
-22 |
-   - {2 is
-   - not ''}
+23 - {2 is
+24 - not ''}
 23 + {2 != ''}
-24 |
    |
 
 F632 [*] Use `!=` to compare constant literals
@@ -155,11 +140,9 @@ F632 [*] Use `!=` to compare constant literals
    |
 help: Replace `is not` with `!=`
    |
-25 |
-   - {2 is
-   -  not ''}
+26 - {2 is
+27 -  not ''}
 26 + {2 != ''}
-27 |
    |
 
 F632 [*] Use `!=` to compare constant literals
@@ -172,10 +155,8 @@ F632 [*] Use `!=` to compare constant literals
    |
 help: Replace `is not` with `!=`
    |
-29 | # Regression test for
-   - if values[1is not None ] is not '-':
+30 - if values[1is not None ] is not '-':
 30 + if values[1is not None ] != '-':
-31 |     pass
    |
 
 F632 [*] Use `!=` to compare constant literals
@@ -188,10 +169,8 @@ F632 [*] Use `!=` to compare constant literals
    |
 help: Replace `is not` with `!=`
    |
-29 | # Regression test for
-   - if values[1is not None ] is not '-':
+30 - if values[1is not None ] is not '-':
 30 + if values[1!= None ] is not '-':
-31 |     pass
    |
 
 F632 [*] Use `!=` to compare constant literals
@@ -202,7 +181,6 @@ F632 [*] Use `!=` to compare constant literals
    |            ^^^^^^^^^^^^
 help: Replace `is not` with `!=`
    |
-33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
-   - variable: "123 is not y"
+34 - variable: "123 is not y"
 34 + variable: "123 != y"
    |

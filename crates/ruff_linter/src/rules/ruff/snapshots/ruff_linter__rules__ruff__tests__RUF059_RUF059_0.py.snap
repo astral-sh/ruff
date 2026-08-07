@@ -12,11 +12,8 @@ RUF059 [*] Unpacked variable `c` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-23 |     bar = (1, 2)
-   -     (c, d) = bar
-24 +     (_c, d) = bar
-25 |
-   |
+24 |     (_c, d) = bar
+   |      +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `d` is never used
@@ -30,11 +27,8 @@ RUF059 [*] Unpacked variable `d` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-23 |     bar = (1, 2)
-   -     (c, d) = bar
-24 +     (c, _d) = bar
-25 |
-   |
+24 |     (c, _d) = bar
+   |         +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
@@ -46,11 +40,8 @@ RUF059 [*] Unpacked variable `x` is never used
    |      ^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-25 |
-   -     (x, y) = baz = bar
-26 +     (_x, y) = baz = bar
-27 |
-   |
+26 |     (_x, y) = baz = bar
+   |      +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
@@ -62,11 +53,8 @@ RUF059 [*] Unpacked variable `y` is never used
    |         ^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-25 |
-   -     (x, y) = baz = bar
-26 +     (x, _y) = baz = bar
-27 |
-   |
+26 |     (x, _y) = baz = bar
+   |         +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `connection` is never used
@@ -80,11 +68,8 @@ RUF059 [*] Unpacked variable `connection` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-65 |
-   -     with connect() as (connection, cursor):
-66 +     with connect() as (_connection, cursor):
-67 |         cursor.execute("SELECT * FROM users")
-   |
+66 |     with connect() as (_connection, cursor):
+   |                        +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `connection` is never used
@@ -98,11 +83,8 @@ RUF059 [*] Unpacked variable `connection` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-73 |
-   -     with connect() as (connection, cursor):
-74 +     with connect() as (_connection, cursor):
-75 |         cursor.execute("SELECT * FROM users")
-   |
+74 |     with connect() as (_connection, cursor):
+   |                        +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `this` is never used
@@ -115,11 +97,8 @@ RUF059 [*] Unpacked variable `this` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-78 | def f():
-   -     with open("file") as my_file, open("") as ((this, that)):
-79 +     with open("file") as my_file, open("") as ((_this, that)):
-80 |         print("hello")
-   |
+79 |     with open("file") as my_file, open("") as ((_this, that)):
+   |                                                 +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `that` is never used
@@ -132,11 +111,8 @@ RUF059 [*] Unpacked variable `that` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-78 | def f():
-   -     with open("file") as my_file, open("") as ((this, that)):
-79 +     with open("file") as my_file, open("") as ((this, _that)):
-80 |         print("hello")
-   |
+79 |     with open("file") as my_file, open("") as ((this, _that)):
+   |                                                       +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `this` is never used
@@ -151,11 +127,8 @@ RUF059 [*] Unpacked variable `this` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-85 |         open("file") as my_file,
-   -         open("") as ((this, that)),
-86 +         open("") as ((_this, that)),
-87 |     ):
-   |
+86 |         open("") as ((_this, that)),
+   |                       +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `that` is never used
@@ -170,11 +143,8 @@ RUF059 [*] Unpacked variable `that` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-85 |         open("file") as my_file,
-   -         open("") as ((this, that)),
-86 +         open("") as ((this, _that)),
-87 |     ):
-   |
+86 |         open("") as ((this, _that)),
+   |                             +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 Unpacked variable `x` is never used

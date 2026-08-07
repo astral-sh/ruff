@@ -11,9 +11,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
   |
 help: Rewrite as a dict comprehension
   |
-  - dict((x, x) for x in range(3))
+1 - dict((x, x) for x in range(3))
 1 + {x: x for x in range(3)}
-2 | dict(
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,14 +29,9 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
   |
 help: Rewrite as a dict comprehension
   |
-1 | dict((x, x) for x in range(3))
-  - dict(
-  -     (x, x) for x in range(3)
-  - )
 2 + {
 3 +     x: x for x in range(3)
 4 + }
-5 | dict(((x, x) for x in range(3)), z=3)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -53,10 +47,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
   |
 help: Rewrite as a dict comprehension
   |
-5 | dict(((x, x) for x in range(3)), z=3)
-  - y = f'{dict((x, x) for x in range(3))}'
+6 - y = f'{dict((x, x) for x in range(3))}'
 6 + y = f'{ {x: x for x in range(3)} }'
-7 | print(f'Hello {dict((x, x) for x in range(3))} World')
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -72,10 +64,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
   |
 help: Rewrite as a dict comprehension
   |
-6 | y = f'{dict((x, x) for x in range(3))}'
-  - print(f'Hello {dict((x, x) for x in range(3))} World')
+7 - print(f'Hello {dict((x, x) for x in range(3))} World')
 7 + print(f'Hello { {x: x for x in range(3)} } World')
-8 | print(f"Hello {dict((x, x) for x in 'abc')} World")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -91,10 +81,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
   |
-7 | print(f'Hello {dict((x, x) for x in range(3))} World')
-  - print(f"Hello {dict((x, x) for x in 'abc')} World")
+8 - print(f"Hello {dict((x, x) for x in 'abc')} World")
 8 + print(f"Hello { {x: x for x in 'abc'} } World")
-9 | print(f'Hello {dict((x, x) for x in "abc")} World')
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,12 +96,10 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
 10 | print(f'Hello {dict((x,x) for x in "abc")} World')
    |
 help: Rewrite as a dict comprehension
-   |
-8  | print(f"Hello {dict((x, x) for x in 'abc')} World")
-   - print(f'Hello {dict((x, x) for x in "abc")} World')
-9  + print(f'Hello { {x: x for x in "abc"} } World')
-10 | print(f'Hello {dict((x,x) for x in "abc")} World')
-   |
+  |
+9 - print(f'Hello {dict((x, x) for x in "abc")} World')
+9 + print(f'Hello { {x: x for x in "abc"} } World')
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C402 [*] Unnecessary generator (rewrite as a dict comprehension)
@@ -128,10 +114,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-9  | print(f'Hello {dict((x, x) for x in "abc")} World')
-   - print(f'Hello {dict((x,x) for x in "abc")} World')
+10 - print(f'Hello {dict((x,x) for x in "abc")} World')
 10 + print(f'Hello { {x: x for x in "abc"} } World')
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -146,10 +130,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-11 |
-   - f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+12 - f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 12 + f'{ {x: x for x in range(3)} | dict((x, x) for x in range(3))}'
-13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -164,10 +146,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-11 |
-   - f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
+12 - f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
 12 + f'{dict((x, x) for x in range(3)) | {x: x for x in range(3)} }'
-13 | f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -182,10 +162,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
-   - f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+13 - f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
 13 + f'{ {x: x for x in range(3)} | dict((x, x) for x in range(3)) }'
-14 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -200,10 +178,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-12 | f'{dict((x, x) for x in range(3)) | dict((x, x) for x in range(3))}'
-   - f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
+13 - f'{ dict((x, x) for x in range(3)) | dict((x, x) for x in range(3)) }'
 13 + f'{ dict((x, x) for x in range(3)) | {x: x for x in range(3)} }'
-14 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -219,10 +195,8 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-17 |
-   - print(f'Hello {dict((x,f(x)) for x in "abc")} World')
+18 - print(f'Hello {dict((x,f(x)) for x in "abc")} World')
 18 + print(f'Hello { {x: f(x) for x in "abc"} } World')
-19 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -237,9 +211,7 @@ C402 [*] Unnecessary generator (rewrite as a dict comprehension)
    |
 help: Rewrite as a dict comprehension
    |
-20 | # Regression test for: https://github.com/astral-sh/ruff/issues/7086
-   - dict((k,v)for k,v in d.iteritems() if k in only_args)
+21 - dict((k,v)for k,v in d.iteritems() if k in only_args)
 21 + {k: v for k,v in d.iteritems() if k in only_args}
-22 |
    |
 note: This is an unsafe fix and may change runtime behavior

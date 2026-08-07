@@ -12,10 +12,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
   |
 help: Remove `list()` cast
   |
-6 |
-  - for i in list(foo_tuple):  # PERF101
+7 - for i in list(foo_tuple):  # PERF101
 7 + for i in foo_tuple:  # PERF101
-8 |     pass
   |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -29,10 +27,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-9  |
-   - for i in list(foo_list):  # PERF101
+10 - for i in list(foo_list):  # PERF101
 10 + for i in foo_list:  # PERF101
-11 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -46,10 +42,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-12 |
-   - for i in list(foo_set):  # PERF101
+13 - for i in list(foo_set):  # PERF101
 13 + for i in foo_set:  # PERF101
-14 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -63,10 +57,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-15 |
-   - for i in list((1, 2, 3)):  # PERF101
+16 - for i in list((1, 2, 3)):  # PERF101
 16 + for i in (1, 2, 3):  # PERF101
-17 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -80,10 +72,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-18 |
-   - for i in list([1, 2, 3]):  # PERF101
+19 - for i in list([1, 2, 3]):  # PERF101
 19 + for i in [1, 2, 3]:  # PERF101
-20 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -97,10 +87,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-21 |
-   - for i in list({1, 2, 3}):  # PERF101
+22 - for i in list({1, 2, 3}):  # PERF101
 22 + for i in {1, 2, 3}:  # PERF101
-23 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -121,17 +109,11 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-24 |
-   - for i in list(
-   -     {
-25 + for i in {
-26 |     1,
-27 |     2,
-28 |     3,
-   -     }
-   - ):
-29 +     }:
-30 |     pass
+25 ~ for i in {
+26 +     1,
+27 +     2,
+28 +     3,
+29 ~     }:
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -148,12 +130,10 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-33 |
-   - for i in list( # Comment
-   -     {1, 2, 3}
-   - ):  # PERF101
+34 - for i in list( # Comment
+35 -     {1, 2, 3}
+36 - ):  # PERF101
 34 + for i in {1, 2, 3}:  # PERF101
-35 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -169,10 +149,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-56 |
-   - for i in list(foo_list):  # PERF101
+57 - for i in list(foo_list):  # PERF101
 57 + for i in foo_list:  # PERF101
-58 |     # Make sure we match the correct list
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -186,10 +164,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-68 |
-   - for i in list(nested_tuple):  # PERF101
+69 - for i in list(nested_tuple):  # PERF101
 69 + for i in nested_tuple:  # PERF101
-70 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -203,10 +179,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-85 |
-   - for i in builtins.list(nested_tuple):  # PERF101
+86 - for i in builtins.list(nested_tuple):  # PERF101
 86 + for i in nested_tuple:  # PERF101
-87 |     pass
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -220,10 +194,8 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
    |
 help: Remove `list()` cast
    |
-90 | items = (1, 2, 3)
-   - for i in(list)(items):
+91 - for i in(list)(items):
 91 + for i in items:
-92 |     print(i)
    |
 
 PERF101 [*] Do not cast an iterable to `list` before iterating over it
@@ -243,16 +215,14 @@ PERF101 [*] Do not cast an iterable to `list` before iterating over it
 103 |       print(i)
     |
 help: Remove `list()` cast
-   |
-95 | items = (1, 2, 3)
-   - for i in (  # 1
-   -     list  # 2
-   -     # 3
-   - )(  # 4
-   -     items  # 5
-   -     # 6
-   - ):
-96 + for i in items:
-97 |     print(i)
-   |
+    |
+ 96 - for i in (  # 1
+ 97 -     list  # 2
+ 98 -     # 3
+ 99 - )(  # 4
+100 -     items  # 5
+101 -     # 6
+102 - ):
+ 96 + for i in items:
+    |
 note: This is an unsafe fix and may change runtime behavior

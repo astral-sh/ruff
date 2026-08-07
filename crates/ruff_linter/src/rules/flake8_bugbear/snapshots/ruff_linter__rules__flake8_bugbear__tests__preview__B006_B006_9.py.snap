@@ -10,11 +10,9 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 help: Replace with `None`; initialize within function
   |
-  - def f1(x=([],)):
-1 + def f1(x=None):
+1 ~ def f1(x=None):
 2 +     if x is None:
 3 +         x = ([],)
-4 |     print(x)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,12 +25,9 @@ B006 [*] Do not use mutable data structures for argument defaults
   |
 help: Replace with `None`; initialize within function
   |
-4 |
-  - def f2(x=(x for x in "x")):
-5 + def f2(x=None):
+5 ~ def f2(x=None):
 6 +     if x is None:
 7 +         x = (x for x in "x")
-8 |     print(x)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,12 +40,9 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
    |
-8  |
-   - def f3(x=((x for x in "x"),)):
-9  + def f3(x=None):
+ 9 ~ def f3(x=None):
 10 +     if x is None:
 11 +         x = ((x for x in "x"),)
-12 |     print(x)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -63,12 +55,9 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
    |
-12 |
-   - def f4(x=(z := [1, ])):
-13 + def f4(x=None):
+13 ~ def f4(x=None):
 14 +     if x is None:
 15 +         x = (z := [1, ])
-16 |     print(x)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -81,11 +70,8 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
    |
-16 |
-   - def f5(x=([1, ])):
-17 + def f5(x=None):
+17 ~ def f5(x=None):
 18 +     if x is None:
 19 +         x = ([1, ])
-20 |     print(x)
    |
 note: This is an unsafe fix and may change runtime behavior

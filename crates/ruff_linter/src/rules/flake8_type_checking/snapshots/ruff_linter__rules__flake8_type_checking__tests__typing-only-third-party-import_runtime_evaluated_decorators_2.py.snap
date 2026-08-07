@@ -10,12 +10,10 @@ TC002 [*] Move third-party import `numpy` into a type-checking block
    |        ^^^^^
 help: Move into type-checking block
    |
-9  |
-   - import numpy  # TC002
-10 + from typing import TYPE_CHECKING
-11 +
-12 + if TYPE_CHECKING:
-13 +     import numpy
-14 |
+10 + 
+11 + from typing import TYPE_CHECKING
+12 ~ 
+13 + if TYPE_CHECKING:
+14 +     import numpy
    |
 note: This is an unsafe fix and may change runtime behavior

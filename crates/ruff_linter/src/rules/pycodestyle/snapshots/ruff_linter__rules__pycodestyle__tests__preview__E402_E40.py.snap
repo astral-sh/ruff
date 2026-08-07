@@ -13,13 +13,8 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  | #: E401
-2  + import foo
-3  | import os, sys
---------------------------------------------------------------------------------
-56 |
-   - import foo
-57 | #: E402
+ 2 + import foo
+ 3 | import os, sys
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,13 +30,8 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  | #: E401
-2  + import foo
-3  | import os, sys
---------------------------------------------------------------------------------
-58 | #: E402
-   - import foo
-59 |
+ 2 + import foo
+ 3 | import os, sys
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -57,13 +47,8 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  | #: E401
-2  + import bar
-3  | import os, sys
---------------------------------------------------------------------------------
-62 |
-   - import bar
-63 |
+ 2 + import bar
+ 3 | import os, sys
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -77,13 +62,8 @@ E402 [*] Module level import not at top of file
    |
 help: Move module level imports to top of file
    |
-1  | #: E401
-2  + import re as regex, string  # also with a comment!
-3  | import os, sys
---------------------------------------------------------------------------------
-65 | #: E401
-   - import re as regex, string  # also with a comment!
-66 | import re as regex, string; x = 1
+ 2 + import re as regex, string  # also with a comment!
+ 3 | import os, sys
    |
 note: This is an unsafe fix and may change runtime behavior
 

@@ -9,10 +9,7 @@ D201 [*] No blank lines allowed before function docstring (found 1)
 137 |     """Leading space."""
     |     ^^^^^^^^^^^^^^^^^^^^
 help: Remove blank line(s) before function docstring
-    |
-135 | def leading_space():
-    -
-136 |     """Leading space."""
+136 - 
     |
 
 D201 [*] No blank lines allowed before function docstring (found 1)
@@ -26,10 +23,7 @@ D201 [*] No blank lines allowed before function docstring (found 1)
 153 |     pass
     |
 help: Remove blank line(s) before function docstring
-    |
-149 | def trailing_and_leading_space():
-    -
-150 |     """Trailing and leading space."""
+150 - 
     |
 
 D201 [*] No blank lines allowed before function docstring (found 1)
@@ -43,10 +37,7 @@ D201 [*] No blank lines allowed before function docstring (found 1)
 549 | |     """
     | |_______^
 help: Remove blank line(s) before function docstring
-    |
-544 | def multiline_leading_space():
-    -
-545 |     """Leading space.
+545 - 
     |
 
 D201 [*] No blank lines allowed before function docstring (found 1)
@@ -63,10 +54,7 @@ D201 [*] No blank lines allowed before function docstring (found 1)
 573 |       pass
     |
 help: Remove blank line(s) before function docstring
-    |
-566 | def multiline_trailing_and_leading_space():
-    -
-567 |     """Trailing and leading space.
+567 - 
     |
 
 D201 No blank lines allowed before function docstring (found 1)

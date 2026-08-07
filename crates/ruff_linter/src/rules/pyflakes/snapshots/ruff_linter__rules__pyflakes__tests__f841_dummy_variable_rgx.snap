@@ -12,10 +12,8 @@ F841 [*] Local variable `e` is assigned to but never used
   |
 help: Remove assignment to unused variable `e`
   |
-2 |     1 / 0
-  - except ValueError as e:
+3 - except ValueError as e:
 3 + except ValueError:
-4 |     pass
   |
 
 F841 [*] Local variable `foo` is assigned to but never used
@@ -28,9 +26,7 @@ F841 [*] Local variable `foo` is assigned to but never used
    |
 help: Remove assignment to unused variable `foo`
    |
-19 | def f():
-   -     foo = (1, 2)
-20 |     (a, b) = (1, 2)
+20 -     foo = (1, 2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -67,10 +63,8 @@ F841 [*] Local variable `baz` is assigned to but never used
    |              ^^^
 help: Remove assignment to unused variable `baz`
    |
-25 |
-   -     (x, y) = baz = bar
+26 -     (x, y) = baz = bar
 26 +     (x, y) = bar
-27 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -85,9 +79,7 @@ F841 [*] Local variable `_` is assigned to but never used
    |
 help: Remove assignment to unused variable `_`
    |
-34 | def f():
-   -     _ = 1
-35 |     __ = 1
+35 -     _ = 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,9 +94,7 @@ F841 [*] Local variable `__` is assigned to but never used
    |
 help: Remove assignment to unused variable `__`
    |
-35 |     _ = 1
-   -     __ = 1
-36 |     _discarded = 1
+36 -     __ = 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -117,9 +107,7 @@ F841 [*] Local variable `_discarded` is assigned to but never used
    |     ^^^^^^^^^^
 help: Remove assignment to unused variable `_discarded`
    |
-36 |     __ = 1
-   -     _discarded = 1
-37 |
+37 -     _discarded = 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -135,10 +123,8 @@ F841 [*] Local variable `b` is assigned to but never used
    |
 help: Remove assignment to unused variable `b`
    |
-50 |         # F841
-   -         b = 1
+51 -         b = 1
 51 +         pass
-52 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -152,10 +138,8 @@ F841 [*] Local variable `my_file` is assigned to but never used
    |
 help: Remove assignment to unused variable `my_file`
    |
-78 | def f():
-   -     with open("file") as my_file, open("") as ((this, that)):
+79 -     with open("file") as my_file, open("") as ((this, that)):
 79 +     with open("file"), open("") as ((this, that)):
-80 |         print("hello")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -171,10 +155,8 @@ F841 [*] Local variable `my_file` is assigned to but never used
    |
 help: Remove assignment to unused variable `my_file`
    |
-84 |     with (
-   -         open("file") as my_file,
+85 -         open("file") as my_file,
 85 +         open("file"),
-86 |         open("") as ((this, that)),
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -190,9 +172,7 @@ F841 [*] Local variable `msg3` is assigned to but never used
     |
 help: Remove assignment to unused variable `msg3`
     |
-101 |     msg2 = "Hello, world!"
-    -     msg3 = "Hello, world!"
-102 |     match x:
+102 -     msg3 = "Hello, world!"
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -208,10 +188,8 @@ F841 [*] Local variable `Baz` is assigned to but never used
     |
 help: Remove assignment to unused variable `Baz`
     |
-114 |     Bar = enum.Enum("Bar", "A B")
-    -     Baz = enum.Enum("Baz", "A B")
+115 -     Baz = enum.Enum("Baz", "A B")
 115 +     enum.Enum("Baz", "A B")
-116 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -247,10 +225,8 @@ F841 [*] Local variable `_` is assigned to but never used
     |
 help: Remove assignment to unused variable `_`
     |
-151 |         pass
-    -     except Exception as _:
+152 -     except Exception as _:
 152 +     except Exception:
-153 |         pass
     |
 
 F841 [*] Local variable `__class__` is assigned to but never used
@@ -262,10 +238,8 @@ F841 [*] Local variable `__class__` is assigned to but never used
     |         ^^^^^^^^^
 help: Remove assignment to unused variable `__class__`
     |
-167 |     def set_class(self, cls):
-    -         __class__ = cls  # F841
+168 -         __class__ = cls  # F841
 168 +         pass  # F841
-169 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -278,10 +252,8 @@ F841 [*] Local variable `__class__` is assigned to but never used
     |             ^^^^^^^^^
 help: Remove assignment to unused variable `__class__`
     |
-173 |         def set_class(self, cls):
-    -             __class__ = cls  # F841
+174 -             __class__ = cls  # F841
 174 +             pass  # F841
-175 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -294,9 +266,7 @@ F841 [*] Local variable `__class__` is assigned to but never used
     |                 ^^^^^^^^^
 help: Remove assignment to unused variable `__class__`
     |
-181 |             def set_class(self, cls):
-    -                 __class__ = cls  # F841
+182 -                 __class__ = cls  # F841
 182 +                 pass  # F841
-183 |
     |
 note: This is an unsafe fix and may change runtime behavior

@@ -12,10 +12,7 @@ E301 [*] Expected 1 blank line, found 0
 480 | # end
     |
 help: Add missing blank line
-    |
-477 |         pass
-478 +
-479 |     def func2():
+478 -     def func2():
     |
 
 E301 [*] Expected 1 blank line, found 0
@@ -29,10 +26,7 @@ E301 [*] Expected 1 blank line, found 0
 491 | # end
     |
 help: Add missing blank line
-    |
-487 |         pass
-488 +
-489 |     # comment
+488 -     # comment
     |
 
 E301 [*] Expected 1 blank line, found 0
@@ -45,10 +39,7 @@ E301 [*] Expected 1 blank line, found 0
 501 |         pass
     |
 help: Add missing blank line
-    |
-498 |     columns = []
-499 +
-500 |     @classmethod
+499 -     @classmethod
     |
 
 E301 [*] Expected 1 blank line, found 0
@@ -62,10 +53,7 @@ E301 [*] Expected 1 blank line, found 0
 513 |         pass
     |
 help: Add missing blank line
-    |
-510 |         pass
-511 +
-512 |     @classmethod
+511 -     @classmethod
     |
 
 E301 [*] Expected 1 blank line, found 0
@@ -79,10 +67,7 @@ E301 [*] Expected 1 blank line, found 0
 528 | # end
     |
 help: Add missing blank line
-    |
-525 |         ...
-526 +
-527 |     def bar(self, x: int | str) -> int | str:
+526 -     def bar(self, x: int | str) -> int | str:
     |
 
 E301 [*] Expected 1 blank line, found 0
@@ -96,8 +81,5 @@ E301 [*] Expected 1 blank line, found 0
 995 | # end
     |
 help: Add missing blank line
-    |
-992 |         print("conditional")
-993 +
-994 |         def test():
+993 -         def test():
     |

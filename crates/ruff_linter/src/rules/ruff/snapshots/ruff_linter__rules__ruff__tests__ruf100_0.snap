@@ -10,12 +10,10 @@ RUF100 [*] Unused blanket `noqa` directive
 10 |     print(c)
    |
 help: Remove unused `noqa` directive
-   |
-8  |     # Invalid
-   -     c = 1  # noqa
-9  +     c = 1
-10 |     print(c)
-   |
+  |
+9 -     c = 1  # noqa
+9 +     c = 1
+  |
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
   --> RUF100_0.py:13:12
@@ -28,10 +26,8 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 help: Remove unused `noqa` directive
    |
-12 |     # Invalid
-   -     d = 1  # noqa: E501
+13 -     d = 1  # noqa: E501
 13 +     d = 1
-14 |
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
@@ -45,10 +41,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
    |
 help: Remove unused `noqa` directive
    |
-15 |     # Invalid
-   -     d = 1  # noqa: F841, E501
+16 -     d = 1  # noqa: F841, E501
 16 +     d = 1
-17 |
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)
@@ -62,10 +56,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)
    |
 help: Remove unused `noqa` directive
    |
-18 |     # Invalid (and unimplemented or not enabled)
-   -     d = 1  # noqa: F841, W191, F821
+19 -     d = 1  # noqa: F841, W191, F821
 19 +     d = 1
-20 |
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `F841`)
@@ -79,10 +71,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
 help: Remove unused `noqa` directive
    |
-21 |     # Invalid (but external)
-   -     d = 1  # noqa: F841, V101
+22 -     d = 1  # noqa: F841, V101
 22 +     d = 1  # noqa: V101
-23 |
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
@@ -97,10 +87,8 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 help: Remove unused `noqa` directive
    |
-28 |     # Invalid - no space before #
-   -     d = 1  # noqa: E501
+29 -     d = 1  # noqa: E501
 29 +     d = 1
-30 |
    |
 
 F841 [*] Local variable `d` is assigned to but never used
@@ -113,9 +101,7 @@ F841 [*] Local variable `d` is assigned to but never used
    |
 help: Remove assignment to unused variable `d`
    |
-31 |     # Invalid - many spaces before #
-   -     d = 1  # noqa: E501
-32 |     # fmt: on
+32 -     d = 1  # noqa: E501
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -129,10 +115,8 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 help: Remove unused `noqa` directive
    |
-31 |     # Invalid - many spaces before #
-   -     d = 1  # noqa: E501
+32 -     d = 1  # noqa: E501
 32 +     d = 1
-33 |     # fmt: on
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `F841`)
@@ -146,10 +130,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`)
    |
 help: Remove unused `noqa` directive
    |
-57 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-   - """  # noqa: E501, F841
+58 - """  # noqa: E501, F841
 58 + """  # noqa: E501
-59 |
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `E501`)
@@ -163,10 +145,8 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 help: Remove unused `noqa` directive
    |
-65 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
-   - """  # noqa: E501
+66 - """  # noqa: E501
 66 + """
-67 |
    |
 
 RUF100 [*] Unused blanket `noqa` directive
@@ -180,10 +160,8 @@ RUF100 [*] Unused blanket `noqa` directive
    |
 help: Remove unused `noqa` directive
    |
-73 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
-   - """  # noqa
+74 - """  # noqa
 74 + """
-75 |
    |
 
 F401 [*] `shelve` imported but unused
@@ -197,9 +175,7 @@ F401 [*] `shelve` imported but unused
    |
 help: Remove unused import: `shelve`
    |
-87 | import os  # noqa: F401, RUF100
-   - import shelve  # noqa: RUF100
-88 | import sys  # noqa: F401, RUF100
+88 - import shelve  # noqa: RUF100
    |
 
 E501 Line too long (89 > 88)
@@ -219,10 +195,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |                                                                                            ^^^^^^^^^^^^
 help: Remove unused `noqa` directive
    |
-92 |
-   - "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
+93 - "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
 93 + "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"
-94 |
    |
 
 F841 [*] Local variable `e` is assigned to but never used
@@ -234,9 +208,7 @@ F841 [*] Local variable `e` is assigned to but never used
     |     ^
 help: Remove assignment to unused variable `e`
     |
-107 |     d = 1  # noqa: F841, E50
-    -     e = 1  # noqa: E50
-108 |
+108 -     e = 1  # noqa: E50
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -252,10 +224,8 @@ RUF100 [*] Unused `noqa` directive (duplicated: `F841`)
     |
 help: Remove unused `noqa` directive
     |
-117 | def f():
-    -     x = 2  # noqa: F841, F841, X200
+118 -     x = 2  # noqa: F841, F841, X200
 118 +     x = 2  # noqa: F841
-119 |
     |
 
 RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
@@ -270,10 +240,8 @@ RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
     |
 help: Remove unused `noqa` directive
     |
-119 |
-    -     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
+120 -     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
 120 +     y = 2 == bar  # noqa: SIM300, F841
-121 |
     |
 
 RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
@@ -288,10 +256,8 @@ RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
     |
 help: Remove unused `noqa` directive
     |
-121 |
-    -     z = 2  # noqa: F841 F841  F841, F841, F841
+122 -     z = 2  # noqa: F841 F841  F841, F841, F841
 122 +     z = 2  # noqa: F841
-123 |
     |
 
 RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
@@ -306,10 +272,8 @@ RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
     |
 help: Remove unused `noqa` directive
     |
-128 | x = eval(command)  # noqa: PGH001, S307
-    - x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
+129 - x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
 129 + x = eval(command)  # noqa: S307, PGH001
-130 | x = eval(command)  # noqa: PGH001, S307, PGH001
     |
 
 RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
@@ -323,10 +287,8 @@ RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
     |
 help: Remove unused `noqa` directive
     |
-129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
-    - x = eval(command)  # noqa: PGH001, S307, PGH001
+130 - x = eval(command)  # noqa: PGH001, S307, PGH001
 130 + x = eval(command)  # noqa: PGH001, S307
-131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |
 
 RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
@@ -338,7 +300,6 @@ RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove unused `noqa` directive
     |
-130 | x = eval(command)  # noqa: PGH001, S307, PGH001
-    - x = eval(command)  # noqa: PGH001, S307, PGH001, S307
+131 - x = eval(command)  # noqa: PGH001, S307, PGH001, S307
 131 + x = eval(command)  # noqa: PGH001, S307
     |

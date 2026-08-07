@@ -12,15 +12,15 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   |
 help: Move into type-checking block
    |
-6  | from pandas import (
-   -     DataFrame,  # DataFrame
-7  |     Series,  # Series
-8  | )
-9  |
+ 4 ~ from typing import TYPE_CHECKING
+ 5 |
+ 6 + from pandas import (
+ 7 +     Series,  # Series
+ 8 + )
+ 9 |
 10 | if TYPE_CHECKING:
 11 +     from pandas import (
 12 +         DataFrame,  # DataFrame
 13 +         )
-14 |     import os
    |
 note: This is an unsafe fix and may change runtime behavior

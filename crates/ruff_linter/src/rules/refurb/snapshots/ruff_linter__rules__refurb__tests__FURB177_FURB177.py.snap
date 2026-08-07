@@ -11,10 +11,10 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
   |
 help: Replace `Path().resolve()` with `Path.cwd()`
   |
+2 ~ from pathlib import Path
+3 |
 4 | # Errors
-  - _ = Path().resolve()
-5 + _ = Path.cwd()
-6 | _ = pathlib.Path().resolve()
+5 ~ _ = Path.cwd()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +30,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
   |
 help: Replace `Path().resolve()` with `Path.cwd()`
   |
+2 ~ from pathlib import Path
+3 |
+4 | # Errors
 5 | _ = Path().resolve()
-  - _ = pathlib.Path().resolve()
-6 + _ = Path.cwd()
-7 |
+6 ~ _ = Path.cwd()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,10 +49,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
   |
 help: Replace `Path().resolve()` with `Path.cwd()`
   |
+2 ~ from pathlib import Path
+3 |
+…
 7 |
-  - _ = Path("").resolve()
-8 + _ = Path.cwd()
-9 | _ = pathlib.Path("").resolve()
+8 ~ _ = Path.cwd()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,12 +67,13 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
 11 | _ = Path(".").resolve()
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
-   |
-8  | _ = Path("").resolve()
-   - _ = pathlib.Path("").resolve()
-9  + _ = Path.cwd()
-10 |
-   |
+  |
+2 ~ from pathlib import Path
+3 |
+…
+8 | _ = Path("").resolve()
+9 ~ _ = Path.cwd()
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
@@ -84,10 +87,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
    |
+ 2 ~ from pathlib import Path
+ 3 |
+ …
 10 |
-   - _ = Path(".").resolve()
-11 + _ = Path.cwd()
-12 | _ = pathlib.Path(".").resolve()
+11 ~ _ = Path.cwd()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,10 +106,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
    |
+ 2 ~ from pathlib import Path
+ 3 |
+ …
 11 | _ = Path(".").resolve()
-   - _ = pathlib.Path(".").resolve()
-12 + _ = Path.cwd()
-13 |
+12 ~ _ = Path.cwd()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -120,10 +125,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
    |
+ 2 ~ from pathlib import Path
+ 3 |
+ …
 13 |
-   - _ = Path("", **kwargs).resolve()
-14 + _ = Path.cwd()
-15 | _ = pathlib.Path("", **kwargs).resolve()
+14 ~ _ = Path.cwd()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -138,10 +144,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
    |
+ 2 ~ from pathlib import Path
+ 3 |
+ …
 14 | _ = Path("", **kwargs).resolve()
-   - _ = pathlib.Path("", **kwargs).resolve()
-15 + _ = Path.cwd()
-16 |
+15 ~ _ = Path.cwd()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -156,10 +163,11 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
    |
+ 2 ~ from pathlib import Path
+ 3 |
+ …
 16 |
-   - _ = Path(".", **kwargs).resolve()
-17 + _ = Path.cwd()
-18 | _ = pathlib.Path(".", **kwargs).resolve()
+17 ~ _ = Path.cwd()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -174,9 +182,10 @@ FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lo
    |
 help: Replace `Path().resolve()` with `Path.cwd()`
    |
+ 2 ~ from pathlib import Path
+ 3 |
+ …
 17 | _ = Path(".", **kwargs).resolve()
-   - _ = pathlib.Path(".", **kwargs).resolve()
-18 + _ = Path.cwd()
-19 |
+18 ~ _ = Path.cwd()
    |
 note: This is an unsafe fix and may change runtime behavior

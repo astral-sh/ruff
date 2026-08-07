@@ -12,8 +12,5 @@ E301 [*] Expected 1 blank line, found 0
 15 |         pass
    |
 help: Add missing blank line
-   |
-12 |         pass
-13 +
-14 |     @classmethod
+13 -     @classmethod
    |

@@ -12,11 +12,8 @@ ANN204 [*] Missing return type annotation for special method `__init__`
   |
 help: Add return type annotation: `None`
   |
-4 | class Foo:
-  -     def __init__(self):
-5 +     def __init__(self) -> None:
-6 |         ...
-  |
+5 |     def __init__(self) -> None:
+  |                        +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__init__`
@@ -30,11 +27,8 @@ ANN204 [*] Missing return type annotation for special method `__init__`
    |
 help: Add return type annotation: `None`
    |
-10 | class Foo:
-   -     def __init__(self, foo):
-11 +     def __init__(self, foo) -> None:
-12 |         ...
-   |
+11 |     def __init__(self, foo) -> None:
+   |                             +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN202 [*] Missing return type annotation for private function `__init__`
@@ -47,11 +41,8 @@ ANN202 [*] Missing return type annotation for private function `__init__`
    |
 help: Add return type annotation: `None`
    |
-39 | # Error
-   - def __init__(self, foo: int):
-40 + def __init__(self, foo: int) -> None:
-41 |     ...
-   |
+40 | def __init__(self, foo: int) -> None:
+   |                              +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__init__`
@@ -65,9 +56,6 @@ ANN204 [*] Missing return type annotation for special method `__init__`
    |
 help: Add return type annotation: `None`
    |
-46 | class Foo:
-   -     def __init__(self, *arg):
-47 +     def __init__(self, *arg) -> None:
-48 |         ...
-   |
+47 |     def __init__(self, *arg) -> None:
+   |                              +++++++
 note: This is an unsafe fix and may change runtime behavior

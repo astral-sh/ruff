@@ -13,11 +13,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
   |
 help: Remove unnecessary assignment
   |
-5 | def foo():
-  -     x = 1
-  -     yield x  # RUF070
+6 -     x = 1
+7 -     yield x  # RUF070
+8 - 
 6 +     yield 1
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -33,11 +32,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
    |
 help: Remove unnecessary assignment
    |
-9  | def foo():
-   -     x = [1, 2, 3]
-   -     yield from x  # RUF070
+10 -     x = [1, 2, 3]
+11 -     yield from x  # RUF070
+12 - 
 10 +     yield from [1, 2, 3]
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -53,11 +51,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-14 |     for i in range(10):
-   -         x = i * 2
-   -         yield x  # RUF070
+15 -         x = i * 2
+16 -         yield x  # RUF070
+17 - 
 15 +         yield i * 2
-16 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -73,11 +70,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-19 |     if True:
-   -         x = 1
-   -         yield x  # RUF070
+20 -         x = 1
+21 -         yield x  # RUF070
+22 - 
 20 +         yield 1
-21 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -93,11 +89,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-24 |     with open("foo.txt") as f:
-   -         x = f.read()
-   -         yield x  # RUF070
+25 -         x = f.read()
+26 -         yield x  # RUF070
+27 - 
 25 +         yield f.read()
-26 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -113,11 +108,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-29 |     try:
-   -         x = something()
-   -         yield x  # RUF070
+30 -         x = something()
+31 -         yield x  # RUF070
+32 -     except Exception:
 30 +         yield something()
-31 |     except Exception:
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -133,11 +127,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-35 | def foo():
-   -     x = some_function()
-   -     yield x  # RUF070
+36 -     x = some_function()
+37 -     yield x  # RUF070
+38 - 
 36 +     yield some_function()
-37 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -153,11 +146,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
    |
 help: Remove unnecessary assignment
    |
-39 | def foo():
-   -     x = some_generator()
-   -     yield from x  # RUF070
+40 -     x = some_generator()
+41 -     yield from x  # RUF070
+42 - 
 40 +     yield from some_generator()
-41 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -173,11 +165,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-43 | def foo():
-   -     x = lambda: 1
-   -     yield x  # RUF070
+44 -     x = lambda: 1
+45 -     yield x  # RUF070
+46 - 
 44 +     yield lambda: 1
-45 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -193,11 +184,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-47 | def foo():
-   -     x = (y := 1)
-   -     yield x  # RUF070
+48 -     x = (y := 1)
+49 -     yield x  # RUF070
+50 - 
 48 +     yield (y := 1)
-49 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -213,11 +203,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-51 | def foo():
-   -     x =1
-   -     yield x  # RUF070 (no space after `=`)
+52 -     x =1
+53 -     yield x  # RUF070 (no space after `=`)
+54 - 
 52 +     yield 1
-53 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -233,11 +222,10 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |
 help: Remove unnecessary assignment
    |
-55 | def foo():
-   -     x = yield 1
-   -     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
+56 -     x = yield 1
+57 -     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
+58 - 
 56 +     yield (yield 1)
-57 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -250,10 +238,9 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
    |           ^
 help: Remove unnecessary assignment
    |
-61 |     with open("foo.txt") as f:
-   -         x = f.read()
-   -     yield x  # RUF070
+62 -         x = f.read()
+63 -     yield x  # RUF070
+64 - 
 62 +         yield f.read()
-63 |
    |
 note: This is an unsafe fix and may change runtime behavior

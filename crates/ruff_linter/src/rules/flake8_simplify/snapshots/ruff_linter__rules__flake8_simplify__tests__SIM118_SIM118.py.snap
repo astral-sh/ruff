@@ -13,10 +13,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   |
 help: Remove `.keys()`
   |
-2 |
-  - key in obj.keys()  # SIM118
+3 - key in obj.keys()  # SIM118
 3 + key in obj  # SIM118
-4 |
   |
 
 SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
@@ -31,10 +29,8 @@ SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
   |
 help: Remove `.keys()`
   |
-4 |
-  - key not in obj.keys()  # SIM118
+5 - key not in obj.keys()  # SIM118
 5 + key not in obj  # SIM118
-6 |
   |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -49,10 +45,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   |
 help: Remove `.keys()`
   |
-6 |
-  - foo["bar"] in obj.keys()  # SIM118
+7 - foo["bar"] in obj.keys()  # SIM118
 7 + foo["bar"] in obj  # SIM118
-8 |
   |
 
 SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
@@ -66,12 +60,10 @@ SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
 11 | foo['bar'] in obj.keys()  # SIM118
    |
 help: Remove `.keys()`
-   |
-8  |
-   - foo["bar"] not in obj.keys()  # SIM118
-9  + foo["bar"] not in obj  # SIM118
-10 |
-   |
+  |
+9 - foo["bar"] not in obj.keys()  # SIM118
+9 + foo["bar"] not in obj  # SIM118
+  |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
   --> SIM118.py:11:1
@@ -85,10 +77,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-10 |
-   - foo['bar'] in obj.keys()  # SIM118
+11 - foo['bar'] in obj.keys()  # SIM118
 11 + foo['bar'] in obj  # SIM118
-12 |
    |
 
 SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
@@ -103,10 +93,8 @@ SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
    |
 help: Remove `.keys()`
    |
-12 |
-   - foo['bar'] not in obj.keys()  # SIM118
+13 - foo['bar'] not in obj.keys()  # SIM118
 13 + foo['bar'] not in obj  # SIM118
-14 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -121,10 +109,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-14 |
-   - foo() in obj.keys()  # SIM118
+15 - foo() in obj.keys()  # SIM118
 15 + foo() in obj  # SIM118
-16 |
    |
 
 SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
@@ -139,10 +125,8 @@ SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
    |
 help: Remove `.keys()`
    |
-16 |
-   - foo() not in obj.keys()  # SIM118
+17 - foo() not in obj.keys()  # SIM118
 17 + foo() not in obj  # SIM118
-18 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -156,10 +140,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-18 |
-   - for key in obj.keys():  # SIM118
+19 - for key in obj.keys():  # SIM118
 19 + for key in obj:  # SIM118
-20 |     pass
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -174,10 +156,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-25 |
-   - [k for k in obj.keys()]  # SIM118
+26 - [k for k in obj.keys()]  # SIM118
 26 + [k for k in obj]  # SIM118
-27 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -192,10 +172,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-27 |
-   - {k for k in obj.keys()}  # SIM118
+28 - {k for k in obj.keys()}  # SIM118
 28 + {k for k in obj}  # SIM118
-29 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -210,10 +188,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-29 |
-   - {k: k for k in obj.keys()}  # SIM118
+30 - {k: k for k in obj.keys()}  # SIM118
 30 + {k: k for k in obj}  # SIM118
-31 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -228,10 +204,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-31 |
-   - (k for k in obj.keys())  # SIM118
+32 - (k for k in obj.keys())  # SIM118
 32 + (k for k in obj)  # SIM118
-33 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -246,10 +220,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-33 |
-   - key in (obj or {}).keys()  # SIM118
+34 - key in (obj or {}).keys()  # SIM118
 34 + key in (obj or {})  # SIM118
-35 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -265,10 +237,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-35 |
-   - (key) in (obj or {}).keys()  # SIM118
+36 - (key) in (obj or {}).keys()  # SIM118
 36 + (key) in (obj or {})  # SIM118
-37 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -283,10 +253,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-49 | # Regression test for: https://github.com/astral-sh/ruff/issues/7124
-   - key in obj.keys()and foo
+50 - key in obj.keys()and foo
 50 + key in obj and foo
-51 | (key in obj.keys())and foo
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -300,10 +268,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-50 | key in obj.keys()and foo
-   - (key in obj.keys())and foo
+51 - (key in obj.keys())and foo
 51 + (key in obj)and foo
-52 | key in (obj.keys())and foo
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -318,10 +284,8 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-51 | (key in obj.keys())and foo
-   - key in (obj.keys())and foo
+52 - key in (obj.keys())and foo
 52 + key in (obj)and foo
-53 |
    |
 
 SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
@@ -339,10 +303,7 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    |
 help: Remove `.keys()`
    |
-57 |         .stations[0]
-   -         .keys()
-58 +         
-59 | ):
+58 -         .keys()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -354,7 +315,6 @@ SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
    | ^^^^^^^^^^^^^^^
 help: Remove `.keys()`
    |
-64 | d = SneakyDict()
-   - key in d.keys()  # SIM118
+65 - key in d.keys()  # SIM118
 65 + key in d  # SIM118
    |

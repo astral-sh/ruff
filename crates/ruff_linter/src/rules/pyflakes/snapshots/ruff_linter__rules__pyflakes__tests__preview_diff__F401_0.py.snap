@@ -22,9 +22,7 @@ F401 [*] `multiprocessing.process` imported but unused
    |
 help: Remove unused import: `multiprocessing.process`
    |
-9  | import multiprocessing.pool
-   - import multiprocessing.process
-10 | import logging.config
+10 - import multiprocessing.process
    |
 
 
@@ -40,7 +38,5 @@ F401 [*] `logging.config` imported but unused
    |
 help: Remove unused import: `logging.config`
    |
-10 | import multiprocessing.process
-   - import logging.config
-11 | import logging.handlers
+11 - import logging.config
    |

@@ -9,10 +9,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
   |             ^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `deque()`
   |
-5 | def f():
-  -     queue = collections.deque([])  # RUF037
+6 -     queue = collections.deque([])  # RUF037
 6 +     queue = collections.deque()  # RUF037
-7 |
   |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -23,10 +21,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `deque(maxlen=...)`
    |
-9  | def f():
-   -     queue = collections.deque([], maxlen=10)  # RUF037
+10 -     queue = collections.deque([], maxlen=10)  # RUF037
 10 +     queue = collections.deque(maxlen=10)  # RUF037
-11 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -37,10 +33,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^
 help: Replace with `deque()`
    |
-13 | def f():
-   -     queue = deque([])  # RUF037
+14 -     queue = deque([])  # RUF037
 14 +     queue = deque()  # RUF037
-15 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -51,10 +45,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^
 help: Replace with `deque()`
    |
-17 | def f():
-   -     queue = deque(())  # RUF037
+18 -     queue = deque(())  # RUF037
 18 +     queue = deque()  # RUF037
-19 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -65,10 +57,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^
 help: Replace with `deque()`
    |
-21 | def f():
-   -     queue = deque({})  # RUF037
+22 -     queue = deque({})  # RUF037
 22 +     queue = deque()  # RUF037
-23 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -79,10 +69,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^^^^
 help: Replace with `deque()`
    |
-25 | def f():
-   -     queue = deque(set())  # RUF037
+26 -     queue = deque(set())  # RUF037
 26 +     queue = deque()  # RUF037
-27 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -93,10 +81,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `deque(maxlen=...)`
    |
-29 | def f():
-   -     queue = collections.deque([], maxlen=10)  # RUF037
+30 -     queue = collections.deque([], maxlen=10)  # RUF037
 30 +     queue = collections.deque(maxlen=10)  # RUF037
-31 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -107,10 +93,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |             ^^^^^^^^^^^
 help: Replace with `deque()`
    |
-60 | def f():
-   -     x = 0 or(deque)([])
+61 -     x = 0 or(deque)([])
 61 +     x = 0 or(deque)()
-62 |
    |
 
 RUF037 Unnecessary empty iterable within a deque call
@@ -136,10 +120,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |
 help: Replace with `deque()`
    |
-66 |     deque([], *[10])  # RUF037 but no fix
-   -     deque([], **{"maxlen": 10})  # RUF037
+67 -     deque([], **{"maxlen": 10})  # RUF037
 67 +     deque(**{"maxlen": 10})  # RUF037
-68 |     deque([], foo=1)  # RUF037
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -152,10 +134,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |     ^^^^^^^^^^^^^^^^
 help: Replace with `deque()`
    |
-67 |     deque([], **{"maxlen": 10})  # RUF037
-   -     deque([], foo=1)  # RUF037
+68 -     deque([], foo=1)  # RUF037
 68 +     deque(foo=1)  # RUF037
-69 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -172,14 +152,12 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    | |_________^
 help: Replace with `deque(maxlen=...)`
    |
-79 | def f():
-   -     deque(  # a comment in deque, deleted
-   -         [  # a comment _in_ the list, deleted
-   -         ],  # a comment after the list, deleted
-   -         maxlen=10,  # a comment on maxlen, deleted
-   -         )  # only this is preserved
+80 -     deque(  # a comment in deque, deleted
+81 -         [  # a comment _in_ the list, deleted
+82 -         ],  # a comment after the list, deleted
+83 -         maxlen=10,  # a comment on maxlen, deleted
+84 -         )  # only this is preserved
 80 +     deque(maxlen=10)  # only this is preserved
-81 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -192,10 +170,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |     ^^^^^^^^^^^^^
 help: Replace with `deque(maxlen=...)`
    |
-88 | def f():
-   -     deque([], 10)
+89 -     deque([], 10)
 89 +     deque(maxlen=10)
-90 |
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -209,10 +185,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |
 help: Replace with `deque()`
    |
-92 | def f():
-   -     deque([], iterable=[])
+93 -     deque([], iterable=[])
 93 +     deque([])
-94 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -227,10 +201,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |
 help: Replace with `deque()`
    |
-95 | # https://github.com/astral-sh/ruff/issues/18854
-   - deque("")
+96 - deque("")
 96 + deque()
-97 | deque(b"")
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -245,10 +217,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
    |
 help: Replace with `deque()`
    |
-96 | deque("")
-   - deque(b"")
+97 - deque(b"")
 97 + deque()
-98 | deque(f"")
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -263,10 +233,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
     |
 help: Replace with `deque()`
    |
-97 | deque(b"")
-   - deque(f"")
+98 - deque(f"")
 98 + deque()
-99 | deque(f"" "")
    |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -280,12 +248,10 @@ RUF037 [*] Unnecessary empty iterable within a deque call
 101 | deque("abc") # OK
     |
 help: Replace with `deque()`
-    |
-98  | deque(f"")
-    - deque(f"" "")
-99  + deque()
-100 | deque(f"" f"")
-    |
+   |
+99 - deque(f"" "")
+99 + deque()
+   |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
    --> RUF037.py:100:1
@@ -299,10 +265,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
     |
 help: Replace with `deque()`
     |
-99  | deque(f"" "")
-    - deque(f"" f"")
+100 - deque(f"" f"")
 100 + deque()
-101 | deque("abc") # OK
     |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -316,10 +280,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
     |
 help: Replace with `deque()`
     |
-106 | # https://github.com/astral-sh/ruff/issues/19951
-    - deque(t"")
+107 - deque(t"")
 107 + deque()
-108 | deque(t""  t"")
     |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -333,10 +295,8 @@ RUF037 [*] Unnecessary empty iterable within a deque call
     |
 help: Replace with `deque()`
     |
-107 | deque(t"")
-    - deque(t""  t"")
+108 - deque(t""  t"")
 108 + deque()
-109 | deque(t"{""}") # OK
     |
 
 RUF037 [*] Unnecessary empty iterable within a deque call
@@ -350,8 +310,6 @@ RUF037 [*] Unnecessary empty iterable within a deque call
     |
 help: Replace with `deque()`
     |
-111 | # https://github.com/astral-sh/ruff/issues/20050
-    - deque(f"{""}")  # RUF037
+112 - deque(f"{""}")  # RUF037
 112 + deque()  # RUF037
-113 |
     |

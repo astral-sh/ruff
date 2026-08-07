@@ -11,8 +11,7 @@ ERA001 [*] Found commented-out code
   |
 help: Remove commented-out code
   |
-  - #import os
-1 | # from foo import junk
+1 - #import os
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -27,9 +26,7 @@ ERA001 [*] Found commented-out code
   |
 help: Remove commented-out code
   |
-1 | #import os
-  - # from foo import junk
-2 | #a = 3
+2 - # from foo import junk
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -45,9 +42,7 @@ ERA001 [*] Found commented-out code
   |
 help: Remove commented-out code
   |
-2 | # from foo import junk
-  - #a = 3
-3 | a = 4
+3 - #a = 3
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -63,9 +58,7 @@ ERA001 [*] Found commented-out code
   |
 help: Remove commented-out code
   |
-4 | a = 4
-  - #foo(1, 2, 3)
-5 |
+5 - #foo(1, 2, 3)
   |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -80,9 +73,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-12 |     # # This is a (nested) comment.
-   -     #return True
-13 |     return False
+13 -     #return True
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -95,9 +86,7 @@ ERA001 [*] Found commented-out code
    |     ^^^^^^^
 help: Remove commented-out code
    |
-20 |     pass
-   -     # b = c
-21 |
+21 -     # b = c
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -113,9 +102,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-25 |     # "key1": 123,  # noqa: ERA001
-   -     # "key2": 456,
-26 |     # "key3": 789,  # test
+26 -     # "key2": 456,
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -130,9 +117,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-26 |     # "key2": 456,
-   -     # "key3": 789,  # test
-27 | }
+27 -     # "key3": 789,  # test
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -148,9 +133,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-31 |
-   - # case 1:
-32 | # try:
+32 - # case 1:
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -165,9 +148,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-32 | # case 1:
-   - # try:
-33 | # try:  # with comment
+33 - # try:
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -183,9 +164,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-33 | # try:
-   - # try:  # with comment
-34 | # try: print()
+34 - # try:  # with comment
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -201,9 +180,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-34 | # try:  # with comment
-   - # try: print()
-35 | # except:
+35 - # try: print()
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -219,9 +196,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-35 | # try: print()
-   - # except:
-36 | # except Foo:
+36 - # except:
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -236,9 +211,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-36 | # except:
-   - # except Foo:
-37 | # except Exception as e: print(e)
+37 - # except Foo:
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -251,9 +224,7 @@ ERA001 [*] Found commented-out code
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove commented-out code
    |
-37 | # except Foo:
-   - # except Exception as e: print(e)
-38 |
+38 - # except Exception as e: print(e)
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -268,9 +239,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-43 | # requires-python = ">=3.11"
-   - # dependencies = [
-44 | #   "requests<3",
+44 - # dependencies = [
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -285,9 +254,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-46 | #   "rich",
-   - # ]
-47 | # ///
+47 - # ]
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -303,9 +270,7 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-74 | # requires-python = ">=3.11"
-   - # dependencies = [
-75 | #   "requests<3",
+75 - # dependencies = [
    |
 note: This is a display-only fix and is likely to be incorrect
 
@@ -321,8 +286,6 @@ ERA001 [*] Found commented-out code
    |
 help: Remove commented-out code
    |
-77 | #   "rich",
-   - # ]
-78 |
+78 - # ]
    |
 note: This is a display-only fix and is likely to be incorrect

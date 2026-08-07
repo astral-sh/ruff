@@ -14,10 +14,8 @@ RUF047 [*] Empty `else` clause
    |
 help: Remove the `else` clause
   |
-6 |     pass
-  - else:
-  -     pass
-7 | finally:
+7 - else:
+8 -     pass
   |
 
 RUF072 [*] Empty `finally` clause
@@ -29,8 +27,7 @@ RUF072 [*] Empty `finally` clause
 10 | |     pass
    | |________^
 help: Remove the `finally` clause
-  |
-8 |     pass
-  - finally:
-  -     pass
-  |
+   |
+ 9 - finally:
+10 -     pass
+   |

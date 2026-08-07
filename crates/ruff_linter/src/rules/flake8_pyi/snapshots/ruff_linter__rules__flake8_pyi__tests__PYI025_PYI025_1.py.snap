@@ -9,11 +9,8 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |                                 ^^^
 help: Alias `Set` to `AbstractSet`
    |
-9  | def f():
-   -     from collections.abc import Set  # PYI025
-10 +     from collections.abc import Set as AbstractSet  # PYI025
-11 |
-   |
+10 |     from collections.abc import Set as AbstractSet  # PYI025
+   |                                     ++++++++++++++
 
 PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
   --> PYI025_1.py:14:51
@@ -26,14 +23,10 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
    |
-13 | def f():
-   -     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-14 +     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
+14 ~     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
 15 |
-   -     GLOBAL: Set[int] = set()
-16 +     GLOBAL: AbstractSet[int] = set()
+16 ~     GLOBAL: AbstractSet[int] = set()
 17 |
 18 |     class Class:
-   -         member: Set[int]
-19 +         member: AbstractSet[int]
+19 ~         member: AbstractSet[int]
    |

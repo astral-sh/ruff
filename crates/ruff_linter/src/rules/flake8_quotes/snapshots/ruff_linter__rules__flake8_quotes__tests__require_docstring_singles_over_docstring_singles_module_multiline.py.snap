@@ -15,13 +15,9 @@ Q001 [*] Single quote multiline found but double quotes preferred
   |
 help: Replace single multiline quotes with double quotes
   |
-3 | '''
-  - '''
 4 + """
-5 | this is not a docstring
-  - '''
+5 + this is not a docstring
 6 + """
-7 | def foo():
   |
 
 Q001 [*] Single quote multiline found but double quotes preferred
@@ -35,10 +31,7 @@ Q001 [*] Single quote multiline found but double quotes preferred
    | |___^
 help: Replace single multiline quotes with double quotes
    |
-8  |     pass
-   - '''
-9  + """
-10 | this is not a docstring
-   - '''
+ 9 + """
+10 + this is not a docstring
 11 + """
    |

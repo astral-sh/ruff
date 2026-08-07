@@ -9,8 +9,6 @@ F401 [*] `pathlib.PurePath` imported but unused
   |                           ^^^^^^^^
 help: Remove unused import: `pathlib.PurePath`
   |
-3 | from typing import List
-  - from pathlib import Path, PurePath
+4 - from pathlib import Path, PurePath
 4 + from pathlib import Path
-5 |
   |

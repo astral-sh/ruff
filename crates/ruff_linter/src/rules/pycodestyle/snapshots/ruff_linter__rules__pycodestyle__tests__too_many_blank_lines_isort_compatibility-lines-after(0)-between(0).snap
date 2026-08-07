@@ -12,14 +12,8 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________________________^
 help: Organize imports
   |
-1 | import json
-  -
-  -
-  -
-2 | from typing import Any, Sequence
-  -
-  -
-3 | class MissingCommand(TypeError): ...  # noqa: N818
+1 + import json
+2 + from typing import Any, Sequence
   |
 
 E303 [*] Too many blank lines (3)
@@ -28,10 +22,9 @@ E303 [*] Too many blank lines (3)
 5 | from typing import Any, Sequence
   | ^^^^
 help: Remove extraneous blank line(s)
-  |
-3 |
-  -
-4 | from typing import Any, Sequence
+2 - 
+3 - 
+4 - 
   |
 
 E303 [*] Too many blank lines (2)
@@ -40,11 +33,8 @@ E303 [*] Too many blank lines (2)
 8 | class MissingCommand(TypeError): ...  # noqa: N818
   | ^^^^^
 help: Remove extraneous blank line(s)
-  |
-5 | from typing import Any, Sequence
-  -
-  -
-6 | class MissingCommand(TypeError): ...  # noqa: N818
+6 - 
+7 - 
   |
 
 E303 [*] Too many blank lines (2)
@@ -56,10 +46,8 @@ E303 [*] Too many blank lines (2)
 23 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
 help: Remove extraneous blank line(s)
-   |
-19 |
-   -
-20 |     abcd.foo()
+19 - 
+20 - 
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -74,10 +62,9 @@ I001 [*] Import block is un-sorted or un-formatted
    | |___________________________________________^
 help: Organize imports
    |
-27 |
-   -
-   -
-28 |     from typing_extensions import TypeAlias
+26 +     import os
+27 + 
+28 +     from typing_extensions import TypeAlias
    |
 
 E303 [*] Too many blank lines (3)
@@ -86,11 +73,9 @@ E303 [*] Too many blank lines (3)
 30 |     from typing_extensions import TypeAlias
    |     ^^^^
 help: Remove extraneous blank line(s)
-   |
-27 |
-   -
-   -
-28 |     from typing_extensions import TypeAlias
+27 - 
+28 - 
+29 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -102,10 +87,8 @@ E303 [*] Too many blank lines (2)
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
 help: Remove extraneous blank line(s)
-   |
-31 |
-   -
-32 |     abcd.foo()
+31 - 
+32 - 
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -118,9 +101,7 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
    |
-60 | from typing import Any, Sequence
-   -
-61 | class MissingCommand(TypeError): ...  # noqa: N818
+60 + from typing import Any, Sequence
    |
 
 E303 [*] Too many blank lines (1)
@@ -131,8 +112,5 @@ E303 [*] Too many blank lines (1)
 62 | class MissingCommand(TypeError): ...  # noqa: N818
    | ^^^^^
 help: Remove extraneous blank line(s)
-   |
-60 | from typing import Any, Sequence
-   -
-61 | class MissingCommand(TypeError): ...  # noqa: N818
+61 - 
    |

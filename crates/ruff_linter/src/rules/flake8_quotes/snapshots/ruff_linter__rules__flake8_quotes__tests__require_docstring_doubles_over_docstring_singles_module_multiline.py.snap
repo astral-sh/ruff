@@ -13,10 +13,7 @@ Q002 [*] Single quote docstring found but double quotes preferred
   |
 help: Replace single quotes docstring with double quotes
   |
-  - '''
 1 + """
-2 | Double quotes multiline module docstring
-  - '''
+2 + Double quotes multiline module docstring
 3 + """
-4 | '''
   |

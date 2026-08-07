@@ -10,10 +10,8 @@ UP045 [*] Use `X | None` for type annotations
   |
 help: Convert to `X | None`
   |
-4 |
-  - def f(x: Optional[str]) -> None:
+5 - def f(x: Optional[str]) -> None:
 5 + def f(x: str | None) -> None:
-6 |     ...
   |
 
 UP045 [*] Use `X | None` for type annotations
@@ -24,9 +22,7 @@ UP045 [*] Use `X | None` for type annotations
 10 |     ...
    |
 help: Convert to `X | None`
-   |
-8  |
-   - def f(x: typing.Optional[str]) -> None:
-9  + def f(x: str | None) -> None:
-10 |     ...
-   |
+  |
+9 - def f(x: typing.Optional[str]) -> None:
+9 + def f(x: str | None) -> None:
+  |

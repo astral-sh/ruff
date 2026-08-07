@@ -13,11 +13,8 @@ TC004 [*] Move import `foo.Foo` out of type-checking block. Import is used for m
   |                --- Used at runtime here
 help: Move out of type-checking block
   |
-4 | from typing import TYPE_CHECKING, TypeAlias
 5 + from foo import Foo
 6 | if TYPE_CHECKING:
-  -     from foo import Foo  # TC004
-7 +     pass  # TC004
-8 |
+7 ~     pass  # TC004
   |
 note: This is an unsafe fix and may change runtime behavior

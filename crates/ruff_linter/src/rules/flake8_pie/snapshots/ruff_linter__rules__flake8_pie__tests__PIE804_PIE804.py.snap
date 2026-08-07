@@ -11,9 +11,8 @@ PIE804 [*] Unnecessary `dict` kwargs
   |
 help: Remove unnecessary kwargs
   |
-  - foo(**{"bar": True})  # PIE804
+1 - foo(**{"bar": True})  # PIE804
 1 + foo(bar=True)  # PIE804
-2 |
   |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -28,10 +27,8 @@ PIE804 [*] Unnecessary `dict` kwargs
   |
 help: Remove unnecessary kwargs
   |
-2 |
-  - foo(**{"r2d2": True})  # PIE804
+3 - foo(**{"r2d2": True})  # PIE804
 3 + foo(r2d2=True)  # PIE804
-4 |
   |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -46,10 +43,8 @@ PIE804 [*] Unnecessary `dict` kwargs
   |
 help: Remove unnecessary kwargs
   |
-4 |
-  - Foo.objects.create(**{"bar": True})  # PIE804
+5 - Foo.objects.create(**{"bar": True})  # PIE804
 5 + Foo.objects.create(bar=True)  # PIE804
-6 |
   |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -64,10 +59,8 @@ PIE804 [*] Unnecessary `dict` kwargs
   |
 help: Remove unnecessary kwargs
   |
-6 |
-  - Foo.objects.create(**{"_id": some_id})  # PIE804
+7 - Foo.objects.create(**{"_id": some_id})  # PIE804
 7 + Foo.objects.create(_id=some_id)  # PIE804
-8 |
   |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -81,12 +74,10 @@ PIE804 [*] Unnecessary `dict` kwargs
 11 | foo(**{})
    |
 help: Remove unnecessary kwargs
-   |
-8  |
-   - Foo.objects.create(**{**bar})  # PIE804
-9  + Foo.objects.create(**bar)  # PIE804
-10 |
-   |
+  |
+9 - Foo.objects.create(**{**bar})  # PIE804
+9 + Foo.objects.create(**bar)  # PIE804
+  |
 
 PIE804 [*] Unnecessary `dict` kwargs
   --> PIE804.py:11:5
@@ -100,10 +91,8 @@ PIE804 [*] Unnecessary `dict` kwargs
    |
 help: Remove unnecessary kwargs
    |
-10 |
-   - foo(**{})
+11 - foo(**{})
 11 + foo()
-12 |
    |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -118,10 +107,8 @@ PIE804 [*] Unnecessary `dict` kwargs
    |
 help: Remove unnecessary kwargs
    |
-21 | abc(**{"for": 3})
-   - foo(**{},)
+22 - foo(**{},)
 22 + foo()
-23 |
    |
 
 PIE804 Unnecessary `dict` kwargs
@@ -168,10 +155,8 @@ PIE804 [*] Unnecessary `dict` kwargs
    |
 help: Remove unnecessary kwargs
    |
-25 | abc(**{'a': b}, **{'a': c})  # PIE804
-   - abc(a=1, **{'a': c}, **{'b': c})  # PIE804
+26 - abc(a=1, **{'a': c}, **{'b': c})  # PIE804
 26 + abc(a=1, **{'a': c}, b=c)  # PIE804
-27 |
    |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -185,10 +170,8 @@ PIE804 [*] Unnecessary `dict` kwargs
    |
 help: Remove unnecessary kwargs
    |
-29 | def foo():
-   -     abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+30 -     abc(foo=1, **{'bar': (bar := 1)})  # PIE804
 30 +     abc(foo=1, bar=(bar := 1))  # PIE804
-31 |     abc(foo=1, **{'bar': (yield 1)})  # PIE804
    |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -203,10 +186,8 @@ PIE804 [*] Unnecessary `dict` kwargs
    |
 help: Remove unnecessary kwargs
    |
-30 |     abc(foo=1, **{'bar': (bar := 1)})  # PIE804
-   -     abc(foo=1, **{'bar': (yield 1)})  # PIE804
+31 -     abc(foo=1, **{'bar': (yield 1)})  # PIE804
 31 +     abc(foo=1, bar=(yield 1))  # PIE804
-32 |
    |
 
 PIE804 [*] Unnecessary `dict` kwargs
@@ -225,14 +206,12 @@ PIE804 [*] Unnecessary `dict` kwargs
    |
 help: Remove unnecessary kwargs
    |
-35 | foo(
-   -     **{
-   -         # Comment 1
-   -         "x": 1.0,
-   -         # Comment 2
-   -         "y": 2.0,
-   -     }
+36 -     **{
+37 -         # Comment 1
+38 -         "x": 1.0,
+39 -         # Comment 2
+40 -         "y": 2.0,
+41 -     }
 36 +     x=1.0, y=2.0
-37 | )
    |
 note: This is an unsafe fix and may change runtime behavior

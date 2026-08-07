@@ -47,10 +47,8 @@ AIR321 [*] `airflow.utils.task_group.TaskGroup` is moved in Airflow 3.1
    |
 help: `TaskGroup` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-17 | # airflow.utils.task_group
-   - from airflow.utils.task_group import TaskGroup
-18 + from airflow.sdk import TaskGroup
-19 |
+18 + 
+19 + from airflow.sdk import TaskGroup
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -66,13 +64,15 @@ AIR321 [*] `airflow.utils.timezone.coerce_datetime` is moved in Airflow 3.1
    |
 help: `coerce_datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-24 | from airflow.utils.timezone import (
-   -     coerce_datetime,
-25 |     convert_to_utc,
---------------------------------------------------------------------------------
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     convert_to_utc,
+26 +     datetime,
+27 +     make_naive,
+28 +     parse,
+29 +     utc,
+30 +     utcnow,
+31 + )
 32 + from airflow.sdk.timezone import coerce_datetime
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -87,13 +87,15 @@ AIR321 [*] `airflow.utils.timezone.convert_to_utc` is moved in Airflow 3.1
    |
 help: `convert_to_utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-25 |     coerce_datetime,
-   -     convert_to_utc,
-26 |     datetime,
---------------------------------------------------------------------------------
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     coerce_datetime,
+26 +     datetime,
+27 +     make_naive,
+28 +     parse,
+29 +     utc,
+30 +     utcnow,
+31 + )
 32 + from airflow.sdk.timezone import convert_to_utc
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -109,13 +111,15 @@ AIR321 [*] `airflow.utils.timezone.datetime` is moved in Airflow 3.1
    |
 help: `datetime` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-26 |     convert_to_utc,
-   -     datetime,
-27 |     make_naive,
---------------------------------------------------------------------------------
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     coerce_datetime,
+26 +     convert_to_utc,
+27 +     make_naive,
+28 +     parse,
+29 +     utc,
+30 +     utcnow,
+31 + )
 32 + from airflow.sdk.timezone import datetime
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -131,14 +135,15 @@ AIR321 [*] `airflow.utils.timezone.make_naive` is moved in Airflow 3.1
    |
 help: `make_naive` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-27 |     datetime,
-   -     make_naive,
-28 |     parse,
-29 |     utc,
-30 |     utcnow,
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     coerce_datetime,
+26 +     convert_to_utc,
+27 +     datetime,
+28 +     parse,
+29 +     utc,
+30 +     utcnow,
+31 + )
 32 + from airflow.sdk.timezone import make_naive
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -154,13 +159,15 @@ AIR321 [*] `airflow.utils.timezone.parse` is moved in Airflow 3.1
    |
 help: `parse` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-28 |     make_naive,
-   -     parse,
-29 |     utc,
-30 |     utcnow,
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     coerce_datetime,
+26 +     convert_to_utc,
+27 +     datetime,
+28 +     make_naive,
+29 +     utc,
+30 +     utcnow,
+31 + )
 32 + from airflow.sdk.timezone import parse
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -175,12 +182,15 @@ AIR321 [*] `airflow.utils.timezone.utc` is moved in Airflow 3.1
    |
 help: `utc` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-29 |     parse,
-   -     utc,
-30 |     utcnow,
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     coerce_datetime,
+26 +     convert_to_utc,
+27 +     datetime,
+28 +     make_naive,
+29 +     parse,
+30 +     utcnow,
+31 + )
 32 + from airflow.sdk.timezone import utc
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -196,11 +206,15 @@ AIR321 [*] `airflow.utils.timezone.utcnow` is moved in Airflow 3.1
    |
 help: `utcnow` has been moved to `airflow.sdk.timezone` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-30 |     utc,
-   -     utcnow,
-31 | )
+24 + from airflow.utils.timezone import (
+25 +     coerce_datetime,
+26 +     convert_to_utc,
+27 +     datetime,
+28 +     make_naive,
+29 +     parse,
+30 +     utc,
+31 + )
 32 + from airflow.sdk.timezone import utcnow
-33 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -272,10 +286,8 @@ AIR321 [*] `airflow.models.baseoperator.BaseOperator` is moved in Airflow 3.1
    |
 help: `BaseOperator` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-64 | # airflow.models.baseoperator
-   - from airflow.models.baseoperator import BaseOperator
-65 + from airflow.sdk import BaseOperator
-66 |
+65 + 
+66 + from airflow.sdk import BaseOperator
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -291,14 +303,12 @@ AIR321 [*] `airflow.macros.ds_add` is moved in Airflow 3.1
    |
 help: `ds_add` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
    |
-70 | from airflow.macros import (
-   -     ds_add,
-71 |     ds_format,
-72 |     datetime_diff_for_humans,
-73 |     ds_format_locale,
-74 | )
+70 + from airflow.macros import (
+71 +     ds_format,
+72 +     datetime_diff_for_humans,
+73 +     ds_format_locale,
+74 + )
 75 + from airflow.sdk.execution_time.macros import ds_add
-76 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -313,13 +323,12 @@ AIR321 [*] `airflow.macros.ds_format` is moved in Airflow 3.1
    |
 help: `ds_format` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
    |
-71 |     ds_add,
-   -     ds_format,
-72 |     datetime_diff_for_humans,
-73 |     ds_format_locale,
-74 | )
+70 + from airflow.macros import (
+71 +     ds_add,
+72 +     datetime_diff_for_humans,
+73 +     ds_format_locale,
+74 + )
 75 + from airflow.sdk.execution_time.macros import ds_format
-76 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -335,12 +344,12 @@ AIR321 [*] `airflow.macros.datetime_diff_for_humans` is moved in Airflow 3.1
    |
 help: `datetime_diff_for_humans` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
    |
-72 |     ds_format,
-   -     datetime_diff_for_humans,
-73 |     ds_format_locale,
-74 | )
+70 + from airflow.macros import (
+71 +     ds_add,
+72 +     ds_format,
+73 +     ds_format_locale,
+74 + )
 75 + from airflow.sdk.execution_time.macros import datetime_diff_for_humans
-76 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -356,11 +365,12 @@ AIR321 [*] `airflow.macros.ds_format_locale` is moved in Airflow 3.1
    |
 help: `ds_format_locale` has been moved to `airflow.sdk.execution_time.macros` since Airflow 3.1. Requires `apache-airflow-task-sdk>=1.1.0,<=1.1.6`. For `apache-airflow-task-sdk>=1.1.7`, import from `airflow.sdk` instead.
    |
-73 |     datetime_diff_for_humans,
-   -     ds_format_locale,
-74 | )
+70 + from airflow.macros import (
+71 +     ds_add,
+72 +     ds_format,
+73 +     datetime_diff_for_humans,
+74 + )
 75 + from airflow.sdk.execution_time.macros import ds_format_locale
-76 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -376,13 +386,11 @@ AIR321 [*] `airflow.io.get_fs` is moved in Airflow 3.1
    |
 help: `get_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-86 | from airflow.io import (
-   -     get_fs,
-87 |     has_fs,
-88 |     Properties,
-89 | )
+86 + from airflow.io import (
+87 +     has_fs,
+88 +     Properties,
+89 + )
 90 + from airflow.sdk.io import get_fs
-91 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -396,12 +404,11 @@ AIR321 [*] `airflow.io.has_fs` is moved in Airflow 3.1
    |
 help: `has_fs` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-87 |     get_fs,
-   -     has_fs,
-88 |     Properties,
-89 | )
+86 + from airflow.io import (
+87 +     get_fs,
+88 +     Properties,
+89 + )
 90 + from airflow.sdk.io import has_fs
-91 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -417,11 +424,11 @@ AIR321 [*] `airflow.io.Properties` is moved in Airflow 3.1
    |
 help: `Properties` has been moved to `airflow.sdk.io` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-88 |     has_fs,
-   -     Properties,
-89 | )
+86 + from airflow.io import (
+87 +     get_fs,
+88 +     has_fs,
+89 + )
 90 + from airflow.sdk.io import Properties
-91 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -437,10 +444,8 @@ AIR321 [*] `airflow.secrets.cache.SecretCache` is moved in Airflow 3.1
     |
 help: `SecretCache` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
    |
-96 | # airflow.secrets.cache
-   - from airflow.secrets.cache import SecretCache
-97 + from airflow.sdk import SecretCache
-98 | SecretCache()
+97 + 
+98 + from airflow.sdk import SecretCache
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -453,9 +458,7 @@ AIR321 [*] `airflow.hooks.base.BaseHook` is moved in Airflow 3.1
     | ^^^^^^^^
 help: `BaseHook` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
     |
-100 | # airflow.hooks
-    - from airflow.hooks.base import BaseHook
-101 + from airflow.sdk import BaseHook
-102 | BaseHook()
+101 + 
+102 + from airflow.sdk import BaseHook
     |
 note: This is an unsafe fix and may change runtime behavior

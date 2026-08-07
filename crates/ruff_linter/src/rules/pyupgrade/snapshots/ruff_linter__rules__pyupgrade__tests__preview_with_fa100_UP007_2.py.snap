@@ -20,7 +20,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,7 +34,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,7 +48,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -71,9 +68,7 @@ help: Convert to `X | Y`
 3 | from typing import Union
 4 |
 5 |
-  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
-6 + def f(x: str | int | Union[float, bytes]) -> None:
-7 |     ...
+6 ~ def f(x: str | int | Union[float, bytes]) -> None:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -92,9 +87,7 @@ help: Convert to `X | Y`
 3 | from typing import Union
 4 |
 5 |
-  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
-6 + def f(x: Union[str, int, float | bytes]) -> None:
-7 |     ...
+6 ~ def f(x: Union[str, int, float | bytes]) -> None:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,12 +101,11 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-1  + from __future__ import annotations
-2  | import typing
---------------------------------------------------------------------------------
-9  |
-   - def f(x: typing.Union[str, int]) -> None:
-10 + def f(x: str | int) -> None:
-11 |     ...
+ 1 + from __future__ import annotations
+ 2 | import typing
+ 3 | from typing import Union
+ …
+ 9 |
+10 ~ def f(x: str | int) -> None:
    |
 note: This is an unsafe fix and may change runtime behavior

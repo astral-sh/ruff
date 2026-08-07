@@ -16,9 +16,5 @@ help: Organize imports
 2 + import datetime as dt
 3 + from datetime import timedelta
 4 + from datetime import timezone as tz
-5 | import encodings
-  - from datetime import timezone as tz
-  - from datetime import timedelta
-  - import datetime as dt
-  - import datetime
+5 + import encodings
   |

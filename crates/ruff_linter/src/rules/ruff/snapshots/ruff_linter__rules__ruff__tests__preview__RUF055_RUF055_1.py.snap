@@ -12,12 +12,10 @@ RUF055 [*] Plain string pattern passed to `re` function
 11 | # aliases are not followed, so this one should not trigger the rule
    |
 help: Replace with `haystack.replace(pat1, "")`
-   |
-8  |
-   - re.sub(pat1, "", haystack)
-9  + haystack.replace(pat1, "")
-10 |
-   |
+  |
+9 - re.sub(pat1, "", haystack)
+9 + haystack.replace(pat1, "")
+  |
 
 RUF055 [*] Plain string pattern passed to `re` function
   --> RUF055_1.py:17:1
@@ -28,7 +26,6 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `haystack.replace(r"abc", repl)`
    |
-16 | repl = "new"
-   - re.sub(r"abc", repl, haystack)
+17 - re.sub(r"abc", repl, haystack)
 17 + haystack.replace(r"abc", repl)
    |

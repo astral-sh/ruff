@@ -12,9 +12,8 @@ D407 [*] Missing dashed underline after section ("Returns")
    |
 help: Add dashed line under "Returns"
    |
-44 |     Returns
+44 ~     Returns
 45 +     -------
-46 |     A value of some sort.
    |
 
 D407 [*] Missing dashed underline after section ("Returns")
@@ -29,9 +28,8 @@ D407 [*] Missing dashed underline after section ("Returns")
    |
 help: Add dashed line under "Returns"
    |
-56 |     Returns
+56 ~     Returns
 57 +     -------
-58 |
    |
 
 D407 [*] Missing dashed underline after section ("Returns")
@@ -43,11 +41,8 @@ D407 [*] Missing dashed underline after section ("Returns")
    |     ^^^^^^^
 help: Add dashed line under "Returns"
    |
-66 |
-   -     Returns"""
-67 +     Returns
-68 +     -------"""
-69 |
+67 ~     Returns
+68 ~     -------"""
    |
 
 D407 [*] Missing dashed underline after section ("Raises")
@@ -61,9 +56,8 @@ D407 [*] Missing dashed underline after section ("Raises")
     |
 help: Add dashed line under "Raises"
     |
-227 |     Raises:
+227 ~     Raises:
 228 +     ------
-229 |     My attention.
     |
 
 D407 [*] Missing dashed underline after section ("Parameters")
@@ -76,10 +70,8 @@ D407 [*] Missing dashed underline after section ("Parameters")
     |
 help: Add dashed line under "Parameters"
     |
-521 |     Parameters
-    -     ==========
+522 -     ==========
 522 +     ----------
-523 |     """
     |
 
 D407 [*] Missing dashed underline after section ("Parameters")
@@ -92,10 +84,8 @@ D407 [*] Missing dashed underline after section ("Parameters")
     |
 help: Add dashed line under "Parameters"
     |
-529 |     Parameters
-    -     ===========
+530 -     ===========
 530 +     ----------
-531 |     """
     |
 
 D407 [*] Missing dashed underline after section ("Parameters")
@@ -110,7 +100,6 @@ D407 [*] Missing dashed underline after section ("Parameters")
     |
 help: Add dashed line under "Parameters"
     |
-613 |    Parameters
+613 ~    Parameters
 614 +    ----------
-615 |    -‐-----------------
     |

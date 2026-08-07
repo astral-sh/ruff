@@ -10,10 +10,8 @@ UP007 [*] Use `X | Y` for type annotations
   |
 help: Convert to `X | Y`
   |
-4 |
-  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 5 + def f(x: str | int | Union[float, bytes]) -> None:
-6 |     ...
   |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -25,10 +23,8 @@ UP007 [*] Use `X | Y` for type annotations
   |
 help: Convert to `X | Y`
   |
-4 |
-  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 5 + def f(x: Union[str, int, float | bytes]) -> None:
-6 |     ...
   |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -39,9 +35,7 @@ UP007 [*] Use `X | Y` for type annotations
 10 |     ...
    |
 help: Convert to `X | Y`
-   |
-8  |
-   - def f(x: typing.Union[str, int]) -> None:
-9  + def f(x: str | int) -> None:
-10 |     ...
-   |
+  |
+9 - def f(x: typing.Union[str, int]) -> None:
+9 + def f(x: str | int) -> None:
+  |

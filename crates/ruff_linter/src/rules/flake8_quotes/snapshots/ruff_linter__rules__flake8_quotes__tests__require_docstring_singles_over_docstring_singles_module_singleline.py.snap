@@ -12,10 +12,8 @@ Q001 [*] Single quote multiline found but double quotes preferred
   |
 help: Replace single multiline quotes with double quotes
   |
-1 | ''' Double quotes singleline module docstring '''
-  - ''' this is not a docstring '''
+2 - ''' this is not a docstring '''
 2 + """ this is not a docstring """
-3 |
   |
 
 Q001 [*] Single quote multiline found but double quotes preferred
@@ -27,7 +25,6 @@ Q001 [*] Single quote multiline found but double quotes preferred
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace single multiline quotes with double quotes
   |
-5 |     pass
-  - ''' this is not a docstring '''
+6 - ''' this is not a docstring '''
 6 + """ this is not a docstring """
   |

@@ -13,10 +13,8 @@ D405 [*] Section name should be properly capitalized ("returns")
    |
 help: Capitalize "returns"
    |
-18 |
-   -     returns
+19 -     returns
 19 +     Returns
-20 |     -------
    |
 
 D405 [*] Section name should be properly capitalized ("Short summary")
@@ -30,10 +28,8 @@ D405 [*] Section name should be properly capitalized ("Short summary")
     |
 help: Capitalize "Short summary"
     |
-217 |
-    -     Short summary
+218 -     Short summary
 218 +     Short Summary
-219 |     -------------
     |
 
 D405 [*] Section name should be properly capitalized ("returns")
@@ -48,8 +44,6 @@ D405 [*] Section name should be properly capitalized ("returns")
     |
 help: Capitalize "returns"
     |
-572 |
-    -     returns:
+573 -     returns:
 573 +     Returns:
-574 |         Here's another note.
     |

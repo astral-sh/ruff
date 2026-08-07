@@ -9,10 +9,8 @@ RUF055 [*] Plain string pattern passed to `re` function
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `"abc" not in s`
   |
-6 | # this should be replaced with `"abc" not in s`
-  - re.search("abc", s) is None
+7 - re.search("abc", s) is None
 7 + "abc" not in s
-8 |
   |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -23,10 +21,8 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `"abc" in s`
    |
-10 | # this should be replaced with `"abc" in s`
-   - re.search("abc", s) is not None
+11 - re.search("abc", s) is not None
 11 + "abc" in s
-12 |
    |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -37,10 +33,8 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `not s.startswith("abc")`
    |
-14 | # this should be replaced with `not s.startswith("abc")`
-   - re.match("abc", s) is None
+15 - re.match("abc", s) is None
 15 + not s.startswith("abc")
-16 |
    |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -51,10 +45,8 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `s.startswith("abc")`
    |
-18 | # this should be replaced with `s.startswith("abc")`
-   - re.match("abc", s) is not None
+19 - re.match("abc", s) is not None
 19 + s.startswith("abc")
-20 |
    |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -65,10 +57,8 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `s != "abc"`
    |
-22 | # this should be replaced with `s != "abc"`
-   - re.fullmatch("abc", s) is None
+23 - re.fullmatch("abc", s) is None
 23 + s != "abc"
-24 |
    |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -79,10 +69,8 @@ RUF055 [*] Plain string pattern passed to `re` function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `s == "abc"`
    |
-26 | # this should be replaced with `s == "abc"`
-   - re.fullmatch("abc", s) is not None
+27 - re.fullmatch("abc", s) is not None
 27 + s == "abc"
-28 |
    |
 
 RUF055 [*] Plain string pattern passed to `re` function
@@ -102,15 +90,13 @@ RUF055 [*] Plain string pattern passed to `re` function
    |
 help: Replace with `s != "a really really really really long string"`
    |
-32 | if (
-   -     re.fullmatch(
-   -         "a really really really really long string",
-   -         s,
-   -     )
-   -     # with a comment here
-   -     is None
+33 -     re.fullmatch(
+34 -         "a really really really really long string",
+35 -         s,
+36 -     )
+37 -     # with a comment here
+38 -     is None
 33 +     s != "a really really really really long string"
-34 | ):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -130,12 +116,10 @@ RUF055 [*] Plain string pattern passed to `re` function
    |
 help: Replace with `s != "a really really really really long string"`
    |
-45 | if (  # leading
-   -     re.fullmatch(
-   -         "a really really really really long string",
-   -         s,
-   -     )
-   -     is None  # trailing
+46 -     re.fullmatch(
+47 -         "a really really really really long string",
+48 -         s,
+49 -     )
+50 -     is None  # trailing
 46 +     s != "a really really really really long string"  # trailing
-47 | ):
    |

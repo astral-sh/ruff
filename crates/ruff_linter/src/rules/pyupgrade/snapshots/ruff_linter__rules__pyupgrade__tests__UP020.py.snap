@@ -12,10 +12,8 @@ UP020 [*] Use builtin `open`
   |
 help: Replace with builtin `open`
   |
-2 |
-  - with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
+3 - with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
 3 + with open("f.txt", mode="r", buffering=-1, **kwargs) as f:
-4 |     print(f.read())
   |
 
 UP020 [*] Use builtin `open`
@@ -28,14 +26,11 @@ UP020 [*] Use builtin `open`
 9 |     print(f.read())
   |
 help: Replace with builtin `open`
-   |
-6  | from io import open
-7  + import builtins
-8  |
-   - with open("f.txt") as f:
-9  + with builtins.open("f.txt") as f:
-10 |     print(f.read())
-   |
+  |
+7 + import builtins
+8 + 
+9 ~ with builtins.open("f.txt") as f:
+  |
 
 UP020 [*] Use builtin `open`
   --> UP020.py:13:5
@@ -50,15 +45,11 @@ UP020 [*] Use builtin `open`
    |
 help: Replace with builtin `open`
    |
-6  | from io import open
-7  + import builtins
-8  |
---------------------------------------------------------------------------------
+ 7 + import builtins
+ 8 + 
+ 9 | with open("f.txt") as f:
+ …
 13 | with (
-   -     io  # text
-   -     # text
-   -     .open("file.txt") as f
-14 +     builtins.open("file.txt") as f
-15 | ):
+14 ~     builtins.open("file.txt") as f
    |
 note: This is an unsafe fix and may change runtime behavior

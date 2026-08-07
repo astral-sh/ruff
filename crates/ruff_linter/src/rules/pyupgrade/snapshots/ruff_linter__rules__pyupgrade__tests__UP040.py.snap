@@ -11,10 +11,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
   |
 help: Use the `type` keyword
   |
-4 | # UP040
-  - x: typing.TypeAlias = int
+5 - x: typing.TypeAlias = int
 5 + type x = int
-6 | x: TypeAlias = int
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +28,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
   |
 help: Use the `type` keyword
   |
-5 | x: typing.TypeAlias = int
-  - x: TypeAlias = int
+6 - x: TypeAlias = int
 6 + type x = int
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -49,10 +45,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-9  | T = typing.TypeVar["T"]
-   - x: typing.TypeAlias = list[T]
+10 - x: typing.TypeAlias = list[T]
 10 + type x[T] = list[T]
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -68,10 +62,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-13 | T = typing.TypeVar("T")
-   - x: typing.TypeAlias = list[T]
+14 - x: typing.TypeAlias = list[T]
 14 + type x[T] = list[T]
-15 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -87,10 +79,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-17 | T = typing.TypeVar("T", bound=int)
-   - x: typing.TypeAlias = list[T]
+18 - x: typing.TypeAlias = list[T]
 18 + type x[T: int] = list[T]
-19 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -106,10 +96,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-21 | T = typing.TypeVar("T", int, str)
-   - x: typing.TypeAlias = list[T]
+22 - x: typing.TypeAlias = list[T]
 22 + type x[T: (int, str)] = list[T]
-23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -125,10 +113,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-25 | T = typing.TypeVar("T", contravariant=True)
-   - x: typing.TypeAlias = list[T]
+26 - x: typing.TypeAlias = list[T]
 26 + type x[T] = list[T]
-27 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -144,10 +130,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-29 | T = typing.TypeVar("T", covariant=True)
-   - x: typing.TypeAlias = list[T]
+30 - x: typing.TypeAlias = list[T]
 30 + type x[T] = list[T]
-31 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -163,10 +147,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-35 |     # reference to global variable
-   -     x: typing.TypeAlias = list[T]
+36 -     x: typing.TypeAlias = list[T]
 36 +     type x[T] = list[T]
-37 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -182,10 +164,8 @@ UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-39 |     TCLS = typing.TypeVar["TCLS"]
-   -     y: typing.TypeAlias = list[TCLS]
+40 -     y: typing.TypeAlias = list[TCLS]
 40 +     type y[TCLS] = list[TCLS]
-41 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -201,10 +181,8 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
    |
 help: Use the `type` keyword
    |
-43 | T = typing.TypeVar(*args)
-   - x: typing.TypeAlias = list[T]
+44 - x: typing.TypeAlias = list[T]
 44 + type x = list[T]
-45 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -217,10 +195,8 @@ UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `typ
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use the `type` keyword
    |
-56 | T = typing.TypeVar["T"]
-   - Decorator: TypeAlias = typing.Callable[[T], T]
+57 - Decorator: TypeAlias = typing.Callable[[T], T]
 57 + type Decorator[T] = typing.Callable[[T], T]
-58 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -238,12 +214,10 @@ UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of t
    |
 help: Use the `type` keyword
    |
-66 | T = TypeVar("T")
-   - PositiveList = TypeAliasType(
-   -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
-   - )
+67 - PositiveList = TypeAliasType(
+68 -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+69 - )
 67 + type PositiveList[T] = list[Annotated[T, Gt(0)]]
-68 |
    |
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
@@ -260,12 +234,10 @@ UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of t
    |
 help: Use the `type` keyword
    |
-72 | T = TypeVar("T", bound=SupportGt)
-   - PositiveList = TypeAliasType(
-   -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
-   - )
+73 - PositiveList = TypeAliasType(
+74 -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+75 - )
 73 + type PositiveList[T: SupportGt] = list[Annotated[T, Gt(0)]]
-74 |
    |
 
 UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment instead of the `type` keyword
@@ -280,10 +252,8 @@ UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment instead of the `ty
    |
 help: Use the `type` keyword
    |
-80 | T3 = TypeVar("T3")
-   - Tuple3 = TypeAliasType("Tuple3", tuple[T1, T2, T3], type_params=(T1, T2, T3))
+81 - Tuple3 = TypeAliasType("Tuple3", tuple[T1, T2, T3], type_params=(T1, T2, T3))
 81 + type Tuple3[T1: SupportGt, T2, T3] = tuple[T1, T2, T3]
-82 |
    |
 
 UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
@@ -296,10 +266,8 @@ UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of th
    |
 help: Use the `type` keyword
    |
-83 | # No type_params
-   - PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
+84 - PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
 84 + type PositiveInt = Annotated[int, Gt(0)]
-85 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
    |
 
 UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
@@ -314,10 +282,8 @@ UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of th
    |
 help: Use the `type` keyword
    |
-84 | PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
-   - PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
+85 - PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)], type_params=())
 85 + type PositiveInt = Annotated[int, Gt(0)]
-86 |
    |
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
@@ -334,12 +300,10 @@ UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of t
     |
 help: Use the `type` keyword
     |
-98  | T = TypeVar("T")
-    - PositiveList = TypeAliasType(  # eaten comment
-    -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
-    - )
-99  + type PositiveList[T] = list[Annotated[T, Gt(0)]]
-100 |
+ 99 - PositiveList = TypeAliasType(  # eaten comment
+100 -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+101 - )
+ 99 + type PositiveList[T] = list[Annotated[T, Gt(0)]]
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -353,12 +317,10 @@ UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of t
     | |_^
 help: Use the `type` keyword
     |
-103 | T = TypeVar("T")
-    - PositiveList = TypeAliasType(
-    -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
-    - ) # this comment should be okay
+104 - PositiveList = TypeAliasType(
+105 -     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
+106 - ) # this comment should be okay
 104 + type PositiveList[T] = list[Annotated[T, Gt(0)]] # this comment should be okay
-105 |
     |
 
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
@@ -377,15 +339,9 @@ UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of t
     |
 help: Use the `type` keyword
     |
-110 | T = TypeVar("T")
-    - PositiveList = TypeAliasType(
-    -     "PositiveList", list[
 111 + type PositiveList[T] = list[
-112 |         Annotated[T, Gt(0)],  # preserved comment
-    -     ], type_params=(T,)
-    - )
+112 +         Annotated[T, Gt(0)],  # preserved comment
 113 +     ]
-114 |
     |
 
 UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
@@ -403,10 +359,10 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
     |
 help: Use the `type` keyword
     |
-116 |
-    - T: TypeAlias = (
 117 + type T = (
-118 |     int
+118 +     int
+119 +     | str
+120 + )
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -430,9 +386,14 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
     |
 help: Use the `type` keyword
     |
-121 |
-    - T: TypeAlias = ( # comment0
 122 + type T = ( # comment0
-123 |     # comment1
+123 +     # comment1
+124 +     int  # comment2
+125 +     # comment3
+126 +     | # comment4
+127 +     # comment5
+128 +     str  # comment6
+129 +     # comment7
+130 ~ ) # comment8
     |
 note: This is an unsafe fix and may change runtime behavior

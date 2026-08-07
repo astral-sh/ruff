@@ -9,11 +9,8 @@ RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.deprecated_call()` as a context-manager
    |
-15 | def test_error_trivial():
-   -     pytest.deprecated_call(raise_deprecation_warning, "deprecated")
-16 +     with pytest.deprecated_call():
+16 ~     with pytest.deprecated_call():
 17 +         raise_deprecation_warning("deprecated")
-18 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,11 +24,8 @@ RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
    |
 help: Use `pytest.deprecated_call()` as a context-manager
    |
-19 | def test_error_assign():
-   -     s = pytest.deprecated_call(raise_deprecation_warning, "deprecated")
-20 +     with pytest.deprecated_call():
+20 ~     with pytest.deprecated_call():
 21 +         s = raise_deprecation_warning("deprecated")
-22 |     print(s)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -43,9 +37,7 @@ RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.deprecated_call()` as a context-manager
    |
-24 | def test_error_lambda():
-   -     pytest.deprecated_call(lambda: warnings.warn("", DeprecationWarning))
-25 +     with pytest.deprecated_call():
+25 ~     with pytest.deprecated_call():
 26 +         (lambda: warnings.warn("", DeprecationWarning))()
    |
 note: This is an unsafe fix and may change runtime behavior

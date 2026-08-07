@@ -56,18 +56,16 @@ fn default_files() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> bar.py:1:7
-      |
-      - bar =     "needs formatting"
-    1 + bar = "needs formatting"
-      |
+      --> bar.py:1:7
+       |
+     1 | bar = "needs formatting"
+       |       ~~~~~~~~~~~~~~~~~~
 
     unformatted: File would be reformatted
-     --> foo.py:1:7
-      |
-      - foo =     "needs formatting"
-    1 + foo = "needs formatting"
-      |
+      --> foo.py:1:7
+       |
+     1 | foo = "needs formatting"
+       |       ~~~~~~~~~~~~~~~~~~
 
     2 files would be reformatted
 
@@ -466,20 +464,20 @@ OTHER = "OTHER"
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
-      |
-      -
-    1 | from test import say_hy
-      |
+      --> main.py:1:1
+       |
+     1 | from test import say_hy
+     2 |
+     3 | if __name__ == "__main__":
+     4 |     say_hy("dear Ruff contributor")
+       |
 
     unformatted: File would be reformatted
-     --> test.py:1:1
-      |
-      -
-    1 | def say_hy(name: str):
-      -         print(f"Hy {name}")
-    2 +     print(f"Hy {name}")
-      |
+      --> test.py:1:1
+       |
+     1 + def say_hy(name: str):
+     2 +     print(f"Hy {name}")
+       |
 
     2 files would be reformatted
 
@@ -520,11 +518,10 @@ exclude = ["format_excluded.py"]
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:3
-      |
-      - x    = 1
-    1 + x = 1
-      |
+      --> main.py:1:3
+       |
+     1 | x = 1
+       |   ~~~
 
     1 file would be reformatted
 
@@ -548,11 +545,10 @@ fn deduplicate_directory_and_explicit_file() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:3
-      |
-      - x   = 1
-    1 + x = 1
-      |
+      --> main.py:1:3
+       |
+     1 | x = 1
+       |
 
     1 file would be reformatted
 
@@ -607,21 +603,23 @@ if __name__ == "__main__":
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
         .arg("--check")
-        .arg("main.py"), @"
+        .arg("main.py"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
-      |
-      -
-    1 | from test import say_hy
-      |
+      --> main.py:1:1
+       |
+     1 | from test import say_hy
+     2 |
+     3 | if __name__ == "__main__":
+     4 |     say_hy("dear Ruff contributor")
+       |
 
     1 file would be reformatted
 
     ----- stderr -----
-    ");
+    "#);
 
     assert_cmd_snapshot!(test.format_command()
         .arg("--isolated")
@@ -699,35 +697,36 @@ fn output_format_notebook() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:2:1
-     ::: cell 1
-      |
-    1 | import numpy
-      - maths = (numpy.arange(100)**2).sum()
-      - stats= numpy.asarray([1,2,3,4]).median()
-    2 +
-    3 + maths = (numpy.arange(100) ** 2).sum()
-    4 + stats = numpy.asarray([1, 2, 3, 4]).median()
-      |
-     ::: cell 3
-      |
-    3 |     pass
-    4 +
-    5 +
-    6 | %matplotlib inline
-      |
-     ::: cell 4
-      |
-    1 | foo = %pwd
-      - def some_function(foo,bar,):
-    2 +
-    3 +
-    4 + def some_function(
-    5 +     foo,
-    6 +     bar,
-    7 + ):
-    8 |     # Another cell with IPython escape command
-      |
+       --> CRATE_ROOT/resources/test/fixtures/unformatted.ipynb:cell 1:2:1
+       ::: cell 1:0:1
+        |
+      0 + import numpy
+      1 + 
+      2 + maths = (numpy.arange(100) ** 2).sum()
+      3 + stats = numpy.asarray([1, 2, 3, 4]).median()
+        |
+       ::: cell 3:3:1
+        |
+      0 | # A cell with IPython escape command
+      1 | def some_function(foo, bar):
+      2 |     pass
+      3 + 
+      4 + 
+      5 | %matplotlib inline
+        |
+       ::: cell 4:0:1
+        |
+      0 + foo = %pwd
+      1 + 
+      2 + 
+      3 + def some_function(
+      4 +     foo,
+      5 +     bar,
+      6 + ):
+      7 +     # Another cell with IPython escape command
+      8 +     foo = %pwd
+      9 +     print(foo)
+        |
 
     1 file would be reformatted
 
@@ -834,13 +833,11 @@ fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:5
-      |
-      - def     foo():
-      -                 pass
-    1 + def foo():
-    2 +     pass
-      |
+      --> main.py:1:5
+       |
+     1 ~ def foo():
+     2 |     pass
+       |
 
 
     ----- stderr -----
@@ -858,13 +855,11 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:5
-      |
-      - def     foo():
-      -                 pass
-    1 + def foo():
-    2 +     pass
-      |
+      --> main.py:1:5
+       |
+     1 ~ def foo():
+     2 |     pass
+       |
 
     1 file would be reformatted
 
@@ -918,21 +913,23 @@ OTHER = "OTHER"
         // Explicitly pass test.py, should not be formatted because of --force-exclude
         .arg("test.py")
         // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
-        .arg("."), @"
+        .arg("."), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> main.py:1:1
-      |
-      -
-    1 | from test import say_hy
-      |
+      --> main.py:1:1
+       |
+     1 | from test import say_hy
+     2 |
+     3 | if __name__ == "__main__":
+     4 |     say_hy("dear Ruff contributor")
+       |
 
     1 file would be reformatted
 
     ----- stderr -----
-    ");
+    "#);
     Ok(())
 }
 
@@ -2555,27 +2552,25 @@ fn markdown_formatting() -> Result<()> {
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:4:7
-       |
-    3  | ```py
-       - print( "hello" )
-       - def foo(): pass
-    4  + print("hello")
-    5  +
-    6  +
-    7  + def foo():
-    8  +     pass
-    9  | ```
-    10 |
-    11 | ```pyi
-       - print( "hello" )
-       - def foo(): pass
-    12 + print("hello")
-    13 +
-    14 + def foo():
-    15 +     pass
-    16 | ```
-       |
+        --> CRATE_ROOT/resources/test/fixtures/unformatted.md:4:7
+         |
+       1 | This is a markdown document with two fenced code blocks:
+       2 |
+       3 | ```py
+       4 ~ print("hello")
+       5 + 
+       6 + 
+       7 + def foo():
+       8 +     pass
+       9 + ```
+      10 + 
+      11 + ```pyi
+      12 + print("hello")
+      13 + 
+      14 + def foo():
+      15 ~     pass
+      16 | ```
+         |
 
     1 file would be reformatted
 
@@ -2692,21 +2687,22 @@ print( 'hello' )
     exit_code: 1
     ----- stdout -----
     unformatted: File would be reformatted
-     --> test.bar:5:7
-      |
-    4 | ```py
-      - print( 'hello' )
-    5 + print("hello")
-    6 | ```
-      |
+      --> test.bar:5:7
+       |
+     2 | Text string
+     3 |
+     4 | ```py
+     5 ~ print("hello")
+     6 | ```
+       |
 
     unformatted: File would be reformatted
-     --> test.foo:1:1
-      |
-      -
-      - print( 'hello' )
-    1 + print("hello")
-      |
+      --> test.foo:1:1
+       |
+     1 - 
+     2 - print( 'hello' )
+     1 + print("hello")
+       |
 
     2 files would be reformatted
 

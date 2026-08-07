@@ -12,10 +12,8 @@ SIM300 [*] Yoda condition detected
   |
 help: Rewrite as `compare == "yoda"`
   |
-1 | # Errors
-  - "yoda" == compare  # SIM300
+2 - "yoda" == compare  # SIM300
 2 + compare == "yoda"  # SIM300
-3 | 42 == age  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -30,10 +28,8 @@ SIM300 [*] Yoda condition detected
   |
 help: Rewrite as `age == 42`
   |
-2 | "yoda" == compare  # SIM300
-  - 42 == age  # SIM300
+3 - 42 == age  # SIM300
 3 + age == 42  # SIM300
-4 | ("a", "b") == compare  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -48,10 +44,8 @@ SIM300 [*] Yoda condition detected
   |
 help: Rewrite as `compare == ("a", "b")`
   |
-3 | 42 == age  # SIM300
-  - ("a", "b") == compare  # SIM300
+4 - ("a", "b") == compare  # SIM300
 4 + compare == ("a", "b")  # SIM300
-5 | "yoda" <= compare  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -66,10 +60,8 @@ SIM300 [*] Yoda condition detected
   |
 help: Rewrite as `compare >= "yoda"`
   |
-4 | ("a", "b") == compare  # SIM300
-  - "yoda" <= compare  # SIM300
+5 - "yoda" <= compare  # SIM300
 5 + compare >= "yoda"  # SIM300
-6 | "yoda" < compare  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -84,10 +76,8 @@ SIM300 [*] Yoda condition detected
   |
 help: Rewrite as `compare > "yoda"`
   |
-5 | "yoda" <= compare  # SIM300
-  - "yoda" < compare  # SIM300
+6 - "yoda" < compare  # SIM300
 6 + compare > "yoda"  # SIM300
-7 | 42 > age  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -102,10 +92,8 @@ SIM300 [*] Yoda condition detected
   |
 help: Rewrite as `age < 42`
   |
-6 | "yoda" < compare  # SIM300
-  - 42 > age  # SIM300
+7 - 42 > age  # SIM300
 7 + age < 42  # SIM300
-8 | -42 > age  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -120,10 +108,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `age < -42`
   |
-7 | 42 > age  # SIM300
-  - -42 > age  # SIM300
+8 - -42 > age  # SIM300
 8 + age < -42  # SIM300
-9 | +42 > age  # SIM300
   |
 
 SIM300 [*] Yoda condition detected
@@ -137,12 +123,10 @@ SIM300 [*] Yoda condition detected
 11 | YODA > age  # SIM300
    |
 help: Rewrite as `age < +42`
-   |
-8  | -42 > age  # SIM300
-   - +42 > age  # SIM300
-9  + age < +42  # SIM300
-10 | YODA == age  # SIM300
-   |
+  |
+9 - +42 > age  # SIM300
+9 + age < +42  # SIM300
+  |
 
 SIM300 [*] Yoda condition detected
   --> SIM300.py:10:1
@@ -156,10 +140,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `age == YODA`
    |
-9  | +42 > age  # SIM300
-   - YODA == age  # SIM300
+10 - YODA == age  # SIM300
 10 + age == YODA  # SIM300
-11 | YODA > age  # SIM300
    |
 
 SIM300 [*] Yoda condition detected
@@ -174,10 +156,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `age < YODA`
    |
-10 | YODA == age  # SIM300
-   - YODA > age  # SIM300
+11 - YODA > age  # SIM300
 11 + age < YODA  # SIM300
-12 | YODA >= age  # SIM300
    |
 
 SIM300 [*] Yoda condition detected
@@ -192,10 +172,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `age <= YODA`
    |
-11 | YODA > age  # SIM300
-   - YODA >= age  # SIM300
+12 - YODA >= age  # SIM300
 12 + age <= YODA  # SIM300
-13 | JediOrder.YODA == age  # SIM300
    |
 
 SIM300 [*] Yoda condition detected
@@ -210,10 +188,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `age == JediOrder.YODA`
    |
-12 | YODA >= age  # SIM300
-   - JediOrder.YODA == age  # SIM300
+13 - JediOrder.YODA == age  # SIM300
 13 + age == JediOrder.YODA  # SIM300
-14 | 0 < (number - 100)  # SIM300
    |
 
 SIM300 [*] Yoda condition detected
@@ -228,10 +204,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `(number - 100) > 0`
    |
-13 | JediOrder.YODA == age  # SIM300
-   - 0 < (number - 100)  # SIM300
+14 - 0 < (number - 100)  # SIM300
 14 + (number - 100) > 0  # SIM300
-15 | B<A[0][0]or B
    |
 
 SIM300 [*] Yoda condition detected
@@ -246,10 +220,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `A[0][0] > B`
    |
-14 | 0 < (number - 100)  # SIM300
-   - B<A[0][0]or B
+15 - B<A[0][0]or B
 15 + A[0][0] > B or B
-16 | B or(B)<A[0][0]
    |
 
 SIM300 [*] Yoda condition detected
@@ -263,10 +235,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `A[0][0] > (B)`
    |
-15 | B<A[0][0]or B
-   - B or(B)<A[0][0]
+16 - B or(B)<A[0][0]
 16 + B or A[0][0] > (B)
-17 | {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
    |
 
 SIM300 [*] Yoda condition detected
@@ -281,10 +251,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `DummyHandler.CONFIG == {"non-empty-dict": "is-ok"}`
    |
-16 | B or(B)<A[0][0]
-   - {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
+17 - {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
 17 + DummyHandler.CONFIG == {"non-empty-dict": "is-ok"}
-18 |
    |
 
 SIM300 [*] Yoda condition detected
@@ -297,10 +265,8 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `UPPER_LIST == ['upper']`
    |
-19 | # Errors in preview
-   - ['upper'] == UPPER_LIST
+20 - ['upper'] == UPPER_LIST
 20 + UPPER_LIST == ['upper']
-21 | {} == DummyHandler.CONFIG
    |
 
 SIM300 [*] Yoda condition detected
@@ -315,8 +281,6 @@ SIM300 [*] Yoda condition detected
    |
 help: Rewrite as `DummyHandler.CONFIG == {}`
    |
-20 | ['upper'] == UPPER_LIST
-   - {} == DummyHandler.CONFIG
+21 - {} == DummyHandler.CONFIG
 21 + DummyHandler.CONFIG == {}
-22 |
    |

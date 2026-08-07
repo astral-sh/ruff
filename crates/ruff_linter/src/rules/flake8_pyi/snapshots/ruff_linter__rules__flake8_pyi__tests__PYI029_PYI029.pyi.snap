@@ -12,10 +12,8 @@ PYI029 [*] Defining `__str__` in a stub is almost always redundant
    |
 help: Remove definition of `__str__`
    |
-9  | class ShouldRemoveSingle:
-   -     def __str__(self) -> builtins.str: ...  # Error: PYI029
+10 -     def __str__(self) -> builtins.str: ...  # Error: PYI029
 10 +     pass  # Error: PYI029
-11 |
    |
 
 PYI029 [*] Defining `__repr__` in a stub is almost always redundant
@@ -28,9 +26,7 @@ PYI029 [*] Defining `__repr__` in a stub is almost always redundant
    |
 help: Remove definition of `__repr__`
    |
-12 | class ShouldRemove:
-   -     def __repr__(self) -> str: ...  # Error: PYI029
-13 |     def __str__(self) -> builtins.str: ...  # Error: PYI029
+13 -     def __repr__(self) -> str: ...  # Error: PYI029
    |
 
 PYI029 [*] Defining `__str__` in a stub is almost always redundant
@@ -45,7 +41,5 @@ PYI029 [*] Defining `__str__` in a stub is almost always redundant
    |
 help: Remove definition of `__str__`
    |
-13 |     def __repr__(self) -> str: ...  # Error: PYI029
-   -     def __str__(self) -> builtins.str: ...  # Error: PYI029
-14 |
+14 -     def __str__(self) -> builtins.str: ...  # Error: PYI029
    |

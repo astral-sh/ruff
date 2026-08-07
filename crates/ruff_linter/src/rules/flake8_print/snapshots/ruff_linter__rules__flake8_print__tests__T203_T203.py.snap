@@ -13,9 +13,7 @@ T203 [*] `pprint` found
   |
 help: Remove `pprint`
   |
-4 |
-  - pprint("Hello, world!")  # T203
-5 | pprint("Hello, world!", stream=None)  # T203
+5 - pprint("Hello, world!")  # T203
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,9 +28,7 @@ T203 [*] `pprint` found
   |
 help: Remove `pprint`
   |
-5 | pprint("Hello, world!")  # T203
-  - pprint("Hello, world!", stream=None)  # T203
-6 | pprint("Hello, world!", stream=sys.stdout)  # T203
+6 - pprint("Hello, world!", stream=None)  # T203
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,9 +43,7 @@ T203 [*] `pprint` found
   |
 help: Remove `pprint`
   |
-6 | pprint("Hello, world!", stream=None)  # T203
-  - pprint("Hello, world!", stream=sys.stdout)  # T203
-7 | pprint("Hello, world!", stream=sys.stderr)  # T203
+7 - pprint("Hello, world!", stream=sys.stdout)  # T203
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,9 +59,7 @@ T203 [*] `pprint` found
    |
 help: Remove `pprint`
   |
-7 | pprint("Hello, world!", stream=sys.stdout)  # T203
-  - pprint("Hello, world!", stream=sys.stderr)  # T203
-8 |
+8 - pprint("Hello, world!", stream=sys.stderr)  # T203
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -83,9 +75,7 @@ T203 [*] `pprint` found
    |
 help: Remove `pprint`
    |
-14 |
-   - pprint.pprint("Hello, world!")  # T203
-15 | pprint.pprint("Hello, world!", stream=None)  # T203
+15 - pprint.pprint("Hello, world!")  # T203
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -100,9 +90,7 @@ T203 [*] `pprint` found
    |
 help: Remove `pprint`
    |
-15 | pprint.pprint("Hello, world!")  # T203
-   - pprint.pprint("Hello, world!", stream=None)  # T203
-16 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
+16 - pprint.pprint("Hello, world!", stream=None)  # T203
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -117,9 +105,7 @@ T203 [*] `pprint` found
    |
 help: Remove `pprint`
    |
-16 | pprint.pprint("Hello, world!", stream=None)  # T203
-   - pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
-17 | pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
+17 - pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -135,8 +121,6 @@ T203 [*] `pprint` found
    |
 help: Remove `pprint`
    |
-17 | pprint.pprint("Hello, world!", stream=sys.stdout)  # T203
-   - pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
-18 |
+18 - pprint.pprint("Hello, world!", stream=sys.stderr)  # T203
    |
 note: This is an unsafe fix and may change runtime behavior

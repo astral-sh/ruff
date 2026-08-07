@@ -12,11 +12,9 @@ AIR302 [*] `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `apache-hdfs` 
   |
 help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHDFSHook` from `airflow.providers.apache.hdfs.hooks.webhdfs` instead.
   |
-2 |
-  - from airflow.hooks.webhdfs_hook import WebHDFSHook
-3 | from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
-4 + from airflow.providers.apache.hdfs.hooks.webhdfs import WebHDFSHook
-5 |
+3 + 
+4 | from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
+5 + from airflow.providers.apache.hdfs.hooks.webhdfs import WebHDFSHook
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,9 +26,7 @@ AIR302 [*] `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved into `apache
   | ^^^^^^^^^^^^^
 help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHdfsSensor` from `airflow.providers.apache.hdfs.sensors.web_hdfs` instead.
   |
-3 | from airflow.hooks.webhdfs_hook import WebHDFSHook
-  - from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
-4 + from airflow.providers.apache.hdfs.sensors.web_hdfs import WebHdfsSensor
-5 |
+4 + 
+5 + from airflow.providers.apache.hdfs.sensors.web_hdfs import WebHdfsSensor
   |
 note: This is an unsafe fix and may change runtime behavior

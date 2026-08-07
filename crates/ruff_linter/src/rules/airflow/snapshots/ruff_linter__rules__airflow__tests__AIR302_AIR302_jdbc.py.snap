@@ -12,12 +12,10 @@ AIR302 [*] `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` provider in A
   |
 help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `JdbcHook` from `airflow.providers.jdbc.hooks.jdbc` instead.
   |
-3 | from airflow.hooks.jdbc_hook import (
-  -     JdbcHook,
-4 |     jaydebeapi,
-5 | )
+3 + from airflow.hooks.jdbc_hook import (
+4 +     jaydebeapi,
+5 + )
 6 + from airflow.providers.jdbc.hooks.jdbc import JdbcHook
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,10 +27,9 @@ AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in
   | ^^^^^^^^^^
 help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `jaydebeapi` from `airflow.providers.jdbc.hooks.jdbc` instead.
   |
-4 |     JdbcHook,
-  -     jaydebeapi,
-5 | )
+3 + from airflow.hooks.jdbc_hook import (
+4 +     JdbcHook,
+5 + )
 6 + from airflow.providers.jdbc.hooks.jdbc import jaydebeapi
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior

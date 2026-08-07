@@ -11,11 +11,9 @@ UP036 [*] Version block is outdated for minimum Python version
   |
 help: Remove outdated version block
   |
-3 | if True:
-  -     if sys.version_info < (3, 3):
-  -         cmd = [sys.executable, "-m", "test.regrtest"]
+4 -     if sys.version_info < (3, 3):
+5 -         cmd = [sys.executable, "-m", "test.regrtest"]
 4 +     pass
-5 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,11 +28,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-10 |         print()
-   -     elif sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-11 +     
-12 |
+11 -     elif sys.version_info < (3, 3):
+12 -         cmd = [sys.executable, "-m", "test.regrtest"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +45,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-16 |         print()
-   -     elif sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-17 |     elif foo:
+17 -     elif sys.version_info < (3, 3):
+18 -         cmd = [sys.executable, "-m", "test.regrtest"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -68,11 +61,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-23 |         print()
-   -     elif sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-24 +     
-25 |
+24 -     elif sys.version_info < (3, 3):
+25 -         cmd = [sys.executable, "-m", "test.regrtest"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -87,10 +77,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-26 |
-   -     if sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-27 |
+27 -     if sys.version_info < (3, 3):
+28 -         cmd = [sys.executable, "-m", "test.regrtest"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -106,10 +94,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-31 |         print()
-   -     elif sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-32 |     else:
+32 -     elif sys.version_info < (3, 3):
+33 -         cmd = [sys.executable, "-m", "test.regrtest"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -125,13 +111,11 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-36 |
-   -     if sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-   -     else:
-   -         cmd = [sys.executable, "-m", "test", "-j0"]
+37 -     if sys.version_info < (3, 3):
+38 -         cmd = [sys.executable, "-m", "test.regrtest"]
+39 -     else:
+40 -         cmd = [sys.executable, "-m", "test", "-j0"]
 37 +     cmd = [sys.executable, "-m", "test", "-j0"]
-38 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -147,11 +131,9 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-41 |
-   -     if sys.version_info < (3, 3):
-   -         cmd = [sys.executable, "-m", "test.regrtest"]
-   -     elif foo:
+42 -     if sys.version_info < (3, 3):
+43 -         cmd = [sys.executable, "-m", "test.regrtest"]
+44 -     elif foo:
 42 +     if foo:
-43 |         cmd = [sys.executable, "-m", "test", "-j0"]
    |
 note: This is an unsafe fix and may change runtime behavior

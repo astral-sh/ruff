@@ -10,11 +10,8 @@ B006 [*] Do not use mutable data structures for argument defaults
    |
 help: Replace with `None`; initialize within function
    |
-16 |
-   - def f5(x=([1, ])):
-17 + def f5(x=None):
+17 ~ def f5(x=None):
 18 +     if x is None:
 19 +         x = [1]
-20 |     print(x)
    |
 note: This is an unsafe fix and may change runtime behavior

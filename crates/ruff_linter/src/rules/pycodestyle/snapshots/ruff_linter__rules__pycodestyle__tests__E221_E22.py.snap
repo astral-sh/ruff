@@ -13,11 +13,8 @@ E221 [*] Multiple spaces before operator
   |
 help: Replace with single space
   |
-2 | a = 12 + 3
-  - b = 4  + 5
-3 + b = 4 + 5
-4 | #: E221 E221
-  |
+3 | b = 4 + 5
+  |      +
 
 E221 [*] Multiple spaces before operator
  --> E22.py:5:2
@@ -31,11 +28,8 @@ E221 [*] Multiple spaces before operator
   |
 help: Replace with single space
   |
-4 | #: E221 E221
-  - x             = 1
-5 + x = 1
-6 | y             = 2
-  |
+5 | x = 1
+  |  +
 
 E221 [*] Multiple spaces before operator
  --> E22.py:6:2
@@ -49,11 +43,8 @@ E221 [*] Multiple spaces before operator
   |
 help: Replace with single space
   |
-5 | x             = 1
-  - y             = 2
-6 + y = 2
-7 | long_variable = 3
-  |
+6 | y = 2
+  |  +
 
 E221 [*] Multiple spaces before operator
   --> E22.py:9:5
@@ -66,12 +57,9 @@ E221 [*] Multiple spaces before operator
 11 | long_variable = 3
    |
 help: Replace with single space
-   |
-8  | #: E221 E221
-   - x[0]          = 1
-9  + x[0] = 1
-10 | x[1]          = 2
-   |
+  |
+9 | x[0] = 1
+  |     +
 
 E221 [*] Multiple spaces before operator
   --> E22.py:10:5
@@ -85,11 +73,8 @@ E221 [*] Multiple spaces before operator
    |
 help: Replace with single space
    |
-9  | x[0]          = 1
-   - x[1]          = 2
-10 + x[1] = 2
-11 | long_variable = 3
-   |
+10 | x[1] = 2
+   |     +
 
 E221 [*] Multiple spaces before operator
   --> E22.py:13:9
@@ -103,11 +88,8 @@ E221 [*] Multiple spaces before operator
    |
 help: Replace with single space
    |
-12 | #: E221 E221
-   - x = f(x)          + 1
-13 + x = f(x) + 1
-14 | y = long_variable + 2
-   |
+13 | x = f(x) + 1
+   |         +
 
 E221 [*] Multiple spaces before operator
   --> E22.py:15:9
@@ -121,11 +103,8 @@ E221 [*] Multiple spaces before operator
    |
 help: Replace with single space
    |
-14 | y = long_variable + 2
-   - z = x[0]          + 3
-15 + z = x[0] + 3
-16 | #: E221:3:14
-   |
+15 | z = x[0] + 3
+   |         +
 
 E221 [*] Multiple spaces before operator
   --> E22.py:19:14
@@ -139,11 +118,8 @@ E221 [*] Multiple spaces before operator
    |
 help: Replace with single space
    |
-18 |     bar
-   -     foo %s"""  % rofl
-19 +     foo %s""" % rofl
-20 | #: Okay
-   |
+19 |     foo %s""" % rofl
+   |              +
 
 E221 [*] Multiple spaces before operator
    --> E22.py:184:5
@@ -156,8 +132,5 @@ E221 [*] Multiple spaces before operator
     |
 help: Replace with single space
     |
-183 |
-    - if a  ==  1:
-184 + if a ==  1:
-185 |     print(a)
-    |
+184 | if a ==  1:
+    |     +

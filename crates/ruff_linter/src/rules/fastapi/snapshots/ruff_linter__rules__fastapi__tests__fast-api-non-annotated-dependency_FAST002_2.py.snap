@@ -13,14 +13,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 14 |     # This should become: param: Annotated[str, Query(description="Test param")]
-   -     param: str = Query(..., description="Test param"),
-15 +     param: Annotated[str, Query(description="Test param")],
-16 | ) -> str:
+15 ~     param: Annotated[str, Query(description="Test param")],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -36,14 +34,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 22 |     # This should become: auth: Annotated[str, Header(description="Auth header")]
-   -     auth: str = Header(..., description="Auth header"),
-23 +     auth: Annotated[str, Header(description="Auth header")],
-24 | ) -> str:
+23 ~     auth: Annotated[str, Header(description="Auth header")],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -59,14 +55,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 30 |     # This should become: data: Annotated[dict, Body(description="Request body")]
-   -     data: dict = Body(..., description="Request body"),
-31 +     data: Annotated[dict, Body(description="Request body")],
-32 | ) -> dict:
+31 ~     data: Annotated[dict, Body(description="Request body")],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -82,14 +76,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 38 |     # This should become: session: Annotated[str, Cookie(description="Session ID")]
-   -     session: str = Cookie(..., description="Session ID"),
-39 +     session: Annotated[str, Cookie(description="Session ID")],
-40 | ) -> str:
+39 ~     session: Annotated[str, Cookie(description="Session ID")],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -105,14 +97,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 46 |     # This should become: id: Annotated[str, Query()]
-   -     id: str = Query(...),
-47 +     id: Annotated[str, Query()],
-48 | ) -> str:
+47 ~     id: Annotated[str, Query()],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,14 +118,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 54 |     # This should become: param: Annotated[str, Query(description="Test", min_length=1, max_length=10)]
-   -     param: str = Query(..., description="Test", min_length=1, max_length=10),
-55 +     param: Annotated[str, Query(description="Test", min_length=1, max_length=10)],
-56 | ) -> str:
+55 ~     param: Annotated[str, Query(description="Test", min_length=1, max_length=10)],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -151,14 +139,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 65 |     # This should become: param: Annotated[str, Query(description="Test")] = "default"
-   -     param: str = Query("default", description="Test"),
-66 +     param: Annotated[str, Query(description="Test")] = "default",
-67 | ) -> str:
+66 ~     param: Annotated[str, Query(description="Test")] = "default",
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -174,14 +160,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 73 |     # This should become: param: Annotated[str | None, Query(description="Test")] = None
-   -     param: str | None = Query(None, description="Test"),
-74 +     param: Annotated[str | None, Query(description="Test")] = None,
-75 | ) -> str:
+74 ~     param: Annotated[str | None, Query(description="Test")] = None,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -197,14 +181,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 81 |     # First param should be fixed with default preserved  
-   -     optional_param: str = Query("default", description="Optional"),
-82 +     optional_param: Annotated[str, Query(description="Optional")] = "default",
-83 |     # Second param should not be fixed because of the preceding default
+82 ~     optional_param: Annotated[str, Query(description="Optional")] = "default",
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -233,13 +215,11 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-3  | from fastapi import Body, Cookie, FastAPI, Header, Query
-4  + from typing import Annotated
-5  |
---------------------------------------------------------------------------------
+ 4 + from typing import Annotated
+ 5 + 
+ 6 | app = FastAPI()
+ …
 85 |     # Third param should be fixed with default preserved
-   -     another_optional_param: int = Query(42, description="Another optional"),
-86 +     another_optional_param: Annotated[int, Query(description="Another optional")] = 42,
-87 | ) -> str:
+86 ~     another_optional_param: Annotated[int, Query(description="Another optional")] = 42,
    |
 note: This is an unsafe fix and may change runtime behavior

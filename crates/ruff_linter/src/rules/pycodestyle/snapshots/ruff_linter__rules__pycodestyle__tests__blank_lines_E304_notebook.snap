@@ -12,8 +12,5 @@ E304 [*] Blank lines found after function decorator (1)
 47 | # end
    |
 help: Remove extraneous blank line(s)
-   |
-43 | @decorator
-   -
-44 | def function():
+44 - 
    |

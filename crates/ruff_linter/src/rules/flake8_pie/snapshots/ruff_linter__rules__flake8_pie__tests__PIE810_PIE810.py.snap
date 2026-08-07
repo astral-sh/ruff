@@ -12,10 +12,8 @@ PIE810 [*] Call `startswith` once with a `tuple`
   |
 help: Merge into a single `startswith` call
   |
-1 | # error
-  - obj.startswith("foo") or obj.startswith("bar")
+2 - obj.startswith("foo") or obj.startswith("bar")
 2 + obj.startswith(("foo", "bar"))
-3 | # error
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,10 +29,8 @@ PIE810 [*] Call `endswith` once with a `tuple`
   |
 help: Merge into a single `endswith` call
   |
-3 | # error
-  - obj.endswith("foo") or obj.endswith("bar")
+4 - obj.endswith("foo") or obj.endswith("bar")
 4 + obj.endswith(("foo", "bar"))
-5 | # error
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ PIE810 [*] Call `startswith` once with a `tuple`
   |
 help: Merge into a single `startswith` call
   |
-5 | # error
-  - obj.startswith(foo) or obj.startswith(bar)
+6 - obj.startswith(foo) or obj.startswith(bar)
 6 + obj.startswith((foo, bar))
-7 | # error
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ PIE810 [*] Call `startswith` once with a `tuple`
    |
 help: Merge into a single `startswith` call
   |
-7 | # error
-  - obj.startswith(foo) or obj.startswith("foo")
+8 - obj.startswith(foo) or obj.startswith("foo")
 8 + obj.startswith((foo, "foo"))
-9 | # error
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ PIE810 [*] Call `startswith` once with a `tuple`
    |
 help: Merge into a single `startswith` call
    |
-9  | # error
-   - obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
+10 - obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
 10 + obj.endswith(foo) or obj.startswith((foo, "foo"))
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -106,10 +96,8 @@ PIE810 [*] Call `startswith` once with a `tuple`
    |
 help: Merge into a single `startswith` call
    |
-18 |
-   -     if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
+19 -     if msg.startswith(x) or msg.startswith(y) or msg.startswith(z): # Error
 19 +     if msg.startswith((x, z)) or msg.startswith(y): # Error
-20 |         print("yes") 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -124,10 +112,8 @@ PIE810 [*] Call `startswith` once with a `tuple`
    |
 help: Merge into a single `startswith` call
    |
-24 |
-   -     if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
+25 -     if msg.startswith(("h", "e", "l", "l", "o")) or msg.startswith("h") or msg.startswith("w"): # Error
 25 +     if msg.startswith(("h", "e", "l", "l", "o", "h", "w")): # Error
-26 |         print("yes") 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -142,9 +128,7 @@ PIE810 [*] Call `startswith` once with a `tuple`
    |
 help: Merge into a single `startswith` call
    |
-82 |     "Regression test for https://github.com/astral-sh/ruff/issues/9663"
-   -     if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
+83 -     if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
 83 +     if x.startswith(("a", "b")) or re.match(r"a\.b", x):
-84 |         print("yes")
    |
 note: This is an unsafe fix and may change runtime behavior

@@ -12,8 +12,6 @@ F401 [*] `submodule.baz` imported but unused
   |
 help: Remove unused import: `submodule.baz`
   |
-2 | import submodule.bar
-  - import submodule.baz
-3 | __all__ = ['submodule']
+3 - import submodule.baz
   |
 note: This is an unsafe fix and may change runtime behavior

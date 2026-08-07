@@ -13,15 +13,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
   |
 help: Replace `assertRaises` with `pytest.raises`
   |
-1 | import unittest
 2 + import pytest
-3 |
+3 + 
 4 |
 5 | class Test(unittest.TestCase):
 6 |     def test_errors(self):
-  -         with self.assertRaises(ValueError):
-7 +         with pytest.raises(ValueError):
-8 |             raise ValueError
+7 ~         with pytest.raises(ValueError):
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,16 +32,14 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
 9 |             raise ValueError
   |
 help: Replace `assertRaises` with `pytest.raises`
-   |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
-8  |             raise ValueError
-   -         with self.assertRaises(expected_exception=ValueError):
-9  +         with pytest.raises(ValueError):
-10 |             raise ValueError
-   |
+  |
+2 + import pytest
+3 + 
+4 |
+…
+8 |             raise ValueError
+9 ~         with pytest.raises(ValueError):
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PT027 [*] Use `pytest.raises` instead of unittest-style `failUnlessRaises`
@@ -58,14 +53,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `failUnlessRaises`
    |
 help: Replace `failUnlessRaises` with `pytest.raises`
    |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
+ 2 + import pytest
+ 3 + 
+ 4 |
+ …
 11 |
-   -         with self.failUnlessRaises(ValueError):
-12 +         with pytest.raises(ValueError):
-13 |             raise ValueError
+12 ~         with pytest.raises(ValueError):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -80,14 +73,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
    |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
+ 2 + import pytest
+ 3 + 
+ 4 |
+ …
 14 |
-   -         with self.assertRaisesRegex(ValueError, "test"):
-15 +         with pytest.raises(ValueError, match="test"):
-16 |             raise ValueError("test")
+15 ~         with pytest.raises(ValueError, match="test"):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,14 +93,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
    |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
+ 2 + import pytest
+ 3 + 
+ 4 |
+ …
 17 |
-   -         with self.assertRaisesRegex(ValueError, expected_regex="test"):
-18 +         with pytest.raises(ValueError, match="test"):
-19 |             raise ValueError("test")
+18 ~         with pytest.raises(ValueError, match="test"):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -125,16 +114,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
    |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
+ 2 + import pytest
+ 3 + 
+ 4 |
+ …
 20 |
-   -         with self.assertRaisesRegex(
-   -             expected_exception=ValueError, expected_regex="test"
-   -         ):
-21 +         with pytest.raises(ValueError, match="test"):
-22 |             raise ValueError("test")
+21 ~         with pytest.raises(ValueError, match="test"):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -150,16 +135,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
    |
 help: Replace `assertRaisesRegex` with `pytest.raises`
    |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
+ 2 + import pytest
+ 3 + 
+ 4 |
+ …
 25 |
-   -         with self.assertRaisesRegex(
-   -             expected_regex="test", expected_exception=ValueError
-   -         ):
-26 +         with pytest.raises(ValueError, match="test"):
-27 |             raise ValueError("test")
+26 ~         with pytest.raises(ValueError, match="test"):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -174,14 +155,12 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegexp`
    |
 help: Replace `assertRaisesRegexp` with `pytest.raises`
    |
-1  | import unittest
-2  + import pytest
-3  |
---------------------------------------------------------------------------------
+ 2 + import pytest
+ 3 + 
+ 4 |
+ …
 30 |
-   -         with self.assertRaisesRegexp(ValueError, "test"):
-31 +         with pytest.raises(ValueError, match="test"):
-32 |             raise ValueError("test")
+31 ~         with pytest.raises(ValueError, match="test"):
    |
 note: This is an unsafe fix and may change runtime behavior
 

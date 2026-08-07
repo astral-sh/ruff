@@ -9,10 +9,8 @@ UP001 [*] `__metaclass__ = type` is implied
   |     ^^^^^^^^^^^^^^^^^^^^
 help: Remove `__metaclass__ = type`
   |
-1 | class A:
-  -     __metaclass__ = type
+2 -     __metaclass__ = type
 2 +     pass
-3 |
   |
 
 UP001 [*] `__metaclass__ = type` is implied
@@ -26,7 +24,5 @@ UP001 [*] `__metaclass__ = type` is implied
   |
 help: Remove `__metaclass__ = type`
   |
-5 | class B:
-  -     __metaclass__ = type
-6 |
+6 -     __metaclass__ = type
   |

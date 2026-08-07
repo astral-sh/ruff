@@ -10,9 +10,7 @@ AIR302 [*] `airflow.hooks.presto_hook.PrestoHook` is moved into `presto` provide
   | ^^^^^^^^^^
 help: Install `apache-airflow-providers-presto>=1.0.0` and use `PrestoHook` from `airflow.providers.presto.hooks.presto` instead.
   |
-2 |
-  - from airflow.hooks.presto_hook import PrestoHook
-3 + from airflow.providers.presto.hooks.presto import PrestoHook
-4 |
+3 + 
+4 + from airflow.providers.presto.hooks.presto import PrestoHook
   |
 note: This is an unsafe fix and may change runtime behavior

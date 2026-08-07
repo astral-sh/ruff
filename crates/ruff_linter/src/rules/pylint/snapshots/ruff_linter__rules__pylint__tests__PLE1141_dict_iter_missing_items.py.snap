@@ -11,11 +11,8 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 help: Add a call to `.items()`
    |
-12 | # Errors
-   - for k, v in d:
-13 + for k, v in d.items():
-14 |     pass
-   |
+13 | for k, v in d.items():
+   |              ++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
@@ -29,11 +26,8 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 help: Add a call to `.items()`
    |
-15 |
-   - for k, v in d_tuple_incorrect_tuple:
-16 + for k, v in d_tuple_incorrect_tuple.items():
-17 |     pass
-   |
+16 | for k, v in d_tuple_incorrect_tuple.items():
+   |                                    ++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
@@ -47,11 +41,8 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 help: Add a call to `.items()`
    |
-36 | empty_dict["x"] = 1
-   - for k, v in empty_dict:
-37 + for k, v in empty_dict.items():
-38 |     pass
-   |
+37 | for k, v in empty_dict.items():
+   |                       ++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
@@ -65,11 +56,8 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 help: Add a call to `.items()`
    |
-45 | empty_dict_unannotated[("x", "y")] = True
-   - for k, v in empty_dict_unannotated:
-46 + for k, v in empty_dict_unannotated.items():
-47 |     pass
-   |
+46 | for k, v in empty_dict_unannotated.items():
+   |                                   ++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
@@ -83,9 +71,6 @@ PLE1141 [*] Unpacking a dictionary in iteration without calling `.items()`
    |
 help: Add a call to `.items()`
    |
-50 | empty_dict_annotated_str_keys["x"] = 1
-   - for k, v in empty_dict_annotated_str_keys:
-51 + for k, v in empty_dict_annotated_str_keys.items():
-52 |     pass
-   |
+51 | for k, v in empty_dict_annotated_str_keys.items():
+   |                                          ++++++++
 note: This is an unsafe fix and may change runtime behavior

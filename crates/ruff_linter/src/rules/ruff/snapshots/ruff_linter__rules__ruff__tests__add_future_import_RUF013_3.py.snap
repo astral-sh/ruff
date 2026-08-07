@@ -14,9 +14,7 @@ help: Convert to `T | None`
 2 | import typing
 3 |
 4 |
-  - def f(arg: typing.List[str] = None):  # RUF013
-5 + def f(arg: typing.List[str] | None = None):  # RUF013
-6 |     pass
+5 ~ def f(arg: typing.List[str] | None = None):  # RUF013
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,13 +27,12 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 help: Convert to `T | None`
    |
-1  + from __future__ import annotations
-2  | import typing
---------------------------------------------------------------------------------
+ 1 + from __future__ import annotations
+ 2 | import typing
+ 3 |
+ …
 22 |
-   - def f(arg: typing.Union[int, str] = None):  # RUF013
-23 + def f(arg: typing.Union[int, str] | None = None):  # RUF013
-24 |     pass
+23 ~ def f(arg: typing.Union[int, str] | None = None):  # RUF013
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,12 +45,11 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
 help: Convert to `T | None`
    |
-1  + from __future__ import annotations
-2  | import typing
---------------------------------------------------------------------------------
+ 1 + from __future__ import annotations
+ 2 | import typing
+ 3 |
+ …
 29 |
-   - def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
-30 + def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
-31 |     pass
+30 ~ def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
    |
 note: This is an unsafe fix and may change runtime behavior

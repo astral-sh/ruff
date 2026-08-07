@@ -12,10 +12,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
   |
 help: Rewrite as a set comprehension
   |
-1 | # Cannot combine with C416. Should use set comprehension here.
-  - even_nums = set(2 * x for x in range(3))
+2 - even_nums = set(2 * x for x in range(3))
 2 + even_nums = {2 * x for x in range(3)}
-3 | odd_nums = set(
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -33,13 +31,9 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
   |
 help: Rewrite as a set comprehension
   |
-2 | even_nums = set(2 * x for x in range(3))
-  - odd_nums = set(
-3 + odd_nums = {
+3 ~ odd_nums = {
 4 |     2 * x + 1 for x in range(3)
-  - )
 5 + }
-6 | small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -55,10 +49,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
   |
 help: Rewrite as a set comprehension
   |
-5 | )
-  - small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
+6 - small_nums = f"{set(a if a < 6 else 0 for a in range(3))}"
 6 + small_nums = f"{ {a if a < 6 else 0 for a in range(3)} }"
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -73,10 +65,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-10 |
-   - print(f"Hello {set(f(a) for a in 'abc')} World")
+11 - print(f"Hello {set(f(a) for a in 'abc')} World")
 11 + print(f"Hello { {f(a) for a in 'abc'} } World")
-12 | print(f"Hello { set(f(a) for a in 'abc') } World")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +78,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite as a set comprehension
    |
-11 | print(f"Hello {set(f(a) for a in 'abc')} World")
-   - print(f"Hello { set(f(a) for a in 'abc') } World")
+12 - print(f"Hello { set(f(a) for a in 'abc') } World")
 12 + print(f"Hello { {f(a) for a in 'abc'} } World")
-13 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -106,10 +94,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-15 | # Short-circuit case, combine with C416 and should produce x = set(range(3))
-   - x = set(x for x in range(3))
+16 - x = set(x for x in range(3))
 16 + x = set(range(3))
-17 | x = set(
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,12 +114,10 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-16 | x = set(x for x in range(3))
-   - x = set(
-   -     x for x in range(3)
-   - )
+17 - x = set(
+18 -     x for x in range(3)
+19 - )
 17 + x = set(range(3))
-18 | print(f"Hello {set(a for a in range(3))} World")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -149,10 +133,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-19 | )
-   - print(f"Hello {set(a for a in range(3))} World")
+20 - print(f"Hello {set(a for a in range(3))} World")
 20 + print(f"Hello {set(range(3))} World")
-21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -167,10 +149,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-20 | print(f"Hello {set(a for a in range(3))} World")
-   - print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+21 - print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 21 + print(f"{set('abc') - set(a for a in 'ab')}")
-22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -185,10 +165,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-20 | print(f"Hello {set(a for a in range(3))} World")
-   - print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
+21 - print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
 21 + print(f"{set(a for a in 'abc') - set('ab')}")
-22 | print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -204,10 +182,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   - print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+22 - print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 22 + print(f"{ set('abc') - set(a for a in 'ab') }")
-23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -223,10 +199,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-21 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   - print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+22 - print(f"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 22 + print(f"{ set(a for a in 'abc') - set('ab') }")
-23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -241,10 +215,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-24 | # Strip parentheses from inner generators.
-   - set((2 * x for x in range(3)))
+25 - set((2 * x for x in range(3)))
 25 + {2 * x for x in range(3)}
-26 | set(((2 * x for x in range(3))))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -259,10 +231,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-25 | set((2 * x for x in range(3)))
-   - set(((2 * x for x in range(3))))
+26 - set(((2 * x for x in range(3))))
 26 + {2 * x for x in range(3)}
-27 | set((((2 * x for x in range(3)))))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -278,10 +248,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-26 | set(((2 * x for x in range(3))))
-   - set((((2 * x for x in range(3)))))
+27 - set((((2 * x for x in range(3)))))
 27 + {2 * x for x in range(3)}
-28 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -297,10 +265,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-30 | # See https://github.com/astral-sh/ruff/issues/15852
-   - set((0 for _ in []),)
+31 - set((0 for _ in []),)
 31 + {0 for _ in []}
-32 | set(
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -321,17 +287,10 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-31 | set((0 for _ in []),)
-   - set(
-   -     (0 for _ in [])
 32 + {
-33 +     0 for _ in []
+33 ~     0 for _ in []
 34 |     # some comments
-   -     ,
-   -     # some more
-   - )
-35 +     }
-36 |
+35 ~     }
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -346,10 +305,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-39 | # t-strings
-   - print(t"Hello {set(f(a) for a in 'abc')} World")
+40 - print(t"Hello {set(f(a) for a in 'abc')} World")
 40 + print(t"Hello { {f(a) for a in 'abc'} } World")
-41 | print(t"Hello { set(f(a) for a in 'abc') } World")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -365,10 +322,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-40 | print(t"Hello {set(f(a) for a in 'abc')} World")
-   - print(t"Hello { set(f(a) for a in 'abc') } World")
+41 - print(t"Hello { set(f(a) for a in 'abc') } World")
 41 + print(t"Hello { {f(a) for a in 'abc'} } World")
-42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -384,10 +339,8 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
    |
 help: Rewrite as a set comprehension
    |
-41 | print(t"Hello { set(f(a) for a in 'abc') } World")
-   - small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
+42 - small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
 42 + small_nums = t"{ {a if a < 6 else 0 for a in range(3)} }"
-43 | print(t"Hello {set(a for a in range(3))} World")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -403,10 +356,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-42 | small_nums = t"{set(a if a < 6 else 0 for a in range(3))}"
-   - print(t"Hello {set(a for a in range(3))} World")
+43 - print(t"Hello {set(a for a in range(3))} World")
 43 + print(t"Hello {set(range(3))} World")
-44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -421,10 +372,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-43 | print(t"Hello {set(a for a in range(3))} World")
-   - print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+44 - print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
 44 + print(t"{set('abc') - set(a for a in 'ab')}")
-45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -439,10 +388,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |
 help: Rewrite using `set()`
    |
-43 | print(t"Hello {set(a for a in range(3))} World")
-   - print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
+44 - print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
 44 + print(t"{set(a for a in 'abc') - set('ab')}")
-45 | print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -455,10 +402,8 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |           ^^^^^^^^^^^^^^^^^^^^^
 help: Rewrite using `set()`
    |
-44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   - print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+45 - print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 45 + print(t"{ set('abc') - set(a for a in 'ab') }")
-46 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -471,9 +416,7 @@ C401 [*] Unnecessary generator (rewrite using `set()`)
    |                                   ^^^^^^^^^^^^^^^^^^^^
 help: Rewrite using `set()`
    |
-44 | print(t"{set(a for a in 'abc') - set(a for a in 'ab')}")
-   - print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
+45 - print(t"{ set(a for a in 'abc') - set(a for a in 'ab') }")
 45 + print(t"{ set(a for a in 'abc') - set('ab') }")
-46 |
    |
 note: This is an unsafe fix and may change runtime behavior

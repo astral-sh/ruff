@@ -10,10 +10,7 @@ E402 [*] Module level import not at top of file
   | ^^^^^^^^^
 help: Move module level imports to top of file
   |
-2 |
 3 + import os
 4 | print("something")
-5 |
-  - import os
   |
 note: This is an unsafe fix and may change runtime behavior

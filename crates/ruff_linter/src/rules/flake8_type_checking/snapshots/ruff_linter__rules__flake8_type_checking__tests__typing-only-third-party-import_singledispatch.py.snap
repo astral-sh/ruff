@@ -13,11 +13,13 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
+ 7 ~ from typing import TYPE_CHECKING
+ 8 |
+ …
 11 | from scipy.sparse import spmatrix
-   - from pandas import DataFrame
-12 |
-13 | if TYPE_CHECKING:
-14 +     from pandas import DataFrame
-15 |     from numpy import ndarray
+12 + 
+13 |
+14 | if TYPE_CHECKING:
+15 +     from pandas import DataFrame
    |
 note: This is an unsafe fix and may change runtime behavior

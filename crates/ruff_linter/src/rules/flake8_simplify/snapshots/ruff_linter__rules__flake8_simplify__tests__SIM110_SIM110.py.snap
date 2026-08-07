@@ -13,13 +13,11 @@ SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
   | |________________^
 help: Replace with `return any(check(x) for x in iterable)`
   |
-2 |     # SIM110
-  -     for x in iterable:
-  -         if check(x):
-  -             return True
-  -     return False
+3 -     for x in iterable:
+4 -         if check(x):
+5 -             return True
+6 -     return False
 3 +     return any(check(x) for x in iterable)
-4 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,13 +33,11 @@ SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loo
    | |_______________^
 help: Replace with `return all(not check(x) for x in iterable)`
    |
-24 |     # SIM111
-   -     for x in iterable:
-   -         if check(x):
-   -             return False
-   -     return True
+25 -     for x in iterable:
+26 -         if check(x):
+27 -             return False
+28 -     return True
 25 +     return all(not check(x) for x in iterable)
-26 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -57,13 +53,11 @@ SIM110 [*] Use `return all(x.is_empty() for x in iterable)` instead of `for` loo
    | |_______________^
 help: Replace with `return all(x.is_empty() for x in iterable)`
    |
-32 |     # SIM111
-   -     for x in iterable:
-   -         if not x.is_empty():
-   -             return False
-   -     return True
+33 -     for x in iterable:
+34 -         if not x.is_empty():
+35 -             return False
+36 -     return True
 33 +     return all(x.is_empty() for x in iterable)
-34 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -80,14 +74,12 @@ SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
    | |____________________^
 help: Replace with `return any(check(x) for x in iterable)`
    |
-54 |     # SIM110
-   -     for x in iterable:
-   -         if check(x):
-   -             return True
-   -     else:
-   -         return False
+55 -     for x in iterable:
+56 -         if check(x):
+57 -             return True
+58 -     else:
+59 -         return False
 55 +     return any(check(x) for x in iterable)
-56 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -104,14 +96,12 @@ SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loo
    | |___________________^
 help: Replace with `return all(not check(x) for x in iterable)`
    |
-63 |     # SIM111
-   -     for x in iterable:
-   -         if check(x):
-   -             return False
-   -     else:
-   -         return True
+64 -     for x in iterable:
+65 -         if check(x):
+66 -             return False
+67 -     else:
+68 -         return True
 64 +     return all(not check(x) for x in iterable)
-65 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -130,14 +120,12 @@ SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
    |
 help: Replace with `return any(check(x) for x in iterable)`
    |
-72 |     # SIM110
-   -     for x in iterable:
-   -         if check(x):
-   -             return True
-   -     else:
-   -         return False
+73 -     for x in iterable:
+74 -         if check(x):
+75 -             return True
+76 -     else:
+77 -         return False
 73 +     return any(check(x) for x in iterable)
-74 |     return True
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -156,14 +144,12 @@ SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loo
    |
 help: Replace with `return all(not check(x) for x in iterable)`
    |
-82 |     # SIM111
-   -     for x in iterable:
-   -         if check(x):
-   -             return False
-   -     else:
-   -         return True
+83 -     for x in iterable:
+84 -         if check(x):
+85 -             return False
+86 -     else:
+87 -         return True
 83 +     return all(not check(x) for x in iterable)
-84 |     return False
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -202,13 +188,11 @@ SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
     | |________________^
 help: Replace with `return any(check(x) for x in iterable)`
     |
-143 |     # SIM110
-    -     for x in iterable:
-    -         if check(x):
-    -             return True
-    -     return False
+144 -     for x in iterable:
+145 -         if check(x):
+146 -             return True
+147 -     return False
 144 +     return any(check(x) for x in iterable)
-145 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -223,13 +207,11 @@ SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loo
     | |_______________^
 help: Replace with `return all(not check(x) for x in iterable)`
     |
-153 |     # SIM111
-    -     for x in iterable:
-    -         if check(x):
-    -             return False
-    -     return True
+154 -     for x in iterable:
+155 -         if check(x):
+156 -             return False
+157 -     return True
 154 +     return all(not check(x) for x in iterable)
-155 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -245,13 +227,11 @@ SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ90
     | |________________^
 help: Replace with `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")`
     |
-161 |     # SIM110
-    -     for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
-    -         if x.isdigit():
-    -             return True
-    -     return False
+162 -     for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ":
+163 -         if x.isdigit():
+164 -             return True
+165 -     return False
 162 +     return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")
-163 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -270,13 +250,11 @@ SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
     |
 help: Replace with `return any(check(x) for x in iterable)`
     |
-183 |     # SIM110
-    -     for x in iterable:
-    -         if check(x):
-    -             return True
-    -     return False
+184 -     for x in iterable:
+185 -         if check(x):
+186 -             return True
+187 -     return False
 184 +     return any(check(x) for x in iterable)
-185 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -295,12 +273,10 @@ SIM110 [*] Use `return any(check(x) for x in await iterable)` instead of `for` l
     |
 help: Replace with `return any(check(x) for x in await iterable)`
     |
-190 |     # SIM110
-    -     for x in await iterable:
-    -         if check(x):
-    -             return True
-    -     return False
+191 -     for x in await iterable:
+192 -         if check(x):
+193 -             return True
+194 -     return False
 191 +     return any(check(x) for x in await iterable)
-192 |
     |
 note: This is an unsafe fix and may change runtime behavior

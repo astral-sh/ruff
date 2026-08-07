@@ -12,11 +12,9 @@ F401 [*] `typing.Union` imported but unused
    |
 help: Remove unused import: `typing.Union`
    |
-36 |         Mapping,  # noqa: F401
-   -         Union,
-   -     )
+35 ~     from typing import (
+36 +         Mapping,  # noqa: F401
 37 +         )
-38 |
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `F401`)
@@ -30,10 +28,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
 help: Remove unused `noqa` directive
    |
-51 |     from typing import (  # noqa: F401
-   -         Optional,  # noqa: F401
+52 -         Optional,  # noqa: F401
 52 +         Optional,
-53 |     )
    |
 
 RUF100 [*] Unused `noqa` directive (unused: `F401`)
@@ -47,10 +43,8 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |
 help: Remove unused `noqa` directive
    |
-58 |     from typing import (  # noqa
-   -         Optional,  # noqa: F401
+59 -         Optional,  # noqa: F401
 59 +         Optional,
-60 |     )
    |
 
 RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
@@ -64,10 +58,8 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
 help: Remove unused `noqa` directive
    |
-65 |     from typing import (  # noqa: F401
-   -         Dict,  # noqa: F501
+66 -         Dict,  # noqa: F501
 66 +         Dict,
-67 |     )
    |
 
 RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
@@ -82,10 +74,8 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |
 help: Remove unused `noqa` directive
    |
-71 |     # This should ignore the error, but mark F501 as unused.
-   -     from typing import (  # noqa: F501
+72 -     from typing import (  # noqa: F501
 72 +     from typing import (
-73 |         Tuple,  # noqa: F401
    |
 
 F401 [*] `typing.Awaitable` imported but unused
@@ -97,8 +87,7 @@ F401 [*] `typing.Awaitable` imported but unused
    |                        ^^^^^^^^^
 help: Remove unused import
    |
-88 |     # This should mark F501 as unused.
-   -     from typing import Awaitable, AwaitableGenerator  # noqa: F501
+89 -     from typing import Awaitable, AwaitableGenerator  # noqa: F501
 89 +     pass  # noqa: F501
    |
 
@@ -111,8 +100,7 @@ F401 [*] `typing.AwaitableGenerator` imported but unused
    |                                   ^^^^^^^^^^^^^^^^^^
 help: Remove unused import
    |
-88 |     # This should mark F501 as unused.
-   -     from typing import Awaitable, AwaitableGenerator  # noqa: F501
+89 -     from typing import Awaitable, AwaitableGenerator  # noqa: F501
 89 +     pass  # noqa: F501
    |
 
@@ -125,7 +113,6 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |                                                       ^^^^^^^^^^^^
 help: Remove unused `noqa` directive
    |
-88 |     # This should mark F501 as unused.
-   -     from typing import Awaitable, AwaitableGenerator  # noqa: F501
+89 -     from typing import Awaitable, AwaitableGenerator  # noqa: F501
 89 +     from typing import Awaitable, AwaitableGenerator
    |

@@ -10,10 +10,8 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
 help: Replace `exit` with `sys.exit()`
   |
-  - exit(0)
 1 + import sys
-2 + sys.exit(0)
-3 | quit(0)
+2 ~ sys.exit(0)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,9 +25,7 @@ help: Replace `quit` with `sys.exit()`
   |
 1 + import sys
 2 | exit(0)
-  - quit(0)
-3 + sys.exit(0)
-4 |
+3 ~ sys.exit(0)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,11 +41,10 @@ help: Replace `exit` with `sys.exit()`
   |
 1 + import sys
 2 | exit(0)
---------------------------------------------------------------------------------
+3 | quit(0)
+…
 6 | def main():
-  -     exit(2)
-7 +     sys.exit(2)
-8 |     quit(2)
+7 ~     sys.exit(2)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -64,9 +59,9 @@ help: Replace `quit` with `sys.exit()`
   |
 1 + import sys
 2 | exit(0)
---------------------------------------------------------------------------------
+3 | quit(0)
+…
 7 |     exit(2)
-  -     quit(2)
-8 +     sys.exit(2)
+8 ~     sys.exit(2)
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -11,10 +11,8 @@ PYI021 [*] Docstrings should not be included in stubs
   |
 help: Remove docstring
   |
-4 | def check_isolation_level(mode: int) -> None:
-  -     """Will report both, but only fix the first."""  # ERROR PYI021
+5 -     """Will report both, but only fix the first."""  # ERROR PYI021
 5 +       # ERROR PYI021
-6 |     ...  # ERROR PIE790
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,8 +25,6 @@ PIE790 [*] Unnecessary `...` literal
   |     ^^^
 help: Remove unnecessary `...`
   |
-5 |     """Will report both, but only fix the first."""  # ERROR PYI021
-  -     ...  # ERROR PIE790
+6 -     ...  # ERROR PIE790
 6 +     # ERROR PIE790
-7 |
   |

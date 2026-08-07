@@ -10,11 +10,8 @@ ANN201 [*] Missing return type annotation for public function `error_partially_t
    |
 help: Add return type annotation: `None`
    |
-23 |
-   - def error_partially_typed_1(a: int, b):
-24 + def error_partially_typed_1(a: int, b) -> None:
-25 |     pass
-   |
+24 | def error_partially_typed_1(a: int, b) -> None:
+   |                                        +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN001 Missing type annotation for function argument `b`
@@ -42,11 +39,8 @@ ANN201 [*] Missing return type annotation for public function `error_partially_t
    |
 help: Add return type annotation: `None`
    |
-31 |
-   - def error_partially_typed_3(a: int, b: int):
-32 + def error_partially_typed_3(a: int, b: int) -> None:
-33 |     pass
-   |
+32 | def error_partially_typed_3(a: int, b: int) -> None:
+   |                                             +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `error_typed_self`
@@ -60,9 +54,6 @@ ANN201 [*] Missing return type annotation for public function `error_typed_self`
    |
 help: Add return type annotation: `None`
    |
-42 |
-   -     def error_typed_self(self: X):
-43 +     def error_typed_self(self: X) -> None:
-44 |         pass
-   |
+43 |     def error_typed_self(self: X) -> None:
+   |                                   +++++++
 note: This is an unsafe fix and may change runtime behavior

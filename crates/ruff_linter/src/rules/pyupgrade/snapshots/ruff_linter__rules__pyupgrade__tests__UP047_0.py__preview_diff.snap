@@ -19,9 +19,6 @@ UP047 [*] Generic function `default_var` should use type parameters
    |
 help: Use type parameters
    |
-50 |
-   - def default_var(v: V) -> V:
-51 + def default_var[V: str = Any](v: V) -> V:
-52 |     return v
-   |
+51 | def default_var[V: str = Any](v: V) -> V:
+   |                ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior

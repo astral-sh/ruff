@@ -13,11 +13,8 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
   |
-1 | if True:
 2 +     import os
-3 |     import sys
-  -     import os
-4 | else:
+3 +     import sys
   |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -30,8 +27,6 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_____________^
 help: Organize imports
   |
-4 | else:
 5 +     import os
-6 |     import sys
-  -     import os
+6 +     import sys
   |

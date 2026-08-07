@@ -11,15 +11,11 @@ FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` in
    |
 help: Replace with `collections.UserDict`
    |
-2  | from enum import Enum, EnumMeta
-   - from collections import UserList as UL
-3  + from collections import UserList as UL, UserDict
-4  |
---------------------------------------------------------------------------------
+ 3 ~ from collections import UserList as UL, UserDict
+ 4 |
+ …
 16 | # positives
-   - class D(dict):
-17 + class D(UserDict):
-18 |     pass
+17 ~ class D(UserDict):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -34,10 +30,11 @@ FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` in
    |
 help: Replace with `collections.UserList`
    |
+ 3 ~ from collections import UserList as UL
+ 4 |
+ …
 19 |
-   - class L(list):
-20 + class L(UL):
-21 |     pass
+20 ~ class L(UL):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -52,15 +49,11 @@ FURB189 [*] Subclassing `str` can be error prone, use `collections.UserString` i
    |
 help: Replace with `collections.UserString`
    |
-2  | from enum import Enum, EnumMeta
-   - from collections import UserList as UL
-3  + from collections import UserList as UL, UserString
-4  |
---------------------------------------------------------------------------------
+ 3 ~ from collections import UserList as UL, UserString
+ 4 |
+ …
 22 |
-   - class S(str):
-23 + class S(UserString):
-24 |     pass
+23 ~ class S(UserString):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -75,15 +68,11 @@ FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` in
    |
 help: Replace with `collections.UserDict`
    |
-2  | from enum import Enum, EnumMeta
-   - from collections import UserList as UL
-3  + from collections import UserList as UL, UserDict
-4  |
---------------------------------------------------------------------------------
+ 3 ~ from collections import UserList as UL, UserDict
+ 4 |
+ …
 25 |
-   - class SubscriptDict(dict[str, str]):
-26 + class SubscriptDict(UserDict[str, str]):
-27 |     pass
+26 ~ class SubscriptDict(UserDict[str, str]):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -98,9 +87,10 @@ FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` in
    |
 help: Replace with `collections.UserList`
    |
+ 3 ~ from collections import UserList as UL
+ 4 |
+ …
 28 |
-   - class SubscriptList(list[str]):
-29 + class SubscriptList(UL[str]):
-30 |     pass
+29 ~ class SubscriptList(UL[str]):
    |
 note: This is an unsafe fix and may change runtime behavior

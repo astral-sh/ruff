@@ -95,9 +95,7 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
    |
-17 |     "a": 3,
-   -     "a": 3,
-18 | }
+17 -     "a": 3,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -137,9 +135,7 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
    |
-24 |     "a": 3,
-   -     "a": 3,
-25 |     "a": 4,
+24 -     "a": 3,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -166,9 +162,7 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
    |
-30 |     "a": 1,
-   -     "a": 1,
-31 |     "a": 2,
+30 -     "a": 1,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -243,9 +237,9 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
    |
-44 |     a: 3,
-   -     "a": 3,
-45 |     a: 4,
+44 -     a: 3,
+45 -     "a": 3,
+44 +     a: 3,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -260,10 +254,8 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
    |
-48 |
-   - x = {"a": 1, "a": 1}
+49 - x = {"a": 1, "a": 1}
 49 + x = {"a": 1}
-50 | x = {"a": 1, "b": 2, "a": 1}
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -278,10 +270,8 @@ F601 [*] Dictionary key literal `"a"` repeated
    |
 help: Remove repeated key literal `"a"`
    |
-49 | x = {"a": 1, "a": 1}
-   - x = {"a": 1, "b": 2, "a": 1}
+50 - x = {"a": 1, "b": 2, "a": 1}
 50 + x = {"a": 1, "b": 2}
-51 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -307,10 +297,8 @@ F601 [*] Dictionary key literal `"x"` repeated
    |
 help: Remove repeated key literal `"x"`
    |
-57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
-   - t={"x":"test123", "x":("test123")}
+58 - t={"x":"test123", "x":("test123")}
 58 + t={"x":"test123"}
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -326,10 +314,8 @@ F601 [*] Dictionary key literal `"x"` repeated
    |
 help: Remove repeated key literal `"x"`
    |
-59 |
-   - t={"x":("test123"), "x":"test123"}
+60 - t={"x":("test123"), "x":"test123"}
 60 + t={"x":("test123")}
-61 |
    |
 note: This is an unsafe fix and may change runtime behavior
 

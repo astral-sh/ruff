@@ -11,9 +11,8 @@ UP003 [*] Use `str` instead of `type(...)`
   |
 help: Replace `type(...)` with `str`
   |
-  - type("")
+1 - type("")
 1 + str
-2 | type(b"")
   |
 
 UP003 [*] Use `bytes` instead of `type(...)`
@@ -27,10 +26,8 @@ UP003 [*] Use `bytes` instead of `type(...)`
   |
 help: Replace `type(...)` with `bytes`
   |
-1 | type("")
-  - type(b"")
+2 - type(b"")
 2 + bytes
-3 | type(0)
   |
 
 UP003 [*] Use `int` instead of `type(...)`
@@ -45,10 +42,8 @@ UP003 [*] Use `int` instead of `type(...)`
   |
 help: Replace `type(...)` with `int`
   |
-2 | type(b"")
-  - type(0)
+3 - type(0)
 3 + int
-4 | type(0.0)
   |
 
 UP003 [*] Use `float` instead of `type(...)`
@@ -62,10 +57,8 @@ UP003 [*] Use `float` instead of `type(...)`
   |
 help: Replace `type(...)` with `float`
   |
-3 | type(0)
-  - type(0.0)
+4 - type(0.0)
 4 + float
-5 | type(0j)
   |
 
 UP003 [*] Use `complex` instead of `type(...)`
@@ -80,10 +73,8 @@ UP003 [*] Use `complex` instead of `type(...)`
   |
 help: Replace `type(...)` with `complex`
   |
-4 | type(0.0)
-  - type(0j)
+5 - type(0j)
 5 + complex
-6 |
   |
 
 UP003 [*] Use `str` instead of `type(...)`
@@ -94,7 +85,6 @@ UP003 [*] Use `str` instead of `type(...)`
    |                             ^^^^^^^^
 help: Replace `type(...)` with `str`
    |
-13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
-   - assert isinstance(fullname, type("")is not True)
+14 - assert isinstance(fullname, type("")is not True)
 14 + assert isinstance(fullname, str is not True)
    |
