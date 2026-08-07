@@ -526,8 +526,8 @@ object. An identity comparison can establish that another value is a string, but
 that provenance. A concrete string literal still identifies its runtime value.
 
 ```py
-from typing import Literal, TypeVar
-from typing_extensions import LiteralString
+from typing import Any, Literal, TypeVar
+from typing_extensions import LiteralString, TypeIs
 from ty_extensions import Intersection, Not
 
 def literal_string(value: object, text: LiteralString) -> None:
@@ -557,6 +557,42 @@ def excluded_literal_string(
     if value is other:
         reveal_type(value)  # revealed: str & ~LiteralString
         reveal_type(other)  # revealed: Literal["hello"]
+```
+
+A gradual string literal can arise naturally by narrowing an `Any` value. Comparing it with a string
+whose `LiteralString` provenance was negated must not make the reachable branch disappear.
+
+```py
+def is_literal_string(value: str) -> TypeIs[LiteralString]:
+    return False
+
+def gradual_literal_from_narrowing(value: str, untyped: Any) -> None:
+    if not is_literal_string(value):
+        if untyped is "hello":
+            reveal_type(untyped)  # revealed: Any & Literal["hello"]
+            if value is untyped:
+                reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+The same overlap remains possible for an explicitly gradual string literal, including when both
+operands are gradual.
+
+```py
+def annotated_gradual_literal(
+    value: Intersection[str, Not[LiteralString]],
+    other: Intersection[Literal["hello"], Any],
+) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: str & ~LiteralString
+        reveal_type(other)  # revealed: Literal["hello"] & Any
+
+def both_operands_gradual(
+    value: Intersection[str, Any, Not[LiteralString]],
+    other: Intersection[Literal["hello"], Any],
+) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: str & Any & ~LiteralString
+        reveal_type(other)  # revealed: Literal["hello"] & Any
 ```
 
 A `LiteralString` negation can also appear in a type variable's bound. Identity preserves the type

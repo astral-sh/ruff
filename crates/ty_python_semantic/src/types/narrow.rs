@@ -3528,9 +3528,21 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             Type::Union(union) => union.elements(db),
             _ => std::slice::from_ref(&transferable_ty),
         };
-        if !rhs_alternatives.iter().any(|ty| {
-            matches!(ty.resolve_type_alias(db), Type::LiteralValue(literal) if literal.is_string())
-        }) {
+        let concrete_string_literal = |ty: Type<'db>| match ty.resolve_type_alias(db) {
+            Type::Intersection(intersection) => {
+                intersection.iter_positive(db).find_map(|positive| {
+                    positive
+                        .resolve_type_alias(db)
+                        .as_literal_value()
+                        .filter(|literal| literal.is_string())
+                })
+            }
+            ty => ty.as_literal_value().filter(|literal| literal.is_string()),
+        };
+        if !rhs_alternatives
+            .iter()
+            .any(|ty| concrete_string_literal(*ty).is_some())
+        {
             return transferable_ty;
         }
 
@@ -3562,8 +3574,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let mut builder = UnionBuilder::new(db, env).add(transferable_ty);
         for &lhs_alternative in lhs_alternatives {
             for &rhs_alternative in rhs_alternatives {
-                if let Type::LiteralValue(literal) = rhs_alternative.resolve_type_alias(db)
-                    && literal.is_string()
+                if let Some(literal) = concrete_string_literal(rhs_alternative)
                     && lhs_alternative.is_disjoint_from(db, env, rhs_alternative)
                     && lhs_alternative
                         .identity_comparison_truthiness(db, env, rhs_alternative)
