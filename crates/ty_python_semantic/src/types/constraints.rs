@@ -2814,7 +2814,7 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let mut path = interior.path_assignments(storage, source_order);
+                let mut path = interior.path_assignments(db, env, storage, source_order);
                 path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                     .is_continue()
             }
@@ -2880,7 +2880,7 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
-                    let mut path = interior.path_assignments(storage, source_order);
+                    let mut path = interior.path_assignments(db, env, storage, source_order);
                     path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                         .is_continue()
                 };
@@ -4051,7 +4051,7 @@ impl<'db> PathBounds<'db> {
         // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(storage, path_source_order);
+        let mut path = interior.path_assignments(db, env, storage, path_source_order);
         let _ = path.visit(db, env, storage, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
@@ -4833,7 +4833,7 @@ impl InteriorNode {
             }
         }
 
-        let mut path = self.path_assignments(storage, source_order);
+        let mut path = self.path_assignments(db, env, storage, source_order);
         let mut visitor = AbstractVisitor { should_remove };
         let ControlFlow::Continue(result) = path.visit(db, env, storage, self.node(), &mut visitor);
         result
@@ -4911,9 +4911,11 @@ impl InteriorNode {
         result
     }
 
-    fn path_assignments(
+    fn path_assignments<'db>(
         self,
-        storage: &mut ConstraintSetStorage<'_>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
@@ -4932,7 +4934,34 @@ impl InteriorNode {
                 .get_index_of(constraint)
                 .expect("every BDD constraint should have a source-order entry")
         });
-        PathAssignments::new(constraints)
+
+        if !self.node().is_single_conjunction(storage) {
+            return PathAssignments::new(constraints, FxHashSet::default());
+        }
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for constraint_id in &constraints {
+            let constraint = storage.constraint_data(*constraint_id);
+            let typevar = storage.typevar_id(db, constraint.typevar);
+            let has_relational_bound =
+                iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
+                    bound.has_typevar(db, env)
+                        || bound.has_unspecialized_type_var(db, env)
+                        || bound.bottom_materialization(db, env)
+                            != bound.top_materialization(db, env)
+                });
+
+            if has_relational_bound {
+                dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
+            } else {
+                independent_typevars.insert(typevar);
+            }
+        }
+
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
+        PathAssignments::new(constraints, independent_typevars)
     }
 
     /// Returns a simplified version of a BDD.
@@ -7063,6 +7092,10 @@ pub(crate) struct PathAssignments {
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
 
+    /// Type variables mentioned only by concrete constraints in the original diagram.
+    /// Deriving relationships to unrelated type variables cannot affect those constraints.
+    independent_typevars: FxHashSet<TypeVarId>,
+
     /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
 
@@ -7127,7 +7160,10 @@ impl Ord for AssignmentFuel {
 }
 
 impl PathAssignments {
-    fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
+    fn new(
+        constraints: impl IntoIterator<Item = ConstraintId>,
+        independent_typevars: FxHashSet<TypeVarId>,
+    ) -> Self {
         let discovered = constraints
             .into_iter()
             .map(|constraint| (constraint, false))
@@ -7138,6 +7174,7 @@ impl PathAssignments {
             additional_fuels: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
+            independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
@@ -7447,6 +7484,17 @@ impl PathAssignments {
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
+                continue;
+            }
+
+            let existing_support = storage.constraint_support(*existing);
+            let constraint_support = storage.constraint_support(constraint);
+            if !existing_support.overlaps_with(constraint_support)
+                && existing_support
+                    .iter()
+                    .chain(constraint_support.iter())
+                    .any(|typevar| self.independent_typevars.contains(&typevar))
+            {
                 continue;
             }
 
@@ -9171,7 +9219,7 @@ mod tests {
     }
 
     #[test]
-    fn constraint_ordering_changes_derived_upper_bound_display() {
+    fn constraint_ordering_preserves_independent_concrete_solutions() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -9197,12 +9245,7 @@ mod tests {
                     .and(storage, int_t)
                     .and(storage, u_int)
             },
-            // TODO: Constraint-ID permutations can still change which equivalent upper-bound
-            // intersection is constructed first.
-            [
-                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
-                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
-            ],
+            ["never=false always=false merged=[T=int, U=int] paths=[T=int, U=int]"],
         );
     }
 
@@ -9542,16 +9585,18 @@ mod tests {
         }
     }
 
-    fn path_assignments_for(
-        builder: &ConstraintSetBuilder<'_>,
+    fn path_assignments_for<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
+            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
             Node::Interior(interior) => {
                 let mut storage = builder.storage.borrow_mut();
-                interior.path_assignments(&mut storage, source_order)
+                interior.path_assignments(db, env, &mut storage, source_order)
             }
         }
     }
@@ -9560,6 +9605,7 @@ mod tests {
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
         let db = &db;
+        let env = db.program_environment();
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
@@ -9569,7 +9615,7 @@ mod tests {
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(&builder, set.node, set.source_order);
+        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
         let storage = builder.storage.borrow();
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
@@ -9627,7 +9673,7 @@ mod tests {
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(&builder, set.node, set.source_order);
+            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
@@ -9664,7 +9710,7 @@ mod tests {
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(&builder, set.node, set.source_order);
+            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
