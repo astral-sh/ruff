@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.16.2
+
+Released on 2026-08-06.
+
+### Bug fixes
+
+- \[`flake8-pyi`\] Avoid false positives on `singledispatch` functions (`PYI041`) ([#27335](https://github.com/astral-sh/ruff/pull/27335))
+
+### Server
+
+- Register formatting capabilities dynamically to exclude TOML files ([#27332](https://github.com/astral-sh/ruff/pull/27332))
+
+### Contributors
+
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@epage](https://github.com/epage)
+- [@sharkdp](https://github.com/sharkdp)
+- [@ntBre](https://github.com/ntBre)
+
 ## 0.16.1
 
 Released on 2026-07-30.
