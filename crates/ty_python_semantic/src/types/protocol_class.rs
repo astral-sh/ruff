@@ -415,6 +415,22 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.includes_member(db, name)
     }
 
+    /// Includes inherited `object` members except `__hash__`, which subclasses can disable.
+    fn includes_member_or_object_fallback(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> bool {
+        self.includes_member(db, name)
+            || name != "__hash__"
+                && object_member_names(db, self.interface.program(db)).contains(name)
+                && matches!(
+                    Type::object().member(db, env, name).place,
+                    Place::Defined(place) if place.is_definitely_defined()
+                )
+    }
+
     /// Compare the original and materialized forms of members required by `required`.
     ///
     /// An unrelated materialized member must not prevent a protocol from retaining its
@@ -3313,6 +3329,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         if source.member_count(db) < target.member_count(db)
             && !self.is_context_collection_enabled()
+            && source.member_count(db) < non_object_protocol_member_count(db, target.interface)
         {
             return self.never();
         }
@@ -3323,6 +3340,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
+
+                if source_member.is_none()
+                    && source.includes_member_or_object_fallback(db, env, target_member.name)
+                {
+                    return self.type_satisfies_protocol_member(db, source_type, &target_member);
+                }
 
                 if let Some(context) = self.report_context()
                     && source_member.is_none()
@@ -3569,6 +3592,35 @@ impl<'db> ProtocolMemberCandidate<'db> {
     }
 }
 
+/// Cache `object` member names so missing protocol members can be rejected without member lookup.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn object_member_names<'db>(db: &'db dyn Db, program: Program<'db>) -> FxHashSet<Name> {
+    let env = ProgramEnvironment::from_program(program);
+    let Some((object, _)) = ClassType::object(db, &env).static_class_literal(db) else {
+        return FxHashSet::default();
+    };
+
+    let mut names = place_table(db, object.body_scope(db))
+        .symbols()
+        .map(|symbol| symbol.name().clone())
+        .collect::<FxHashSet<_>>();
+    names.shrink_to_fit();
+    names
+}
+
+/// Count protocol requirements that cannot be supplied by inherited `object` members.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn non_object_protocol_member_count<'db>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+) -> usize {
+    let inherited_member_count = object_member_names(db, interface.program(db))
+        .iter()
+        .filter(|name| name.as_str() != "__hash__" && interface.includes_member(db, name))
+        .count();
+    interface.member_count(db) - inherited_member_count
+}
+
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
     returns(copy),
@@ -3728,10 +3780,12 @@ pub(super) fn has_all_protocol_members_defined<'db>(
         Type::ProtocolInstance(source_protocol) => {
             let source_interface = source_protocol.interface(db);
 
-            source_interface.member_count(db) >= target_interface.member_count(db)
-                && target_interface
-                    .members(db)
-                    .all(|member| source_interface.includes_member(db, member.name()))
+            (source_interface.member_count(db) >= target_interface.member_count(db)
+                || source_interface.member_count(db)
+                    >= non_object_protocol_member_count(db, target_interface.interface))
+                && target_interface.members(db).all(|member| {
+                    source_interface.includes_member_or_object_fallback(db, env, member.name())
+                })
         }
         _ => target_interface.members(db).all(|member| {
             matches!(
