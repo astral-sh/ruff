@@ -70,7 +70,7 @@ class Baz(Bar):
     # error: [empty-body]
     def f(self) -> int: ...
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Qux(Protocol[T]):
     def f(self) -> int: ...

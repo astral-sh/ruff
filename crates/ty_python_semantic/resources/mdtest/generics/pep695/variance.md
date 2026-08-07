@@ -505,6 +505,29 @@ static_assert(not is_subtype_of(C[A], C[B]))
 One might think that occurrences in the types of normal attributes are covariant, but they are
 mutable, and thus the occurrences are invariant.
 
+### Mutable protocol attributes
+
+Underscore-prefixed protocol attributes remain writable through their structural interface, so their
+inferred type parameters are invariant.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+static_assert(not is_subtype_of(WritableProtocol[int], WritableProtocol[object]))
+static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[object]))
+
+def overwrite(value: WritableProtocol[object]) -> None:
+    value._value = object()
+
+def unsound(value: WritableProtocol[int]) -> None:
+    overwrite(value)  # error: [invalid-argument-type]
+```
+
 ### Immutable Attributes
 
 Immutable attributes can't be written to, and thus constrain the typevar to covariance, not
