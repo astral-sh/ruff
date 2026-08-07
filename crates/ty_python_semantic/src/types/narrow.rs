@@ -3487,6 +3487,89 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
+    /// Return the constraint on the left-hand operand of a successful identity comparison.
+    ///
+    /// Usually, `value is other` means that `value` can be narrowed to the static type of `other`.
+    /// However, excluding a `NewType` only excludes its static type; it does not exclude the runtime
+    /// objects accepted by its constructor. For example:
+    ///
+    /// ```python
+    /// UserId = NewType("UserId", int)
+    ///
+    /// def f(value: Not[UserId], other: UserId) -> None:
+    ///     if value is other:
+    ///         reveal_type(value)  # int & ~UserId
+    /// ```
+    ///
+    /// A `NewType` constructor returns its argument unchanged, so `value` and `other` can identify
+    /// the same integer even though their static types are disjoint. Intersecting `~UserId` with
+    /// `UserId` directly would incorrectly make this reachable branch `Never`. Instead, retain the
+    /// static exclusion and narrow `value` to the underlying runtime type, yielding `int & ~UserId`.
+    ///
+    /// The same distinction applies to excluded type variables and `LiteralString` provenance.
+    /// Handle each union alternative independently so that genuinely incompatible alternatives
+    /// remain excluded without dropping values that can still identify the same runtime object.
+    fn evaluate_expr_is(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Type<'db> {
+        let db = self.db;
+        let left = match lhs_ty.resolve_type_alias(db) {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&lhs_ty),
+        };
+        let right = match rhs_ty.resolve_type_alias(db) {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&rhs_ty),
+        };
+
+        let may_have_static_only_exclusion = |ty: &Type<'db>| match ty.resolve_type_alias(db) {
+            Type::TypeVar(_) => true,
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|positive| matches!(positive.resolve_type_alias(db), Type::TypeVar(_)))
+                    || intersection.iter_negative(db).any(|negative| {
+                        match negative.resolve_type_alias(db) {
+                            Type::NewTypeInstance(_) | Type::TypeVar(_) => true,
+                            Type::LiteralValue(literal) => literal.is_literal_string(),
+                            _ => false,
+                        }
+                    })
+            }
+            _ => false,
+        };
+        if !left.iter().chain(right).any(may_have_static_only_exclusion) {
+            return rhs_ty;
+        }
+
+        // Excluding a NewType, type variable, or LiteralString does not exclude the
+        // same runtime object. Restore those alternatives without weakening other cases.
+        let mut builder = UnionBuilder::new(db, &self.env).add(rhs_ty);
+        for &left in left {
+            for &right in right {
+                if left.is_disjoint_from(db, &self.env, right)
+                    && left
+                        .identity_comparison_truthiness(db, &self.env, right)
+                        .may_be_true()
+                {
+                    let identity = right.identity_comparison_type(db, &self.env);
+                    let overlap =
+                        IntersectionType::from_two_elements(db, &self.env, left, identity);
+                    let overlap = if overlap.is_never() {
+                        let fallback = match identity {
+                            Type::LiteralValue(literal) => literal.fallback_instance(db, &self.env),
+                            _ => identity.promote(db, &self.env),
+                        };
+                        IntersectionType::from_two_elements(db, &self.env, left, fallback)
+                    } else {
+                        overlap
+                    };
+                    builder = builder.add(if overlap.is_never() { left } else { overlap });
+                }
+            }
+        }
+        builder.build()
+    }
+
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let db = self.db;
         let rhs_ty = rhs_ty.resolve_type_alias(db);
@@ -3631,7 +3714,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 };
                 Some(rhs_constraint.negate(db, &self.env))
             }
-            ast::CmpOp::Is => Some(rhs_ty),
+            ast::CmpOp::Is => Some(self.evaluate_expr_is(lhs_ty, rhs_ty)),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,

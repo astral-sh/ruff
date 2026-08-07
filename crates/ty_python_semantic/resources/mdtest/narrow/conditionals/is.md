@@ -339,6 +339,92 @@ def f(value: int | None | EllipsisType, other: T) -> None:
         reveal_type(value)  # revealed: int | (None & ~T@f) | (EllipsisType & ~T@f)
 ```
 
+## Static exclusions and runtime identity
+
+Excluding a `NewType` does not exclude the objects accepted by its constructor. An identity
+comparison must preserve that exclusion without making a reachable branch disappear.
+
+```py
+from typing import Literal, NewType, TypeVar
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+UserId = NewType("UserId", int)
+
+def excluded_newtype(value: Not[UserId], other: UserId) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: int & ~UserId
+        reveal_type(other)  # revealed: UserId
+        value.does_not_exist  # error: [unresolved-attribute]
+
+    if other is value:
+        reveal_type(value)  # revealed: int & ~UserId
+        reveal_type(other)  # revealed: UserId
+```
+
+A type variable can hide the same static exclusion in its upper bound. The reachable branch must
+preserve that type variable.
+
+```py
+ExcludedBound = TypeVar("ExcludedBound", bound=Intersection[int, Not[UserId]])
+
+def excluded_newtype_in_bound(
+    value: ExcludedBound,
+    other: UserId,
+    without_one: Intersection[ExcludedBound, Not[Literal[1]]],
+) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: ExcludedBound@excluded_newtype_in_bound
+        other.does_not_exist  # error: [unresolved-attribute]
+
+    if without_one is other:
+        reveal_type(without_one)  # revealed: ExcludedBound@excluded_newtype_in_bound & ~Literal[1]
+```
+
+The same runtime overlap remains reachable when both operands are unions, while genuinely
+incompatible alternatives are removed.
+
+```py
+def excluded_newtype_in_unions(
+    value: Intersection[int, Not[UserId]] | None,
+    other: UserId | bytes,
+) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: int & ~UserId
+        reveal_type(other)  # revealed: UserId
+```
+
+`LiteralString` describes string provenance, not runtime identity, so excluding it cannot make an
+identity comparison with a concrete string unreachable.
+
+```py
+def excluded_literal_string(
+    value: Not[LiteralString],
+    text: Intersection[str, Not[LiteralString]],
+    other: Literal["hello"],
+) -> None:
+    if value is "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+
+    if text is "hello":
+        reveal_type(text)  # revealed: str & ~LiteralString
+
+    if value is other:
+        reveal_type(value)  # revealed: str & ~LiteralString
+        reveal_type(other)  # revealed: Literal["hello"]
+```
+
+In contrast, excluding a concrete literal or its runtime class genuinely rules out identity.
+
+```py
+def excluded_runtime_values(value: Not[Literal["hello"]], not_int: Not[int], other: UserId) -> None:
+    if value is "hello":
+        reveal_type(value)  # revealed: Never
+
+    if not_int is other:
+        reveal_type(not_int)  # revealed: Never
+```
+
 ## `is` with `NewType`s
 
 ### Distinct `NewType`s with the same base
