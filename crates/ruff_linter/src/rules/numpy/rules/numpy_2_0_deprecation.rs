@@ -684,7 +684,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         } => {
             diagnostic.try_set_fix(|| {
                 // `numpy.char` is not an importable module path on NumPy 1.x.
-                let (path, name, attribute) = if (path, name) == ("numpy.char", "chararray") {
+                let (path, name, attribute) = if matches!((path, name), ("numpy.char", "chararray" | "compare_chararrays")) {
                     ("numpy", "char", Some("chararray"))
                 } else {
                     (path, name, None)
