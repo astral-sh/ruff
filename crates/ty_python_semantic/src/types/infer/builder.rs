@@ -2510,18 +2510,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let recursively_defined = match nested_bindings_kind.execution {
-            NestedBindingExecution::Lazy => RecursivelyDefined::Yes,
-            NestedBindingExecution::Eager => RecursivelyDefined::No,
+        let (recursively_defined, exception_source) = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => (RecursivelyDefined::Yes, None),
+            NestedBindingExecution::Eager => (RecursivelyDefined::No, None),
+            NestedBindingExecution::EagerAtException { source_definition } => {
+                (RecursivelyDefined::No, Some(source_definition))
+            }
         };
         let env = self.program_environment();
         let mut union = UnionBuilder::new(db, env).recursively_defined(recursively_defined);
         for bindings in binding_sources {
-            if nested_bindings_kind.execution == NestedBindingExecution::Eager {
+            if !recursively_defined.is_yes() {
                 // A comprehension can execute repeatedly, so a source that is unreachable in the
                 // first modeled iteration may become reachable in a later one. Preserve each
                 // source's narrowed type and let the proxy's outer use-def state track boundness.
                 for binding in bindings {
+                    if exception_source.is_some_and(|source| source != binding.binding_order) {
+                        continue;
+                    }
+
                     let DefinitionState::Defined(source) = binding.binding else {
                         continue;
                     };
@@ -2549,9 +2556,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(ty);
         }
         let ty = union.build();
-        let ty = match nested_bindings_kind.execution {
-            NestedBindingExecution::Lazy => ty,
-            NestedBindingExecution::Eager => ty.promote(db, env),
+        let ty = if recursively_defined.is_yes() {
+            ty
+        } else {
+            ty.promote(db, env)
         };
         self.bindings.insert(definition, ty);
     }

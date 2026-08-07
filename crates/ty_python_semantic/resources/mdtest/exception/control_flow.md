@@ -1,16 +1,621 @@
 # Control flow for exception handlers
 
-These tests assert that we understand the possible "definition states" (which symbols might or might
-not be defined) in the various branches of a `try`/`except`/`else`/`finally` block.
+These tests describe which names are defined and what types they have in the branches of a
+`try`/`except`/`else`/`finally` statement.
 
 For a full writeup on the semantics of exception handlers, see [this document][1].
 
-The tests throughout this Markdown document use functions with names starting with `could_raise_*`
-to mark definitions that might or might not succeed (as the function could raise an exception). A
-type checker must assume that any arbitrary function call could raise an exception in Python; this
-is just a naming convention used in these tests for clarity, and to future-proof the tests against
-possible future improvements whereby certain statements or expressions could potentially be inferred
-as being incapable of causing an exception to be raised.
+Functions whose names start with `could_raise_` make it clear that a call may raise an exception
+before an assignment completes. Any other function call can raise as well.
+
+## Operations that cannot raise
+
+An exception handler can run only if the `try` block contains an operation that can raise. Assigning
+a literal to a local name cannot raise:
+
+```py
+x = 1
+try:
+    x = 2
+except:
+    x = "unreachable"
+
+reveal_type(x)  # revealed: Literal[2]
+```
+
+Testing literals, comparing identities, combining these conditions, and iterating over a list
+literal cannot raise either:
+
+```py
+def known_safe_conditions(value: int | None) -> None:
+    state = 0
+    try:
+        if not False:
+            state = 1
+        if not (value is None):
+            state = 1
+        if True and True:
+            state = 1
+        if False or True:
+            state = 1
+        for _ in [0]:
+            state = 1
+    except:
+        state = 2
+
+    reveal_type(state)  # revealed: Literal[1]
+```
+
+## Looking up an undefined name
+
+An undefined name raises `NameError`, so an exception handler can provide its value:
+
+```py
+try:
+    fallback  # ty: ignore[unresolved-reference]
+except NameError:
+    fallback = 1
+
+def use_fallback() -> None:
+    reveal_type(fallback)  # revealed: Literal[1]
+```
+
+A conditionally defined name may retain its original value or receive a value from the handler:
+
+```py
+def possibly_bound(flag: bool) -> None:
+    if flag:
+        value = 1
+
+    try:
+        value  # ty: ignore[possibly-unresolved-reference]
+    except NameError:
+        value = 2
+
+    def use_value() -> None:
+        reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+A name that is definitely defined in the current scope cannot raise `NameError`:
+
+```py
+def definitely_bound(local_value: int) -> None:
+    state = 0
+    try:
+        local_value
+    except NameError:
+        state = 1
+
+    reveal_type(state)  # revealed: Literal[0]
+```
+
+A later local assignment can shadow a builtin and make an earlier reference raise
+`UnboundLocalError`:
+
+```py
+def shadowed_builtin() -> None:
+    try:
+        int
+    except NameError:
+        int = 1
+
+    def use_shadowed_builtin() -> None:
+        reveal_type(int)  # revealed: Literal[1]
+```
+
+## Undefined attribute and subscript receivers
+
+An exception handler can also provide a missing name when that name is used as an attribute
+receiver:
+
+```py
+try:
+    receiver.attribute  # ty: ignore[unresolved-reference]
+except NameError:
+    receiver = object()
+
+def use_receiver() -> None:
+    reveal_type(receiver)  # revealed: object
+```
+
+Likewise, a subscript receiver may raise before its index is evaluated. The subscript itself may
+raise after the index has been evaluated:
+
+```py
+state = "before"
+try:
+    state = 0
+    missing[(state := 1)]  # ty: ignore[unresolved-reference]
+except NameError:
+    reveal_type(state)  # revealed: Literal[0, 1]
+```
+
+## Function arguments are evaluated before the call
+
+If a function call raises, an assignment in one of its arguments has already completed:
+
+```py
+def may_raise(value: object) -> None: ...
+
+x = 0
+try:
+    may_raise(x := 1)
+except:
+    reveal_type(x)  # revealed: Literal[1]
+```
+
+## Failed imports do not create bindings
+
+When an import fails, its target has not been assigned. An exception handler can therefore provide a
+fallback without conflicting with the imported module's type:
+
+```py
+try:
+    import ssl
+except ImportError:
+    ssl = None
+```
+
+When importing several names, an earlier name may already be defined when a later import fails:
+
+```py
+first = 0
+try:
+    from collections.abc import Awaitable as first, Iterable as second
+except ImportError:
+    second = None
+    reveal_type(first)  # revealed: Literal[0] | <class 'Awaitable'>
+```
+
+## Explicit raises and failing assertions
+
+A `raise` statement runs after earlier assignments have completed:
+
+```py
+x = 1
+try:
+    x = 2
+    raise RuntimeError
+except:
+    reveal_type(x)  # revealed: Literal[2]
+```
+
+A failing assertion preserves the narrowing implied by its failed condition:
+
+```py
+def check_assertion(x: int | None) -> None:
+    try:
+        assert x is not None
+    except:
+        reveal_type(x)  # revealed: None
+```
+
+Short-circuiting determines whether an assignment inside the assertion has run:
+
+```py
+def check_short_circuit_assertion(flag: bool) -> None:
+    state = 2
+    try:
+        assert flag and (state := 0)
+    except:
+        reveal_type(state)  # revealed: Literal[2, 0]
+```
+
+## Attribute access and subscripting
+
+Attribute access can raise after its receiver has been evaluated:
+
+```py
+class C:
+    value: int
+
+def attribute_access(c: C) -> None:
+    state: C | int = 0
+    try:
+        (state := c).value
+    except:
+        reveal_type(state)  # revealed: C
+```
+
+A subscript can raise after its index has been evaluated:
+
+```py
+def subscript_access(values: list[int]) -> None:
+    state = 0
+    try:
+        values[state := 1]
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+## Operators and augmented assignments
+
+An arithmetic operator can raise after evaluating both operands:
+
+```py
+class Number:
+    def __truediv__(self, other: int) -> int:
+        raise NotImplementedError
+
+    def __lt__(self, other: int) -> bool:
+        raise NotImplementedError
+
+def division(number: Number) -> None:
+    state = 0
+    try:
+        number / (state := 1)
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+A comparison is also evaluated after its operands:
+
+```py
+def comparison(number: Number) -> None:
+    state = 0
+    try:
+        number < (state := 1)
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+Augmented assignment evaluates the target before its right-hand side. Reading the target can raise
+before the right-hand side runs:
+
+```py
+def augmented_assignment(values: list[int]) -> None:
+    target_state = 0
+    rhs_state = 0
+    try:
+        values[target_state := 1] += (rhs_state := 1)
+    except:
+        reveal_type(target_state)  # revealed: Literal[1]
+        reveal_type(rhs_state)  # revealed: Literal[0, 1]
+```
+
+## Conditions can raise
+
+Evaluating an `if` condition can call `__bool__` or `__len__` and raise before its body runs:
+
+```py
+def if_condition(value: object) -> None:
+    state = 0
+    try:
+        if value:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
+A `while` condition can fail before its first iteration or after an earlier iteration:
+
+```py
+def while_condition(value: object) -> None:
+    state = 0
+    try:
+        while value:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0, 1]
+```
+
+## Iteration can raise
+
+An iterator can fail before producing its first item or after an earlier iteration has completed:
+
+```py
+from collections.abc import AsyncIterable, Iterable
+
+def iteration(values: Iterable[int]) -> None:
+    state = 0
+    try:
+        state = 1
+        for _ in values:
+            state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1, 2]
+```
+
+Assigning an iteration target can also fail before or after an earlier iteration:
+
+```py
+class C:
+    value: int
+
+def iteration_target(target: C) -> None:
+    state = 0
+    try:
+        state = 1
+        for target.value in [0, 1]:
+            state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1, 2]
+```
+
+The same possibilities apply to asynchronous iteration:
+
+```py
+async def async_iteration(values: AsyncIterable[int]) -> None:
+    state = 0
+    try:
+        state = 1
+        async for _ in values:
+            state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1, 2]
+```
+
+## Unpacking can raise
+
+Unpacking can fail before the assignments following it run:
+
+```py
+from collections.abc import Iterable
+
+def unpacking(values: Iterable[int]) -> None:
+    state = 0
+    try:
+        first, second = values
+        state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
+## Awaiting and yielding can raise
+
+Awaiting can raise when a coroutine resumes:
+
+```py
+from collections.abc import Awaitable, Iterable
+
+async def awaiting(value: Awaitable[int]) -> None:
+    state = 0
+    try:
+        state = 1
+        await value
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+Delegating to another iterable can raise while the generator is resumed:
+
+```py
+def yielding_from(values: Iterable[int]):
+    state = 0
+    try:
+        state = 1
+        yield from values
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+A plain `yield` can also raise when an exception is sent into the generator:
+
+```py
+def yielding():
+    state = 0
+    try:
+        state = 1
+        yield
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+## Immediately and lazily evaluated scopes
+
+A class body runs immediately, so an exception raised there reaches the surrounding handler:
+
+```py
+def may_raise() -> None: ...
+
+x = 0
+try:
+    class C:
+        may_raise()
+
+except:
+    x = 1
+
+reveal_type(x)  # revealed: Literal[0, 1]
+```
+
+A list comprehension also runs immediately:
+
+```py
+y = 0
+try:
+    [may_raise() for _ in [0]]
+except:
+    y = 1
+
+reveal_type(y)  # revealed: Literal[0, 1]
+```
+
+A generator expression does not run its body until the generator is consumed:
+
+```py
+z = 0
+try:
+    (may_raise() for _ in [0])
+except:
+    z = 1
+
+reveal_type(z)  # revealed: Literal[0]
+```
+
+## Assignment order in comprehensions
+
+An exception handler sees an assignment expression that ran before a later function call raised:
+
+```py
+def comprehension_may_raise() -> None: ...
+def assignment_before_exception() -> None:
+    state = 0
+    try:
+        [(state := 1, comprehension_may_raise()) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+```
+
+An exception raised before the assignment leaves the original value unchanged:
+
+```py
+def exception_before_assignment() -> None:
+    state = 0
+    try:
+        [(comprehension_may_raise(), state := 1) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
+An assignment after the raising call has not run:
+
+```py
+def exception_before_later_assignment() -> None:
+    state = 0
+    try:
+        [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+```
+
+## Conditional assignments in comprehensions
+
+A conditional assignment may have run before the exception:
+
+```py
+def comprehension_may_raise() -> None: ...
+def conditional_assignment_before_exception(flag: bool) -> None:
+    state = "before"
+    try:
+        state = "ready"
+        [((state := 1) if flag else 0, comprehension_may_raise(), state := 2) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: Literal["ready"] | int
+```
+
+## Multiple assignments in comprehensions
+
+Separate assignment targets retain the values they had when the exception was raised:
+
+```py
+def comprehension_may_raise() -> None: ...
+def multiple_assignments_before_exception() -> None:
+    first = 0
+    second = 0
+    try:
+        [(first := 1, second := "bound", comprehension_may_raise(), second := 2) for _ in [0]]
+    except:
+        reveal_type(first)  # revealed: int
+        reveal_type(second)  # revealed: str
+```
+
+## Nested comprehension assignments
+
+An inner comprehension can replace a value assigned by the enclosing comprehension:
+
+```py
+def comprehension_may_raise() -> None: ...
+def nested_comprehension_assignments() -> None:
+    state = 0
+    try:
+        [((state := "outer"), [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]) for _ in [0]]
+    except:
+        reveal_type(state)  # revealed: int
+```
+
+## Module and global assignments in comprehensions
+
+An assignment expression in a module-level comprehension updates the module-level name:
+
+```py
+def comprehension_may_raise() -> None: ...
+
+module_comprehension_state = "before"
+try:
+    [(module_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
+except:
+    reveal_type(module_comprehension_state)  # revealed: int
+```
+
+An explicitly global assignment updates the same name from inside a function:
+
+```py
+global_comprehension_state = "before"
+
+def global_comprehension_assignment() -> None:
+    global global_comprehension_state
+    try:
+        [(global_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
+    except:
+        reveal_type(global_comprehension_state)  # revealed: Literal["before"] | int
+```
+
+## Assignments in asynchronous comprehensions
+
+An asynchronous comprehension can raise during iteration or after an assignment has completed:
+
+```py
+from collections.abc import AsyncIterable, Awaitable
+
+async def async_comprehension_assignment(values: AsyncIterable[int], awaitable: Awaitable[int]) -> None:
+    state = "before"
+    try:
+        state = "ready"
+        [(state := 1, await awaitable) async for _ in values]
+    except:
+        reveal_type(state)  # revealed: Literal["ready"] | int
+```
+
+## Nested exception handlers
+
+A bare inner handler catches an exception before it can reach the outer handler:
+
+```py
+def may_raise() -> None: ...
+
+x = 0
+try:
+    try:
+        x = 1
+        may_raise()
+    except:
+        x = 2
+except:
+    x = "outer"
+
+reveal_type(x)  # revealed: Literal[1, 2]
+```
+
+An exception raised inside the inner handler can still reach the outer handler:
+
+```py
+try:
+    try:
+        may_raise()
+    except:
+        x = 3
+        may_raise()
+except:
+    reveal_type(x)  # revealed: Literal[3]
+```
+
+Code in an unreachable inner handler cannot make the outer handler reachable:
+
+```py
+z = 0
+try:
+    class C:
+        try:
+            pass
+        except:
+            may_raise()
+
+except:
+    z = 1
+
+reveal_type(z)  # revealed: Literal[0]
+```
 
 ## A single bare `except`
 
@@ -20,14 +625,10 @@ have been taken from the perspective of code following this block. The inferred 
 block's conclusion is therefore the union of the type at the end of the `try` suite (`str`) and the
 type at the end of the `except` suite (`Literal[2]`).
 
-*Within* the `except` suite, we must infer a union of all possible "definition states" we could have
-been in at any point during the `try` suite. This is because control flow could have jumped to the
-`except` suite without any of the `try`-suite definitions successfully completing, with only *some*
-of the `try`-suite definitions successfully completing, or indeed with *all* of them successfully
-completing. The type of `x` at the beginning of the `except` suite in this example is therefore
-`Literal[1] | str`, taking into account that we might have jumped to the `except` suite before the
-`x = could_raise_returns_str()` redefinition, but we *also* could have jumped to the `except` suite
-*after* that redefinition.
+*Within* the `except` suite, we infer a union of the definition states at each exception checkpoint
+in the `try` suite. The type of `x` at the beginning of the `except` suite in this example is
+therefore `Literal[1] | str`: the call on the right-hand side can raise before the redefinition
+completes, while the later `reveal_type` call can raise after it completes.
 
 ```py
 def could_raise_returns_str() -> str:
@@ -436,13 +1037,10 @@ reveal_type(x)  # revealed: C | E | G
 
 ## Nested `try`/`except` blocks
 
-It would take advanced analysis, which we are not yet capable of, to be able to determine that an
-exception handler always suppresses all exceptions. This is partly because it is possible for
-statements in `except`, `else` and `finally` suites to raise exceptions as well as statements in
-`try` suites. This means that if an exception handler is nested inside the `try` statement of an
-enclosing exception handler, it should (at least for now) be treated the same as any other node: as
-a suite containing statements that could possibly raise exceptions, which would lead to control flow
-jumping out of that suite prior to the suite running to completion.
+A checkpoint in a nested `try` suite propagates to both the nested and enclosing handlers unless the
+nested statement has a bare handler. Checkpoints in its `except`, `else`, and `finally` suites
+propagate only to the enclosing handler, because exceptions raised there are not handled by the same
+`try` statement.
 
 ```py
 class A: ...
