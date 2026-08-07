@@ -343,13 +343,18 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
+          prefix-key: v1-rust-workspace
           shared-key: ruff-linux-ci-${{ hashFiles('Cargo.toml') }}
+          cache-workspace-crates: "true"
           save-if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.cargo_profile == 'true') }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -446,13 +451,18 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
+          prefix-key: v1-rust-workspace
           key: ${{ hashFiles('Cargo.toml') }}
+          cache-workspace-crates: "true"
           save-if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.cargo_profile == 'true') }}
           # Fix for https://github.com/Swatinem/rust-cache/issues/341
           cache-bin: "false"
