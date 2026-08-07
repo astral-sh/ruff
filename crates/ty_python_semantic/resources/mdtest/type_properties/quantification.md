@@ -30,7 +30,6 @@ implicit upper bound of `object`), but the only _satisfying_ assignment is `X = 
 result should be equivalent to `A ≤ Invariant[int]`.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -42,18 +41,18 @@ class Invariant[T]:
 
 def grounded[X, A]() -> None:
     # ∃X. X = int ∧ A ≤ Invariant[X]
-    body = ConstraintSet.range(int, X, int) & ConstraintSet.range(Never, A, Invariant[X])
+    body = ConstraintSet.range(int, X, int) & ConstraintSet.upper_bound(A, Invariant[X])
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, A=list[int]]]
-    # revealed: tuple[Solution[X=int, A=Never]]
+    # revealed: tuple[Solution[X=int, A=Invariant[int] & Invariant[X@grounded]]]
     reveal_type(body.solutions(inferable=tuple[X, A]))
     # TODO: revealed: tuple[Solution[A=list[int]]]
-    # revealed: tuple[Solution[A=Never]]
+    # revealed: tuple[Solution[A=Invariant[int]]]
     reveal_type(quantified.solutions(inferable=tuple[A]))
 
     # A ≤ Invariant[int]
-    expected = ConstraintSet.range(Never, A, Invariant[int])
+    expected = ConstraintSet.upper_bound(A, Invariant[int])
     static_assert(quantified == expected)
     static_assert(~quantified == ~expected)
 ```
@@ -63,21 +62,20 @@ def grounded[X, A]() -> None:
 There is an `X` satisfying `U ≤ X ∧ X = V` exactly when `U ≤ V`.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def relational_bridge[X, U, V]() -> None:
     # ∃X. U ≤ X ∧ X = V
-    body = ConstraintSet.range(Never, U, X) & ConstraintSet.range(V, X, V)
+    body = ConstraintSet.upper_bound(U, X) & ConstraintSet.range(V, X, V)
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[V=object, U=object]]
-    # revealed: tuple[Solution[U=Never, V=U@relational_bridge]]
+    # revealed: tuple[Solution[V=U@relational_bridge, U=V@relational_bridge]]
     reveal_type(quantified.solutions(inferable=tuple[U, V]))
 
     # U ≤ V
-    expected = ConstraintSet.range(Never, U, V)
+    expected = ConstraintSet.upper_bound(U, V)
     static_assert(quantified == expected)
     static_assert(~quantified == ~expected)
 ```
@@ -89,7 +87,6 @@ both `A` and `B`. `A = Invariant[str]` and `B ≤ int` cannot satisfy the expres
 satisfy its negation.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -101,22 +98,22 @@ class Invariant[T]:
 
 def inverse_image[X, A, B]() -> None:
     # ∃X. A ≤ Invariant[X] ∧ X ≤ B
-    body = ConstraintSet.range(Never, A, Invariant[X]) & ConstraintSet.range(Never, X, B)
+    body = ConstraintSet.upper_bound(A, Invariant[X]) & ConstraintSet.upper_bound(X, B)
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object, X=object]]
-    # revealed: tuple[Solution[A=Never, X=Never, B=X@inverse_image]]
+    # revealed: tuple[Solution[A=Invariant[X@inverse_image], B=X@inverse_image, X=B@inverse_image]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object]]
     # revealed: tuple[()]
     reveal_type(quantified.solutions(inferable=tuple[A, B]))
 
     # Invariant[str] ≤ A ∧ B ≤ int
-    invalid = ConstraintSet.range(Invariant[str], A, object) & ConstraintSet.range(Never, B, int)
+    invalid = ConstraintSet.lower_bound(Invariant[str], A) & ConstraintSet.upper_bound(B, int)
     # revealed: None
     reveal_type((body & invalid).solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: None
-    # revealed: tuple[Solution[A=Invariant[str], B=Never]]
+    # revealed: tuple[Solution[A=Invariant[str], B=int]]
     reveal_type((quantified & invalid).solutions(inferable=tuple[A, B]))
 
     static_assert(not (quantified & invalid))
@@ -132,7 +129,6 @@ satisfy the expression. `A ≥ int` and `B ≤ Invariant[str]` cannot satisfy it
 its negation.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -144,7 +140,7 @@ class Invariant[T]:
 
 def witness_sensitive[X, A, B]() -> None:
     # ∃X. A ≤ X ∧ Invariant[X] ≤ B
-    body = ConstraintSet.range(A, X, object) & ConstraintSet.range(Invariant[X], B, object)
+    body = ConstraintSet.lower_bound(A, X) & ConstraintSet.lower_bound(Invariant[X], B)
     quantified = body.exists(tuple[X])
 
     # Each solution for A and B depends on the compatible choice of X.
@@ -156,11 +152,11 @@ def witness_sensitive[X, A, B]() -> None:
     reveal_type(quantified.solutions(inferable=tuple[A, B]))
 
     # int ≤ A ∧ B ≤ Invariant[str]
-    invalid = ConstraintSet.range(int, A, object) & ConstraintSet.range(Never, B, Invariant[str])
+    invalid = ConstraintSet.lower_bound(int, A) & ConstraintSet.upper_bound(B, Invariant[str])
     # revealed: None
     reveal_type((body & invalid).solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: None
-    # revealed: tuple[Solution[A=int, B=Never]]
+    # revealed: tuple[Solution[A=int, B=Invariant[str]]]
     reveal_type((quantified & invalid).solutions(inferable=tuple[A, B]))
 
     static_assert(not (quantified & invalid))

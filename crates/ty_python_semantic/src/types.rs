@@ -4663,6 +4663,22 @@ impl<'db> Type<'db> {
                 }
 
                 Type::ClassLiteral(class)
+                    if name == "lower_bound" && class.is_known(db, KnownClass::ConstraintSet) =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetLowerBound,
+                    ))
+                    .into()
+                }
+                Type::ClassLiteral(class)
+                    if name == "upper_bound" && class.is_known(db, KnownClass::ConstraintSet) =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetUpperBound,
+                    ))
+                    .into()
+                }
+                Type::ClassLiteral(class)
                     if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
                 {
                     Place::bound(Type::KnownBoundMethod(
@@ -7384,6 +7400,8 @@ impl<'db> Type<'db> {
                 )
                 | Type::KnownBoundMethod(
                     KnownBoundMethodType::StrStartswith(_)
+                        | KnownBoundMethodType::ConstraintSetLowerBound
+                        | KnownBoundMethodType::ConstraintSetUpperBound
                         | KnownBoundMethodType::ConstraintSetRange
                         | KnownBoundMethodType::ConstraintSetAlways
                         | KnownBoundMethodType::ConstraintSetNever
@@ -7753,6 +7771,8 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetUpperBound
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -8048,6 +8068,8 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(
                 KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetUpperBound
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever

@@ -2790,6 +2790,51 @@ impl<'db> Bindings<'db> {
                         }
                     },
 
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetLowerBound
+                        | KnownBoundMethodType::ConstraintSetUpperBound),
+                    ) => {
+                        let [Some(first), Some(second)] = overload.parameter_types() else {
+                            return;
+                        };
+                        let first = first.project_type_form(db, env);
+                        let second = second.project_type_form(db, env);
+                        let is_lower_bound =
+                            matches!(method, KnownBoundMethodType::ConstraintSetLowerBound);
+                        let (typevar, bound) = if is_lower_bound {
+                            (second, first)
+                        } else {
+                            (first, second)
+                        };
+                        let Type::TypeVar(typevar) = typevar else {
+                            return;
+                        };
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            if is_lower_bound {
+                                ConstraintSet::constrain_typevar_lower_bound(
+                                    db,
+                                    env,
+                                    constraints,
+                                    typevar,
+                                    bound,
+                                )
+                            } else {
+                                ConstraintSet::constrain_typevar_upper_bound(
+                                    db,
+                                    env,
+                                    constraints,
+                                    typevar,
+                                    bound,
+                                )
+                            }
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
                         let [Some(lower), Some(typevar), Some(upper)] = overload.parameter_types()
                         else {

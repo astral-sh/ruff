@@ -1703,7 +1703,7 @@ class OuterCarrier[A_outer]:
 
     def check[R](self) -> None:
         actual = is_constraint_set_assignable_to(RegularCallableTypeOf[OuterCarrier[A_outer].method], Callable[..., R])
-        expected = ConstraintSet.range(A_outer, R, object)
+        expected = ConstraintSet.lower_bound(A_outer, R)
         static_assert(actual == expected)
 ```
 
