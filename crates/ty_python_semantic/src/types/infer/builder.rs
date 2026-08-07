@@ -1458,6 +1458,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             previous_bindings
                 .filter_map(|previous| previous.binding.definition())
+                // Synthetic bindings never carry declarations, and inferring them can recurse
+                // through the loop or nested-scope bindings they summarize.
+                .filter(|previous| previous.kind(db).is_user_visible())
                 .filter_map(|previous| inferred_declaration(db, previous).declared())
                 .find(|imported| imported.qualifiers().contains(TypeQualifiers::FINAL))
         } else {
