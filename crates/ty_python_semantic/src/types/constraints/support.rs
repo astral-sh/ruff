@@ -64,11 +64,6 @@ impl Support {
             })
         })
     }
-
-    /// Returns whether this support contains any type variables in common with `other`.
-    pub(super) fn overlaps_with(&self, other: &Self) -> bool {
-        std::iter::zip(&self.chunks, &other.chunks).any(|(lhs, rhs)| (*lhs & *rhs) != 0)
-    }
 }
 
 impl BitOrAssign<&Self> for Support {

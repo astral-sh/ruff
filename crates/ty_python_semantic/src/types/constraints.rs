@@ -2814,7 +2814,7 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let mut path = interior.path_assignments(db, env, storage, source_order);
+                let mut path = interior.path_assignments(storage, source_order);
                 path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                     .is_continue()
             }
@@ -2880,7 +2880,7 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
-                    let mut path = interior.path_assignments(db, env, storage, source_order);
+                    let mut path = interior.path_assignments(storage, source_order);
                     path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                         .is_continue()
                 };
@@ -4018,52 +4018,56 @@ impl<'db> PathBounds<'db> {
         }
 
         let mut source_orders = storage.calculate_source_orders(source_order);
-        if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
-            db,
-            env,
-            storage,
-            &source_orders,
-            node,
-            inferable,
-        ) {
-            return path_bounds;
-        }
+        let (node, independent_constraints) =
+            Self::split_independent_bounds(db, env, storage, &source_orders, node, inferable);
 
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order);
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
-        let interior = match node.node() {
-            Node::AlwaysTrue => return PathBounds::Unconstrained,
+        let mut paths = match node.node() {
+            Node::AlwaysTrue if independent_constraints.is_empty() => {
+                return PathBounds::Unconstrained;
+            }
+            Node::AlwaysTrue => vec![independent_constraints],
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
-            Node::Interior(interior) => interior,
+            Node::Interior(interior) => {
+                // Sort the constraints in each path by their `source_order`s, to ensure that we
+                // construct any unions or intersections in our type mappings in a stable order.
+                // Constraints might come out of `PathAssignment`s with identical `source_order`s,
+                // but if they do, those "tied" constraints will still be ordered in a stable way.
+                // So we need a stable sort to retain that stable per-tie ordering.
+                let mut collect_visitor = CollectVisitor {
+                    source_orders: &source_orders,
+                    sorted_paths: Vec::new(),
+                };
+                // Sequent discovery must also happen in source order. Sorting the collected paths
+                // below is too late: sequent pairs are not commutative, and TDD traversal order can
+                // otherwise discard gradual evidence before solution extraction.
+                let path_source_order =
+                    storage.ordered_source_order(source_order, derived_source_order);
+                let mut path = interior.path_assignments(storage, path_source_order);
+                let _ = path.visit(db, env, storage, node, &mut collect_visitor);
+
+                for path in &mut collect_visitor.sorted_paths {
+                    path.extend(independent_constraints.iter().copied());
+                    path.sort_by_key(|(_, source_order)| *source_order);
+                }
+
+                collect_visitor.sorted_paths
+            }
         };
 
-        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
-        // any unions or intersections in our type mappings in a stable order. Constraints might
-        // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
-        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
-        // retain that stable per-tie ordering.
-        let mut collect_visitor = CollectVisitor {
-            source_orders: &source_orders,
-            sorted_paths: Vec::new(),
-        };
-        // Sequent discovery must also happen in source order. Sorting the collected paths below
-        // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
-        // discard gradual evidence before solution extraction.
-        let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(db, env, storage, path_source_order);
-        let _ = path.visit(db, env, storage, node, &mut collect_visitor);
-        collect_visitor.sorted_paths.sort_by(|path1, path2| {
+        paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
             let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
         });
 
-        let mut result = Vec::with_capacity(collect_visitor.sorted_paths.len());
+        let mut result = Vec::with_capacity(paths.len());
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxIndexMap::default();
 
-        for path in collect_visitor.sorted_paths {
+        for path in paths {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
@@ -4099,79 +4103,203 @@ impl<'db> PathBounds<'db> {
         PathBounds::Constrained(result.into_boxed_slice())
     }
 
-    /// Accumulates a conjunction of concrete bound constraints without constructing a
-    /// [`PathAssignments`] or its sequent map.
+    /// Removes concrete constraints that hold on every path and are independent of other bounds.
     ///
-    /// There are no relationships to derive between these constraints, as the upper and lower
-    /// bounds do not contain typevars. The normal solution-selection logic still validates each
-    /// accumulated bound against the typevar's declared bound or constraints.
-    fn compute_simple_bound_conjunction(
+    /// The removed constraints can be accumulated directly into every residual solution. If every
+    /// constraint is independent, the residual is `true` and no sequent analysis is necessary.
+    fn split_independent_bounds(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: &FxIndexSet<ConstraintId>,
         node: NodeId,
         inferable: TypeVarSet<'db>,
-    ) -> Option<Self> {
-        match node.node() {
-            Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
-            Node::AlwaysFalse => return Some(PathBounds::Unsatisfiable),
-            Node::Interior(_) => {}
+    ) -> (NodeId, Vec<(ConstraintId, usize)>) {
+        let mut constraints = FxIndexSet::default();
+        node.for_each_unique_constraint(storage, &mut |constraint| {
+            constraints.insert(constraint);
+        });
+
+        if constraints.is_empty() {
+            return (node, Vec::new());
         }
 
-        let mut constraints = Vec::default();
+        let Some(mandatory_constraints) =
+            Self::mandatory_positive_constraints(storage, node, &mut FxHashMap::default())
+        else {
+            return (node, Vec::new());
+        };
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for constraint_id in &constraints {
+            let constraint = storage.constraint_data(*constraint_id);
+            let typevar = storage.typevar_id(db, constraint.typevar);
+            let is_dependent = !mandatory_constraints.contains(constraint_id)
+                || !constraint.typevar.is_inferable(db, inferable)
+                || iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
+                    bound.has_typevar(db, env)
+                        || bound.has_unspecialized_type_var(db, env)
+                        || bound.bottom_materialization(db, env)
+                            != bound.top_materialization(db, env)
+                });
+
+            if is_dependent {
+                dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
+            } else {
+                independent_typevars.insert(typevar);
+            }
+        }
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
+        if independent_typevars.is_empty() {
+            return (node, Vec::new());
+        }
+
+        let mut independent_constraints = Vec::with_capacity(constraints.len());
+        for constraint_id in constraints {
+            let constraint = storage.constraint_data(constraint_id);
+            let typevar = storage.typevar_id(db, constraint.typevar);
+            if independent_typevars.contains(&typevar) {
+                let source_order = source_orders
+                    .get_index_of(&constraint_id)
+                    .expect("every TDD constraint should have a source order");
+                independent_constraints.push((constraint_id, source_order));
+            }
+        }
+        independent_constraints.sort_by_key(|(_, source_order)| *source_order);
+
+        let residual = Self::remove_independent_constraints(
+            db,
+            storage,
+            node,
+            &independent_typevars,
+            &mut FxHashMap::default(),
+        );
+
+        (residual, independent_constraints)
+    }
+
+    /// Finds positive constraints shared by every structurally satisfiable path.
+    fn mandatory_positive_constraints(
+        storage: &ConstraintSetStorage<'db>,
+        node: NodeId,
+        cache: &mut FxHashMap<NodeId, Option<FxHashSet<ConstraintId>>>,
+    ) -> Option<FxHashSet<ConstraintId>> {
+        if let Some(mandatory) = cache.get(&node) {
+            return mandatory.clone();
+        }
+
+        let mut prefix = FxHashSet::default();
         let mut current = node;
-        loop {
+        let mandatory = loop {
             match current.node() {
-                Node::AlwaysTrue => break,
-                Node::AlwaysFalse => return None,
+                Node::AlwaysTrue => break Some(prefix),
+                Node::AlwaysFalse => break None,
                 Node::Interior(_) => {
                     let interior = storage.interior_node_data(current);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return None;
+                    if interior.if_uncertain == ALWAYS_FALSE && interior.if_false == ALWAYS_FALSE {
+                        prefix.insert(interior.constraint);
+                        current = interior.if_true;
+                        continue;
                     }
 
-                    let constraint = storage.constraint_data(interior.constraint);
-                    if !constraint.typevar.is_inferable(db, inferable) {
-                        return None;
+                    let mut mandatory: Option<FxHashSet<ConstraintId>> = None;
+                    for (branch, positive) in [
+                        (interior.if_true, true),
+                        (interior.if_uncertain, false),
+                        (interior.if_false, false),
+                    ] {
+                        let Some(mut branch_constraints) =
+                            Self::mandatory_positive_constraints(storage, branch, cache)
+                        else {
+                            continue;
+                        };
+
+                        if positive {
+                            branch_constraints.insert(interior.constraint);
+                        }
+
+                        if let Some(mandatory) = &mut mandatory {
+                            mandatory.retain(|constraint| branch_constraints.contains(constraint));
+                        } else {
+                            mandatory = Some(branch_constraints);
+                        }
                     }
 
-                    if iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
-                        bound.has_typevar(db, env) || bound.has_unspecialized_type_var(db, env)
-                    }) {
-                        return None;
-                    }
-
-                    current = interior.if_true;
-                    constraints.push((
-                        constraint.typevar,
-                        constraint.bounds,
-                        source_orders
-                            .get_index_of(&interior.constraint)
-                            .expect("every TDD constraint should have a source order"),
-                    ));
+                    break mandatory.map(|mut mandatory| {
+                        mandatory.extend(prefix);
+                        mandatory
+                    });
                 }
             }
+        };
+
+        cache.insert(node, mandatory.clone());
+        mandatory
+    }
+
+    /// Removes already-extracted positive constraints without disturbing the remaining diagram.
+    fn remove_independent_constraints(
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+        node: NodeId,
+        independent_typevars: &FxHashSet<TypeVarId>,
+        cache: &mut FxHashMap<NodeId, NodeId>,
+    ) -> NodeId {
+        if let Some(residual) = cache.get(&node) {
+            return *residual;
         }
 
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxIndexMap::default();
-        constraints.sort_by_key(|(_, _, source_order)| *source_order);
-        for (typevar, constraint, _) in constraints {
-            let bounds = mappings.entry(typevar).or_default();
-            if let Some(lower) = constraint.lower {
-                bounds.add_lower(db, env, lower);
+        let residual = match node.node() {
+            Node::AlwaysTrue | Node::AlwaysFalse => node,
+            Node::Interior(_) => {
+                let interior = storage.interior_node_data(node);
+                let constraint = storage.constraint_data(interior.constraint);
+                let typevar = storage.typevar_id(db, constraint.typevar);
+                if independent_typevars.contains(&typevar) {
+                    Self::remove_independent_constraints(
+                        db,
+                        storage,
+                        interior.if_true,
+                        independent_typevars,
+                        cache,
+                    )
+                } else {
+                    let if_true = Self::remove_independent_constraints(
+                        db,
+                        storage,
+                        interior.if_true,
+                        independent_typevars,
+                        cache,
+                    );
+                    let if_uncertain = Self::remove_independent_constraints(
+                        db,
+                        storage,
+                        interior.if_uncertain,
+                        independent_typevars,
+                        cache,
+                    );
+                    let if_false = Self::remove_independent_constraints(
+                        db,
+                        storage,
+                        interior.if_false,
+                        independent_typevars,
+                        cache,
+                    );
+                    NodeId::with_uncertain(
+                        storage,
+                        interior.constraint,
+                        if_true,
+                        if_uncertain,
+                        if_false,
+                    )
+                }
             }
-            if let Some(upper) = constraint.upper {
-                bounds.add_upper(db, env, upper);
-            }
-        }
+        };
 
-        let path = mappings
-            .drain(..)
-            .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
-            .collect();
-        Some(PathBounds::Constrained(Box::new([path])))
+        cache.insert(node, residual);
+        residual
     }
 
     pub(crate) fn solve(
@@ -4833,7 +4961,7 @@ impl InteriorNode {
             }
         }
 
-        let mut path = self.path_assignments(db, env, storage, source_order);
+        let mut path = self.path_assignments(storage, source_order);
         let mut visitor = AbstractVisitor { should_remove };
         let ControlFlow::Continue(result) = path.visit(db, env, storage, self.node(), &mut visitor);
         result
@@ -4911,11 +5039,9 @@ impl InteriorNode {
         result
     }
 
-    fn path_assignments<'db>(
+    fn path_assignments(
         self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
+        storage: &mut ConstraintSetStorage<'_>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
@@ -4935,33 +5061,7 @@ impl InteriorNode {
                 .expect("every BDD constraint should have a source-order entry")
         });
 
-        if !self.node().is_single_conjunction(storage) {
-            return PathAssignments::new(constraints, FxHashSet::default());
-        }
-
-        let mut independent_typevars = FxHashSet::default();
-        let mut dependent_typevars = FxHashSet::default();
-        for constraint_id in &constraints {
-            let constraint = storage.constraint_data(*constraint_id);
-            let typevar = storage.typevar_id(db, constraint.typevar);
-            let has_relational_bound =
-                iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
-                    bound.has_typevar(db, env)
-                        || bound.has_unspecialized_type_var(db, env)
-                        || bound.bottom_materialization(db, env)
-                            != bound.top_materialization(db, env)
-                });
-
-            if has_relational_bound {
-                dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
-            } else {
-                independent_typevars.insert(typevar);
-            }
-        }
-
-        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
-
-        PathAssignments::new(constraints, independent_typevars)
+        PathAssignments::new(constraints)
     }
 
     /// Returns a simplified version of a BDD.
@@ -7092,10 +7192,6 @@ pub(crate) struct PathAssignments {
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
 
-    /// Type variables mentioned only by concrete constraints in the original diagram.
-    /// Deriving relationships to unrelated type variables cannot affect those constraints.
-    independent_typevars: FxHashSet<TypeVarId>,
-
     /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
 
@@ -7160,10 +7256,7 @@ impl Ord for AssignmentFuel {
 }
 
 impl PathAssignments {
-    fn new(
-        constraints: impl IntoIterator<Item = ConstraintId>,
-        independent_typevars: FxHashSet<TypeVarId>,
-    ) -> Self {
+    fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
         let discovered = constraints
             .into_iter()
             .map(|constraint| (constraint, false))
@@ -7174,7 +7267,6 @@ impl PathAssignments {
             additional_fuels: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
-            independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
@@ -7484,17 +7576,6 @@ impl PathAssignments {
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
-                continue;
-            }
-
-            let existing_support = storage.constraint_support(*existing);
-            let constraint_support = storage.constraint_support(constraint);
-            if !existing_support.overlaps_with(constraint_support)
-                && existing_support
-                    .iter()
-                    .chain(constraint_support.iter())
-                    .any(|typevar| self.independent_typevars.contains(&typevar))
-            {
                 continue;
             }
 
@@ -9585,18 +9666,16 @@ mod tests {
         }
     }
 
-    fn path_assignments_for<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
+    fn path_assignments_for(
+        builder: &ConstraintSetBuilder<'_>,
         node: NodeId,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
+            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
             Node::Interior(interior) => {
                 let mut storage = builder.storage.borrow_mut();
-                interior.path_assignments(db, env, &mut storage, source_order)
+                interior.path_assignments(&mut storage, source_order)
             }
         }
     }
@@ -9605,7 +9684,6 @@ mod tests {
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
         let db = &db;
-        let env = db.program_environment();
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
@@ -9615,7 +9693,7 @@ mod tests {
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
+        let path = path_assignments_for(&builder, set.node, set.source_order);
         let storage = builder.storage.borrow();
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
@@ -9673,7 +9751,7 @@ mod tests {
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
+            let mut path = path_assignments_for(&builder, set.node, set.source_order);
             let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
@@ -9710,7 +9788,7 @@ mod tests {
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
+            let mut path = path_assignments_for(&builder, set.node, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
