@@ -10743,7 +10743,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(!value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => Type::int_literal(!i64::from(value)),
+                LiteralValueTypeKind::Bool(value) => {
+                    // `~bool` is deprecated and will be removed in Python 3.16.
+                    // Then it will become unavailable and the fallback will report it
+                    // as `unsupported-operator`.
+                    if let Some(dunder) = operand_type
+                        .member_lookup_with_policy(
+                            db,
+                            env,
+                            "__invert__",
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                        .ignore_possibly_undefined()
+                    {
+                        self.check_deprecated(unary, dunder);
+                        Type::int_literal(!i64::from(value))
+                    } else {
+                        fallback_unary_expression_type()
+                    }
+                }
                 _ => fallback_unary_expression_type(),
             },
 
