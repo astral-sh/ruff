@@ -89,17 +89,6 @@ CORPUS_PROJECTS = (
         source_directories=("astropy/units",),
     ),
     EcosystemProject(
-        name="prefect",
-        repository="PrefectHQ/prefect",
-        revision="db66b14dbaea18e726fc4ea0100fd194383c6c59",
-        source_directories=(
-            "src/prefect/server/models",
-            "src/prefect/concurrency",
-            "src/prefect/events",
-            "src/prefect/input",
-        ),
-    ),
-    EcosystemProject(
         name="typeshed",
         repository="python/typeshed",
         revision="e0efbeef901e9b6998d016e1ab9352678f09ae77",
