@@ -153,10 +153,7 @@ def derived_solution[U, T]() -> None:
         & (ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str))
     )
 
-    # TODO: The derived relationship should not leave an inferable `U` in the solution for `T`.
-    # TODO: revealed: tuple[Solution[T=int]]
-    # TODO: sometimes: revealed tuple[Solution[T=int | U@derived_solution]]
-    # revealed: tuple[Solution[T=U@derived_solution | int]]
+    # revealed: tuple[Solution[T=int]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U]))
 
     # TODO: The derived relationship should not leave an inferable `T` in the solution for `U`.
@@ -204,8 +201,7 @@ def chain_stu[S, T, U]() -> None:
 
     constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
-    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
-    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
+    # revealed: tuple[Solution[S=int | T@chain_stu]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
@@ -220,8 +216,7 @@ def chain_uts[U, T, S]() -> None:
 
     constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
-    # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
-    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
+    # revealed: tuple[Solution[S=int | T@chain_uts]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))

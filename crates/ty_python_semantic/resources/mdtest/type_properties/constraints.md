@@ -787,6 +787,20 @@ def concrete_pivot[T, U]() -> None:
     static_assert(constraints.implies_subtype_of(T, U))
 ```
 
+When both type variables have independent concrete evidence, their implied relationship should not
+be reused as an inferred specialization. The nested third constraint ensures this exercises the
+general solver rather than its concrete-conjunction fast path.
+
+```py
+def independent_concrete_pivot[T, U, V]() -> None:
+    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(int, U, int) & ConstraintSet.range(Never, V, list[T])
+
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
+    # revealed: tuple[Solution[U=int]]
+    reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
+```
+
 ## Other simplifications
 
 ### Ordering of intersection and union elements

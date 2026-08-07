@@ -10,12 +10,28 @@ use crate::types::visitor::any_over_type;
 use crate::types::{BoundTypeVarInstance, DynamicType, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
+type ProvenancedAssignment = (ConstraintAssignment, ConstraintId, AssignmentProvenance);
+
+/// Whether an assignment came directly from the diagram or was derived through transitivity.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum AssignmentProvenance {
+    Original,
+    Derived,
+}
+
 pub(super) struct SolutionWalker<'db> {
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
     source_orders: FxIndexSet<ConstraintId>,
-    explored_nodes: FxHashSet<(NodeId, Vec<(ConstraintAssignment, ConstraintId)>)>,
-    sorted_paths: Vec<Vec<(ConstraintId, usize)>>,
+    explored_nodes: FxHashSet<(NodeId, Vec<ProvenancedAssignment>)>,
+    sorted_paths: Vec<Vec<(ConstraintId, usize, AssignmentProvenance)>>,
+}
+
+/// Concrete bounds that appear directly on a TDD path, without sequent derivation.
+#[derive(Default)]
+struct DirectConcreteBounds<'db> {
+    lower: Vec<Type<'db>>,
+    upper: Vec<Type<'db>>,
 }
 
 impl<'db> SolutionWalker<'db> {
@@ -50,15 +66,22 @@ impl<'db> SolutionWalker<'db> {
         storage: &ConstraintSetStorage<'db>,
         path: &PathAssignments,
         support: &Support,
-    ) -> impl Iterator<Item = (ConstraintAssignment, ConstraintId)> {
+    ) -> impl Iterator<Item = ProvenancedAssignment> {
         path.assignments
             .iter()
             .filter_map(|(assignment, (source_constraint, _))| {
                 let constraint = assignment.as_constrained()?;
                 let constraint_support = storage.constraint_support(constraint);
-                constraint_support
-                    .overlaps_with(support)
-                    .then_some((*assignment, *source_constraint))
+                if !constraint_support.overlaps_with(support) {
+                    return None;
+                }
+
+                let provenance = if path.assignment_is_original(*assignment) {
+                    AssignmentProvenance::Original
+                } else {
+                    AssignmentProvenance::Derived
+                };
+                Some((*assignment, *source_constraint, provenance))
             })
     }
 
@@ -85,7 +108,7 @@ impl<'db> SolutionWalker<'db> {
         relevant_typevars.close_over_constraints(storage, &Self::constrained_assignments(path));
         let mut relevant_path: Vec<_> =
             Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
-        relevant_path.sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
+        relevant_path.sort_unstable_by_key(|(assignment, _, _)| assignment.constraint().ordering());
         let key = (node, relevant_path);
         if !self.explored_nodes.insert(key) {
             return;
@@ -225,17 +248,57 @@ impl<'db> SolutionWalker<'db> {
     ) {
         let mut path: Vec<_> =
             Self::constrained_assignments_mentioning(storage, path, visible_typevars)
-                .filter(|(assignment, _)| assignment.is_positive())
-                .map(|(assignment, source_constraint)| {
+                .filter(|(assignment, _, _)| assignment.is_positive())
+                .map(|(assignment, source_constraint, provenance)| {
                     let source_order = self
                         .source_orders
                         .get_index_of(&source_constraint)
                         .expect("every TDD constraint should have a source order");
-                    (assignment.constraint(), source_order)
+                    (assignment.constraint(), source_order, provenance)
                 })
                 .collect();
-        path.sort_by_key(|(_, source_order)| *source_order);
+        path.sort_by_key(|(_, source_order, _)| *source_order);
         self.sorted_paths.push(path);
+    }
+
+    /// A derived relationship is redundant inference evidence when direct concrete bounds
+    /// already prove it: `source <= source_upper <= target_lower <= target`.
+    ///
+    /// The sequent remains available for contradiction checking and implication queries. Omitting
+    /// it here only avoids treating the logical consequence as a new, mutually recursive candidate
+    /// specialization for two independently constrained type variables.
+    fn derived_relationship_is_redundant(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        direct_bounds: &FxIndexMap<BoundTypeVarInstance<'db>, DirectConcreteBounds<'db>>,
+        provenance: AssignmentProvenance,
+        (source, target): (BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>),
+    ) -> bool {
+        if provenance != AssignmentProvenance::Derived
+            || !source.is_inferable(db, self.inferable)
+            || !target.is_inferable(db, self.inferable)
+        {
+            return false;
+        }
+
+        let (Some(source_bounds), Some(target_bounds)) =
+            (direct_bounds.get(&source), direct_bounds.get(&target))
+        else {
+            return false;
+        };
+
+        source_bounds.upper.iter().any(|source_upper| {
+            target_bounds.lower.iter().any(|target_lower| {
+                storage.cached_is_constraint_set_subtype_of(
+                    db,
+                    env,
+                    source_upper.top_materialization(db, env),
+                    target_lower.bottom_materialization(db, env),
+                )
+            })
+        })
     }
 
     pub(super) fn finish(
@@ -249,8 +312,8 @@ impl<'db> SolutionWalker<'db> {
         }
 
         self.sorted_paths.sort_by(|path1, path2| {
-            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
-            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+            let source_orders1 = path1.iter().map(|(_, source_order, _)| *source_order);
+            let source_orders2 = path2.iter().map(|(_, source_order, _)| *source_order);
             source_orders1.cmp(source_orders2)
         });
         self.sorted_paths.dedup_by(|path1, path2| {
@@ -273,9 +336,48 @@ impl<'db> SolutionWalker<'db> {
             })
         };
 
-        for path in self.sorted_paths {
+        for path in std::mem::take(&mut self.sorted_paths) {
             mappings.clear();
-            for (constraint, _) in path {
+
+            let mut direct_bounds: FxIndexMap<
+                BoundTypeVarInstance<'db>,
+                DirectConcreteBounds<'db>,
+            > = FxIndexMap::default();
+            for &(constraint, _, provenance) in &path {
+                if provenance != AssignmentProvenance::Original {
+                    continue;
+                }
+
+                let Some(constraint) = storage.constraint_data(constraint).as_typevar() else {
+                    continue;
+                };
+                if !constraint.typevar.is_inferable(db, self.inferable) {
+                    continue;
+                }
+
+                if let Some(lower) = constraint.bounds.lower
+                    && !lower.has_typevar(db, env)
+                    && !lower.has_provisional_marker(db, env)
+                {
+                    direct_bounds
+                        .entry(constraint.typevar)
+                        .or_default()
+                        .lower
+                        .push(lower);
+                }
+                if let Some(upper) = constraint.bounds.upper
+                    && !upper.has_typevar(db, env)
+                    && !upper.has_provisional_marker(db, env)
+                {
+                    direct_bounds
+                        .entry(constraint.typevar)
+                        .or_default()
+                        .upper
+                        .push(upper);
+                }
+            }
+
+            for (constraint, _, provenance) in path {
                 let Some(constraint) = storage.constraint_data(constraint).as_typevar() else {
                     continue;
                 };
@@ -303,6 +405,18 @@ impl<'db> SolutionWalker<'db> {
                 // callable still provides a useful concrete bound and must be preserved.
                 if let Some(lower) = constraint.bounds.lower
                     && !contains_unspecialized_typevar(lower)
+                    && !matches!(
+                        lower,
+                        Type::TypeVar(source)
+                            if self.derived_relationship_is_redundant(
+                                db,
+                                env,
+                                storage,
+                                &direct_bounds,
+                                provenance,
+                                (source, typevar),
+                            )
+                    )
                 {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
@@ -315,6 +429,18 @@ impl<'db> SolutionWalker<'db> {
 
                 if let Some(upper) = constraint.bounds.upper
                     && !contains_unspecialized_typevar(upper)
+                    && !matches!(
+                        upper,
+                        Type::TypeVar(target)
+                            if self.derived_relationship_is_redundant(
+                                db,
+                                env,
+                                storage,
+                                &direct_bounds,
+                                provenance,
+                                (typevar, target),
+                            )
+                    )
                 {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, env, upper);

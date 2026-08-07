@@ -7793,6 +7793,15 @@ impl PathAssignments {
         Some(max_fuel)
     }
 
+    /// Only a constraint encountered directly in the TDD retains the full path-fuel budget.
+    ///
+    /// Reusing branch-local fuel replenishment also ensures that an assignment derived on the
+    /// parent path stops being considered direct after leaving a branch that explicitly asserted
+    /// the same constraint.
+    fn assignment_is_original(&self, assignment: ConstraintAssignment) -> bool {
+        self.max_remaining_fuel_for(assignment) == Some(PATH_FUEL_BUDGET)
+    }
+
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
     /// constraint. We do not calculate the new sequents directly. Instead, we call
     /// [`SequentMap::for_constraint`] and [`for_constraint_pair`][SequentMap::for_constraint_pair]
@@ -9572,7 +9581,7 @@ mod tests {
     }
 
     #[test]
-    fn constraint_ordering_changes_derived_upper_bound_display() {
+    fn concrete_pivot_solutions_are_independent_of_constraint_order() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -9598,12 +9607,7 @@ mod tests {
                     .and(storage, int_t)
                     .and(storage, u_int)
             },
-            // TODO: Constraint-ID permutations can still change which equivalent upper-bound
-            // intersection is constructed first.
-            [
-                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
-                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
-            ],
+            ["never=false always=false merged=[T=int, U=int] paths=[T=int, U=int]"],
         );
     }
 

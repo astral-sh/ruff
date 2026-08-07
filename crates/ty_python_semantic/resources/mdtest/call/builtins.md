@@ -439,8 +439,7 @@ def _(xs: Unknown, values: list[tuple[Any, ...]]):
     # TODO: should be `map[str]`
     reveal_type(map("{}".format, xs))  # revealed: map[str | Unknown]
 
-    # TODO: should be `LiteralString`
-    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+    reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 
     reveal_type(map(min, values))  # revealed: map[Any]
 ```

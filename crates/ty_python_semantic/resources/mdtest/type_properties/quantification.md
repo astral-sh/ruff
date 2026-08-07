@@ -199,7 +199,7 @@ def correlated_outputs[X, Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=int | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[int], Y=int], Solution[X=str | Y@correlated_outputs, Z=Invariant[X@correlated_outputs] | Invariant[str], Y=str]]
+    # revealed: tuple[Solution[X=int, Z=Invariant[X@correlated_outputs] | Invariant[int], Y=int], Solution[X=str, Z=Invariant[X@correlated_outputs] | Invariant[str], Y=str]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
