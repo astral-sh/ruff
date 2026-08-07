@@ -227,17 +227,18 @@ static_assert(not is_singleton(tuple[None]))
 python-version = "3.11"
 ```
 
-The `Never` type contains no inhabitants, so a tuple type that contains `Never` as a mandatory
-element also contains no inhabitants.
+The `Never` type contains no inhabitants, but a tuple annotation can also describe user-defined
+subclasses. A tuple type containing `Never` as a mandatory element therefore retains its shape
+instead of simplifying to `Never`.
 
 ```py
 from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to
 
-static_assert(is_equivalent_to(tuple[Never], Never))
-static_assert(is_equivalent_to(tuple[int, Never], Never))
-static_assert(is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
+static_assert(not is_equivalent_to(tuple[Never], Never))
+static_assert(not is_equivalent_to(tuple[int, Never], Never))
+static_assert(not is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
 ```
 
 If the variable-length portion of a tuple is `Never`, then that portion of the tuple must always be

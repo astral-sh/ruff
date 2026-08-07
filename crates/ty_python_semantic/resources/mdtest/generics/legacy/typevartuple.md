@@ -327,6 +327,62 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited specializations containing `Never`
+
+A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
+arguments to a generic base.
+
+```py
+from typing import Any, Generic, Never, TypeVar, TypeVarTuple
+
+T = TypeVar("T", covariant=True)
+Ts = TypeVarTuple("Ts")
+
+class Kind(Generic[T, *Ts]): ...
+class SupportsKind(Kind[T, *Ts]): ...
+class Container(SupportsKind["Container", int, str, Never]): ...
+
+def _(value: Container) -> None:
+    expected: Kind[Container, int, str, Any] = value
+
+reveal_type(Kind[Container, int, str, Never])  # revealed: <class 'Kind[Container, int, str, Never]'>
+```
+
+### Callbacks returning `Never`-padded containers
+
+A callback can return a concrete container whose variadic base is padded with `Never` when the
+expected container type uses `Any` in that position.
+
+```py
+from collections.abc import Callable
+from typing import Any, Generic, Never, TypeVar, TypeVarTuple
+
+Instance = TypeVar("Instance", covariant=True)
+Value = TypeVar("Value")
+Error = TypeVar("Error")
+NewValue = TypeVar("NewValue")
+Ts = TypeVarTuple("Ts")
+
+class Kind(Generic[Instance, *Ts]): ...
+class SupportsKind(Kind[Instance, *Ts]): ...
+
+Kind2 = Kind[Instance, Value, Error, Any]
+SupportsKind2 = SupportsKind[Instance, Value, Error, Never]
+
+class Result(SupportsKind2["Result[Any, Any]", Value, Error]):
+    def bind(
+        self,
+        callback: Callable[[Value], Kind2["Result[Any, Any]", NewValue, Error]],
+    ) -> "Result[NewValue, Error]":
+        raise NotImplementedError
+
+def parse(value: str) -> Result[int, Exception]:
+    raise NotImplementedError
+
+def _(result: Result[str, Exception]) -> None:
+    reveal_type(result.bind(parse))  # revealed: Result[int, Exception]
+```
+
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
@@ -484,6 +540,25 @@ def _(
     reveal_type(a8)  # revealed: tuple[bool]
     reveal_type(a9)  # revealed: tuple[int, str, bool]
     reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+```
+
+### Legacy aliases containing `Never`
+
+A legacy alias must retain free type variables that appear alongside a `Never` argument in a
+variadic specialization.
+
+```py
+from typing import Generic, Never, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class Container(Generic[*Ts]): ...
+
+Padded = Container[T, Never]
+
+def _(value: Padded[int]) -> None:
+    reveal_type(value)  # revealed: Container[int, Never]
 ```
 
 ### Variadic arguments require variadic aliases
