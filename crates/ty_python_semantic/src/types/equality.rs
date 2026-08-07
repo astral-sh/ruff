@@ -1333,6 +1333,13 @@ fn finite_alternatives<'db>(
 
                 let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
                 let complement = match expanded {
+                    Type::LiteralValue(literal)
+                        if matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
+                            && KnownComparisonSemantics::of_type(db, env, expanded, operator)
+                                .is_some() =>
+                    {
+                        return Some(vec![expanded]);
+                    }
                     Type::EnumComplement(complement) => complement,
                     Type::Intersection(intersection) => intersection.enum_complement(db, env)?,
                     _ => return None,

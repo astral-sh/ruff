@@ -2215,8 +2215,9 @@ def compare_branded_exclusion(
     other: Literal[IdentityEnum.A, IdentityEnum.B],
 ) -> None:
     if branded == other:
-        reveal_type(branded)  # revealed: WrappedIdentityEnum & ~Literal[IdentityEnum.A]
+        reveal_type(branded)  # revealed: WrappedIdentityEnum & Literal[IdentityEnum.B]
         reveal_type(other)  # revealed: Literal[IdentityEnum.B]
+        accepts_b(branded)
         accepts_b(other)
     else:
         reveal_type(other)  # revealed: Literal[IdentityEnum.A]
@@ -2228,7 +2229,7 @@ def compare_nested_brand(value: NestedAlias, other: Literal[IdentityEnum.A]) -> 
     if value == other:
         reveal_type(value)  # revealed: NestedIdentityEnum & Literal[IdentityEnum.A]
     else:
-        reveal_type(value)  # revealed: NestedIdentityEnum & ~Literal[IdentityEnum.A]
+        reveal_type(value)  # revealed: NestedIdentityEnum & Literal[IdentityEnum.B]
 ```
 
 Distinct branded `IntEnum` classes still compare by their integer values, and custom equality

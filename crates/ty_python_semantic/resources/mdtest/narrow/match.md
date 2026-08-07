@@ -3356,6 +3356,7 @@ python-version = "3.11"
 ```py
 from enum import Enum, IntEnum, StrEnum, auto
 from typing import Literal, NewType, assert_never
+from ty_extensions import Intersection
 from ty_extensions._internal import Unknown
 
 class Color(StrEnum):
@@ -3413,6 +3414,11 @@ class Second(IntEnum):
 BrandedFirst = NewType("BrandedFirst", First)
 BrandedSecond = NewType("BrandedSecond", Second)
 
+def branded_int_enum_literal_pattern_is_exhaustive(value: Intersection[BrandedFirst, Literal[First.ONE]]) -> int:
+    match value:
+        case 1:
+            return 1
+
 def branded_int_enum_integer_patterns_are_exhaustive(value: BrandedFirst) -> int:
     match value:
         case 1:
@@ -3436,7 +3442,7 @@ def branded_cross_int_enum_member_patterns(value: BrandedFirst | BrandedSecond) 
         case First.ONE:
             reveal_type(value)  # revealed: (BrandedFirst & Literal[First.ONE]) | (BrandedSecond & Literal[Second.ONE])
         case _:
-            reveal_type(value)  # revealed: (BrandedFirst & ~Literal[First.ONE]) | (BrandedSecond & ~Literal[Second.ONE])
+            reveal_type(value)  # revealed: (BrandedFirst & Literal[First.TWO]) | (BrandedSecond & Literal[Second.TWO])
 
 def cross_int_enum_members(value: First | Second) -> None:
     match value:
