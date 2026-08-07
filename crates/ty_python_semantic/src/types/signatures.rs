@@ -2457,6 +2457,56 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut source_parameters = source.parameters.expand_starred_variadic_annotations(db);
         let mut target_parameters = target.parameters.expand_starred_variadic_annotations(db);
 
+        let source_has_unpacked_suffix = source_parameters.variadic().is_some_and(|(index, _)| {
+            source_parameters
+                .get(index + 1)
+                .is_some_and(Parameter::is_positional)
+        });
+        let target_has_unpacked_suffix = target_parameters.variadic().is_some_and(|(index, _)| {
+            target_parameters
+                .get(index + 1)
+                .is_some_and(Parameter::is_positional)
+        });
+
+        if source_has_unpacked_suffix || target_has_unpacked_suffix {
+            // A target call can fill a source parameter positionally and also pass its name as a
+            // keyword. A matching target prefix protects that name only when the same call must
+            // already have filled the target parameter, including every prefix before a suffix.
+            for (source_index, source_parameter) in source_parameters.positional().enumerate() {
+                let Some(source_name) = source_parameter.keyword_name() else {
+                    continue;
+                };
+
+                if target_parameters.variadic().is_none()
+                    && source_index >= target_parameters.positional().count()
+                {
+                    continue;
+                }
+
+                let target_keyword = target_parameters.keyword_by_name(source_name.as_str());
+                if target_keyword.is_some_and(|(target_index, target_parameter)| {
+                    target_parameter.is_positional()
+                        && (target_index <= source_index || target_has_unpacked_suffix)
+                }) {
+                    continue;
+                }
+
+                let accepts_keyword = target_keyword.map_or_else(
+                    || {
+                        target_parameters
+                            .keyword_variadic()
+                            .is_some_and(|(_, parameter)| {
+                                !parameter.annotated_type().resolve_type_alias(db).is_never()
+                            })
+                    },
+                    |(_, parameter)| !parameter.annotated_type().resolve_type_alias(db).is_never(),
+                );
+                if accepts_keyword {
+                    return self.never();
+                }
+            }
+        }
+
         // Gradual variadics and TypeVarTuples need their original suffix boundaries for
         // materialization and inference. Named source prefixes must also remain visible when a
         // target keyword could fill the same parameter.
@@ -4038,6 +4088,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     default_type: target_default,
                 } => {
                     if let Some(source_param) = source_keywords.remove(&**target_name) {
+                        // The suffix forces a target prefix to be positional, so it cannot
+                        // provide a source parameter that must be supplied by keyword.
+                        if target_has_unpacked_suffix
+                            && source_param.is_keyword_only()
+                            && source_param.default_type().is_none()
+                            && !target_param.is_keyword_only()
+                        {
+                            if let Some(context) = self.report_context() {
+                                context.push(ErrorContext::ExtraRequiredParameter {
+                                    parameter: ParameterDescription::new(
+                                        target_index,
+                                        source_param.name(),
+                                    ),
+                                });
+                            }
+                            return self.never();
+                        }
+
                         match source_param.kind() {
                             ParameterKind::PositionalOrKeyword {
                                 default_type: source_default,
@@ -4100,6 +4168,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         return self.never();
                     };
+
+                    // An explicit source keyword takes precedence over its `**kwargs`. Unless
+                    // the target also binds that name explicitly, values from its keyword
+                    // variadic must therefore be compatible with the source parameter too.
+                    for source_param in &source_parameters {
+                        let Some(source_name) = source_param.keyword_name() else {
+                            continue;
+                        };
+                        if !source_keywords.contains_key(source_name.as_str())
+                            || target_parameters
+                                .keyword_by_name(source_name.as_str())
+                                .is_some()
+                        {
+                            continue;
+                        }
+                        if !check_types(
+                            &mut result,
+                            target_param.annotated_type(),
+                            source_param.annotated_type(),
+                            Some(source_name),
+                            target_index,
+                        ) {
+                            return result;
+                        }
+                    }
+
                     if !check_types(
                         &mut result,
                         target_param.annotated_type(),
