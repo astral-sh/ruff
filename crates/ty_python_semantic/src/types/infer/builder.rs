@@ -3256,6 +3256,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns whether an alias-shaped expression refers to a later binding in the same scope.
+    fn is_stub_assignment_forward_reference(
+        &self,
+        value: &ast::Expr,
+        definition: Definition<'db>,
+    ) -> bool {
+        match value {
+            ast::Expr::Name(name) if !name.is_invalid() => {
+                let db = self.db();
+                let file_scope_id = self.scope().file_scope_id(db);
+                let use_def = self.index.use_def_map(file_scope_id);
+                let use_id = name.scoped_use_id(db, self.program_file());
+
+                !use_def
+                    .bindings_at_use(use_id)
+                    .any(|binding| binding.binding.definition().is_some())
+                    && self
+                        .index
+                        .place_table(file_scope_id)
+                        .symbol_id(name.id.as_str())
+                        .is_some_and(|symbol| {
+                            use_def.reachable_symbol_bindings(symbol).any(|binding| {
+                                binding
+                                    .binding
+                                    .definition()
+                                    .is_some_and(|candidate| candidate != definition)
+                            })
+                        })
+            }
+            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                self.is_stub_assignment_forward_reference(&binary.left, definition)
+                    || self.is_stub_assignment_forward_reference(&binary.right, definition)
+            }
+            _ => false,
+        }
+    }
+
     fn infer_assignment_definition_impl(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,
@@ -3386,6 +3423,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     self.store_expression_type(value, ty);
                     ty
+                } else if self.in_stub()
+                    && self.is_stub_assignment_forward_reference(value, definition)
+                {
+                    // Stub assignments that could be implicit type aliases may refer to later
+                    // definitions. Keep existing bindings eager to avoid introducing cycles.
+                    self.infer_expression_with_state(value, tcx, DeferredExpressionState::Deferred)
                 } else {
                     self.infer_expression(value, tcx)
                 };
