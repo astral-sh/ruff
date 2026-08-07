@@ -436,7 +436,7 @@ help: Replace with `numpy.char.compare_chararrays`
    |
 57 |
    -     np.compare_chararrays
-58 +     np.char.chararray
+58 +     np.char.compare_chararrays
 59 |
    |
 
