@@ -1,0 +1,48 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> fit_line_length_pragma.py:3:1
+  |
+1 |   # The next import fits on one line once the pragma comment is excluded from the width;
+2 |   # in preview it should not be wrapped (the `# noqa` must stay effective).
+3 | / from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # noqa: TID251
+4 | | # The next import exceeds the line length even without the pragma comment;
+5 | | # it must still be wrapped.
+6 | | from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # noqa: TID251
+  | |_________________________________________________________________________________________^
+help: Organize imports
+   |
+2  | # in preview it should not be wrapped (the `# noqa` must stay effective).
+   - from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # noqa: TID251
+3  + from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import (
+4  +     x,  # noqa: TID251
+5  + )
+6  +
+7  | # The next import exceeds the line length even without the pragma comment;
+8  | # it must still be wrapped.
+   - from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # noqa: TID251
+9  + from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import (
+10 +     x,  # noqa: TID251
+11 + )
+12 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> fit_line_length_pragma.py:12:5
+   |
+10 |     # The next import fits on one line once the pragma comment is excluded from the
+11 |     # width, so in preview it should not be wrapped.
+12 |     from cccccccccccccccccccccccccccccc.ccccccccccccccccccccccccccccccccccccc import bar  # noqa: PLC0415
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |     bar()
+   |
+help: Organize imports
+   |
+11 |     # width, so in preview it should not be wrapped.
+   -     from cccccccccccccccccccccccccccccc.ccccccccccccccccccccccccccccccccccccc import bar  # noqa: PLC0415
+12 +     from cccccccccccccccccccccccccccccc.ccccccccccccccccccccccccccccccccccccc import (
+13 +         bar,  # noqa: PLC0415
+14 +     )
+15 |     bar()
+   |
