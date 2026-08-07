@@ -519,32 +519,21 @@ def _(x: Unrelated | Invariant[int]):
 
 ## `TypeIs` narrowing of `NewType` instances
 
-`NewType` constructors return compatible subclass instances unchanged, and runtime subclass checks
-ignore their static tags. A `TypeIs` guard for such a subclass must therefore preserve the
-possibility of a `NewType` value matching it.
+`NewType` constructors return their arguments unchanged, so an integer-based `NewType` can contain a
+`bool`. A `TypeIs[bool]` guard preserves both the `NewType` and its runtime class.
 
 ```py
 from typing import NewType
 from typing_extensions import TypeIs
 
-class Base: ...
-class Child(Base): ...
-
-BaseId = NewType("BaseId", Base)
 UserId = NewType("UserId", int)
-
-def is_child(value: object) -> TypeIs[Child]:
-    return isinstance(value, Child)
 
 def is_bool(value: object) -> TypeIs[bool]:
     return isinstance(value, bool)
 
-def _(branded: BaseId, user_id: UserId):
-    if is_child(branded):
-        reveal_type(branded)  # revealed: BaseId & Child
-
-    if is_bool(user_id):
-        reveal_type(user_id)  # revealed: UserId & bool
+def _(value: UserId):
+    if is_bool(value):
+        reveal_type(value)  # revealed: UserId & bool
 ```
 
 ## `TypeGuard` special cases

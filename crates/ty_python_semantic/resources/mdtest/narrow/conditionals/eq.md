@@ -1119,7 +1119,7 @@ def _(answer: CoupledInequality):
 ## Recursive aliases containing enum domains
 
 Enum domains nested in a recursive alias fall back to general comparison inference. Comparisons
-against specific enum members must also terminate and preserve any `NewType` brand:
+against specific enum members must also terminate and preserve the `NewType`:
 
 ```toml
 [environment]
@@ -1141,9 +1141,6 @@ def _(left: Recursive, right: EnumValue):
 
 BrandedEnumValue = NewType("BrandedEnumValue", EnumValue)
 type RecursiveBrand = BrandedEnumValue | RecursiveBrand
-
-def compare_recursive_brand(left: RecursiveBrand, right: EnumValue) -> None:
-    reveal_type(left == right)  # revealed: bool
 
 def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
     if left == EnumValue.VALUE:

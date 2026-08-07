@@ -529,11 +529,10 @@ impl<'db> EnumValueSet<'db> {
             .positive(db)
             .iter()
             .any(|positive| matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_)))
+            && let expanded = intersection.with_expanded_typevars_and_newtypes(db, env)
+            && let Some(value_set) = Self::from_type(db, env, expanded, active_types)
         {
-            let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
-            if let Some(value_set) = Self::from_type(db, env, expanded, active_types) {
-                return Some(value_set);
-            }
+            return Some(value_set);
         }
 
         // Other intersection components can only reduce the represented enum values. Ignoring

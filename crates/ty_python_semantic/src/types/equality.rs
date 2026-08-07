@@ -1333,12 +1333,10 @@ fn finite_alternatives<'db>(
 
                 let expanded = intersection.with_expanded_typevars_and_newtypes(db, env);
                 let complement = match expanded {
-                    Type::LiteralValue(literal)
-                        if matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
-                            && KnownComparisonSemantics::of_type(db, env, expanded, operator)
-                                .is_some() =>
-                    {
-                        return Some(vec![expanded]);
+                    Type::LiteralValue(literal) if literal.is_enum() => {
+                        return KnownComparisonSemantics::of_type(db, env, expanded, operator)
+                            .is_some()
+                            .then(|| vec![expanded]);
                     }
                     Type::EnumComplement(complement) => complement,
                     Type::Intersection(intersection) => intersection.enum_complement(db, env)?,
@@ -1606,7 +1604,7 @@ fn evaluate_tuple_element_equality<'db>(
     ) {
         ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
         // Known comparison semantics are reflexive, so a false result rules out shared runtime
-        // identity. Nominal distinctness alone is insufficient because `NewType` and similar
+        // identity. Static disjointness alone is insufficient because `NewType` and similar
         // wrappers can erase their distinction at runtime.
         ComparisonResult::AlwaysFalse
             if [left, right]

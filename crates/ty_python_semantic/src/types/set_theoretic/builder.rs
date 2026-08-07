@@ -1980,8 +1980,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .iter()
                     .any(|positive| matches!(positive, Type::NewTypeInstance(_)))
             {
-                // Preserve the original NewType while making its sole remaining enum member
-                // explicit.
+                // Preserve the NewType while making its remaining enum member explicit.
                 self.add_positive(db, env, complement.remaining_literal_union(db, env));
             }
         }

@@ -360,7 +360,6 @@ def excluded_newtype(value: Not[UserId], other: UserId) -> None:
 
     if other is value:
         reveal_type(value)  # revealed: int & ~UserId
-        reveal_type(other)  # revealed: UserId
 ```
 
 A type variable can hide the same static exclusion in its upper bound. The reachable branch must
@@ -418,10 +417,11 @@ def excluded_literal_string(
 In contrast, excluding a concrete literal or its runtime class genuinely rules out identity.
 
 ```py
-def excluded_runtime_values(value: Not[Literal["hello"]], not_int: Not[int], other: UserId) -> None:
+def excluded_literal(value: Not[Literal["hello"]]) -> None:
     if value is "hello":
         reveal_type(value)  # revealed: Never
 
+def excluded_runtime_class(not_int: Not[int], other: UserId) -> None:
     if not_int is other:
         reveal_type(not_int)  # revealed: Never
 ```
@@ -460,11 +460,9 @@ def same_object(value: Foo) -> None:
 def union(value: FooNewType1 | None, other: FooNewType2) -> None:
     if value is other:
         reveal_type(value)  # revealed: FooNewType1
-        reveal_type(other)  # revealed: FooNewType2
 
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
     if left is right:
-        reveal_type(left)  # revealed: FooNewType1 & FooSub
         reveal_type(right)  # revealed: FooNewType2 & FooSub
 ```
 

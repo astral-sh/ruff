@@ -3515,6 +3515,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     /// remain excluded without dropping values that can still identify the same runtime object.
     fn evaluate_expr_is(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Type<'db> {
         let db = self.db;
+        let env = &self.env;
         let left = match lhs_ty.resolve_type_alias(db) {
             Type::Union(union) => union.elements(db),
             _ => std::slice::from_ref(&lhs_ty),
@@ -3552,23 +3553,22 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         // Distinct NewTypes and excluded NewTypes, type variables, or LiteralString can still
         // describe the same runtime object. Restore those alternatives without weakening others.
-        let mut builder = UnionBuilder::new(db, &self.env).add(rhs_ty);
+        let mut builder = UnionBuilder::new(db, env).add(rhs_ty);
         for &left in left {
             for &right in right {
-                if left.is_disjoint_from(db, &self.env, right)
+                if left.is_disjoint_from(db, env, right)
                     && left
-                        .identity_comparison_truthiness(db, &self.env, right)
+                        .identity_comparison_truthiness(db, env, right)
                         .may_be_true()
                 {
-                    let identity = right.identity_comparison_type(db, &self.env);
-                    let overlap =
-                        IntersectionType::from_two_elements(db, &self.env, left, identity);
+                    let identity = right.identity_comparison_type(db, env);
+                    let overlap = IntersectionType::from_two_elements(db, env, left, identity);
                     let overlap = if overlap.is_never() {
                         let fallback = match identity {
-                            Type::LiteralValue(literal) => literal.fallback_instance(db, &self.env),
-                            _ => identity.promote(db, &self.env),
+                            Type::LiteralValue(literal) => literal.fallback_instance(db, env),
+                            _ => identity.promote(db, env),
                         };
-                        IntersectionType::from_two_elements(db, &self.env, left, fallback)
+                        IntersectionType::from_two_elements(db, env, left, fallback)
                     } else {
                         overlap
                     };

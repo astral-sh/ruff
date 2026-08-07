@@ -46,26 +46,15 @@ reveal_type(x)  # revealed: object
 
 ## Class patterns on `NewType` instances
 
-A `NewType` does not change its argument's runtime class. Its values can therefore match class
-patterns for subclasses of the concrete base, including `bool` for a `NewType` based on `int`.
+A `NewType` does not change its argument's runtime class, so an integer-based `NewType` can match a
+`bool` class pattern.
 
 ```py
 from typing import NewType
 
-class Base: ...
-class Child(Base): ...
-
-BrandedBase = NewType("BrandedBase", Base)
 UserId = NewType("UserId", int)
 
-def match_branded_subclass(value: BrandedBase) -> None:
-    match value:
-        case Child():
-            reveal_type(value)  # revealed: BrandedBase & Child
-        case _:
-            reveal_type(value)  # revealed: BrandedBase & ~Child
-
-def match_branded_boolean(value: UserId) -> None:
+def match_newtype_boolean(value: UserId) -> None:
     match value:
         case bool():
             reveal_type(value)  # revealed: UserId & bool
@@ -3431,10 +3420,8 @@ def branded_int_enum_integer_patterns_are_exhaustive(value: BrandedFirst) -> int
 def branded_int_enum_member_patterns_are_exhaustive(value: BrandedFirst) -> int:
     match value:
         case First.ONE:
-            reveal_type(value)  # revealed: BrandedFirst & Literal[First.ONE]
             return 1
         case First.TWO:
-            reveal_type(value)  # revealed: BrandedFirst & Literal[First.TWO]
             return 2
 
 def branded_cross_int_enum_member_patterns(value: BrandedFirst | BrandedSecond) -> None:

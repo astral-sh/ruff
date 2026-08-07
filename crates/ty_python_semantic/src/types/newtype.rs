@@ -241,7 +241,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: NewType<'db>,
         right: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // Different NewTypes are disjoint unless one is derived from the other.
+        // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
+        // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
+        // it's not possible for some third type to multiply-inherit from both.
+
         let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
         relation_checker
             .check_newtype_pair(db, left, right)

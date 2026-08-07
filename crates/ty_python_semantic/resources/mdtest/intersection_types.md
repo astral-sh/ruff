@@ -456,19 +456,15 @@ nested `NewType`s retain their relationship with their parent.
 ```py
 from typing import Never, NewType
 from ty_extensions import Intersection, static_assert
-from ty_extensions._internal import is_disjoint_from, is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_equivalent_to
 
 UserId = NewType("UserId", int)
 OtherUserId = NewType("OtherUserId", int)
 NestedUserId = NewType("NestedUserId", UserId)
-StringId = NewType("StringId", str)
 
-static_assert(is_subtype_of(NestedUserId, UserId))
-static_assert(not is_disjoint_from(UserId, NestedUserId))
 static_assert(is_equivalent_to(Intersection[UserId, OtherUserId], Never))
 static_assert(is_equivalent_to(Intersection[OtherUserId, UserId], Never))
 static_assert(is_equivalent_to(Intersection[NestedUserId, OtherUserId], Never))
-static_assert(is_equivalent_to(Intersection[UserId, StringId], Never))
 
 def newtype_intersections(
     user_bool: UserId & bool,

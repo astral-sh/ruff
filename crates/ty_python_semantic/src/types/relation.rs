@@ -3674,7 +3674,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
                 nontrivial_check(self, || self.check_newtype_pair(db, left, right))
             }
-
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
                 nontrivial_check(self, || {
                     self.check_type_pair(db, newtype.concrete_base_type(db), other)

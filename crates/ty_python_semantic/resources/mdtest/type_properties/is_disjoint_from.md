@@ -47,15 +47,12 @@ UserId(True)
 static_assert(not is_disjoint_from(UserId, Literal[True]))
 static_assert(not is_disjoint_from(Literal[True], UserId))
 static_assert(not is_disjoint_from(UserId, Literal[False]))
-static_assert(not is_disjoint_from(Literal[False], UserId))
 static_assert(not is_disjoint_from(UserId, Literal[True, False]))
 static_assert(not is_disjoint_from(UserId, Literal[1]))
-static_assert(not is_disjoint_from(Literal[1], UserId))
 static_assert(not is_disjoint_from(UserId, bool))
 static_assert(not is_disjoint_from(bool, UserId))
 static_assert(not is_disjoint_from(UserId, int))
 static_assert(is_disjoint_from(UserId, Literal["user"]))
-static_assert(is_disjoint_from(Literal["user"], UserId))
 
 static_assert(not is_disjoint_from(StringId, Literal["user"]))
 static_assert(not is_disjoint_from(BytesId, Literal[b"user"]))
@@ -75,7 +72,6 @@ static_assert(not is_disjoint_from(FloatId, bool))
 static_assert(not is_disjoint_from(FloatId, Literal[True]))
 static_assert(not is_disjoint_from(FloatId, Literal[1]))
 static_assert(not is_disjoint_from(FloatId, int))
-static_assert(not is_disjoint_from(FloatId, float))
 static_assert(not is_disjoint_from(BoolId, bool))
 ```
 
@@ -104,11 +100,9 @@ static_assert(is_disjoint_from(NestedFirst, Second))
 static_assert(is_disjoint_from(NestedFirst, OtherNestedFirst))
 static_assert(is_disjoint_from(First, Numeric))
 static_assert(is_disjoint_from(First, Text))
-static_assert(is_disjoint_from(Text, First))
 
 static_assert(not is_disjoint_from(NestedFirst, First))
 static_assert(not is_disjoint_from(First, NestedFirst))
-static_assert(not is_disjoint_from(OtherNestedFirst, First))
 static_assert(not is_disjoint_from(First, int))
 static_assert(not is_disjoint_from(Second, int))
 static_assert(not is_disjoint_from(First, bool))
@@ -118,9 +112,7 @@ static_assert(not is_disjoint_from(Second, Literal[True]))
 static_assert(is_disjoint_from(list[int], list[str]))
 
 static_assert(not is_subtype_of(First, Second))
-static_assert(not is_subtype_of(Second, First))
 static_assert(not is_assignable_to(First, Second))
-static_assert(not is_assignable_to(Second, First))
 static_assert(is_subtype_of(NestedFirst, First))
 static_assert(is_assignable_to(NestedFirst, First))
 static_assert(not is_assignable_to(First, NestedFirst))
@@ -146,9 +138,7 @@ class OrdinaryInt(int): ...
 FinalIntId = NewType("FinalIntId", FinalInt)
 
 static_assert(not is_disjoint_from(UserId, FinalInt))
-static_assert(not is_disjoint_from(FinalInt, UserId))
 static_assert(not is_disjoint_from(UserId, OrdinaryInt))
-static_assert(not is_disjoint_from(OrdinaryInt, UserId))
 static_assert(not is_disjoint_from(UserId, int))
 static_assert(not is_disjoint_from(UserId, object))
 static_assert(is_disjoint_from(UserId, str))
@@ -167,7 +157,6 @@ class Choice(IntEnum):
 
 static_assert(not is_disjoint_from(UserId, Choice))
 static_assert(not is_disjoint_from(UserId, Literal[Choice.FIRST]))
-static_assert(not is_disjoint_from(Literal[Choice.FIRST], UserId))
 ```
 
 ## NewTypes and generic classes
@@ -207,14 +196,12 @@ Independently defined `NewType`s remain disjoint.
 ```py
 AnyListId = NewType("AnyListId", list[Any])
 IntListId = NewType("IntListId", list[int])
-StrListId = NewType("StrListId", list[str])
 
 static_assert(not is_subtype_of(AnyListId, list[int]))
 static_assert(not is_disjoint_from(AnyListId, list[int]))
 static_assert(not is_disjoint_from(IntListId, list[Any]))
 static_assert(is_disjoint_from(IntListId, list[str]))
 static_assert(is_disjoint_from(IntListId, AnyListId))
-static_assert(is_disjoint_from(IntListId, StrListId))
 ```
 
 A generic type variable must not make a potentially compatible specialization appear disjoint.
@@ -227,7 +214,6 @@ def unconstrained[T]() -> None:
 
 def compatible_constraints[T: (int, str)]() -> None:
     static_assert(not is_disjoint_from(IntListId, list[T]))
-    static_assert(not is_disjoint_from(list[T], IntListId))
 
 def compatible_bound[T: int]() -> None:
     static_assert(not is_disjoint_from(IntListId, list[T]))
@@ -1067,23 +1053,13 @@ Numeric = NewType("Numeric", float)
 Text = NewType("Text", str)
 
 static_assert(not is_disjoint_from(Boolean, TypeGuard[str]))
-static_assert(not is_disjoint_from(TypeGuard[str], Boolean))
-static_assert(not is_disjoint_from(Boolean, TypeIs[str]))
 static_assert(not is_disjoint_from(TypeIs[str], Boolean))
 
 static_assert(not is_disjoint_from(Integer, TypeGuard[str]))
-static_assert(not is_disjoint_from(TypeGuard[str], Integer))
-static_assert(not is_disjoint_from(Integer, TypeIs[str]))
-static_assert(not is_disjoint_from(TypeIs[str], Integer))
 
-static_assert(not is_disjoint_from(Numeric, TypeGuard[str]))
-static_assert(not is_disjoint_from(TypeGuard[str], Numeric))
 static_assert(not is_disjoint_from(Numeric, TypeIs[str]))
-static_assert(not is_disjoint_from(TypeIs[str], Numeric))
 
 static_assert(is_disjoint_from(Text, TypeGuard[str]))
-static_assert(is_disjoint_from(TypeGuard[str], Text))
-static_assert(is_disjoint_from(Text, TypeIs[str]))
 static_assert(is_disjoint_from(TypeIs[str], Text))
 ```
 

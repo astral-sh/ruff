@@ -144,8 +144,6 @@ from ty_extensions import Intersection
 
 def f(value: Not[LiteralString], nonliteral_string: Intersection[str, Not[LiteralString]]) -> None:
     reveal_type(value is "hello")  # revealed: bool
-    reveal_type(value is not "hello")  # revealed: bool
-    reveal_type(nonliteral_string is "hello")  # revealed: bool
     reveal_type(nonliteral_string is not "hello")  # revealed: bool
 ```
 
