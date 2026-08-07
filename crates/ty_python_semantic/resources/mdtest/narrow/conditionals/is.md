@@ -28,6 +28,127 @@ def _(x: A, y: A | None):
     reveal_type(y)  # revealed: A | None
 ```
 
+Identity also transfers facts about the shared object, such as whether a string is truthy.
+
+```py
+def truthy_string(value: object, text: str) -> None:
+    if text:
+        if value is text:
+            reveal_type(value)  # revealed: str & ~AlwaysFalsy
+```
+
+## `is` with invariant generic types
+
+A `list[int]` guarantees that values read from the list are integers. That guarantee must hold for
+every reference to the same mutable list: if another reference could treat it as `list[str]`, it
+could append a string that the first reference would then incorrectly read as an integer. An
+identity comparison can therefore transfer the invariant type argument.
+
+```py
+def generic_type(value: object, items: list[int]) -> None:
+    if value is items:
+        reveal_type(value)  # revealed: list[int]
+        reveal_type(items)  # revealed: list[int]
+```
+
+Incompatible invariant specializations cannot describe the same object in soundly typed code.
+
+```py
+def incompatible_generic_types(integers: list[int], strings: list[str]) -> None:
+    reveal_type(integers is strings)  # revealed: Literal[False]
+```
+
+## `is` with covariant generic types
+
+Covariant specializations can describe the same object: an empty tuple belongs to both
+`tuple[int, ...]` and `tuple[str, ...]`. Identity therefore remains possible and preserves both sets
+of type arguments.
+
+```py
+def covariant_generic_type(value: object, items: tuple[int, ...]) -> None:
+    if value is items:
+        reveal_type(value)  # revealed: tuple[int, ...]
+
+def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...]) -> None:
+    reveal_type(integers is strings)  # revealed: bool
+    if integers is strings:
+        # TODO: Ideally, this intersection would simplify to tuple[()].
+        reveal_type(integers)  # revealed: tuple[int, ...] & tuple[str, ...]
+```
+
+## `is` with a `NewType`
+
+A `NewType` constructor returns its argument unchanged, so its tag belongs to one static view rather
+than the shared object. Identity can establish the underlying type without transferring that tag.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+
+def discard_newtype_tag(value: object, user_id: UserId) -> None:
+    if value is user_id:
+        reveal_type(value)  # revealed: int
+        reveal_type(user_id)  # revealed: UserId
+```
+
+## `is` with unconstrained type variables
+
+An unconstrained type variable can hold a `NewType`. Identity therefore cannot transfer the type
+variable, since doing so would also transfer the `NewType` tag.
+
+```py
+from typing import NewType, TypeVar
+
+T = TypeVar("T")
+UserId = NewType("UserId", int)
+
+def type_variable(value: object, other: T) -> T:
+    if value is other:
+        reveal_type(value)  # revealed: object
+        reveal_type(other)  # revealed: T@type_variable
+    return other
+
+reveal_type(type_variable(1, UserId(1)))  # revealed: UserId
+```
+
+## `is` with bounded type variables
+
+A type variable bounded by `int` can still hold an integer `NewType`. Identity transfers its `int`
+bound without transferring the type variable or its possible `NewType` tag.
+
+```py
+from typing import NewType, TypeVar
+
+BoundedT = TypeVar("BoundedT", bound=int)
+UserId = NewType("UserId", int)
+
+def bounded_type_variable(value: object, other: BoundedT) -> BoundedT:
+    if value is other:
+        reveal_type(value)  # revealed: int
+        reveal_type(other)  # revealed: BoundedT@bounded_type_variable
+    return other
+
+reveal_type(bounded_type_variable(1, UserId(1)))  # revealed: UserId
+```
+
+## `is` with constrained type variables
+
+Identity transfers a constrained type variable's possible runtime types without transferring any
+`NewType` tags in its constraints.
+
+```py
+from typing import NewType, TypeVar
+
+UserId = NewType("UserId", int)
+TaggedChoice = TypeVar("TaggedChoice", UserId, str)
+
+def constrained_type_variable(value: object, other: TaggedChoice) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: int | str
+        reveal_type(other)  # revealed: TaggedChoice@constrained_type_variable
+```
+
 ## Narrowing tagged unions of nominal classes by attribute identity
 
 ```py
@@ -339,15 +460,14 @@ def f(value: int | None | EllipsisType, other: T) -> None:
         reveal_type(value)  # revealed: int | (None & ~T@f) | (EllipsisType & ~T@f)
 ```
 
-## Static exclusions and runtime identity
+## `is` with a negated `NewType`
 
 Excluding a `NewType` removes its invisible tag, not the runtime objects accepted by its
-constructor. An identity comparison must preserve that exclusion without making a reachable branch
+constructor. An identity comparison must preserve that negation without making a reachable branch
 disappear.
 
 ```py
 from typing import Literal, NewType, TypeVar
-from typing_extensions import LiteralString
 from ty_extensions import Intersection, Not
 
 UserId = NewType("UserId", int)
@@ -356,13 +476,12 @@ def excluded_newtype(value: Not[UserId], other: UserId) -> None:
     if value is other:
         reveal_type(value)  # revealed: int & ~UserId
         reveal_type(other)  # revealed: UserId
-        value.does_not_exist  # error: [unresolved-attribute]
 
     if other is value:
         reveal_type(value)  # revealed: int & ~UserId
 ```
 
-A type variable can hide the same static exclusion in its upper bound. The reachable branch must
+A type variable can hide the same static negation in its upper bound. The reachable branch must
 preserve that type variable.
 
 ```py
@@ -375,7 +494,6 @@ def excluded_newtype_in_bound(
 ) -> None:
     if value is other:
         reveal_type(value)  # revealed: ExcludedBound@excluded_newtype_in_bound
-        other.does_not_exist  # error: [unresolved-attribute]
 
     if without_one is other:
         reveal_type(without_one)  # revealed: ExcludedBound@excluded_newtype_in_bound & ~Literal[1]
@@ -394,8 +512,36 @@ def excluded_newtype_in_unions(
         reveal_type(other)  # revealed: UserId
 ```
 
-`LiteralString` describes string provenance, not runtime identity, so excluding it cannot make an
-identity comparison with a concrete string unreachable.
+Unlike a negated `NewType`, a negated runtime class genuinely rules out identity with its instances.
+
+```py
+def excluded_runtime_class(not_int: Not[int], other: UserId) -> None:
+    if not_int is other:
+        reveal_type(not_int)  # revealed: Never
+```
+
+## `is` does not transfer `LiteralString`
+
+`LiteralString` records string provenance, not a guarantee shared by every view of the same string
+object. An identity comparison can establish that another value is a string, but cannot transfer
+that provenance. A concrete string literal still identifies its runtime value.
+
+```py
+from typing import Literal, TypeVar
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+def literal_string(value: object, text: LiteralString) -> None:
+    if value is text:
+        reveal_type(value)  # revealed: str
+        reveal_type(text)  # revealed: LiteralString
+
+def concrete_literal(value: object, text: Literal["hello"]) -> None:
+    if value is text:
+        reveal_type(value)  # revealed: Literal["hello"]
+```
+
+Negating `LiteralString` likewise does not rule out identity with a concrete string.
 
 ```py
 def excluded_literal_string(
@@ -414,16 +560,45 @@ def excluded_literal_string(
         reveal_type(other)  # revealed: Literal["hello"]
 ```
 
-In contrast, excluding a concrete literal or its runtime class genuinely rules out identity.
+A `LiteralString` negation can also appear in a type variable's bound. Identity preserves the type
+variable without making the concrete-string comparison unreachable.
+
+```py
+NonLiteralStringT = TypeVar("NonLiteralStringT", bound=Intersection[str, Not[LiteralString]])
+
+def excluded_literal_string_in_bound(value: NonLiteralStringT, other: Literal["hello"]) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: NonLiteralStringT@excluded_literal_string_in_bound
+        reveal_type(other)  # revealed: Literal["hello"]
+```
+
+The same negation remains compatible with a concrete string when both operands contain additional
+alternatives. Unrelated alternatives are still removed, while compatible alternatives are retained.
+
+```py
+def excluded_literal_string_in_union(
+    value: Intersection[str, Not[LiteralString]] | int,
+    other: Literal["hello"] | bytes,
+) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: str & ~LiteralString
+        reveal_type(other)  # revealed: Literal["hello"]
+
+def excluded_literal_string_with_shared_alternative(
+    value: Intersection[str, Not[LiteralString]] | bytes,
+    other: Literal["hello"] | bytes,
+) -> None:
+    if value is other:
+        reveal_type(value)  # revealed: bytes | (str & ~LiteralString)
+        reveal_type(other)  # revealed: Literal["hello"] | bytes
+```
+
+In contrast, excluding a concrete literal genuinely rules out identity with that value.
 
 ```py
 def excluded_literal(value: Not[Literal["hello"]]) -> None:
     if value is "hello":
         reveal_type(value)  # revealed: Never
-
-def excluded_runtime_class(not_int: Not[int], other: UserId) -> None:
-    if not_int is other:
-        reveal_type(not_int)  # revealed: Never
 ```
 
 ## `is` with `NewType`s
@@ -503,9 +678,19 @@ def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> tuple[Const
     return (left, right)
 ```
 
+A type variable bounded by a `NewType` also carries that `NewType` tag. Identity cannot transfer the
+type variable to an untagged value, but can establish the underlying runtime class.
+
+```py
+def object_with_bounded_newtype(value: object, tagged: BoundedT) -> None:
+    if value is tagged:
+        reveal_type(value)  # revealed: Foo
+        reveal_type(tagged)  # revealed: BoundedT@object_with_bounded_newtype
+```
+
 Every constraint below is a `NewType` based on `EllipsisType`. Although their tags are mutually
-exclusive, all of these values refer to the same `...` object. After an `is not` check, repeating
-the opposite check must be unreachable.
+exclusive, all of these values refer to the same `...` object. An `is not` check therefore removes
+the singleton alternative, making a subsequent `is` check unreachable.
 
 ```py
 from types import EllipsisType
@@ -524,31 +709,34 @@ def same_singleton(first: SingletonA, second: SingletonB) -> None:
         reveal_type(first)  # revealed: SingletonA
         reveal_type(second)  # revealed: SingletonB
 
-def direct(value: SingletonC | int, other: SingletonT) -> None:
+def contradictory_singleton_comparisons(value: SingletonC | int, other: SingletonT) -> None:
     if value is not other:
+        reveal_type(value)  # revealed: int
         if value is other:
             assert_never(value)
 ```
 
-### Narrowing an object to a `NewType` in the true branch
+### Narrowing an object to the generic base of a `NewType`
 
-If an object is identical to a value with a `NewType`, the true branch narrows the object to that
-`NewType` rather than its underlying type.
+Identity does not transfer a `NewType` tag, but it preserves the invariant type arguments of the
+underlying generic type.
 
 ```py
 from typing import NewType
 
-UserId = NewType("UserId", int)
+UserIds = NewType("UserIds", list[int])
 
-def preserve_newtype(x: object, user_id: UserId) -> None:
-    if x is user_id:
-        reveal_type(x)  # revealed: UserId
+def preserve_generic_base(value: object, user_ids: UserIds) -> None:
+    if value is user_ids:
+        reveal_type(value)  # revealed: list[int]
+        reveal_type(user_ids)  # revealed: UserIds
 ```
 
 ### Comparing `NewType`s with literals
 
 Calls to `NewType` return their arguments unchanged. Comparisons with `bool` and `int` literals can
-therefore succeed, so the true branches below remain reachable.
+therefore succeed. Identity transfers the literal value to the tagged operand, but does not transfer
+its `NewType` tag back to the literal.
 
 ```py
 from typing import Literal, NewType
@@ -558,10 +746,10 @@ IntNewType = NewType("IntNewType", int)
 
 def literals(true: Literal[True], b: BoolNewType, forty_two: Literal[42], i: IntNewType) -> None:
     if b is true:
-        reveal_type(true)  # revealed: Literal[True] & BoolNewType
+        reveal_type(true)  # revealed: Literal[True]
         reveal_type(b)  # revealed: BoolNewType & Literal[True]
     if i is forty_two:
-        reveal_type(forty_two)  # revealed: Literal[42] & IntNewType
+        reveal_type(forty_two)  # revealed: Literal[42]
         reveal_type(i)  # revealed: IntNewType & Literal[42]
 ```
 

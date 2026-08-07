@@ -469,9 +469,9 @@ static_assert(is_equivalent_to(Intersection[NestedUserId, OtherUserId], Never))
 def newtype_intersections(
     user_bool: UserId & bool,
     bool_user: bool & UserId,
-    user_other: UserId & OtherUserId,
     user_nested: UserId & NestedUserId,
     nested_user: NestedUserId & UserId,
+    user_other: UserId & OtherUserId,
 ) -> None:
     reveal_type(user_bool)  # revealed: UserId & bool
     reveal_type(bool_user)  # revealed: bool & UserId

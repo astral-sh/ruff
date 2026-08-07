@@ -1119,7 +1119,7 @@ def _(answer: CoupledInequality):
 ## Recursive aliases containing enum domains
 
 Enum domains nested in a recursive alias fall back to general comparison inference. Comparisons
-against specific enum members must also terminate and preserve the `NewType`:
+against specific enum members preserve the `NewType`:
 
 ```toml
 [environment]
@@ -2199,19 +2199,18 @@ def literal_with_erased_identity(value: WrappedIdentityEnum) -> None:
     reveal_type(IdentityEnum.A != value)  # revealed: bool
 ```
 
-When a `WrappedIdentityEnum` value cannot be `IdentityEnum.A`, equality with
-`Literal[IdentityEnum.A, IdentityEnum.B]` leaves only `IdentityEnum.B`. The narrowed value keeps its
-`WrappedIdentityEnum` type, and both operands can be passed to a function accepting
-`Literal[IdentityEnum.B]`.
+When a `WrappedIdentityEnum` value is `IdentityEnum.B`, equality narrows another `IdentityEnum`
+value to the same member. The first value keeps its `WrappedIdentityEnum` type, and both operands
+can be passed to a function accepting `Literal[IdentityEnum.B]`.
 
 ```py
 from typing import Literal, TypeAlias
-from ty_extensions import Intersection, Not
+from ty_extensions import Intersection
 
 def accepts_b(value: Literal[IdentityEnum.B]) -> None: ...
-def compare_branded_exclusion(
-    branded: Intersection[WrappedIdentityEnum, Not[Literal[IdentityEnum.A]]],
-    other: Literal[IdentityEnum.A, IdentityEnum.B],
+def compare_branded_member(
+    branded: Intersection[WrappedIdentityEnum, Literal[IdentityEnum.B]],
+    other: IdentityEnum,
 ) -> None:
     if branded == other:
         reveal_type(branded)  # revealed: WrappedIdentityEnum & Literal[IdentityEnum.B]

@@ -3487,92 +3487,100 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Return the constraint on the left-hand operand of a successful identity comparison.
+    /// Return the constraint on `value` when `value is other` succeeds.
     ///
-    /// Usually, `value is other` means that `value` can be narrowed to the static type of `other`.
-    /// However, excluding a `NewType` only excludes its static type; it does not exclude the runtime
-    /// objects accepted by its constructor. For example:
+    /// A typed inhabitant includes its runtime object and any static tags (such as a generic
+    /// specialization or `NewType`). Identity establishes that both operands identify the same
+    /// object, but cannot transfer tags specific to the other operand. For example, a `NewType`
+    /// constructor returns its argument unchanged, so `value is user_id` establishes that `value`
+    /// is an `int`, not that it carries `user_id`'s `UserId` tag. Similarly, identity with a
+    /// `LiteralString` establishes that the value is a `str`, not that it has the same
+    /// `LiteralString` provenance. Each operand retains its own existing tags and provenance when
+    /// this constraint is applied.
     ///
     /// ```python
-    /// UserId = NewType("UserId", int)
+    /// def narrow(value: object, user_id: UserId, items: list[int]) -> None:
+    ///     if value is user_id:
+    ///         reveal_type(value)  # int, not UserId
+    ///     if value is items:
+    ///         reveal_type(value)  # list[int], not list[Unknown]
     ///
-    /// def f(value: Not[UserId], other: UserId) -> None:
+    /// def bounded[T: int](value: object, other: T) -> None:
     ///     if value is other:
-    ///         reveal_type(value)  # int & ~UserId
+    ///         reveal_type(value)  # int, not T: T might be UserId
     /// ```
     ///
-    /// A `NewType` constructor returns its argument unchanged, so `value` and `other` can identify
-    /// the same integer even though their static types are disjoint. Intersecting `~UserId` with
-    /// `UserId` directly would incorrectly make this reachable branch `Never`. Instead, retain the
-    /// static exclusion and narrow `value` to the underlying runtime type, yielding `int & ~UserId`.
+    /// In contrast, `value is items` for `items: list[int]` establishes that `value` is also a
+    /// `list[int]`: unlike a `NewType` tag, its element type cannot differ between soundly typed
+    /// views of the same mutable list. A type variable can hide an operand-specific tag even when
+    /// its bound is `int`, so only its upcast bound or constraints are transferable. The operand
+    /// being narrowed still retains any type variables already present in its own type.
     ///
-    /// Distinct `NewType`s can also describe the same runtime object even though their static
-    /// types are disjoint. In that case, preserve each operand's own `NewType` instead of combining
-    /// the incompatible static types.
-    ///
-    /// The same distinction applies to excluded type variables and `LiteralString` provenance.
-    /// Handle each union alternative independently so that genuinely incompatible alternatives
-    /// remain excluded without dropping values that can still identify the same runtime object.
+    /// A concrete string literal is more subtle because its type also implies `LiteralString`
+    /// provenance. Consequently, `~LiteralString & Literal["hello"]` incorrectly simplifies to
+    /// `Never`, even though both values can identify the same string. In this case, retain the
+    /// operand's own `~LiteralString` constraint and widen only the literal to `str`.
     fn evaluate_expr_is(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Type<'db> {
         let db = self.db;
         let env = &self.env;
-        let left = match lhs_ty.resolve_type_alias(db) {
+        let transferable_ty = rhs_ty.identity_comparison_type(db, env);
+        let rhs_alternatives = match transferable_ty.resolve_type_alias(db) {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&transferable_ty),
+        };
+        if !rhs_alternatives.iter().any(|ty| {
+            matches!(ty.resolve_type_alias(db), Type::LiteralValue(literal) if literal.is_string())
+        }) {
+            return transferable_ty;
+        }
+
+        let lhs_alternatives = match lhs_ty.resolve_type_alias(db) {
             Type::Union(union) => union.elements(db),
             _ => std::slice::from_ref(&lhs_ty),
         };
-        let right = match rhs_ty.resolve_type_alias(db) {
-            Type::Union(union) => union.elements(db),
-            _ => std::slice::from_ref(&rhs_ty),
-        };
-
-        let may_have_static_only_distinction = |ty: &Type<'db>| match ty.resolve_type_alias(db) {
-            Type::NewTypeInstance(_) | Type::TypeVar(_) => true,
+        let may_exclude_literal_string = |ty: &Type<'db>| match ty.resolve_type_alias(db) {
+            Type::TypeVar(_) => true,
             Type::Intersection(intersection) => {
-                intersection.positive(db).iter().any(|positive| {
-                    matches!(
-                        positive.resolve_type_alias(db),
-                        Type::NewTypeInstance(_) | Type::TypeVar(_)
-                    )
-                }) || intersection.iter_negative(db).any(|negative| {
-                    match negative.resolve_type_alias(db) {
-                        Type::NewTypeInstance(_) | Type::TypeVar(_) => true,
-                        Type::LiteralValue(literal) => literal.is_literal_string(),
-                        _ => false,
-                    }
-                })
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|positive| matches!(positive.resolve_type_alias(db), Type::TypeVar(_)))
+                    || intersection.iter_negative(db).any(|negative| {
+                        match negative.resolve_type_alias(db) {
+                            Type::TypeVar(_) => true,
+                            Type::LiteralValue(literal) => literal.is_literal_string(),
+                            _ => false,
+                        }
+                    })
             }
             _ => false,
         };
-        if !left
-            .iter()
-            .chain(right)
-            .any(may_have_static_only_distinction)
-        {
-            return rhs_ty;
+        if !lhs_alternatives.iter().any(may_exclude_literal_string) {
+            return transferable_ty;
         }
 
-        // Distinct NewTypes and excluded NewTypes, type variables, or LiteralString can still
-        // describe the same runtime object. Restore those alternatives without weakening others.
-        let mut builder = UnionBuilder::new(db, env).add(rhs_ty);
-        for &left in left {
-            for &right in right {
-                if left.is_disjoint_from(db, env, right)
-                    && left
-                        .identity_comparison_truthiness(db, env, right)
+        let mut builder = UnionBuilder::new(db, env).add(transferable_ty);
+        for &lhs_alternative in lhs_alternatives {
+            for &rhs_alternative in rhs_alternatives {
+                if let Type::LiteralValue(literal) = rhs_alternative.resolve_type_alias(db)
+                    && literal.is_string()
+                    && lhs_alternative.is_disjoint_from(db, env, rhs_alternative)
+                    && lhs_alternative
+                        .identity_comparison_truthiness(db, env, rhs_alternative)
                         .may_be_true()
                 {
-                    let identity = right.identity_comparison_type(db, env);
-                    let overlap = IntersectionType::from_two_elements(db, env, left, identity);
-                    let overlap = if overlap.is_never() {
-                        let fallback = match identity {
-                            Type::LiteralValue(literal) => literal.fallback_instance(db, env),
-                            _ => identity.promote(db, env),
-                        };
-                        IntersectionType::from_two_elements(db, env, left, fallback)
-                    } else {
-                        overlap
-                    };
-                    builder = builder.add(if overlap.is_never() { left } else { overlap });
+                    // `fallback_instance` also widens annotated, non-promotable literals. Preserve
+                    // the original operand's negations: widening the entire union to `str` would
+                    // also retain other string alternatives that cannot identify the same object.
+                    let overlap = IntersectionType::from_two_elements(
+                        db,
+                        env,
+                        lhs_alternative,
+                        literal.fallback_instance(db, env),
+                    );
+                    if !overlap.is_never() {
+                        builder = builder.add(overlap);
+                    }
                 }
             }
         }

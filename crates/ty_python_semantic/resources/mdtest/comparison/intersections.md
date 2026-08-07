@@ -121,8 +121,8 @@ def f(value: Not[E]) -> None:
         value.does_not_exist  # no error (unreachable branch)
 ```
 
-A `NewType` exclusion removes its static tag, not the runtime objects of its base: an integer
-without that tag can still be identical to the integer passed into the `NewType` constructor.
+A `NewType` negation removes its static tag, not the runtime objects of its base: an integer without
+that tag can still be identical to the integer passed into the `NewType` constructor.
 
 ```py
 from typing import NewType
@@ -147,8 +147,8 @@ def f(value: Not[LiteralString], nonliteral_string: Intersection[str, Not[Litera
     reveal_type(nonliteral_string is not "hello")  # revealed: bool
 ```
 
-A specific string literal does identify a runtime value, so excluding it still makes the identity
-comparison definite.
+A string literal determines its value, not the identity of its runtime object. Negating that literal
+excludes every object with the same value, so the identity comparison is definite.
 
 ```py
 from typing import Literal
