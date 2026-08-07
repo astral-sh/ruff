@@ -1536,41 +1536,62 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> ProtocolMemberCapabilities<'db> {
-        match self.kind {
-            ProtocolMemberKind::Method(member, kind) => {
-                let instance_method = match (member.ty(), kind) {
-                    (Type::Callable(callable), ProtocolMethodKind::Instance) => member.with_ty(
-                        Type::Callable(protocol_bind_self(db, env.program(db), callable, None)),
-                    ),
-                    _ => member,
-                };
-                ProtocolMemberCapabilities {
-                    instance: ProtocolMemberAccess::new(Some(instance_method), None),
-                    class: ProtocolMemberAccess::new(Some(member), None),
-                }
+        ProtocolMemberCapabilities {
+            instance: self.access(db, env, ProtocolMemberAccessMode::Instance),
+            class: self.access(db, env, ProtocolMemberAccessMode::Class),
+        }
+    }
+
+    /// Derive only the requested access so class access does not bind an unused instance receiver.
+    fn access(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: ProtocolMemberAccessMode,
+    ) -> ProtocolMemberAccess<'db> {
+        match (self.kind, mode) {
+            (
+                ProtocolMemberKind::Method(member, ProtocolMethodKind::Instance),
+                ProtocolMemberAccessMode::Instance,
+            ) => {
+                let member =
+                    match member.ty() {
+                        Type::Callable(callable) => member.with_ty(Type::Callable(
+                            protocol_bind_self(db, env.program(db), callable, None),
+                        )),
+                        _ => member,
+                    };
+                ProtocolMemberAccess::new(Some(member), None)
             }
-            ProtocolMemberKind::Property { read, write } => ProtocolMemberCapabilities {
-                instance: ProtocolMemberAccess::new(read, write),
-                class: ProtocolMemberAccess::NONE,
-            },
-            ProtocolMemberKind::Attribute(member_ty) => {
+            (ProtocolMemberKind::Method(member, _), _) => {
+                ProtocolMemberAccess::new(Some(member), None)
+            }
+            (ProtocolMemberKind::Property { read, write }, ProtocolMemberAccessMode::Instance) => {
+                ProtocolMemberAccess::new(read, write)
+            }
+            (ProtocolMemberKind::Property { .. }, ProtocolMemberAccessMode::Class) => {
+                ProtocolMemberAccess::NONE
+            }
+            (ProtocolMemberKind::Attribute(member_ty), ProtocolMemberAccessMode::Instance) => {
                 let is_class_var = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
                 let is_final = self.qualifiers.contains(TypeQualifiers::FINAL);
-                ProtocolMemberCapabilities {
-                    instance: ProtocolMemberAccess::new(
-                        Some(member_ty),
-                        (!is_class_var && !is_final)
-                            .then_some(ProtocolMemberWrite::from_type(member_ty)),
-                    ),
-                    class: if is_class_var {
-                        ProtocolMemberAccess::new(
-                            Some(member_ty),
-                            (!is_final).then_some(ProtocolMemberWrite::from_type(member_ty)),
-                        )
-                    } else {
-                        ProtocolMemberAccess::NONE
-                    },
-                }
+                ProtocolMemberAccess::new(
+                    Some(member_ty),
+                    (!is_class_var && !is_final)
+                        .then_some(ProtocolMemberWrite::from_type(member_ty)),
+                )
+            }
+            (ProtocolMemberKind::Attribute(member_ty), ProtocolMemberAccessMode::Class)
+                if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) =>
+            {
+                ProtocolMemberAccess::new(
+                    Some(member_ty),
+                    (!self.qualifiers.contains(TypeQualifiers::FINAL))
+                        .then_some(ProtocolMemberWrite::from_type(member_ty)),
+                )
+            }
+            (ProtocolMemberKind::Attribute(_), ProtocolMemberAccessMode::Class) => {
+                ProtocolMemberAccess::NONE
             }
         }
     }
@@ -2116,11 +2137,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         env: &ProgramEnvironment<'db>,
         mode: ProtocolMemberAccessMode,
     ) -> ProtocolMemberAccess<'db> {
-        let capabilities = self.data.capabilities(db, env);
-        let access = match mode {
-            ProtocolMemberAccessMode::Instance => capabilities.instance,
-            ProtocolMemberAccessMode::Class => capabilities.class,
-        };
+        let access = self.data.access(db, env, mode);
         self.materialization
             .map_or(access, |kind| access.materialize(db, env, kind))
     }
@@ -2447,6 +2464,7 @@ fn protocol_member_read_type<'db>(
     ty: Type<'db>,
     receiver_ty: Type<'db>,
     member: &ProtocolMember<'_, 'db>,
+    source_member: Option<&ProtocolMember<'_, 'db>>,
     access: ProtocolMemberAccessMode,
 ) -> Option<Type<'db>> {
     // A callback protocol describes call syntax. Use the candidate's callable type instead of an
@@ -2460,11 +2478,7 @@ fn protocol_member_read_type<'db>(
 
     // Reuse declared protocol members to avoid the generic member lookup, descriptor dispatch,
     // and Salsa interning otherwise required on this common comparison path.
-    if let Type::ProtocolInstance(source_protocol) = ty
-        && let Some(source_member) = source_protocol
-            .interface(db)
-            .member_by_name(db, member.name)
-    {
+    if let Some(source_member) = source_member {
         let read = source_member.access(db, env, access).read?;
 
         if source_member.is_method() {
@@ -2526,16 +2540,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ///
     /// Resolution is shared with real assignments, but this path evaluates the result using the
     /// active type relation and constraints instead of inferring an expression or emitting an
-    /// assignment diagnostic.
+    /// assignment diagnostic. A previously resolved protocol requirement avoids looking up the
+    /// same declared member again.
     fn check_property_write(
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
         member_name: &str,
         value_ty: Type<'db>,
+        protocol_requirement: Option<AttributeWriteRequirement<'db>>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        let requirement = attribute_write_requirement(db, env, ty, member_name);
+        let requirement = protocol_requirement
+            .unwrap_or_else(|| attribute_write_requirement(db, env, ty, member_name));
         let result = self.check_property_write_requirement(db, &requirement, member_name, value_ty);
 
         if let Some(context) = self.report_context()
@@ -2863,12 +2880,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
+        source_member: Option<&ProtocolMember<'_, 'db>>,
         required_ty: ProtocolMemberType<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         let Some(attribute_type) =
-            protocol_member_read_type(db, env, ty, receiver_ty, member, access)
+            protocol_member_read_type(db, env, ty, receiver_ty, member, source_member, access)
         else {
             return self.never();
         };
@@ -2995,6 +3013,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
+        source_member: Option<&ProtocolMember<'_, 'db>>,
         required: ProtocolMemberAccess<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
@@ -3009,12 +3028,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return self.always();
             }
 
+            if source_member.is_some_and(ProtocolMember::is_method) {
+                return self.always();
+            }
+
             if protocol_member_read_type(
                 db,
                 self.env,
                 ty,
                 receiver_ty,
                 member,
+                source_member,
                 ProtocolMemberAccessMode::Class,
             )
             .is_none()
@@ -3024,9 +3048,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             // TODO special-casing `ClassVar`s shouldn't be necessary here, this should naturally
             // fall out of more generalised checks.
-            let qualifiers = if let Type::ProtocolInstance(protocol) = ty
-                && let Some(source_member) = protocol.interface(db).member_by_name(db, member.name)
-            {
+            let qualifiers = if let Some(source_member) = source_member {
                 source_member.qualifiers()
             } else {
                 receiver_ty.member(db, self.env, member.name).qualifiers
@@ -3041,7 +3063,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let read_result = required.read.map_or_else(
             || self.always(),
             |required_ty| {
-                self.check_protocol_member_read(db, ty, receiver_ty, member, required_ty, access)
+                self.check_protocol_member_read(
+                    db,
+                    ty,
+                    receiver_ty,
+                    member,
+                    source_member,
+                    required_ty,
+                    access,
+                )
             },
         );
 
@@ -3061,7 +3091,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     write
                         .bind_compatibility_type(db, env, fallback_ty)
                         .when_some_and(db, self.constraints, |write_ty| {
-                            self.check_property_write(db, receiver_ty, member.name, write_ty)
+                            let protocol_requirement = source_member.map(|source_member| {
+                                let write = source_member.access(db, env, access).write;
+                                let write = match access {
+                                    ProtocolMemberAccessMode::Instance => write.and_then(|write| {
+                                        write.bind_requirement(db, env, receiver_ty)
+                                    }),
+                                    ProtocolMemberAccessMode::Class => write
+                                        .and_then(|write| {
+                                            write.bind_compatibility_type(db, env, ty)
+                                        })
+                                        .map(ProtocolMemberWriteRequirement::AssignableTo),
+                                };
+                                AttributeWriteRequirement::ProtocolMember {
+                                    write,
+                                    qualifiers: source_member.qualifiers(),
+                                }
+                            });
+                            self.check_property_write(
+                                db,
+                                receiver_ty,
+                                member.name,
+                                write_ty,
+                                protocol_requirement,
+                            )
                         })
                 },
             )
@@ -3076,12 +3129,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        let class_receiver_ty = ty
-            .as_protocol_instance()
-            .map(|protocol| protocol.to_meta_type(db, env))
-            .unwrap_or_else(|| ty.to_meta_type(db, env));
+        let source_protocol = ty.as_protocol_instance();
+        let source_member = source_protocol
+            .and_then(|protocol| protocol.interface(db).member_by_name(db, member.name));
         let instance_access =
             member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
+        let class_access =
+            member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Class);
+        // A declared protocol method already guarantees class-side presence. Callback protocols
+        // instead use the candidate's callable type directly, so neither needs a class receiver.
+        let class_access_already_satisfied = member.is_instance_method()
+            && (member.name == "__call__"
+                || source_member
+                    .as_ref()
+                    .is_some_and(ProtocolMember::is_method));
+        let class_receiver_ty = (class_access != ProtocolMemberAccess::NONE
+            && !class_access_already_satisfied)
+            .then(|| {
+                source_protocol
+                    .map(|protocol| protocol.to_meta_type(db, env))
+                    .unwrap_or_else(|| ty.to_meta_type(db, env))
+            });
         if let Some(context) = self.report_context() {
             let instance_read_missing = instance_access.read.is_some()
                 && protocol_member_read_type(
@@ -3090,23 +3158,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ty,
                     ty,
                     member,
+                    source_member.as_ref(),
                     ProtocolMemberAccessMode::Instance,
                 )
                 .is_none();
-            let class_access =
-                member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Class);
-            let class_read_missing = class_access.read.is_some()
-                && !(member.is_instance_method() && member.name == "__call__")
-                && protocol_member_read_type(
-                    db,
-                    env,
-                    ty,
-                    class_receiver_ty,
-                    member,
-                    ProtocolMemberAccessMode::Class,
-                )
-                .is_none();
-            if instance_read_missing || class_read_missing {
+            let class_read_missing = || {
+                class_access.read.is_some()
+                    && !(member.is_instance_method() && member.name == "__call__")
+                    && class_receiver_ty.is_some_and(|class_receiver_ty| {
+                        protocol_member_read_type(
+                            db,
+                            env,
+                            ty,
+                            class_receiver_ty,
+                            member,
+                            source_member.as_ref(),
+                            ProtocolMemberAccessMode::Class,
+                        )
+                        .is_none()
+                    })
+            };
+            if instance_read_missing || class_read_missing() {
                 if instance_read_missing
                     && is_class_object_type(ty)
                     && member.is_instance_method()
@@ -3122,27 +3194,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        let result = self
-            .type_satisfies_protocol_member_access(
-                db,
-                ty,
-                ty,
-                member,
-                instance_access,
-                ProtocolMemberAccessMode::Instance,
-            )
-            .and(db, self.constraints, || {
-                let class_access =
-                    member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Class);
+        let instance_result = self.type_satisfies_protocol_member_access(
+            db,
+            ty,
+            ty,
+            member,
+            source_member.as_ref(),
+            instance_access,
+            ProtocolMemberAccessMode::Instance,
+        );
+        let result = if let Some(class_receiver_ty) = class_receiver_ty {
+            instance_result.and(db, self.constraints, || {
                 self.type_satisfies_protocol_member_access(
                     db,
                     ty,
                     class_receiver_ty,
                     member,
+                    source_member.as_ref(),
                     class_access,
                     ProtocolMemberAccessMode::Class,
                 )
-            });
+            })
+        } else {
+            instance_result
+        };
         if let Some(context) = self.report_context()
             && result.is_never_satisfied(db, env)
         {
@@ -3176,6 +3251,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return self.always();
                 }
 
+                let source_member = instance_ty
+                    .as_protocol_instance()
+                    .and_then(|protocol| protocol.interface(db).member_by_name(db, member.name));
                 let result = if member.is_method() {
                     required.read.map_or_else(
                         || self.always(),
@@ -3185,6 +3263,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 instance_ty,
                                 meta_ty,
                                 &member,
+                                source_member.as_ref(),
                                 required_ty,
                                 ProtocolMemberAccessMode::Class,
                             )
@@ -3196,6 +3275,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         instance_ty,
                         meta_ty,
                         &member,
+                        source_member.as_ref(),
                         required,
                         ProtocolMemberAccessMode::Class,
                     )
