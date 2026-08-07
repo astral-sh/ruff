@@ -93,8 +93,9 @@ impl OsSystem {
 
         match temporary_file.persist_noclobber(cache_path.as_std_path()) {
             Ok(_) => Ok(()),
-            Err(error)
-                if error.error.kind() == ErrorKind::AlreadyExists && self.is_file(cache_path) =>
+            Err(_)
+                if std::fs::read(cache_path.as_std_path())
+                    .is_ok_and(|cached_contents| cached_contents == contents) =>
             {
                 Ok(())
             }
