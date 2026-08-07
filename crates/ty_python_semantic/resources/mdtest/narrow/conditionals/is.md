@@ -598,6 +598,9 @@ BoundedU = TypeVar("BoundedU", bound=FooNewType2)
 def bounded_typevars(left: BoundedT, right: BoundedU) -> None:
     reveal_type(left is right)  # revealed: bool
     if left is right:
+        # These are the same object, so substituting `left` for `right` in a return would be
+        # sound. But `BoundedT & BoundedU` is still empty because their `NewType` tags differ;
+        # inferring that intersection could incorrectly make reachable code disappear.
         reveal_type(left)  # revealed: BoundedT@bounded_typevars
         reveal_type(right)  # revealed: BoundedU@bounded_typevars
 
