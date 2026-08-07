@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Ruff with profile-guided optimization using tracked repository files."""
+"""Build Ruff with profile-guided optimization using pinned ecosystem projects."""
 
 from __future__ import annotations
 
@@ -9,13 +9,89 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
-CORPUS_DIRECTORIES = (
-    "crates/ruff_benchmark/resources",
-    "scripts",
-    "python/ruff-ecosystem/ruff_ecosystem",
+EXCLUDED_DIRECTORIES = frozenset({"_tests", "_vendor", "test", "tests"})
+
+
+@dataclass(frozen=True)
+class EcosystemProject:
+    name: str
+    repository: str
+    revision: str
+    source_directories: tuple[str, ...]
+
+
+CORPUS_PROJECTS = (
+    EcosystemProject(
+        name="pytest",
+        repository="pytest-dev/pytest",
+        revision="28e86a6c2ae0173831e4925a4af89b02a2936d09",
+        source_directories=("src/_pytest",),
+    ),
+    EcosystemProject(
+        name="httpx",
+        repository="encode/httpx",
+        revision="b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+        source_directories=("httpx",),
+    ),
+    EcosystemProject(
+        name="fastapi",
+        repository="fastapi/fastapi",
+        revision="a375f6b948b99fa4260129856bbf11d037f363ef",
+        source_directories=("fastapi",),
+    ),
+    EcosystemProject(
+        name="anyio",
+        repository="agronholm/anyio",
+        revision="ffe91331adb912c5d150f5d373f7cd28a0e96a62",
+        source_directories=("src/anyio",),
+    ),
+    EcosystemProject(
+        name="pip",
+        repository="pypa/pip",
+        revision="d1fd55753405fd728a0751a578e27c1054acdf48",
+        source_directories=("src/pip/_internal",),
+    ),
+    EcosystemProject(
+        name="sphinx",
+        repository="sphinx-doc/sphinx",
+        revision="b06d92e80eed130e1dd4e67cac4afa1267424f1a",
+        source_directories=(
+            "sphinx/builders",
+            "sphinx/ext/autodoc",
+            "sphinx/domains/python",
+        ),
+    ),
+    EcosystemProject(
+        name="astropy",
+        repository="astropy/astropy",
+        revision="b779108c7cec25c840c0f744fdf2a1550441e309",
+        source_directories=("astropy/units",),
+    ),
+    EcosystemProject(
+        name="prefect",
+        repository="PrefectHQ/prefect",
+        revision="db66b14dbaea18e726fc4ea0100fd194383c6c59",
+        source_directories=(
+            "src/prefect/server/models",
+            "src/prefect/concurrency",
+            "src/prefect/events",
+            "src/prefect/input",
+        ),
+    ),
+    EcosystemProject(
+        name="typeshed",
+        repository="python/typeshed",
+        revision="e0efbeef901e9b6998d016e1ab9352678f09ae77",
+        source_directories=(
+            "stdlib/asyncio",
+            "stdlib/collections",
+            "stubs/requests",
+        ),
+    ),
 )
 
 
@@ -42,14 +118,15 @@ def main() -> None:
         action="store_true",
         help="Only produce <target-dir>/ruff.profdata for a subsequent release build",
     )
+    parser.add_argument(
+        "--prepare-corpus",
+        action="store_true",
+        help="Only download and prepare the pinned ecosystem training corpus",
+    )
     args = parser.parse_args()
 
-    host = rustc_host()
-    target = args.target or host
-    if target != host:
-        parser.error(
-            f"PGO training requires the host-native target {host}, got {target}"
-        )
+    if args.prepare_corpus and args.train_only:
+        parser.error("--prepare-corpus and --train-only cannot be used together")
 
     target_dir = (
         args.target_dir
@@ -59,14 +136,29 @@ def main() -> None:
     ).resolve()
     profile_dir = (args.profile_dir or target_dir / "profiles").resolve()
     merged_profile = target_dir / "ruff.profdata"
+
+    environment = os.environ.copy()
+    if args.prepare_corpus:
+        corpus = ecosystem_python_files(target_dir / "corpus", environment=environment)
+        write_corpus_arguments(target_dir, corpus)
+        print(f"Prepared {len(corpus)} ecosystem Python files", flush=True)
+        return
+
+    host = rustc_host()
+    target = args.target or host
+    if target != host:
+        parser.error(
+            f"PGO training requires the host-native target {host}, got {target}"
+        )
+
     profiler = find_llvm_profdata(host, args.llvm_profdata)
-    corpus = tracked_python_files()
+    corpus = ecosystem_python_files(target_dir / "corpus", environment=environment)
+    corpus_arguments = write_corpus_arguments(target_dir, corpus)
 
     profile_dir.mkdir(parents=True, exist_ok=True)
     for profile in profile_dir.glob("ruff-*.profraw"):
         profile.unlink()
 
-    environment = os.environ.copy()
     environment["CARGO_INCREMENTAL"] = "0"
     if target.endswith("-apple-darwin"):
         for variable in ("CFLAGS", "CXXFLAGS"):
@@ -99,9 +191,15 @@ def main() -> None:
         "--no-cache",
         "--silent",
     ]
-    print(f"Training on {len(corpus)} tracked Python files", flush=True)
+    print(f"Training on {len(corpus)} ecosystem Python files", flush=True)
     run(
-        [str(instrumented_binary), "check", *common_arguments, "--exit-zero", *corpus],
+        [
+            str(instrumented_binary),
+            "check",
+            *common_arguments,
+            "--exit-zero",
+            f"@{corpus_arguments}",
+        ],
         environment=training_environment,
     )
     run(
@@ -110,7 +208,7 @@ def main() -> None:
             "format",
             *common_arguments,
             "--check",
-            *corpus,
+            f"@{corpus_arguments}",
         ],
         environment=training_environment,
         allowed_exit_codes=(0, 1),
@@ -192,21 +290,122 @@ def find_llvm_profdata(host: str, override: Path | None) -> Path:
     return profiler
 
 
-def tracked_python_files() -> list[str]:
-    tracked_files = subprocess.run(
-        ["git", "ls-files", "-z", "--", *CORPUS_DIRECTORIES],
-        cwd=REPOSITORY_ROOT,
-        check=True,
-        capture_output=True,
-    ).stdout.split(b"\0")
-    paths = [
-        os.fsdecode(path)
-        for path in tracked_files
-        if path and Path(os.fsdecode(path)).suffix in {".py", ".pyi"}
-    ]
-    if not paths:
-        raise RuntimeError("No tracked Python files found in the Ruff training corpus")
+def ecosystem_python_files(
+    corpus_directory: Path, *, environment: dict[str, str]
+) -> list[str]:
+    corpus_directory.mkdir(parents=True, exist_ok=True)
+    git_environment = environment | {
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_LFS_SKIP_SMUDGE": "1",
+    }
+    paths: list[str] = []
+
+    for project in CORPUS_PROJECTS:
+        checkout = corpus_directory / project.name
+        checkout.mkdir(parents=True, exist_ok=True)
+        git = ["git", "-c", f"core.hooksPath={os.devnull}", "-C", str(checkout)]
+
+        if not (checkout / ".git").is_dir():
+            print(f"Preparing {project.repository}@{project.revision}", flush=True)
+            run([*git, "init", "--quiet"], environment=git_environment)
+            run(
+                [
+                    *git,
+                    "remote",
+                    "add",
+                    "origin",
+                    f"https://github.com/{project.repository}.git",
+                ],
+                environment=git_environment,
+            )
+
+        run(
+            [*git, "sparse-checkout", "set", "--cone", *project.source_directories],
+            environment=git_environment,
+        )
+
+        current_revision = subprocess.run(
+            [*git, "rev-parse", "--verify", "HEAD"],
+            cwd=REPOSITORY_ROOT,
+            env=git_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if (
+            current_revision.returncode != 0
+            or current_revision.stdout.strip() != project.revision
+        ):
+            run(
+                [
+                    *git,
+                    "fetch",
+                    "--quiet",
+                    "--no-tags",
+                    "--no-recurse-submodules",
+                    "--depth=1",
+                    "--filter=blob:none",
+                    "origin",
+                    project.revision,
+                ],
+                environment=git_environment,
+            )
+
+        run(
+            [
+                *git,
+                "checkout",
+                "--quiet",
+                "--detach",
+                "--force",
+                "--no-recurse-submodules",
+                project.revision,
+            ],
+            environment=git_environment,
+        )
+
+        for source_directory in project.source_directories:
+            source = checkout / source_directory
+            if not source.is_dir():
+                raise RuntimeError(
+                    f"Missing training source directory {source_directory!r} "
+                    f"in {project.repository}@{project.revision}"
+                )
+
+        tracked_files = subprocess.run(
+            [*git, "ls-files", "-z", "--", *project.source_directories],
+            cwd=REPOSITORY_ROOT,
+            env=git_environment,
+            check=True,
+            capture_output=True,
+        ).stdout.split(b"\0")
+        project_paths = [
+            str(path)
+            for tracked_file in tracked_files
+            if tracked_file
+            and (path := checkout / os.fsdecode(tracked_file)).suffix in {".py", ".pyi"}
+            and path.is_file()
+            and not path.is_symlink()
+            and not EXCLUDED_DIRECTORIES.intersection(
+                path.relative_to(checkout).parts[:-1]
+            )
+        ]
+
+        if not project_paths:
+            raise RuntimeError(
+                f"No Python training files found in {project.repository}"
+            )
+        paths.extend(sorted(project_paths))
+        print(f"  {project.name}: {len(project_paths)} Python files", flush=True)
+
     return paths
+
+
+def write_corpus_arguments(target_directory: Path, corpus: list[str]) -> Path:
+    arguments = target_directory / "ruff-pgo.args"
+    arguments.write_text("\n".join(corpus) + "\n", encoding="utf-8", newline="\n")
+    return arguments
 
 
 def cargo_command(target: str) -> list[str]:
@@ -237,7 +436,13 @@ def run(
     environment: dict[str, str],
     allowed_exit_codes: tuple[int, ...] = (0,),
 ) -> None:
-    print(f"> {shlex.join(command)}", flush=True)
+    logged_arguments = 16
+    displayed_command = shlex.join(command[:logged_arguments])
+    if len(command) > logged_arguments:
+        displayed_command += (
+            f" ... ({len(command) - logged_arguments} arguments omitted)"
+        )
+    print(f"> {displayed_command}", flush=True)
     completed = subprocess.run(
         command, cwd=REPOSITORY_ROOT, env=environment, check=False
     )
