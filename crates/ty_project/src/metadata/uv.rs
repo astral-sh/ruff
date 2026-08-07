@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use pep440_rs::Version;
-use ruff_db::system::{System, SystemPath, SystemPathBuf, WhichError};
+use ruff_db::system::{Command, System, SystemPath, SystemPathBuf, WhichError};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
@@ -32,12 +32,12 @@ impl UvWorkspace {
 
         // `uv check` has already selected and synchronized the environment. Keep this query
         // read-only so package selection and `--isolated` aren't overwritten by a second sync.
+        let mut command = Command::new(uv);
+        command
+            .args(["workspace", "metadata", "--frozen", "--active"])
+            .current_dir(path);
         let output = system
-            .run_command(
-                &uv,
-                &["workspace", "metadata", "--frozen", "--active"],
-                path,
-            )
+            .run_command(command)
             .map_err(UvWorkspaceError::Invocation)?;
 
         if !output.status.success() {
