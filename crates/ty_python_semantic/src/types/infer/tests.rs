@@ -274,6 +274,49 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
 }
 
 #[test]
+fn common_statement_inference_data_stays_inline() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/statement.py",
+        r#"
+        def collect() -> list[int]:
+            values = []
+            return values
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "src/statement.py").expect("file to exist");
+    let file = program_file(&db, file);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let function = module.syntax().body[0]
+        .as_function_def_stmt()
+        .expect("function definition");
+    let assignment = function.body[0]
+        .as_assign_stmt()
+        .expect("collection assignment");
+    let index = semantic_index(&db, file);
+    let collection = index.expect_single_definition(
+        assignment.targets[0]
+            .as_name_expr()
+            .expect("collection assignment target"),
+    );
+    let statement = index
+        .try_statement(&function.body[1])
+        .and_then(|statement| match statement {
+            Statement::Other(statement) => Some(statement),
+            Statement::Expression(_) | Statement::Definition(_) => None,
+        })
+        .expect("return statement to have its own inference region");
+    let inference = infer_statement_types_impl(&db, statement);
+
+    assert_eq!(inference.return_types_and_ranges.len(), 1);
+    assert!(inference.collection_use_constraints(collection).is_some());
+    assert!(inference.extra.is_none());
+
+    Ok(())
+}
+
+#[test]
 fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert!(
         std::mem::size_of::<DefinitionTypes>()

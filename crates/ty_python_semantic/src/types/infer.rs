@@ -1783,6 +1783,12 @@ pub(crate) struct StatementInferenceInner<'db> {
     /// The types and type qualifiers of every declaration in this region.
     declarations: Box<[(Definition<'db>, TypeAndQualifiers<'db>)]>,
 
+    /// The returned types and their corresponding ranges, if this statement is in a function body.
+    return_types_and_ranges: Box<[TypeAndRange<'db>]>,
+
+    /// The constraints on any collection initializers that are accessed in this region.
+    collection_use_constraints: CollectionUseConstraints<'db>,
+
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<StatementInferenceInnerExtra<'db>>>,
 }
@@ -1798,14 +1804,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
 
-    /// The returned types and their corresponding ranges, if this statement is in a function body.
-    return_types_and_ranges: Box<[TypeAndRange<'db>]>,
-
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
-
-    /// The constraints on any collection initializers that are accessed in this region.
-    collection_use_constraints: CollectionUseConstraints<'db>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -1829,6 +1829,8 @@ impl<'db> StatementInferenceInner<'db> {
             expressions: FrozenMap::default(),
             bindings: Box::default(),
             declarations: Box::default(),
+            return_types_and_ranges: Box::default(),
+            collection_use_constraints: CollectionUseConstraints::default(),
             #[cfg(debug_assertions)]
             scope,
             extra: Some(Box::new(StatementInferenceInnerExtra {
@@ -1876,13 +1878,11 @@ impl<'db> StatementInferenceInner<'db> {
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
-            && let Some(previous_extra) = previous_inference.extra.as_deref()
-            && !previous_extra.collection_use_constraints.is_empty()
+            && !previous_inference.collection_use_constraints.is_empty()
         {
-            let extra = self.extra.get_or_insert_default();
             extend_collection_use_constraints(
-                &mut extra.collection_use_constraints,
-                &previous_extra.collection_use_constraints,
+                &mut self.collection_use_constraints,
+                &previous_inference.collection_use_constraints,
             );
         }
 
@@ -1905,10 +1905,7 @@ impl<'db> StatementInferenceInner<'db> {
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
-        self.extra
-            .as_ref()?
-            .collection_use_constraints
-            .get(&collection_def)
+        self.collection_use_constraints.get(&collection_def)
     }
 
     fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
