@@ -3267,10 +3267,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let db = self.db();
                 let file_scope_id = self.scope().file_scope_id(db);
                 let use_def = self.index.use_def_map(file_scope_id);
-                let use_id = name.scoped_use_id(db, self.program_file());
 
                 !use_def
-                    .bindings_at_use(use_id)
+                    .bindings_at_use(name.scoped_use_id(db, self.program_file()))
                     .any(|binding| binding.binding.definition().is_some())
                     && self
                         .index
@@ -3280,8 +3279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             use_def.reachable_symbol_bindings(symbol).any(|binding| {
                                 binding
                                     .binding
-                                    .definition()
-                                    .is_some_and(|candidate| candidate != definition)
+                                    .is_defined_and(|candidate| candidate != definition)
                             })
                         })
             }

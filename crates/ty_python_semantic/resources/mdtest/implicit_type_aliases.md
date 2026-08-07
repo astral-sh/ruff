@@ -52,21 +52,11 @@ def use_alias(value: Alias) -> None:
 
 A union alias in a stub may refer to classes defined after the assignment.
 
-`aliases.pyi`:
-
 ```pyi
 UnionAlias = Target | Other
 
 class Target: ...
 class Other: ...
-```
-
-The imported union alias preserves both class references as a value and in a type expression.
-
-`main.py`:
-
-```py
-from aliases import UnionAlias
 
 reveal_type(UnionAlias)  # revealed: <types.UnionType special-form 'Target | Other'>
 
@@ -78,18 +68,10 @@ def use_alias(value: UnionAlias) -> None:
 
 A stub assignment may refer to an ordinary value defined later in the same file.
 
-`aliases.pyi`:
-
 ```pyi
 AliasValue = VALUE
 
 VALUE = 7
-```
-
-`main.py`:
-
-```py
-from aliases import AliasValue
 
 reveal_type(AliasValue)  # revealed: Literal[7]
 ```
@@ -98,18 +80,10 @@ reveal_type(AliasValue)  # revealed: Literal[7]
 
 A stub assignment should use an existing earlier binding instead of a later reassignment.
 
-`aliases.pyi`:
-
 ```pyi
 VALUE = 1
 Alias = VALUE
 VALUE = 2
-```
-
-`main.py`:
-
-```py
-from aliases import Alias, VALUE
 
 reveal_type(Alias)  # revealed: Literal[1]
 reveal_type(VALUE)  # revealed: Literal[2]
@@ -119,17 +93,9 @@ reveal_type(VALUE)  # revealed: Literal[2]
 
 Reassigning a stub variable to itself should resolve its previous binding without creating a cycle.
 
-`aliases.pyi`:
-
 ```pyi
 SelfValue = 3
 SelfValue = SelfValue
-```
-
-`main.py`:
-
-```py
-from aliases import SelfValue
 
 reveal_type(SelfValue)  # revealed: Literal[3]
 ```
