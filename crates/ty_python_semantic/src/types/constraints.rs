@@ -1955,7 +1955,7 @@ impl<'db> ConstraintBound<'db> {
         Self::Validity(Type::object())
     }
 
-    fn ty(self) -> Type<'db> {
+    pub(crate) fn ty(self) -> Type<'db> {
         match self {
             Self::Validity(ty) | Self::Evidence(ty) => ty,
         }
@@ -2076,42 +2076,62 @@ impl<'db> ConstraintBounds<'db> {
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
-/// Each stored type is one clause in the conjunction that forms the upper bound. Importantly, each
-/// clause may be a union. This keeps bounds such as `(A | B) & (C | D)` factored in a CNF-like
-/// form instead of immediately converting them to the DNF representation that [`Type`] uses.
+/// Validity and evidence clauses are stored separately. Clauses may be unions, keeping bounds such
+/// as `(A | B) & (C | D)` factored rather than distributing them into the DNF representation used
+/// by [`Type`].
 ///
-/// An empty `UpperBound` represents a _missing_ upper bound, which (in the absence of other
-/// constraints) we solve to `Unknown`. An upper bound of `object` is treated as an explicit
-/// request for "any type" as a solution, so we solve it to `object`.
+/// Every `UpperBound` contains at least one validity clause. An unconstrained validity upper bound
+/// is represented explicitly by `object`. An explicit evidence bound of `object` remains meaningful
+/// because evidence and validity clauses are stored separately.
 ///
-/// Redundant clauses are retained while accumulating the bound, avoiding repeated relation checks
-/// for every newly discovered clause. Consumers that require one effective bound can recover it
-/// with [`UpperBound::as_single_bound`] without eagerly expanding large intersections of unions.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+/// Redundant clauses are retained to preserve evidence even when a validity restriction is
+/// stronger. Consumers that require one effective bound can recover it with
+/// [`UpperBound::as_single_bound`] without eagerly expanding intersections of unions.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UpperBound<'db> {
-    clauses: FxOrderSet<Type<'db>>,
+    evidence: FxOrderSet<Type<'db>>,
+    validity: FxOrderSet<Type<'db>>,
+}
+
+impl Default for UpperBound<'_> {
+    fn default() -> Self {
+        Self {
+            evidence: FxOrderSet::default(),
+            validity: FxOrderSet::from_iter([Type::object()]),
+        }
+    }
 }
 
 impl<'db> UpperBound<'db> {
-    fn none() -> Self {
+    fn unconstrained() -> Self {
         Self::default()
     }
 
-    /// Creates an upper bound from one explicit clause.
-    ///
-    /// This preserves an explicit `object` clause so callers can distinguish `T <= object` from a
-    /// missing upper bound. Use [`UpperBound::add_clause`] when accumulating multiple clauses.
+    /// Creates an upper bound from one explicit evidence clause.
     fn from_clause(clause: Type<'db>) -> Self {
-        let clauses = FxOrderSet::from_iter([clause]);
-        Self { clauses }
+        let mut upper = Self::default();
+        upper.evidence.insert(clause);
+        upper
     }
 
-    fn is_empty(&self) -> bool {
-        self.clauses.is_empty()
+    fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+        self.evidence.iter().copied().map(ConstraintBound::Evidence)
     }
 
-    fn has_explicit_bound(&self) -> bool {
-        !self.is_empty()
+    fn iter_validity(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+        self.validity.iter().copied().map(ConstraintBound::Validity)
+    }
+
+    pub(crate) fn iter_clauses(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+        std::iter::chain(self.iter_evidence(), self.iter_validity())
+    }
+
+    fn has_evidence(&self) -> bool {
+        !self.evidence.is_empty()
+    }
+
+    fn has_same_evidence(&self, other: &Self) -> bool {
+        self.evidence.set_eq(&other.evidence)
     }
 
     /// Returns an existing upper-bound clause if every other clause is redundant with it.
@@ -2119,48 +2139,87 @@ impl<'db> UpperBound<'db> {
     /// This preserves constrained type variables without distributing unions: expanding
     /// `S & (int | str)` into `(S & int) | (S & str)` would otherwise lose `S` as the single
     /// effective bound. Returns `None` instead of materializing intersections when no existing
-    /// clause dominates the others. A missing bound remains distinct from an explicit `object`.
+    /// clause dominates the others. An unconstrained validity bound remains distinct from an
+    /// explicit evidence bound of `object`.
     pub(crate) fn as_single_bound(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        let mut clauses = self.clauses.iter().copied();
-        let first = clauses.next()?;
-        let candidate = clauses.fold(first, |candidate, clause| {
-            if candidate.is_redundant_with(db, env, clause) {
-                candidate
-            } else {
-                clause
-            }
-        });
+        Self::single_bound_from_iterator(db, env, self.iter_clauses())
+    }
 
-        self.clauses
-            .iter()
-            .all(|clause| candidate.is_redundant_with(db, env, *clause))
+    pub(crate) fn as_single_evidence_bound(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        Self::single_bound_from_iterator(db, env, self.iter_evidence())
+    }
+
+    fn as_single_validity_bound(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        Self::single_bound_from_iterator(db, env, self.iter_validity())
+    }
+
+    fn single_bound_from_iterator(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut clauses: impl Iterator<Item = ConstraintBound<'db>> + Clone,
+    ) -> Option<Type<'db>> {
+        let candidate = clauses
+            .clone()
+            .map(ConstraintBound::ty)
+            .reduce(|candidate, clause| {
+                if candidate.is_redundant_with(db, env, clause) {
+                    candidate
+                } else {
+                    clause
+                }
+            })?;
+
+        clauses
+            .all(|clause| candidate.is_redundant_with(db, env, clause.ty()))
             .then_some(candidate)
     }
 
-    fn is_never(&self) -> bool {
-        self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
-    }
-
-    fn add_clause(&mut self, clause: Type<'db>) {
-        if self.is_never() {
+    fn add_clause(&mut self, clause: ConstraintBound<'db>) {
+        if clause == ConstraintBound::missing_upper()
+            || (matches!(clause, ConstraintBound::Evidence(_))
+                && self.evidence.contains(&Type::Never))
+        {
             return;
         }
 
-        if clause.is_never() {
-            self.clauses.clear();
-            self.clauses.insert(Type::Never);
-            return;
+        match clause {
+            ConstraintBound::Evidence(Type::Never) => {
+                self.evidence.clear();
+                self.evidence.insert(Type::Never);
+            }
+            ConstraintBound::Validity(Type::Never) => {
+                self.validity.clear();
+                self.validity.insert(Type::Never);
+            }
+            ConstraintBound::Evidence(ty) => {
+                self.evidence.insert(ty);
+            }
+            ConstraintBound::Validity(ty) => {
+                if !self.validity.contains(&Type::Never) {
+                    if self.validity.len() == 1 && self.validity.contains(&Type::object()) {
+                        self.validity.clear();
+                    }
+                    self.validity.insert(ty);
+                }
+            }
         }
-
-        self.clauses.insert(clause);
     }
 
     fn shrink_to_fit(&mut self) {
-        self.clauses.shrink_to_fit();
+        self.evidence.shrink_to_fit();
+        self.validity.shrink_to_fit();
     }
 
     /// Exact conversion to an ordinary [`Type`]. This may be expensive: if any stored clause is a
@@ -2171,11 +2230,11 @@ impl<'db> UpperBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        IntersectionType::from_elements(db, env, self.clauses.iter().copied())
+        IntersectionType::from_elements(db, env, self.iter_clauses().map(ConstraintBound::ty))
     }
 
     fn has_visible_union_clause(&self) -> bool {
-        self.clauses.iter().copied().any(Type::is_union)
+        self.iter_clauses().any(|clause| clause.ty().is_union())
     }
 
     fn is_satisfied_by(
@@ -2184,9 +2243,8 @@ impl<'db> UpperBound<'db> {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> bool {
-        self.clauses
-            .iter()
-            .all(|clause| ty.is_constraint_set_assignable_to(db, env, *clause))
+        self.iter_clauses()
+            .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause.ty()))
     }
 
     /// Returns the constraints under which `lower` is assignable to every stored upper clause.
@@ -2199,8 +2257,8 @@ impl<'db> UpperBound<'db> {
     ) -> (NodeId, Option<SourceOrderId>) {
         let mut node = ALWAYS_TRUE;
         let mut source_order = None;
-        for clause in &self.clauses {
-            let when_clause = lower.when_constraint_set_assignable_to_owned(db, env, *clause);
+        for clause in self.iter_clauses() {
+            let when_clause = lower.when_constraint_set_assignable_to_owned(db, env, clause.ty());
             let (clause_node, clause_source_order) = storage.load(db, env, &when_clause);
             node = node.and(storage, clause_node);
             source_order = storage.ordered_source_order(source_order, clause_source_order);
@@ -2730,9 +2788,9 @@ impl ConstraintId {
             self_constraint.bounds.lower.ty(),
             other_constraint.bounds.lower.ty(),
         );
-        let mut merged_upper = UpperBound::none();
-        merged_upper.add_clause(self_constraint.bounds.upper.ty());
-        merged_upper.add_clause(other_constraint.bounds.upper.ty());
+        let mut merged_upper = UpperBound::unconstrained();
+        merged_upper.add_clause(self_constraint.bounds.upper);
+        merged_upper.add_clause(other_constraint.bounds.upper);
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.
@@ -3666,18 +3724,18 @@ struct InteriorNodeData {
     if_false: NodeId,
 }
 
-/// Accumulates lower and upper bounds for a single typevar on a single BDD path.
+/// Accumulates validity and evidence bounds for a single typevar on one TDD path.
 ///
-/// Lower bounds are collected into a union (they are alternatives for the minimum type the
-/// typevar can specialize to). Upper bounds are kept as a factored intersection (the typevar
-/// must satisfy all of them simultaneously). Once the path has been fully traversed, the
-/// accumulated bounds are stored in a [`PathBound`].
+/// Separate lower-bound unions preserve inference evidence even when a wider validity restriction
+/// determines the effective minimum. Upper clauses retain their individual provenance and stay
+/// factored to avoid distributing intersections over unions.
 #[derive(Default)]
 struct ConstraintBoundsBuilder<'db> {
-    lower: FxIndexSet<Type<'db>>,
+    evidence_lower: FxIndexSet<Type<'db>>,
+    validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
-    // Classify each bound before aggregation: unioning lower bounds can otherwise make separate
-    // gradual and static evidence indistinguishable from a single gradual union.
+    // Classify each evidence bound before aggregation: a union can otherwise make gradual and
+    // static argument evidence indistinguishable from a single gradual union.
     has_gradual_evidence: bool,
     has_static_evidence: bool,
 }
@@ -3694,18 +3752,38 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         }
     }
 
-    fn add_lower(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+    fn add_lower(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: ConstraintBound<'db>,
+    ) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
-        self.classify_evidence(db, env, ty);
-        self.lower.insert(ty);
+        match bound {
+            ConstraintBound::Evidence(ty) => {
+                self.classify_evidence(db, env, ty);
+                self.evidence_lower.insert(ty);
+            }
+            ConstraintBound::Validity(ty) if bound != ConstraintBound::missing_lower() => {
+                self.validity_lower.insert(ty);
+            }
+            ConstraintBound::Validity(_) => {}
+        }
     }
 
-    fn add_upper(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
-        self.classify_evidence(db, env, ty);
-        self.upper.add_clause(ty);
+    fn add_upper(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: ConstraintBound<'db>,
+    ) {
+        if let ConstraintBound::Evidence(ty) = bound {
+            self.classify_evidence(db, env, ty);
+        }
+        self.upper.add_clause(bound);
     }
 
     fn finish(
@@ -3715,27 +3793,36 @@ impl<'db> ConstraintBoundsBuilder<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> PathBound<'db> {
         let Self {
-            lower,
+            evidence_lower,
+            validity_lower,
             mut upper,
             has_gradual_evidence,
             has_static_evidence,
         } = self;
-        let lower = (!lower.is_empty()).then(|| UnionType::from_elements(db, env, lower));
+        let evidence_lower =
+            (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
+        let validity_lower = if validity_lower.is_empty() {
+            Type::Never
+        } else {
+            UnionType::from_elements(db, env, validity_lower)
+        };
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
-            lower,
+            evidence_lower,
+            validity_lower,
             upper,
             has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
         }
     }
 }
 
-/// The explicit lower and upper bounds inferred for one typevar on one BDD path.
+/// The validity restrictions and inference evidence for one typevar on one TDD path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    pub(crate) lower: Option<Type<'db>>,
+    pub(crate) evidence_lower: Option<Type<'db>>,
+    pub(crate) validity_lower: Type<'db>,
     pub(crate) upper: UpperBound<'db>,
     /// Whether the path contains gradual evidence and no static evidence.
     has_only_gradual_evidence: bool,
@@ -3745,14 +3832,27 @@ impl<'db> PathBound<'db> {
     pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
         Self {
             bound_typevar,
-            lower: Some(ty),
+            evidence_lower: Some(ty),
+            validity_lower: Type::Never,
             upper: UpperBound::from_clause(ty),
             has_only_gradual_evidence: false,
         }
     }
 
+    pub(crate) fn effective_lower(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        if let Some(evidence) = self.evidence_lower {
+            UnionType::from_two_elements(db, env, evidence, self.validity_lower)
+        } else {
+            self.validity_lower
+        }
+    }
+
     fn variance(&self) -> TypeVarVariance {
-        match (self.lower, self.has_upper()) {
+        match (self.evidence_lower, self.has_upper_evidence()) {
             (None, true) => TypeVarVariance::Covariant,
             (Some(_), false) => TypeVarVariance::Contravariant,
             (Some(_), true) => TypeVarVariance::Invariant,
@@ -3760,16 +3860,17 @@ impl<'db> PathBound<'db> {
         }
     }
 
-    fn lower_or_never(&self) -> Type<'db> {
-        self.lower.unwrap_or(Type::Never)
+    pub(crate) fn has_upper_evidence(&self) -> bool {
+        self.upper.has_evidence()
     }
 
-    pub(crate) fn has_upper(&self) -> bool {
-        self.upper.has_explicit_bound()
-    }
-
-    fn has_only_gradual_evidence(&self) -> bool {
-        self.has_only_gradual_evidence
+    fn as_equality_validity_bound(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let validity_upper = self.upper.as_single_validity_bound(db, env)?;
+        (self.validity_lower == validity_upper).then_some(self.validity_lower)
     }
 
     /// Restricts the range of a gradual solution by the upper bounds inferred for this constraint.
@@ -3779,8 +3880,9 @@ impl<'db> PathBound<'db> {
         env: &ProgramEnvironment<'db>,
         solution: Type<'db>,
     ) -> Type<'db> {
-        if self.lower != Some(solution)
-            || !self.has_upper()
+        if self.evidence_lower.is_none()
+            || self.effective_lower(db, env) != solution
+            || !self.has_upper_evidence()
             || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
         {
             return solution;
@@ -3792,7 +3894,7 @@ impl<'db> PathBound<'db> {
         }
 
         // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
-        if self.upper.clauses.len() == 1 && self.upper.clauses.contains(&solution) {
+        if self.upper.as_single_evidence_bound(db, env) == Some(solution) {
             return solution;
         }
 
@@ -3812,9 +3914,8 @@ impl<'db> PathBound<'db> {
 
         let mut upper_bounds = self
             .upper
-            .clauses
-            .iter()
-            .copied()
+            .iter_evidence()
+            .map(ConstraintBound::ty)
             .filter_map(materialize_upper);
         let Some(first_upper) = upper_bounds.next() else {
             return solution;
@@ -3910,7 +4011,7 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
 pub(crate) enum PathBounds<'db> {
     Unsatisfiable,
     Unconstrained,
-    Constrained(Box<[Box<[PathBound<'db>]>]>),
+    Constrained(Vec<Box<[PathBound<'db>]>>),
 }
 
 impl<'db> PathBounds<'db> {
@@ -4037,23 +4138,25 @@ impl<'db> PathBounds<'db> {
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
-                if let ConstraintBound::Evidence(lower) = constraint.bounds.lower {
+                let lower = constraint.bounds.lower;
+                if lower != ConstraintBound::missing_lower() {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
 
-                    if let Type::TypeVar(lower_bound_typevar) = lower {
+                    if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, env, Type::TypeVar(typevar));
+                        bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
                     }
                 }
 
-                if let ConstraintBound::Evidence(upper) = constraint.bounds.upper {
+                let upper = constraint.bounds.upper;
+                if upper != ConstraintBound::missing_upper() {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, env, upper);
 
-                    if let Type::TypeVar(upper_bound_typevar) = upper {
+                    if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, env, Type::TypeVar(typevar));
+                        bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
                     }
                 }
             }
@@ -4065,7 +4168,8 @@ impl<'db> PathBounds<'db> {
             result.push(path_bounds);
         }
 
-        PathBounds::Constrained(result.into_boxed_slice())
+        result.shrink_to_fit();
+        PathBounds::Constrained(result)
     }
 
     /// Accumulates a conjunction of concrete bound constraints without constructing a
@@ -4131,19 +4235,162 @@ impl<'db> PathBounds<'db> {
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, constraint, _) in constraints {
             let bounds = mappings.entry(typevar).or_default();
-            if let ConstraintBound::Evidence(lower) = constraint.lower {
-                bounds.add_lower(db, env, lower);
-            }
-            if let ConstraintBound::Evidence(upper) = constraint.upper {
-                bounds.add_upper(db, env, upper);
-            }
+            bounds.add_lower(db, env, constraint.lower);
+            bounds.add_upper(db, env, constraint.upper);
         }
 
         let path = mappings
             .drain(..)
             .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
             .collect();
-        Some(PathBounds::Constrained(Box::new([path])))
+        Some(PathBounds::Constrained(vec![path]))
+    }
+
+    /// Removes less-preferred declared alternatives without combining separate paths.
+    ///
+    /// Paths are comparable only when they have the same inference evidence, bind the same
+    /// typevars, and differ in one declared constrained alternative. Callers explicitly opt into
+    /// pruning; ordinary solution extraction preserves every path.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "concrete-specialization consumers opt into pruning in a later phase"
+        )
+    )]
+    pub(crate) fn prune_subsumed(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
+        let Self::Constrained(paths) = self else {
+            return;
+        };
+
+        // TODO: Avoid comparing every pair of paths if pruning becomes a hot path. Grouping
+        // paths by their shared bounds could narrow the candidate comparisons.
+        let dominated: Vec<_> = paths
+            .iter()
+            .enumerate()
+            .map(|(index, candidate)| {
+                paths.iter().enumerate().any(|(other_index, other)| {
+                    index != other_index && Self::path_subsumes(db, env, other, candidate)
+                })
+            })
+            .collect();
+        let mut dominated = dominated.into_iter();
+        paths.retain(|_| dominated.next() == Some(false));
+    }
+
+    /// Returns whether `lhs` subsumes `rhs`. If so, `rhs` can be removed from a set containing
+    /// both paths without losing a distinct inference alternative.
+    fn path_subsumes(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        lhs: &[PathBound<'db>],
+        rhs: &[PathBound<'db>],
+    ) -> bool {
+        // We only remove a path when another one includes exactly the same typevars and has
+        // identical bounds for all but one of them. Different path lengths cannot contain the
+        // same set of typevars.
+        if lhs.len() != rhs.len() {
+            return false;
+        }
+
+        // Verify that both paths contain the same typevars and differ in exactly one bound.
+        let mut differing = None;
+        for lhs_bound in lhs {
+            // TODO: Index bounds by typevar identity if paths contain many typevars; repeatedly
+            // scanning the other path makes each comparison quadratic.
+            let Some(rhs_bound) = rhs.iter().find(|rhs_bound| {
+                lhs_bound
+                    .bound_typevar
+                    .is_same_typevar_as(db, rhs_bound.bound_typevar)
+            }) else {
+                // This typevar does not appear in both paths.
+                return false;
+            };
+
+            if lhs_bound == rhs_bound {
+                // The bounds for this typevar match.
+                continue;
+            }
+
+            // Gradual-only evidence does not distinguish between all of the declared constraints
+            // that it is compatible with, so preserve each alternative.
+            if lhs_bound.has_only_gradual_evidence || rhs_bound.has_only_gradual_evidence {
+                return false;
+            }
+
+            // The differing bounds must represent different declared constraint branches.
+            if lhs_bound.validity_lower == rhs_bound.validity_lower {
+                return false;
+            }
+
+            // A differing bound is comparable only when both paths have the same inference
+            // evidence. Otherwise, the paths represent separate inference alternatives rather
+            // than different declared constraints for the same alternative.
+            if lhs_bound.evidence_lower != rhs_bound.evidence_lower {
+                return false;
+            }
+            if !lhs_bound.upper.has_same_evidence(&rhs_bound.upper) {
+                return false;
+            }
+
+            // If the differing typevar does not have any declared constraints, this heuristic does
+            // not apply.
+            let bound_typevar = lhs_bound.bound_typevar;
+            let Some(TypeVarBoundOrConstraints::Constraints(_)) =
+                bound_typevar.typevar(db).bound_or_constraints(db, env)
+            else {
+                return false;
+            };
+
+            // Each declared constraint contributes an equality bound to the validity domain, which
+            // cannot be weakened by other constraints on this path. We can therefore assume that
+            // the validity lower and upper bounds are always present for this typevar, and that
+            // they are equal.
+            let lhs_validity = lhs_bound
+                .as_equality_validity_bound(db, env)
+                .expect("constrained typevar should have an equality validity bound");
+            let rhs_validity = rhs_bound
+                .as_equality_validity_bound(db, env)
+                .expect("constrained typevar should have an equality validity bound");
+
+            if differing
+                .replace((lhs_bound.variance(), lhs_validity, rhs_validity))
+                .is_some()
+            {
+                // A second typevar has different bounds.
+                return false;
+            }
+        }
+
+        let Some((lhs_variance, lhs_validity, rhs_validity)) = differing else {
+            // There were no typevars with different bounds.
+            return false;
+        };
+
+        // Check whether either validity bound is assignable to the other.
+        let lhs_assignable_to_rhs = lhs_validity.is_assignable_to(db, env, rhs_validity);
+        let rhs_assignable_to_lhs = rhs_validity.is_assignable_to(db, env, lhs_validity);
+
+        // If the bounds are mutually unassignable, neither one subsumes the other.
+        if !lhs_assignable_to_rhs && !rhs_assignable_to_lhs {
+            return false;
+        }
+
+        // Gradual alternatives can be assignable in both directions. Prefer a fully static
+        // alternative in that case, but preserve both if they are equally static or gradual.
+        if lhs_assignable_to_rhs == rhs_assignable_to_lhs {
+            let lhs_is_static = lhs_validity.bottom_materialization(db, env)
+                == lhs_validity.top_materialization(db, env);
+            let rhs_is_static = rhs_validity.bottom_materialization(db, env)
+                == rhs_validity.top_materialization(db, env);
+            return lhs_is_static && !rhs_is_static;
+        }
+
+        match lhs_variance {
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => lhs_assignable_to_rhs,
+            TypeVarVariance::Covariant => rhs_assignable_to_lhs,
+            TypeVarVariance::Bivariant => false,
+        }
     }
 
     pub(crate) fn solve(
@@ -4178,6 +4425,9 @@ impl<'db> PathBounds<'db> {
             let mut solution = Vec::with_capacity(path.len());
             for path_bound in path {
                 let variance = path_bound.variance();
+                if variance == TypeVarVariance::Bivariant {
+                    continue;
+                }
 
                 match choose(variance, path_bound) {
                     Ok(Some(ty)) => solution.push(TypeVarSolution {
@@ -4241,8 +4491,12 @@ impl<'db> PathBounds<'db> {
         // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
         // before solving.
 
+        if path_bound.variance() == TypeVarVariance::Bivariant {
+            return Ok(None);
+        }
+
         let bound_typevar = path_bound.bound_typevar;
-        let lower = path_bound.lower_or_never();
+        let lower = path_bound.effective_lower(db, env);
 
         match bound_typevar
             .typevar(db)
@@ -4254,7 +4508,7 @@ impl<'db> PathBounds<'db> {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
-                if let Some(lower) = path_bound.lower {
+                if path_bound.evidence_lower.is_some() {
                     if !path_bound.upper.is_satisfied_by(db, env, lower) {
                         let mut storage = builder.storage.borrow_mut();
                         let (when_upper, source_order) =
@@ -4280,15 +4534,14 @@ impl<'db> PathBounds<'db> {
                     return Ok(Some(lower));
                 }
 
-                if path_bound.has_upper() {
+                if path_bound.has_upper_evidence() {
                     return Ok(IntersectionType::bounded_from_elements(
                         db,
                         env,
                         path_bound
                             .upper
-                            .clauses
-                            .iter()
-                            .copied()
+                            .iter_clauses()
+                            .map(ConstraintBound::ty)
                             .chain([declared_upper]),
                     ));
                 }
@@ -4340,7 +4593,7 @@ impl<'db> PathBounds<'db> {
                         current_best.is_assignable_to(db, env, candidate);
 
                     if candidate_assignable_to_best != best_assignable_to_candidate {
-                        if path_bound.lower.is_some() {
+                        if path_bound.evidence_lower.is_some() {
                             candidate_assignable_to_best
                         } else {
                             best_assignable_to_candidate
@@ -4394,9 +4647,10 @@ impl<'db> PathBounds<'db> {
                     return Err(());
                 };
 
-                if let (Some(ty @ Type::TypeVar(_)), _) | (_, Some(ty @ Type::TypeVar(_))) =
-                    (path_bound.lower, path_bound.upper.as_single_bound(db, env))
-                {
+                if let (Some(ty @ Type::TypeVar(_)), _) | (_, Some(ty @ Type::TypeVar(_))) = (
+                    path_bound.evidence_lower,
+                    path_bound.upper.as_single_evidence_bound(db, env),
+                ) {
                     // This path relates two TypeVars, such as passing `S` to a parameter typed as
                     // `T: (int, str)`. The compatibility check above has verified that at least
                     // one of `T`'s declared constraints can satisfy the path, but choosing a
@@ -4413,14 +4667,14 @@ impl<'db> PathBounds<'db> {
                 // as the result if it's gradual. (Checking `Any` against `T: (int, str)` selects
                 // `T = Any`) If the path solution is fully static, we choose the "tightest"
                 // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
-                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence() {
-                    if let Some(lower) = path_bound.lower {
+                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence {
+                    if path_bound.evidence_lower.is_some() {
                         Ok(Some(lower))
-                    } else if path_bound.has_upper() {
+                    } else if path_bound.has_upper_evidence() {
                         Ok(IntersectionType::bounded_from_elements(
                             db,
                             env,
-                            path_bound.upper.clauses.iter().copied(),
+                            path_bound.upper.iter_clauses().map(ConstraintBound::ty),
                         ))
                     } else {
                         Ok(None)
@@ -7438,6 +7692,37 @@ mod tests {
         class.to_instance(db, &db.program_environment())
     }
 
+    fn declared_path_bound<'db>(
+        bound_typevar: BoundTypeVarInstance<'db>,
+        alternative: Type<'db>,
+        variance: TypeVarVariance,
+    ) -> PathBound<'db> {
+        let evidence_lower = matches!(
+            variance,
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant
+        )
+        .then_some(Type::Never);
+        let mut upper = UpperBound::unconstrained();
+        upper.add_clause(ConstraintBound::Validity(alternative));
+        if matches!(
+            variance,
+            TypeVarVariance::Covariant | TypeVarVariance::Invariant
+        ) {
+            upper.add_clause(ConstraintBound::Evidence(Type::object()));
+        }
+        PathBound {
+            bound_typevar,
+            evidence_lower,
+            validity_lower: alternative,
+            upper,
+            has_only_gradual_evidence: false,
+        }
+    }
+
+    fn path_bounds(paths: Vec<Vec<PathBound<'_>>>) -> PathBounds<'_> {
+        PathBounds::Constrained(paths.into_iter().map(Vec::into_boxed_slice).collect())
+    }
+
     // XXX: Remove once solution extraction exercises validity domains.
     #[test]
     fn validity_domain_uses_supported_typevars_in_builder_order() {
@@ -8166,6 +8451,41 @@ mod tests {
     }
 
     #[test]
+    fn upper_bound_retains_evidence_under_stronger_validity() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = known_instance(db, KnownClass::Int);
+        let bool = known_instance(db, KnownClass::Bool);
+
+        for clauses in [
+            [
+                ConstraintBound::Evidence(int),
+                ConstraintBound::Validity(bool),
+            ],
+            [
+                ConstraintBound::Validity(bool),
+                ConstraintBound::Evidence(int),
+            ],
+        ] {
+            let mut upper = UpperBound::unconstrained();
+            for clause in clauses {
+                upper.add_clause(clause);
+            }
+
+            assert!(upper.has_evidence());
+            assert_eq!(upper.as_single_bound(db, &env), Some(bool));
+            assert_eq!(upper.as_single_evidence_bound(db, &env), Some(int));
+        }
+
+        let mut upper = UpperBound::from_clause(int);
+        upper.add_clause(ConstraintBound::Validity(Type::Never));
+        assert!(upper.has_evidence());
+        assert_eq!(upper.materialize_exact(db, &env), Type::Never);
+        assert_eq!(upper.as_single_evidence_bound(db, &env), Some(int));
+    }
+
+    #[test]
     fn upper_bound_collapses_never() {
         let db = setup_db();
         let db = &db;
@@ -8173,12 +8493,17 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
 
         let mut upper = UpperBound::from_clause(int);
-        upper.add_clause(Type::Never);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+        upper.add_clause(ConstraintBound::Evidence(Type::Never));
+        assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
+        assert_eq!(upper.validity, FxOrderSet::from_iter([Type::object()]));
         assert_eq!(upper.materialize_exact(db, &env), Type::Never);
 
-        upper.add_clause(int);
-        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
+        upper.add_clause(ConstraintBound::Validity(int));
+        assert_eq!(upper.validity, FxOrderSet::from_iter([int]));
+
+        upper.add_clause(ConstraintBound::Evidence(int));
+        assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
+        assert_eq!(upper.validity, FxOrderSet::from_iter([int]));
     }
 
     #[test]
@@ -8203,25 +8528,36 @@ mod tests {
             ([int_or_str, u], u),
             ([u, int_or_str], u),
         ] {
-            let mut upper = UpperBound::none();
+            let mut upper = UpperBound::unconstrained();
             for clause in clauses {
-                upper.add_clause(clause);
+                upper.add_clause(ConstraintBound::Evidence(clause));
             }
 
-            assert_eq!(upper.clauses.len(), 2);
+            assert_eq!(upper.evidence.len(), 2);
             assert_eq!(upper.as_single_bound(db, &env), Some(expected));
         }
     }
 
     #[test]
-    fn upper_bound_distinguishes_missing_bound_from_explicit_object() {
+    fn upper_bound_distinguishes_default_validity_from_explicit_object_evidence() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
 
-        assert_eq!(UpperBound::none().as_single_bound(db, &env), None);
+        let validity_only = UpperBound::unconstrained();
         assert_eq!(
-            UpperBound::from_clause(Type::object()).as_single_bound(db, &env),
+            validity_only.as_single_bound(db, &env),
+            Some(Type::object())
+        );
+        assert_eq!(validity_only.as_single_evidence_bound(db, &env), None);
+
+        let explicit_evidence = UpperBound::from_clause(Type::object());
+        assert_eq!(
+            explicit_evidence.as_single_bound(db, &env),
+            Some(Type::object())
+        );
+        assert_eq!(
+            explicit_evidence.as_single_evidence_bound(db, &env),
             Some(Type::object())
         );
     }
@@ -8238,9 +8574,9 @@ mod tests {
         let int_or_bytes = UnionType::from_two_elements(db, &env, int, bytes);
 
         for clauses in [[int_or_str, int_or_bytes], [int_or_bytes, int_or_str]] {
-            let mut upper = UpperBound::none();
+            let mut upper = UpperBound::unconstrained();
             for clause in clauses {
-                upper.add_clause(clause);
+                upper.add_clause(ConstraintBound::Evidence(clause));
             }
 
             assert_eq!(upper.materialize_exact(db, &env), int);
@@ -8256,7 +8592,7 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
         let u = Type::TypeVar(create_typevar(db, "U"));
         let mut upper = UpperBound::from_clause(u);
-        upper.add_clause(int);
+        upper.add_clause(ConstraintBound::Evidence(int));
 
         assert!(
             upper
@@ -8384,6 +8720,272 @@ mod tests {
     }
 
     #[test]
+    fn path_bounds_preserve_validity_without_manufacturing_evidence() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = known_instance(db, KnownClass::Int);
+        let bool = known_instance(db, KnownClass::Bool);
+        let str = known_instance(db, KnownClass::Str);
+        let typevar = create_typevar(db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let evidence =
+            ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, typevar, bool);
+        let (validity_node, validity_source_order) = Constraint::new_node_with_bounds(
+            db,
+            &env,
+            &mut builder.storage.borrow_mut(),
+            typevar,
+            ConstraintBound::Validity(int),
+            ConstraintBound::Validity(int),
+        );
+        let validity = ConstraintSet::from_node(&builder, validity_node, validity_source_order);
+        let inferable = TypeVarSet::from_typevars(db, [typevar]);
+        let combined = evidence.and(db, &builder, || validity);
+
+        let solutions =
+            combined.solutions_with(db, &env, &builder, inferable, |variance, path_bound| {
+                assert_eq!(variance, TypeVarVariance::Contravariant);
+                assert_eq!(path_bound.evidence_lower, Some(bool));
+                assert_eq!(path_bound.validity_lower, int);
+                assert_eq!(path_bound.effective_lower(db, &env), int);
+                assert!(!path_bound.has_upper_evidence());
+                assert_eq!(path_bound.upper.as_single_bound(db, &env), Some(int));
+                PathBounds::default_solve(db, &env, &builder, path_bound)
+            });
+        let expected = Solutions::Constrained(vec![vec![TypeVarSolution {
+            bound_typevar: typevar,
+            solution: int,
+        }]]);
+        assert_eq!(solutions, expected);
+
+        let (other_node, other_source_order) = Constraint::new_node_with_bounds(
+            db,
+            &env,
+            &mut builder.storage.borrow_mut(),
+            typevar,
+            ConstraintBound::Validity(str),
+            ConstraintBound::Validity(str),
+        );
+        let other = ConstraintSet::from_node(&builder, other_node, other_source_order);
+        let alternatives = validity.or(db, &builder, || other);
+        let ordinary_path = evidence.and(db, &builder, || alternatives);
+        let solutions =
+            ordinary_path.solutions_with(db, &env, &builder, inferable, |variance, path_bound| {
+                assert_eq!(variance, TypeVarVariance::Contravariant);
+                assert_eq!(path_bound.evidence_lower, Some(bool));
+                assert_eq!(path_bound.validity_lower, int);
+                assert_eq!(path_bound.effective_lower(db, &env), int);
+                PathBounds::default_solve(db, &env, &builder, path_bound)
+            });
+        assert_eq!(solutions, expected);
+
+        let mut callback_invoked = false;
+        let solutions =
+            validity.solutions_with(db, &env, &builder, inferable, |_variance, _path_bound| {
+                callback_invoked = true;
+                Ok(Some(int))
+            });
+        assert!(!callback_invoked);
+        assert_eq!(solutions, Solutions::Constrained(vec![Vec::new()]));
+    }
+
+    // XXX: Remove once domain-aware solution extraction invokes `prune_subsumed`; constrained
+    // TypeVar mdtests should cover this pipeline through production callers.
+    #[test]
+    fn path_pruning_selects_declared_domain_alternatives_before_solving() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let bool = known_instance(db, KnownClass::Bool);
+        let int = known_instance(db, KnownClass::Int);
+
+        for lower_evidence in [true, false] {
+            let typevar = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+                Some(TypeVarBoundOrConstraints::Constraints(
+                    TypeVarConstraints::new(db, [bool, int].as_slice()),
+                ))
+            });
+            let builder = ConstraintSetBuilder::new();
+            let evidence = if lower_evidence {
+                ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, typevar, bool)
+            } else {
+                ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, typevar, int)
+            };
+            let (domain, source_order) =
+                builder
+                    .storage
+                    .borrow_mut()
+                    .validity_domain(db, &env, evidence.node);
+            let domain = ConstraintSet::from_node(&builder, domain, source_order);
+            let combined = evidence.and(db, &builder, || domain);
+            let inferable = TypeVarSet::from_typevars(db, [typevar]);
+            let mut paths = PathBounds::compute(
+                db,
+                &env,
+                &mut builder.storage.borrow_mut(),
+                combined.node,
+                inferable,
+                combined.source_order,
+            );
+
+            assert!(matches!(&paths, PathBounds::Constrained(paths) if paths.len() == 2));
+            paths.prune_subsumed(db, &env);
+            let expected = if lower_evidence { bool } else { int };
+            assert_eq!(
+                paths.solve(db, &env, &builder),
+                Solutions::Constrained(vec![vec![TypeVarSolution {
+                    bound_typevar: typevar,
+                    solution: expected,
+                }]])
+            );
+        }
+    }
+
+    #[test]
+    fn path_pruning_ranks_declared_validity_bounds() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+        let any = Type::any();
+        let object = Type::object();
+        let int_or_str = UnionType::from_two_elements(db, &env, int, str);
+        let cases = [
+            (
+                [Type::Never, int],
+                Type::Never,
+                int,
+                TypeVarVariance::Contravariant,
+            ),
+            (
+                [int, int_or_str],
+                int,
+                int_or_str,
+                TypeVarVariance::Contravariant,
+            ),
+            (
+                [int, int_or_str],
+                int_or_str,
+                int,
+                TypeVarVariance::Covariant,
+            ),
+            ([int, object], object, int, TypeVarVariance::Covariant),
+            ([any, int], int, any, TypeVarVariance::Contravariant),
+        ];
+
+        for (alternatives, preferred, discarded, variance) in cases {
+            let typevar = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+                Some(TypeVarBoundOrConstraints::Constraints(
+                    TypeVarConstraints::new(db, alternatives.as_slice()),
+                ))
+            });
+            let preferred = declared_path_bound(typevar, preferred, variance);
+            let discarded = declared_path_bound(typevar, discarded, variance);
+
+            for paths in [
+                vec![vec![preferred.clone()], vec![discarded.clone()]],
+                vec![vec![discarded.clone()], vec![preferred.clone()]],
+            ] {
+                let mut actual = path_bounds(paths);
+                actual.prune_subsumed(db, &env);
+                assert_eq!(actual, path_bounds(vec![vec![preferred.clone()]]));
+            }
+        }
+    }
+
+    #[test]
+    fn path_pruning_preserves_correlated_and_independent_alternatives() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let bool = known_instance(db, KnownClass::Bool);
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+        let typevar = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(db, [bool, int, str].as_slice()),
+            ))
+        });
+        let other = create_typevar(db, "U");
+        let lower = TypeVarVariance::Contravariant;
+        let upper = TypeVarVariance::Covariant;
+        let declared = |alternative, variance| declared_path_bound(typevar, alternative, variance);
+        let unrelated = |alternative| PathBound::exact(other, alternative);
+        let mut different_evidence = declared(int, lower);
+        different_evidence.evidence_lower = Some(bool);
+        let cases = [
+            vec![
+                vec![declared(bool, lower), unrelated(int)],
+                vec![declared(int, lower), unrelated(str)],
+            ],
+            vec![vec![declared(int, lower)], vec![declared(str, lower)]],
+            vec![vec![declared(bool, lower)], vec![declared(int, upper)]],
+            vec![vec![unrelated(bool)], vec![unrelated(int)]],
+            vec![vec![declared(bool, lower)], vec![different_evidence]],
+        ];
+
+        for paths in cases {
+            let mut actual = path_bounds(paths);
+            let expected = actual.clone();
+            actual.prune_subsumed(db, &env);
+            assert_eq!(actual, expected);
+        }
+
+        let narrow = vec![declared(bool, lower), unrelated(int)];
+        let broad = vec![unrelated(int), declared(int, lower)];
+        let mut actual = path_bounds(vec![broad, narrow.clone()]);
+        actual.prune_subsumed(db, &env);
+        assert_eq!(actual, path_bounds(vec![narrow]));
+
+        for mut paths in [
+            path_bounds(vec![Vec::new()]),
+            PathBounds::Unsatisfiable,
+            PathBounds::Unconstrained,
+        ] {
+            let expected = paths.clone();
+            paths.prune_subsumed(db, &env);
+            assert_eq!(paths, expected);
+        }
+    }
+
+    #[test]
+    fn path_pruning_preserves_ambiguous_gradual_alternatives() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let bool = known_instance(db, KnownClass::Bool);
+        let int = known_instance(db, KnownClass::Int);
+        let any = Type::any();
+        let list_any = KnownClass::List.to_specialized_instance(db, &env, &[any]);
+        let typevar = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(db, [bool, int, any, list_any].as_slice()),
+            ))
+        });
+        let declared =
+            |alternative| declared_path_bound(typevar, alternative, TypeVarVariance::Contravariant);
+
+        let mut gradual_bool = declared(bool);
+        gradual_bool.evidence_lower = Some(any);
+        gradual_bool.has_only_gradual_evidence = true;
+        let mut gradual_int = declared(int);
+        gradual_int.evidence_lower = Some(any);
+        gradual_int.has_only_gradual_evidence = true;
+
+        for paths in [
+            vec![vec![declared(any)], vec![declared(list_any)]],
+            vec![vec![gradual_bool], vec![gradual_int]],
+        ] {
+            let mut actual = path_bounds(paths);
+            let expected = actual.clone();
+            actual.prune_subsumed(db, &env);
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
     fn simple_lower_bound_conjunction_skips_sequent_analysis() {
         let db = setup_db();
         let db = &db;
@@ -8504,8 +9106,9 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let path_bound = PathBound {
             bound_typevar: t,
-            lower: None,
-            upper: UpperBound::none(),
+            evidence_lower: None,
+            validity_lower: Type::Never,
+            upper: UpperBound::unconstrained(),
             has_only_gradual_evidence: false,
         };
 

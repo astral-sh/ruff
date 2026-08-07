@@ -302,25 +302,28 @@ to the validity/evidence provenance rules described above; do not use this refac
 relationships between gradual and static types, and do not compensate by expanding declared
 gradual equalities into bottom/top materialization ranges.
 
-### Prefer narrowly subsumed complete solutions
+### Prefer narrowly subsumed complete paths
 
-Add witness-derived `TypeVarVariance` to `TypeVarSolution`. The variance is already available where
-`PathBounds::solve_with` constructs each binding, so no witness-set or callback-signature expansion
-is required.
+Add an explicit shared pruning operation on `PathBounds`, before solution extraction discards the
+validity bounds and inference evidence needed to compare declared alternatives. Read variance and
+gradual/static argument classification directly from each `PathBound`; do not add variance or
+other path metadata to `TypeVarSolution`.
 
-Add an explicit shared pruning operation on `Solutions`. Compare complete assignments
-conservatively:
+Compare complete paths conservatively:
 
-1. Both solutions must contain the same type-variable identities.
-1. All bindings except one must be identical.
-1. The differing binding must belong to a declared constrained type variable.
-1. Both bindings must have compatible evidence-derived variance.
+1. Both paths must contain the same type-variable identities.
+1. All type-variable bounds except one must be identical.
+1. The differing bounds must belong to a declared constrained type variable and identify exact
+    declared alternatives through their validity bounds.
+1. Both paths must retain the same inference evidence and compatible evidence-derived variance.
 1. Lower-side evidence prefers the narrower compatible declared alternative.
 1. Upper-side-only evidence prefers the broader compatible declared alternative.
 1. Mutually assignable alternatives prefer static over gradual; otherwise retain declaration
     order.
-1. Preserve both solutions if multiple bindings differ, the differing alternatives are
-    incomparable, or the variable is not declared constrained.
+1. Preserve both paths if multiple type-variable bounds differ, their evidence differs, the
+    alternatives are incomparable, or the variable is not declared constrained.
+1. Preserve ambiguous gradual argument evidence rather than arbitrarily choosing one compatible
+    declared alternative.
 
 For example, lower-side evidence prefers the first of:
 
@@ -336,8 +339,9 @@ But neither of these dominates the other:
 {T = str | bytes, U = int}
 ```
 
-Pruning is opt-in for concrete-specialization consumers. Do not prune automatically inside
-`PathBounds::solve_with`: internal `ConstraintSet.solutions()` and `solutions_for()` APIs should
+Pruning is opt-in for concrete-specialization consumers: callers explicitly prune `PathBounds`
+before extracting solutions. Do not prune automatically inside `PathBounds::compute` or
+`PathBounds::solve_with`; internal `ConstraintSet.solutions()` and `solutions_for()` APIs should
 continue returning their raw solution paths unless a specific implementation expectation conflicts
 with required user-visible behavior.
 
@@ -359,7 +363,7 @@ expanding `Solutions`:
 - [x] Phase 1: retain bound type-variable instances in constraint-set arenas.
 - [x] Phase 2: replace optional constraint bounds with validity/evidence bounds.
 - [x] Phase 3: reintroduce support-derived validity-domain construction.
-- [ ] Phase 4: preserve evidence-derived variance and add complete-solution pruning.
+- [x] Phase 4: preserve evidence-derived variance and add complete-path pruning.
 - [ ] Phase 5: solve the domain-conjoined TDD and simplify default solving.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
@@ -431,9 +435,9 @@ Suggested revision description: `[π] Derive type-variable validity domains from
     user-visible bounded/constrained generic behavior.
 1. Run the full suite before marking the phase complete.
 
-### Phase 4: preserve evidence-derived variance and add complete-solution pruning
+### Phase 4: preserve evidence-derived variance and add complete-path pruning
 
-Suggested revision description: `[π] Preserve evidence variance and compare complete solutions`.
+Suggested revision description: `[π] Preserve evidence variance and compare complete paths`.
 
 1. Propagate validity/evidence provenance through `ConstraintBoundsBuilder`, `PathBound`, and
     factored `UpperBound` clauses so both `default_solve` and custom callbacks can inspect it.
@@ -442,19 +446,20 @@ Suggested revision description: `[π] Preserve evidence variance and compare com
 1. Preserve effective lower/upper restrictions while deriving variance and gradual/static
     classification only from evidence.
 1. Update contextual inference, generic specialization, receiver handling, pattern narrowing,
-    diagnostic helpers, and other real `PathBound` consumers to use narrow provenance-aware
-    accessors.
+    diagnostic helpers, and other real `PathBound` consumers to inspect provenance-aware fields
+    directly.
 1. Preserve witnessed relationships between compatible constrained type variables. Prefer using
     the new provenance-aware path bounds directly; introduce specialized relationship metadata only
     if the representation proves insufficient.
 1. Ensure the ordinary visitor and `compute_simple_bound_conjunction` agree, including canonical
     reorientation of constraints involving another type variable.
 1. Leave variables without positive evidence unsolved while preserving valid empty solution paths.
-1. Add variance to `TypeVarSolution` and update the small number of direct initializers.
-1. Implement the explicit whole-`Solution` pruning operation without changing solver callbacks or
+1. Keep `TypeVarSolution` limited to the type variable and its selected solution; derive variance
+    and gradual/static evidence directly from `PathBound` when comparing paths.
+1. Implement explicit whole-path pruning on `PathBounds` without changing solver callbacks or
     automatically pruning raw solver results.
 1. Cover narrow versus broad preference, static versus gradual preference, declaration-order ties,
-    incomparable complete assignments, and correlated assignments where necessary.
+    incomparable or independently evidenced alternatives, and correlated paths where necessary.
 1. Delay behavior-changing consumer integration until Phase 5.
 1. Run the full suite before marking the phase complete.
 
@@ -472,8 +477,8 @@ Suggested revision description: `[π] Solve declared type-variable domains as co
     inspecting `TypeVarBoundOrConstraints` or rebuilding declared alternatives independently.
 1. Preserve witnessed variance, gradual evidence, bounded lower/upper behavior, absent versus
     explicit bounds, unsolved variables, and relationships between compatible type variables.
-1. Explicitly prune subsumed complete solutions in affected specialization consumers before they
-    combine bindings individually; leave raw internal solution APIs exhaustive.
+1. Explicitly prune subsumed complete paths in affected specialization consumers before extracting
+    solutions and combining bindings individually; leave raw internal solution APIs exhaustive.
 1. Recover declaration-specific diagnostics by inspecting unconjoined paths only after a
     domain-aware solve fails.
 1. Do not apply domains before eager quantification or expand this project into the separate
@@ -596,8 +601,9 @@ Run prek from the Jujutsu workspace:
     empty complete solutions; validity bounds alone must not manufacture inferred bindings.
 - **Variance direction:** lower-only evidence maps to `Contravariant`; upper-only evidence maps to
     `Covariant`. Preserve the existing narrower/broader solution preferences.
-- **Complete-solution correlations:** only compare assignments differing in one constrained
-    variable; do not create independently combined assignments or prune raw solver output.
+- **Complete-path correlations:** only compare paths differing in one constrained variable while
+    retaining identical inference evidence; do not create independently combined assignments or
+    prune raw solver output.
 - **Diagnostics:** invalid paths may disappear before callbacks run; reconstruct specific
     declaration errors only on the diagnostic failure path.
 - **Ordering:** merge source-order sidecars consistently and retain declaration-order tie breaks

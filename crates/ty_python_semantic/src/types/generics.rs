@@ -3054,8 +3054,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<ConstraintFailure<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.lower?;
-        let variance = if path_bound.has_upper() {
+        let argument = path_bound.evidence_lower?;
+        let variance = if path_bound.has_upper_evidence() {
             ConstraintFailureVariance::Invariant
         } else {
             ConstraintFailureVariance::Contravariant
@@ -3071,12 +3071,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 bound_typevar,
                 argument,
             }),
-            TypeVarBoundOrConstraints::Constraints(_) => {
-                (!path_bound.has_upper()).then_some(SpecializationError::MismatchedConstraint {
+            TypeVarBoundOrConstraints::Constraints(_) => (!path_bound.has_upper_evidence())
+                .then_some(SpecializationError::MismatchedConstraint {
                     bound_typevar,
                     argument,
-                })
-            }
+                }),
         }?;
         Some(ConstraintFailure { error, variance })
     }

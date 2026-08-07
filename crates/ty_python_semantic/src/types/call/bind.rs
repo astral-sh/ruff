@@ -6038,7 +6038,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
             let bounds = bounds?;
-            let lower = bounds.lower?;
+            let lower = bounds.evidence_lower?;
 
             if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(db))
                 && lower.is_assignable_to(db, self.env, preferred_ty)

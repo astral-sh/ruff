@@ -131,6 +131,17 @@ def _[T]() -> None:
     static_assert(ConstraintSet.lower_bound(int, T) == expected)
 ```
 
+An explicit `Never` lower bound still provides inference evidence, even though it is the logical
+minimum of every type variable's domain.
+
+```py
+from typing import Never
+
+def explicit_bottom[T]() -> None:
+    # revealed: tuple[Solution[T=Never]]
+    reveal_type(ConstraintSet.lower_bound(Never, T).solutions_for(T, inferable=tuple[T]))
+```
+
 ### Upper bound
 
 An upper-bound constraint requires the type variable to be a subtype of its bound without providing
@@ -143,6 +154,15 @@ from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_
 def _[T]() -> None:
     expected = is_constraint_set_assignable_to(T, int)
     static_assert(ConstraintSet.upper_bound(T, int) == expected)
+```
+
+An explicit `object` upper bound likewise remains inference evidence instead of becoming an absent
+upper bound.
+
+```py
+def explicit_top[T]() -> None:
+    # revealed: tuple[Solution[T=object]]
+    reveal_type(ConstraintSet.upper_bound(T, object).solutions_for(T, inferable=tuple[T]))
 ```
 
 Unlike an explicit two-sided range, an upper-bound constraint does not supply `Never` as lower-bound
