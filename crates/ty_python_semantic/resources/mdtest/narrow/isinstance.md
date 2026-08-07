@@ -334,10 +334,9 @@ else:
 
 ## `NewType` instances and concrete-base subclasses
 
-A `NewType` constructor returns its argument unchanged, so a branded value can still be an instance
-of any subclass accepted by the concrete base. Type checkers accept `UserId(True)` because `bool` is
-a subtype of `int`, so they cannot reliably prevent an integer-based brand from containing a
-boolean.
+A `NewType` constructor returns its argument unchanged at runtime, so the resulting value can still
+be an instance of a subclass of its concrete base. For example, `UserId(True)` is valid because
+`bool` is a subtype of `int`, and the returned value remains a `bool`.
 
 ```py
 from typing import NewType

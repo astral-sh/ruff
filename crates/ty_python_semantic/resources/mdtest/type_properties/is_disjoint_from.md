@@ -25,9 +25,9 @@ static_assert(not is_disjoint_from(str, LiteralString))
 
 ## NewTypes and literal types
 
-A `NewType` overlaps with any literal compatible with its concrete base. Type checkers accept
-`UserId(True)` and cannot reliably prevent such calls because `bool` is a subtype of `int`, so an
-integer-based `NewType` also overlaps boolean literals.
+A `NewType` overlaps with any literal compatible with its concrete base. Because `bool` is a subtype
+of `int`, type checkers correctly accept `UserId(True)`, and an integer-based `NewType` also
+overlaps boolean literals.
 
 ```py
 from typing import Literal, NewType
@@ -58,7 +58,7 @@ static_assert(not is_disjoint_from(BytesId, Literal[b"user"]))
 ```
 
 Nested NewTypes retain the overlap, and a float-based NewType also accepts `int` and `bool` through
-the numeric tower.
+the `int`/`float` special case.
 
 ```py
 NestedUserId = NewType("NestedUserId", UserId)
@@ -106,8 +106,8 @@ static_assert(not is_assignable_to(Second, First))
 
 ## NewTypes and nominal subclasses
 
-A `NewType` overlaps with subclasses of its base, whether or not those subclasses are final. It also
-overlaps with its own base and with any supertypes of that base.
+A `NewType` overlaps with subclasses of its base. It also overlaps with its own base and with any
+supertypes of that base.
 
 ```py
 from typing import Literal, NewType, final
@@ -160,7 +160,7 @@ subclasses. Two differently specialized covariant types can also overlap through
 specific specialization.
 
 ```py
-from typing import Any, NewType, final
+from typing import Any, NewType
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from, is_subtype_of
 
@@ -168,18 +168,15 @@ class Base[T]:
     def get(self) -> T:
         raise NotImplementedError
 
-@final
-class FinalChild[T](Base[T]): ...
-
-class OrdinaryChild[T](Base[T]): ...
+class Child[T](Base[T]): ...
 
 BaseId = NewType("BaseId", Base[int])
 
 static_assert(not is_disjoint_from(BaseId, Base[int]))
 static_assert(not is_disjoint_from(BaseId, Base[object]))
+# `Base[Never]` is inhabited (`get` can raise) and is a subtype of both `Base[int]` and `Base[str]`.
 static_assert(not is_disjoint_from(BaseId, Base[str]))
-static_assert(not is_disjoint_from(BaseId, FinalChild[object]))
-static_assert(not is_disjoint_from(BaseId, OrdinaryChild[object]))
+static_assert(not is_disjoint_from(BaseId, Child[object]))
 ```
 
 Gradual type arguments can overlap even when strict subtyping does not hold.

@@ -2183,8 +2183,9 @@ def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
 
 ## Narrowing with NewTypes
 
-`NewType` wrappers erase their distinction at runtime, so comparisons with an identity-based enum
-literal remain ambiguous:
+A `NewType` constructor returns its argument unchanged at runtime. A `WrappedIdentityEnum` value can
+therefore be either `IdentityEnum.A` or `IdentityEnum.B`, so comparing it with `IdentityEnum.A` has
+an unknown result:
 
 ```py
 from enum import Enum
@@ -2201,9 +2202,10 @@ def literal_with_erased_identity(value: WrappedIdentityEnum) -> None:
     reveal_type(IdentityEnum.A != value)  # revealed: bool
 ```
 
-Branded enum values retain their brand after narrowing, while equality transfers only enum-member
-restrictions to the other operand. Excluding a member from the branded operand therefore narrows a
-union of possible members without producing a spurious argument-type error.
+When a `WrappedIdentityEnum` value cannot be `IdentityEnum.A`, equality with
+`Literal[IdentityEnum.A, IdentityEnum.B]` leaves only `IdentityEnum.B`. The narrowed value keeps its
+`WrappedIdentityEnum` type, and both operands can be passed to a function accepting
+`Literal[IdentityEnum.B]`.
 
 ```py
 from typing import Literal, TypeAlias
@@ -2232,8 +2234,9 @@ def compare_nested_brand(value: NestedAlias, other: Literal[IdentityEnum.A]) -> 
         reveal_type(value)  # revealed: NestedIdentityEnum & Literal[IdentityEnum.B]
 ```
 
-Distinct branded `IntEnum` classes still compare by their integer values, and custom equality
-methods continue to determine comparisons after branding.
+`NewType` does not change how an `IntEnum` compares: values from different `IntEnum` classes still
+compare by their integer values. A custom enum `__eq__` method likewise still determines the result
+after its value is passed through a `NewType` constructor.
 
 ```py
 from enum import IntEnum
