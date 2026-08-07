@@ -576,6 +576,24 @@ def finally_assignment_runs_before_break():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Returning from a context manager still runs an enclosing `finally` clause
+
+Adding exception handling for context managers must not prevent an enclosing `finally` clause from
+running when execution returns from inside a `with` statement.
+
+```py
+from contextlib import nullcontext
+
+def finally_runs_after_return_from_context_manager():
+    value = "before"
+    try:
+        with nullcontext():
+            value = "return"
+            return
+    finally:
+        reveal_type(value)  # revealed: Literal["return"]
+```
+
 ## Calls to functions returning `Never` / `NoReturn`
 
 These calls should be treated as terminal statements.

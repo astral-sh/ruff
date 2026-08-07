@@ -2164,6 +2164,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .pattern(pattern, module)
                     }
                     PredicateNode::SubjectElementPattern(_)
+                    | PredicateNode::ContextManagerMaySuppress { .. }
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::OrPatternAlternative(_)
@@ -2399,7 +2400,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && self.in_try
             && self
                 .try_node_context_stack_manager
                 .has_active_exception_handler()
@@ -2495,6 +2495,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
             .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
+    }
+
+    /// Guards both exceptional reachability and the narrowing retained from the `with` body.
+    /// A statically non-suppressing manager must not leave body-only narrowing visible after its
+    /// exceptional path has been discarded.
+    fn record_with_suppression_constraint(&mut self, predicate: ScopedPredicateId) {
+        let reachability = self
+            .current_reachability_constraints_mut()
+            .add_atom(predicate);
+        let narrowing = self
+            .current_use_def_map_mut()
+            .narrowing_constraints
+            .add_atom(predicate);
+        self.current_use_def_map_mut()
+            .record_non_terminal_call_constraints(reachability, narrowing);
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -4108,6 +4123,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 is_async,
                 ..
             }) => {
+                let mut suppression_contexts = Vec::with_capacity(items.len());
+
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -4116,9 +4133,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } in items
                 {
                     self.visit_expr(context_expr);
+                    let context_manager = self.add_standalone_expression(context_expr);
+
+                    // Entering this manager can raise into an earlier manager or an enclosing
+                    // `try`, but the manager itself cannot suppress a failed entry.
+                    self.record_exception_checkpoint();
 
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
@@ -4128,8 +4149,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             context_manager,
                         );
                     }
+
+                    let suppression_predicate =
+                        self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                            node: PredicateNode::ContextManagerMaySuppress {
+                                context_manager,
+                                is_async: *is_async,
+                            },
+                            is_positive: true,
+                        }));
+
+                    self.try_node_context_stack_manager.push_with_context();
+                    suppression_contexts.push(suppression_predicate);
                 }
+
                 self.visit_body(body);
+
+                let normal_exit = self.flow_snapshot();
+                let mut suppressed_exits = Vec::with_capacity(items.len());
+
+                while let Some(suppression_predicate) = suppression_contexts.pop() {
+                    let mut exception_checkpoints = self
+                        .try_node_context_stack_manager
+                        .take_exception_snapshots()
+                        .into_iter();
+                    self.try_node_context_stack_manager.pop_context();
+
+                    let Some(first_checkpoint) = exception_checkpoints.next() else {
+                        continue;
+                    };
+
+                    self.flow_restore(first_checkpoint);
+
+                    for exception_checkpoint in exception_checkpoints {
+                        self.flow_merge(exception_checkpoint);
+                    }
+
+                    self.record_ambiguous_reachability();
+                    self.record_with_suppression_constraint(suppression_predicate);
+                    suppressed_exits.push(self.flow_snapshot());
+                }
+
+                self.flow_restore(normal_exit);
+
+                for suppressed_exit in suppressed_exits {
+                    self.flow_merge(suppressed_exit);
+                }
             }
 
             ast::Stmt::For(
@@ -4445,7 +4510,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ExceptionHandlers::propagating()
                 };
                 self.try_node_context_stack_manager
-                    .push_context(exception_handlers);
+                    .push_try_context(exception_handlers);
 
                 // Visit the `try` block!
                 self.visit_body(body);
@@ -4458,7 +4523,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // `finally` suite.
                 let try_block_snapshots = self
                     .try_node_context_stack_manager
-                    .take_try_suite_snapshots();
+                    .take_exception_snapshots();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
@@ -4545,10 +4610,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let terminal_finally_entry_snapshots = self
-                    .try_node_context_stack_manager
-                    .pop_context()
-                    .into_terminal_finally_entry_snapshots();
+                let terminal_finally_entry_snapshots =
+                    self.try_node_context_stack_manager.pop_context();
 
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit

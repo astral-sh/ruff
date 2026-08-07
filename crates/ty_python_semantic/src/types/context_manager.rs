@@ -2,15 +2,74 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::{
     FxOrderSet,
+    place::Place,
     types::{
-        Bindings, CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
-        context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
+        Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
+        TypeContext, UnionBuilder, call::CallErrorKind, context::InferContext,
+        diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
-use ty_python_core::EvaluationMode;
+use ty_python_core::{EvaluationMode, Truthiness};
 
 impl<'db> Type<'db> {
+    /// Returns whether the combined exit return type can suppress exceptions under the typing
+    /// specification.
+    pub(crate) fn context_manager_exit_truthiness(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
+    ) -> Truthiness {
+        let exit_method = match mode {
+            EvaluationMode::Async => "__aexit__",
+            EvaluationMode::Sync => "__exit__",
+        };
+
+        let Place::Defined(exit) = self
+            .member_lookup_with_policy(
+                db,
+                env,
+                exit_method,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        else {
+            return Truthiness::AlwaysFalse;
+        };
+
+        let Some(callables) = exit.ty.try_upcast_to_callable(db, env) else {
+            return Truthiness::AlwaysFalse;
+        };
+
+        let mut return_types = UnionBuilder::new(db, env);
+
+        for callable in &callables {
+            for signature in callable.signatures(db) {
+                let return_type = if mode.is_async() {
+                    signature
+                        .return_ty
+                        .try_await(db, env)
+                        .unwrap_or(Type::unknown())
+                } else {
+                    signature.return_ty
+                };
+
+                return_types.add_in_place(return_type);
+            }
+        }
+
+        let return_type = return_types.build();
+
+        if return_type.is_equivalent_to(db, env, KnownClass::Bool.to_instance(db, env))
+            || return_type.is_equivalent_to(db, env, Type::bool_literal(true))
+        {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::AlwaysFalse
+        }
+    }
+
     /// Returns the type bound from a context manager with type `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
@@ -123,7 +182,6 @@ impl<'db> Type<'db> {
                     mode,
                 })
             }
-            // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
             (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error, mode)),
             (Err(enter_error), Err(exit_error)) => Err(ContextManagerError::EnterAndExit {
                 enter_error,
