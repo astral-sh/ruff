@@ -362,18 +362,78 @@ jobs:
             *.tar.gz
             *.sha256
 
+  linux-aarch64:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-24.04-arm
+    env:
+      # see https://github.com/astral-sh/ruff/issues/3791
+      # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
+      JEMALLOC_SYS_WITH_LG_PAGE: "16"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target aarch64-unknown-linux-gnu \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v1.14.1
+          target: aarch64-unknown-linux-gnu
+          manylinux: 2_17
+          docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+          args: --release --locked --out dist --compatibility pypi
+      - name: "Test wheel"
+        run: |
+          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheels-aarch64-unknown-linux-gnu
+          path: dist
+      - name: "Archive binary"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET=aarch64-unknown-linux-gnu
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+      - name: "Upload binary"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-aarch64-unknown-linux-gnu
+          path: |
+            *.tar.gz
+            *.sha256
+
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         platform:
-          - target: aarch64-unknown-linux-gnu
-            arch: aarch64
-            manylinux: 2_17
-            # see https://github.com/astral-sh/ruff/issues/3791
-            # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
             manylinux: 2_17
