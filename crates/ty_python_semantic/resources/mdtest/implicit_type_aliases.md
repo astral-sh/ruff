@@ -76,16 +76,16 @@ VALUE = 7
 reveal_type(AliasValue)  # revealed: Literal[7]
 ```
 
-## Stub assignments preserve earlier bindings
+## Stub assignments include later bindings
 
-A stub assignment should use an existing earlier binding instead of a later reassignment.
+A deferred stub assignment sees both earlier and later bindings in the same scope.
 
 ```pyi
 VALUE = 1
 Alias = VALUE
 VALUE = 2
 
-reveal_type(Alias)  # revealed: Literal[1]
+reveal_type(Alias)  # revealed: Literal[1, 2]
 reveal_type(VALUE)  # revealed: Literal[2]
 ```
 
