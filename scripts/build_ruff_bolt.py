@@ -10,6 +10,7 @@ import csv
 import hashlib
 import io
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -256,7 +257,7 @@ def validate_input(readelf: Path, binary: Path) -> None:
     ).stdout
     if ".symtab" not in output:
         raise RuntimeError(f"BOLT input lacks symbols: {binary}")
-    if ".real.text" not in output and ".rel.text" not in output:
+    if not re.search(r"\.rel(?:a)?\.text", output):
         raise RuntimeError(
             f"BOLT input lacks text relocations: {binary}; "
             "link with `-Clink-arg=-Wl,--emit-relocs`"
