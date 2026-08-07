@@ -334,16 +334,6 @@ impl<'db> RecursiveDefinition<'db> {
     }
 }
 
-impl<'db> DefinitionUse<'db> {
-    fn walk_arguments(self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
-        if let Some(specialization) = self.specialization {
-            for argument in specialization.types(db) {
-                visitor.visit_type(db, *argument);
-            }
-        }
-    }
-}
-
 impl<'db> SpecializationFlowGraph<'db> {
     fn build(db: &'db dyn Db, root: RecursiveDefinition<'db>) -> Self {
         let mut graph = Self::default();
@@ -563,6 +553,14 @@ impl<'db> SpecializationFlowVisitor<'db> {
         true
     }
 
+    fn visit_arguments(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
+        if let Some(specialization) = reference.specialization {
+            for argument in specialization.types(db) {
+                self.visit_type(db, *argument);
+            }
+        }
+    }
+
     fn record_reference(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
         self.referenced_definitions
             .borrow_mut()
@@ -626,7 +624,7 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 
         if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
             self.record_reference(db, reference);
-            reference.walk_arguments(db, self);
+            self.visit_arguments(db, reference);
             return;
         }
 
@@ -671,6 +669,14 @@ impl<'a, 'db> SourceParameterCollector<'a, 'db> {
                 )
             })
     }
+
+    fn walk_arguments(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
+        if let Some(specialization) = reference.specialization {
+            for argument in specialization.types(db) {
+                self.visit_type(db, *argument);
+            }
+        }
+    }
 }
 
 impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
@@ -711,7 +717,7 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
 
         let was_in_nested_type = self.in_nested_type.replace(true);
         if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
-            reference.walk_arguments(db, self);
+            self.walk_arguments(db, reference);
         } else {
             walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
         }
