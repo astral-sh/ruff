@@ -1271,9 +1271,20 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred =
-                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
-                    .place;
+            let inferred_binding =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None);
+            let imported_qualifiers = place_id
+                .as_symbol()
+                .filter(|symbol| {
+                    place_table(db, scope)
+                        .symbol(*symbol)
+                        .has_imported_binding()
+                })
+                .and(inferred_binding.first_definition)
+                .and_then(|definition| inferred_declaration(db, definition).declared())
+                .map(|imported| imported.qualifiers())
+                .unwrap_or_default();
+            let mut inferred = inferred_binding.place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1315,20 +1326,18 @@ pub(crate) fn place_by_id<'db>(
             // We generally trust undeclared places in stubs and expose the raw type.
             let in_stub_file = scope.file(db).is_stub(db);
 
-            if is_considered_non_modifiable
+            if !(is_considered_non_modifiable
                 || is_module_global
                 || scope_has_private_visibility
-                || in_stub_file
+                || in_stub_file)
             {
-                inferred.into()
-            } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
-                inferred
-                    .with_public_type_policy(PublicTypePolicy::Promote)
-                    .into()
+                inferred = inferred.with_public_type_policy(PublicTypePolicy::Promote);
             }
+
+            inferred.with_qualifiers(imported_qualifiers)
         }
     }
 
