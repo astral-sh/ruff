@@ -27,6 +27,7 @@ use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
 bitflags! {
@@ -358,6 +359,20 @@ impl<'db> TypedDictType<'db> {
                 builder.add(Type::string_literal(db, name))
             })
             .build()
+    }
+
+    /// Returns whether a literal string key must, cannot, or might be present.
+    ///
+    /// An undeclared key can still exist in an implicitly open `TypedDict` or one with explicit
+    /// extra items. An optional field with an uninhabited value type can never be present.
+    pub(crate) fn key_membership_truthiness(self, db: &'db dyn Db, key: &str) -> Truthiness {
+        match self.items(db).get(key) {
+            Some(field) if field.is_required() => Truthiness::AlwaysTrue,
+            Some(field) if field.may_be_present(db) => Truthiness::Ambiguous,
+            Some(_) => Truthiness::AlwaysFalse,
+            None if self.openness(db).is_closed() => Truthiness::AlwaysFalse,
+            None => Truthiness::Ambiguous,
+        }
     }
 
     /// Returns the field exposed by a literal key.

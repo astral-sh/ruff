@@ -1058,6 +1058,16 @@ fn infer_membership_test_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
     let env = &context.program_environment();
+
+    if let Some(key) = left.as_string_literal()
+        && let Some(typed_dict) = right.as_typed_dict()
+    {
+        let truthiness = typed_dict
+            .key_membership_truthiness(db, key.value(db))
+            .negate_if(op.is_not_in());
+        return Ok(Type::from_truthiness(db, env, truthiness));
+    }
+
     let compare_result_opt = match right.try_call_dunder(
         db,
         env,

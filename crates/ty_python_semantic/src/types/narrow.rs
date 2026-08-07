@@ -7,9 +7,7 @@ use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker};
-use crate::types::typed_dict::{
-    TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
-};
+use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -4042,9 +4040,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             } else {
                 let requires_key = |td: TypedDictType<'db>| -> bool {
-                    td.items(db)
-                        .get(key)
-                        .is_some_and(TypedDictField::is_required)
+                    td.key_membership_truthiness(db, key).is_always_true()
                 };
 
                 let resolved_rhs_type = rhs_type.resolve_type_alias(db);
@@ -4815,6 +4811,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             Type::Union(union) => union.map(db, &self.env, |element| {
                 self.narrow_with_present_key(*element, key)
             }),
+            Type::TypedDict(typed_dict)
+                if typed_dict
+                    .key_membership_truthiness(db, key)
+                    .is_always_false() =>
+            {
+                Type::Never
+            }
             resolved if typeddict_declares_key(db, resolved, key) => resolved,
             // TODO: Extend this to subtypes of `Mapping[str, object]` whose membership and
             // subscript operations obey the `Mapping` contract.
