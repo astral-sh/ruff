@@ -348,12 +348,11 @@ debug = "line-tables-only"
 # Avoid the local ThinLTO that Cargo enables at nonzero optimization levels.
 lto = "off"
 
-# Profile for CI: optimize test execution without slowing down builds with ThinLTO.
+# Profile for CI: minimize build times while retaining useful debug information.
 [profile.ci]
 inherits = "dev"
-opt-level = 1
+opt-level = 0
 debug = "line-tables-only"
-lto = "off"
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]

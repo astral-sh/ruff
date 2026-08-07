@@ -41,8 +41,6 @@ jobs:
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
       code: ${{ steps.check_code.outputs.changed }}
-      # Flag that is raised when Cargo profiles or their CI cache configuration change
-      cargo_profile: ${{ steps.check_cargo_profile.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
       # Flag that is set to "true" when code related to ty changes.
@@ -206,20 +204,6 @@ jobs:
               echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if Cargo profiles or their CI cache configuration changed
-        id: check_cargo_profile
-        env:
-          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
-        run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
-            ':Cargo.toml' \
-            ':.github/workflows/ci.yaml' \
-          ; then
-              echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Check if there was any playground related change
         id: check_playground
         env:
@@ -360,19 +344,14 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    env:
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
-      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          prefix-key: v2-rust-workspace
           shared-key: ruff-linux-ci-${{ hashFiles('Cargo.toml') }}
-          cache-workspace-crates: "true"
-          save-if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.cargo_profile == 'true') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -468,19 +447,14 @@ jobs:
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    env:
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
-      RUSTC_BOOTSTRAP: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          prefix-key: v2-rust-workspace
           key: ${{ hashFiles('Cargo.toml') }}
-          cache-workspace-crates: "true"
-          save-if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.cargo_profile == 'true') }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
           # Fix for https://github.com/Swatinem/rust-cache/issues/341
           cache-bin: "false"
       - name: "Install Rust toolchain"
