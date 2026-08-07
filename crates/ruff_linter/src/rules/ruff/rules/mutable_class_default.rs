@@ -2,7 +2,6 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_python_semantic::ScopeId;
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -101,11 +100,7 @@ impl Violation for MutableClassDefault {
 }
 
 /// RUF012
-pub(crate) fn mutable_class_default(
-    checker: &Checker,
-    class_def: &ast::StmtClassDef,
-    scope_id: ScopeId,
-) {
+pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     // Collect any `ClassVar`s we find in case they get reassigned later.
     let mut class_var_targets = FxHashSet::default();
 
@@ -129,7 +124,7 @@ pub(crate) fn mutable_class_default(
                     && !is_final_annotation(annotation, checker.semantic())
                     && !is_immutable_annotation(annotation, checker.semantic(), &[])
                 {
-                    if dataclass_kind(class_def, checker.semantic(), scope_id).is_some() {
+                    if dataclass_kind(class_def, checker.semantic()).is_some() {
                         continue;
                     }
 

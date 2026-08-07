@@ -85,7 +85,7 @@ pub(crate) fn function_call_in_dataclass_default(
 ) {
     let semantic = checker.semantic();
 
-    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic, scope_id) else {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
     };
 
@@ -180,8 +180,7 @@ fn is_frozen_dataclass_instantiation(
                 return false;
             };
 
-            let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic, scope_id)
-            else {
+            let Some((_, dataclass_decorator)) = dataclass_kind(class_def, semantic) else {
                 return false;
             };
             is_frozen_dataclass(dataclass_decorator, semantic)

@@ -1,7 +1,7 @@
 use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
-use ruff_python_semantic::{BindingKind, Modules, ScopeId, SemanticModel, analyze};
+use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -120,7 +120,6 @@ pub(super) enum DataclassKind<'a> {
 pub(super) fn dataclass_kind<'a>(
     class_def: &'a ast::StmtClassDef,
     semantic: &SemanticModel<'a>,
-    scope_id: ScopeId,
 ) -> Option<(DataclassKind<'a>, &'a ast::Decorator)> {
     if !(semantic.seen_module(Modules::DATACLASSES)
         || semantic.seen_module(Modules::ATTRS)
@@ -178,7 +177,7 @@ pub(super) fn dataclass_kind<'a>(
         }
 
         if let Some(field_specifiers) =
-            dataclass_transform_field_specifiers(&decorator.expression, semantic, scope_id)
+            dataclass_transform_field_specifiers(&decorator.expression, semantic)
         {
             return Some((DataclassKind::Transform(field_specifiers), decorator));
         }
@@ -187,22 +186,22 @@ pub(super) fn dataclass_kind<'a>(
     None
 }
 
-/// If `decorator` resolves, via same-file semantic lookup, to a function or class that is
+/// If `decorator` resolves, via same-file name resolution, to a function or class that is
 /// itself decorated with [PEP 681's `dataclass_transform`], return the qualified names of the
 /// `field_specifiers` it declares (or an empty list, if none are declared).
 ///
-/// This only recognises decorators defined in the same file being linted; a `dataclass_transform`
-/// applied within a third-party library (e.g. Pydantic's `BaseModel`) is not detected, since Ruff's
-/// semantic model does not perform cross-module type inference.
+/// This only recognises decorators that are a plain name defined in the same file being linted;
+/// a decorator accessed via an attribute path (e.g. `@some_module.create_model`), or a
+/// `dataclass_transform` applied within a third-party library (e.g. Pydantic's `BaseModel`), is
+/// not detected, since Ruff's semantic model does not perform cross-module type inference.
 ///
 /// [PEP 681's `dataclass_transform`]: https://peps.python.org/pep-0681/
 fn dataclass_transform_field_specifiers<'a>(
     decorator: &Expr,
     semantic: &SemanticModel<'a>,
-    scope_id: ScopeId,
 ) -> Option<Vec<QualifiedName<'a>>> {
-    let callee = map_callable(decorator);
-    let binding_id = semantic.lookup_attribute_in_scope(callee, scope_id)?;
+    let callee = map_callable(decorator).as_name_expr()?;
+    let binding_id = semantic.resolve_name(callee)?;
     let (Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. })
     | Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. })) =
         semantic.binding(binding_id).statement(semantic)?
