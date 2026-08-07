@@ -35,7 +35,13 @@ use crate::{FixAvailability, Locator, Violation};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is marked as unsafe because the rewrite can change runtime
+/// behavior when the `write` argument does not match the open mode. `open(path, "w")`
+/// truncates the file *before* `write` runs, so if `write` raises (for example,
+/// passing `bytes` to a text-mode file), the file is already truncated and data is
+/// lost. The replacement `Path(path).write_text(...)` type-checks the argument
+/// *before* opening the file, so on a wrong-type argument the file is not truncated.
+/// Marking the fix unsafe avoids silently changing this behavior.
 ///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
@@ -231,11 +237,13 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    // The fix is always unsafe: `open(path, "w")` truncates the file *before* `write`
+    // runs, so a `write` that raises (e.g. passing `bytes` to a text-mode file) still
+    // leaves the file truncated. The replacement `Path(path).write_text(...)` type
+    // checks the argument before opening the file, so a wrong-type argument no longer
+    // truncates the file. Marking the fix unsafe avoids silently changing that
+    // behavior (see astral-sh/ruff#26920).
+    let applicability = Applicability::Unsafe;
 
     Some(Fix::applicable_edits(
         Edit::range_replacement(replacement, with_stmt.range()),

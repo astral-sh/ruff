@@ -20,6 +20,7 @@ help: Replace with `Path("file.txt").write_text("\n", encoding="utf-8")`
 4 + pathlib.Path("file.txt").write_text("\n", encoding="utf-8")
 5 | f = object()
   |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
   --> FURB103_2.py:16:10
@@ -43,6 +44,7 @@ help: Replace with `Path("file.txt").write_text("\n")`
 17 +     pathlib.Path("file.txt").write_text("\n")
 18 |     return (f.name for _ in [0])
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
   --> FURB103_2.py:23:10
@@ -66,3 +68,4 @@ help: Replace with `Path("file.txt").write_text("\n")`
 24 +     pathlib.Path("file.txt").write_text("\n")
 25 |     g = {f.name for _ in [0]}
    |
+note: This is an unsafe fix and may change runtime behavior

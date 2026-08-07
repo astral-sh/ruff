@@ -18,6 +18,7 @@ help: Replace with `Path("file.txt").write_text("test")`
 3 + Path("file.txt").write_text("test")
 4 |
   |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
  --> FURB103_1.py:6:6
@@ -36,6 +37,7 @@ help: Replace with `Path("file.txt").write_bytes(b"test")`
 6 + Path("file.txt").write_bytes(b"test")
 7 |
   |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
   --> FURB103_1.py:9:6
@@ -54,6 +56,7 @@ help: Replace with `Path("file.txt").write_text("test")`
 9  + Path("file.txt").write_text("test")
 10 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
   --> FURB103_1.py:12:6
@@ -72,6 +75,7 @@ help: Replace with `Path("file.txt").write_text("test", encoding="utf8")`
 12 + Path("file.txt").write_text("test", encoding="utf8")
 13 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
   --> FURB103_1.py:15:6
@@ -90,6 +94,7 @@ help: Replace with `Path("file.txt").write_text("test", errors="ignore")`
 15 + Path("file.txt").write_text("test", errors="ignore")
 16 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
   --> FURB103_1.py:18:6
@@ -108,6 +113,7 @@ help: Replace with `Path(foo()).write_text("test")`
 18 + Path(foo()).write_text("test")
 19 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `p.write_text("test")`
   --> FURB103_1.py:22:6
@@ -125,6 +131,7 @@ help: Replace with `p.write_text("test")`
 22 + p.write_text("test")
 23 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("foo", "bar", "baz").write_text("test")`
   --> FURB103_1.py:25:6
@@ -142,3 +149,4 @@ help: Replace with `Path("foo", "bar", "baz").write_text("test")`
    -     f.write("test")
 25 + Path("foo", "bar", "baz").write_text("test")
    |
+note: This is an unsafe fix and may change runtime behavior
