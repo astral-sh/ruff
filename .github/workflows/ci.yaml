@@ -352,7 +352,7 @@ jobs:
           persist-credentials: false
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          prefix-key: v1-rust-workspace
+          prefix-key: v2-rust-workspace
           shared-key: ruff-linux-ci-${{ hashFiles('Cargo.toml') }}
           cache-workspace-crates: "true"
           save-if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.cargo_profile == 'true') }}
@@ -460,7 +460,7 @@ jobs:
           persist-credentials: false
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          prefix-key: v1-rust-workspace
+          prefix-key: v2-rust-workspace
           key: ${{ hashFiles('Cargo.toml') }}
           cache-workspace-crates: "true"
           save-if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.cargo_profile == 'true') }}
