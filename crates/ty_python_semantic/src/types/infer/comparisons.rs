@@ -23,16 +23,15 @@ impl<'db> Type<'db> {
     /// Upcast `self` to a type that conservatively describes its possible runtime objects in an
     /// identity comparison.
     ///
-    /// A `NewType` constructor returns its argument unchanged, and `LiteralString` describes how a
-    /// string was produced rather than which object it is. Those distinctions can therefore differ
-    /// between two views of the same object: upcast a `NewType` to its concrete base and
-    /// `LiteralString` to `str`. In contrast, preserve invariant generic arguments because the same
-    /// mutable object cannot satisfy incompatible commitments such as `list[int]` and `list[str]`
-    /// without some other code already being unsound.
+    /// A `NewType` constructor returns its argument unchanged, so its tag can differ between two
+    /// views of the same object: upcast a `NewType` to its concrete base. In contrast, preserve
+    /// invariant generic arguments because the same mutable object cannot satisfy incompatible
+    /// commitments such as `list[int]` and `list[str]` without some other code already being
+    /// unsound.
     ///
     /// Preserve negations that constrain the object itself, such as `~None`, `~SomeClass`, and
-    /// `~Literal[1]`. Negations of a `NewType`, `LiteralString`, a type variable, or a type-guard
-    /// proof can differ between views of the same object and must instead be discarded.
+    /// `~Literal[1]`. A `NewType` tag, type-variable selection, or type-guard proof can differ
+    /// between views. Retain the existing conservative handling of negated string types.
     ///
     /// A type variable can also hide a `NewType` tag: even a variable bounded by `int` can be
     /// instantiated as an integer `NewType`. Expand variables to their upcast bounds or constraints
@@ -62,9 +61,6 @@ impl<'db> Type<'db> {
                 Type::NewTypeInstance(newtype) => {
                     upcast(db, env, newtype.concrete_base_type(db), visitor)
                 }
-                Type::LiteralValue(literal) if literal.is_literal_string() => {
-                    literal.fallback_instance(db, env)
-                }
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
                     match typevar.typevar(db).bound_or_constraints(db, env) {
                         Some(bound_or_constraints) => {
@@ -82,15 +78,18 @@ impl<'db> Type<'db> {
                         builder = builder.add_positive(upcast(db, env, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        // Tags, type-variable selections, `LiteralString` provenance, and predicate
-                        // proofs belong to one static view rather than the shared object. Keep every
-                        // negation that describes the object itself instead.
+                        // Static tags and predicate proofs can differ between views. Retain the
+                        // existing conservative handling of negated string types.
                         match element.resolve_type_alias(db) {
                             Type::NewTypeInstance(_)
                             | Type::TypeVar(_)
                             | Type::TypeIs(_)
                             | Type::TypeGuard(_) => continue,
-                            Type::LiteralValue(literal) if literal.is_literal_string() => continue,
+                            Type::LiteralValue(literal)
+                                if literal.is_literal_string() || literal.is_string() =>
+                            {
+                                continue;
+                            }
                             _ => builder.add_negative_in_place(*element),
                         }
                     }

@@ -524,121 +524,23 @@ def excluded_runtime_class(not_int: Not[int], other: UserId) -> None:
         reveal_type(other)  # revealed: Never
 ```
 
-## `is` does not transfer `LiteralString`
+## `is` with string types
 
-`LiteralString` records string provenance, not a guarantee shared by every view of the same string
-object. An identity comparison can establish that another value is a string, but cannot transfer
-that provenance. A concrete string literal still identifies its runtime value.
+Identity comparisons preserve existing `LiteralString` narrowing and do not make negated string
+literal comparisons unreachable.
 
 ```py
-from typing import Any, Literal, TypeVar
-from typing_extensions import LiteralString, TypeIs
-from ty_extensions import Intersection, Not
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import Not
 
 def literal_string(value: object, text: LiteralString) -> None:
     if value is text:
-        reveal_type(value)  # revealed: str
-        reveal_type(text)  # revealed: LiteralString
+        reveal_type(value)  # revealed: LiteralString
 
-def concrete_literal(value: object, text: Literal["hello"]) -> None:
-    if value is text:
-        reveal_type(value)  # revealed: Literal["hello"]
-```
-
-Negating `LiteralString` likewise does not rule out identity with a concrete string.
-
-```py
-def excluded_literal_string(
-    value: Not[LiteralString],
-    text: Intersection[str, Not[LiteralString]],
-    other: Literal["hello"],
-) -> None:
+def negated_string_literal(value: Not[Literal["hello"]]) -> None:
     if value is "hello":
-        reveal_type(value)  # revealed: str & ~LiteralString
-
-    if text is "hello":
-        reveal_type(text)  # revealed: str & ~LiteralString
-
-    if value is other:
-        reveal_type(value)  # revealed: str & ~LiteralString
-        reveal_type(other)  # revealed: Literal["hello"]
-```
-
-A gradual string literal can arise naturally by narrowing an `Any` value. Comparing it with a string
-whose `LiteralString` provenance was negated must not make the reachable branch disappear.
-
-```py
-def is_literal_string(value: str) -> TypeIs[LiteralString]:
-    return False
-
-def gradual_literal_from_narrowing(value: str, untyped: Any) -> None:
-    if not is_literal_string(value):
-        if untyped is "hello":
-            reveal_type(untyped)  # revealed: Any & Literal["hello"]
-            if value is untyped:
-                reveal_type(value)  # revealed: str & ~LiteralString
-```
-
-The same overlap remains possible for an explicitly gradual string literal, including when both
-operands are gradual.
-
-```py
-def annotated_gradual_literal(
-    value: Intersection[str, Not[LiteralString]],
-    other: Intersection[Literal["hello"], Any],
-) -> None:
-    if value is other:
-        reveal_type(value)  # revealed: str & ~LiteralString
-        reveal_type(other)  # revealed: Literal["hello"] & Any
-
-def both_operands_gradual(
-    value: Intersection[str, Any, Not[LiteralString]],
-    other: Intersection[Literal["hello"], Any],
-) -> None:
-    if value is other:
-        reveal_type(value)  # revealed: str & Any & ~LiteralString
-        reveal_type(other)  # revealed: Literal["hello"] & Any
-```
-
-A `LiteralString` negation can also appear in a type variable's bound. Identity preserves the type
-variable without making the concrete-string comparison unreachable.
-
-```py
-NonLiteralStringT = TypeVar("NonLiteralStringT", bound=Intersection[str, Not[LiteralString]])
-
-def excluded_literal_string_in_bound(value: NonLiteralStringT, other: Literal["hello"]) -> None:
-    if value is other:
-        reveal_type(value)  # revealed: NonLiteralStringT@excluded_literal_string_in_bound
-```
-
-The same negation remains compatible with a concrete string when both operands contain additional
-alternatives. Unrelated alternatives are still removed, while compatible alternatives are retained.
-
-```py
-def excluded_literal_string_in_union(
-    value: Intersection[str, Not[LiteralString]] | int,
-    other: Literal["hello"] | bytes,
-) -> None:
-    if value is other:
-        reveal_type(value)  # revealed: str & ~LiteralString
-        reveal_type(other)  # revealed: Literal["hello"]
-
-def excluded_literal_string_with_shared_alternative(
-    value: Intersection[str, Not[LiteralString]] | bytes,
-    other: Literal["hello"] | bytes,
-) -> None:
-    if value is other:
-        reveal_type(value)  # revealed: bytes | (str & ~LiteralString)
-        reveal_type(other)  # revealed: Literal["hello"] | bytes
-```
-
-In contrast, excluding a concrete literal genuinely rules out identity with string literals that
-have that value.
-
-```py
-def excluded_literal(value: Not[Literal["hello"]]) -> None:
-    if value is "hello":
-        reveal_type(value)  # revealed: Never
+        reveal_type(value)  # revealed: ~Literal["hello"]
 ```
 
 ## `is` with `NewType`s

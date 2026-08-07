@@ -3487,117 +3487,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Return the constraint on `value` when `value is other` succeeds.
-    ///
-    /// A typed inhabitant includes its runtime object and any static tags (such as a generic
-    /// specialization or `NewType`). Identity establishes that both operands identify the same
-    /// object, but cannot transfer tags specific to the other operand. For example, a `NewType`
-    /// constructor returns its argument unchanged, so `value is user_id` establishes that `value`
-    /// is an `int`, not that it carries `user_id`'s `UserId` tag. Similarly, identity with a
-    /// `LiteralString` establishes that the value is a `str`, not that it has the same
-    /// `LiteralString` provenance. Each operand retains its own existing tags and provenance when
-    /// this constraint is applied.
-    ///
-    /// ```python
-    /// def narrow(value: object, user_id: UserId, items: list[int]) -> None:
-    ///     if value is user_id:
-    ///         reveal_type(value)  # int, not UserId
-    ///     if value is items:
-    ///         reveal_type(value)  # list[int], not list[Unknown]
-    ///
-    /// def bounded[T: int](value: object, other: T) -> None:
-    ///     if value is other:
-    ///         reveal_type(value)  # int, not T: T might be UserId
-    /// ```
-    ///
-    /// In contrast, `value is items` for `items: list[int]` establishes that `value` is also a
-    /// `list[int]`: unlike a `NewType` tag, its element type cannot differ between soundly typed
-    /// views of the same mutable list. A type variable can hide an operand-specific tag even when
-    /// its bound is `int`, so only its upcast bound or constraints are transferable. The operand
-    /// being narrowed still retains any type variables already present in its own type.
-    ///
-    /// A concrete string literal is more subtle because its type also implies `LiteralString`
-    /// provenance. Consequently, `~LiteralString & Literal["hello"]` incorrectly simplifies to
-    /// `Never`, even though both values can identify the same string. In this case, retain the
-    /// operand's own `~LiteralString` constraint and widen only the literal to `str`.
-    fn evaluate_expr_is(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Type<'db> {
-        let db = self.db;
-        let env = &self.env;
-        let transferable_ty = rhs_ty.identity_comparison_type(db, env);
-        let rhs_alternatives = match transferable_ty.resolve_type_alias(db) {
-            Type::Union(union) => union.elements(db),
-            _ => std::slice::from_ref(&transferable_ty),
-        };
-        let concrete_string_literal = |ty: Type<'db>| match ty.resolve_type_alias(db) {
-            Type::Intersection(intersection) => {
-                intersection.iter_positive(db).find_map(|positive| {
-                    positive
-                        .resolve_type_alias(db)
-                        .as_literal_value()
-                        .filter(|literal| literal.is_string())
-                })
-            }
-            ty => ty.as_literal_value().filter(|literal| literal.is_string()),
-        };
-        if !rhs_alternatives
-            .iter()
-            .any(|ty| concrete_string_literal(*ty).is_some())
-        {
-            return transferable_ty;
-        }
-
-        let lhs_alternatives = match lhs_ty.resolve_type_alias(db) {
-            Type::Union(union) => union.elements(db),
-            _ => std::slice::from_ref(&lhs_ty),
-        };
-        let may_exclude_literal_string = |ty: &Type<'db>| match ty.resolve_type_alias(db) {
-            Type::TypeVar(_) => true,
-            Type::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .any(|positive| positive.resolve_type_alias(db).is_type_var())
-                    || intersection.iter_negative(db).any(|negative| {
-                        match negative.resolve_type_alias(db) {
-                            Type::TypeVar(_) => true,
-                            Type::LiteralValue(literal) => literal.is_literal_string(),
-                            _ => false,
-                        }
-                    })
-            }
-            _ => false,
-        };
-        if !lhs_alternatives.iter().any(may_exclude_literal_string) {
-            return transferable_ty;
-        }
-
-        let mut builder = UnionBuilder::new(db, env).add(transferable_ty);
-        for &lhs_alternative in lhs_alternatives {
-            for &rhs_alternative in rhs_alternatives {
-                if let Some(literal) = concrete_string_literal(rhs_alternative)
-                    && lhs_alternative.is_disjoint_from(db, env, rhs_alternative)
-                    && lhs_alternative
-                        .identity_comparison_truthiness(db, env, rhs_alternative)
-                        .may_be_true()
-                {
-                    // `fallback_instance` also widens annotated, non-promotable literals. Preserve
-                    // the original operand's negations: widening the entire union to `str` would
-                    // also retain other string alternatives that cannot identify the same object.
-                    let overlap = IntersectionType::from_two_elements(
-                        db,
-                        env,
-                        lhs_alternative,
-                        literal.fallback_instance(db, env),
-                    );
-                    if !overlap.is_never() {
-                        builder.add_in_place(overlap);
-                    }
-                }
-            }
-        }
-        builder.build()
-    }
-
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let db = self.db;
         let rhs_ty = rhs_ty.resolve_type_alias(db);
@@ -3742,7 +3631,70 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 };
                 Some(rhs_constraint.negate(db, &self.env))
             }
-            ast::CmpOp::Is => Some(self.evaluate_expr_is(lhs_ty, rhs_ty)),
+            ast::CmpOp::Is => {
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(db, &self.env);
+                // Identity transfers the runtime type, not a `NewType` tag or type-variable
+                // selection belonging to the other operand.
+                let mut builder = UnionBuilder::new(db, &self.env).add(rhs_identity_ty);
+                let rhs_resolved = rhs_ty.resolve_type_alias(db);
+                let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
+                    let overlaps_only_at_runtime = |rhs_element| {
+                        element.is_disjoint_from(db, &self.env, rhs_element)
+                            && element
+                                .identity_comparison_truthiness(db, &self.env, rhs_element)
+                                .may_be_true()
+                    };
+                    let has_runtime_only_overlap = match rhs_resolved {
+                        Type::Union(union) => union
+                            .elements(db)
+                            .iter()
+                            .copied()
+                            .any(overlaps_only_at_runtime),
+                        Type::TypeVar(typevar) => {
+                            match typevar.typevar(db).bound_or_constraints(db, &self.env) {
+                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                    overlaps_only_at_runtime(bound)
+                                }
+                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                    constraints
+                                        .elements(db)
+                                        .iter()
+                                        .copied()
+                                        .any(overlaps_only_at_runtime)
+                                }
+                                None => overlaps_only_at_runtime(rhs_ty),
+                            }
+                        }
+                        rhs_ty => overlaps_only_at_runtime(rhs_ty),
+                    };
+                    if !has_runtime_only_overlap {
+                        return builder;
+                    }
+
+                    let runtime_overlap = IntersectionType::from_two_elements(
+                        db,
+                        &self.env,
+                        element,
+                        rhs_identity_ty,
+                    );
+                    builder.add(if runtime_overlap.is_never() {
+                        element
+                    } else {
+                        runtime_overlap
+                    })
+                };
+
+                if let Type::Union(union) = lhs_ty.resolve_type_alias(db) {
+                    builder = union
+                        .elements(db)
+                        .iter()
+                        .copied()
+                        .fold(builder, add_runtime_overlap);
+                } else {
+                    builder = add_runtime_overlap(builder, lhs_ty);
+                }
+                Some(builder.build())
+            }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
