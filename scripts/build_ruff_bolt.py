@@ -155,7 +155,11 @@ def main() -> None:
         "-reorder-blocks=ext-tsp",
         "-reorder-functions=cdsort",
         "-split-functions",
-        "-split-strategy=cdsplit",
+        (
+            "-split-strategy=profile2"
+            if args.target.startswith("aarch64-")
+            else "-split-strategy=cdsplit"
+        ),
         "-split-all-cold",
         "-jump-tables=move",
         "-icf=all",

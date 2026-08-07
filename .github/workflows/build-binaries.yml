@@ -379,6 +379,38 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Install LLVM profiling tools"
         run: rustup component add llvm-tools-preview
+      - name: "Install LLVM BOLT"
+        run: |
+          set -euo pipefail
+
+          BOLT_ROOT="${RUNNER_TEMP}/llvm-bolt"
+          BOLT_VERSION="22.1.8~++20260714014902+ca7933e47d3a-1~exp1~20260714135019.80"
+          BOLT_BASE_URL="https://apt.llvm.org/noble/pool/main/l/llvm-toolchain-22"
+
+          mkdir -p "${BOLT_ROOT}"
+
+          curl --fail --location --retry 3 \
+            --output "${BOLT_ROOT}/bolt-22.deb" \
+            "${BOLT_BASE_URL}/bolt-22_${BOLT_VERSION}_arm64.deb"
+          curl --fail --location --retry 3 \
+            --output "${BOLT_ROOT}/libbolt-22-dev.deb" \
+            "${BOLT_BASE_URL}/libbolt-22-dev_${BOLT_VERSION}_arm64.deb"
+
+          printf '%s  %s\n' \
+            'ba8c0f36ca8c924adaf1ce38a2e0493c5c3f653f756f72ef410c091d3a6961bf' \
+            "${BOLT_ROOT}/bolt-22.deb" \
+            '26e9f3a5fedc08cdfb51f50af98ff6067a449d6786a29af0c263b1da52e5b6e3' \
+            "${BOLT_ROOT}/libbolt-22-dev.deb" \
+            | sha256sum --check
+
+          dpkg-deb --extract "${BOLT_ROOT}/bolt-22.deb" "${BOLT_ROOT}"
+          dpkg-deb --extract "${BOLT_ROOT}/libbolt-22-dev.deb" "${BOLT_ROOT}"
+
+          "${BOLT_ROOT}/usr/lib/llvm-22/bin/llvm-bolt" --version
+          "${BOLT_ROOT}/usr/lib/llvm-22/bin/merge-fdata" --version
+          test -f "${BOLT_ROOT}/usr/lib/llvm-22/lib/libbolt_rt_instr.a"
+
+          echo "${BOLT_ROOT}/usr/lib/llvm-22/bin" >> "${GITHUB_PATH}"
       - name: "Train PGO Ruff"
         run: |
           python scripts/build_ruff_pgo.py \
@@ -386,7 +418,8 @@ jobs:
             --target-dir "${{ github.workspace }}/target/ruff-pgo" \
             --train-only
 
-          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata -C link-arg=-Wl,--emit-relocs" >> "$GITHUB_ENV"
+          echo "MATURIN_STRIP=false" >> "$GITHUB_ENV"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
@@ -397,6 +430,13 @@ jobs:
           manylinux: 2_17
           docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           args: --release --locked --out dist --compatibility pypi
+      - name: "Optimize Ruff with BOLT"
+        run: |
+          python scripts/build_ruff_bolt.py \
+            --target aarch64-unknown-linux-gnu \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --wheels-dir "${{ github.workspace }}/dist" \
+            --binary "${{ github.workspace }}/target/aarch64-unknown-linux-gnu/release/ruff"
       - name: "Test wheel"
         run: |
           pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
