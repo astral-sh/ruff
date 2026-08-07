@@ -409,23 +409,74 @@ values: tuple[int] = (1,)
 values[0] += 1
 ```
 
-## Failed attribute and subscript loads
+## Failed attribute loads
 
-Both the load and the store are checked, just as they are for an ordinary assignment whose value
-reads the same target.
+A missing attribute prevents the assignment from reaching its write phase, so the failed read is
+reported only once.
 
 ```py
 class Missing: ...
 
 missing = Missing()
 # error: [unresolved-attribute]
-# error: [unresolved-attribute]
 missing.value += 1
+```
+
+Missing attributes on functions and classes also fail before the write phase.
+
+```py
+def callback() -> None:
+    pass
+
+# error: [unresolved-attribute]
+callback.count += 1
+
+# error: [unresolved-attribute]
+Missing.value += 1
+```
+
+An attribute that is missing from one union alternative likewise cannot be written.
+
+```py
+class Counter:
+    count: int
+
+def update(counter: Counter | None) -> None:
+    # error: [unresolved-attribute]
+    counter.count += 1
+```
+
+## Failed subscript loads
+
+A failed subscript read also prevents the assignment from reaching its write phase.
+
+```py
+mapping: dict[str, int] = {}
+# error: [invalid-argument-type]
+mapping[1] += 1
+
+value = 1
+# error: [not-subscriptable]
+value[0] += 1
+```
+
+## Failed loads still infer the right-hand side
+
+The right-hand side is still inferred after a failed read so that its independent errors are
+reported.
+
+```py
+class Missing: ...
+
+missing = Missing()
+# error: [unresolved-attribute]
+# error: [unresolved-reference]
+missing.value += missing_attribute_operand
 
 mapping: dict[str, int] = {}
 # error: [invalid-argument-type]
-# error: [invalid-assignment]
-mapping[1] += 1
+# error: [unresolved-reference]
+mapping[1] += missing_subscript_operand
 ```
 
 ## Failed augmented operations

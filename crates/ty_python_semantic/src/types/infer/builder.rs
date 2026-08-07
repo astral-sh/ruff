@@ -1509,7 +1509,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             let value_ty = self.get_or_infer_expression(value, TypeContext::default());
             let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            Some(self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx))
+            Some(
+                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
+                    .unwrap_or_else(|recovery_ty| recovery_ty),
+            )
         } else {
             None
         }
@@ -4827,28 +4830,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = assignment;
 
         // Resolve the target type, assuming a load context.
-        let target_type = match &**target {
+        let target_result = match &**target {
             ast::Expr::Name(name) => {
                 let previous_value = self.infer_name_load(name);
                 self.store_expression_type(target, previous_value);
-                previous_value
+                Ok(previous_value)
             }
             ast::Expr::Attribute(attr) => {
-                let previous_value = self.infer_attribute_load(attr);
+                let result = self.infer_attribute_load(attr);
+                let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
                 self.store_expression_type(target, previous_value);
-                previous_value
+                result
             }
             ast::Expr::Subscript(subscript) => {
-                let previous_value = self.infer_subscript_load(subscript);
+                let result = self.infer_subscript_load(subscript);
+                let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
                 self.store_expression_type(target, previous_value);
-                previous_value
+                result
             }
-            _ => self.infer_expression(target, TypeContext::default()),
+            _ => Ok(self.infer_expression(target, TypeContext::default())),
         };
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
-        })
+        let target_type = target_result.unwrap_or_else(|recovery_ty| recovery_ty);
+        let operation_result =
+            self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            });
+
+        match (target_result, operation_result) {
+            (Ok(_), Ok(result_ty)) => Ok(result_ty),
+            (_, Ok(recovery_ty) | Err(recovery_ty)) => Err(recovery_ty),
+        }
     }
 
     fn infer_dict_key_assignment_definition(
@@ -9258,6 +9270,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let collection_generic_context = collection_literal.generic_context(db);
                 let mut identity_bindings = self
                     .infer_attribute_load_impl(attribute, identity_instance)
+                    .unwrap_or_else(|recovery_ty| recovery_ty)
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -10318,19 +10331,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
-    fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
+    /// Infer an attribute load, returning its recovery type if lookup fails.
+    fn infer_attribute_load(
+        &mut self,
+        attribute: &ast::ExprAttribute,
+    ) -> Result<Type<'db>, Type<'db>> {
         let value_type =
             self.infer_maybe_standalone_expression(&attribute.value, TypeContext::default());
         self.infer_attribute_load_impl(attribute, value_type)
     }
 
-    /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
+    /// Infer an attribute load on a known receiver, returning its recovery type if lookup fails.
     fn infer_attribute_load_impl(
         &mut self,
         attribute: &ast::ExprAttribute,
         mut value_type: Type<'db>,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         fn union_elements_missing_attribute<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -10393,8 +10409,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         let attr_name = &attr.id;
-        let resolved_type =
-            fallback_place.unwrap_with_diagnostic(db, env, |lookup_err| match lookup_err {
+        let lookup_result = fallback_place.into_lookup_result(db, env);
+        let resolved_type = lookup_result.unwrap_or_else(|lookup_err| match lookup_err {
                 LookupError::Undefined(_) => {
                     let fallback = || {
                         TypeAndQualifiers::new(
@@ -10651,7 +10667,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     type_when_bound
                 }
-            });
+        });
 
         let resolved_type = resolved_type.inner_type();
 
@@ -10659,7 +10675,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
-        assigned_type.unwrap_or(resolved_type)
+        let inferred_type = assigned_type.unwrap_or(resolved_type);
+        lookup_result
+            .map(|_| inferred_type)
+            .map_err(|_| inferred_type)
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
@@ -10672,13 +10691,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = attribute;
 
         match ctx {
-            ExprContext::Load => self.infer_attribute_load(attribute),
+            ExprContext::Load => self
+                .infer_attribute_load(attribute)
+                .unwrap_or_else(|recovery_ty| recovery_ty),
             ExprContext::Store => {
                 self.infer_expression(value, TypeContext::default());
                 Type::Never
             }
             ExprContext::Del => {
-                self.infer_attribute_load(attribute);
+                let _ = self.infer_attribute_load(attribute);
                 self.validate_attribute_deletion(
                     attribute,
                     self.expression_type(value),
