@@ -29,8 +29,8 @@ python-version = "3.13"
 from ty_extensions._internal import ConstraintSet
 
 def absorption[T]() -> None:
-    scalar = ConstraintSet.range(str, T, object)
-    tuple_ = ConstraintSet.range(tuple[str, ...], T, object)
+    scalar = ConstraintSet.lower_bound(str, T)
+    tuple_ = ConstraintSet.lower_bound(tuple[str, ...], T)
 
     # revealed: tuple[Solution[T=str]]
     reveal_type((scalar & (scalar | tuple_)).solutions_for(T, inferable=tuple[T]))
@@ -53,26 +53,26 @@ from ty_extensions._internal import ConstraintSet
 
 def bindings_tuv[T, U, V]() -> None:
     # (T = int) ∧ (U = str) ∧ (V = bytes)
-    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.equality(U, str) & ConstraintSet.equality(V, bytes)
     # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_vtu[V, T, U]() -> None:
     # (T = int) ∧ (U = str) ∧ (V = bytes)
-    constraints = ConstraintSet.range(int, T, int) & ConstraintSet.range(str, U, str) & ConstraintSet.range(bytes, V, bytes)
+    constraints = ConstraintSet.equality(T, int) & ConstraintSet.equality(U, str) & ConstraintSet.equality(V, bytes)
     # revealed: tuple[Solution[T=int, U=str, V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_reverse_source[T, U, V]() -> None:
     # (V = bytes) ∧ (U = str) ∧ (T = int)
-    constraints = ConstraintSet.range(bytes, V, bytes) & ConstraintSet.range(str, U, str) & ConstraintSet.range(int, T, int)
+    constraints = ConstraintSet.equality(V, bytes) & ConstraintSet.equality(U, str) & ConstraintSet.equality(T, int)
     # revealed: tuple[Solution[V=bytes, U=str, T=int]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 
 def bindings_absorbed[T, U, X]() -> None:
-    t = ConstraintSet.range(str, T, object)
-    u = ConstraintSet.range(bytes, U, object)
-    x = ConstraintSet.range(int, X, object)
+    t = ConstraintSet.lower_bound(str, T)
+    u = ConstraintSet.lower_bound(bytes, U)
+    x = ConstraintSet.lower_bound(int, X)
 
     # ((X ≥ int) ∧ (T ≥ str) ∧ (U ≥ bytes)) | ((U ≥ bytes) ∧ (T ≥ str))
     constraints = (x & t & u) | (u & t)
@@ -88,14 +88,13 @@ and vice versa. Because we combine them with union, we are allowed to _either_ f
 `T` and `U`, _or_ find a solution for `V`. We are not _obligated_ to find a solution for all three.
 
 ```py
-from typing import Never
 from ty_extensions._internal import ConstraintSet
 
 def nested_transitive[T, U, V]() -> None:
     # ((T ≤ list[U]) ∧ (U ≤ int) ∧ (list[int] ≤ T)) | (bytes ≤ V)
     constraints = (
-        ConstraintSet.range(Never, T, list[U]) & ConstraintSet.range(Never, U, int) & ConstraintSet.range(list[int], T, object)
-    ) | ConstraintSet.range(bytes, V, object)
+        ConstraintSet.upper_bound(T, list[U]) & ConstraintSet.upper_bound(U, int) & ConstraintSet.lower_bound(list[int], T)
+    ) | ConstraintSet.lower_bound(bytes, V)
 
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=Never], Solution[]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int]], Solution[T=list[int]], Solution[]]
@@ -127,14 +126,11 @@ includes both sides of the union, so any solution that includes `bytes ≤ U` sh
 solution for `T`.
 
 ```py
-from typing import Never
 from ty_extensions._internal import ConstraintSet
 
 def negated_alternative[T, U]() -> None:
     # ¬((T ≤ int) ∨ (T ≤ str)) | (bytes ≤ U)
-    constraints = ~(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str)) | ConstraintSet.range(
-        bytes, U, object
-    )
+    constraints = ~(ConstraintSet.upper_bound(T, int) | ConstraintSet.upper_bound(T, str)) | ConstraintSet.lower_bound(bytes, U)
 
     # TODO: sometimes: revealed tuple[Solution[], Solution[T=Never], Solution[]]
     # revealed: tuple[Solution[], Solution[]]
@@ -155,15 +151,14 @@ Constructing the constraints in the opposite source order makes the derived unio
 elements should not be reordered merely because the TDD-variable order changes.
 
 ```py
-from typing import Never
 from ty_extensions._internal import ConstraintSet
 
 def derived_solution[U, T]() -> None:
     # (U ≤ int) ∧ (int ≤ T) ∧ ((T ≤ int) | (T ≤ str))
     constraints = (
-        ConstraintSet.range(Never, U, int)
-        & ConstraintSet.range(int, T, object)
-        & (ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str))
+        ConstraintSet.upper_bound(U, int)
+        & ConstraintSet.lower_bound(int, T)
+        & (ConstraintSet.upper_bound(T, int) | ConstraintSet.upper_bound(T, str))
     )
 
     # TODO: The derived relationship should not leave an inferable `U` in the solution for `T`.
@@ -174,7 +169,7 @@ def derived_solution[U, T]() -> None:
 
     # TODO: The derived relationship should not leave an inferable `T` in the solution for `U`.
     # TODO: revealed: tuple[Solution[U=int]]
-    # revealed: tuple[Solution[U=Never]]
+    # revealed: tuple[Solution[U=int & T@derived_solution]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U]))
 ```
 
@@ -185,37 +180,36 @@ range or two linked constraints. Logical equivalence and solution-element order 
 in both declaration orders.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def orientation_st[S, T]() -> None:
-    lower = ConstraintSet.range(Never, S, T)
-    upper = ConstraintSet.range(S, T, object)
+    lower = ConstraintSet.upper_bound(S, T)
+    upper = ConstraintSet.lower_bound(S, T)
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(lower == upper)
 
-    equality_st = ConstraintSet.range(T, S, T)
-    equality_ts = ConstraintSet.range(S, T, S)
+    equality_st = ConstraintSet.equality(S, T)
+    equality_ts = ConstraintSet.equality(T, S)
     static_assert(equality_st == equality_ts)
 
 def orientation_ts[T, S]() -> None:
-    lower = ConstraintSet.range(Never, S, T)
-    upper = ConstraintSet.range(S, T, object)
+    lower = ConstraintSet.upper_bound(S, T)
+    upper = ConstraintSet.lower_bound(S, T)
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(lower == upper)
 
-    equality_st = ConstraintSet.range(T, S, T)
-    equality_ts = ConstraintSet.range(S, T, S)
+    equality_st = ConstraintSet.equality(S, T)
+    equality_ts = ConstraintSet.equality(T, S)
     static_assert(equality_st == equality_ts)
 
 def chain_stu[S, T, U]() -> None:
     chain = ConstraintSet.range(S, T, U)
-    linked = ConstraintSet.range(Never, S, T) & ConstraintSet.range(Never, T, U)
+    linked = ConstraintSet.upper_bound(S, T) & ConstraintSet.upper_bound(T, U)
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(chain == linked)
 
-    constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
+    constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
     # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
@@ -227,11 +221,11 @@ def chain_stu[S, T, U]() -> None:
 
 def chain_uts[U, T, S]() -> None:
     chain = ConstraintSet.range(S, T, U)
-    linked = ConstraintSet.range(Never, S, T) & ConstraintSet.range(Never, T, U)
+    linked = ConstraintSet.upper_bound(S, T) & ConstraintSet.upper_bound(T, U)
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(chain == linked)
 
-    constraints = chain & ConstraintSet.range(int, S, object) & ConstraintSet.range(Never, U, int)
+    constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
     # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
@@ -249,14 +243,13 @@ leak onto the surviving paths. Universal abstraction of an alternative must like
 unrelated branch.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def noninferable_nested[T, U, V]() -> None:
     constraints = (
-        ConstraintSet.range(Never, T, list[U]) & ConstraintSet.range(Never, U, int) & ConstraintSet.range(list[int], T, object)
-    ) | ConstraintSet.range(bytes, V, object)
+        ConstraintSet.upper_bound(T, list[U]) & ConstraintSet.upper_bound(U, int) & ConstraintSet.lower_bound(list[int], T)
+    ) | ConstraintSet.lower_bound(bytes, V)
 
     # `U` is deliberately non-inferable here.
     # TODO: We should not include a solution for non-inferable U.
@@ -273,18 +266,16 @@ def noninferable_nested[T, U, V]() -> None:
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, V]))
 
     quantified = constraints.for_all(tuple[T, U])
-    expected = ConstraintSet.range(bytes, V, object)
+    expected = ConstraintSet.lower_bound(bytes, V)
     static_assert(quantified == expected)
     # revealed: tuple[Solution[V=bytes]]
     reveal_type(quantified.solutions_for(V, inferable=tuple[V]))
 
 def noninferable_negated[T, U]() -> None:
-    constraints = ~(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, str)) | ConstraintSet.range(
-        bytes, U, object
-    )
+    constraints = ~(ConstraintSet.upper_bound(T, int) | ConstraintSet.upper_bound(T, str)) | ConstraintSet.lower_bound(bytes, U)
 
     quantified = constraints.for_all(tuple[T])
-    expected = ConstraintSet.range(bytes, U, object)
+    expected = ConstraintSet.lower_bound(bytes, U)
     static_assert(quantified == expected)
     # revealed: tuple[Solution[U=bytes]]
     reveal_type(quantified.solutions_for(U, inferable=tuple[U]))
@@ -332,7 +323,7 @@ def listify[T](value: T) -> list[T]:
     return [value]
 
 def invariant_callable[U, V]() -> None:
-    constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.range(int, V, int)
+    constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.equality(V, int)
     # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
     # TODO: sometimes: no error
     # error: [static-assert-error]
@@ -397,7 +388,7 @@ sequent fuel budget. The remaining solution, its element order, and the elements
 truncated diagnostic display must not depend on which implications were encountered first.
 
 ```py
-from typing import Literal, Never
+from typing import Literal
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -443,18 +434,18 @@ def high_fanout[
         & ConstraintSet.range(Literal[11], L11, P)
     )
     upper = (
-        ConstraintSet.range(Never, P, R0)
-        & ConstraintSet.range(Never, P, R1)
-        & ConstraintSet.range(Never, P, R2)
-        & ConstraintSet.range(Never, P, R3)
-        & ConstraintSet.range(Never, P, R4)
-        & ConstraintSet.range(Never, P, R5)
-        & ConstraintSet.range(Never, P, R6)
-        & ConstraintSet.range(Never, P, R7)
-        & ConstraintSet.range(Never, P, R8)
-        & ConstraintSet.range(Never, P, R9)
-        & ConstraintSet.range(Never, P, R10)
-        & ConstraintSet.range(Never, P, R11)
+        ConstraintSet.upper_bound(P, R0)
+        & ConstraintSet.upper_bound(P, R1)
+        & ConstraintSet.upper_bound(P, R2)
+        & ConstraintSet.upper_bound(P, R3)
+        & ConstraintSet.upper_bound(P, R4)
+        & ConstraintSet.upper_bound(P, R5)
+        & ConstraintSet.upper_bound(P, R6)
+        & ConstraintSet.upper_bound(P, R7)
+        & ConstraintSet.upper_bound(P, R8)
+        & ConstraintSet.upper_bound(P, R9)
+        & ConstraintSet.upper_bound(P, R10)
+        & ConstraintSet.upper_bound(P, R11)
     )
     inferable = tuple[
         P,
@@ -507,7 +498,7 @@ def high_fanout[
     # revealed: tuple[Solution[R11=L1@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
     reveal_type(result)
 
-    impossible = constraints & ConstraintSet.range(Never, R11, Literal[0])
+    impossible = constraints & ConstraintSet.upper_bound(R11, Literal[0])
     # TODO: sometimes: error [static-assert-error] "Static assertion error: argument evaluates to `False`"
     static_assert(not impossible.satisfied_by_all_typevars(inferable=inferable))
 ```

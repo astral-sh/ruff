@@ -1322,6 +1322,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         )),
                         Some(literal.value(db)),
                     ),
+                    KnownBoundMethodType::ConstraintSetLowerBound => {
+                        return f.write_str("bound method `ConstraintSet.lower_bound`");
+                    }
+                    KnownBoundMethodType::ConstraintSetUpperBound => {
+                        return f.write_str("bound method `ConstraintSet.upper_bound`");
+                    }
+                    KnownBoundMethodType::ConstraintSetEquality => {
+                        return f.write_str("bound method `ConstraintSet.equality`");
+                    }
                     KnownBoundMethodType::ConstraintSetRange => {
                         return f.write_str("bound method `ConstraintSet.range`");
                     }
