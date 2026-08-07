@@ -650,7 +650,7 @@ from typing import Any
 
 def excludes_bounded_generic(value: BoundedCovariant[Any] | bool) -> bool:
     if isinstance(value, BoundedCovariant):
-        reveal_type(value)  # revealed: BoundedCovariant[Any]
+        reveal_type(value)  # revealed: BoundedCovariant[int & Any]
         return False
 
     reveal_type(value)  # revealed: bool
@@ -664,7 +664,7 @@ def excludes_bounded_generic_tuple(
     value: BoundedCovariant[Any] | bool | bytes,
 ) -> bool:
     if isinstance(value, (BoundedCovariant, bytes)):
-        reveal_type(value)  # revealed: BoundedCovariant[Any] | bytes
+        reveal_type(value)  # revealed: BoundedCovariant[int & Any] | bytes
         return False
 
     reveal_type(value)  # revealed: bool
@@ -1460,8 +1460,8 @@ Negative narrowing also excludes gradual specializations of the defaulted tuple 
 ```py
 def excludes_defaulted_tuple(value: DefaultedTuple[Any] | bool) -> bool:
     if isinstance(value, DefaultedTuple):
-        reveal_type(value)  # revealed: DefaultedTuple[Any]
-        reveal_type(value[0])  # revealed: Any
+        reveal_type(value)  # revealed: DefaultedTuple[int & Any]
+        reveal_type(value[0])  # revealed: int & Any
         reveal_type(value[1])  # revealed: str
         return False
 

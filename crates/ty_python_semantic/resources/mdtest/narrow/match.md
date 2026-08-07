@@ -134,7 +134,8 @@ def narrow_sequence_to_list(value: Sequence[int]) -> None:
 
 ### Strict mode
 
-With strict generic narrowing enabled, class patterns retain their top materializations.
+With strict generic narrowing enabled, class patterns retain their top materializations while
+combining gradual type arguments with known arguments from the narrowed type.
 
 ```toml
 [environment]
@@ -144,7 +145,7 @@ python-version = "3.12"
 strict-generic-narrowing = true
 ```
 
-A `list()` pattern retains the original `Sequence` alongside the top-materialized list.
+A `list()` pattern transfers the known `Sequence` element type into the top-materialized list.
 
 ```py
 from typing import Sequence
@@ -152,7 +153,7 @@ from typing import Sequence
 def narrow_sequence_to_list(value: Sequence[int]) -> None:
     match value:
         case list():
-            reveal_type(value)  # revealed: Sequence[int] & Top[list[Unknown]]
+            reveal_type(value)  # revealed: Top[list[Unknown & int]]
         case _:
             reveal_type(value)  # revealed: Sequence[int] & ~Top[list[Unknown]]
 ```
