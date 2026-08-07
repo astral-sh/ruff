@@ -95,8 +95,8 @@ def _[T]() -> None:
     ConstraintSet.equality(T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Gradual lower and upper evidence bounds behave like their bottom and top materializations,
+respectively.
 
 ```py
 def _[T]() -> None:
@@ -242,8 +242,8 @@ def _[T]() -> None:
     ~ConstraintSet.equality(T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
+Gradual lower and upper evidence bounds behave like their bottom and top materializations,
+respectively.
 
 ```pyi
 def _[T]() -> None:
@@ -296,6 +296,21 @@ def _[T, U]() -> None:
     ConstraintSet.range(Sub, T, Base) & ConstraintSet.range(Sub, U, Base)
     # ¬(Sub ≤ T@_ ≤ Base) ∧ ¬(Sub ≤ U@_ ≤ Base)
     ~ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.range(Sub, U, Base)
+```
+
+### Declared bounds on nested typevars
+
+A type variable nested in another variable's bound must satisfy its own declared upper bound. Here,
+the intersection requires `U` to be `int`, contradicting its declared `str` bound.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def invalid_nested[T, U: str]() -> None:
+    constraints = ConstraintSet.upper_bound(T, list[U]) & ConstraintSet.lower_bound(list[int], T)
+
+    # revealed: None
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
 ```
 
 ### Intersection of two ranges

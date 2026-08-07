@@ -1656,6 +1656,44 @@ impl<'db> ConstraintSetStorage<'db> {
             .map(|support| self.support_data(support))
     }
 
+    /// Returns a constraint set encoding the declared upper bound or constraints of every typevar
+    /// in this node's support. This constraint set defines the _domain_ (or, the set of valid
+    /// solutions) of the node. Any constraints in the constraint set will use
+    /// [`Validity`][ConstraintBound::Validity] bounds, since they constrain which solutions are
+    /// valid, but do not provide direct evidence of the particular solution we should choose.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "validity domains are applied during solution extraction in a later phase"
+        )
+    )]
+    fn validity_domain(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        node: NodeId,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        let Some(support) = self.node_support(node).cloned() else {
+            return (ALWAYS_TRUE, None);
+        };
+
+        let mut domain = ALWAYS_TRUE;
+        let mut source_order = None;
+        for typevar in support.iter() {
+            let typevar = self.typevar_data(typevar);
+            let (valid_specializations, validity_source_order) =
+                typevar.valid_specializations(db, env, self);
+            domain = domain.and(self, valid_specializations);
+            source_order = self.ordered_source_order(source_order, validity_source_order);
+            if domain == ALWAYS_FALSE {
+                break;
+            }
+        }
+
+        (domain, source_order)
+    }
+
     /// Loads an [`OwnedConstraintSet`] into this storage.
     fn load(
         &mut self,
@@ -1751,6 +1789,51 @@ impl<'db> ConstraintSetStorage<'db> {
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Returns a constraint set encoding this type variable's declared upper bound or constraints.
+    /// Any constraints in the constraint set will use [`Validity`][ConstraintBound::Validity]
+    /// bounds, since they constrain which solutions are valid, but do not provide direct evidence
+    /// of the particular solution we should choose.
+    fn valid_specializations(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        // TODO: Support ParamSpecs in constraint sets
+        if self.paramspec_attr(db).is_some() {
+            return (ALWAYS_TRUE, None);
+        }
+
+        match self.typevar(db).bound_or_constraints(db, env) {
+            None => (ALWAYS_TRUE, None),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Constraint::new_node_with_bounds(
+                db,
+                env,
+                storage,
+                self,
+                ConstraintBound::missing_lower(),
+                ConstraintBound::Validity(bound),
+            ),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                let mut specializations = ALWAYS_FALSE;
+                let mut source_order = None;
+                for constraint in constraints.elements(db) {
+                    let validity = ConstraintBound::Validity(*constraint);
+                    let (constraint, constraint_source_order) = Constraint::new_node_with_bounds(
+                        db, env, storage, self, validity, validity,
+                    );
+                    specializations = specializations.or(storage, constraint);
+                    source_order =
+                        storage.ordered_source_order(source_order, constraint_source_order);
+                    if specializations == ALWAYS_TRUE {
+                        break;
+                    }
+                }
+                (specializations, source_order)
+            }
+        }
+    }
+
     /// Returns whether this typevar can be the lower or upper bound of another typevar in a
     /// constraint set.
     ///
@@ -7325,7 +7408,9 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::types::generics::ApplySpecialization;
-    use crate::types::typevar::{TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation};
+    use crate::types::typevar::{
+        TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    };
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
@@ -7351,6 +7436,135 @@ mod tests {
 
     fn known_instance(db: &TestDb, class: KnownClass) -> Type<'_> {
         class.to_instance(db, &db.program_environment())
+    }
+
+    // XXX: Remove once solution extraction exercises validity domains.
+    #[test]
+    fn validity_domain_uses_supported_typevars_in_builder_order() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+        let bytes = known_instance(db, KnownClass::Bytes);
+        let gradual_upper = KnownClass::List.to_specialized_instance(db, &env, &[Type::any()]);
+        let bounded = create_typevar(db, "Bounded").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(gradual_upper))
+        });
+        let nested = create_typevar(db, "Nested")
+            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+        let unbounded = create_typevar(db, "Unbounded");
+        let unused = create_typevar(db, "Unused")
+            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bytes)));
+        let nested_upper =
+            KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(nested)]);
+
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            let root = ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                &env,
+                builder,
+                bounded,
+                nested_upper,
+            )
+            .and(db, builder, || {
+                ConstraintSet::constrain_typevar_lower_bound(db, &env, builder, unbounded, int)
+            });
+            builder.storage.borrow_mut().intern_typevar(db, unused);
+            root
+        });
+
+        owned.query(|builder, root| {
+            let mut storage = builder.storage.borrow_mut();
+            let (domain, source_order) = storage.validity_domain(db, &env, root.node);
+            let constraints: Vec<_> = storage
+                .calculate_source_orders(source_order)
+                .into_iter()
+                .map(|constraint| storage.constraint_data(constraint))
+                .collect();
+
+            assert_eq!(
+                constraints,
+                vec![
+                    Constraint {
+                        typevar: bounded,
+                        bounds: ConstraintBounds::new(
+                            ConstraintBound::missing_lower(),
+                            ConstraintBound::Validity(gradual_upper),
+                        ),
+                    },
+                    Constraint {
+                        typevar: nested,
+                        bounds: ConstraintBounds::new(
+                            ConstraintBound::missing_lower(),
+                            ConstraintBound::Validity(str),
+                        ),
+                    },
+                ]
+            );
+
+            let support: Vec<_> = storage
+                .node_support(domain)
+                .into_iter()
+                .flat_map(Support::iter)
+                .map(|typevar| storage.typevar_data(typevar))
+                .collect();
+            assert_eq!(support, vec![bounded, nested]);
+            assert_eq!(
+                storage.validity_domain(db, &env, ALWAYS_TRUE),
+                (ALWAYS_TRUE, None)
+            );
+            assert_eq!(
+                storage.validity_domain(db, &env, ALWAYS_FALSE),
+                (ALWAYS_TRUE, None)
+            );
+        });
+    }
+
+    // XXX: Remove once solution extraction exercises validity domains.
+    #[test]
+    fn validity_domain_preserves_exact_gradual_declared_constraints() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = known_instance(db, KnownClass::Int);
+        let list_any = KnownClass::List.to_specialized_instance(db, &env, &[Type::any()]);
+        let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
+
+        for alternatives in [[Type::any(), int], [list_any, list_int]] {
+            let typevar = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+                Some(TypeVarBoundOrConstraints::Constraints(
+                    TypeVarConstraints::new(db, alternatives.as_slice()),
+                ))
+            });
+            let builder = ConstraintSetBuilder::new();
+            let root = ConstraintSet::constrain_typevar_lower_bound(
+                db,
+                &env,
+                &builder,
+                typevar,
+                alternatives[1],
+            );
+            let mut storage = builder.storage.borrow_mut();
+            let (_, source_order) = storage.validity_domain(db, &env, root.node);
+            let actual: Vec<_> = storage
+                .calculate_source_orders(source_order)
+                .into_iter()
+                .map(|constraint| storage.constraint_data(constraint))
+                .collect();
+            let expected: Vec<_> = alternatives
+                .into_iter()
+                .map(|alternative| Constraint {
+                    typevar,
+                    bounds: ConstraintBounds::new(
+                        ConstraintBound::Validity(alternative),
+                        ConstraintBound::Validity(alternative),
+                    ),
+                })
+                .collect();
+
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]

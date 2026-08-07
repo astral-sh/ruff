@@ -358,7 +358,7 @@ expanding `Solutions`:
 
 - [x] Phase 1: retain bound type-variable instances in constraint-set arenas.
 - [x] Phase 2: replace optional constraint bounds with validity/evidence bounds.
-- [ ] Phase 3: reintroduce support-derived validity-domain construction.
+- [x] Phase 3: reintroduce support-derived validity-domain construction.
 - [ ] Phase 4: preserve evidence-derived variance and add complete-solution pruning.
 - [ ] Phase 5: solve the domain-conjoined TDD and simplify default solving.
 

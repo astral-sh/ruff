@@ -618,6 +618,25 @@ specific.asDict()
 
 reveal_type(any_first(1))  # revealed: int
 reveal_type(int_first(1))  # revealed: int
+reveal_type(any_first("x"))  # revealed: Any
+reveal_type(int_first("x"))  # revealed: Any
+```
+
+## Preserve gradual container constraints
+
+A gradual container constraint remains available when the argument does not satisfy a more specific
+constraint. Arguments satisfying both constraints prefer the specific one.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", list[Any], list[int])
+
+def identity(value: T) -> T:
+    return value
+
+reveal_type(identity([1]))  # revealed: list[int]
+reveal_type(identity(["x"]))  # revealed: list[Any]
 ```
 
 ## Typevar inference is a unification problem
