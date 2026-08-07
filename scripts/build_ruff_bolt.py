@@ -1,5 +1,9 @@
-#!/usr/bin/env python3
 """Apply BOLT optimization to Ruff's Linux executable and its existing wheel."""
+
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 
 from __future__ import annotations
 
