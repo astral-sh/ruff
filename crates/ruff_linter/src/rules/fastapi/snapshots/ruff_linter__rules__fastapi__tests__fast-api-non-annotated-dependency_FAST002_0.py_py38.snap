@@ -13,14 +13,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 24 | def get_items(
-   -     current_user: User = Depends(get_current_user),
-25 +     current_user: Annotated[User, Depends(get_current_user)],
-26 |     some_security_param: str = Security(get_oauth2_user),
+25 ~     current_user: Annotated[User, Depends(get_current_user)],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -36,14 +34,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 25 |     current_user: User = Depends(get_current_user),
-   -     some_security_param: str = Security(get_oauth2_user),
-26 +     some_security_param: Annotated[str, Security(get_oauth2_user)],
-27 | ):
+26 ~     some_security_param: Annotated[str, Security(get_oauth2_user)],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -59,14 +55,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 32 | def do_stuff(
-   -     some_path_param: str = Path(),
-33 +     some_path_param: Annotated[str, Path()],
-34 |     some_cookie_param: str = Cookie(),
+33 ~     some_path_param: Annotated[str, Path()],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -82,14 +76,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 33 |     some_path_param: str = Path(),
-   -     some_cookie_param: str = Cookie(),
-34 +     some_cookie_param: Annotated[str, Cookie()],
-35 |     some_file_param: UploadFile = File(),
+34 ~     some_cookie_param: Annotated[str, Cookie()],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -105,14 +97,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 34 |     some_cookie_param: str = Cookie(),
-   -     some_file_param: UploadFile = File(),
-35 +     some_file_param: Annotated[UploadFile, File()],
-36 |     some_form_param: str = Form(),
+35 ~     some_file_param: Annotated[UploadFile, File()],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,14 +118,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 35 |     some_file_param: UploadFile = File(),
-   -     some_form_param: str = Form(),
-36 +     some_form_param: Annotated[str, Form()],
-37 |     some_query_param: str | None = Query(default=None),
+36 ~     some_form_param: Annotated[str, Form()],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -151,14 +139,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 36 |     some_form_param: str = Form(),
-   -     some_query_param: str | None = Query(default=None),
-37 +     some_query_param: Annotated[str | None, Query()] = None,
-38 |     some_body_param: str = Body("foo"),
+37 ~     some_query_param: Annotated[str | None, Query()] = None,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -174,14 +160,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 37 |     some_query_param: str | None = Query(default=None),
-   -     some_body_param: str = Body("foo"),
-38 +     some_body_param: Annotated[str, Body()] = "foo",
-39 |     some_header_param: int = Header(default=5),
+38 ~     some_body_param: Annotated[str, Body()] = "foo",
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -197,14 +181,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 38 |     some_body_param: str = Body("foo"),
-   -     some_header_param: int = Header(default=5),
-39 +     some_header_param: Annotated[int, Header()] = 5,
-40 | ):
+39 ~     some_header_param: Annotated[int, Header()] = 5,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -220,14 +202,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 47 |     limit: int,
-   -     current_user: User = Depends(get_current_user),
-48 +     current_user: Annotated[User, Depends(get_current_user)],
-49 | ):
+48 ~     current_user: Annotated[User, Depends(get_current_user)],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -243,14 +223,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 53 | def get_users(
-   -     current_user: User = Depends(get_current_user),
-54 +     current_user: Annotated[User, Depends(get_current_user)],
-55 |     skip: int = 0,
+54 ~     current_user: Annotated[User, Depends(get_current_user)],
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -264,14 +242,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing_extensions.Annotated`
    |
-14 | from pydantic import BaseModel
 15 + from typing_extensions import Annotated
-16 |
---------------------------------------------------------------------------------
+16 + 
+17 | app = FastAPI()
+ …
 61 | @app.get("/items/{item_id}")
-   - async def read_items(*, item_id: int = Path(title="The ID of the item to get"), q: str):
-62 + async def read_items(*, item_id: Annotated[int, Path(title="The ID of the item to get")], q: str):
-63 |     pass
+62 ~ async def read_items(*, item_id: Annotated[int, Path(title="The ID of the item to get")], q: str):
    |
 note: This is an unsafe fix and may change runtime behavior
 

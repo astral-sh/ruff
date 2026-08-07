@@ -13,10 +13,8 @@ LOG004 [*] `.exception()` call outside exception handlers
    |
 help: Replace with `.error()`
    |
-12 |
-   - logging.exception("")
+13 - logging.exception("")
 13 + logging.error("")
-14 | logger.exception("")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +28,8 @@ LOG004 [*] `.exception()` call outside exception handlers
    |
 help: Replace with `.error()`
    |
-13 | logging.exception("")
-   - logger.exception("")
+14 - logger.exception("")
 14 + logger.error("")
-15 | exc("")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -57,10 +53,8 @@ LOG004 [*] `.exception()` call outside exception handlers
    |
 help: Replace with `.error()`
    |
-18 | def _():
-   -     logging.exception("")
+19 -     logging.exception("")
 19 +     logging.error("")
-20 |     logger.exception("")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -75,10 +69,8 @@ LOG004 [*] `.exception()` call outside exception handlers
    |
 help: Replace with `.error()`
    |
-19 |     logging.exception("")
-   -     logger.exception("")
+20 -     logger.exception("")
 20 +     logger.error("")
-21 |     exc("")
    |
 note: This is an unsafe fix and may change runtime behavior
 

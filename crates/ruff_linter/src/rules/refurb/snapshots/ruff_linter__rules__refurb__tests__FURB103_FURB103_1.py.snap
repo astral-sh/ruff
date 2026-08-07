@@ -12,11 +12,9 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.t
   |
 help: Replace with `Path("file.txt").write_text("test")`
   |
+1 ~ from pathlib import Path
 2 |
-  - with Path("file.txt").open("w") as f:
-  -     f.write("test")
 3 + Path("file.txt").write_text("test")
-4 |
   |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_bytes(b"test")`
@@ -30,11 +28,11 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.t
   |
 help: Replace with `Path("file.txt").write_bytes(b"test")`
   |
+1 ~ from pathlib import Path
+2 |
+…
 5 |
-  - with Path("file.txt").open("wb") as f:
-  -     f.write(b"test")
 6 + Path("file.txt").write_bytes(b"test")
-7 |
   |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test")`
@@ -47,13 +45,13 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.t
 10 |     f.write("test")
    |
 help: Replace with `Path("file.txt").write_text("test")`
-   |
-8  |
-   - with Path("file.txt").open(mode="w") as f:
-   -     f.write("test")
-9  + Path("file.txt").write_text("test")
-10 |
-   |
+  |
+1 ~ from pathlib import Path
+2 |
+…
+8 |
+9 + Path("file.txt").write_text("test")
+  |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", encoding="utf8")`
   --> FURB103_1.py:12:6
@@ -66,11 +64,11 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.t
    |
 help: Replace with `Path("file.txt").write_text("test", encoding="utf8")`
    |
+ 1 ~ from pathlib import Path
+ 2 |
+ …
 11 |
-   - with Path("file.txt").open("w", encoding="utf8") as f:
-   -     f.write("test")
 12 + Path("file.txt").write_text("test", encoding="utf8")
-13 |
    |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.txt").write_text("test", errors="ignore")`
@@ -84,11 +82,11 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("file.t
    |
 help: Replace with `Path("file.txt").write_text("test", errors="ignore")`
    |
+ 1 ~ from pathlib import Path
+ 2 |
+ …
 14 |
-   - with Path("file.txt").open("w", errors="ignore") as f:
-   -     f.write("test")
 15 + Path("file.txt").write_text("test", errors="ignore")
-16 |
    |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path(foo()).write_text("test")`
@@ -102,11 +100,11 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path(foo()).
    |
 help: Replace with `Path(foo()).write_text("test")`
    |
+ 1 ~ from pathlib import Path
+ 2 |
+ …
 17 |
-   - with Path(foo()).open("w") as f:
-   -     f.write("test")
 18 + Path(foo()).write_text("test")
-19 |
    |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `p.write_text("test")`
@@ -119,11 +117,11 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `p.write_text
    |
 help: Replace with `p.write_text("test")`
    |
+ 1 ~ from pathlib import Path
+ 2 |
+ …
 21 | p = Path("file.txt")
-   - with p.open("w") as f:
-   -     f.write("test")
 22 + p.write_text("test")
-23 |
    |
 
 FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("foo", "bar", "baz").write_text("test")`
@@ -137,8 +135,9 @@ FURB103 [*] `Path.open()` followed by `write()` can be replaced by `Path("foo", 
    |
 help: Replace with `Path("foo", "bar", "baz").write_text("test")`
    |
+ 1 ~ from pathlib import Path
+ 2 |
+ …
 24 |
-   - with Path("foo", "bar", "baz").open("w") as f:
-   -     f.write("test")
 25 + Path("foo", "bar", "baz").write_text("test")
    |

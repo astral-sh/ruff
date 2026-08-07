@@ -12,11 +12,8 @@ RUF059 [*] Unpacked variable `x2` is never used
   |
 help: Prefix it with an underscore or any other dummy variable pattern
   |
-7 |
-  -     with foo() as (x2, y2):
-8 +     with foo() as (_x2, y2):
-9 |         pass
-  |
+8 |     with foo() as (_x2, y2):
+  |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y2` is never used
@@ -30,11 +27,8 @@ RUF059 [*] Unpacked variable `y2` is never used
   |
 help: Prefix it with an underscore or any other dummy variable pattern
   |
-7 |
-  -     with foo() as (x2, y2):
-8 +     with foo() as (x2, _y2):
-9 |         pass
-  |
+8 |     with foo() as (x2, _y2):
+  |                        +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x2` is never used
@@ -48,11 +42,8 @@ RUF059 [*] Unpacked variable `x2` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-16 |     (x1, y1) = (1, 2)
-   -     (x2, y2) = coords2 = (1, 2)
-17 +     (_x2, y2) = coords2 = (1, 2)
-18 |     coords3 = (x3, y3) = (1, 2)
-   |
+17 |     (_x2, y2) = coords2 = (1, 2)
+   |      +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y2` is never used
@@ -66,11 +57,8 @@ RUF059 [*] Unpacked variable `y2` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-16 |     (x1, y1) = (1, 2)
-   -     (x2, y2) = coords2 = (1, 2)
-17 +     (x2, _y2) = coords2 = (1, 2)
-18 |     coords3 = (x3, y3) = (1, 2)
-   |
+17 |     (x2, _y2) = coords2 = (1, 2)
+   |          +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x3` is never used
@@ -82,11 +70,8 @@ RUF059 [*] Unpacked variable `x3` is never used
    |                ^^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-17 |     (x2, y2) = coords2 = (1, 2)
-   -     coords3 = (x3, y3) = (1, 2)
-18 +     coords3 = (_x3, y3) = (1, 2)
-19 |
-   |
+18 |     coords3 = (_x3, y3) = (1, 2)
+   |                +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y3` is never used
@@ -98,11 +83,8 @@ RUF059 [*] Unpacked variable `y3` is never used
    |                    ^^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-17 |     (x2, y2) = coords2 = (1, 2)
-   -     coords3 = (x3, y3) = (1, 2)
-18 +     coords3 = (x3, _y3) = (1, 2)
-19 |
-   |
+18 |     coords3 = (x3, _y3) = (1, 2)
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `x` is never used
@@ -115,11 +97,8 @@ RUF059 [*] Unpacked variable `x` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-21 | def f():
-   -     with Nested(m) as (x, y):
-22 +     with Nested(m) as (_x, y):
-23 |         pass
-   |
+22 |     with Nested(m) as (_x, y):
+   |                        +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `y` is never used
@@ -132,11 +111,8 @@ RUF059 [*] Unpacked variable `y` is never used
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-21 | def f():
-   -     with Nested(m) as (x, y):
-22 +     with Nested(m) as (x, _y):
-23 |         pass
-   |
+22 |     with Nested(m) as (x, _y):
+   |                           +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `a` is never used
@@ -147,11 +123,8 @@ RUF059 [*] Unpacked variable `a` is never used
    |                 ^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-26 | def f():
-   -     toplevel = (a, b) = lexer.get_token()
-27 +     toplevel = (_a, b) = lexer.get_token()
-28 |
-   |
+27 |     toplevel = (_a, b) = lexer.get_token()
+   |                 +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `b` is never used
@@ -162,11 +135,8 @@ RUF059 [*] Unpacked variable `b` is never used
    |                    ^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-26 | def f():
-   -     toplevel = (a, b) = lexer.get_token()
-27 +     toplevel = (a, _b) = lexer.get_token()
-28 |
-   |
+27 |     toplevel = (a, _b) = lexer.get_token()
+   |                    +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `a` is never used
@@ -177,10 +147,8 @@ RUF059 [*] Unpacked variable `a` is never used
    |      ^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-30 | def f():
-   -     (a, b) = toplevel = lexer.get_token()
-31 +     (_a, b) = toplevel = lexer.get_token()
-   |
+31 |     (_a, b) = toplevel = lexer.get_token()
+   |      +
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `b` is never used
@@ -191,8 +159,6 @@ RUF059 [*] Unpacked variable `b` is never used
    |         ^
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-30 | def f():
-   -     (a, b) = toplevel = lexer.get_token()
-31 +     (a, _b) = toplevel = lexer.get_token()
-   |
+31 |     (a, _b) = toplevel = lexer.get_token()
+   |         +
 note: This is an unsafe fix and may change runtime behavior

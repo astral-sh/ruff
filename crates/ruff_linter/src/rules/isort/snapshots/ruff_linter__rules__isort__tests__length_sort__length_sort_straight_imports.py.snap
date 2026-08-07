@@ -13,8 +13,6 @@ help: Organize imports
   |
 1 + import short
 2 + import mediuuuuuuma
-3 | import mediuuuuuumb
-  - import short
-4 | import looooooooooooooooong
-  - import mediuuuuuuma
+3 + import mediuuuuuumb
+4 + import looooooooooooooooong
   |

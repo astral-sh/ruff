@@ -12,10 +12,7 @@ E201 [*] Whitespace after '('
   |
 help: Remove whitespace before '('
   |
-1 | #: E201:1:6
-  - spam( ham[1], {eggs: 2})
-2 + spam(ham[1], {eggs: 2})
-3 | #: E201:1:10
+2 | spam(ham[1], {eggs: 2})
   |
 
 E201 [*] Whitespace after '['
@@ -30,10 +27,7 @@ E201 [*] Whitespace after '['
   |
 help: Remove whitespace before '['
   |
-3 | #: E201:1:10
-  - spam(ham[ 1], {eggs: 2})
-4 + spam(ham[1], {eggs: 2})
-5 | #: E201:1:15
+4 | spam(ham[1], {eggs: 2})
   |
 
 E201 [*] Whitespace after '{'
@@ -48,10 +42,7 @@ E201 [*] Whitespace after '{'
   |
 help: Remove whitespace before '{'
   |
-5 | #: E201:1:15
-  - spam(ham[1], { eggs: 2})
-6 + spam(ham[1], {eggs: 2})
-7 | #: E201:1:6
+6 | spam(ham[1], {eggs: 2})
   |
 
 E201 [*] Whitespace after '('
@@ -66,10 +57,7 @@ E201 [*] Whitespace after '('
    |
 help: Remove whitespace before '('
   |
-7 | #: E201:1:6
-  - spam(	ham[1], {eggs: 2})
-8 + spam(ham[1], {eggs: 2})
-9 | #: E201:1:10
+8 | spam(ham[1], {eggs: 2})
   |
 
 E201 [*] Whitespace after '['
@@ -84,10 +72,7 @@ E201 [*] Whitespace after '['
    |
 help: Remove whitespace before '['
    |
-9  | #: E201:1:10
-   - spam(ham[	1], {eggs: 2})
-10 + spam(ham[1], {eggs: 2})
-11 | #: E201:1:15
+10 | spam(ham[1], {eggs: 2})
    |
 
 E201 [*] Whitespace after '{'
@@ -102,10 +87,7 @@ E201 [*] Whitespace after '{'
    |
 help: Remove whitespace before '{'
    |
-11 | #: E201:1:15
-   - spam(ham[1], {	eggs: 2})
-12 + spam(ham[1], {eggs: 2})
-13 | #: Okay
+12 | spam(ham[1], {eggs: 2})
    |
 
 E201 [*] Whitespace after '['
@@ -119,10 +101,7 @@ E201 [*] Whitespace after '['
     |
 help: Remove whitespace before '['
     |
-106 | #: E201:1:6
-    - spam[ ~ham]
-107 + spam[~ham]
-108 |
+107 | spam[~ham]
     |
 
 E201 [*] Whitespace after '['
@@ -136,10 +115,7 @@ E201 [*] Whitespace after '['
     |
 help: Remove whitespace before '['
     |
-115 | f"{ {'a': 1} }"
-    - f"{[ { {'a': 1} } ]}"
-116 + f"{[{ {'a': 1} } ]}"
-117 | f"normal { {f"{ { [1, 2] } }" } } normal"
+116 | f"{[{ {'a': 1} } ]}"
     |
 
 E201 [*] Whitespace after '['
@@ -153,10 +129,7 @@ E201 [*] Whitespace after '['
     |
 help: Remove whitespace before '['
     |
-144 | #: E201:1:5
-    - ham[ : upper]
-145 + ham[: upper]
-146 |
+145 | ham[: upper]
     |
 
 E201 [*] Whitespace after '['
@@ -170,8 +143,5 @@ E201 [*] Whitespace after '['
     |
 help: Remove whitespace before '['
     |
-194 | t"{ {'a': 1} }"
-    - t"{[ { {'a': 1} } ]}"
-195 + t"{[{ {'a': 1} } ]}"
-196 | t"normal { {t"{ { [1, 2] } }" } } normal"
+195 | t"{[{ {'a': 1} } ]}"
     |

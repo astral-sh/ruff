@@ -12,11 +12,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-53 | #: E225
-   - submitted +=1
-54 + submitted += 1
-55 | #: E225
-   |
+54 | submitted += 1
+   |             +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:56:10
@@ -30,11 +27,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-55 | #: E225
-   - submitted+= 1
-56 + submitted += 1
-57 | #: E225
-   |
+56 | submitted += 1
+   |          +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:58:3
@@ -48,11 +42,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-57 | #: E225
-   - c =-1
-58 + c = -1
-59 | #: E225
-   |
+58 | c = -1
+   |    +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:76:2
@@ -66,11 +57,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-75 | #: E225 E225
-   - i=i+ 1
-76 + i = i+ 1
-77 | #: E225 E225
-   |
+76 | i = i+ 1
+   |  + +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:78:2
@@ -84,11 +72,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-77 | #: E225 E225
-   - i=i +1
-78 + i = i +1
-79 | #: E225
-   |
+78 | i = i +1
+   |  + +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:80:6
@@ -102,11 +87,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-79 | #: E225
-   - i = 1and 1
-80 + i = 1 and 1
-81 | #: E225
-   |
+80 | i = 1 and 1
+   |      +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:82:6
@@ -120,11 +102,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-81 | #: E225
-   - i = 1or 0
-82 + i = 1 or 0
-83 | #: E225
-   |
+82 | i = 1 or 0
+   |      +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:84:2
@@ -138,11 +117,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-83 | #: E225
-   - 1is 1
-84 + 1 is 1
-85 | #: E225
-   |
+84 | 1 is 1
+   |  +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:86:2
@@ -156,11 +132,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-85 | #: E225
-   - 1in []
-86 + 1 in []
-87 | #: E225
-   |
+86 | 1 in []
+   |  +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:92:2
@@ -174,11 +147,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-91 | #: E225 E226
-   - i=i+1
-92 + i = i+1
-93 | #: E225 E226
-   |
+92 | i = i+1
+   |  + +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:94:3
@@ -192,11 +162,8 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-93 | #: E225 E226
-   - i =i+1
-94 + i = i+1
-95 | #: E225 E226
-   |
+94 | i = i+1
+   |    +
 
 E225 [*] Missing whitespace around operator
   --> E22.py:96:2
@@ -210,8 +177,5 @@ E225 [*] Missing whitespace around operator
    |
 help: Add missing whitespace
    |
-95 | #: E225 E226
-   - i= i+1
-96 + i = i+1
-97 | #: E225 E226
-   |
+96 | i = i+1
+   |  +

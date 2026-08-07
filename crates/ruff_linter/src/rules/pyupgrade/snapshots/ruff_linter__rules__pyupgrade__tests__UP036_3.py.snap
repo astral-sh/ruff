@@ -13,19 +13,9 @@ UP036 [*] Version block is outdated for minimum Python version
   |
 help: Remove outdated version block
   |
-2 |
-  - if            sys.version_info < (3,0):
-  -     print("py2")
-  -     for item in range(10):
-  -         print(f"PY2-{item}")
-  - else                                :
-  -     print("py3")
-  -     for item in range(10):
-  -         print(f"PY3-{item}")
 3 + print("py3")
 4 + for item in range(10):
 5 +     print(f"PY3-{item}")
-6 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -40,19 +30,9 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-12 | if False:
-   -     if            sys.version_info < (3,0):
-   -         print("py2")
-   -         for item in range(10):
-   -             print(f"PY2-{item}")
-   -     else                                :
-   -         print("py3")
-   -         for item in range(10):
-   -             print(f"PY3-{item}")
 13 +     print("py3")
 14 +     for item in range(10):
 15 +         print(f"PY3-{item}")
-16 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,9 +45,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-22 |
-   - if            sys.version_info < (3,0): print("PY2!")
-   - else                               : print("PY3!")
+23 - if            sys.version_info < (3,0): print("PY2!")
+24 - else                               : print("PY3!")
 23 + print("PY3!")
    |
 note: This is an unsafe fix and may change runtime behavior

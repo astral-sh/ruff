@@ -17,12 +17,8 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
    |        -------- Used at runtime here
 help: Move out of type-checking block
    |
-9  | import numpy
 10 + import datetime
-11 |
-12 | if TYPE_CHECKING:
-   -     import datetime  # TC004
-13 |     from array import array  # TC004
+11 + 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -44,13 +40,8 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
    |        ----- Used at runtime here
 help: Move out of type-checking block
    |
-9  | import numpy
 10 + from array import array
-11 |
-12 | if TYPE_CHECKING:
-13 |     import datetime  # TC004
-   -     from array import array  # TC004
-14 |
+11 + 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -71,12 +62,7 @@ TC004 [*] Move import `pandas` out of type-checking block. Import is used for mo
    |        ------ Used at runtime here
 help: Move out of type-checking block
    |
-9  | import numpy
 10 + import pandas
-11 |
---------------------------------------------------------------------------------
-15 |
-   -     import pandas  # TC004
-16 |     import pyproj
+11 + 
    |
 note: This is an unsafe fix and may change runtime behavior

@@ -4502,7 +4502,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |        ^^^^
     help: Remove unused import: `math`
       |
-      - import math
+    1 - import math
       |
 
     Found 1 error.
@@ -4566,7 +4566,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     --> normal.py:1:1
 
     stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
-    --> normal.py:1:1
+     --> normal.py:1:1
       |
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
@@ -5221,7 +5221,7 @@ fn ruff_toml_is_linted() -> Result<()> {
       |                 ^^^^
     help: Replace rule code with `unused-import`
       |
-      - lint.select = ["F401"]
+    1 - lint.select = ["F401"]
     1 + lint.select = ["unused-import"]
       |
 

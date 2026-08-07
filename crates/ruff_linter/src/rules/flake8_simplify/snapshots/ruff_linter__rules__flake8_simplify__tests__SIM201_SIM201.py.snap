@@ -11,10 +11,8 @@ SIM201 [*] Use `a != b` instead of `not a == b`
   |
 help: Replace with `!=` operator
   |
-1 | # SIM201
-  - if not a == b:
+2 - if not a == b:
 2 + if a != b:
-3 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,10 +26,8 @@ SIM201 [*] Use `a != b + c` instead of `not a == b + c`
   |
 help: Replace with `!=` operator
   |
-5 | # SIM201
-  - if not a == (b + c):
+6 - if not a == (b + c):
 6 + if a != b + c:
-7 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,9 +41,7 @@ SIM201 [*] Use `a + b != c` instead of `not a + b == c`
    |
 help: Replace with `!=` operator
    |
-9  | # SIM201
-   - if not (a + b) == c:
+10 - if not (a + b) == c:
 10 + if a + b != c:
-11 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior

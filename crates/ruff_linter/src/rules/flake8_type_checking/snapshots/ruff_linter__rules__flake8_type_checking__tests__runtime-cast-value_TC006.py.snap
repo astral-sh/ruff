@@ -10,10 +10,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
   |          ^^^
 help: Add quotes
   |
-3 |
-  -     cast(int, 3.0)  # TC006
+4 -     cast(int, 3.0)  # TC006
 4 +     cast("int", 3.0)  # TC006
-5 |
   |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -25,10 +23,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add quotes
    |
-9  |
-   -     cast(list[tuple[bool | float | int | str]], 3.0)  # TC006
+10 -     cast(list[tuple[bool | float | int | str]], 3.0)  # TC006
 10 +     cast("list[tuple[bool | float | int | str]]", 3.0)  # TC006
-11 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -40,10 +36,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add quotes
    |
-15 |
-   -     cast(list[tuple[Union[bool, float, int, str]]], 3.0)  # TC006
+16 -     cast(list[tuple[Union[bool, float, int, str]]], 3.0)  # TC006
 16 +     cast("list[tuple[Union[bool, float, int, str]]]", 3.0)  # TC006
-17 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -55,10 +49,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |              ^^^
 help: Add quotes
    |
-39 |
-   -     typecast(int, 3.0)  # TC006
+40 -     typecast(int, 3.0)  # TC006
 40 +     typecast("int", 3.0)  # TC006
-41 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -70,10 +62,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |                 ^^^
 help: Add quotes
    |
-45 |
-   -     typing.cast(int, 3.0)  # TC006
+46 -     typing.cast(int, 3.0)  # TC006
 46 +     typing.cast("int", 3.0)  # TC006
-47 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -85,10 +75,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |            ^^^^^^^^^^^^^^^^^^^^^
 help: Add quotes
    |
-51 |
-   -     t.cast(t.Literal["3.0", '3'], 3.0)  # TC006
+52 -     t.cast(t.Literal["3.0", '3'], 3.0)  # TC006
 52 +     t.cast("t.Literal['3.0', '3']", 3.0)  # TC006
-53 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -103,11 +91,9 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |
 help: Add quotes
    |
-58 |     cast(
-   -         int  # TC006 (unsafe, because it will get rid of this comment)
-   -         | None,
+59 -         int  # TC006 (unsafe, because it will get rid of this comment)
+60 -         | None,
 59 +         "int | None",
-60 |         3.0
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -120,10 +106,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |                 ^^^^
 help: Add quotes
    |
-67 |     import typing
-   -     typing.cast(M-())
+68 -     typing.cast(M-())
 68 +     typing.cast("M - ()")
-69 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -135,10 +119,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |          ^^^^^^^^^^^^
 help: Add quotes
    |
-74 |
-   -     cast(Literal["A"], 'A')
+75 -     cast(Literal["A"], 'A')
 75 +     cast("Literal['A']", 'A')
-76 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -150,10 +132,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add quotes
    |
-81 |
-   -     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
+82 -     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
 82 +     cast("list[Annotated[list[Literal['A']], 'Foo']]", ['A'])
-83 |
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -167,10 +147,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |
 help: Add quotes
    |
-88 |     cast(
-   -         int  # TC006
+89 -         int  # TC006
 89 +         "int"  # TC006
-90 |         , 6.0
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -184,10 +162,8 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |
 help: Add quotes
    |
-97 |
-   -     cast(typ=int, val=3.0)  # TC006
+98 -     cast(typ=int, val=3.0)  # TC006
 98 +     cast(typ="int", val=3.0)  # TC006
-99 |     cast(val=3.0, typ=int)  # TC006
    |
 
 TC006 [*] Add quotes to type expression in `typing.cast()`
@@ -198,7 +174,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
    |                       ^^^
 help: Add quotes
    |
-98 |     cast(typ=int, val=3.0)  # TC006
-   -     cast(val=3.0, typ=int)  # TC006
+99 -     cast(val=3.0, typ=int)  # TC006
 99 +     cast(val=3.0, typ="int")  # TC006
    |

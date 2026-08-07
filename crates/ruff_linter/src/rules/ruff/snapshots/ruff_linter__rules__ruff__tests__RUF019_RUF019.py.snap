@@ -12,10 +12,8 @@ RUF019 [*] Unnecessary key check before dictionary access
   |
 help: Replace with `dict.get`
   |
-2 | # RUF019
-  - if "k" in d and d["k"]:
+3 - if "k" in d and d["k"]:
 3 + if d.get("k"):
-4 |     pass
   |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -28,10 +26,8 @@ RUF019 [*] Unnecessary key check before dictionary access
   |
 help: Replace with `dict.get`
   |
-6 | k = "k"
-  - if k in d and d[k]:
+7 - if k in d and d[k]:
 7 + if d.get(k):
-8 |     pass
   |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -45,10 +41,8 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-9  |
-   - if (k) in d and d[k]:
+10 - if (k) in d and d[k]:
 10 + if d.get(k):
-11 |     pass
    |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -62,10 +56,8 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-12 |
-   - if k in d and d[(k)]:
+13 - if k in d and d[(k)]:
 13 + if d.get((k)):
-14 |     pass
    |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -80,10 +72,8 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-15 |
-   - not ("key" in dct and dct["key"])
+16 - not ("key" in dct and dct["key"])
 16 + not (dct.get("key"))
-17 |
    |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -98,10 +88,8 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-17 |
-   - bool("key" in dct and dct["key"])
+18 - bool("key" in dct and dct["key"])
 18 + bool(dct.get("key"))
-19 |
    |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -117,12 +105,10 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-27 | if (
-   -         "key" in d
-   -         and  # text
-   -         d ["key"]
+28 -         "key" in d
+29 -         and  # text
+30 -         d ["key"]
 28 +         d.get("key")
-29 | ):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -136,10 +122,8 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-41 | c = Formatter()
-   - if f"{c}" in d and d[f"{c}"]:
+42 - if f"{c}" in d and d[f"{c}"]:
 42 + if d.get(f"{c}"):
-43 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -153,10 +137,8 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-45 | # F-string with only literal interpolation — safe fix
-   - if f"{1}" in d and d[f"{1}"]:
+46 - if f"{1}" in d and d[f"{1}"]:
 46 + if d.get(f"{1}"):
-47 |     pass
    |
 
 RUF019 [*] Unnecessary key check before dictionary access
@@ -169,8 +151,6 @@ RUF019 [*] Unnecessary key check before dictionary access
    |
 help: Replace with `dict.get`
    |
-49 | # Plain f-string without interpolation — safe fix
-   - if f"key" in d and d[f"key"]:
+50 - if f"key" in d and d[f"key"]:
 50 + if d.get(f"key"):
-51 |     pass
    |

@@ -11,7 +11,6 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
   |
-  - import os
-1 |
+1 - import os
   |
 note: This is an unsafe fix and may change runtime behavior

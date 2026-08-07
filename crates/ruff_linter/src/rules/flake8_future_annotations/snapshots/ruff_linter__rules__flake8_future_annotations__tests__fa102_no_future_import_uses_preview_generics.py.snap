@@ -13,7 +13,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,7 +29,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,7 +45,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -64,7 +61,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -81,7 +77,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -98,7 +93,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -115,7 +109,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -132,7 +125,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -149,7 +141,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -166,7 +157,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -183,7 +173,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -200,7 +189,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -217,7 +205,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -234,7 +221,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -251,7 +237,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -268,7 +253,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -285,7 +269,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -302,7 +285,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -319,7 +301,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -336,7 +317,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -353,7 +333,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -370,7 +349,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -387,7 +365,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -404,7 +381,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -421,7 +397,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -438,7 +413,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -455,7 +429,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -472,7 +445,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -489,7 +461,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -506,7 +477,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -523,7 +493,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -540,7 +509,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -557,7 +525,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -574,7 +541,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -591,7 +557,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -608,7 +573,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -625,7 +589,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -642,7 +605,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -659,7 +621,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -676,7 +637,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -693,7 +653,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -710,7 +669,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -727,7 +685,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -744,7 +701,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -761,7 +717,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -778,7 +733,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -795,7 +749,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -812,7 +765,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -829,7 +781,6 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -846,6 +797,5 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import asyncio
   |
 note: This is an unsafe fix and may change runtime behavior

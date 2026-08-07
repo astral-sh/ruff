@@ -13,14 +13,11 @@ AIR302 [*] `airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG` is mo
    |
 help: Install `apache-airflow-providers-celery>=3.3.0` and use `DEFAULT_CELERY_CONFIG` from `airflow.providers.celery.executors.default_celery` instead.
   |
-2 |
-  - from airflow.config_templates.default_celery import DEFAULT_CELERY_CONFIG
-3 | from airflow.executors.celery_executor import (
-4 |     CeleryExecutor,
-5 |     app,
-6 | )
-7 + from airflow.providers.celery.executors.default_celery import DEFAULT_CELERY_CONFIG
-8 |
+3 + 
+4 | from airflow.executors.celery_executor import (
+…
+7 | )
+8 + from airflow.providers.celery.executors.default_celery import DEFAULT_CELERY_CONFIG
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,11 +32,10 @@ AIR302 [*] `airflow.executors.celery_executor.app` is moved into `celery` provid
    |
 help: Install `apache-airflow-providers-celery>=3.3.0` and use `app` from `airflow.providers.celery.executors.celery_executor_utils` instead.
   |
-5 |     CeleryExecutor,
-  -     app,
-6 | )
+4 + from airflow.executors.celery_executor import (
+5 +     CeleryExecutor,
+6 + )
 7 + from airflow.providers.celery.executors.celery_executor_utils import app
-8 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,11 +47,9 @@ AIR302 [*] `airflow.executors.celery_executor.CeleryExecutor` is moved into `cel
    | ^^^^^^^^^^^^^^
 help: Install `apache-airflow-providers-celery>=3.3.0` and use `CeleryExecutor` from `airflow.providers.celery.executors.celery_executor` instead.
   |
-4 | from airflow.executors.celery_executor import (
-  -     CeleryExecutor,
-5 |     app,
-6 | )
+4 + from airflow.executors.celery_executor import (
+5 +     app,
+6 + )
 7 + from airflow.providers.celery.executors.celery_executor import CeleryExecutor
-8 |
   |
 note: This is an unsafe fix and may change runtime behavior

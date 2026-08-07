@@ -13,10 +13,8 @@ E703 [*] Statement ends with an unnecessary semicolon
    |
 help: Remove unnecessary semicolon
    |
-9  | #: E703:1:13
-   - import shlex;
+10 - import shlex;
 10 + import shlex
-11 | #: E702:1:9 E703:1:23
    |
 
 E703 [*] Statement ends with an unnecessary semicolon
@@ -31,10 +29,8 @@ E703 [*] Statement ends with an unnecessary semicolon
    |
 help: Remove unnecessary semicolon
    |
-11 | #: E702:1:9 E703:1:23
-   - del a[:]; a.append(42);
+12 - del a[:]; a.append(42);
 12 + del a[:]; a.append(42)
-13 | #: E704:1:1
    |
 
 E703 [*] Statement ends with an unnecessary semicolon
@@ -49,10 +45,8 @@ E703 [*] Statement ends with an unnecessary semicolon
    |
 help: Remove unnecessary semicolon
    |
-24 | #: E704:1:8 E702:1:11 E703:1:14
-   - if True: x; y;
+25 - if True: x; y;
 25 + if True: x; y
-26 | #: E701:1:8
    |
 
 E703 [*] Statement ends with an unnecessary semicolon
@@ -67,11 +61,9 @@ E703 [*] Statement ends with an unnecessary semicolon
    |
 help: Remove unnecessary semicolon
    |
-66 | #: E703:2:1
-   - 0\
-   - ;
+67 - 0\
+68 - ;
 67 + 0
-68 | #: E701:2:3
    |
 
 E703 [*] Statement ends with an unnecessary semicolon
@@ -86,8 +78,6 @@ E703 [*] Statement ends with an unnecessary semicolon
    |
 help: Remove unnecessary semicolon
    |
-70 | a = \
-   -   5;
+71 -   5;
 71 +   5
-72 | #:
    |

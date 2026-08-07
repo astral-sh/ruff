@@ -12,10 +12,8 @@ FURB171 [*] Membership test against single-item container
   |
 help: Convert to equality test
   |
-2 |
-  - if 1 in set([1]):
+3 - if 1 in set([1]):
 3 + if 1 == 1:
-4 |     print("Single-element set")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +28,8 @@ FURB171 [*] Membership test against single-item container
   |
 help: Convert to equality test
   |
-5 |
-  - if 1 in set((1,)):
+6 - if 1 in set((1,)):
 6 + if 1 == 1:
-7 |     print("Single-element set")
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,12 +43,10 @@ FURB171 [*] Membership test against single-item container
 10 |     print("Single-element set")
    |
 help: Convert to equality test
-   |
-8  |
-   - if 1 in set({1}):
-9  + if 1 == 1:
-10 |     print("Single-element set")
-   |
+  |
+9 - if 1 in set({1}):
+9 + if 1 == 1:
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB171 [*] Membership test against single-item container
@@ -66,10 +60,8 @@ FURB171 [*] Membership test against single-item container
    |
 help: Convert to equality test
    |
-11 |
-   - if 1 in frozenset([1]):
+12 - if 1 in frozenset([1]):
 12 + if 1 == 1:
-13 |     print("Single-element set")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -84,10 +76,8 @@ FURB171 [*] Membership test against single-item container
    |
 help: Convert to equality test
    |
-14 |
-   - if 1 in frozenset((1,)):
+15 - if 1 in frozenset((1,)):
 15 + if 1 == 1:
-16 |     print("Single-element set")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,10 +92,8 @@ FURB171 [*] Membership test against single-item container
    |
 help: Convert to equality test
    |
-17 |
-   - if 1 in frozenset({1}):
+18 - if 1 in frozenset({1}):
 18 + if 1 == 1:
-19 |     print("Single-element set")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -120,10 +108,8 @@ FURB171 [*] Membership test against single-item container
    |
 help: Convert to equality test
    |
-20 |
-   - if 1 in set(set([1])):
+21 - if 1 in set(set([1])):
 21 + if 1 == 1:
-22 |     print('Recursive solution')
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -137,10 +123,8 @@ FURB171 [*] Membership test against single-item container
    |
 help: Convert to equality test
    |
-58 | # set() and frozenset() with NaN
-   - if math.nan in set([math.nan]):
+59 - if math.nan in set([math.nan]):
 59 + if math.nan == math.nan:
-60 |     print("This should be marked unsafe")
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -155,9 +139,7 @@ FURB171 [*] Membership test against single-item container
    |
 help: Convert to equality test
    |
-61 |
-   - if math.nan in frozenset([math.nan]):
+62 - if math.nan in frozenset([math.nan]):
 62 + if math.nan == math.nan:
-63 |     print("This should be marked unsafe")
    |
 note: This is an unsafe fix and may change runtime behavior

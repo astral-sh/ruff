@@ -14,14 +14,10 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
 help: Move into type-checking block
   |
 1 + from typing import TYPE_CHECKING
-2 +
+2 ~ 
 3 + if TYPE_CHECKING:
 4 +     from django.contrib.auth.models import AbstractBaseUser
 5 | def f():
-6 |     from typing import Literal, Union
-7 |
-  -     from django.contrib.auth.models import AbstractBaseUser
-8 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -37,15 +33,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-16 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-17 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -61,15 +53,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-25 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-26 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -85,15 +73,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models` into a type-check
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth import models
-5  | def f():
---------------------------------------------------------------------------------
-34 |
-   -     from django.contrib.auth import models
-35 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth import models
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -109,15 +93,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models` into a type-check
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth import models
-5  | def f():
---------------------------------------------------------------------------------
-43 |
-   -     from django.contrib.auth import models
-44 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth import models
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -133,15 +113,11 @@ TC002 [*] Move third-party import `third_party.Type` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from third_party import Type
-5  | def f():
---------------------------------------------------------------------------------
-62 |     from typing import Literal
-   -     from third_party import Type
-63 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from third_party import Type
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -157,14 +133,10 @@ TC002 [*] Move third-party import `third_party.Type` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from third_party import Type
-5  | def f():
---------------------------------------------------------------------------------
-70 |     from typing import Literal
-   -     from third_party import Type
-71 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from third_party import Type
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior

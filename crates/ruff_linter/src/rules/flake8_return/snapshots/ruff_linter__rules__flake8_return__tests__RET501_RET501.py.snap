@@ -10,10 +10,8 @@ RET501 [*] Do not explicitly `return None` in function if it is the only possibl
   |     ^^^^^^^^^^^
 help: Remove explicit `return None`
   |
-3 |         return
-  -     return None  # error
+4 -     return None  # error
 4 +     return  # error
-5 |
   |
 
 RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
@@ -28,10 +26,8 @@ RET501 [*] Do not explicitly `return None` in function if it is the only possibl
    |
 help: Remove explicit `return None`
    |
-13 |         print(f"{key} not found")
-   -         return None
+14 -         return None
 14 +         return
-15 |
    |
 
 RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
@@ -45,10 +41,9 @@ RET501 [*] Do not explicitly `return None` in function if it is the only possibl
    | |_________^
 help: Remove explicit `return None`
    |
-58 |             return
-   -         return (
-   -             None # comment
-   -         )
+59 -         return (
+60 -             None # comment
+61 -         )
 59 +         return
    |
 note: This is an unsafe fix and may change runtime behavior

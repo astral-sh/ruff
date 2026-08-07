@@ -67,8 +67,7 @@ error[PYI041]: Use `float` instead of `int | float`
   |                                      ^^^^^^^^^^^
 help: Remove redundant type
   |
-6 | @dispatch.register
-  - def _(value: float | complex, other: int | float) -> None: ...  # snapshot: redundant-numeric-union
+7 - def _(value: float | complex, other: int | float) -> None: ...  # snapshot: redundant-numeric-union
 7 + def _(value: float | complex, other: float) -> None: ...  # snapshot: redundant-numeric-union
   |
 ```

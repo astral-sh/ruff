@@ -22,11 +22,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-26 |     AssertionError("This is an assertion error")  # PLW0133
-   -     MyError("This is a custom error")  # PLW0133
-27 +     raise MyError("This is a custom error")  # PLW0133
-28 |     MySubError("This is a custom error")  # PLW0133
-   |
+27 |     raise MyError("This is a custom error")  # PLW0133
+   |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -41,11 +38,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-27 |     MyError("This is a custom error")  # PLW0133
-   -     MySubError("This is a custom error")  # PLW0133
-28 +     raise MySubError("This is a custom error")  # PLW0133
-29 |     MyValueError("This is a custom value error")  # PLW0133
-   |
+28 |     raise MySubError("This is a custom error")  # PLW0133
+   |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -58,11 +52,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
    |
-28 |     MySubError("This is a custom error")  # PLW0133
-   -     MyValueError("This is a custom value error")  # PLW0133
-29 +     raise MyValueError("This is a custom value error")  # PLW0133
-30 |
-   |
+29 |     raise MyValueError("This is a custom value error")  # PLW0133
+   |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -78,11 +69,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-35 |         Exception("This is an exception")  # PLW0133
-   -         MyError("This is an exception")  # PLW0133
-36 +         raise MyError("This is an exception")  # PLW0133
-37 |         MySubError("This is an exception")  # PLW0133
-   |
+36 |         raise MyError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -98,11 +86,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-36 |         MyError("This is an exception")  # PLW0133
-   -         MySubError("This is an exception")  # PLW0133
-37 +         raise MySubError("This is an exception")  # PLW0133
-38 |         MyValueError("This is an exception")  # PLW0133
-   |
+37 |         raise MySubError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -118,11 +103,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-37 |         MySubError("This is an exception")  # PLW0133
-   -         MyValueError("This is an exception")  # PLW0133
-38 +         raise MyValueError("This is an exception")  # PLW0133
-39 |     except Exception as err:
-   |
+38 |         raise MyValueError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -138,11 +120,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-46 |         RuntimeError("This is an exception")  # PLW0133
-   -         MyError("This is an exception")  # PLW0133
-47 +         raise MyError("This is an exception")  # PLW0133
-48 |         MySubError("This is an exception")  # PLW0133
-   |
+47 |         raise MyError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -157,11 +136,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-47 |         MyError("This is an exception")  # PLW0133
-   -         MySubError("This is an exception")  # PLW0133
-48 +         raise MySubError("This is an exception")  # PLW0133
-49 |         MyValueError("This is an exception")  # PLW0133
-   |
+48 |         raise MySubError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -174,11 +150,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
    |
-48 |         MySubError("This is an exception")  # PLW0133
-   -         MyValueError("This is an exception")  # PLW0133
-49 +         raise MyValueError("This is an exception")  # PLW0133
-50 |
-   |
+49 |         raise MyValueError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -194,11 +167,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-56 |             TypeError("This is an exception")  # PLW0133
-   -             MyError("This is an exception")  # PLW0133
-57 +             raise MyError("This is an exception")  # PLW0133
-58 |             MySubError("This is an exception")  # PLW0133
-   |
+57 |             raise MyError("This is an exception")  # PLW0133
+   |             +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -213,11 +183,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-57 |             MyError("This is an exception")  # PLW0133
-   -             MySubError("This is an exception")  # PLW0133
-58 +             raise MySubError("This is an exception")  # PLW0133
-59 |             MyValueError("This is an exception")  # PLW0133
-   |
+58 |             raise MySubError("This is an exception")  # PLW0133
+   |             +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -230,11 +197,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
    |
-58 |             MySubError("This is an exception")  # PLW0133
-   -             MyValueError("This is an exception")  # PLW0133
-59 +             raise MyValueError("This is an exception")  # PLW0133
-60 |
-   |
+59 |             raise MyValueError("This is an exception")  # PLW0133
+   |             +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -250,11 +214,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-65 |         IndexError("This is an exception")  # PLW0133
-   -         MyError("This is an exception")  # PLW0133
-66 +         raise MyError("This is an exception")  # PLW0133
-67 |         MySubError("This is an exception")  # PLW0133
-   |
+66 |         raise MyError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -269,11 +230,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-66 |         MyError("This is an exception")  # PLW0133
-   -         MySubError("This is an exception")  # PLW0133
-67 +         raise MySubError("This is an exception")  # PLW0133
-68 |         MyValueError("This is an exception")  # PLW0133
-   |
+67 |         raise MySubError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -289,11 +247,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-67 |         MySubError("This is an exception")  # PLW0133
-   -         MyValueError("This is an exception")  # PLW0133
-68 +         raise MyValueError("This is an exception")  # PLW0133
-69 |
-   |
+68 |         raise MyValueError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -309,11 +264,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-76 |         KeyError("This is an exception")  # PLW0133
-   -         MyError("This is an exception")  # PLW0133
-77 +         raise MyError("This is an exception")  # PLW0133
-78 |         MySubError("This is an exception")  # PLW0133
-   |
+77 |         raise MyError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -328,11 +280,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-77 |         MyError("This is an exception")  # PLW0133
-   -         MySubError("This is an exception")  # PLW0133
-78 +         raise MySubError("This is an exception")  # PLW0133
-79 |         MyValueError("This is an exception")  # PLW0133
-   |
+78 |         raise MySubError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -345,11 +294,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
    |
-78 |         MySubError("This is an exception")  # PLW0133
-   -         MyValueError("This is an exception")  # PLW0133
-79 +         raise MyValueError("This is an exception")  # PLW0133
-80 |
-   |
+79 |         raise MyValueError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -365,11 +311,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-87 |             NotImplementedError("This is an exception")  # PLW0133
-   -             MyError("This is an exception")  # PLW0133
-88 +             raise MyError("This is an exception")  # PLW0133
-89 |             MySubError("This is an exception")  # PLW0133
-   |
+88 |             raise MyError("This is an exception")  # PLW0133
+   |             +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -384,11 +327,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-88 |             MyError("This is an exception")  # PLW0133
-   -             MySubError("This is an exception")  # PLW0133
-89 +             raise MySubError("This is an exception")  # PLW0133
-90 |             MyValueError("This is an exception")  # PLW0133
-   |
+89 |             raise MySubError("This is an exception")  # PLW0133
+   |             +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -401,11 +341,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
    |
-89 |             MySubError("This is an exception")  # PLW0133
-   -             MyValueError("This is an exception")  # PLW0133
-90 +             raise MyValueError("This is an exception")  # PLW0133
-91 |
-   |
+90 |             raise MyValueError("This is an exception")  # PLW0133
+   |             +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -421,11 +358,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-96 |         AttributeError("This is an exception")  # PLW0133
-   -         MyError("This is an exception")  # PLW0133
-97 +         raise MyError("This is an exception")  # PLW0133
-98 |         MySubError("This is an exception")  # PLW0133
-   |
+97 |         raise MyError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -440,11 +374,8 @@ PLW0133 [*] Missing `raise` statement on exception
    |
 help: Add `raise` keyword
    |
-97 |         MyError("This is an exception")  # PLW0133
-   -         MySubError("This is an exception")  # PLW0133
-98 +         raise MySubError("This is an exception")  # PLW0133
-99 |         MyValueError("This is an exception")  # PLW0133
-   |
+98 |         raise MySubError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -456,12 +387,9 @@ PLW0133 [*] Missing `raise` statement on exception
 99 |         MyValueError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
-    |
-98  |         MySubError("This is an exception")  # PLW0133
-    -         MyValueError("This is an exception")  # PLW0133
-99  +         raise MyValueError("This is an exception")  # PLW0133
-100 |
-    |
+   |
+99 |         raise MyValueError("This is an exception")  # PLW0133
+   |         +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -477,11 +405,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-104 |     (RuntimeError("This is an exception"))  # PLW0133
-    -     (MyError("This is an exception"))  # PLW0133
-105 +     raise (MyError("This is an exception"))  # PLW0133
-106 |     (MySubError("This is an exception"))  # PLW0133
-    |
+105 |     raise (MyError("This is an exception"))  # PLW0133
+    |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -496,11 +421,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-105 |     (MyError("This is an exception"))  # PLW0133
-    -     (MySubError("This is an exception"))  # PLW0133
-106 +     raise (MySubError("This is an exception"))  # PLW0133
-107 |     (MyValueError("This is an exception"))  # PLW0133
-    |
+106 |     raise (MySubError("This is an exception"))  # PLW0133
+    |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -513,11 +435,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
     |
-106 |     (MySubError("This is an exception"))  # PLW0133
-    -     (MyValueError("This is an exception"))  # PLW0133
-107 +     raise (MyValueError("This is an exception"))  # PLW0133
-108 |
-    |
+107 |     raise (MyValueError("This is an exception"))  # PLW0133
+    |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -533,11 +452,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-112 |     x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
-    -     x = 1; (MyError("This is an exception")); y = 2  # PLW0133
-113 +     x = 1; raise (MyError("This is an exception")); y = 2  # PLW0133
-114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
-    |
+113 |     x = 1; raise (MyError("This is an exception")); y = 2  # PLW0133
+    |            +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -552,11 +468,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-113 |     x = 1; (MyError("This is an exception")); y = 2  # PLW0133
-    -     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
-114 +     x = 1; raise (MySubError("This is an exception")); y = 2  # PLW0133
-115 |     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
-    |
+114 |     x = 1; raise (MySubError("This is an exception")); y = 2  # PLW0133
+    |            +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -569,11 +482,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
     |
-114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
-    -     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
-115 +     x = 1; raise (MyValueError("This is an exception")); y = 2  # PLW0133
-116 |
-    |
+115 |     x = 1; raise (MyValueError("This is an exception")); y = 2  # PLW0133
+    |            +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -586,11 +496,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
     |
-120 |     UserWarning("This is a user warning")  # PLW0133
-    -     MyUserWarning("This is a custom user warning")  # PLW0133
-121 +     raise MyUserWarning("This is a custom user warning")  # PLW0133
-122 |
-    |
+121 |     raise MyUserWarning("This is a custom user warning")  # PLW0133
+    |     +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -606,11 +513,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-130 |
-    - MyError("This is an exception")  # PLW0133
-131 + raise MyError("This is an exception")  # PLW0133
-132 |
-    |
+131 | raise MyError("This is an exception")  # PLW0133
+    | +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -626,11 +530,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-132 |
-    - MySubError("This is an exception")  # PLW0133
-133 + raise MySubError("This is an exception")  # PLW0133
-134 |
-    |
+133 | raise MySubError("This is an exception")  # PLW0133
+    | +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -646,11 +547,8 @@ PLW0133 [*] Missing `raise` statement on exception
     |
 help: Add `raise` keyword
     |
-134 |
-    - MyValueError("This is an exception")  # PLW0133
-135 + raise MyValueError("This is an exception")  # PLW0133
-136 |
-    |
+135 | raise MyValueError("This is an exception")  # PLW0133
+    | +++++
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -663,9 +561,6 @@ PLW0133 [*] Missing `raise` statement on exception
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add `raise` keyword
     |
-138 |
-    - MyUserWarning("This is a custom user warning")  # PLW0133
-139 + raise MyUserWarning("This is a custom user warning")  # PLW0133
-140 |
-    |
+139 | raise MyUserWarning("This is a custom user warning")  # PLW0133
+    | +++++
 note: This is an unsafe fix and may change runtime behavior

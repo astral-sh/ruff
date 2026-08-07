@@ -13,10 +13,8 @@ AIR301 [*] `schedule_interval` is removed in Airflow 3.0
    |
 help: Use `schedule` instead
    |
-20 |
-   - DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
+21 - DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
 21 + DAG(dag_id="class_schedule_interval", schedule="@hourly")
-22 |
    |
 
 AIR301 [*] `timetable` is removed in Airflow 3.0
@@ -31,10 +29,8 @@ AIR301 [*] `timetable` is removed in Airflow 3.0
    |
 help: Use `schedule` instead
    |
-22 |
-   - DAG(dag_id="class_timetable", timetable=NullTimetable())
+23 - DAG(dag_id="class_timetable", timetable=NullTimetable())
 23 + DAG(dag_id="class_timetable", schedule=NullTimetable())
-24 |
    |
 
 AIR301 [*] `concurrency` is removed in Airflow 3.0
@@ -49,10 +45,8 @@ AIR301 [*] `concurrency` is removed in Airflow 3.0
    |
 help: Use `max_active_tasks` instead
    |
-24 |
-   - DAG(dag_id="class_concurrency", concurrency=12)
+25 - DAG(dag_id="class_concurrency", concurrency=12)
 25 + DAG(dag_id="class_concurrency", max_active_tasks=12)
-26 |
    |
 
 AIR301 [*] `fail_stop` is removed in Airflow 3.0
@@ -67,10 +61,8 @@ AIR301 [*] `fail_stop` is removed in Airflow 3.0
    |
 help: Use `fail_fast` instead
    |
-26 |
-   - DAG(dag_id="class_fail_stop", fail_stop=True)
+27 - DAG(dag_id="class_fail_stop", fail_stop=True)
 27 + DAG(dag_id="class_fail_stop", fail_fast=True)
-28 |
    |
 
 AIR301 `default_view` is removed in Airflow 3.0
@@ -105,10 +97,8 @@ AIR301 [*] `schedule_interval` is removed in Airflow 3.0
    |
 help: Use `schedule` instead
    |
-41 |
-   - @dag(schedule_interval="0 * * * *")
+42 - @dag(schedule_interval="0 * * * *")
 42 + @dag(schedule="0 * * * *")
-43 | def decorator_schedule_interval():
    |
 
 AIR301 [*] `timetable` is removed in Airflow 3.0
@@ -121,10 +111,8 @@ AIR301 [*] `timetable` is removed in Airflow 3.0
    |
 help: Use `schedule` instead
    |
-46 |
-   - @dag(timetable=NullTimetable())
+47 - @dag(timetable=NullTimetable())
 47 + @dag(schedule=NullTimetable())
-48 | def decorator_timetable():
    |
 
 AIR301 [*] `execution_date` is removed in Airflow 3.0
@@ -139,10 +127,8 @@ AIR301 [*] `execution_date` is removed in Airflow 3.0
    |
 help: Use `logical_date` instead
    |
-54 |     trigger_dagrun_op = trigger_dagrun.TriggerDagRunOperator(
-   -         task_id="trigger_dagrun_op1", trigger_dag_id="test", execution_date="2024-12-04"
+55 -         task_id="trigger_dagrun_op1", trigger_dag_id="test", execution_date="2024-12-04"
 55 +         task_id="trigger_dagrun_op1", trigger_dag_id="test", logical_date="2024-12-04"
-56 |     )
    |
 
 AIR301 [*] `execution_date` is removed in Airflow 3.0
@@ -156,10 +142,8 @@ AIR301 [*] `execution_date` is removed in Airflow 3.0
    |
 help: Use `logical_date` instead
    |
-57 |     trigger_dagrun_op2 = TriggerDagRunOperator(
-   -         task_id="trigger_dagrun_op2", trigger_dag_id="test", execution_date="2024-12-04"
+58 -         task_id="trigger_dagrun_op2", trigger_dag_id="test", execution_date="2024-12-04"
 58 +         task_id="trigger_dagrun_op2", trigger_dag_id="test", logical_date="2024-12-04"
-59 |     )
    |
 
 AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
@@ -173,10 +157,8 @@ AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
    |
 help: Use `use_task_logical_date` instead
    |
-61 |     branch_dt_op = datetime.BranchDateTimeOperator(
-   -         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
+62 -         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
 62 +         task_id="branch_dt_op", use_task_logical_date=True, task_concurrency=5
-63 |     )
    |
 
 AIR301 [*] `task_concurrency` is removed in Airflow 3.0
@@ -190,10 +172,8 @@ AIR301 [*] `task_concurrency` is removed in Airflow 3.0
    |
 help: Use `max_active_tis_per_dag` instead
    |
-61 |     branch_dt_op = datetime.BranchDateTimeOperator(
-   -         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
+62 -         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
 62 +         task_id="branch_dt_op", use_task_execution_day=True, max_active_tis_per_dag=5
-63 |     )
    |
 
 AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
@@ -208,10 +188,8 @@ AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
    |
 help: Use `use_task_logical_date` instead
    |
-65 |         task_id="branch_dt_op2",
-   -         use_task_execution_day=True,
+66 -         use_task_execution_day=True,
 66 +         use_task_logical_date=True,
-67 |         sla=timedelta(seconds=10),
    |
 
 AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
@@ -225,10 +203,8 @@ AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
    |
 help: Use `use_task_logical_date` instead
    |
-92 |         week_day=1,
-   -         use_task_execution_day=True,
+93 -         use_task_execution_day=True,
 93 +         use_task_logical_date=True,
-94 |     )
    |
 
 AIR301 `filename_template` is removed in Airflow 3.0
@@ -293,10 +269,8 @@ AIR301 [*] `default_var` is removed in Airflow 3.0
     |
 help: Use `default` instead
     |
-113 |
-    - Variable.get("key", default_var="deprecated")
+114 - Variable.get("key", default_var="deprecated")
 114 + Variable.get("key", default="deprecated")
-115 | Variable.get(key="key", default_var="deprecated")
     |
 
 AIR301 [*] `default_var` is removed in Airflow 3.0
@@ -310,10 +284,8 @@ AIR301 [*] `default_var` is removed in Airflow 3.0
     |
 help: Use `default` instead
     |
-114 | Variable.get("key", default_var="deprecated")
-    - Variable.get(key="key", default_var="deprecated")
+115 - Variable.get(key="key", default_var="deprecated")
 115 + Variable.get(key="key", default="deprecated")
-116 |
     |
 
 AIR301 `provide_context` is removed in Airflow 3.0
@@ -478,10 +450,8 @@ AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
     |
 help: Use `none_failed_min_one_success` instead
     |
-273 |
-    - @task(trigger_rule="none_failed_or_skipped")
+274 - @task(trigger_rule="none_failed_or_skipped")
 274 + @task(trigger_rule="none_failed_min_one_success")
-275 | def invalid_trigger_rule_task():
     |
 
 AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
@@ -496,10 +466,8 @@ AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is re
     |
 help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
     |
-277 |
-    - @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+278 - @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
 278 + @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-279 | def invalid_trigger_rule_task():
     |
 
 AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
@@ -514,10 +482,8 @@ AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
     |
 help: Use `none_failed_min_one_success` instead
     |
-285 |
-    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+286 - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
 286 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_min_one_success")
-287 |
     |
 
 AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
@@ -532,10 +498,8 @@ AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is re
     |
 help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
     |
-287 |
-    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+288 - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
 288 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-289 |
     |
 
 AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
@@ -550,10 +514,8 @@ AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
     |
 help: Use `none_failed_min_one_success` instead
     |
-294 |
-    - @task(trigger_rule="none_failed_or_skipped")
+295 - @task(trigger_rule="none_failed_or_skipped")
 295 + @task(trigger_rule="none_failed_min_one_success")
-296 | def invalid_trigger_rule_task():
     |
 
 AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
@@ -568,10 +530,8 @@ AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is re
     |
 help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
     |
-298 |
-    - @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+299 - @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
 299 + @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-300 | def invalid_trigger_rule_task():
     |
 
 AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
@@ -586,10 +546,8 @@ AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
     |
 help: Use `none_failed_min_one_success` instead
     |
-306 |
-    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+307 - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
 307 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_min_one_success")
-308 |
     |
 
 AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
@@ -604,10 +562,8 @@ AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is re
     |
 help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
     |
-308 |
-    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+309 - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
 309 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
-310 |
     |
 
 AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
@@ -621,10 +577,8 @@ AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
     |
 help: Use `none_failed_min_one_success` instead
     |
-319 |     return_last=False,
-    -     trigger_rule="none_failed_or_skipped",
+320 -     trigger_rule="none_failed_or_skipped",
 320 +     trigger_rule="none_failed_min_one_success",
-321 | )
     |
 
 AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
@@ -638,10 +592,8 @@ AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is re
     |
 help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
     |
-327 |     return_last=False,
-    -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+328 -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
 328 +     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-329 | )
     |
 
 AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
@@ -655,10 +607,8 @@ AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
     |
 help: Use `none_failed_min_one_success` instead
     |
-338 |     replace=True,
-    -     trigger_rule="none_failed_or_skipped",
+339 -     trigger_rule="none_failed_or_skipped",
 339 +     trigger_rule="none_failed_min_one_success",
-340 | )
     |
 
 AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
@@ -672,8 +622,6 @@ AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is re
     |
 help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
     |
-347 |     replace=True,
-    -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+348 -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
 348 +     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-349 | )
     |

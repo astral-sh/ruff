@@ -10,10 +10,8 @@ UP007 [*] Use `X | Y` for type annotations
   |
 help: Convert to `X | Y`
   |
-4 |
-  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 5 + def f(x: str | int | Union[float, bytes]) -> None:
-6 |     ...
   |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -25,10 +23,8 @@ UP007 [*] Use `X | Y` for type annotations
   |
 help: Convert to `X | Y`
   |
-4 |
-  - def f(x: Union[str, int, Union[float, bytes]]) -> None:
+5 - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 5 + def f(x: Union[str, int, float | bytes]) -> None:
-6 |     ...
   |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -39,12 +35,10 @@ UP007 [*] Use `X | Y` for type annotations
 10 |     ...
    |
 help: Convert to `X | Y`
-   |
-8  |
-   - def f(x: typing.Union[str, int]) -> None:
-9  + def f(x: str | int) -> None:
-10 |     ...
-   |
+  |
+9 - def f(x: typing.Union[str, int]) -> None:
+9 + def f(x: str | int) -> None:
+  |
 
 UP007 [*] Use `X | Y` for type annotations
   --> UP007_1.py:13:10
@@ -55,10 +49,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-12 |
-   - def f(x: typing.Union[(str, int)]) -> None:
+13 - def f(x: typing.Union[(str, int)]) -> None:
 13 + def f(x: str | int) -> None:
-14 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -70,10 +62,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-16 |
-   - def f(x: typing.Union[(str, int), float]) -> None:
+17 - def f(x: typing.Union[(str, int), float]) -> None:
 17 + def f(x: str | int | float) -> None:
-18 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -85,10 +75,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-20 |
-   - def f(x: typing.Union[(int,)]) -> None:
+21 - def f(x: typing.Union[(int,)]) -> None:
 21 + def f(x: int) -> None:
-22 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -100,10 +88,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-24 |
-   - def f(x: typing.Union[()]) -> None:
+25 - def f(x: typing.Union[()]) -> None:
 25 + def f(x: ()) -> None:
-26 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -115,10 +101,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-28 |
-   - def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+29 - def f(x: "Union[str, int, Union[float, bytes]]") -> None:
 29 + def f(x: "str | int | Union[float, bytes]") -> None:
-30 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -130,10 +114,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-28 |
-   - def f(x: "Union[str, int, Union[float, bytes]]") -> None:
+29 - def f(x: "Union[str, int, Union[float, bytes]]") -> None:
 29 + def f(x: "Union[str, int, float | bytes]") -> None:
-30 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -145,10 +127,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-32 |
-   - def f(x: "typing.Union[str, int]") -> None:
+33 - def f(x: "typing.Union[str, int]") -> None:
 33 + def f(x: "str | int") -> None:
-34 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -160,10 +140,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-36 |
-   - def f(x: Union["str", int]) -> None:
+37 - def f(x: Union["str", int]) -> None:
 37 + def f(x: "str" | int) -> None:
-38 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -175,10 +153,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-40 |
-   - def f(x: Union[("str", "int"), float]) -> None:
+41 - def f(x: Union[("str", "int"), float]) -> None:
 41 + def f(x: "str" | "int" | float) -> None:
-42 |     ...
    |
 
 UP007 Use `X | Y` for type annotations
@@ -203,10 +179,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-47 |     x = Union["str", "int"]
-   -     x: Union[str, int]
+48 -     x: Union[str, int]
 48 +     x: str | int
-49 |     x: Union["str", "int"]
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -218,10 +192,8 @@ UP007 [*] Use `X | Y` for type annotations
    |        ^^^^^^^^^^^^^^^^^^^
 help: Convert to `X | Y`
    |
-48 |     x: Union[str, int]
-   -     x: Union["str", "int"]
+49 -     x: Union["str", "int"]
 49 +     x: "str" | "int"
-50 |
    |
 
 UP007 Use `X | Y` for type annotations
@@ -288,10 +260,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-82 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
-   - def f(x: Union[int, str, bytes]) -> None:
+83 - def f(x: Union[int, str, bytes]) -> None:
 83 + def f(x: int | str | bytes) -> None:
-84 |     ...
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -305,10 +275,8 @@ UP007 [*] Use `X | Y` for type annotations
    |
 help: Convert to `X | Y`
    |
-90 |
-   - def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
+91 - def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
 91 + def myfunc(param: "tuple[int | 'AClass' | None, str]"):
-92 |     print(param)
    |
 
 UP007 [*] Use `X | Y` for type annotations
@@ -325,12 +293,7 @@ UP007 [*] Use `X | Y` for type annotations
     | |_____^
 help: Convert to `X | Y`
     |
-150 |
-    -     LongLiterals: TypeAlias = Union[
-    -         Literal["LongLiteralNumberOne"]
-151 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
-152 |         | Literal["LongLiteralNumberTwo"]
-    -         | Literal["LongLiteralNumberThree"]
-    -     ]
+151 ~     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
+152 +         | Literal["LongLiteralNumberTwo"]
 153 +         | Literal["LongLiteralNumberThree"])
     |

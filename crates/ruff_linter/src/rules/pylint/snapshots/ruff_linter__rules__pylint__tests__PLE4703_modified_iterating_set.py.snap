@@ -13,11 +13,8 @@ PLE4703 [*] Iterated set `nums` is modified within the `for` loop
   |
 help: Iterate over a copy of `nums`
   |
-3 | nums = {1, 2, 3}
-  - for num in nums:
-4 + for num in nums.copy():
-5 |     nums.add(num + 1)
-  |
+4 | for num in nums.copy():
+  |                +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE4703 [*] Iterated set `animals` is modified within the `for` loop
@@ -32,11 +29,8 @@ PLE4703 [*] Iterated set `animals` is modified within the `for` loop
    |
 help: Iterate over a copy of `animals`
   |
-7 | animals = {"dog", "cat", "cow"}
-  - for animal in animals:
-8 + for animal in animals.copy():
-9 |     animals.pop("cow")
-  |
+8 | for animal in animals.copy():
+  |                      +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE4703 [*] Iterated set `fruits` is modified within the `for` loop
@@ -51,11 +45,8 @@ PLE4703 [*] Iterated set `fruits` is modified within the `for` loop
    |
 help: Iterate over a copy of `fruits`
    |
-11 | fruits = {"apple", "orange", "grape"}
-   - for fruit in fruits:
-12 + for fruit in fruits.copy():
-13 |     fruits.clear()
-   |
+12 | for fruit in fruits.copy():
+   |                    +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE4703 [*] Iterated set `planets` is modified within the `for` loop
@@ -70,11 +61,8 @@ PLE4703 [*] Iterated set `planets` is modified within the `for` loop
    |
 help: Iterate over a copy of `planets`
    |
-15 | planets = {"mercury", "venus", "earth"}
-   - for planet in planets:
-16 + for planet in planets.copy():
-17 |     planets.discard("mercury")
-   |
+16 | for planet in planets.copy():
+   |                      +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE4703 [*] Iterated set `colors` is modified within the `for` loop
@@ -89,11 +77,8 @@ PLE4703 [*] Iterated set `colors` is modified within the `for` loop
    |
 help: Iterate over a copy of `colors`
    |
-19 | colors = {"red", "green", "blue"}
-   - for color in colors:
-20 + for color in colors.copy():
-21 |     colors.remove("red")
-   |
+20 | for color in colors.copy():
+   |                    +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 PLE4703 [*] Iterated set `odds` is modified within the `for` loop
@@ -109,9 +94,6 @@ PLE4703 [*] Iterated set `odds` is modified within the `for` loop
    |
 help: Iterate over a copy of `odds`
    |
-23 | odds = {1, 3, 5}
-   - for num in odds:
-24 + for num in odds.copy():
-25 |     if num > 1:
-   |
+24 | for num in odds.copy():
+   |                +++++++
 note: This is an unsafe fix and may change runtime behavior

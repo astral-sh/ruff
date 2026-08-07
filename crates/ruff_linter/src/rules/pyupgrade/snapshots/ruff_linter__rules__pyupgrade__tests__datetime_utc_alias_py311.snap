@@ -10,13 +10,12 @@ UP017 [*] Use `datetime.UTC` alias
    |           ^^^^^^^^^^^^
 help: Convert to `datetime.UTC` alias
    |
-1  + from datetime import UTC
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from datetime import UTC
+ 2 | def func():
+ 3 |     import datetime
+ …
 10 |
-   -     print(timezone.utc)
-11 +     print(UTC)
-12 |
+11 ~     print(UTC)
    |
 
 UP017 [*] Use `datetime.UTC` alias
@@ -28,13 +27,12 @@ UP017 [*] Use `datetime.UTC` alias
    |           ^^^^^^
 help: Convert to `datetime.UTC` alias
    |
-1  + from datetime import UTC
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from datetime import UTC
+ 2 | def func():
+ 3 |     import datetime
+ …
 16 |
-   -     print(tz.utc)
-17 +     print(UTC)
-18 |
+17 ~     print(UTC)
    |
 
 UP017 [*] Use `datetime.UTC` alias
@@ -46,10 +44,9 @@ UP017 [*] Use `datetime.UTC` alias
    |           ^^^^^^^^^^^^^^^^^^^^^
 help: Convert to `datetime.UTC` alias
    |
+20 ~     import datetime
 21 |
-   -     print(datetime.timezone.utc)
-22 +     print(datetime.UTC)
-23 |
+22 ~     print(datetime.UTC)
    |
 
 UP017 [*] Use `datetime.UTC` alias
@@ -61,10 +58,9 @@ UP017 [*] Use `datetime.UTC` alias
    |           ^^^^^^^^^^^^^^^
 help: Convert to `datetime.UTC` alias
    |
+26 ~     import datetime as dt
 27 |
-   -     print(dt.timezone.utc)
-28 +     print(dt.UTC)
-29 |
+28 ~     print(dt.UTC)
    |
 
 UP017 [*] Use `datetime.UTC` alias
@@ -79,11 +75,9 @@ UP017 [*] Use `datetime.UTC` alias
    |
 help: Convert to `datetime.UTC` alias
    |
+32 ~     import datetime
+33 |
 34 |     print((
-   -         datetime
-   -         .timezone  # text
-   -         .utc
-35 +         datetime.UTC
-36 |     ))
+35 ~         datetime.UTC
    |
 note: This is an unsafe fix and may change runtime behavior

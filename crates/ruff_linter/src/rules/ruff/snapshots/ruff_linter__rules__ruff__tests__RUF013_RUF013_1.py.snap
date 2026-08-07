@@ -10,9 +10,6 @@ RUF013 [*] PEP 484 prohibits implicit `Optional`
   |
 help: Convert to `T | None`
   |
-3 |
-  - def f(arg: int = None):  # RUF013
-4 + def f(arg: int | None = None):  # RUF013
-5 |     pass
-  |
+4 | def f(arg: int | None = None):  # RUF013
+  |                ++++++
 note: This is an unsafe fix and may change runtime behavior

@@ -9,10 +9,8 @@ TC005 [*] Found empty type-checking block
   |     ^^^^
 help: Delete empty type-checking block
   |
-2 |
-  - if TYPE_CHECKING:
-  -     pass  # TC005
-3 |
+3 - if TYPE_CHECKING:
+4 -     pass  # TC005
   |
 
 TC005 [*] Found empty type-checking block
@@ -25,12 +23,10 @@ TC005 [*] Found empty type-checking block
 10 |     return
    |
 help: Delete empty type-checking block
-  |
-7 | def example():
-  -     if TYPE_CHECKING:
-  -         pass  # TC005
-8 |     return
-  |
+   |
+ 8 -     if TYPE_CHECKING:
+ 9 -         pass  # TC005
+   |
 
 TC005 [*] Found empty type-checking block
   --> TC005.py:15:9
@@ -43,10 +39,8 @@ TC005 [*] Found empty type-checking block
    |
 help: Delete empty type-checking block
    |
-13 | class Test:
-   -     if TYPE_CHECKING:
-   -         pass  # TC005
-14 |     x = 2
+14 -     if TYPE_CHECKING:
+15 -         pass  # TC005
    |
 
 TC005 [*] Found empty type-checking block
@@ -60,8 +54,6 @@ TC005 [*] Found empty type-checking block
    |
 help: Delete empty type-checking block
    |
-29 |
-   - if TYPE_CHECKING:
-   -     pass  # TC005
-30 |
+30 - if TYPE_CHECKING:
+31 -     pass  # TC005
    |

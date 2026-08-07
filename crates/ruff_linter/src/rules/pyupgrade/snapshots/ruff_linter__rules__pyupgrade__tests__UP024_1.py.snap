@@ -13,10 +13,8 @@ UP024 [*] Replace aliased errors with `OSError`
   |
 help: Replace with builtin `OSError`
   |
-4 |     pass
-  - except (OSError, mmap.error, IOError):
+5 - except (OSError, mmap.error, IOError):
 5 + except OSError:
-6 |     pass
   |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -30,10 +28,8 @@ UP024 [*] Replace aliased errors with `OSError`
   |
 help: Replace with builtin `OSError`
   |
-6 |     pass
-  - except (OSError, socket.error, KeyError):
+7 - except (OSError, socket.error, KeyError):
 7 + except (OSError, KeyError):
-8 |     pass
   |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -52,12 +48,10 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace with builtin `OSError`
    |
-11 |     pass
-   - except (
-   -     OSError,
-   -     select.error,
-   -     IOError,
-   - ):
+12 - except (
+13 -     OSError,
+14 -     select.error,
+15 -     IOError,
+16 - ):
 12 + except OSError:
-13 |     pass
    |

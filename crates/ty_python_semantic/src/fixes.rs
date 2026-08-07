@@ -907,8 +907,7 @@ mod tests {
           |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         help: Remove the unused suppression comment
           |
-        1 | import sys
-          - a = 5 + 10  # ty: ignore[unresolved-reference]
+        2 - a = 5 + 10  # ty: ignore[unresolved-reference]
         2 + a = 5 + 10
           |
         ");
@@ -1156,10 +1155,8 @@ class B(A):
           |
         help: Remove the unused suppression code
           |
-        6 | class B(A):
-          -     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+        7 -     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
         7 +     def test(  # ty:ignore[invalid-method-override]
-        8 |         self,
           |
         "#);
     }
@@ -1206,7 +1203,7 @@ class B(A):
           |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         help: Remove the unused suppression comment
           |
-          - value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
+        1 - value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
         1 + value = missing  # ty: ignore[unresolved-reference]
           |
         "
@@ -1252,9 +1249,7 @@ class B(A):
           |
         help: Remove the unused suppression comment
           |
-        3 | values = [
-          -     # ty: ignore[] tracked by [123]
-        4 |     missing,
+        4 -     # ty: ignore[] tracked by [123]
           |
         "
         );
@@ -1293,10 +1288,8 @@ class B(A):
           |
         help: Remove the unused suppression comment
           |
-        1 | seen_code = True
-          - # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        2 - # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
         2 + # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule]
-        3 | value = 1 / 0
           |
         "
         );
@@ -1352,8 +1345,7 @@ class B(A):
           |                                        ^^^^^^^^^^^^^^^^
         help: Remove the unused suppression code
           |
-        2 |
-          - result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
+        3 - result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
         3 + result: int = f(missing)  # ty: ignore[invalid-assignment, too-many-positional-arguments, unresolved-reference]
           |
         "#
@@ -1582,10 +1574,8 @@ class B(A):
           |
         help: Remove the unused suppression code
           |
-        1 | seen_code = True
-          - # ty: ignore[too-many-positional-arguments, unresolved-reference]
+        2 - # ty: ignore[too-many-positional-arguments, unresolved-reference]
         2 + # ty: ignore[unresolved-reference]
-        3 | values = [
           |
 
         warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-argument-type'
@@ -1600,10 +1590,8 @@ class B(A):
           |
         help: Remove the unused suppression code
           |
-        3 | values = [
-          -     # ty: ignore[invalid-argument-type, unresolved-reference]
+        4 -     # ty: ignore[invalid-argument-type, unresolved-reference]
         4 +     # ty: ignore[unresolved-reference]
-        5 |     missing,
           |
         "
         );

@@ -11,10 +11,8 @@ UP039 [*] Unnecessary parentheses after class definition
   |
 help: Remove parentheses
   |
-1 | # Errors
-  - class A():
+2 - class A():
 2 + class A:
-3 |     pass
   |
 
 UP039 [*] Unnecessary parentheses after class definition
@@ -27,10 +25,8 @@ UP039 [*] Unnecessary parentheses after class definition
   |
 help: Remove parentheses
   |
-5 |
-  - class A() \
+6 - class A() \
 6 + class A \
-7 |     :
   |
 
 UP039 [*] Unnecessary parentheses after class definition
@@ -43,10 +39,8 @@ UP039 [*] Unnecessary parentheses after class definition
    |
 help: Remove parentheses
    |
-11 | class A \
-   -         ():
+12 -         ():
 12 +         :
-13 |     pass
    |
 
 UP039 [*] Unnecessary parentheses after class definition
@@ -59,10 +53,8 @@ UP039 [*] Unnecessary parentheses after class definition
    |
 help: Remove parentheses
    |
-16 | @decorator()
-   - class A():
+17 - class A():
 17 + class A:
-18 |     pass
    |
 
 UP039 [*] Unnecessary parentheses after class definition
@@ -75,10 +67,8 @@ UP039 [*] Unnecessary parentheses after class definition
    |
 help: Remove parentheses
    |
-20 | @decorator
-   - class A():
+21 - class A():
 21 + class A:
-22 |     pass
    |
 
 UP039 [*] Unnecessary parentheses after class definition
@@ -91,10 +81,9 @@ UP039 [*] Unnecessary parentheses after class definition
    | |_^
 help: Remove parentheses
    |
-45 |
-   - class Foo(
-   -     # text
-   - ): ...
+46 - class Foo(
+47 -     # text
+48 - ): ...
 46 + class Foo: ...
    |
 note: This is an unsafe fix and may change runtime behavior

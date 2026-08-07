@@ -40,46 +40,25 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_______________^
 help: Organize imports
    |
-2  | # Comment 2
-   - import D
-3  + import B  # Comment 4
-4  |
-5  | # Comment 3a
-   - import C
-   -
-6  | # Comment 3b
-7  | import C
-8  + import D
-9  |
-   - import B  # Comment 4
-   -
-10 | # Comment 5
-   -
-11 | # Comment 6
-12 | from A import (
-   -     a,  # Comment 7
-   -     b,
-   -     c,  # Comment 8
+ 3 + import B  # Comment 4
+ 4 + 
+ 5 + # Comment 3a
+ 6 + # Comment 3b
+ 7 + import C
+ 8 + import D
+ 9 + 
+10 + # Comment 5
+11 + # Comment 6
+12 + from A import (
 13 +     a,  # Comment 7  # Comment 9
 14 +     b,  # Comment 10
 15 +     c,  # Comment 8  # Comment 11
-16 | )
-   - from A import (
-   -     a,  # Comment 9
-   -     b,  # Comment 10
-   -     c,  # Comment 11
+16 + )
 17 + from D import (
 18 +     a_long_name_to_force_multiple_lines,  # Comment 12
 19 +     another_long_name_to_force_multiple_lines,  # Comment 13
-20 | )
-   -
-   - from D import a_long_name_to_force_multiple_lines # Comment 12
-   - from D import another_long_name_to_force_multiple_lines # Comment 13
-   -
-21 | from E import a  # Comment 1
-   -
-   - from F import a  # Comment 1
-   - from F import b
+20 + )
+21 + from E import a  # Comment 1
 22 + from F import (
 23 +     a,  # Comment 1
 24 +     b,

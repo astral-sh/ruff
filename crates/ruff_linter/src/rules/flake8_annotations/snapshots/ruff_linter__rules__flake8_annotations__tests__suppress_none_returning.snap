@@ -11,11 +11,8 @@ ANN201 [*] Missing return type annotation for public function `foo`
    |
 help: Add return type annotation: `bool`
    |
-44 | # Error
-   - def foo():
-45 + def foo() -> bool:
-46 |     return True
-   |
+45 | def foo() -> bool:
+   |           +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN201 [*] Missing return type annotation for public function `foo`
@@ -29,11 +26,8 @@ ANN201 [*] Missing return type annotation for public function `foo`
    |
 help: Add return type annotation: `bool | None`
    |
-49 | # Error
-   - def foo():
-50 + def foo() -> bool | None:
-51 |     a = 2 + 2
-   |
+50 | def foo() -> bool | None:
+   |           ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN001 Missing type annotation for function argument `a`

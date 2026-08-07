@@ -13,10 +13,8 @@ RUF050 [*] Empty `if` statement
   |
 help: Remove the `if` statement
   |
-3 | # Simple if with pass
-  - if True:
-  -     pass
-4 |
+4 - if True:
+5 -     pass
   |
 
 RUF050 [*] Empty `if` statement
@@ -30,12 +28,10 @@ RUF050 [*] Empty `if` statement
 11 |   # Side-effect-free condition (comparison)
    |
 help: Remove the `if` statement
-  |
-7 | # Simple if with ellipsis
-  - if True:
-  -     ...
-8 |
-  |
+   |
+ 8 - if True:
+ 9 -     ...
+   |
 
 RUF050 [*] Empty `if` statement
   --> RUF050.py:13:1
@@ -50,10 +46,8 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-12 | import sys
-   - if sys.version_info >= (3, 11):
-   -     pass
-13 |
+13 - if sys.version_info >= (3, 11):
+14 -     pass
    |
 
 RUF050 [*] Empty `if` statement
@@ -68,10 +62,8 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-16 | # Side-effect-free condition (boolean operator)
-   - if x and y:
-   -     pass
-17 |
+17 - if x and y:
+18 -     pass
    |
 
 RUF050 [*] Empty `if` statement
@@ -87,11 +79,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-21 | def nested():
-   -     if a:
-   -         pass
+22 -     if a:
+23 -         pass
 22 +     pass
-23 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -105,9 +95,7 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-25 | # Single-line form (pass)
-   - if True: pass
-26 |
+26 - if True: pass
    |
 
 RUF050 [*] Empty `if` statement
@@ -121,9 +109,7 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-28 | # Single-line form (ellipsis)
-   - if True: ...
-29 |
+29 - if True: ...
    |
 
 RUF050 [*] Empty `if` statement
@@ -139,11 +125,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-31 | # Multiple pass statements
-   - if True:
-   -     pass
-   -     pass
-32 |
+32 - if True:
+33 -     pass
+34 -     pass
    |
 
 RUF050 [*] Empty `if` statement
@@ -159,11 +143,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-36 | # Mixed pass and ellipsis
-   - if True:
-   -     pass
-   -     ...
-37 |
+37 - if True:
+38 -     pass
+39 -     ...
    |
 
 RUF050 [*] Empty `if` statement
@@ -176,11 +158,9 @@ RUF050 [*] Empty `if` statement
    | |____________^
 help: Remove the `if` statement
    |
-42 | with pytest.raises(ValueError, match=msg):
-   -     if obj1:
-   -         pass
+43 -     if obj1:
+44 -         pass
 43 +     pass
-44 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -195,11 +175,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-49 | # Function call
-   - if foo():
-   -     pass
+50 - if foo():
+51 -     pass
 50 + foo()
-51 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -214,11 +192,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-53 | # Method call
-   - if bar.baz():
-   -     pass
+54 - if bar.baz():
+55 -     pass
 54 + bar.baz()
-55 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -233,11 +209,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-57 | # Nested call in boolean operator
-   - if x and foo():
-   -     pass
+58 - if x and foo():
+59 -     pass
 58 + x and foo()
-59 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -255,15 +229,10 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-61 | # Multiline expression that needs outer parentheses
-   - if (
 62 + (
-63 |     id(0)
-64 |     + 0
-   - ):
-   -     pass
+63 +     id(0)
+64 +     + 0
 65 + )
-66 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -281,15 +250,10 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-68 | # Multiline call stays a single expression statement
-   - if foo(
 69 + foo(
-70 |     1,
-71 |     2,
-   - ):
-   -     pass
+70 +     1,
+71 +     2,
 72 + )
-73 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -304,11 +268,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-75 | # Walrus operator with call
-   - if (x := foo()):
-   -     pass
+76 - if (x := foo()):
+77 -     pass
 76 + (x := foo())
-77 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -323,11 +285,9 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-79 | # Walrus operator without call
-   - if (x := y):
-   -     pass
+80 - if (x := y):
+81 -     pass
 80 + (x := y)
-81 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -340,9 +300,7 @@ RUF050 [*] Empty `if` statement
    | |____________^
 help: Remove the `if` statement
    |
-84 | class Foo:
-   -     if foo():
-   -         pass
+85 -     if foo():
+86 -         pass
 85 +     foo()
-86 |
    |

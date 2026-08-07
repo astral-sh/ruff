@@ -13,12 +13,9 @@ Q002 [*] Single quote docstring found but double quotes preferred
   |
 help: Replace single quotes docstring with double quotes
   |
-  - '''
 1 + """
-2 | Single quotes multiline module docstring
-  - '''
+2 + Single quotes multiline module docstring
 3 + """
-4 |
   |
 
 Q002 [*] Single quote docstring found but double quotes preferred
@@ -35,13 +32,9 @@ Q002 [*] Single quote docstring found but double quotes preferred
    |
 help: Replace single quotes docstring with double quotes
    |
-13 | ''')):
-   -     '''
-14 +     """
-15 |     Single quotes multiline class docstring
-   -     '''
+14 ~     """
+15 +     Single quotes multiline class docstring
 16 +     """
-17 |
    |
 
 Q002 [*] Single quote docstring found but double quotes preferred
@@ -58,11 +51,7 @@ Q002 [*] Single quote docstring found but double quotes preferred
    |
 help: Replace single quotes docstring with double quotes
    |
-25 |         val=l[Cls():3]):
-   -         '''
-26 +         """
-27 |         Single quotes multiline function docstring
-   -         '''
+26 ~         """
+27 +         Single quotes multiline function docstring
 28 +         """
-29 |
    |

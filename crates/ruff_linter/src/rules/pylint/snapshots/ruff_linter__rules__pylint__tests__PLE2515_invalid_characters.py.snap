@@ -12,10 +12,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-43 |
-   - zwsp = 'zero​width'
+44 - zwsp = 'zero​width'
 44 + zwsp = 'zero\u200bwidth'
-45 | zwsp = f'zero​width'
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -29,10 +27,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-44 | zwsp = 'zero​width'
-   - zwsp = f'zero​width'
+45 - zwsp = f'zero​width'
 45 + zwsp = f'zero\u200bwidth'
-46 |
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -47,10 +43,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-49 |
-   - zwsp_after_multibyte_character = "ಫ​"
+50 - zwsp_after_multibyte_character = "ಫ​"
 50 + zwsp_after_multibyte_character = "ಫ\u200b"
-51 | zwsp_after_multibyte_character = f"ಫ​"
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -64,10 +58,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-50 | zwsp_after_multibyte_character = "ಫ​"
-   - zwsp_after_multibyte_character = f"ಫ​"
+51 - zwsp_after_multibyte_character = f"ಫ​"
 51 + zwsp_after_multibyte_character = f"ಫ\u200b"
-52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -81,10 +73,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-51 | zwsp_after_multibyte_character = f"ಫ​"
-   - zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+52 - zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 52 + zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
-53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -98,10 +88,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-51 | zwsp_after_multibyte_character = f"ಫ​"
-   - zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+52 - zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 52 + zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
-53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -116,10 +104,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
-   - zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 - zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 + zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
-54 |
    |
 
 PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
@@ -134,10 +120,8 @@ PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
    |
 help: Replace with escape sequence
    |
-52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
-   - zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 - zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
 53 + zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
-54 |
    |
 
 PLE2515 Invalid unescaped character zero-width-space, use "\u200B" instead

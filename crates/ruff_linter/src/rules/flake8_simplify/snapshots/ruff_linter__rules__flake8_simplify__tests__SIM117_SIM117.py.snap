@@ -12,13 +12,8 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
   |
 help: Combine `with` statements
   |
-1 | # SIM117
-  - with A() as a:
-  -     with B() as b:
-  -         print("hello")
 2 + with A() as a, B() as b:
 3 +     print("hello")
-4 |
   |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -32,17 +27,11 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
 10 |               print("hello")
    |
 help: Combine `with` statements
-   |
-6  | # SIM117
-   - with A():
-   -     with B():
-   -         with C():
-   -             print("hello")
-7  + with A(), B():
-8  +     with C():
-9  +         print("hello")
-10 |
-   |
+  |
+7 + with A(), B():
+8 +     with C():
+9 +         print("hello")
+  |
 
 SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
   --> SIM117.py:13:1
@@ -68,15 +57,9 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-18 | # SIM117
-   - with A() as a:
-   -     with B() as b:
-   -         # Fixable due to placement of this comment.
-   -         print("hello")
 19 + with A() as a, B() as b:
 20 +     # Fixable due to placement of this comment.
 21 +     print("hello")
-22 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -90,13 +73,8 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-46 | # SIM117
-   - async with A() as a:
-   -     async with B() as b:
-   -         print("hello")
 47 + async with A() as a, B() as b:
 48 +     print("hello")
-49 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -112,25 +90,18 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-52 |     # SIM117
-   -     with A() as a:
-   -         with B() as b:
-   -             """this
 53 +     with A() as a, B() as b:
 54 +         """this
-55 | is valid"""
-56 |
-   -             """the indentation on
+55 + is valid"""
+56 + 
 57 +         """the indentation on
-58 |             this line is significant"""
-59 |
-   -             "this is" \
+58 +             this line is significant"""
+59 + 
 60 +         "this is" \
-61 | "allowed too"
-62 |
-   -             ("so is"
+61 + "allowed too"
+62 + 
 63 +         ("so is"
-64 | "this for some reason")
+64 + "this for some reason")
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -147,14 +118,11 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-69 |     A() as a,
-   -     B() as b,
+68 + with (
+69 +     A() as a,
 70 +     B() as b,C() as c
-71 | ):
-   -     with C() as c:
-   -         print("hello")
+71 + ):
 72 +     print("hello")
-73 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -171,19 +139,11 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-75 | # SIM117
-   - with A() as a:
-   -     with (
-   -         B() as b,
-   -         C() as c,
-   -     ):
-   -         print("hello")
 76 + with (
 77 +     A() as a, B() as b,
 78 +     C() as c,
 79 + ):
 80 +     print("hello")
-81 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -203,18 +163,12 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-85 |     A() as a,
-   -     B() as b,
+84 + with (
+85 +     A() as a,
 86 +     B() as b,C() as c,
 87 +     D() as d,
-88 | ):
-   -     with (
-   -         C() as c,
-   -         D() as d,
-   -     ):
-   -         print("hello")
+88 + ):
 89 +     print("hello")
-90 |
    |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -228,13 +182,8 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
    |
 help: Combine `with` statements
    |
-94 | # SIM117 (auto-fixable)
-   - with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a:
-   -     with B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
-   -         print("hello")
-95 + with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a, B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
+95 ~ with A("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as a, B("01ß9💣2ℝ8901ß9💣2ℝ8901ß9💣2ℝ89") as b:
 96 +     print("hello")
-97 |
    |
 
 SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -271,26 +220,16 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
     |
 help: Combine `with` statements
     |
-125 | # SIM117
-    - with A() as a:
-    -     with B() as b:
-    -         type ListOrSet[T] = list[T] | set[T]
 126 + with A() as a, B() as b:
 127 +     type ListOrSet[T] = list[T] | set[T]
-128 |
-    -         class ClassA[T: str]:
-    -             def method1(self) -> T:
-    -                 ...
+128 + 
 129 +     class ClassA[T: str]:
 130 +         def method1(self) -> T:
 131 +             ...
-132 |
-    -         f" something { my_dict["key"] } something else "
+132 + 
 133 +     f" something { my_dict["key"] } something else "
-134 |
-    -         f"foo {f"bar {x}"} baz"
+134 + 
 135 +     f"foo {f"bar {x}"} baz"
-136 |
     |
 
 SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
@@ -304,10 +243,6 @@ SIM117 [*] Use a single `with` statement with multiple contexts instead of neste
     |
 help: Combine `with` statements
     |
-162 | # Do not suppress combination, if a context manager is already combined with another.
-    - async with asyncio.timeout(1), A():
-    -     async with B():
-    -         pass
 163 + async with asyncio.timeout(1), A(), B():
 164 +     pass
     |

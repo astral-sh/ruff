@@ -10,10 +10,8 @@ D300 [*] Use triple double quotes `"""`
     |     ^^^^^^^^^^^^^^^
 help: Convert to triple double quotes
     |
-306 | def triple_single_quotes_raw():
-    -     r'''Summary.'''
+307 -     r'''Summary.'''
 307 +     r"""Summary."""
-308 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -25,10 +23,8 @@ D300 [*] Use triple double quotes `"""`
     |     ^^^^^^^^^^^^^^^
 help: Convert to triple double quotes
     |
-311 | def triple_single_quotes_raw_uppercase():
-    -     R'''Summary.'''
+312 -     R'''Summary.'''
 312 +     R"""Summary."""
-313 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -40,10 +36,8 @@ D300 [*] Use triple double quotes `"""`
     |     ^^^^^^^^^^^
 help: Convert to triple double quotes
     |
-316 | def single_quotes_raw():
-    -     r'Summary.'
+317 -     r'Summary.'
 317 +     r"""Summary."""
-318 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -55,10 +49,8 @@ D300 [*] Use triple double quotes `"""`
     |     ^^^^^^^^^^^
 help: Convert to triple double quotes
     |
-321 | def single_quotes_raw_uppercase():
-    -     R'Summary.'
+322 -     R'Summary.'
 322 +     R"""Summary."""
-323 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -70,10 +62,8 @@ D300 [*] Use triple double quotes `"""`
     |     ^^^^^^^^^^^^
 help: Convert to triple double quotes
     |
-327 | def single_quotes_raw_uppercase_backslash():
-    -     R'Sum\mary.'
+328 -     R'Sum\mary.'
 328 +     R"""Sum\mary."""
-329 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -88,12 +78,8 @@ D300 [*] Use triple double quotes `"""`
     |
 help: Convert to triple double quotes
     |
-644 | def single_line_docstring_with_an_escaped_backslash():
-    -     "\
-    -     "
-645 +     """\
+645 ~     """\
 646 +     """
-647 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -107,10 +93,8 @@ D300 [*] Use triple double quotes `"""`
     |
 help: Convert to triple double quotes
     |
-648 | class StatementOnSameLineAsDocstring:
-    -     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+649 -     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
 649 +     """After this docstring there's another statement on the same line separated by a semicolon.""" ; priorities=1
-650 |     def sort_services(self):
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -121,10 +105,8 @@ D300 [*] Use triple double quotes `"""`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Convert to triple double quotes
     |
-653 | class StatementOnSameLineAsDocstring:
-    -     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+654 -     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
 654 +     """After this docstring there's another statement on the same line separated by a semicolon."""; priorities=1
-655 |
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -138,10 +120,8 @@ D300 [*] Use triple double quotes `"""`
     |
 help: Convert to triple double quotes
     |
-657 | class CommentAfterDocstring:
-    -     "After this docstring there's a comment."  # priorities=1
+658 -     "After this docstring there's a comment."  # priorities=1
 658 +     """After this docstring there's a comment."""  # priorities=1
-659 |     def sort_services(self):
     |
 
 D300 [*] Use triple double quotes `"""`
@@ -153,10 +133,6 @@ D300 [*] Use triple double quotes `"""`
     | |_________________________________________________________^
 help: Convert to triple double quotes
     |
-663 | def newline_after_closing_quote(self):
-    -     "We enforce a newline after the closing quote for a multi-line docstring \
-    -     but continuations shouldn't be considered multi-line"
-664 +     """We enforce a newline after the closing quote for a multi-line docstring \
+664 ~     """We enforce a newline after the closing quote for a multi-line docstring \
 665 +     but continuations shouldn't be considered multi-line"""
-666 |
     |

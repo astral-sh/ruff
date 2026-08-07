@@ -12,10 +12,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
   |
 help: Remove parentheses
   |
-1 | d = {(1,2):"a",(3,4):"b",(5,6,7):"c",(8,):"d"}
-  - d[(1,2)]
+2 - d[(1,2)]
 2 + d[1,2]
-3 | d[(
   |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -34,14 +32,9 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
   |
 help: Remove parentheses
   |
-2 | d[(1,2)]
-  - d[(
-3 + d[
-4 |     1,
-5 |     2
-  - )]
-6 + ]
-7 | d[
+3 ~ d[
+4 +     1,
+5 +     2
   |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -56,10 +49,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-10 | ]
-   - d[(2,4)]
+11 - d[(2,4)]
 11 + d[2,4]
-12 | d[(5,6,7)]
    |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -74,10 +65,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-11 | d[(2,4)]
-   - d[(5,6,7)]
+12 - d[(5,6,7)]
 12 + d[5,6,7]
-13 | d[(8,)]
    |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -92,10 +81,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-12 | d[(5,6,7)]
-   - d[(8,)]
+13 - d[(8,)]
 13 + d[8,]
-14 | d[tuple(1,2)]
    |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -109,11 +96,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-19 | e = {((1,2),(3,4)):"a"}
-   - e[((1,2),(3,4))]
-20 | e[(1,2),(3,4)]
-21 + e[(1,2),(3,4)]
-22 |
+20 - e[((1,2),(3,4))]
+20 + e[(1,2),(3,4)]
    |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -126,10 +110,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-23 | token_features[
-   -     (window_position, feature_name)
+24 -     (window_position, feature_name)
 24 +     window_position, feature_name
-25 | ] = self._extract_raw_features_from_token
    |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -143,10 +125,8 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-27 | d[1,]
-   - d[(1,)]
+28 - d[(1,)]
 28 + d[1,]
-29 | d[()] # empty tuples should be ignored
    |
 
 RUF031 [*] Avoid parentheses for tuples in subscripts
@@ -161,8 +141,6 @@ RUF031 [*] Avoid parentheses for tuples in subscripts
    |
 help: Remove parentheses
    |
-35 | # https://github.com/astral-sh/ruff/issues/12776
-   - d[(*foo,bar)]
+36 - d[(*foo,bar)]
 36 + d[*foo,bar]
-37 |
    |

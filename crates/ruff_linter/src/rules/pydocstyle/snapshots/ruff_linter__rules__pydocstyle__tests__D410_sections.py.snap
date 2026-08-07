@@ -12,10 +12,7 @@ D410 [*] Missing blank line after section ("Returns")
 80 |     Yields
    |
 help: Add blank line after "Returns"
-   |
-79 |     -------
-80 +
-81 |     Yields
+80 -     Yields
    |
 
 D410 [*] Missing blank line after section ("Returns")
@@ -29,8 +26,5 @@ D410 [*] Missing blank line after section ("Returns")
 226 |     Many many wonderful things.
     |
 help: Add blank line after "Returns"
-    |
-226 |     Many many wonderful things.
-227 +
-228 |     Raises:
+227 -     Raises:
     |

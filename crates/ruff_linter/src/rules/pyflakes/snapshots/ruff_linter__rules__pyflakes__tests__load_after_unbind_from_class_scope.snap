@@ -12,10 +12,8 @@ F841 [*] Local variable `x` is assigned to but never used
   |
 help: Remove assignment to unused variable `x`
   |
-7 |             pass
-  -         except ValueError as x:
+8 -         except ValueError as x:
 8 +         except ValueError:
-9 |             pass
   |
 
 F821 Undefined name `x`

@@ -12,11 +12,8 @@ D413 [*] Missing blank line after last section ("Returns")
 9 | """
   |
 help: Add blank line after "Returns"
-   |
-8  |     the value
-9  +
-10 | """
-   |
+9 - """
+  |
 
 D413 [*] Missing blank line after last section ("Returns")
   --> D413.py:19:5
@@ -29,10 +26,7 @@ D413 [*] Missing blank line after last section ("Returns")
 21 |     """
    |
 help: Add blank line after "Returns"
-   |
-20 |         the value
-21 +
-22 |     """
+21 -     """
    |
 
 D413 [*] Missing blank line after last section ("Returns")
@@ -46,12 +40,9 @@ D413 [*] Missing blank line after last section ("Returns")
    |
 help: Add blank line after "Returns"
    |
-58 |     Returns:
-   -         the value"""
-59 +         the value
-60 +
-61 +     """
-62 |
+59 ~         the value
+60 + 
+61 ~     """
    |
 
 D413 [*] Missing blank line after last section ("Returns")
@@ -66,12 +57,8 @@ D413 [*] Missing blank line after last section ("Returns")
    |
 help: Add blank line after "Returns"
    |
-70 |         the value
-   -         """
-71 |
-72 +     """
-73 +
-74 |
+71 + 
+72 ~     """
    |
 
 D413 [*] Missing blank line after last section ("Raises")
@@ -85,8 +72,5 @@ D413 [*] Missing blank line after last section ("Raises")
 79 |     """)
    |
 help: Add blank line after "Raises"
-   |
-78 |         ValueError: An error.
-79 +
-80 |     """)
+79 -     """)
    |

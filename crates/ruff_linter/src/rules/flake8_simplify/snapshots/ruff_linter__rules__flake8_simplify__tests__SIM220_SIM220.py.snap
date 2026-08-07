@@ -10,9 +10,8 @@ SIM220 [*] Use `False` instead of `a and not a`
   |
 help: Replace with `False`
   |
-  - if a and not a:
+1 - if a and not a:
 1 + if False:
-2 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,10 +26,8 @@ SIM220 [*] Use `False` instead of `a and not a`
   |
 help: Replace with `False`
   |
-3 |
-  - if (a and not a) and b:
+4 - if (a and not a) and b:
 4 + if (False) and b:
-5 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,9 +42,7 @@ SIM220 [*] Use `False` instead of `a and not a`
   |
 help: Replace with `False`
   |
-6 |
-  - if (a and not a) or b:
+7 - if (a and not a) or b:
 7 + if (False) or b:
-8 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior

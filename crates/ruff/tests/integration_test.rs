@@ -122,7 +122,7 @@ fn stdin_error() {
       |        ^^
     help: Remove unused import: `os`
       |
-      - import os
+    1 - import os
       |
 
     Found 1 error.
@@ -149,7 +149,7 @@ fn stdin_filename() {
       |        ^^
     help: Remove unused import: `os`
       |
-      - import os
+    1 - import os
       |
 
     Found 1 error.
@@ -187,8 +187,7 @@ import bar   # unused import
       |        ^^^
     help: Remove unused import: `bar`
       |
-    1 |
-      - import bar   # unused import
+    2 - import bar   # unused import
       |
 
     F401 [*] `foo` imported but unused
@@ -198,8 +197,7 @@ import bar   # unused import
       |        ^^^
     help: Remove unused import: `foo`
       |
-    1 |
-      - import foo   # unused import
+    2 - import foo   # unused import
       |
 
     Found 2 errors.
@@ -229,7 +227,7 @@ fn check_warn_stdin_filename_with_files() {
       |        ^^
     help: Remove unused import: `os`
       |
-      - import os
+    1 - import os
       |
 
     Found 1 error.
@@ -258,7 +256,7 @@ fn stdin_source_type_py() {
       |        ^^
     help: Remove unused import: `os`
       |
-      - import os
+    1 - import os
       |
 
     Found 1 error.
@@ -595,9 +593,9 @@ fn stdin_override_parser_ipynb() {
     1 | import os
       |        ^^
     help: Remove unused import: `os`
-     ::: cell 1
+     ::: cell 1:0:1
       |
-      - import os
+    0 - import os
       |
 
     F401 [*] `sys` imported but unused
@@ -606,9 +604,9 @@ fn stdin_override_parser_ipynb() {
     1 | import sys
       |        ^^^
     help: Remove unused import: `sys`
-     ::: cell 3
+     ::: cell 3:0:1
       |
-      - import sys
+    0 - import sys
       |
 
     Found 2 errors.
@@ -640,7 +638,7 @@ fn stdin_override_parser_py() {
       |        ^^
     help: Remove unused import: `os`
       |
-      - import os
+    1 - import os
       |
 
     Found 1 error.
@@ -677,7 +675,7 @@ extension = {ipynb="python"}
       |        ^^
     help: Remove unused import: `os`
       |
-      - import os
+    1 - import os
       |
 
     Found 1 error.
@@ -1855,7 +1853,7 @@ fn check_input_from_argfile() -> Result<()> {
           |        ^^
         help: Remove unused import: `os`
           |
-          - import os
+        1 - import os
           |
 
         Found 1 error.
@@ -1899,7 +1897,7 @@ fn check_hints_hidden_unsafe_fixes() {
     exit_code: 1
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-safe-fix
       |
@@ -1944,7 +1942,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     exit_code: 1
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-safe-fix
       |
@@ -1990,13 +1988,13 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     exit_code: 1
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-safe-fix
       |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-unsafe-fix
       |
@@ -2275,13 +2273,13 @@ extend-safe-fixes = ["RUF902"]
     exit_code: 1
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-safe-fix
       |
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-unsafe-fix
       |
@@ -2319,7 +2317,7 @@ extend-safe-fixes = ["RUF902"]
     exit_code: 1
     ----- stdout -----
     RUF901 [*] Hey this is a stable test rule with a safe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-safe-fix
       |
@@ -2368,10 +2366,13 @@ extend-safe-fixes = ["RUF9"]
     --> -:1:1
 
     RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    --> -:1:1
+     --> -:1:1
       |
     1 + # fix from stable-test-rule-unsafe-fix
     2 | x = {'a': 1, 'a': 1}
+    3 | print(('foo'))
+    4 | print(str('foo'))
+    5 | isinstance(x, (int, str))
       |
 
     RUF903 Hey this is a stable test rule with a display only fix.

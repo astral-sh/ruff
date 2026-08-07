@@ -16,9 +16,7 @@ help: Use `math.pi`
 1 + import math
 2 | r = 3.1  # OK
 3 |
-  - A = 3.14 * r ** 2  # FURB152
-4 + A = math.pi * r ** 2  # FURB152
-5 |
+4 ~ A = math.pi * r ** 2  # FURB152
   |
 
 FURB152 [*] Replace `6.28` with `math.tau`
@@ -38,9 +36,7 @@ help: Use `math.tau`
 3 |
 4 | A = 3.14 * r ** 2  # FURB152
 5 |
-  - C = 6.28 * r  # FURB152
-6 + C = math.tau * r  # FURB152
-7 |
+6 ~ C = math.tau * r  # FURB152
   |
 
 FURB152 [*] Replace `2.71` with `math.e`
@@ -57,11 +53,10 @@ help: Use `math.e`
   |
 1 + import math
 2 | r = 3.1  # OK
---------------------------------------------------------------------------------
+3 |
+…
 7 |
-  - e = 2.71  # FURB152
-8 + e = math.e  # FURB152
-9 |
+8 ~ e = math.e  # FURB152
   |
 
 FURB152 [*] Replace `3.141` with `math.pi`
@@ -76,13 +71,12 @@ FURB152 [*] Replace `3.141` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 11 |
-   - r = 3.141  # FURB152
-12 + r = math.pi  # FURB152
-13 |
+12 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.142` with `math.pi`
@@ -97,13 +91,12 @@ FURB152 [*] Replace `3.142` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 13 |
-   - r = 3.142  # FURB152
-14 + r = math.pi  # FURB152
-15 |
+14 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.1415` with `math.pi`
@@ -118,13 +111,12 @@ FURB152 [*] Replace `3.1415` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 15 |
-   - r = 3.1415  # FURB152
-16 + r = math.pi  # FURB152
-17 |
+16 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.1416` with `math.pi`
@@ -139,13 +131,12 @@ FURB152 [*] Replace `3.1416` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 17 |
-   - r = 3.1416  # FURB152
-18 + r = math.pi  # FURB152
-19 |
+18 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.141592` with `math.pi`
@@ -160,13 +151,12 @@ FURB152 [*] Replace `3.141592` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 19 |
-   - r = 3.141592  # FURB152
-20 + r = math.pi  # FURB152
-21 |
+20 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.141593` with `math.pi`
@@ -181,13 +171,12 @@ FURB152 [*] Replace `3.141593` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 21 |
-   - r = 3.141593  # FURB152
-22 + r = math.pi  # FURB152
-23 |
+22 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.14159265` with `math.pi`
@@ -202,13 +191,12 @@ FURB152 [*] Replace `3.14159265` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 23 |
-   - r = 3.14159265  # FURB152
-24 + r = math.pi  # FURB152
-25 |
+24 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `3.141592653589793238462643383279` with `math.pi`
@@ -223,13 +211,12 @@ FURB152 [*] Replace `3.141592653589793238462643383279` with `math.pi`
    |
 help: Use `math.pi`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 25 |
-   - r = 3.141592653589793238462643383279  # FURB152
-26 + r = math.pi  # FURB152
-27 |
+26 ~ r = math.pi  # FURB152
    |
 
 FURB152 [*] Replace `2.718` with `math.e`
@@ -244,13 +231,12 @@ FURB152 [*] Replace `2.718` with `math.e`
    |
 help: Use `math.e`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 31 |
-   - e = 2.718  # FURB152
-32 + e = math.e  # FURB152
-33 |
+32 ~ e = math.e  # FURB152
    |
 
 FURB152 [*] Replace `2.7182` with `math.e`
@@ -265,13 +251,12 @@ FURB152 [*] Replace `2.7182` with `math.e`
    |
 help: Use `math.e`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 33 |
-   - e = 2.7182  # FURB152
-34 + e = math.e  # FURB152
-35 |
+34 ~ e = math.e  # FURB152
    |
 
 FURB152 [*] Replace `2.7183` with `math.e`
@@ -286,13 +271,12 @@ FURB152 [*] Replace `2.7183` with `math.e`
    |
 help: Use `math.e`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 35 |
-   - e = 2.7183  # FURB152
-36 + e = math.e  # FURB152
-37 |
+36 ~ e = math.e  # FURB152
    |
 
 FURB152 [*] Replace `2.7182000000000001` with `math.e`
@@ -304,10 +288,10 @@ FURB152 [*] Replace `2.7182000000000001` with `math.e`
    |     ^^^^^^^^^^^^^^^^^^
 help: Use `math.e`
    |
-1  + import math
-2  | r = 3.1  # OK
---------------------------------------------------------------------------------
+ 1 + import math
+ 2 | r = 3.1  # OK
+ 3 |
+ …
 45 |
-   - e = 2.7182000000000001  # FURB152
-46 + e = math.e  # FURB152
+46 ~ e = math.e  # FURB152
    |

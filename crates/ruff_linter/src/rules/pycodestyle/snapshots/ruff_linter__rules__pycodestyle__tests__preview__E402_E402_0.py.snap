@@ -10,13 +10,8 @@ E402 [*] Module level import not at top of file
    | ^^^^^^^^
 help: Move module level imports to top of file
    |
-1  | """Top-level docstring."""
-2  + import h
-3  |
---------------------------------------------------------------------------------
-35 |
-   - import h
-36 |
+ 2 + import h
+ 3 + 
    |
 note: This is an unsafe fix and may change runtime behavior
 

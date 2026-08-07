@@ -11,11 +11,8 @@ D409 [*] Section underline should match the length of its name ("Returns")
     |
 help: Adjust underline length to match "Returns"
     |
-110 |     Returns
-    -     --
-111 +     -------
-112 |     A value of some sort.
-    |
+111 |     -------
+    |       +++++
 
 D409 [*] Section underline should match the length of its name ("Returns")
    --> sections.py:225:5
@@ -28,11 +25,8 @@ D409 [*] Section underline should match the length of its name ("Returns")
     |
 help: Adjust underline length to match "Returns"
     |
-224 |     Returns
-    -     ------
-225 +     -------
-226 |     Many many wonderful things.
-    |
+225 |     -------
+    |           +
 
 D409 [*] Section underline should match the length of its name ("Other Parameters")
    --> sections.py:589:5
@@ -45,8 +39,5 @@ D409 [*] Section underline should match the length of its name ("Other Parameter
     |
 help: Adjust underline length to match "Other Parameters"
     |
-588 |     Other Parameters
-    -     ----------
-589 +     ----------------
-590 |     other_parameters:
-    |
+589 |     ----------------
+    |               ++++++

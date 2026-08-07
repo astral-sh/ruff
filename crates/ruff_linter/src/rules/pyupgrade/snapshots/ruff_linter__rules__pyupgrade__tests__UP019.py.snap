@@ -10,10 +10,8 @@ UP019 [*] `typing.Text` is deprecated, use `str`
   |
 help: Replace with `str`
   |
-6 |
-  - def print_word(word: Text) -> None:
+7 - def print_word(word: Text) -> None:
 7 + def print_word(word: str) -> None:
-8 |     print(word)
   |
 
 UP019 [*] `typing.Text` is deprecated, use `str`
@@ -25,10 +23,8 @@ UP019 [*] `typing.Text` is deprecated, use `str`
    |
 help: Replace with `str`
    |
-10 |
-   - def print_second_word(word: typing.Text) -> None:
+11 - def print_second_word(word: typing.Text) -> None:
 11 + def print_second_word(word: str) -> None:
-12 |     print(word)
    |
 
 UP019 [*] `typing.Text` is deprecated, use `str`
@@ -40,10 +36,8 @@ UP019 [*] `typing.Text` is deprecated, use `str`
    |
 help: Replace with `str`
    |
-14 |
-   - def print_third_word(word: Hello.Text) -> None:
+15 - def print_third_word(word: Hello.Text) -> None:
 15 + def print_third_word(word: str) -> None:
-16 |     print(word)
    |
 
 UP019 [*] `typing.Text` is deprecated, use `str`
@@ -55,10 +49,8 @@ UP019 [*] `typing.Text` is deprecated, use `str`
    |
 help: Replace with `str`
    |
-18 |
-   - def print_fourth_word(word: Goodbye) -> None:
+19 - def print_fourth_word(word: Goodbye) -> None:
 19 + def print_fourth_word(word: str) -> None:
-20 |     print(word)
    |
 
 UP019 [*] `typing_extensions.Text` is deprecated, use `str`
@@ -70,10 +62,8 @@ UP019 [*] `typing_extensions.Text` is deprecated, use `str`
    |
 help: Replace with `str`
    |
-27 |
-   - def print_fifth_word(word: typing_extensions.Text) -> None:
+28 - def print_fifth_word(word: typing_extensions.Text) -> None:
 28 + def print_fifth_word(word: str) -> None:
-29 |     print(word)
    |
 
 UP019 [*] `typing_extensions.Text` is deprecated, use `str`
@@ -85,10 +75,8 @@ UP019 [*] `typing_extensions.Text` is deprecated, use `str`
    |
 help: Replace with `str`
    |
-31 |
-   - def print_sixth_word(word: TypingExt.Text) -> None:
+32 - def print_sixth_word(word: TypingExt.Text) -> None:
 32 + def print_sixth_word(word: str) -> None:
-33 |     print(word)
    |
 
 UP019 [*] `typing_extensions.Text` is deprecated, use `str`
@@ -100,8 +88,6 @@ UP019 [*] `typing_extensions.Text` is deprecated, use `str`
    |
 help: Replace with `str`
    |
-35 |
-   - def print_seventh_word(word: TextAlias) -> None:
+36 - def print_seventh_word(word: TextAlias) -> None:
 36 + def print_seventh_word(word: str) -> None:
-37 |     print(word)
    |

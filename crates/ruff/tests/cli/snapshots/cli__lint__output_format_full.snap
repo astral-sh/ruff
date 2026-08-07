@@ -26,8 +26,7 @@ F401 [*] `os` imported but unused
   |
 help: Remove unused import: `os`
   |
-  - import os  # F401
-1 | x = y      # F821
+1 - import os  # F401
   |
 
 F821 Undefined name `y`

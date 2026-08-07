@@ -12,10 +12,11 @@ PLE1519 [*] `@singledispatch` decorator should not be used on methods
    |
 help: Replace with `@singledispatchmethod`
    |
-9  | class Board:
-   -     @singledispatch  # [singledispatch-method]
-10 +     @singledispatchmethod  # [singledispatch-method]
-11 |     @classmethod
+ 1 ~ from functools import singledispatch, singledispatchmethod
+ 2 |
+ …
+ 9 | class Board:
+10 ~     @singledispatchmethod  # [singledispatch-method]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,10 +32,11 @@ PLE1519 [*] `@singledispatch` decorator should not be used on methods
    |
 help: Replace with `@singledispatchmethod`
    |
+ 1 ~ from functools import singledispatch, singledispatchmethod
+ 2 |
+ …
 14 |
-   -     @singledispatch  # [singledispatch-method]
-15 +     @singledispatchmethod  # [singledispatch-method]
-16 |     def move(self, position):
+15 ~     @singledispatchmethod  # [singledispatch-method]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,9 +52,10 @@ PLE1519 [*] `@singledispatch` decorator should not be used on methods
    |
 help: Replace with `@singledispatchmethod`
    |
+ 1 ~ from functools import singledispatch, singledispatchmethod
+ 2 |
+ …
 22 |
-   -     @singledispatch  # [singledispatch-method]
-23 +     @singledispatchmethod  # [singledispatch-method]
-24 |     @staticmethod
+23 ~     @singledispatchmethod  # [singledispatch-method]
    |
 note: This is an unsafe fix and may change runtime behavior

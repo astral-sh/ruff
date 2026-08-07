@@ -33,44 +33,26 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_____________^
 help: Organize imports
    |
-   - from a import b
-1  + import A
-2  + import a
-3  + import B
-4  + import b
-5  + import x
-6  + import x as A
-7  + import x as Y
-8  + import x as a
-9  + import x as y
-10 | from a import BAD as DEF
-   - from a import B
-   - from a import Boo as DEF
+ 1 + import A
+ 2 + import a
+ 3 + import B
+ 4 + import b
+ 5 + import x
+ 6 + import x as A
+ 7 + import x as Y
+ 8 + import x as a
+ 9 + import x as y
+10 + from a import BAD as DEF
 11 + from a import B, b
 12 + from a import B as A
-13 | from a import B as Abc
-   - from a import B as A
-14 | from a import B as DEF
+13 + from a import B as Abc
+14 + from a import B as DEF
 15 + from a import Boo as DEF
-16 | from a import b as a
-   - from a import b as x
-17 | from a import b as c
-   - from b import c
-18 | from a import b as d
+16 + from a import b as a
+17 + from a import b as c
+18 + from a import b as d
 19 + from a import b as x
-20 | from a import b as y
-   - from b import C
+20 + from a import b as y
 21 + from b import C, c
-22 | from b import c as d
-   -
-   - import A
-   - import a
-   - import b
-   - import B
-   -
-   - import x as y
-   - import x as A
-   - import x as Y
-   - import x
-   - import x as a
+22 + from b import c as d
    |

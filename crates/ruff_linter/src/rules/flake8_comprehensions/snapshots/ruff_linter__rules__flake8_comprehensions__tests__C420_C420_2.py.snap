@@ -8,7 +8,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
   |       ^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `dict.fromkeys(iterable, value)`)
   |
-  - foo or{x: None for x in bar}
+1 - foo or{x: None for x in bar}
 1 + foo or dict.fromkeys(bar)
-2 |
   |

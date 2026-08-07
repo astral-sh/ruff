@@ -13,10 +13,9 @@ LOG001 [*] Use `logging.getLogger()` to instantiate loggers
   |
 help: Replace with `logging.getLogger()`
   |
+1 ~ import logging
 2 |
-  - logging.Logger(__name__)
-3 + logging.getLogger(__name__)
-4 | logging.Logger()
+3 ~ logging.getLogger(__name__)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,9 +29,9 @@ LOG001 [*] Use `logging.getLogger()` to instantiate loggers
   |
 help: Replace with `logging.getLogger()`
   |
+1 ~ import logging
+2 |
 3 | logging.Logger(__name__)
-  - logging.Logger()
-4 + logging.getLogger()
-5 | logging.getLogger(__name__)
+4 ~ logging.getLogger()
   |
 note: This is an unsafe fix and may change runtime behavior

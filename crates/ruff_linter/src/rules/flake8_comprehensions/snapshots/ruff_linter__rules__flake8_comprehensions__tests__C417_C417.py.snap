@@ -13,10 +13,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   |
 help: Replace `map()` with a generator expression
   |
-2 | nums = [1, 2, 3]
-  - map(lambda x: x + 1, nums)
+3 - map(lambda x: x + 1, nums)
 3 + (x + 1 for x in nums)
-4 | map(lambda x: str(x), nums)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
   |
 help: Replace `map()` with a generator expression
   |
-3 | map(lambda x: x + 1, nums)
-  - map(lambda x: str(x), nums)
+4 - map(lambda x: str(x), nums)
 4 + (str(x) for x in nums)
-5 | list(map(lambda x: x * 2, nums))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +47,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
   |
 help: Replace `map()` with a list comprehension
   |
-4 | map(lambda x: str(x), nums)
-  - list(map(lambda x: x * 2, nums))
+5 - list(map(lambda x: x * 2, nums))
 5 + [x * 2 for x in nums]
-6 | set(map(lambda x: x % 2 == 0, nums))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,10 +64,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
   |
 help: Replace `map()` with a set comprehension
   |
-5 | list(map(lambda x: x * 2, nums))
-  - set(map(lambda x: x % 2 == 0, nums))
+6 - set(map(lambda x: x % 2 == 0, nums))
 6 + {x % 2 == 0 for x in nums}
-7 | dict(map(lambda v: (v, v**2), nums))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
   |
 help: Replace `map()` with a dict comprehension
   |
-6 | set(map(lambda x: x % 2 == 0, nums))
-  - dict(map(lambda v: (v, v**2), nums))
+7 - dict(map(lambda v: (v, v**2), nums))
 7 + {v: v**2 for v in nums}
-8 | dict(map(lambda v: [v, v**2], nums))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
    |
 help: Replace `map()` with a dict comprehension
   |
-7 | dict(map(lambda v: (v, v**2), nums))
-  - dict(map(lambda v: [v, v**2], nums))
+8 - dict(map(lambda v: [v, v**2], nums))
 8 + {v: v**2 for v in nums}
-9 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -126,10 +114,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-9  |
-   - map(lambda _: 3.0, nums)
+10 - map(lambda _: 3.0, nums)
 10 + (3.0 for _ in nums)
-11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -144,10 +130,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-10 | map(lambda _: 3.0, nums)
-   - _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+11 - _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 11 + _ = "".join((x in nums and "1" or "0" for x in range(123)))
-12 | all(map(lambda v: isinstance(v, dict), nums))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -162,10 +146,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-11 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
-   - all(map(lambda v: isinstance(v, dict), nums))
+12 - all(map(lambda v: isinstance(v, dict), nums))
 12 + all((isinstance(v, dict) for v in nums))
-13 | filter(func, map(lambda v: v, nums))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -178,10 +160,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |              ^^^^^^^^^^^^^^^^^^^^^^
 help: Replace `map()` with a generator expression
    |
-12 | all(map(lambda v: isinstance(v, dict), nums))
-   - filter(func, map(lambda v: v, nums))
+13 - filter(func, map(lambda v: v, nums))
 13 + filter(func, (v for v in nums))
-14 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -195,10 +175,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
    |
 help: Replace `map()` with a set comprehension
    |
-16 | # When inside f-string, then the fix should be surrounded by whitespace
-   - _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+17 - _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
 17 + _ = f"{ {x % 2 == 0 for x in nums} }"
-18 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -214,10 +192,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
    |
 help: Replace `map()` with a dict comprehension
    |
-17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
-   - _ = f"{dict(map(lambda v: (v, v**2), nums))}"
+18 - _ = f"{dict(map(lambda v: (v, v**2), nums))}"
 18 + _ = f"{ {v: v**2 for v in nums} }"
-19 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -232,10 +208,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-35 | # Error: the `x` is overridden by the inner lambda.
-   - map(lambda x: lambda x: x, range(4))
+36 - map(lambda x: lambda x: x, range(4))
 36 + (lambda x: x for x in range(4))
-37 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -250,10 +224,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-46 | # Regression test for: https://github.com/astral-sh/ruff/issues/7121
-   - map(lambda x: x, y if y else z)
+47 - map(lambda x: x, y if y else z)
 47 + (x for x in (y if y else z))
-48 | map(lambda x: x, (y if y else z))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -268,10 +240,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-47 | map(lambda x: x, y if y else z)
-   - map(lambda x: x, (y if y else z))
+48 - map(lambda x: x, (y if y else z))
 48 + (x for x in (y if y else z))
-49 | map(lambda x: x, (x, y, z))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -287,10 +257,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
    |
 help: Replace `map()` with a generator expression
    |
-48 | map(lambda x: x, (y if y else z))
-   - map(lambda x: x, (x, y, z))
+49 - map(lambda x: x, (x, y, z))
 49 + (x for x in (x, y, z))
-50 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -304,10 +272,8 @@ C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
    |
 help: Replace `map()` with a set comprehension
    |
-74 | # When inside t-string, then the fix should be surrounded by whitespace
-   - _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
+75 - _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
 75 + _ = t"{ {x % 2 == 0 for x in nums} }"
-76 | _ = t"{dict(map(lambda v: (v, v**2), nums))}"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -320,9 +286,7 @@ C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace `map()` with a dict comprehension
    |
-75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
-   - _ = t"{dict(map(lambda v: (v, v**2), nums))}"
+76 - _ = t"{dict(map(lambda v: (v, v**2), nums))}"
 76 + _ = t"{ {v: v**2 for v in nums} }"
-77 |
    |
 note: This is an unsafe fix and may change runtime behavior

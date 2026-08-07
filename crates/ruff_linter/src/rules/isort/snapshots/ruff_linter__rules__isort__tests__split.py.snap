@@ -13,11 +13,8 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
    |
-14 | if True:
 15 +     import A
-16 |     import C
-   -     import A
-17 |
+16 +     import C
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -30,11 +27,8 @@ I001 [*] Import block is un-sorted or un-formatted
    | |____________^
 help: Organize imports
    |
-19 |
 20 +     import B
-21 |     import D
-   -     import B
-22 |
+21 +     import D
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -47,8 +41,6 @@ I001 [*] Import block is un-sorted or un-formatted
    | |________^
 help: Organize imports
    |
-29 |
 30 + import c
-31 | import d
-   - import c
+31 + import d
    |

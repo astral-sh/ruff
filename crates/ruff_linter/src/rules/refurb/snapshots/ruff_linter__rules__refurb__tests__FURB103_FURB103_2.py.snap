@@ -13,12 +13,8 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
   |
 help: Replace with `Path("file.txt").write_text("\n", encoding="utf-8")`
   |
-2 | # should trigger
-  - with open("file.txt", "w", encoding="utf-8") as f:
-  -     f.write("\n")
 3 + import pathlib
-4 + pathlib.Path("file.txt").write_text("\n", encoding="utf-8")
-5 | f = object()
+4 ~ pathlib.Path("file.txt").write_text("\n", encoding="utf-8")
   |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
@@ -33,15 +29,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text("\n")`
    |
-2  | # should trigger
-3  + import pathlib
-4  | with open("file.txt", "w", encoding="utf-8") as f:
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 | with open("file.txt", "w", encoding="utf-8") as f:
+ 5 |     f.write("\n")
+ …
 16 |     # should trigger
-   -     with open("file.txt", "w") as f:
-   -         f.write("\n")
-17 +     pathlib.Path("file.txt").write_text("\n")
-18 |     return (f.name for _ in [0])
+17 ~     pathlib.Path("file.txt").write_text("\n")
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n")`
@@ -56,13 +49,10 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text("\n")`
    |
-2  | # should trigger
-3  + import pathlib
-4  | with open("file.txt", "w", encoding="utf-8") as f:
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 | with open("file.txt", "w", encoding="utf-8") as f:
+ 5 |     f.write("\n")
+ …
 23 |     # should trigger
-   -     with open("file.txt", "w") as f:
-   -         f.write("\n")
-24 +     pathlib.Path("file.txt").write_text("\n")
-25 |     g = {f.name for _ in [0]}
+24 ~     pathlib.Path("file.txt").write_text("\n")
    |

@@ -13,8 +13,5 @@ E242 [*] Tab after comma
   |
 help: Replace with single space
   |
-5 | #: E242
-  - a = (1,	2)  # tab before 2
-6 + a = (1, 2)  # tab before 2
-7 | #: Okay
-  |
+6 | a = (1, 2)  # tab before 2
+  |        +

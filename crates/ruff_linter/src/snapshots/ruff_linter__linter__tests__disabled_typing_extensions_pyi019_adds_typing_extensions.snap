@@ -11,13 +11,10 @@ PYI019 [*] Use `Self` instead of custom TypeVar `T`
   |
 help: Replace TypeVar `T` with `Self`
   |
-2 | from typing import TypeVar
 3 + from typing_extensions import Self
-4 |
+4 + 
 5 | T = TypeVar("T", bound="_NiceReprEnum")
 6 |
 7 | class C:
-  - 	def __new__(cls: type[T]) -> T:
-8 + 	def __new__(cls) -> Self:
-9 |               return cls
+8 ~     def __new__(cls) -> Self:
   |

@@ -11,10 +11,8 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
   |
 help: Remove unnecessary parentheses
   |
-4 |
-  - @functools.lru_cache()
+5 - @functools.lru_cache()
 5 + @functools.lru_cache
-6 | def fixme():
   |
 
 UP011 [*] Unnecessary parentheses to `functools.lru_cache`
@@ -27,10 +25,8 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
 help: Remove unnecessary parentheses
    |
-9  |
-   - @lru_cache()
+10 - @lru_cache()
 10 + @lru_cache
-11 | def fixme():
    |
 
 UP011 [*] Unnecessary parentheses to `functools.lru_cache`
@@ -44,10 +40,8 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
 help: Remove unnecessary parentheses
    |
-15 | @other_decorator
-   - @functools.lru_cache()
+16 - @functools.lru_cache()
 16 + @functools.lru_cache
-17 | def fixme():
    |
 
 UP011 [*] Unnecessary parentheses to `functools.lru_cache`
@@ -60,8 +54,6 @@ UP011 [*] Unnecessary parentheses to `functools.lru_cache`
    |
 help: Remove unnecessary parentheses
    |
-20 |
-   - @functools.lru_cache()
+21 - @functools.lru_cache()
 21 + @functools.lru_cache
-22 | @other_decorator
    |

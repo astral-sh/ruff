@@ -13,16 +13,11 @@ TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  | from __future__ import annotations
-2  + from typing import TYPE_CHECKING
-3  +
-4  + if TYPE_CHECKING:
-5  +     from pkg.bar import A
-6  |
---------------------------------------------------------------------------------
-57 |     import pkg
-   -     from pkg.bar import A
-58 |
+ 2 + from typing import TYPE_CHECKING
+ 3 ~ 
+ 4 + if TYPE_CHECKING:
+ 5 +     from pkg.bar import A
+ 6 + 
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -37,15 +32,10 @@ TC002 [*] Move third-party import `pkg` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  | from __future__ import annotations
-2  + from typing import TYPE_CHECKING
-3  +
-4  + if TYPE_CHECKING:
-5  +     import pkg
-6  |
---------------------------------------------------------------------------------
-94 |     # testing the implementation.
-   -     import pkg
-95 |     import pkgfoo.bar as B
+ 2 + from typing import TYPE_CHECKING
+ 3 ~ 
+ 4 + if TYPE_CHECKING:
+ 5 +     import pkg
+ 6 + 
    |
 note: This is an unsafe fix and may change runtime behavior

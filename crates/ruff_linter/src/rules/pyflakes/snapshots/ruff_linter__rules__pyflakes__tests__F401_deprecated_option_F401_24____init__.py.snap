@@ -8,9 +8,7 @@ F401 [*] `sys` imported but unused
    |        ^^^
 help: Remove unused import: `sys`
    |
-18 |
-   - import sys  # F401: remove unused
-19 |
+19 - import sys  # F401: remove unused
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -21,9 +19,7 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
    |               ^^^^^^
 help: Remove unused import: `.unused`
    |
-32 |
-   - from . import unused  # F401: change to redundant alias
-33 |
+33 - from . import unused  # F401: change to redundant alias
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -34,7 +30,6 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
    |                          ^^^^
 help: Remove unused import: `.renamed`
    |
-35 |
-   - from . import renamed as bees  # F401: no fix
+36 - from . import renamed as bees  # F401: no fix
    |
 note: This is an unsafe fix and may change runtime behavior

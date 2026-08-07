@@ -11,10 +11,8 @@ RUF047 [*] Empty `else` clause
   | |________^
 help: Remove the `else` clause
   |
-5 |     break
-  - else:
-  -     pass
-6 |
+6 - else:
+7 -     pass
   |
 
 RUF047 [*] Empty `else` clause
@@ -27,8 +25,6 @@ RUF047 [*] Empty `else` clause
    | |_______^
 help: Remove the `else` clause
    |
-11 |     belongs_to()  # `for`
-   - else:
-   -     ...
-12 |
+12 - else:
+13 -     ...
    |

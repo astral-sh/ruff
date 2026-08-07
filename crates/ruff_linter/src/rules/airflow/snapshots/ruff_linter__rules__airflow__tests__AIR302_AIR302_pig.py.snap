@@ -12,11 +12,9 @@ AIR302 [*] `airflow.hooks.pig_hook.PigCliHook` is moved into `apache-pig` provid
   |
 help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigCliHook` from `airflow.providers.apache.pig.hooks.pig` instead.
   |
-2 |
-  - from airflow.hooks.pig_hook import PigCliHook
-3 | from airflow.operators.pig_operator import PigOperator
-4 + from airflow.providers.apache.pig.hooks.pig import PigCliHook
-5 |
+3 + 
+4 | from airflow.operators.pig_operator import PigOperator
+5 + from airflow.providers.apache.pig.hooks.pig import PigCliHook
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,9 +26,7 @@ AIR302 [*] `airflow.operators.pig_operator.PigOperator` is moved into `apache-pi
   | ^^^^^^^^^^^
 help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigOperator` from `airflow.providers.apache.pig.operators.pig` instead.
   |
-3 | from airflow.hooks.pig_hook import PigCliHook
-  - from airflow.operators.pig_operator import PigOperator
-4 + from airflow.providers.apache.pig.operators.pig import PigOperator
-5 |
+4 + 
+5 + from airflow.providers.apache.pig.operators.pig import PigOperator
   |
 note: This is an unsafe fix and may change runtime behavior

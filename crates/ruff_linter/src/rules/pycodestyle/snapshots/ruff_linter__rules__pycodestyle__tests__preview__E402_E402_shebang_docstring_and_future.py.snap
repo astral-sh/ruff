@@ -10,11 +10,7 @@ E402 [*] Module level import not at top of file
   | ^^^^^^^^^
 help: Move module level imports to top of file
   |
-5 | from __future__ import annotations
 6 + import os
-7 |
-8 | print("something")
-9 |
-  - import os
+7 + 
   |
 note: This is an unsafe fix and may change runtime behavior

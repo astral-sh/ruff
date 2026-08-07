@@ -13,11 +13,8 @@ E271 [*] Multiple spaces after keyword
   |
 help: Replace with single space
   |
-3 | #: E271
-  - True and  False
-4 + True and False
-5 | #: E272
-  |
+4 | True and False
+  |         +
 
 E271 [*] Multiple spaces after keyword
  --> E27.py:6:5
@@ -31,11 +28,8 @@ E271 [*] Multiple spaces after keyword
   |
 help: Replace with single space
   |
-5 | #: E272
-  - True  and False
-6 + True and False
-7 | #: E271
-  |
+6 | True and False
+  |     +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:8:3
@@ -49,11 +43,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
   |
-7 | #: E271
-  - if   1:
-8 + if 1:
-9 |     pass
-  |
+8 | if 1:
+  |   +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:15:6
@@ -67,11 +58,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-14 | #: E271
-   - a and  b
-15 + a and b
-16 | #: E271
-   |
+15 | a and b
+   |      +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:17:6
@@ -85,11 +73,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-16 | #: E271
-   - 1 and  b
-17 + 1 and b
-18 | #: E271
-   |
+17 | 1 and b
+   |      +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:19:6
@@ -103,11 +88,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-18 | #: E271
-   - a and  2
-19 + a and 2
-20 | #: E271 E272
-   |
+19 | a and 2
+   |      +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:21:7
@@ -121,11 +103,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-20 | #: E271 E272
-   - 1  and  b
-21 + 1  and b
-22 | #: E271 E272
-   |
+21 | 1  and b
+   |       +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:23:7
@@ -139,11 +118,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-22 | #: E271 E272
-   - a  and  2
-23 + a  and 2
-24 | #: E272
-   |
+23 | a  and 2
+   |       +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:36:14
@@ -157,11 +133,8 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-35 | #: E271
-   - from w import  (e, f)
-36 + from w import (e, f)
-37 | #: E275
-   |
+36 | from w import (e, f)
+   |              +
 
 E271 [*] Multiple spaces after keyword
   --> E27.py:71:5
@@ -174,8 +147,5 @@ E271 [*] Multiple spaces after keyword
    |
 help: Replace with single space
    |
-70 | #: E271
-   - type  Number = int
-71 + type Number = int
-72 |
-   |
+71 | type Number = int
+   |     +

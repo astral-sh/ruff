@@ -11,9 +11,8 @@ PIE800 [*] Unnecessary spread `**`
   |
 help: Remove unnecessary dict
   |
-  - {"foo": 1, **{"bar": 1}}  # PIE800
+1 - {"foo": 1, **{"bar": 1}}  # PIE800
 1 + {"foo": 1, "bar": 1}  # PIE800
-2 |
   |
 
 PIE800 [*] Unnecessary spread `**`
@@ -28,10 +27,8 @@ PIE800 [*] Unnecessary spread `**`
   |
 help: Remove unnecessary dict
   |
-2 |
-  - {**{"bar": 10}, "a": "b"}  # PIE800
+3 - {**{"bar": 10}, "a": "b"}  # PIE800
 3 + {"bar": 10, "a": "b"}  # PIE800
-4 |
   |
 
 PIE800 [*] Unnecessary spread `**`
@@ -46,10 +43,8 @@ PIE800 [*] Unnecessary spread `**`
   |
 help: Remove unnecessary dict
   |
-4 |
-  - foo({**foo, **{"bar": True}})  # PIE800
+5 - foo({**foo, **{"bar": True}})  # PIE800
 5 + foo({**foo, "bar": True})  # PIE800
-6 |
   |
 
 PIE800 [*] Unnecessary spread `**`
@@ -64,10 +59,8 @@ PIE800 [*] Unnecessary spread `**`
   |
 help: Remove unnecessary dict
   |
-6 |
-  - {**foo, **{"bar": 10}}  # PIE800
+7 - {**foo, **{"bar": 10}}  # PIE800
 7 + {**foo, "bar": 10}  # PIE800
-8 |
   |
 
 PIE800 [*] Unnecessary spread `**`
@@ -86,16 +79,11 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-11 |     # Preserve
-   -     **{
-12 +     
+12 ~     
 13 |         # all
-   -         "bar": 10,  # the
-14 +         "bar": 10  # the
+14 ~         "bar": 10  # the
 15 |         # comments
-   -     },
-16 +     ,
-17 | }
+16 ~     ,
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -110,10 +98,8 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-18 |
-   - {**foo, **buzz, **{bar: 10}}  # PIE800
+19 - {**foo, **buzz, **{bar: 10}}  # PIE800
 19 + {**foo, **buzz, bar: 10}  # PIE800
-20 |
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -127,10 +113,8 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-23 |     "data": [],
-   -     **({"count": 1 if include_count else {}}),
+24 -     **({"count": 1 if include_count else {}}),
 24 +     "count": 1 if include_count else {},
-25 | }
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -145,14 +129,9 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-28 |     "data": [],
-   -     **(  # Comment
-   -         {  # Comment
-   -             "count": 1 if include_count else {}}),
-29 +       # Comment
-30 +           # Comment
-31 +             "count": 1 if include_count else {},
-32 | }
+29 ~       # Comment
+30 ~           # Comment
+31 ~             "count": 1 if include_count else {},
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -167,14 +146,9 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-35 |     "data": [],
-   -     **(
-   -         {
-   -             "count": (a := 1),}),
-36 +     
-37 +         
-38 +             "count": (a := 1),
-39 | }
+36 ~     
+37 ~         
+38 ~             "count": (a := 1),
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -191,17 +165,11 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-42 |     "data": [],
-   -     **(
-   -         {
-43 +     
-44 +         
+43 ~     
+44 ~         
 45 |             "count": (a := 1)
-   -             }
-   -     )
-46 +             
-47 +     
-48 |     ,
+46 ~             
+47 ~     
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -218,18 +186,11 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-52 |     "data": [],
-   -     **(
-   -         {
-   -             "count": (a := 1),  # Comment
-   -             }  # Comment
-   -     ) # Comment
-53 +     
-54 +         
-55 +             "count": (a := 1)  # Comment
-56 +               # Comment
-57 +      # Comment
-58 |     ,
+53 ~     
+54 ~         
+55 ~             "count": (a := 1)  # Comment
+56 ~               # Comment
+57 ~      # Comment
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -246,22 +207,13 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-62 |     "data": [],
-   -     **(  # Comment
-   -         (   # Comment
-   - { # Comment
-   -             "count": (a := 1),  # Comment
-   -         }  # Comment
-   -             )
-   -     ) # Comment
-63 +       # Comment
-64 +            # Comment
-65 +  # Comment
-66 +             "count": (a := 1)  # Comment
-67 +           # Comment
-68 +             
-69 +      # Comment
-70 |     ,
+63 ~       # Comment
+64 ~            # Comment
+65 |  # Comment
+66 ~             "count": (a := 1)  # Comment
+67 ~           # Comment
+68 ~             
+69 ~      # Comment
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -278,19 +230,12 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-74 |     "data": [],
-   -     ** # Foo
-   -     (  # Comment
-   -         { "a": b,
-75 +      # Foo
-76 +       # Comment
-77 +          "a": b
+75 ~      # Foo
+76 ~       # Comment
+77 ~          "a": b
 78 |           # Comment
-   -           }
-   -     ) ,
-79 +           
-80 +      ,
-81 |     c: 9,
+79 ~           
+80 ~      ,
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -303,10 +248,8 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-85 | # https://github.com/astral-sh/ruff/issues/15997
-   - {"a": [], **{},}
+86 - {"a": [], **{},}
 86 + {"a": [], }
-87 | {"a": [], **({}),}
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -321,10 +264,8 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-86 | {"a": [], **{},}
-   - {"a": [], **({}),}
+87 - {"a": [], **({}),}
 87 + {"a": [], }
-88 |
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -338,10 +279,8 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-88 |
-   - {"a": [], **{}, 6: 3}
+89 - {"a": [], **{}, 6: 3}
 89 + {"a": [],  6: 3}
-90 | {"a": [], **({}), 6: 3}
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -355,10 +294,8 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-89 | {"a": [], **{}, 6: 3}
-   - {"a": [], **({}), 6: 3}
+90 - {"a": [], **({}), 6: 3}
 90 + {"a": [],  6: 3}
-91 |
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -376,13 +313,7 @@ PIE800 [*] Unnecessary spread `**`
    |
 help: Remove unnecessary dict
    |
-91 |
-   - {"a": [], **{
-92 + {"a": [], 
-93 |     # Comment
-   - }, 6: 3}
-94 +  6: 3}
-95 | {"a": [], **({
+92 ~ {"a": [], 
    |
 
 PIE800 [*] Unnecessary spread `**`
@@ -397,11 +328,5 @@ PIE800 [*] Unnecessary spread `**`
    | |_^
 help: Remove unnecessary dict
    |
-94 | }, 6: 3}
-   - {"a": [], **({
-95 + {"a": [], 
-96 |     # Comment
-   - }), 6: 3}
-97 +  6: 3}
-98 |
+95 ~ {"a": [], 
    |

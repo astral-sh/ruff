@@ -11,7 +11,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
   |
 help: Replace double quotes docstring with single quotes
   |
-  - """This is a docstring."""
+1 - """This is a docstring."""
 1 + '''This is a docstring.'''
-2 |
   |

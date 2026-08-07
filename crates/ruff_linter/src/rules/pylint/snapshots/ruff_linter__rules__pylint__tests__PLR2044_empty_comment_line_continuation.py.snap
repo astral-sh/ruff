@@ -11,8 +11,7 @@ PLR2044 [*] Line with empty comment
   |
 help: Delete the empty comment
   |
-  - #
-1 | x = 0 \
+1 - #
   |
 
 PLR2044 [*] Line with empty comment
@@ -27,8 +26,5 @@ PLR2044 [*] Line with empty comment
   |
 help: Delete the empty comment
   |
-2 | x = 0 \
-  - #
-3 +
-4 | +1
+3 - #
   |

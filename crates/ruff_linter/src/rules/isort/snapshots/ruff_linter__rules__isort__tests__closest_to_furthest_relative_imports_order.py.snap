@@ -12,7 +12,5 @@ help: Organize imports
   |
 1 + from . import c
 2 + from .. import b
-3 | from ... import a
-  - from .. import b
-  - from . import c
+3 + from ... import a
   |

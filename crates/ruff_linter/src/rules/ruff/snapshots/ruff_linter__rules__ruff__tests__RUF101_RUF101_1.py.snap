@@ -13,8 +13,6 @@ RUF101 [*] `TCH002` is a redirect to `TC002`
   |
 help: Replace with `TC002`
   |
-4 | """
-  - # ruff: noqa: TCH002
+5 - # ruff: noqa: TCH002
 5 + # ruff: noqa: TC002
-6 |
   |

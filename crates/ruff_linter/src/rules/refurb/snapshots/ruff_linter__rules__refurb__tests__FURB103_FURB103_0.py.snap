@@ -11,14 +11,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text("test")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 12 | # FURB103
-   - with open("file.txt", "w") as f:
-   -     f.write("test")
 13 + pathlib.Path("file.txt").write_text("test")
-14 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(foobar)`
@@ -31,14 +29,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_byt
    |
 help: Replace with `Path("file.txt").write_bytes(foobar)`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 16 | # FURB103
-   - with open("file.txt", "wb") as f:
-   -     f.write(foobar)
 17 + pathlib.Path("file.txt").write_bytes(foobar)
-18 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
@@ -51,14 +47,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_byt
    |
 help: Replace with `Path("file.txt").write_bytes(b"abc")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 20 | # FURB103
-   - with open("file.txt", mode="wb") as f:
-   -     f.write(b"abc")
 21 + pathlib.Path("file.txt").write_bytes(b"abc")
-22 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
@@ -71,14 +65,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text(foobar, encoding="utf8")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 24 | # FURB103
-   - with open("file.txt", "w", encoding="utf8") as f:
-   -     f.write(foobar)
 25 + pathlib.Path("file.txt").write_text(foobar, encoding="utf8")
-26 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
@@ -91,14 +83,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text(foobar, errors="ignore")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 28 | # FURB103
-   - with open("file.txt", "w", errors="ignore") as f:
-   -     f.write(foobar)
 29 + pathlib.Path("file.txt").write_text(foobar, errors="ignore")
-30 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
@@ -111,14 +101,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text(foobar)`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 32 | # FURB103
-   - with open("file.txt", mode="w") as f:
-   -     f.write(foobar)
 33 + pathlib.Path("file.txt").write_text(foobar)
-34 |
    |
 
 FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
@@ -175,14 +163,12 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
    |
-1  + import pathlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import pathlib
+ 2 | def foo():
+ 3 |     ...
+ …
 58 | # FURB103
-   - with open("file.txt", "w", newline="\r\n") as f:
-   -     f.write(foobar)
 59 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
-60 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
@@ -195,15 +181,11 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
    |
-62 | import builtins
 63 + import pathlib
-64 |
+64 + 
 65 |
 66 | # FURB103
-   - with builtins.open("file.txt", "w", newline="\r\n") as f:
-   -     f.write(foobar)
 67 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
-68 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, newline="\r\n")`
@@ -216,15 +198,11 @@ FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_tex
    |
 help: Replace with `Path("file.txt").write_text(foobar, newline="\r\n")`
    |
-70 | from builtins import open as o
 71 + import pathlib
-72 |
+72 + 
 73 |
 74 | # FURB103
-   - with o("file.txt", "w", newline="\r\n") as f:
-   -     f.write(foobar)
 75 + pathlib.Path("file.txt").write_text(foobar, newline="\r\n")
-76 |
    |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("test.json")....`
@@ -238,15 +216,11 @@ FURB103 [*] `open` and `write` should be replaced by `Path("test.json")....`
     |
 help: Replace with `Path("test.json")....`
     |
-150 | import json
 151 + import pathlib
-152 |
+152 + 
 153 | data = {"price": 100}
 154 |
-    - with open("test.json", "wb") as f:
-    -     f.write(json.dumps(data, indent=4).encode("utf-8"))
 155 + pathlib.Path("test.json").write_bytes(json.dumps(data, indent=4).encode("utf-8"))
-156 |
     |
 
 FURB103 [*] `open` and `write` should be replaced by `Path("tmp_path/pyproject.toml")....`
@@ -260,13 +234,15 @@ FURB103 [*] `open` and `write` should be replaced by `Path("tmp_path/pyproject.t
     |
 help: Replace with `Path("tmp_path/pyproject.toml")....`
     |
-150 | import json
 151 + import pathlib
-152 |
---------------------------------------------------------------------------------
+152 + 
+153 | data = {"price": 100}
+  …
 158 | # See: https://github.com/astral-sh/ruff/issues/21381
-    - with open("tmp_path/pyproject.toml", "w") as f:
-    -     f.write(dedent(
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
-160 |         """
+160 +         """
+161 +         [project]
+162 +         other = 1.234
+163 +         """,
+164 +     ))
     |

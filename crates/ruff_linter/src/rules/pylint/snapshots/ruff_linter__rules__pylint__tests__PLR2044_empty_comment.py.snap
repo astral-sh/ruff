@@ -13,9 +13,7 @@ PLR2044 [*] Line with empty comment
   |
 help: Delete the empty comment
   |
-2 |     # this line is also OK, but the three following lines are not
-  - #
-3 |     #
+3 - #
   |
 
 PLR2044 [*] Line with empty comment
@@ -29,9 +27,7 @@ PLR2044 [*] Line with empty comment
   |
 help: Delete the empty comment
   |
-3 | #
-  -     #
-4 |         #
+4 -     #
   |
 
 PLR2044 [*] Line with empty comment
@@ -46,9 +42,7 @@ PLR2044 [*] Line with empty comment
   |
 help: Delete the empty comment
   |
-4 |     #
-  -         #
-5 |
+5 -         #
   |
 
 PLR2044 [*] Line with empty comment
@@ -59,10 +53,8 @@ PLR2044 [*] Line with empty comment
    |           ^
 help: Delete the empty comment
    |
-17 | def foo():  # this comment is OK, the one below is not
-   -     pass  #
+18 -     pass  #
 18 +     pass
-19 |
    |
 
 PLR2044 [*] Line with empty comment
@@ -76,9 +68,7 @@ PLR2044 [*] Line with empty comment
    |
 help: Delete the empty comment
    |
-44 | #
-   - #
-45 |
+44 - #
    |
 
 PLR2044 [*] Line with empty comment
@@ -92,9 +82,7 @@ PLR2044 [*] Line with empty comment
    |
 help: Delete the empty comment
    |
-44 | #
-   - #
-45 |
+45 - #
    |
 
 PLR2044 [*] Line with empty comment
@@ -105,7 +93,6 @@ PLR2044 [*] Line with empty comment
    |  ^
 help: Delete the empty comment
    |
-57 | α = 1
-   - α#
+58 - α#
 58 + α
    |

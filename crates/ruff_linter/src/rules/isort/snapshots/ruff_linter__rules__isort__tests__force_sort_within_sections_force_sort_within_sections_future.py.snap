@@ -10,6 +10,5 @@ I001 [*] Import block is un-sorted or un-formatted
 help: Organize imports
   |
 1 + from __future__ import annotations
-2 | import __future__
-  - from __future__ import annotations
+2 + import __future__
   |

@@ -9,13 +9,11 @@ I001 [*] Import block is un-sorted or un-formatted
 3 | | import math
   | |___________^
 help: Organize imports
- ::: cell 1
+ ::: cell 1:0:1
   |
-1 + import math
-2 + import random
-3 | from pathlib import Path
-  - import random
-  - import math
+0 + import math
+1 + import random
+2 + from pathlib import Path
   |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -28,14 +26,10 @@ I001 [*] Import block is un-sorted or un-formatted
 4 |   def foo():
   |
 help: Organize imports
- ::: cell 2
+ ::: cell 2:0:1
   |
-1 + import collections
-2 | from typing import Any
-  - import collections
-3 +
-4 +
-5 | # Newline should be added here
+0 + import collections
+1 + from typing import Any
   |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -48,12 +42,10 @@ I001 [*] Import block is un-sorted or un-formatted
 4 |   %matplotlib \
   |
 help: Organize imports
- ::: cell 3
+ ::: cell 3:0:1
   |
-1 + import sys
-2 | from pathlib import Path
-  - import sys
-3 |
+0 + import sys
+1 + from pathlib import Path
   |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -65,10 +57,8 @@ I001 [*] Import block is un-sorted or un-formatted
 8 | | import abc
   | |__________^
 help: Organize imports
- ::: cell 3
+ ::: cell 3:6:1
   |
-6 |
-7 + import abc
-8 | import math
-  - import abc
+6 + import abc
+7 + import math
   |

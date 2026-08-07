@@ -18,13 +18,11 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
   |
-2 | from math import (
-  -   sin,
-  -   tan,
-3 |   cos,
-4 |   nan,
-5 |   pi,
+2 + from math import (
+3 +   cos,
+4 +   nan,
+5 +   pi,
 6 +   sin,
 7 +   tan,
-8 | )
+8 + )
   |

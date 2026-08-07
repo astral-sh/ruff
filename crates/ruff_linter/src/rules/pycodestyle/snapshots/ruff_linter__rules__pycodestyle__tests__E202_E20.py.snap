@@ -12,10 +12,7 @@ E202 [*] Whitespace before ')'
    |
 help: Remove whitespace before ')'
    |
-18 | #: E202:1:23
-   - spam(ham[1], {eggs: 2} )
-19 + spam(ham[1], {eggs: 2})
-20 | #: E202:1:22
+19 | spam(ham[1], {eggs: 2})
    |
 
 E202 [*] Whitespace before '}'
@@ -30,10 +27,7 @@ E202 [*] Whitespace before '}'
    |
 help: Remove whitespace before '}'
    |
-20 | #: E202:1:22
-   - spam(ham[1], {eggs: 2 })
-21 + spam(ham[1], {eggs: 2})
-22 | #: E202:1:11
+21 | spam(ham[1], {eggs: 2})
    |
 
 E202 [*] Whitespace before ']'
@@ -48,10 +42,7 @@ E202 [*] Whitespace before ']'
    |
 help: Remove whitespace before ']'
    |
-22 | #: E202:1:11
-   - spam(ham[1 ], {eggs: 2})
-23 + spam(ham[1], {eggs: 2})
-24 | #: E202:1:23
+23 | spam(ham[1], {eggs: 2})
    |
 
 E202 [*] Whitespace before ')'
@@ -66,10 +57,7 @@ E202 [*] Whitespace before ')'
    |
 help: Remove whitespace before ')'
    |
-24 | #: E202:1:23
-   - spam(ham[1], {eggs: 2}	)
-25 + spam(ham[1], {eggs: 2})
-26 | #: E202:1:22
+25 | spam(ham[1], {eggs: 2})
    |
 
 E202 [*] Whitespace before '}'
@@ -84,10 +72,7 @@ E202 [*] Whitespace before '}'
    |
 help: Remove whitespace before '}'
    |
-26 | #: E202:1:22
-   - spam(ham[1], {eggs: 2	})
-27 + spam(ham[1], {eggs: 2})
-28 | #: E202:1:11
+27 | spam(ham[1], {eggs: 2})
    |
 
 E202 [*] Whitespace before ']'
@@ -102,10 +87,7 @@ E202 [*] Whitespace before ']'
    |
 help: Remove whitespace before ']'
    |
-28 | #: E202:1:11
-   - spam(ham[1	], {eggs: 2})
-29 + spam(ham[1], {eggs: 2})
-30 | #: Okay
+29 | spam(ham[1], {eggs: 2})
    |
 
 E202 [*] Whitespace before ']'
@@ -119,10 +101,7 @@ E202 [*] Whitespace before ']'
     |
 help: Remove whitespace before ']'
     |
-115 | f"{ {'a': 1} }"
-    - f"{[ { {'a': 1} } ]}"
-116 + f"{[ { {'a': 1} }]}"
-117 | f"normal { {f"{ { [1, 2] } }" } } normal"
+116 | f"{[ { {'a': 1} }]}"
     |
 
 E202 [*] Whitespace before ']'
@@ -136,10 +115,7 @@ E202 [*] Whitespace before ']'
     |
 help: Remove whitespace before ']'
     |
-171 | #: E202:1:12
-    - ham[upper : ]
-172 + ham[upper :]
-173 |
+172 | ham[upper :]
     |
 
 E202 [*] Whitespace before ']'
@@ -153,8 +129,5 @@ E202 [*] Whitespace before ']'
     |
 help: Remove whitespace before ']'
     |
-194 | t"{ {'a': 1} }"
-    - t"{[ { {'a': 1} } ]}"
-195 + t"{[ { {'a': 1} }]}"
-196 | t"normal { {t"{ { [1, 2] } }" } } normal"
+195 | t"{[ { {'a': 1} }]}"
     |

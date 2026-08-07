@@ -13,10 +13,10 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
   |
 help: Replace with `Path.stat(...).st_atime`
   |
+2 ~ from pathlib import Path
+3 | from os.path import getatime
 4 |
-  - os.path.getatime("filename")
 5 + Path("filename").stat().st_atime
-6 | os.path.getatime(b"filename")
   |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -29,10 +29,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
   |
 help: Replace with `Path.stat(...).st_atime`
   |
+2 ~ from pathlib import Path
+3 | from os.path import getatime
+4 |
 5 | os.path.getatime("filename")
-  - os.path.getatime(b"filename")
 6 + Path(b"filename").stat().st_atime
-7 | os.path.getatime(Path("filename"))
   |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -44,10 +45,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
   | ^^^^^^^^^^^^^^^^
 help: Replace with `Path.stat(...).st_atime`
   |
+2 ~ from pathlib import Path
+3 | from os.path import getatime
+…
 6 | os.path.getatime(b"filename")
-  - os.path.getatime(Path("filename"))
 7 + Path("filename").stat().st_atime
-8 |
   |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -60,10 +62,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
-9  |
-   - getatime("filename")
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
+ 9 |
 10 + Path("filename").stat().st_atime
-11 | getatime(b"filename")
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -76,10 +79,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 10 | getatime("filename")
-   - getatime(b"filename")
 11 + Path(b"filename").stat().st_atime
-12 | getatime(Path("filename"))
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -91,10 +95,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    | ^^^^^^^^
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 11 | getatime(b"filename")
-   - getatime(Path("filename"))
 12 + Path("filename").stat().st_atime
-13 |
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -109,10 +114,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 16 |
-   - os.path.getatime(file)
 17 + Path(file).stat().st_atime
-18 | os.path.getatime(filename="filename")
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -125,10 +131,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 17 | os.path.getatime(file)
-   - os.path.getatime(filename="filename")
 18 + Path("filename").stat().st_atime
-19 | os.path.getatime(filename=Path("filename"))
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -143,10 +150,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 18 | os.path.getatime(filename="filename")
-   - os.path.getatime(filename=Path("filename"))
 19 + Path("filename").stat().st_atime
-20 |
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -161,16 +169,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 20 |
-   - os.path.getatime(  # comment 1
-   -     # comment 2
-   -     "filename"  # comment 3
-   -     # comment 4
-   -     ,  # comment 5
-   -     # comment 6
-   - )  # comment 7
-21 + Path("filename").stat().st_atime  # comment 7
-22 |
+21 ~ Path("filename").stat().st_atime  # comment 7
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -186,10 +189,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 28 |
-   - os.path.getatime("file" + "name")
 29 + Path("file" + "name").stat().st_atime
-30 |
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -204,10 +208,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 30 |
-   - getatime(Path("filename").resolve())
 31 + Path(Path("filename").resolve()).stat().st_atime
-32 |
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -222,10 +227,11 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    |
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 32 |
-   - os.path.getatime(pathlib.Path("filename"))
 33 + pathlib.Path("filename").stat().st_atime
-34 |
    |
 
 PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
@@ -237,7 +243,9 @@ PTH203 [*] `os.path.getatime` should be replaced by `Path.stat().st_atime`
    | ^^^^^^^^
 help: Replace with `Path.stat(...).st_atime`
    |
+ 2 ~ from pathlib import Path
+ 3 | from os.path import getatime
+ …
 34 |
-   - getatime(Path("dir") / "file.txt")
 35 + Path(Path("dir") / "file.txt").stat().st_atime
    |

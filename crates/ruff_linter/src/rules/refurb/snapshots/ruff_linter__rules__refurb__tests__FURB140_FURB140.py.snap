@@ -14,11 +14,10 @@ help: Replace with `itertools.starmap`
   |
 1 + from itertools import starmap
 2 | def zipped():
---------------------------------------------------------------------------------
+3 |     return zip([1, 2, 3], "ABC")
+…
 7 | # FURB140
-  - [print(x, y) for x, y in zipped()]
 8 + list(starmap(print, zipped()))
-9 |
   |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -32,13 +31,12 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
-1  + from itertools import starmap
-2  | def zipped():
---------------------------------------------------------------------------------
+ 1 + from itertools import starmap
+ 2 | def zipped():
+ 3 |     return zip([1, 2, 3], "ABC")
+ …
 10 | # FURB140
-   - (print(x, y) for x, y in zipped())
 11 + starmap(print, zipped())
-12 |
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -49,13 +47,12 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `itertools.starmap`
    |
-1  + from itertools import starmap
-2  | def zipped():
---------------------------------------------------------------------------------
+ 1 + from itertools import starmap
+ 2 | def zipped():
+ 3 |     return zip([1, 2, 3], "ABC")
+ …
 13 | # FURB140
-   - {print(x, y) for x, y in zipped()}
 14 + set(starmap(print, zipped()))
-15 |
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -69,10 +66,10 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
 18 | # FURB140
-   - [print(x, y) for x, y in zipped()]
 19 + list(sm(print, zipped()))
-20 |
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -86,10 +83,11 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
+ …
 21 | # FURB140
-   - (print(x, y) for x, y in zipped())
 22 + sm(print, zipped())
-23 |
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -103,10 +101,11 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
+ …
 24 | # FURB140
-   - {print(x, y) for x, y in zipped()}
 25 + set(sm(print, zipped()))
-26 |
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -121,10 +120,11 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
+ …
 28 | # See https://github.com/astral-sh/ruff/issues/7636
-   - [foo(*t) for t in [(85, 60), (100, 80)]]
 29 + list(sm(foo, [(85, 60), (100, 80)]))
-30 | (foo(*t) for t in [(85, 60), (100, 80)])
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -138,10 +138,11 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
+ …
 29 | [foo(*t) for t in [(85, 60), (100, 80)]]
-   - (foo(*t) for t in [(85, 60), (100, 80)])
 30 + sm(foo, [(85, 60), (100, 80)])
-31 | {foo(*t) for t in [(85, 60), (100, 80)]}
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -156,10 +157,11 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
+ …
 30 | (foo(*t) for t in [(85, 60), (100, 80)])
-   - {foo(*t) for t in [(85, 60), (100, 80)]}
 31 + set(sm(foo, [(85, 60), (100, 80)]))
-32 |
    |
 
 FURB140 [*] Use `itertools.starmap` instead of the generator
@@ -176,13 +178,10 @@ FURB140 [*] Use `itertools.starmap` instead of the generator
    |
 help: Replace with `itertools.starmap`
    |
+16 ~ from itertools import starmap as sm
+17 |
+ …
 61 | all(
-   -     predicate(a, b)
-   -     # text
-   -     for a, b
-   -     # text
-   -     in some_iterable
-62 +     sm(predicate, some_iterable)
-63 | )
+62 ~     sm(predicate, some_iterable)
    |
 note: This is an unsafe fix and may change runtime behavior

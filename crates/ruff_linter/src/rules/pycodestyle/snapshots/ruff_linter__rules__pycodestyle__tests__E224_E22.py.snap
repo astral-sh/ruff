@@ -12,8 +12,5 @@ E224 [*] Tab after operator
    |
 help: Replace with single space
    |
-47 | #: E224
-   - a +=	1
-48 + a += 1
-49 | b += 1000
-   |
+48 | a += 1
+   |     +

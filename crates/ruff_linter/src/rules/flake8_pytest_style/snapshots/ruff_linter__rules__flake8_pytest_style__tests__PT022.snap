@@ -10,10 +10,8 @@ PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |     ^^^^^^^^^^^^^^
 help: Replace `yield` with `return`
    |
-16 |     resource = acquire_resource()
-   -     yield resource
+17 -     yield resource
 17 +     return resource
-18 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -26,13 +24,9 @@ PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |     ^^^^^^^^^^^^^^
 help: Replace `yield` with `return`
    |
-34 | @pytest.fixture()
-   - def error() -> typing.Generator[typing.Any, None, None]:
-35 + def error() -> typing.Any:
+35 ~ def error() -> typing.Any:
 36 |     resource = acquire_resource()
-   -     yield resource
-37 +     return resource
-38 |
+37 ~     return resource
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,11 +39,8 @@ PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |     ^^^^^^^^^^^^^^
 help: Replace `yield` with `return`
    |
-40 | @pytest.fixture()
-   - def error() -> Generator[Resource, None, None]:
-41 + def error() -> Resource:
+41 ~ def error() -> Resource:
 42 |     resource = acquire_resource()
-   -     yield resource
-43 +     return resource
+43 ~     return resource
    |
 note: This is an unsafe fix and may change runtime behavior

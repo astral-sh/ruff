@@ -13,10 +13,8 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-9  |     x,
-   -     y: str = os.pathsep,  # Error PYI011 Only simple default values allowed for typed arguments
+10 -     y: str = os.pathsep,  # Error PYI011 Only simple default values allowed for typed arguments
 10 +     y: str = ...,  # Error PYI011 Only simple default values allowed for typed arguments
-11 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -35,13 +33,11 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-37 |         int, int
-   -     ] = {  # Error PYI011 Only simple default values allowed for typed arguments
-   -         1: 2,
-   -         **{3: 4},
-   -     }
+38 -     ] = {  # Error PYI011 Only simple default values allowed for typed arguments
+39 -         1: 2,
+40 -         **{3: 4},
+41 -     }
 38 +     ] = ...
-39 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -69,22 +65,20 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-45 |         int
-   -     ] = [  # Error PYI011 Only simple default values allowed for typed arguments
-   -         1,
-   -         2,
-   -         3,
-   -         4,
-   -         5,
-   -         6,
-   -         7,
-   -         8,
-   -         9,
-   -         10,
-   -         11,
-   -     ]
+46 -     ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+47 -         1,
+48 -         2,
+49 -         3,
+50 -         4,
+51 -         5,
+52 -         6,
+53 -         7,
+54 -         8,
+55 -         9,
+56 -         10,
+57 -         11,
+58 -     ]
 46 +     ] = ...
-47 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -103,13 +97,11 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-62 |         str, tuple[str, ...]
-   -     ] = (  # Error PYI011 Only simple default values allowed for typed arguments
-   -         "foo",
-   -         ("bar", "baz"),
-   -     )
+63 -     ] = (  # Error PYI011 Only simple default values allowed for typed arguments
+64 -         "foo",
+65 -         ("bar", "baz"),
+66 -     )
 63 +     ] = ...
-64 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -127,12 +119,10 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-70 |         int
-   -     ] = [  # Error PYI011 Only simple default values allowed for typed arguments
-   -         *range(10)
-   -     ],
+71 -     ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+72 -         *range(10)
+73 -     ],
 71 +     ] = ...,
-72 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -150,12 +140,10 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-77 |         int
-   -     ] = list(  # Error PYI011 Only simple default values allowed for typed arguments
-   -         range(10)
-   -     ),
+78 -     ] = list(  # Error PYI011 Only simple default values allowed for typed arguments
+79 -         range(10)
+80 -     ),
 78 +     ] = ...,
-79 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -173,12 +161,10 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-84 |         bytes
-   -     ] = frozenset(  # Error PYI011 Only simple default values allowed for typed arguments
-   -         {b"foo", b"bar", b"baz"}
-   -     )
+85 -     ] = frozenset(  # Error PYI011 Only simple default values allowed for typed arguments
+86 -         {b"foo", b"bar", b"baz"}
+87 -     )
 85 +     ] = ...
-86 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -195,11 +181,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-89 | def f17(
-   -     x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
-   -     + "bar",
+90 -     x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+91 -     + "bar",
 90 +     x: str = ...,
-91 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -216,11 +200,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
    |
 help: Replace default value with `...`
    |
-93 | def f18(
-   -     x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
-   -     + b"bar",
+94 -     x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
+95 -     + b"bar",
 94 +     x: str = ...,
-95 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -237,11 +219,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
    |
-97 | def f19(
-   -     x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
-   -     + 4,
+98 -     x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+99 -     + 4,
 98 +     x: object = ...,
-99 | ) -> None: ...
    |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -258,11 +238,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-101 | def f20(
-    -     x: int = 5
-    -     + 5,  # Error PYI011 Only simple default values allowed for typed arguments
+102 -     x: int = 5
+103 -     + 5,  # Error PYI011 Only simple default values allowed for typed arguments
 102 +     x: int = ...,  # Error PYI011 Only simple default values allowed for typed arguments
-103 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -279,11 +257,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-105 | def f21(
-    -     x: complex = 3j
-    -     - 3j,  # Error PYI011 Only simple default values allowed for typed arguments
+106 -     x: complex = 3j
+107 -     - 3j,  # Error PYI011 Only simple default values allowed for typed arguments
 106 +     x: complex = ...,  # Error PYI011 Only simple default values allowed for typed arguments
-107 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -300,11 +276,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-109 | def f22(
-    -     x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
-    -     + 4.3j,
+110 -     x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
+111 -     + 4.3j,
 110 +     x: complex = ...,
-111 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -319,10 +293,8 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-137 | def f31(
-    -     x: float = inf,  # Error PYI011 Only simple default values allowed for typed arguments
+138 -     x: float = inf,  # Error PYI011 Only simple default values allowed for typed arguments
 138 +     x: float = ...,  # Error PYI011 Only simple default values allowed for typed arguments
-139 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -337,10 +309,8 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-140 | def f32(
-    -     x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
+141 -     x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
 141 +     x: float = ...,  # Error PYI011 Only simple default values allowed for typed arguments
-142 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -355,10 +325,8 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-146 | def f34(
-    -     x: float = -math.nan,  # Error PYI011 Only simple default values allowed for typed arguments
+147 -     x: float = -math.nan,  # Error PYI011 Only simple default values allowed for typed arguments
 147 +     x: float = ...,  # Error PYI011 Only simple default values allowed for typed arguments
-148 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -375,11 +343,9 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-149 | def f35(
-    -     x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
-    -     + 1j,
+150 -     x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
+151 -     + 1j,
 150 +     x: complex = ...,
-151 | ) -> None: ...
     |
 
 PYI011 [*] Only simple default values allowed for typed arguments
@@ -395,9 +361,7 @@ PYI011 [*] Only simple default values allowed for typed arguments
     |
 help: Replace default value with `...`
     |
-158 |     *,
-    -     x: str = ""  # Error PYI011 Only simple default values allowed for typed arguments
-    -     + "",
+159 -     x: str = ""  # Error PYI011 Only simple default values allowed for typed arguments
+160 -     + "",
 159 +     x: str = ...,
-160 | ) -> None: ...
     |

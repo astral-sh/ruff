@@ -13,12 +13,10 @@ RUF072 [*] Empty `finally` clause
 11 |   # try/except/finally with ellipsis
    |
 help: Remove the `finally` clause
-  |
-7 |     bar()
-  - finally:
-  -     pass
-8 |
-  |
+   |
+ 8 - finally:
+ 9 -     pass
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:16:1
@@ -33,10 +31,8 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-15 |     bar()
-   - finally:
-   -     ...
-16 |
+16 - finally:
+17 -     ...
    |
 
 RUF072 [*] Empty `finally` clause
@@ -52,10 +48,8 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-25 |     baz()
-   - finally:
-   -     pass
-26 |
+26 - finally:
+27 -     pass
    |
 
 RUF072 [*] Empty `finally` clause
@@ -71,13 +65,12 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-29 | # bare try/finally with pass
-   - try:
-   -     foo()
-   - finally:
-   -     pass
+30 - try:
+31 -     foo()
+32 - finally:
+33 -     pass
+34 - 
 30 + foo()
-31 |
    |
 
 RUF072 [*] Empty `finally` clause
@@ -93,13 +86,12 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-35 | # bare try/finally with ellipsis
-   - try:
-   -     foo()
-   - finally:
-   -     ...
+36 - try:
+37 -     foo()
+38 - finally:
+39 -     ...
+40 - 
 36 + foo()
-37 |
    |
 
 RUF072 [*] Empty `finally` clause
@@ -115,17 +107,9 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-41 | # bare try/finally with multi-line body
-   - try:
-   -     foo()
-   -     bar()
-   -     baz()
-   - finally:
-   -     pass
 42 + foo()
 43 + bar()
 44 + baz()
-45 |
    |
 
 RUF072 [*] Empty `finally` clause
@@ -141,13 +125,12 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-50 | try:
-   -     try:
-   -         foo()
-   -     finally:
-   -         pass
+51 -     try:
+52 -         foo()
+53 -     finally:
+54 -         pass
+55 - except Exception:
 51 +     foo()
-52 | except Exception:
    |
 
 RUF072 [*] Empty `finally` clause
@@ -164,11 +147,9 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-62 |     bar()
-   - finally:
-   -     pass
-   -     pass
-63 |
+63 - finally:
+64 -     pass
+65 -     pass
    |
 
 RUF072 [*] Empty `finally` clause
@@ -185,14 +166,13 @@ RUF072 [*] Empty `finally` clause
    |
 help: Remove the `finally` clause
    |
-67 | # bare try/finally with pass and ellipsis
-   - try:
-   -     foo()
-   - finally:
-   -     pass
-   -     ...
+68 - try:
+69 -     foo()
+70 - finally:
+71 -     pass
+72 -     ...
+73 - 
 68 + foo()
-69 |
    |
 
 RUF072 Empty `finally` clause
@@ -321,15 +301,8 @@ RUF072 [*] Empty `finally` clause
     | |________^
 help: Remove the `finally` clause
     |
-174 | # Bare try finally with line starting with a formfeed
-    - try:
-    -     1
-    -     2
-    - finally:
-    -     pass
-175 + 1
+175 + ␌1
 176 + 2
-177 |
     |
 
 RUF072 [*] Empty `finally` clause
@@ -342,10 +315,9 @@ RUF072 [*] Empty `finally` clause
     | |________^
 help: Remove the `finally` clause
     |
-183 | # (`try` is preceded by a form feed below)
-    - try:
-    -     1
-    - finally:
-    -     pass
+184 - ␌try:
+185 -     1
+186 - finally:
+187 -     pass
 184 + 1
     |

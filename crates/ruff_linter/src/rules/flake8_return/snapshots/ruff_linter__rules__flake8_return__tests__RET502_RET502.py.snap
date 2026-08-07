@@ -12,8 +12,5 @@ RET502 [*] Do not implicitly `return None` in function able to return non-`None`
   |
 help: Add explicit `None` return value
   |
-2 |     if not y:
-  -         return  # error
-3 +         return None  # error
-4 |     return 1
-  |
+3 |         return None  # error
+  |                ++++

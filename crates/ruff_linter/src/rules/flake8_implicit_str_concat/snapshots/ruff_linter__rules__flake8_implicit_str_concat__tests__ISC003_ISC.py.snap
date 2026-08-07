@@ -12,10 +12,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
    |
-8  | _ = (
-   -   "abc" +
-9  +   "abc"
-10 |   "def"
+ 9 ~   "abc"
+10 ~   "def"
    |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -29,10 +27,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
    |
-13 | _ = (
-   -   f"abc" +
-14 +   f"abc"
-15 |   "def"
+14 ~   f"abc"
+15 ~   "def"
    |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -46,10 +42,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
    |
-18 | _ = (
-   -   b"abc" +
-19 +   b"abc"
-20 |   b"def"
+19 ~   b"abc"
+20 ~   b"def"
    |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -65,10 +59,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
    |
-78 | _ = f"a {f"first"
-   -     + f"second"} d"
-79 +      f"second"} d"
-80 | _ = f"a {f"first {f"middle"}"
+78 ~ _ = f"a {f"first"
+79 ~      f"second"} d"
    |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -85,10 +77,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
    |
 help: Remove redundant '+' operator to implicitly concatenate
    |
-80 | _ = f"a {f"first {f"middle"}"
-   -     + f"second"} d"
-81 +      f"second"} d"
-82 |
+80 ~ _ = f"a {f"first {f"middle"}"
+81 ~      f"second"} d"
    |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -102,10 +92,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-109 | _ = (
-    -     rf"raw_f{x}" +
-110 +     rf"raw_f{x}"
-111 |     r"raw_normal"
+110 ~     rf"raw_f{x}"
+111 ~     r"raw_normal"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -120,10 +108,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-116 | _ = (
-    -     u"unicode" +
-117 +     u"unicode"
-118 |     r"raw"
+117 ~     u"unicode"
+118 ~     r"raw"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -137,10 +123,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-121 | _ = (
-    -     rb"raw_bytes" +
-122 +     rb"raw_bytes"
-123 |     b"normal_bytes"
+122 ~     rb"raw_bytes"
+123 ~     b"normal_bytes"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -154,10 +138,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-126 | _ = (
-    -     b"bytes" +
-127 +     b"bytes"
-128 |     b"with_bytes"
+127 ~     b"bytes"
+128 ~     b"with_bytes"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -174,10 +156,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-132 |
-    - _ = ("a" +
-133 + _ = ("a"
-134 |     "b" +
+133 ~ _ = ("a"
+134 ~     "b" +
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -194,10 +174,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-139 | _ = ("a"
-    -     + "b"
-140 +      "b"
-141 |     + "c"
+139 ~ _ = ("a"
+140 ~      "b"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -211,10 +189,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-160 |     "first"
-    -     +    "second"  # extra spaces around +
-161 +         "second"  # extra spaces around +
-162 | )
+160 ~     "first"
+161 ~         "second"  # extra spaces around +
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -228,10 +204,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-164 | _ = (
-    -     "first"    +  # trailing spaces before +
-165 +     "first"  # trailing spaces before +
-166 |     "second"
+165 ~     "first"  # trailing spaces before +
+166 ~     "second"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -245,10 +219,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-169 | _ = ((
-    -     "deep" +
-170 +     "deep"
-171 |     "nesting"
+170 ~     "deep"
+171 ~     "nesting"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -262,10 +234,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-174 | _ = (
-    -     "contains + plus" +
-175 +     "contains + plus"
-176 |     "another string"
+175 ~     "contains + plus"
+176 ~     "another string"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -280,10 +250,9 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-181 | 		# leading comment
-    -     + "end"
-182 +      "end"
-183 | )
+180 ~     "start"
+181 ~         # leading comment
+182 ~      "end"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -298,10 +267,9 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-185 | _ = (
-    -     "start" +
-186 +     "start"
-187 | 		# leading comment
+186 ~     "start"
+187 ~         # leading comment
+188 ~     "end"
     |
 
 ISC003 [*] Explicitly concatenated string should be implicitly concatenated
@@ -316,10 +284,8 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-201 |     t"The quick brown fox jumps over the lazy "
-    -     + t"dog"
-202 +      t"dog"
-203 | )
+201 ~     t"The quick brown fox jumps over the lazy "
+202 ~      t"dog"
     |
 
 ISC003 Explicitly concatenated string should be implicitly concatenated
@@ -364,8 +330,6 @@ ISC003 [*] Explicitly concatenated string should be implicitly concatenated
     |
 help: Remove redundant '+' operator to implicitly concatenate
     |
-229 |     "A"  # Complains about this: +
-    -     + " broken"
-230 +      " broken"
-231 |     + " line"
+229 ~     "A"  # Complains about this: +
+230 ~      " broken"
     |

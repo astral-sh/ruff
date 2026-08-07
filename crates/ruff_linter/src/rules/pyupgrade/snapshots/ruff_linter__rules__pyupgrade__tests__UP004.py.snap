@@ -10,10 +10,8 @@ UP004 [*] Class `A` inherits from `object`
   |
 help: Remove `object` inheritance
   |
-4 |
-  - class A(object):
+5 - class A(object):
 5 + class A:
-6 |     ...
   |
 
 UP004 [*] Class `A` inherits from `object`
@@ -27,12 +25,10 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-8  |
-   - class A(
-   -     object,
-   - ):
-9  + class A:
-10 |     ...
+ 9 - class A(
+10 -     object,
+11 - ):
+ 9 + class A:
    |
 
 UP004 [*] Class `A` inherits from `object`
@@ -46,13 +42,11 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-14 |
-   - class A(
-   -     object,
-   -     #
-   - ):
+15 - class A(
+16 -     object,
+17 -     #
+18 - ):
 15 + class A:
-16 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -68,13 +62,11 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-21 |
-   - class A(
-   -     #
-   -     object,
-   - ):
+22 - class A(
+23 -     #
+24 -     object,
+25 - ):
 22 + class A:
-23 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -90,13 +82,11 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-28 |
-   - class A(
-   -     #
-   -     object
-   - ):
+29 - class A(
+30 -     #
+31 -     object
+32 - ):
 29 + class A:
-30 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -111,13 +101,11 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-35 |
-   - class A(
-   -     object
-   -     #
-   - ):
+36 - class A(
+37 -     object
+38 -     #
+39 - ):
 36 + class A:
-37 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -133,14 +121,12 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-42 |
-   - class A(
-   -     #
-   -     object,
-   -     #
-   - ):
+43 - class A(
+44 -     #
+45 -     object,
+46 -     #
+47 - ):
 43 + class A:
-44 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -156,14 +142,12 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-50 |
-   - class A(
-   -     #
-   -     object,
-   -     #
-   - ):
+51 - class A(
+52 -     #
+53 -     object,
+54 -     #
+55 - ):
 51 + class A:
-52 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -179,14 +163,12 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-58 |
-   - class A(
-   -     #
-   -     object
-   -     #
-   - ):
+59 - class A(
+60 -     #
+61 -     object
+62 -     #
+63 - ):
 59 + class A:
-60 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -202,14 +184,12 @@ UP004 [*] Class `A` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-66 |
-   - class A(
-   -     #
-   -     object
-   -     #
-   - ):
+67 - class A(
+68 -     #
+69 -     object
+70 -     #
+71 - ):
 67 + class A:
-68 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -222,10 +202,8 @@ UP004 [*] Class `B` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-74 |
-   - class B(A, object):
+75 - class B(A, object):
 75 + class B(A):
-76 |     ...
    |
 
 UP004 [*] Class `B` inherits from `object`
@@ -237,10 +215,8 @@ UP004 [*] Class `B` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-78 |
-   - class B(object, A):
+79 - class B(object, A):
 79 + class B(A):
-80 |     ...
    |
 
 UP004 [*] Class `B` inherits from `object`
@@ -254,9 +230,7 @@ UP004 [*] Class `B` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-83 | class B(
-   -     object,
-84 |     A,
+84 -     object,
    |
 
 UP004 [*] Class `B` inherits from `object`
@@ -271,9 +245,9 @@ UP004 [*] Class `B` inherits from `object`
    |
 help: Remove `object` inheritance
    |
-91 |     A,
-   -     object,
-92 | ):
+91 -     A,
+92 -     object,
+91 +     A,
    |
 
 UP004 [*] Class `B` inherits from `object`
@@ -287,9 +261,7 @@ UP004 [*] Class `B` inherits from `object`
     |
 help: Remove `object` inheritance
    |
-97 | class B(
-   -     object,
-98 |     # Comment on A.
+98 -     object,
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -305,9 +277,9 @@ UP004 [*] Class `B` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-107 |     A,
-    -     object,
-108 | ):
+107 -     A,
+108 -     object,
+107 +     A,
     |
 
 UP004 [*] Class `A` inherits from `object`
@@ -321,12 +293,10 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-117 |
-    - class A(
-    -     object,
-    - ):
+118 - class A(
+119 -     object,
+120 - ):
 118 + class A:
-119 |     ...
     |
 
 UP004 [*] Class `A` inherits from `object`
@@ -340,12 +310,10 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-123 |
-    - class A(
-    -     object,  # )
-    - ):
+124 - class A(
+125 -     object,  # )
+126 - ):
 124 + class A:
-125 |     ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -360,13 +328,11 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-129 |
-    - class A(
-    -     object  # )
-    -     ,
-    - ):
+130 - class A(
+131 -     object  # )
+132 -     ,
+133 - ):
 130 + class A:
-131 |     ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -379,10 +345,8 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-136 |
-    - class A(object, object):
+137 - class A(object, object):
 137 + class A(object):
-138 |     ...
     |
 
 UP004 [*] Class `A` inherits from `object`
@@ -394,10 +358,8 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-136 |
-    - class A(object, object):
+137 - class A(object, object):
 137 + class A(object):
-138 |     ...
     |
 
 UP004 [*] Class `A` inherits from `object`
@@ -410,10 +372,8 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-141 | @decorator()
-    - class A(object):
+142 - class A(object):
 142 + class A:
-143 |     ...
     |
 
 UP004 [*] Class `A` inherits from `object`
@@ -426,10 +386,8 @@ UP004 [*] Class `A` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-145 | @decorator()  # class A(object):
-    - class A(object):
+146 - class A(object):
 146 + class A:
-147 |     ...
     |
 
 UP004 [*] Class `Unusual` inherits from `object`
@@ -443,8 +401,6 @@ UP004 [*] Class `Unusual` inherits from `object`
     |
 help: Remove `object` inheritance
     |
-158 |
-    - class Unusual(builtins.object):
+159 - class Unusual(builtins.object):
 159 + class Unusual:
-160 |     ...
     |

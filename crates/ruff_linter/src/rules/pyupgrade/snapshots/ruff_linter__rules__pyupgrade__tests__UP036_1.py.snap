@@ -13,13 +13,11 @@ UP036 [*] Version block is outdated for minimum Python version
   |
 help: Remove outdated version block
   |
-2 |
-  - if sys.version_info == 2:
-  -     2
-  - else:
-  -     3
+3 - if sys.version_info == 2:
+4 -     2
+5 - else:
+6 -     3
 3 + 3
-4 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -34,15 +32,13 @@ UP036 [*] Version block is outdated for minimum Python version
 10 | else:
    |
 help: Remove outdated version block
-  |
-7 |
-  - if sys.version_info < (3,):
-  -     2
-  - else:
-  -     3
-8 + 3
-9 |
-  |
+   |
+ 8 - if sys.version_info < (3,):
+ 9 -     2
+10 - else:
+11 -     3
+ 8 + 3
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 UP036 [*] Version block is outdated for minimum Python version
@@ -57,13 +53,11 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-12 |
-   - if sys.version_info < (3,0):
-   -     2
-   - else:
-   -     3
+13 - if sys.version_info < (3,0):
+14 -     2
+15 - else:
+16 -     3
 13 + 3
-14 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,13 +73,11 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-17 |
-   - if sys.version_info == 3:
-   -     3
-   - else:
-   -     2
+18 - if sys.version_info == 3:
+19 -     3
+20 - else:
+21 -     2
 18 + 3
-19 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -101,13 +93,11 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-22 |
-   - if sys.version_info > (3,):
-   -     3
-   - else:
-   -     2
+23 - if sys.version_info > (3,):
+24 -     3
+25 - else:
+26 -     2
 23 + 3
-24 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -123,13 +113,11 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-27 |
-   - if sys.version_info >= (3,):
-   -     3
-   - else:
-   -     2
+28 - if sys.version_info >= (3,):
+29 -     3
+30 - else:
+31 -     2
 28 + 3
-29 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,13 +133,11 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-34 |
-   - if version_info > (3,):
-   -     3
-   - else:
-   -     2
+35 - if version_info > (3,):
+36 -     3
+37 - else:
+38 -     2
 35 + 3
-36 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -167,10 +153,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-41 |     print(1)
-   - elif sys.version_info < (3,0):
-   -     print(2)
-42 | else:
+42 - elif sys.version_info < (3,0):
+43 -     print(2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -186,13 +170,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-48 |     print(1)
-   - elif sys.version_info > (3,):
 49 + else:
-50 |     print(3)
-   - else:
-   -     print(2)
-51 |
+50 +     print(3)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -207,10 +186,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-55 |     print(1)
-   - elif sys.version_info > (3,):
 56 + else:
-57 |     print(3)
+57 +     print(3)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -225,10 +202,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-61 |         print(1)
-   -     elif sys.version_info > (3,):
-62 +     else:
-63 |         print(3)
+62 ~     else:
+63 +         print(3)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -244,10 +219,8 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-66 |     print(1)
-   - elif sys.version_info < (3,0):
-   -     print(2)
-67 | else:
+67 - elif sys.version_info < (3,0):
+68 -     print(2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -262,9 +235,7 @@ UP036 [*] Version block is outdated for minimum Python version
    |
 help: Remove outdated version block
    |
-74 |         print(1)
-   -     elif sys.version_info > (3,):
-75 +     else:
-76 |         print(3)
+75 ~     else:
+76 +         print(3)
    |
 note: This is an unsafe fix and may change runtime behavior

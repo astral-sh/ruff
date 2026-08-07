@@ -12,14 +12,10 @@ TC002 [*] Move third-party import `flask` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     import flask
-5  | def f():
---------------------------------------------------------------------------------
-17 | def f():
-   -     import flask
-18 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     import flask
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior

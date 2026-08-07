@@ -13,10 +13,8 @@ FURB136 [*] Replace `x if x > y else y` with `max(y, x)`
   |
 help: Replace with `max(y, x)`
   |
-3 |
-  - x if x > y else y  # FURB136
+4 - x if x > y else y  # FURB136
 4 + max(y, x)  # FURB136
-5 |
   |
 
 FURB136 [*] Replace `x if x >= y else y` with `max(x, y)`
@@ -31,10 +29,8 @@ FURB136 [*] Replace `x if x >= y else y` with `max(x, y)`
   |
 help: Replace with `max(x, y)`
   |
-5 |
-  - x if x >= y else y  # FURB136
+6 - x if x >= y else y  # FURB136
 6 + max(x, y)  # FURB136
-7 |
   |
 
 FURB136 [*] Replace `x if x < y else y` with `min(y, x)`
@@ -49,10 +45,8 @@ FURB136 [*] Replace `x if x < y else y` with `min(y, x)`
    |
 help: Replace with `min(y, x)`
   |
-7 |
-  - x if x < y else y  # FURB136
+8 - x if x < y else y  # FURB136
 8 + min(y, x)  # FURB136
-9 |
   |
 
 FURB136 [*] Replace `x if x <= y else y` with `min(x, y)`
@@ -67,10 +61,8 @@ FURB136 [*] Replace `x if x <= y else y` with `min(x, y)`
    |
 help: Replace with `min(x, y)`
    |
-9  |
-   - x if x <= y else y  # FURB136
+10 - x if x <= y else y  # FURB136
 10 + min(x, y)  # FURB136
-11 |
    |
 
 FURB136 [*] Replace `y if x > y else x` with `min(x, y)`
@@ -85,10 +77,8 @@ FURB136 [*] Replace `y if x > y else x` with `min(x, y)`
    |
 help: Replace with `min(x, y)`
    |
-11 |
-   - y if x > y else x  # FURB136
+12 - y if x > y else x  # FURB136
 12 + min(x, y)  # FURB136
-13 |
    |
 
 FURB136 [*] Replace `y if x >= y else x` with `min(y, x)`
@@ -103,10 +93,8 @@ FURB136 [*] Replace `y if x >= y else x` with `min(y, x)`
    |
 help: Replace with `min(y, x)`
    |
-13 |
-   - y if x >= y else x  # FURB136
+14 - y if x >= y else x  # FURB136
 14 + min(y, x)  # FURB136
-15 |
    |
 
 FURB136 [*] Replace `y if x < y else x` with `max(x, y)`
@@ -121,10 +109,8 @@ FURB136 [*] Replace `y if x < y else x` with `max(x, y)`
    |
 help: Replace with `max(x, y)`
    |
-15 |
-   - y if x < y else x  # FURB136
+16 - y if x < y else x  # FURB136
 16 + max(x, y)  # FURB136
-17 |
    |
 
 FURB136 [*] Replace `y if x <= y else x` with `max(y, x)`
@@ -139,10 +125,8 @@ FURB136 [*] Replace `y if x <= y else x` with `max(y, x)`
    |
 help: Replace with `max(y, x)`
    |
-17 |
-   - y if x <= y else x  # FURB136
+18 - y if x <= y else x  # FURB136
 18 + max(y, x)  # FURB136
-19 |
    |
 
 FURB136 [*] Replace `if` expression with `max(y, x)`
@@ -157,13 +141,11 @@ FURB136 [*] Replace `if` expression with `max(y, x)`
    | |________^
 help: Replace with `max(y, x)`
    |
-21 |
-   - x if (
-   -     x
-   -     > y
-   - ) else y  # FURB136
+22 - x if (
+23 -     x
+24 -     > y
+25 - ) else y  # FURB136
 22 + max(y, x)  # FURB136
-23 |
    |
 
 FURB136 [*] Replace `if` expression with `max(y, x)`
@@ -179,12 +161,10 @@ FURB136 [*] Replace `if` expression with `max(y, x)`
    |
 help: Replace with `max(y, x)`
    |
-28 | highest_score = (
-   -     x
-   -     # text
-   -     if x > y
-   -     else y
+29 -     x
+30 -     # text
+31 -     if x > y
+32 -     else y
 29 +     max(y, x)
-30 | )
    |
 note: This is an unsafe fix and may change runtime behavior

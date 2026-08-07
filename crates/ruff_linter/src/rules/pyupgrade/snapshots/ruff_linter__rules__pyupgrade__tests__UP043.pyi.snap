@@ -10,10 +10,8 @@ UP043 [*] Unnecessary default type arguments
   |
 help: Remove default type arguments
   |
-3 |
-  - def func() -> Generator[int, None, None]:
+4 - def func() -> Generator[int, None, None]:
 4 + def func() -> Generator[int]:
-5 |     yield 42
   |
 
 UP043 [*] Unnecessary default type arguments
@@ -25,10 +23,8 @@ UP043 [*] Unnecessary default type arguments
   |
 help: Remove default type arguments
   |
-7 |
-  - def func() -> Generator[int, None]:
+8 - def func() -> Generator[int, None]:
 8 + def func() -> Generator[int]:
-9 |     yield 42
   |
 
 UP043 [*] Unnecessary default type arguments
@@ -41,10 +37,8 @@ UP043 [*] Unnecessary default type arguments
    |
 help: Remove default type arguments
    |
-20 |
-   - def func() -> Generator[int, int, None]:
+21 - def func() -> Generator[int, int, None]:
 21 + def func() -> Generator[int, int]:
-22 |     _ = yield 42
    |
 
 UP043 [*] Unnecessary default type arguments
@@ -56,10 +50,8 @@ UP043 [*] Unnecessary default type arguments
    |
 help: Remove default type arguments
    |
-30 |
-   - async def func() -> AsyncGenerator[int, None]:
+31 - async def func() -> AsyncGenerator[int, None]:
 31 + async def func() -> AsyncGenerator[int]:
-32 |     yield 42
    |
 
 UP043 [*] Unnecessary default type arguments
@@ -71,10 +63,8 @@ UP043 [*] Unnecessary default type arguments
    |
 help: Remove default type arguments
    |
-46 |
-   - def func() -> Generator[str, None, None]:
+47 - def func() -> Generator[str, None, None]:
 47 + def func() -> Generator[str]:
-48 |     yield "hello"
    |
 
 UP043 [*] Unnecessary default type arguments
@@ -86,10 +76,8 @@ UP043 [*] Unnecessary default type arguments
    |
 help: Remove default type arguments
    |
-50 |
-   - async def func() -> AsyncGenerator[str, None]:
+51 - async def func() -> AsyncGenerator[str, None]:
 51 + async def func() -> AsyncGenerator[str]:
-52 |     yield "hello"
    |
 
 UP043 [*] Unnecessary default type arguments
@@ -105,12 +93,10 @@ UP043 [*] Unnecessary default type arguments
    |
 help: Remove default type arguments
    |
-54 |
-   - async def func() -> AsyncGenerator[  # type: ignore
-   -     str,
-   -     None
-   - ]:
+55 - async def func() -> AsyncGenerator[  # type: ignore
+56 -     str,
+57 -     None
+58 - ]:
 55 + async def func() -> AsyncGenerator[str]:
-56 |     yield "hello"
    |
 note: This is an unsafe fix and may change runtime behavior

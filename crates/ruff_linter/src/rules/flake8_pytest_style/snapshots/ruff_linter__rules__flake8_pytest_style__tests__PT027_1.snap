@@ -11,10 +11,11 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 help: Replace `assertRaises` with `pytest.raises`
    |
+ 2 ~ import pytest
+ 3 |
+ …
 10 |     def test_errors(self):
-   -         with self.assertRaises(ValueError):
-11 +         with pytest.raises(ValueError):
-12 |             raise ValueError
+11 ~         with pytest.raises(ValueError):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,15 +29,15 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 help: Replace `assertRaises` with `pytest.raises`
    |
+ 2 ~ import pytest
+ 3 |
+ …
 14 |     def test_rewrite_references(self):
-   -         with self.assertRaises(ValueError) as e:
-15 +         with pytest.raises(ValueError) as e:
+15 ~         with pytest.raises(ValueError) as e:
 16 |             raise ValueError
 17 |
 18 |         print(e.foo)
-   -         print(e.exception)
-19 +         print(e.value)
-20 |
+19 ~         print(e.value)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,16 +52,15 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 help: Replace `assertRaises` with `pytest.raises`
    |
+ 2 ~ import pytest
+ 3 |
+ …
 21 |     def test_rewrite_references_multiple_items(self):
-   -         with self.assertRaises(ValueError) as e1, \
-22 +         with pytest.raises(ValueError) as e1, \
+22 ~         with pytest.raises(ValueError) as e1, \
 23 |             self.assertRaises(ValueError) as e2:
-24 |             raise ValueError
-25 |
+ …
 26 |         print(e1.foo)
-   -         print(e1.exception)
-27 +         print(e1.value)
-28 |
+27 ~         print(e1.value)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -75,15 +75,15 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 help: Replace `assertRaises` with `pytest.raises`
    |
+ 2 ~ import pytest
+ 3 |
+ …
 22 |         with self.assertRaises(ValueError) as e1, \
-   -             self.assertRaises(ValueError) as e2:
-23 +             pytest.raises(ValueError) as e2:
+23 ~             pytest.raises(ValueError) as e2:
 24 |             raise ValueError
---------------------------------------------------------------------------------
+ …
 29 |         print(e2.foo)
-   -         print(e2.exception)
-30 +         print(e2.value)
-31 |
+30 ~         print(e2.value)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -98,16 +98,15 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 help: Replace `assertRaises` with `pytest.raises`
    |
+ 2 ~ import pytest
+ 3 |
+ …
 32 |     def test_rewrite_references_multiple_items_nested(self):
-   -         with self.assertRaises(ValueError) as e1, \
-33 +         with pytest.raises(ValueError) as e1, \
+33 ~         with pytest.raises(ValueError) as e1, \
 34 |             foo(self.assertRaises(ValueError)) as e2:
-35 |             raise ValueError
-36 |
+ …
 37 |         print(e1.foo)
-   -         print(e1.exception)
-38 +         print(e1.value)
-39 |
+38 ~         print(e1.value)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -122,9 +121,10 @@ PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
    |
 help: Replace `assertRaises` with `pytest.raises`
    |
+ 2 ~ import pytest
+ 3 |
+ …
 33 |         with self.assertRaises(ValueError) as e1, \
-   -             foo(self.assertRaises(ValueError)) as e2:
-34 +             foo(pytest.raises(ValueError)) as e2:
-35 |             raise ValueError
+34 ~             foo(pytest.raises(ValueError)) as e2:
    |
 note: This is an unsafe fix and may change runtime behavior

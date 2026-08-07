@@ -12,10 +12,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-18 | # Invalid usage
-   - getattr(foo, "bar")
+19 - getattr(foo, "bar")
 19 + foo.bar
-20 | getattr(foo, "_123abc")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -30,10 +28,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-19 | getattr(foo, "bar")
-   - getattr(foo, "_123abc")
+20 - getattr(foo, "_123abc")
 20 + foo._123abc
-21 | getattr(foo, "__123abc__")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -48,10 +44,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-20 | getattr(foo, "_123abc")
-   - getattr(foo, "__123abc__")
+21 - getattr(foo, "__123abc__")
 21 + foo.__123abc__
-22 | getattr(foo, "abc123")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -66,10 +60,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-21 | getattr(foo, "__123abc__")
-   - getattr(foo, "abc123")
+22 - getattr(foo, "abc123")
 22 + foo.abc123
-23 | getattr(foo, r"abc123")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -84,10 +76,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-22 | getattr(foo, "abc123")
-   - getattr(foo, r"abc123")
+23 - getattr(foo, r"abc123")
 23 + foo.abc123
-24 | _ = lambda x: getattr(x, "bar")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -102,10 +92,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-23 | getattr(foo, r"abc123")
-   - _ = lambda x: getattr(x, "bar")
+24 - _ = lambda x: getattr(x, "bar")
 24 + _ = lambda x: x.bar
-25 | if getattr(x, "bar"):
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -120,10 +108,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-24 | _ = lambda x: getattr(x, "bar")
-   - if getattr(x, "bar"):
+25 - if getattr(x, "bar"):
 25 + if x.bar:
-26 |     pass
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -138,10 +124,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-26 |     pass
-   - getattr(1, "real")
+27 - getattr(1, "real")
 27 + (1).real
-28 | getattr(1., "real")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -156,10 +140,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-27 | getattr(1, "real")
-   - getattr(1., "real")
+28 - getattr(1., "real")
 28 + (1.).real
-29 | getattr(1.0, "real")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -174,10 +156,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-28 | getattr(1., "real")
-   - getattr(1.0, "real")
+29 - getattr(1.0, "real")
 29 + (1.0).real
-30 | getattr(1j, "real")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -192,10 +172,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-29 | getattr(1.0, "real")
-   - getattr(1j, "real")
+30 - getattr(1j, "real")
 30 + (1j).real
-31 | getattr(True, "real")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -210,10 +188,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-30 | getattr(1j, "real")
-   - getattr(True, "real")
+31 - getattr(True, "real")
 31 + (True).real
-32 | getattr(x := 1, "real")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -228,10 +204,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-31 | getattr(True, "real")
-   - getattr(x := 1, "real")
+32 - getattr(x := 1, "real")
 32 + (x := 1).real
-33 | getattr(x + y, "real")
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -246,10 +220,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-32 | getattr(x := 1, "real")
-   - getattr(x + y, "real")
+33 - getattr(x + y, "real")
 33 + (x + y).real
-34 | getattr("foo"
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -262,12 +234,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    | |______________________^
 help: Replace `getattr` with attribute access
    |
-33 | getattr(x + y, "real")
-   - getattr("foo"
-   -         "bar", "real")
 34 + ("foo"
 35 +         "bar").real
-36 |
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -281,10 +249,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
-   - assert getattr(func, '_rpc')is True
+58 - assert getattr(func, '_rpc')is True
 58 + assert func._rpc is True
-59 |
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -299,12 +265,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-64 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
-   - getattr(self.
-   -    registration.registry, '__name__')
 65 + (self.
 66 +    registration.registry).__name__
-67 |
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -318,10 +280,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-68 | import builtins
-   - builtins.getattr(foo, "bar")
+69 - builtins.getattr(foo, "bar")
 69 + foo.bar
-70 |
    |
 
 B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
@@ -335,10 +295,8 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    |
 help: Replace `getattr` with attribute access
    |
-79 | # Example: the long s character "ſ" normalizes to "s" under NFKC.
-   - getattr(foo, "ſ")
+80 - getattr(foo, "ſ")
 80 + foo.ſ
-81 | setattr(foo, "ſ", 1)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -353,12 +311,11 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
    | |_^
 help: Replace `getattr` with attribute access
    |
-83 |
-   - getattr(
-   -     obj,
-   -     # text
-   -     "foo",
-   - )
+84 - getattr(
+85 -     obj,
+86 -     # text
+87 -     "foo",
+88 - )
 84 + obj.foo
    |
 note: This is an unsafe fix and may change runtime behavior

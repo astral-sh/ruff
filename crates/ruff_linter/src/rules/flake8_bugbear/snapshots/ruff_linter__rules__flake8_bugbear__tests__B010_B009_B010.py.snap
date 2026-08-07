@@ -12,10 +12,8 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    |
 help: Replace `setattr` with assignment
    |
-49 | # Invalid usage
-   - setattr(foo, "bar", None)
+50 - setattr(foo, "bar", None)
 50 + foo.bar = None
-51 | setattr(foo, "_123abc", None)
    |
 
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
@@ -30,10 +28,8 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    |
 help: Replace `setattr` with assignment
    |
-50 | setattr(foo, "bar", None)
-   - setattr(foo, "_123abc", None)
+51 - setattr(foo, "_123abc", None)
 51 + foo._123abc = None
-52 | setattr(foo, "__123abc__", None)
    |
 
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
@@ -48,10 +44,8 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    |
 help: Replace `setattr` with assignment
    |
-51 | setattr(foo, "_123abc", None)
-   - setattr(foo, "__123abc__", None)
+52 - setattr(foo, "__123abc__", None)
 52 + foo.__123abc__ = None
-53 | setattr(foo, "abc123", None)
    |
 
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
@@ -66,10 +60,8 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    |
 help: Replace `setattr` with assignment
    |
-52 | setattr(foo, "__123abc__", None)
-   - setattr(foo, "abc123", None)
+53 - setattr(foo, "abc123", None)
 53 + foo.abc123 = None
-54 | setattr(foo, r"abc123", None)
    |
 
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
@@ -83,10 +75,8 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    |
 help: Replace `setattr` with assignment
    |
-53 | setattr(foo, "abc123", None)
-   - setattr(foo, r"abc123", None)
+54 - setattr(foo, r"abc123", None)
 54 + foo.abc123 = None
-55 | setattr(foo.bar, r"baz", None)
    |
 
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
@@ -101,10 +91,8 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    |
 help: Replace `setattr` with assignment
    |
-54 | setattr(foo, r"abc123", None)
-   - setattr(foo.bar, r"baz", None)
+55 - setattr(foo.bar, r"baz", None)
 55 + foo.bar.baz = None
-56 |
    |
 
 B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
@@ -116,9 +104,7 @@ B010 [*] Do not call `setattr` with a constant attribute value. It is not any sa
    | ^^^^^^^^^^^^^^^^^^^^
 help: Replace `setattr` with assignment
    |
-80 | getattr(foo, "ſ")
-   - setattr(foo, "ſ", 1)
+81 - setattr(foo, "ſ", 1)
 81 + foo.ſ = 1
-82 |
    |
 note: This is an unsafe fix and may change runtime behavior

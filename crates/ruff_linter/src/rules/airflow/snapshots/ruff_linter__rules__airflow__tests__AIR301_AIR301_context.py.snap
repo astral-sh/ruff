@@ -177,10 +177,8 @@ AIR301 [*] `triggering_dataset_events` is removed in Airflow 3.0
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `triggering_asset_events` instead
    |
-50 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
-   -     events = context["triggering_dataset_events"]
+51 -     events = context["triggering_dataset_events"]
 51 +     events = context["triggering_asset_events"]
-52 |
    |
 
 AIR301 `execution_date` is removed in Airflow 3.0
@@ -312,10 +310,8 @@ AIR301 [*] `triggering_dataset_events` is removed in Airflow 3.0
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `triggering_asset_events` instead
    |
-67 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
-   -     events = context["triggering_dataset_events"]
+68 -     events = context["triggering_dataset_events"]
 68 +     events = context["triggering_asset_events"]
-69 |
    |
 
 AIR301 `tomorrow_ds` is removed in Airflow 3.0
@@ -369,10 +365,8 @@ AIR301 [*] `schedule_interval` is removed in Airflow 3.0
     |
 help: Use `schedule` instead
     |
-112 |     dag_id="example_dag",
-    -     schedule_interval="@daily",
+113 -     schedule_interval="@daily",
 113 +     schedule="@daily",
-114 |     start_date=datetime(2023, 1, 1),
     |
 
 AIR301 `next_ds` is removed in Airflow 3.0

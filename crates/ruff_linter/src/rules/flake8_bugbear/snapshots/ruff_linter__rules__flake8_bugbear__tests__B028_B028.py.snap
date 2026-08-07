@@ -13,11 +13,8 @@ B028 [*] No explicit `stacklevel` keyword argument found
    |
 help: Set `stacklevel=2`
   |
-7 |
-  - warnings.warn("test", DeprecationWarning)
-8 + warnings.warn("test", DeprecationWarning, stacklevel=2)
-9 | warnings.warn("test", DeprecationWarning, source=None)
-  |
+8 | warnings.warn("test", DeprecationWarning, stacklevel=2)
+  |                                         ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B028 [*] No explicit `stacklevel` keyword argument found
@@ -30,12 +27,9 @@ B028 [*] No explicit `stacklevel` keyword argument found
 11 | warnings.warn("test", DeprecationWarning, stacklevel=1)
    |
 help: Set `stacklevel=2`
-   |
-8  | warnings.warn("test", DeprecationWarning)
-   - warnings.warn("test", DeprecationWarning, source=None)
-9  + warnings.warn("test", DeprecationWarning, stacklevel=2, source=None)
-10 | warnings.warn("test", DeprecationWarning, source=None, stacklevel=2)
-   |
+  |
+9 | warnings.warn("test", DeprecationWarning, stacklevel=2, source=None)
+  |                                           +++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B028 [*] No explicit `stacklevel` keyword argument found
@@ -50,11 +44,8 @@ B028 [*] No explicit `stacklevel` keyword argument found
    |
 help: Set `stacklevel=2`
    |
-25 |         # some comments here
-   -         source = None # no trailing comma
-26 +         stacklevel=2, source = None # no trailing comma
-27 |     )
-   |
+26 |         stacklevel=2, source = None # no trailing comma
+   |         +++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B028 [*] No explicit `stacklevel` keyword argument found
@@ -69,9 +60,6 @@ B028 [*] No explicit `stacklevel` keyword argument found
    |
 help: Set `stacklevel=2`
    |
-31 | # trigger diagnostic if `skip_file_prefixes` is present and set to the default value
-   - warnings.warn("test", skip_file_prefixes=())
-32 + warnings.warn("test", stacklevel=2, skip_file_prefixes=())
-33 |
-   |
+32 | warnings.warn("test", stacklevel=2, skip_file_prefixes=())
+   |                       +++++++++++++
 note: This is an unsafe fix and may change runtime behavior

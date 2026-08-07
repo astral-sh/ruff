@@ -10,11 +10,8 @@ UP037 [*] Remove quotes from type annotation
   |              ^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove quotes
   |
-2 |
-  - def f(a: Foo['SingleLine  # Comment']): ...
-3 + def f(a: Foo[(SingleLine  # Comment
-4 + )]): ...
-5 |
+3 ~ def f(a: Foo[(SingleLine  # Comment
+4 ~ )]): ...
   |
 
 UP037 [*] Remove quotes from type annotation
@@ -27,13 +24,9 @@ UP037 [*] Remove quotes from type annotation
   | |____________^
 help: Remove quotes
   |
-5 |
-  - def f(a: Foo['''Bar[
-6 + def f(a: Foo[Bar[
-7 |     Multi |
-  -     Line]''']): ...
-8 +     Line]]): ...
-9 |
+6 ~ def f(a: Foo[Bar[
+7 +     Multi |
+8 ~     Line]]): ...
   |
 
 UP037 [*] Remove quotes from type annotation
@@ -47,14 +40,10 @@ UP037 [*] Remove quotes from type annotation
    | |____^
 help: Remove quotes
    |
-10 |
-   - def f(a: Foo['''Bar[
-11 + def f(a: Foo[Bar[
-12 |     Multi |
-13 |     Line  # Comment
-   - ]''']): ...
-14 + ]]): ...
-15 |
+11 ~ def f(a: Foo[Bar[
+12 +     Multi |
+13 +     Line  # Comment
+14 ~ ]]): ...
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -67,14 +56,10 @@ UP037 [*] Remove quotes from type annotation
    | |_______________________^
 help: Remove quotes
    |
-16 |
-   - def f(a: Foo['''Bar[
-17 + def f(a: Foo[(Bar[
-18 |     Multi |
-   -     Line]  # Comment''']): ...
+17 ~ def f(a: Foo[(Bar[
+18 +     Multi |
 19 +     Line]  # Comment
-20 + )]): ...
-21 |
+20 ~ )]): ...
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -88,15 +73,11 @@ UP037 [*] Remove quotes from type annotation
    | |_______________________^
 help: Remove quotes
    |
-21 |
-   - def f(a: Foo['''
-22 + def f(a: Foo[(
-23 | Bar[
-24 |     Multi |
-   -     Line]  # Comment''']): ...
+22 ~ def f(a: Foo[(
+23 + Bar[
+24 +     Multi |
 25 +     Line]  # Comment
-26 + )]): ...
-27 |
+26 ~ )]): ...
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -108,12 +89,8 @@ UP037 [*] Remove quotes from type annotation
    | |_______^
 help: Remove quotes
    |
-27 |
-   - def f(a: '''list[int]
-   - 	''' = []): ...
-28 + def f(a: list[int]
-29 + 	 = []): ...
-30 |
+28 ~ def f(a: list[int]
+29 ~      = []): ...
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -125,12 +102,8 @@ UP037 [*] Remove quotes from type annotation
    | |____________^
 help: Remove quotes
    |
-31 |
-   - a: '''\\
-   - list[int]''' = [42]
-32 + a: (\
-33 + list[int]) = [42]
-34 |
+32 ~ a: (\
+33 ~ list[int]) = [42]
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -143,13 +116,9 @@ UP037 [*] Remove quotes from type annotation
    | |_______^
 help: Remove quotes
    |
-35 |
-   - def f(a: '''
-36 + def f(a: 
-37 | 	list[int]
-   - 	''' = []): ...
-38 + 	 = []): ...
-39 |
+36 ~ def f(a: 
+37 ~     list[int]
+38 ~      = []): ...
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -165,17 +134,13 @@ UP037 [*] Remove quotes from type annotation
    | |___________________^
 help: Remove quotes
    |
-40 |
-   - def f(a: Foo['''
-41 + def f(a: Foo[(
-42 |     Bar
-43 |     [
-44 |     Multi |
-45 |     Line
-   -     ]  # Comment''']): ...
+41 ~ def f(a: Foo[(
+42 +     Bar
+43 +     [
+44 +     Multi |
+45 +     Line
 46 +     ]  # Comment
-47 + )]): ...
-48 |
+47 ~ )]): ...
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -187,9 +152,6 @@ UP037 [*] Remove quotes from type annotation
    | |________^
 help: Remove quotes
    |
-48 |
-   - a: '''list
-   - [int]''' = [42]
-49 + a: (list
-50 + [int]) = [42]
+49 ~ a: (list
+50 ~ [int]) = [42]
    |

@@ -13,10 +13,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-15 |
-   - some_string = some_string + "a very long end of string"
+16 - some_string = some_string + "a very long end of string"
 16 + some_string += "a very long end of string"
-17 | index = index - 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,10 +29,8 @@ PLR6104 [*] Use `-=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-16 | some_string = some_string + "a very long end of string"
-   - index = index - 1
+17 - index = index - 1
 17 + index -= 1
-18 | a_list = a_list + ["to concat"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-17 | index = index - 1
-   - a_list = a_list + ["to concat"]
+18 - a_list = a_list + ["to concat"]
 18 + a_list += ["to concat"]
-19 | some_set = some_set | {"to concat"}
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ PLR6104 [*] Use `|=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-18 | a_list = a_list + ["to concat"]
-   - some_set = some_set | {"to concat"}
+19 - some_set = some_set | {"to concat"}
 19 + some_set |= {"to concat"}
-20 | to_multiply = to_multiply * 5
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-19 | some_set = some_set | {"to concat"}
-   - to_multiply = to_multiply * 5
+20 - to_multiply = to_multiply * 5
 20 + to_multiply *= 5
-21 | to_multiply = 5 * to_multiply
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-20 | to_multiply = to_multiply * 5
-   - to_multiply = 5 * to_multiply
+21 - to_multiply = 5 * to_multiply
 21 + to_multiply *= 5
-22 | to_multiply = to_multiply * to_multiply
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -126,10 +114,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-21 | to_multiply = 5 * to_multiply
-   - to_multiply = to_multiply * to_multiply
+22 - to_multiply = to_multiply * to_multiply
 22 + to_multiply *= to_multiply
-23 | to_divide = to_divide / 5
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,10 +131,8 @@ PLR6104 [*] Use `/=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-22 | to_multiply = to_multiply * to_multiply
-   - to_divide = to_divide / 5
+23 - to_divide = to_divide / 5
 23 + to_divide /= 5
-24 | to_divide = to_divide // 5
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -164,10 +148,8 @@ PLR6104 [*] Use `//=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-23 | to_divide = to_divide / 5
-   - to_divide = to_divide // 5
+24 - to_divide = to_divide // 5
 24 + to_divide //= 5
-25 | to_cube = to_cube**3
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -183,10 +165,8 @@ PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-24 | to_divide = to_divide // 5
-   - to_cube = to_cube**3
+25 - to_cube = to_cube**3
 25 + to_cube **= 3
-26 | to_cube = 3**to_cube
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -202,10 +182,8 @@ PLR6104 [*] Use `**=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-26 | to_cube = 3**to_cube
-   - to_cube = to_cube**to_cube
+27 - to_cube = to_cube**to_cube
 27 + to_cube **= to_cube
-28 | timeDiffSeconds = timeDiffSeconds % 60
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -221,10 +199,8 @@ PLR6104 [*] Use `%=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-27 | to_cube = to_cube**to_cube
-   - timeDiffSeconds = timeDiffSeconds % 60
+28 - timeDiffSeconds = timeDiffSeconds % 60
 28 + timeDiffSeconds %= 60
-29 | flags = flags & 0x1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -240,10 +216,8 @@ PLR6104 [*] Use `&=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-28 | timeDiffSeconds = timeDiffSeconds % 60
-   - flags = flags & 0x1
+29 - flags = flags & 0x1
 29 + flags &= 0x1
-30 | flags = flags | 0x1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -259,10 +233,8 @@ PLR6104 [*] Use `|=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-29 | flags = flags & 0x1
-   - flags = flags | 0x1
+30 - flags = flags | 0x1
 30 + flags |= 0x1
-31 | flags = flags ^ 0x1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -278,10 +250,8 @@ PLR6104 [*] Use `^=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-30 | flags = flags | 0x1
-   - flags = flags ^ 0x1
+31 - flags = flags ^ 0x1
 31 + flags ^= 0x1
-32 | flags = flags << 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -297,10 +267,8 @@ PLR6104 [*] Use `<<=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-31 | flags = flags ^ 0x1
-   - flags = flags << 1
+32 - flags = flags << 1
 32 + flags <<= 1
-33 | flags = flags >> 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -316,10 +284,8 @@ PLR6104 [*] Use `>>=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-32 | flags = flags << 1
-   - flags = flags >> 1
+33 - flags = flags >> 1
 33 + flags >>= 1
-34 | mat1 = mat1 @ mat2
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -334,10 +300,8 @@ PLR6104 [*] Use `@=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-33 | flags = flags >> 1
-   - mat1 = mat1 @ mat2
+34 - mat1 = mat1 @ mat2
 34 + mat1 @= mat2
-35 | a_list[1] = a_list[1] + 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -353,10 +317,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-34 | mat1 = mat1 @ mat2
-   - a_list[1] = a_list[1] + 1
+35 - a_list[1] = a_list[1] + 1
 35 + a_list[1] += 1
-36 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -372,10 +334,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-36 |
-   - a_list[0:2] = a_list[0:2] * 3
+37 - a_list[0:2] = a_list[0:2] * 3
 37 + a_list[0:2] *= 3
-38 | a_list[:2] = a_list[:2] * 3
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -390,10 +350,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-37 | a_list[0:2] = a_list[0:2] * 3
-   - a_list[:2] = a_list[:2] * 3
+38 - a_list[:2] = a_list[:2] * 3
 38 + a_list[:2] *= 3
-39 | a_list[1:] = a_list[1:] * 3
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -408,10 +366,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-38 | a_list[:2] = a_list[:2] * 3
-   - a_list[1:] = a_list[1:] * 3
+39 - a_list[1:] = a_list[1:] * 3
 39 + a_list[1:] *= 3
-40 | a_list[:] = a_list[:] * 3
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -427,10 +383,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-39 | a_list[1:] = a_list[1:] * 3
-   - a_list[:] = a_list[:] * 3
+40 - a_list[:] = a_list[:] * 3
 40 + a_list[:] *= 3
-41 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -443,10 +397,8 @@ PLR6104 [*] Use `*=` to perform an augmented assignment directly
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with augmented assignment
    |
-41 |
-   - index = index * (index + 10)
+42 - index = index * (index + 10)
 42 + index *= (index + 10)
-43 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -459,10 +411,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |         ^^^^^^^^^^^^^^^^^^^
 help: Replace with augmented assignment
    |
-46 |     def t(self):
-   -         self.a = self.a + 1
+47 -         self.a = self.a + 1
 47 +         self.a += 1
-48 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -474,10 +424,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    | ^^^^^^^^^^^^^^^^^
 help: Replace with augmented assignment
    |
-50 | obj = T()
-   - obj.a = obj.a + 1
+51 - obj.a = obj.a + 1
 51 + obj.a += 1
-52 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -491,10 +439,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-53 |
-   - a = a+-1
+54 - a = a+-1
 54 + a += -1
-55 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -510,10 +456,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-57 | test = 0x5
-   - test = test + 0xBA
+58 - test = test + 0xBA
 58 + test += 0xBA
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -528,10 +472,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-60 | test2 = b""
-   - test2 = test2 + b"\000"
+61 - test2 = test2 + b"\000"
 61 + test2 += b"\000"
-62 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -547,10 +489,8 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-63 | test3 = ""
-   - test3 = test3 + (   a := R""
 64 + test3 += (   a := R""
-65 |                          f"oo"   )
+65 +                          f"oo"   )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -568,10 +508,10 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-67 | test4 = []
-   - test4 = test4 + ( e
 68 + test4 += ( e
-69 |                   for e in
+69 +                   for e in
+70 +                   range(10)
+71 +                   )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -591,10 +531,11 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-72 |
-   - test5 = test5 + (
 73 + test5 += (
-74 |     4
+74 +     4
+75 +     *
+76 +     10
+77 + )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -615,11 +556,11 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-78 |
-   - test6 = test6 + \
-   -         (
 79 + test6 += (
-80 |             4
+80 +             4
+81 +             *
+82 +             10
+83 +         )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -637,12 +578,10 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    |
 help: Replace with augmented assignment
    |
-85 |
-   - test7 = \
-   -         100 \
-   -     + test7
+86 - test7 = \
+87 -         100 \
+88 -     + test7
 86 + test7 += 100
-87 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -659,13 +598,11 @@ PLR6104 [*] Use `+=` to perform an augmented assignment directly
    | |_________^
 help: Replace with augmented assignment
    |
-89 |
-   - test8 = \
-   -     886 \
-   -     + \
-   -  \
-   -     test8
+90 - test8 = \
+91 -     886 \
+92 -     + \
+93 -  \
+94 -     test8
 90 + test8 += 886
-91 |
    |
 note: This is an unsafe fix and may change runtime behavior

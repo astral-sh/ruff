@@ -11,9 +11,7 @@ UP024 [*] Replace aliased errors with `OSError`
 10 |     return HttpResponseServerError("cache: cannot connect to broker.")
    |
 help: Replace with builtin `OSError`
-   |
-8  |     conn._close()
-   - except (socket.error, exceptions.OperationalError):
-9  + except (OSError, exceptions.OperationalError):
-10 |     return HttpResponseServerError("cache: cannot connect to broker.")
-   |
+  |
+9 - except (socket.error, exceptions.OperationalError):
+9 + except (OSError, exceptions.OperationalError):
+  |

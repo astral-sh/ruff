@@ -12,10 +12,8 @@ E713 [*] Test for membership should be `not in`
   |
 help: Convert to `not in`
   |
-1 | #: E713
-  - if not X in Y:
+2 - if not X in Y:
 2 + if X not in Y:
-3 |     pass
   |
 
 E713 [*] Test for membership should be `not in`
@@ -30,10 +28,8 @@ E713 [*] Test for membership should be `not in`
   |
 help: Convert to `not in`
   |
-4 | #: E713
-  - if not X.B in Y:
+5 - if not X.B in Y:
 5 + if X.B not in Y:
-6 |     pass
   |
 
 E713 [*] Test for membership should be `not in`
@@ -48,10 +44,8 @@ E713 [*] Test for membership should be `not in`
    |
 help: Convert to `not in`
   |
-7 | #: E713
-  - if not X in Y and Z == "zero":
+8 - if not X in Y and Z == "zero":
 8 + if X not in Y and Z == "zero":
-9 |     pass
   |
 
 E713 [*] Test for membership should be `not in`
@@ -66,10 +60,8 @@ E713 [*] Test for membership should be `not in`
    |
 help: Convert to `not in`
    |
-10 | #: E713
-   - if X == "zero" or not Y in Z:
+11 - if X == "zero" or not Y in Z:
 11 + if X == "zero" or Y not in Z:
-12 |     pass
    |
 
 E713 [*] Test for membership should be `not in`
@@ -83,10 +75,8 @@ E713 [*] Test for membership should be `not in`
    |
 help: Convert to `not in`
    |
-13 | #: E713
-   - if not (X in Y):
+14 - if not (X in Y):
 14 + if X not in Y:
-15 |     pass
    |
 
 E713 [*] Test for membership should be `not in`
@@ -98,7 +88,6 @@ E713 [*] Test for membership should be `not in`
    |            ^^^^^^^^^^^^^^^^^
 help: Convert to `not in`
    |
-39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
-   - assert not('name' in request)or not request['name']
+40 - assert not('name' in request)or not request['name']
 40 + assert 'name' not in request or not request['name']
    |

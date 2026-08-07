@@ -12,10 +12,8 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
   |
 help: Use existing variable
   |
-3 | def fix_these():
-  -     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
+4 -     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
 4 +     [fruit_count for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
-5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
@@ -29,10 +27,8 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
   |
 help: Use existing variable
   |
-4 |     [FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()]  # PLR1733
-  -     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
+5 -     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 5 +     {fruit_count for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
-6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
@@ -47,10 +43,8 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
   |
 help: Use existing variable
   |
-5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
-  -     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
+6 -     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 6 +     {fruit_name: fruit_count for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
-7 |
   |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
@@ -63,12 +57,10 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |
 help: Use existing variable
-   |
-8  |     for fruit_name, fruit_count in FRUITS.items():
-   -         print(FRUITS[fruit_name])  # PLR1733
-9  +         print(fruit_count)  # PLR1733
-10 |         blah = FRUITS[fruit_name]  # PLR1733
-   |
+  |
+8 ~     for fruit_name, fruit_count in FRUITS.items():
+9 ~         print(fruit_count)  # PLR1733
+  |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
   --> unnecessary_dict_index_lookup.py:10:16
@@ -81,10 +73,9 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
    |
 help: Use existing variable
    |
-9  |         print(FRUITS[fruit_name])  # PLR1733
-   -         blah = FRUITS[fruit_name]  # PLR1733
-10 +         blah = fruit_count  # PLR1733
-11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
+ 8 ~     for fruit_name, fruit_count in FRUITS.items():
+ 9 |         print(FRUITS[fruit_name])  # PLR1733
+10 ~         blah = fruit_count  # PLR1733
    |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
@@ -96,10 +87,10 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
    |                ^^^^^^^^^^^^^^^^^^
 help: Use existing variable
    |
+ 8 ~     for fruit_name, fruit_count in FRUITS.items():
+ 9 |         print(FRUITS[fruit_name])  # PLR1733
 10 |         blah = FRUITS[fruit_name]  # PLR1733
-   -         assert FRUITS[fruit_name] == "pear"  # PLR1733
-11 +         assert fruit_count == "pear"  # PLR1733
-12 |
+11 ~         assert fruit_count == "pear"  # PLR1733
    |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
@@ -114,10 +105,11 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
    |
 help: Use existing variable
    |
+46 ~     for label, array in value_arrays.items():
+47 |         mapped_label = client_label_map(label)
+48 |         if mapped_label in mapped_arrays:
 49 |             for i in range(len(array)):
-   -                 mapped_arrays[mapped_label][i] += value_arrays[label][i]  # PLR1733
-50 +                 mapped_arrays[mapped_label][i] += array[i]  # PLR1733
-51 |         else:
+50 ~                 mapped_arrays[mapped_label][i] += array[i]  # PLR1733
    |
 
 PLR1733 [*] Unnecessary lookup of dictionary value by key
@@ -131,8 +123,9 @@ PLR1733 [*] Unnecessary lookup of dictionary value by key
    |
 help: Use existing variable
    |
+46 ~     for label, array in value_arrays.items():
+47 |         mapped_label = client_label_map(label)
+ …
 51 |         else:
-   -             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
-52 +             mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
-53 |     return mapped_arrays
+52 ~             mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
    |

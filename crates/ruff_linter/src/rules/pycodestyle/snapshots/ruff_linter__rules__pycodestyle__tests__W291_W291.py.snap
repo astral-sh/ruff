@@ -10,9 +10,7 @@ W291 [*] Trailing whitespace
   |
 help: Remove trailing whitespace
   |
-  - '''trailing whitespace 
-1 + '''trailing whitespace
-2 | inside a multiline string'''
+1 | '''trailing whitespace
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,10 +25,7 @@ W291 [*] Trailing whitespace
   |
 help: Remove trailing whitespace
   |
-3 |
-  - f'''trailing whitespace 
-4 + f'''trailing whitespace
-5 | inside a multiline f-string'''
+4 | f'''trailing whitespace
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,10 +40,7 @@ W291 [*] Trailing whitespace
    |
 help: Remove trailing whitespace
   |
-7 | # Trailing whitespace after `{`
-  - f'abc { 
-8 + f'abc {
-9 |     1 + 2
+8 | f'abc {
   |
 
 W291 [*] Trailing whitespace
@@ -62,8 +54,5 @@ W291 [*] Trailing whitespace
    |
 help: Remove trailing whitespace
    |
-13 | f'abc {
-   -     1 + 2 
-14 +     1 + 2
-15 | }'
+14 |     1 + 2
    |

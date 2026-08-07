@@ -9,21 +9,16 @@ error[F401][*]: `os` imported but unused
 2 | import os
   |        ^^
 help: Remove unused import: `os`
- ::: cell 1
+ ::: cell 1:1:1
   |
-1 | # cell 1
-  - import os
+1 - import os
   |
- ::: cell 2
+ ::: cell 2:1:1
   |
-1 | # cell 2
-  - import math
-2 |
+1 - import math
   |
- ::: cell 3
+ ::: cell 3:3:1
   |
-3 |     print()
-  -     x = 1
-4 |
+3 -     x = 1
   |
 note: This is an unsafe fix and may change runtime behavior

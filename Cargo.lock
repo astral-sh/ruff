@@ -3214,7 +3214,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "similar 3.1.1",
  "supports-hyperlinks",
  "tempfile",
  "thiserror 2.0.19",

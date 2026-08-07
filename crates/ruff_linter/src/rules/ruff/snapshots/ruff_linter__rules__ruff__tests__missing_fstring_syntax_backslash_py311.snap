@@ -22,11 +22,8 @@ RUF027 [*] Possible f-string without an `f` prefix
    | |_______^
 help: Add `f` prefix
    |
-40 |     # RUF027
-   -     multi_line = a = """b { # comment
-41 +     multi_line = a = f"""b { # comment
-42 |     c}  d
-   |
+41 |     multi_line = a = f"""b { # comment
+   |                      +
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -42,11 +39,8 @@ RUF027 [*] Possible f-string without an `f` prefix
    | |_____^
 help: Add `f` prefix
    |
-48 |     # RUF027
-   -     b = " {\
-49 +     b = f" {\
-50 |     a} \
-   |
+49 |     b = f" {\
+   |         +
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -62,11 +56,8 @@ RUF027 [*] Possible f-string without an `f` prefix
    |
 help: Add `f` prefix
    |
-91 |     x = "test"
-   -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
-92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
-93 |
-   |
+92 |     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+   |           +
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -84,9 +75,6 @@ RUF027 [*] Possible f-string without an `f` prefix
     |
 help: Add `f` prefix
    |
-97 |     x = "!"
-   -     print("""{x  # }
-98 +     print(f"""{x  # }
-99 | }""")
-   |
+98 |     print(f"""{x  # }
+   |           +
 note: This is an unsafe fix and may change runtime behavior

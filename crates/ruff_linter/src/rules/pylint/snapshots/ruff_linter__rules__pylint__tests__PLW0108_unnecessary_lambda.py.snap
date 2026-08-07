@@ -10,9 +10,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 help: Inline function call
   |
-  - _ = lambda: print()  # [unnecessary-lambda]
+1 - _ = lambda: print()  # [unnecessary-lambda]
 1 + _ = print  # [unnecessary-lambda]
-2 | _ = lambda x, y: min(x, y) # [unnecessary-lambda]
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,10 +26,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 help: Inline function call
   |
-1 | _ = lambda: print()  # [unnecessary-lambda]
-  - _ = lambda x, y: min(x, y) # [unnecessary-lambda]
+2 - _ = lambda x, y: min(x, y) # [unnecessary-lambda]
 2 + _ = min # [unnecessary-lambda]
-3 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -46,10 +43,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 help: Inline function call
   |
-3 |
-  - _ = lambda *args: f(*args) # [unnecessary-lambda]
+4 - _ = lambda *args: f(*args) # [unnecessary-lambda]
 4 + _ = f # [unnecessary-lambda]
-5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -64,10 +59,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 help: Inline function call
   |
-4 | _ = lambda *args: f(*args) # [unnecessary-lambda]
-  - _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
+5 - _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
 5 + _ = f # [unnecessary-lambda]
-6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -82,10 +75,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 help: Inline function call
   |
-5 | _ = lambda **kwargs: f(**kwargs) # [unnecessary-lambda]
-  - _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
+6 - _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
 6 + _ = f # [unnecessary-lambda]
-7 | _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -101,10 +92,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
   |
 help: Inline function call
   |
-6 | _ = lambda *args, **kwargs: f(*args, **kwargs) # [unnecessary-lambda]
-  - _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
+7 - _ = lambda x, y, z, *args, **kwargs: f(x, y, z, *args, **kwargs) # [unnecessary-lambda]
 7 + _ = f # [unnecessary-lambda]
-8 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -118,12 +107,10 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
 10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
    |
 help: Inline function call
-   |
-8  |
-   - _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
-9  + _ = f(lambda x: x) # [unnecessary-lambda]
-10 | _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
-   |
+  |
+9 - _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
+9 + _ = f(lambda x: x) # [unnecessary-lambda]
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
@@ -137,10 +124,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
    |
 help: Inline function call
    |
-9  | _ = lambda x: f(lambda x: x)(x) # [unnecessary-lambda]
-   - _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
+10 - _ = lambda x, y: f(lambda x, y: x + y)(x, y) # [unnecessary-lambda]
 10 + _ = f(lambda x, y: x + y) # [unnecessary-lambda]
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -154,10 +139,8 @@ PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
    |
 help: Inline function call
    |
-61 | # https://github.com/astral-sh/ruff/issues/18675
-   - _ = lambda x: (string := str)(x)
+62 - _ = lambda x: (string := str)(x)
 62 + _ = (string := str)
-63 | _ = lambda x: ((x := 1) and str)(x)
    |
 note: This is an unsafe fix and may change runtime behavior
 

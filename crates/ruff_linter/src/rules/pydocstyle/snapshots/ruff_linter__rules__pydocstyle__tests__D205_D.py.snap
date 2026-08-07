@@ -26,8 +26,6 @@ D205 [*] 1 blank line required between summary line and description (found 2)
 215 | |     """
     | |_______^
 help: Insert single blank line
-    |
-211 |
-    -
-212 |     Description.
+211 - 
+212 - 
     |

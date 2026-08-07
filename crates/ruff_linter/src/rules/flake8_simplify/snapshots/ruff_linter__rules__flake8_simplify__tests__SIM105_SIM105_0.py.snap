@@ -14,14 +14,10 @@ help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): 
   |
 1 + import contextlib
 2 | def foo():
---------------------------------------------------------------------------------
+3 |     pass
+…
 6 | # SIM105
-  - try:
-7 + with contextlib.suppress(ValueError):
-8 |     foo()
-  - except ValueError:
-  -     pass
-9 |
+7 ~ with contextlib.suppress(ValueError):
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -39,16 +35,12 @@ SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`exce
    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError, OSError): ...`
    |
-1  + import contextlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import contextlib
+ 2 | def foo():
+ 3 |     pass
+ …
 13 | # SIM105
-   - try:
-14 + with contextlib.suppress(ValueError, OSError):
-15 |     foo()
-   - except (ValueError, OSError):
-   -     pass
-16 |
+14 ~ with contextlib.suppress(ValueError, OSError):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -66,16 +58,12 @@ SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`exce
    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError, OSError): ...`
    |
-1  + import contextlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import contextlib
+ 2 | def foo():
+ 3 |     pass
+ …
 19 | # SIM105
-   - try:
-20 + with contextlib.suppress(ValueError, OSError):
-21 |     foo()
-   - except (ValueError, OSError) as e:
-   -     pass
-22 |
+20 ~ with contextlib.suppress(ValueError, OSError):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -93,16 +81,12 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
    |
-1  + import contextlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import contextlib
+ 2 | def foo():
+ 3 |     pass
+ …
 25 | # SIM105
-   - try:
-26 + with contextlib.suppress(BaseException):
-27 |     foo()
-   - except:
-   -     pass
-28 |
+26 ~ with contextlib.suppress(BaseException):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -120,16 +104,12 @@ SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`
    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(a.Error, b.Error): ...`
    |
-1  + import contextlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import contextlib
+ 2 | def foo():
+ 3 |     pass
+ …
 31 | # SIM105
-   - try:
-32 + with contextlib.suppress(a.Error, b.Error):
-33 |     foo()
-   - except (a.Error, b.Error):
-   -     pass
-34 |
+32 ~ with contextlib.suppress(a.Error, b.Error):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,16 +125,12 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
    | |___________^
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
    |
-1  + import contextlib
-2  | def foo():
---------------------------------------------------------------------------------
+ 1 + import contextlib
+ 2 | def foo():
+ 3 |     pass
+ …
 85 |     # OK
-   -     try:
-86 +     with contextlib.suppress(ValueError):
-87 |         foo()
-   -     except ValueError:
-   -         ...
-88 |
+86 ~     with contextlib.suppress(ValueError):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -187,16 +163,12 @@ SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(OSError): ...`
     |
-1   + import contextlib
-2   | def foo():
---------------------------------------------------------------------------------
+  1 + import contextlib
+  2 | def foo():
+  3 |     pass
+  …
 117 | def write_models(directory, Models):
-    -     try:
-118 +     with contextlib.suppress(OSError):
-119 |         os.makedirs(model_dir);
-    -     except OSError:
-    -         pass;
-120 |
+118 ~     with contextlib.suppress(OSError):
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -214,15 +186,12 @@ SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(OSError): ...`
     |
-1   + import contextlib
-2   | def foo():
---------------------------------------------------------------------------------
+  1 + import contextlib
+  2 | def foo():
+  3 |     pass
+  …
 122 |
-    -     try: os.makedirs(model_dir);
-    -     except OSError:
-    -         pass;
-123 +     with contextlib.suppress(OSError): os.makedirs(model_dir);
-124 |
+123 ~     with contextlib.suppress(OSError): os.makedirs(model_dir);
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -240,15 +209,12 @@ SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
     |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(OSError): ...`
     |
-1   + import contextlib
-2   | def foo():
---------------------------------------------------------------------------------
+  1 + import contextlib
+  2 | def foo():
+  3 |     pass
+  …
 126 |
-    -     try: os.makedirs(model_dir);
-    -     except OSError:
-    -         pass; \
-127 +     with contextlib.suppress(OSError): os.makedirs(model_dir);
-128 |             \
+127 ~     with contextlib.suppress(OSError): os.makedirs(model_dir);
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -263,16 +229,12 @@ SIM105 [*] Use `contextlib.suppress()` instead of `try`-`except`-`pass`
     | |________^
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(): ...`
     |
-1   + import contextlib
-2   | def foo():
---------------------------------------------------------------------------------
+  1 + import contextlib
+  2 | def foo():
+  3 |     pass
+  …
 133 | # Regression tests for: https://github.com/astral-sh/ruff/issues/18209
-    - try:
-134 + with contextlib.suppress():
-135 |     1 / 0
-    - except ():
-    -     pass
-136 |
+134 ~ with contextlib.suppress():
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -287,14 +249,11 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
     | |________^
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
     |
-1   + import contextlib
-2   | def foo():
---------------------------------------------------------------------------------
+  1 + import contextlib
+  2 | def foo():
+  3 |     pass
+  …
 140 | BaseException = ValueError
-    - try:
-141 + with contextlib.suppress(BaseException):
-142 |     int("a")
-    - except BaseException:
-    -     pass
+141 ~ with contextlib.suppress(BaseException):
     |
 note: This is an unsafe fix and may change runtime behavior

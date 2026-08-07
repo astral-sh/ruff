@@ -14,10 +14,8 @@ RUF047 [*] Empty `else` clause
   |
 help: Remove the `else` clause
   |
-5 |     pass
-  - else:
-  -     pass
-6 |
+6 - else:
+7 -     pass
   |
 
 RUF047 [*] Empty `else` clause
@@ -33,10 +31,8 @@ RUF047 [*] Empty `else` clause
    |
 help: Remove the `else` clause
    |
-13 |     pass
-   - else:
-   -     pass
-14 |
+14 - else:
+15 -     pass
    |
 
 RUF047 [*] Empty `else` clause
@@ -49,8 +45,6 @@ RUF047 [*] Empty `else` clause
    | |________^
 help: Remove the `else` clause
    |
-20 |     pass
-   - else:
-   -     pass
-21 |
+21 - else:
+22 -     pass
    |

@@ -12,11 +12,9 @@ FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append
    |
 help: Replace with `nums.extend((1, 2))`
    |
-22 | # FURB113
-   - nums.append(1)
-   - nums.append(2)
+23 - nums.append(1)
+24 - nums.append(2)
 23 + nums.extend((1, 2))
-24 | pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,11 +29,9 @@ FURB113 [*] Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.appe
    |
 help: Replace with `nums3.extend((1, 2))`
    |
-28 | # FURB113
-   - nums3.append(1)
-   - nums3.append(2)
+29 - nums3.append(1)
+30 - nums3.append(2)
 29 + nums3.extend((1, 2))
-30 | pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,11 +46,9 @@ FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.appe
    |
 help: Replace with `nums4.extend((1, 2))`
    |
-34 | # FURB113
-   - nums4.append(1)
-   - nums4.append(2)
+35 - nums4.append(1)
+36 - nums4.append(2)
 35 + nums4.extend((1, 2))
-36 | pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -116,11 +110,9 @@ FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.appe
    |
 help: Replace with `nums4.extend((1, 2))`
    |
-55 | # FURB113
-   - nums4.append(1)
-   - nums4.append(2)
+56 - nums4.append(1)
+57 - nums4.append(2)
 56 + nums4.extend((1, 2))
-57 | nums3.append(2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -134,12 +126,10 @@ FURB113 [*] Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.app
    | |______________^
 help: Replace with `nums.extend((1, 2, 3))`
    |
-61 | # FURB113
-   - nums.append(1)
-   - nums.append(2)
-   - nums.append(3)
+62 - nums.append(1)
+63 - nums.append(2)
+64 - nums.append(3)
 62 + nums.extend((1, 2, 3))
-63 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -153,11 +143,9 @@ FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append
    | |__________________^
 help: Replace with `nums.extend((1, 2))`
    |
-68 |     # FURB113
-   -     nums.append(1)
-   -     nums.append(2)
+69 -     nums.append(1)
+70 -     nums.append(2)
 69 +     nums.extend((1, 2))
-70 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -173,11 +161,9 @@ FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append
    |
 help: Replace with `nums.extend((1, 2))`
    |
-74 |     # FURB113
-   -     nums.append(1)
-   -     nums.append(2)
+75 -     nums.append(1)
+76 -     nums.append(2)
 75 +     nums.extend((1, 2))
-76 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -203,11 +189,9 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
    | |_______________^
 help: Replace with `x.extend((1, 2))`
    |
-89 |     # FURB113
-   -     x.append(1)
-   -     x.append(2)
+90 -     x.append(1)
+91 -     x.append(2)
 90 +     x.extend((1, 2))
-91 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -221,11 +205,9 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
    | |_______________^
 help: Replace with `x.extend((1, 2))`
    |
-95 |     # FURB113
-   -     x.append(1)
-   -     x.append(2)
+96 -     x.append(1)
+97 -     x.append(2)
 96 +     x.extend((1, 2))
-97 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -239,11 +221,9 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
     | |_______________^
 help: Replace with `x.extend((1, 2))`
     |
-101 |     # FURB113
-    -     x.append(1)
-    -     x.append(2)
+102 -     x.append(1)
+103 -     x.append(2)
 102 +     x.extend((1, 2))
-103 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -257,11 +237,9 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
     | |_______________^
 help: Replace with `x.extend((1, 2))`
     |
-107 |     # FURB113
-    -     x.append(1)
-    -     x.append(2)
+108 -     x.append(1)
+109 -     x.append(2)
 108 +     x.extend((1, 2))
-109 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -287,11 +265,9 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
     | |_______________^
 help: Replace with `x.extend((1, 2))`
     |
-121 |     # FURB113
-    -     x.append(1)
-    -     x.append(2)
+122 -     x.append(1)
+123 -     x.append(2)
 122 +     x.extend((1, 2))
-123 |
     |
 note: This is an unsafe fix and may change runtime behavior
 

@@ -9,8 +9,7 @@ F841 [*] Local variable `x` is assigned to but never used
   |     ^
 help: Remove assignment to unused variable `x`
   |
-7 | def f():
-  -     x = 1
+8 -     x = 1
 8 +     pass
   |
 note: This is an unsafe fix and may change runtime behavior

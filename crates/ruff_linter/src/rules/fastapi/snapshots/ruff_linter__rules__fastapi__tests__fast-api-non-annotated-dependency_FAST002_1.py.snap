@@ -11,14 +11,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-4  | from fastapi import FastAPI, Query
-5  + from typing import Annotated
-6  |
---------------------------------------------------------------------------------
+ 5 + from typing import Annotated
+ 6 + 
+ 7 | app = FastAPI()
+ …
 10 | @app.get("/test")
-   - def handler(echo: str = Query("")):
-11 + def handler(echo: Annotated[str, Query()] = ""):
-12 |     return echo
+11 ~ def handler(echo: Annotated[str, Query()] = ""):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,14 +30,12 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-4  | from fastapi import FastAPI, Query
-5  + from typing import Annotated
-6  |
---------------------------------------------------------------------------------
+ 5 + from typing import Annotated
+ 6 + 
+ 7 | app = FastAPI()
+ …
 15 | @app.get("/test")
-   - def handler2(echo: str = Query(default="")):
-16 + def handler2(echo: Annotated[str, Query()] = ""):
-17 |     return echo
+16 ~ def handler2(echo: Annotated[str, Query()] = ""):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -53,13 +49,11 @@ FAST002 [*] FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
    |
-4  | from fastapi import FastAPI, Query
-5  + from typing import Annotated
-6  |
---------------------------------------------------------------------------------
+ 5 + from typing import Annotated
+ 6 + 
+ 7 | app = FastAPI()
+ …
 20 | @app.get("/test")
-   - def handler3(echo: str = Query("123", min_length=3, max_length=50)):
-21 + def handler3(echo: Annotated[str, Query(min_length=3, max_length=50)] = "123"):
-22 |     return echo
+21 ~ def handler3(echo: Annotated[str, Query(min_length=3, max_length=50)] = "123"):
    |
 note: This is an unsafe fix and may change runtime behavior

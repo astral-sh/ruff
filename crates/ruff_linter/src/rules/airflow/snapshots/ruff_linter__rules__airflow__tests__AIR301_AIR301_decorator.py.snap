@@ -12,7 +12,5 @@ AIR301 [*] `apply_defaults` is removed in Airflow 3.0
   |
 help: `apply_defaults` is now unconditionally done and can be safely removed.
   |
-6 | class DecoratedOperator(BaseOperator):
-  -     @apply_defaults
-7 |     def __init__(self, message, **kwargs):
+7 -     @apply_defaults
   |

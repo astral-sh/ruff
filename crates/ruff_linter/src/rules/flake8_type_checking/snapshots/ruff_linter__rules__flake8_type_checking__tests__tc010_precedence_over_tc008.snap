@@ -12,10 +12,8 @@ TC008 [*] Remove quotes from type alias
   |
 help: Remove quotes
   |
-5 |
-  - a: TypeAlias = 'int | None'  # TC008
+6 - a: TypeAlias = 'int | None'  # TC008
 6 + a: TypeAlias = int | None  # TC008
-7 | b: TypeAlias = 'int' | None  # TC010
   |
 
 TC010 Invalid string member in `X | Y`-style union type

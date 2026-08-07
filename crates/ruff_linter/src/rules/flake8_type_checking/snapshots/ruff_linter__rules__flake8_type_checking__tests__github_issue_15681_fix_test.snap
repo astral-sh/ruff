@@ -13,12 +13,10 @@ TC003 [*] Move standard library import `pathlib` into a type-checking block
   |
 help: Move into type-checking block
   |
-3 |
-  - import pathlib  # TC003
-4 |
-5 | TYPE_CHECKING = False
-6 | if TYPE_CHECKING:
-7 +     import pathlib
-8 |     from types import TracebackType
+4 + 
+5 |
+6 ~ TYPE_CHECKING = False
+7 | if TYPE_CHECKING:
+8 +     import pathlib
   |
 note: This is an unsafe fix and may change runtime behavior

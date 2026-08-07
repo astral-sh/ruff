@@ -13,10 +13,8 @@ F401 [*] `exceptiongroup.ExceptionGroup` imported but unused
    |
 help: Remove unused import: `exceptiongroup.ExceptionGroup`
    |
-11 | if sys.version_info < (3, 11):
-   -     from exceptiongroup import ExceptionGroup
+12 -     from exceptiongroup import ExceptionGroup
 12 +     pass
-13 |
    |
 
 RUF050 [*] Empty `if` statement
@@ -31,8 +29,6 @@ RUF050 [*] Empty `if` statement
    |
 help: Remove the `if` statement
    |
-14 | # Already-empty block handled in a single pass by RUF050
-   - if sys.version_info < (3, 11):
-   -     pass
-15 |
+15 - if sys.version_info < (3, 11):
+16 -     pass
    |

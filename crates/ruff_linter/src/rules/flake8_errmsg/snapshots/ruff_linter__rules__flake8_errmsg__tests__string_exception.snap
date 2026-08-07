@@ -9,11 +9,8 @@ EM101 [*] Exception must not use a string literal, assign to variable first
   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Assign to variable; remove string literal
   |
-1 | def f_byte():
-  -     raise RuntimeError(b"This is an example exception")
-2 +     msg = b"This is an example exception"
-3 +     raise RuntimeError(msg)
-4 |
+2 ~     msg = b"This is an example exception"
+3 ~     raise RuntimeError(msg)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -25,9 +22,7 @@ EM101 [*] Exception must not use a string literal, assign to variable first
   |                        ^^^
 help: Assign to variable; remove string literal
   |
-5 | def f_byte_empty():
-  -     raise RuntimeError(b"")
-6 +     msg = b""
-7 +     raise RuntimeError(msg)
+6 ~     msg = b""
+7 ~     raise RuntimeError(msg)
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -12,13 +12,8 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________________________^
 help: Organize imports
   |
-1 | import json
-  -
-  -
-  -
-2 | from typing import Any, Sequence
-  -
-3 |
+1 + import json
+2 + from typing import Any, Sequence
   |
 
 E303 [*] Too many blank lines (3)
@@ -27,11 +22,9 @@ E303 [*] Too many blank lines (3)
 5 | from typing import Any, Sequence
   | ^^^^
 help: Remove extraneous blank line(s)
-  |
-2 |
-  -
-  -
-3 | from typing import Any, Sequence
+2 - 
+3 - 
+4 - 
   |
 
 E303 [*] Too many blank lines (2)
@@ -40,10 +33,8 @@ E303 [*] Too many blank lines (2)
 8 | class MissingCommand(TypeError): ...  # noqa: N818
   | ^^^^^
 help: Remove extraneous blank line(s)
-  |
-6 |
-  -
-7 | class MissingCommand(TypeError): ...  # noqa: N818
+6 - 
+7 - 
   |
 
 E303 [*] Too many blank lines (2)
@@ -55,11 +46,9 @@ E303 [*] Too many blank lines (2)
 13 |     backend_object: str | None
    |
 help: Remove extraneous blank line(s)
-   |
-9  |
-   -
-10 | class BackendProxy:
-   |
+9 - 
+10- 
+  |
 
 E303 [*] Too many blank lines (2)
   --> E30_isort.pyi:17:1
@@ -69,10 +58,8 @@ E303 [*] Too many blank lines (2)
 18 |     import abcd
    |
 help: Remove extraneous blank line(s)
-   |
-15 |
-   -
-16 | if __name__ == "__main__":
+15 - 
+16 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -84,10 +71,8 @@ E303 [*] Too many blank lines (2)
 23 | def __init__(self, backend_module: str, backend_obj: str | None) -> None: ...
    |
 help: Remove extraneous blank line(s)
-   |
-19 |
-   -
-20 |     abcd.foo()
+19 - 
+20 - 
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -102,10 +87,9 @@ I001 [*] Import block is un-sorted or un-formatted
    | |___________________________________________^
 help: Organize imports
    |
-27 |
-   -
-   -
-28 |     from typing_extensions import TypeAlias
+26 +     import os
+27 + 
+28 +     from typing_extensions import TypeAlias
    |
 
 E303 [*] Too many blank lines (3)
@@ -114,11 +98,9 @@ E303 [*] Too many blank lines (3)
 30 |     from typing_extensions import TypeAlias
    |     ^^^^
 help: Remove extraneous blank line(s)
-   |
-27 |
-   -
-   -
-28 |     from typing_extensions import TypeAlias
+27 - 
+28 - 
+29 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -130,10 +112,8 @@ E303 [*] Too many blank lines (2)
 35 | def __call__(self, name: str, *args: Any, **kwargs: Any) -> Any:
    |
 help: Remove extraneous blank line(s)
-   |
-31 |
-   -
-32 |     abcd.foo()
+31 - 
+32 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -142,10 +122,8 @@ E303 [*] Too many blank lines (2)
 45 | def _exit(self) -> None: ...
    | ^^^
 help: Remove extraneous blank line(s)
-   |
-43 |
-   -
-44 | def _exit(self) -> None: ...
+43 - 
+44 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -154,10 +132,8 @@ E303 [*] Too many blank lines (2)
 48 | def _optional_commands(self) -> dict[str, bool]: ...
    | ^^^
 help: Remove extraneous blank line(s)
-   |
-46 |
-   -
-47 | def _optional_commands(self) -> dict[str, bool]: ...
+46 - 
+47 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -166,10 +142,8 @@ E303 [*] Too many blank lines (2)
 51 | def run(argv: Sequence[str]) -> int: ...
    | ^^^
 help: Remove extraneous blank line(s)
-   |
-49 |
-   -
-50 | def run(argv: Sequence[str]) -> int: ...
+49 - 
+50 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -178,10 +152,8 @@ E303 [*] Too many blank lines (2)
 54 | def read_line(fd: int = 0) -> bytearray: ...
    | ^^^
 help: Remove extraneous blank line(s)
-   |
-52 |
-   -
-53 | def read_line(fd: int = 0) -> bytearray: ...
+52 - 
+53 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -190,10 +162,8 @@ E303 [*] Too many blank lines (2)
 57 | def flush() -> None: ...
    | ^^^
 help: Remove extraneous blank line(s)
-   |
-55 |
-   -
-56 | def flush() -> None: ...
+55 - 
+56 - 
    |
 
 E303 [*] Too many blank lines (2)
@@ -205,8 +175,6 @@ E303 [*] Too many blank lines (2)
 62 | class MissingCommand(TypeError): ...  # noqa: N818
    |
 help: Remove extraneous blank line(s)
-   |
-58 |
-   -
-59 | from typing import Any, Sequence
+58 - 
+59 - 
    |

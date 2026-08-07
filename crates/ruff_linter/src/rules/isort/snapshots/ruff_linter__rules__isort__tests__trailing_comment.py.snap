@@ -18,16 +18,11 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
    |
-7  |
-8  + from foo import bar  # some comment
-9  | from mylib import (
-10 |     MyClient,
-11 |     MyMgmtClient,
-   - ); from foo import (
-   -     bar
-   - )# some comment
+ 8 + from foo import bar  # some comment
+ 9 + from mylib import (
+10 +     MyClient,
+11 +     MyMgmtClient,
 12 + )
-13 |
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -49,12 +44,12 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
    |
-16 |
-   - from foo import (
-   -     bar
-   - )
 17 + from foo import bar
-18 | from mylib import (
+18 + from mylib import (
+19 +     MyClient,
+20 +     MyMgmtClient,
+21 +     # some comment
+22 + )
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -72,13 +67,13 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
    |
-34 |
-   - from mylib import (
-   -     MyClient
-   -     # some comment
-   - )
+35 - from mylib import (
+36 -     MyClient
+37 -     # some comment
+38 - )
+39 - 
+40 - pass
 35 + from mylib import MyClient  # some comment
-36 |
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -96,13 +91,13 @@ I001 [*] Import block is un-sorted or un-formatted
    |
 help: Organize imports
    |
-41 |
-   - from mylib import (
-   -     # some comment
-   -     MyClient
-   - )
+42 - from mylib import (
+43 -     # some comment
+44 -     MyClient
+45 - )
+46 - 
+47 - pass
 42 + from mylib import MyClient  # some comment
-43 |
    |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -117,11 +112,10 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_^
 help: Organize imports
    |
-49 | # a
-   - from mylib import ( # b
-   -     # c
-   -     MyClient # d
-   -     # e
-   - ) # f
+50 - from mylib import ( # b
+51 -     # c
+52 -     MyClient # d
+53 -     # e
+54 - ) # f
 50 + from mylib import MyClient  # b  # c  # d  # e  # f
    |

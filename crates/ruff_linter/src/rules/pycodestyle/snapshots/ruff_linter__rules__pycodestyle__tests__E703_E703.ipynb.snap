@@ -13,10 +13,8 @@ E703 [*] Statement ends with an unnecessary semicolon
   |
 help: Remove unnecessary semicolon
   |
-4 | # Only skip the last expression
-  - x;  # E703
+5 - x;  # E703
 5 + x  # E703
-6 | x;
   |
 
 E703 [*] Statement ends with an unnecessary semicolon
@@ -30,9 +28,7 @@ E703 [*] Statement ends with an unnecessary semicolon
 11 | x; x;
    |
 help: Remove unnecessary semicolon
-   |
-8  | if True:
-   -     x;
-9  +     x
-10 | # Semicolons with multiple expressions
-   |
+  |
+9 -     x;
+9 +     x
+  |

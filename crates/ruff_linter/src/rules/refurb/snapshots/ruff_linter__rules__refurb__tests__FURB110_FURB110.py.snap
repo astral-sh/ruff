@@ -11,9 +11,8 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
   |
 help: Replace with `or` operator
   |
-  - z = x if x else y  # FURB110
+1 - z = x if x else y  # FURB110
 1 + z = x or y  # FURB110
-2 |
   |
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
@@ -30,11 +29,9 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
   |
 help: Replace with `or` operator
   |
-2 |
-  - z = x \
-  -     if x else y  # FURB110
+3 - z = x \
+4 -     if x else y  # FURB110
 3 + z = x or y  # FURB110
-4 |
   |
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
@@ -52,12 +49,10 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
   |
-5 |
-  - z = x if x \
-  -     else  \
-  -         y  # FURB110
+6 - z = x if x \
+7 -     else  \
+8 -         y  # FURB110
 6 + z = x or y  # FURB110
-7 |
   |
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
@@ -72,10 +67,8 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
    |
-9  |
-   - z = x() if x() else y()  # FURB110
+10 - z = x() if x() else y()  # FURB110
 10 + z = x() or y()  # FURB110
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -97,14 +90,13 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
    |
-12 | # FURB110
-   - z = x if (
-13 + z = (
-14 |     # Test for x.
-15 |     x
-   - ) else (
+13 ~ z = (
+14 +     # Test for x.
+15 +     x
 16 + ) or (
-17 |     # Test for y.
+17 +     # Test for y.
+18 +     y
+19 + )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -125,14 +117,13 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
    |
-22 | z = (
-   -     x if (
-23 +     (
-24 |         # Test for x.
-25 |         x
-   -     ) else (
+23 ~     (
+24 +         # Test for x.
+25 +         x
 26 +     ) or (
-27 |         # Test for y.
+27 +         # Test for y.
+28 +         y
+29 +     )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -152,15 +143,13 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
    |
-33 | z = (
-   -     x if
-   -     # If true, use x.
-   -     x
-   -     # Otherwise, use y.
-   -     else
-   -     y
+34 -     x if
+35 -     # If true, use x.
+36 -     x
+37 -     # Otherwise, use y.
+38 -     else
+39 -     y
 34 +     x or y
-35 | )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -179,15 +168,9 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
    |
-43 | z = (
-   -     x
-   -     if x
-   -     else y
-44 +     x or (y
-45 |     if y > 0
-   -     else None
+44 ~     x or (y
+45 +     if y > 0
 46 +     else None)
-47 | )
    |
 
 FURB110 [*] Replace ternary `if` expression with `or` operator
@@ -203,12 +186,10 @@ FURB110 [*] Replace ternary `if` expression with `or` operator
    |
 help: Replace with `or` operator
    |
-52 | z = (
-   -     x
-   -     if x
-   -     # text
-   -     else y
+53 -     x
+54 -     if x
+55 -     # text
+56 -     else y
 53 +     x or y
-54 | )
    |
 note: This is an unsafe fix and may change runtime behavior

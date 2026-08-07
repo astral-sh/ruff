@@ -13,14 +13,8 @@ PLR0202 [*] Class method defined without decorator
    |
 help: Add @classmethod decorator
    |
-8  |
-9  +     @classmethod
-10 |     def pick_colors(cls, *args):  # [no-classmethod-decorator]
-11 |         """classmethod to pick fruit colors"""
-12 |         cls.COLORS = args
-13 |
-   -     pick_colors = classmethod(pick_colors)
-14 |
+ 9 ~     @classmethod
+10 ~     def pick_colors(cls, *args):  # [no-classmethod-decorator]
    |
 
 PLR0202 [*] Class method defined without decorator
@@ -33,12 +27,9 @@ PLR0202 [*] Class method defined without decorator
    |
 help: Add @classmethod decorator
    |
-21 | class Class:
-22 +     @classmethod
-23 |     def class_method(cls):
+22 ~     @classmethod
+23 ~     def class_method(cls):
 24 |         pass
 25 |
-   -     class_method = classmethod(class_method);another_statement
-26 +     another_statement
-27 |
+26 ~     another_statement
    |

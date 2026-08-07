@@ -13,10 +13,11 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
   |
 help: Replace with `abc.ABC`
   |
+1 ~ import abc
+2 | from abc import abstractmethod, ABCMeta
+…
 6 |
-  - class A0(metaclass=abc.ABCMeta):
-7 + class A0(abc.ABC):
-8 |     @abstractmethod
+7 ~ class A0(abc.ABC):
   |
 
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
@@ -29,10 +30,11 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+ 1 ~ import abc
+ 2 | from abc import abstractmethod, ABCMeta
+ …
 11 |
-   - class A1(metaclass=ABCMeta):
-12 + class A1(abc.ABC):
-13 |     @abstractmethod
+12 ~ class A1(abc.ABC):
    |
 
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
@@ -45,10 +47,11 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+ 1 ~ import abc
+ 2 | from abc import abstractmethod, ABCMeta
+ …
 25 |
-   - class A2(B0, B1, metaclass=ABCMeta):
-26 + class A2(B0, B1, abc.ABC):
-27 |     @abstractmethod
+26 ~ class A2(B0, B1, abc.ABC):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -61,10 +64,11 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+ 1 ~ import abc
+ 2 | from abc import abstractmethod, ABCMeta
+ …
 30 |
-   - class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
-31 + class A3(B0, abc.ABC, before_metaclass=1):
-32 |     pass
+31 ~ class A3(B0, abc.ABC, before_metaclass=1):
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,10 +83,11 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+ 1 ~ import abc
+ 2 | from abc import abstractmethod, ABCMeta
+ …
 61 | # Regression tests for https://github.com/astral-sh/ruff/issues/17162
-   - class A8(abc.ABC, metaclass=ABCMeta):  # FURB180
-62 + class A8(abc.ABC):  # FURB180
-63 |     @abstractmethod
+62 ~ class A8(abc.ABC):  # FURB180
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -98,10 +103,9 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+69 ~     from abc import ABC
 70 |
-   -     class A9(ABC, metaclass=ABCMeta):  # FURB180
-71 +     class A9(ABC):  # FURB180
-72 |         @abstractmethod
+71 ~     class A9(ABC):  # FURB180
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -117,10 +121,9 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+78 ~     from abc import ABC as ABCAlternativeName
 79 |
-   -     class A10(ABCAlternativeName, metaclass=ABCMeta):  # FURB180
-80 +     class A10(ABCAlternativeName):  # FURB180
-81 |         @abstractmethod
+80 ~     class A10(ABCAlternativeName):  # FURB180
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -134,10 +137,11 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
    |
 help: Replace with `abc.ABC`
    |
+ 1 ~ import abc
+ 2 | from abc import abstractmethod, ABCMeta
+ …
 88 |
-   - class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
-89 + class A11(MyMetaClass):  # FURB180
-90 |     @abstractmethod
+89 ~ class A11(MyMetaClass):  # FURB180
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -153,11 +157,10 @@ FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
     |
 help: Replace with `abc.ABC`
    |
+ 1 ~ import abc
+ 2 | from abc import abstractmethod, ABCMeta
+ …
 95 | class A12(
-   -     keyword_argument=1,
-   -     # comment
-   -     metaclass=abc.ABCMeta,
-96 +     abc.ABC, keyword_argument=1,
-97 | ):  # FURB180
+96 ~     abc.ABC, keyword_argument=1,
    |
 note: This is an unsafe fix and may change runtime behavior

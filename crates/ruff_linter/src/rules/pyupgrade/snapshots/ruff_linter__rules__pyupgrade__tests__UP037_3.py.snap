@@ -13,10 +13,8 @@ UP037 [*] Remove quotes from type annotation
    |
 help: Remove quotes
    |
-14 | class EmptyCell:
-   -     _singleton: ClassVar[Optional["EmptyCell"]] = None
+15 -     _singleton: ClassVar[Optional["EmptyCell"]] = None
 15 +     _singleton: ClassVar[Optional[EmptyCell]] = None
-16 |     # the behavior of _singleton above should match a non-ClassVar
    |
 
 UP037 [*] Remove quotes from type annotation
@@ -28,7 +26,6 @@ UP037 [*] Remove quotes from type annotation
    |                 ^^^^^^^^^^^
 help: Remove quotes
    |
-16 |     # the behavior of _singleton above should match a non-ClassVar
-   -     _doubleton: "EmptyCell"
+17 -     _doubleton: "EmptyCell"
 17 +     _doubleton: EmptyCell
    |

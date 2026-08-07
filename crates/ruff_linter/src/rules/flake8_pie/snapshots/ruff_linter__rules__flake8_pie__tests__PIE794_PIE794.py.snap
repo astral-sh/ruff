@@ -13,9 +13,7 @@ PIE794 [*] Class field `name` is defined multiple times
   |
 help: Remove duplicate field definition for `name`
   |
-3 |     # ....
-  -     name = StringField()  # PIE794
-4 |
+4 -     name = StringField()  # PIE794
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,9 +29,7 @@ PIE794 [*] Class field `name` is defined multiple times
    |
 help: Remove duplicate field definition for `name`
    |
-12 |     # ....
-   -     name = StringField()  # PIE794
-13 |
+13 -     name = StringField()  # PIE794
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -46,9 +42,7 @@ PIE794 [*] Class field `bar` is defined multiple times
    |     ^^^^^^^^^^^^^^^^^^^
 help: Remove duplicate field definition for `bar`
    |
-22 |     # ...
-   -     bar = StringField()  # PIE794
-23 |
+23 -     bar = StringField()  # PIE794
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -61,9 +55,7 @@ PIE794 [*] Class field `bar` is defined multiple times
    |     ^^^^^^^^^^^^^^^^^^^
 help: Remove duplicate field definition for `bar`
    |
-39 |     # ...
-   -     bar = StringField()  # PIE794
-40 |
+40 -     bar = StringField()  # PIE794
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -76,9 +68,7 @@ PIE794 [*] Class field `name` is defined multiple times
    |     ^^^^^^^^^^^^
 help: Remove duplicate field definition for `name`
    |
-45 |     name = name + " Bar"
-   -     name = "Bar"  # PIE794
-46 |
+46 -     name = "Bar"  # PIE794
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -91,9 +81,7 @@ PIE794 [*] Class field `name` is defined multiple times
    |     ^^^^^^^^^^^^^^^^^
 help: Remove duplicate field definition for `name`
    |
-51 |     name: str = name + " Bar"
-   -     name: str = "Bar"  # PIE794
-52 |
+52 -     name: str = "Bar"  # PIE794
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -106,7 +94,6 @@ PIE794 [*] Class field `start_line` is defined multiple times
    |     ^^^^^^^^^^^^^^^
 help: Remove duplicate field definition for `start_line`
    |
-56 |     start_line: int
-   -     start_line: int  # PIE794
+57 -     start_line: int  # PIE794
    |
 note: This is an unsafe fix and may change runtime behavior

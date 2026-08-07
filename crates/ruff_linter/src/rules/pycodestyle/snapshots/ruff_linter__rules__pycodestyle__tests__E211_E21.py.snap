@@ -12,10 +12,7 @@ E211 [*] Whitespace before '('
   |
 help: Removed whitespace before '('
   |
-1 | #: E211
-  - spam (1)
-2 + spam(1)
-3 | #: E211 E211
+2 | spam(1)
   |
 
 E211 [*] Whitespace before '['
@@ -30,10 +27,7 @@ E211 [*] Whitespace before '['
   |
 help: Removed whitespace before '['
   |
-3 | #: E211 E211
-  - dict ['key'] = list [index]
-4 + dict['key'] = list [index]
-5 | #: E211
+4 | dict['key'] = list [index]
   |
 
 E211 [*] Whitespace before '['
@@ -48,10 +42,7 @@ E211 [*] Whitespace before '['
   |
 help: Removed whitespace before '['
   |
-3 | #: E211 E211
-  - dict ['key'] = list [index]
-4 + dict ['key'] = list[index]
-5 | #: E211
+4 | dict ['key'] = list[index]
   |
 
 E211 [*] Whitespace before '['
@@ -66,10 +57,7 @@ E211 [*] Whitespace before '['
   |
 help: Removed whitespace before '['
   |
-5 | #: E211
-  - dict['key'] ['subkey'] = list[index]
-6 + dict['key']['subkey'] = list[index]
-7 | #: Okay
+6 | dict['key']['subkey'] = list[index]
   |
 
 E211 [*] Whitespace before '('
@@ -81,10 +69,7 @@ E211 [*] Whitespace before '('
    |
 help: Removed whitespace before '('
    |
-16 |
-   - def fetch_name () -> Union[str, None]:
-17 + def fetch_name() -> Union[str, None]:
-18 |     """Fetch name from --person-name in sys.argv.
+17 | def fetch_name() -> Union[str, None]:
    |
 
 E211 [*] Whitespace before '('
@@ -99,10 +84,7 @@ E211 [*] Whitespace before '('
    |
 help: Removed whitespace before '('
    |
-26 |     # Logger.info("test code")
-   -     for i in range (0, len (sys.argv)) :
-27 +     for i in range(0, len (sys.argv)) :
-28 |         if sys.argv[i] == "--name" :
+27 |     for i in range(0, len (sys.argv)) :
    |
 
 E211 [*] Whitespace before '('
@@ -117,8 +99,5 @@ E211 [*] Whitespace before '('
    |
 help: Removed whitespace before '('
    |
-26 |     # Logger.info("test code")
-   -     for i in range (0, len (sys.argv)) :
-27 +     for i in range (0, len(sys.argv)) :
-28 |         if sys.argv[i] == "--name" :
+27 |     for i in range (0, len(sys.argv)) :
    |

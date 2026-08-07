@@ -13,9 +13,8 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +29,8 @@ TID255 [*] Lazy import `Component` is resolved immediately
    |
 help: Convert to an eager import
   |
-3 | lazy import aliased as alias
-  - lazy from library import Component
+4 - lazy from library import Component
 4 + from library import Component
-5 | lazy from library import Other as Renamed
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -49,10 +46,8 @@ TID255 [*] Lazy import `alias` is resolved immediately
    |
 help: Convert to an eager import
   |
-2 | lazy import package.submodule
-  - lazy import aliased as alias
+3 - lazy import aliased as alias
 3 + import aliased as alias
-4 | lazy from library import Component
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -67,10 +62,8 @@ TID255 [*] Lazy import `package` is resolved immediately
    |
 help: Convert to an eager import
   |
-1 | lazy import foo
-  - lazy import package.submodule
+2 - lazy import package.submodule
 2 + import package.submodule
-3 | lazy import aliased as alias
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -96,9 +89,8 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -113,10 +105,8 @@ TID255 [*] Lazy import `Component` is resolved immediately
    |
 help: Convert to an eager import
   |
-3 | lazy import aliased as alias
-  - lazy from library import Component
+4 - lazy from library import Component
 4 + from library import Component
-5 | lazy from library import Other as Renamed
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -129,9 +119,8 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -146,10 +135,8 @@ TID255 [*] Lazy import `Component` is resolved immediately
    |
 help: Convert to an eager import
   |
-3 | lazy import aliased as alias
-  - lazy from library import Component
+4 - lazy from library import Component
 4 + from library import Component
-5 | lazy from library import Other as Renamed
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -162,10 +149,8 @@ TID255 [*] Lazy import `Renamed` is resolved immediately
    |
 help: Convert to an eager import
   |
-4 | lazy from library import Component
-  - lazy from library import Other as Renamed
+5 - lazy from library import Other as Renamed
 5 + from library import Other as Renamed
-6 | lazy import multi_one, multi_two
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -181,9 +166,8 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -198,10 +182,8 @@ TID255 [*] Lazy import `Component` is resolved immediately
    |
 help: Convert to an eager import
   |
-3 | lazy import aliased as alias
-  - lazy from library import Component
+4 - lazy from library import Component
 4 + from library import Component
-5 | lazy from library import Other as Renamed
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -216,9 +198,8 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -233,10 +214,8 @@ TID255 [*] Lazy import `Component` is resolved immediately
    |
 help: Convert to an eager import
   |
-3 | lazy import aliased as alias
-  - lazy from library import Component
+4 - lazy from library import Component
 4 + from library import Component
-5 | lazy from library import Other as Renamed
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -250,9 +229,8 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -268,8 +246,7 @@ TID255 [*] Lazy import `foo` is resolved immediately
    |
 help: Convert to an eager import
   |
-  - lazy import foo
+1 - lazy import foo
 1 + import foo
-2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -14,10 +14,8 @@ UP018 [*] Unnecessary `int` call (rewrite as a literal)
   |
 help: Replace with integer literal
   |
-2 |
-  - int(-
 3 + (-
-4 |     1)
+4 +     1)
   |
 
 UP018 [*] Unnecessary `int` call (rewrite as a literal)
@@ -30,8 +28,6 @@ UP018 [*] Unnecessary `int` call (rewrite as a literal)
   | |______^
 help: Replace with integer literal
   |
-5 |
-  - int(+
 6 + (+
-7 |     1)
+7 +     1)
   |

@@ -13,8 +13,6 @@ F504 [*] `%`-format string has unused named argument(s): baz
    |
 help: Remove extra named arguments: baz
   |
-7 | '%(bar)s' % {}  # F505
-  - '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
+8 - '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
 8 + '%(bar)s' % {'bar': 1, }  # F504
-9 | '%(bar)s' % (1, 2, 3)  # F502
   |

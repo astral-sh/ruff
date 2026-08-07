@@ -10,9 +10,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
 help: Merge `isinstance` calls for `a`
   |
-  - if isinstance(a, int) or isinstance(a, float):  # SIM101
+1 - if isinstance(a, int) or isinstance(a, float):  # SIM101
 1 + if isinstance(a, (int, float)):  # SIM101
-2 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -27,10 +26,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
 help: Merge `isinstance` calls for `a`
   |
-3 |
-  - if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
+4 - if isinstance(a, (int, float)) or isinstance(a, bool):  # SIM101
 4 + if isinstance(a, (int, float, bool)):  # SIM101
-5 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -45,10 +42,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
   |
 help: Merge `isinstance` calls for `a`
   |
-6 |
-  - if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
+7 - if isinstance(a, int) or isinstance(a, float) or isinstance(b, bool):  # SIM101
 7 + if isinstance(a, (int, float)) or isinstance(b, bool):  # SIM101
-8 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -63,10 +58,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 help: Merge `isinstance` calls for `a`
    |
-9  |
-   - if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
+10 - if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
 10 + if isinstance(b, bool) or isinstance(a, (int, float)):  # SIM101
-11 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -81,10 +74,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 help: Merge `isinstance` calls for `a`
    |
-15 |
-   - if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
+16 - if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 16 + if (isinstance(a, (int, float))) and isinstance(b, bool):  # SIM101
-17 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -99,10 +90,8 @@ SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
 help: Merge `isinstance` calls
    |
-18 |
-   - if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
+19 - if isinstance(a.b, int) or isinstance(a.b, float):  # SIM101
 19 + if isinstance(a.b, (int, float)):  # SIM101
-20 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,10 +117,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 help: Merge `isinstance` calls for `a`
    |
-37 |
-   - if x or isinstance(a, int) or isinstance(a, float):
+38 - if x or isinstance(a, int) or isinstance(a, float):
 38 + if x or isinstance(a, (int, float)):
-39 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -146,10 +133,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 help: Merge `isinstance` calls for `a`
    |
-40 |
-   - if x or y or isinstance(a, int) or isinstance(a, float) or z:
+41 - if x or y or isinstance(a, int) or isinstance(a, float) or z:
 41 + if x or y or isinstance(a, (int, float)) or z:
-42 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -163,10 +148,8 @@ SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
 help: Merge `isinstance` calls for `a`
    |
-52 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722460483
-   - if(isinstance(a, int)) or (isinstance(a, float)):
+53 - if(isinstance(a, int)) or (isinstance(a, float)):
 53 + if isinstance(a, (int, float)):
-54 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -182,10 +165,8 @@ SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
 help: Merge `isinstance` calls
    |
-59 | # whose interpolations include lambdas.
-   - isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
+60 - isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
 60 + isinstance(f"{(lambda: 0)}", (int, str))
-61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -201,10 +182,8 @@ SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
 help: Merge `isinstance` calls
    |
-60 | isinstance(f"{(lambda: 0)}", int) or isinstance(f"{(lambda: 0)}", str)
-   - isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
+61 - isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
 61 + isinstance(f"{0:{(lambda: 0)}}", (int, str))
-62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -219,10 +198,8 @@ SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
 help: Merge `isinstance` calls
    |
-61 | isinstance(f"{0:{(lambda: 0)}}", int) or isinstance(f"{0:{(lambda: 0)}}", str)
-   - isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
+62 - isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
 62 + isinstance(f"{0:\x22}", (int, str))
-63 | isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -238,10 +215,8 @@ SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
    |
 help: Merge `isinstance` calls
    |
-62 | isinstance(f"{0:\x22}", int) or isinstance(f"{0:\x22}", str)
-   - isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
+63 - isinstance(f"{0:\x7b}", int) or isinstance(f"{0:\x7b}", str)
 63 + isinstance(f"{0:\x7b}", (int, str))
-64 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -257,10 +232,8 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
    |
 help: Merge `isinstance` calls for `x`
    |
-66 | types = (int,)
-   - isinstance(x, (*types,)) or isinstance(x, ())
+67 - isinstance(x, (*types,)) or isinstance(x, ())
 67 + isinstance(x, (*types,))
-68 | isinstance(x, (*types,)) or isinstance(x, (*types,))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -276,10 +249,8 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
    |
 help: Merge `isinstance` calls for `x`
    |
-67 | isinstance(x, (*types,)) or isinstance(x, ())
-   - isinstance(x, (*types,)) or isinstance(x, (*types,))
+68 - isinstance(x, (*types,)) or isinstance(x, (*types,))
 68 + isinstance(x, (*types, *types))
-69 | isinstance(x, ()) or isinstance(x, int)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -295,10 +266,8 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
    |
 help: Merge `isinstance` calls for `x`
    |
-68 | isinstance(x, (*types,)) or isinstance(x, (*types,))
-   - isinstance(x, ()) or isinstance(x, int)
+69 - isinstance(x, ()) or isinstance(x, int)
 69 + isinstance(x, (int))
-70 | isinstance(x, ()) or isinstance(x, ())
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -314,10 +283,8 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
    |
 help: Merge `isinstance` calls for `x`
    |
-69 | isinstance(x, ()) or isinstance(x, int)
-   - isinstance(x, ()) or isinstance(x, ())
+70 - isinstance(x, ()) or isinstance(x, ())
 70 + isinstance(x, ())
-71 | ((isinstance(x, int)) or isinstance(x, str))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -332,10 +299,8 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
    |
 help: Merge `isinstance` calls for `x`
    |
-70 | isinstance(x, ()) or isinstance(x, ())
-   - ((isinstance(x, int)) or isinstance(x, str))
+71 - ((isinstance(x, int)) or isinstance(x, str))
 71 + (isinstance(x, (int, str)))
-72 | isinstance(x, int) or (isinstance(x, str))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -348,8 +313,7 @@ SIM101 [*] Multiple `isinstance` calls for `x`, merge into a single call
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Merge `isinstance` calls for `x`
    |
-71 | ((isinstance(x, int)) or isinstance(x, str))
-   - isinstance(x, int) or (isinstance(x, str))
+72 - isinstance(x, int) or (isinstance(x, str))
 72 + isinstance(x, (int, str))
    |
 note: This is an unsafe fix and may change runtime behavior

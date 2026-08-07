@@ -12,10 +12,8 @@ UP021 [*] `universal_newlines` is deprecated, use `text`
   |
 help: Replace with `text` keyword argument
   |
-4 | # Errors
-  - subprocess.run(["foo"], universal_newlines=True, check=True)
+5 - subprocess.run(["foo"], universal_newlines=True, check=True)
 5 + subprocess.run(["foo"], text=True, check=True)
-6 | subprocess.run(["foo"], universal_newlines=True, text=True)
   |
 
 UP021 [*] `universal_newlines` is deprecated, use `text`
@@ -29,10 +27,8 @@ UP021 [*] `universal_newlines` is deprecated, use `text`
   |
 help: Replace with `text` keyword argument
   |
-5 | subprocess.run(["foo"], universal_newlines=True, check=True)
-  - subprocess.run(["foo"], universal_newlines=True, text=True)
+6 - subprocess.run(["foo"], universal_newlines=True, text=True)
 6 + subprocess.run(["foo"], text=True)
-7 | run(["foo"], universal_newlines=True, check=False)
   |
 
 UP021 [*] `universal_newlines` is deprecated, use `text`
@@ -47,8 +43,6 @@ UP021 [*] `universal_newlines` is deprecated, use `text`
   |
 help: Replace with `text` keyword argument
   |
-6 | subprocess.run(["foo"], universal_newlines=True, text=True)
-  - run(["foo"], universal_newlines=True, check=False)
+7 - run(["foo"], universal_newlines=True, check=False)
 7 + run(["foo"], text=True, check=False)
-8 |
   |

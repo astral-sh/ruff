@@ -24,10 +24,8 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
   | ^^^^^^^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - # ruff: noqa: F401
+2 - # ruff: noqa: F401
 2 + # ruff: file-ignore[F401]
-3 | import math
   |
 ```
 
@@ -51,10 +49,8 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - # ruff: noqa: F401, F402, F403
+2 - # ruff: noqa: F401, F402, F403
 2 + # ruff: file-ignore[F401, F402, F403]
-3 | import math
   |
 ```
 
@@ -78,10 +74,8 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - # ruff: noqa: F401, F402, F403 for some reason
+2 - # ruff: noqa: F401, F402, F403 for some reason
 2 + # ruff: file-ignore[F401, F402, F403] for some reason
-3 | import math
   |
 ```
 
@@ -105,10 +99,8 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - # ruff: noqa: F401, F402, F403 # fmt:skip
+2 - # ruff: noqa: F401, F402, F403 # fmt:skip
 2 + # ruff: file-ignore[F401, F402, F403] # fmt:skip
-3 | import math
   |
 ```
 
@@ -137,8 +129,7 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
   |              ^^^^^^^^^^^^^^^^^^^^
 help: Use `ruff: ignore` instead
   |
-2 | # snapshot: noqa-comments
-  - import math  # noqa: F401, UNK001
+3 - import math  # noqa: F401, UNK001
 3 + import math  # ruff: ignore[F401, UNK001]
   |
 ```
@@ -222,8 +213,7 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
   |              ^^^^^^^^^^^^
 help: Use `ruff: ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - import math  # noqa: F401
+2 - import math  # noqa: F401
 2 + import math  # ruff: ignore[F401]
   |
 ```
@@ -261,8 +251,7 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
   |                         ^^^^^^^^^^^^
 help: Use `ruff: ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - import math  # fmt:skip # noqa: F401
+2 - import math  # fmt:skip # noqa: F401
 2 + import math  # fmt:skip # ruff: ignore[F401]
   |
 ```
@@ -287,10 +276,8 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
   |              ^^^^^^
 help: Use `ruff: ignore` instead
   |
-1 | # snapshot: noqa-comments
-  - import math  # noqa
+2 - import math  # noqa
 2 + import math  # ruff: ignore[F401]
-3 | # snapshot: noqa-comments
   |
 ```
 
@@ -309,8 +296,7 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
   |                  ^^^^^^
 help: Use `ruff: ignore` instead
   |
-3 | # snapshot: noqa-comments
-  - import foo, bar  # noqa
+4 - import foo, bar  # noqa
 4 + import foo, bar  # ruff: ignore[F401]
   |
 ```

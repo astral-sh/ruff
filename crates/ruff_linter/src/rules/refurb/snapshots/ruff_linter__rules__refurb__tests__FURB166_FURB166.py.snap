@@ -13,10 +13,8 @@ FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
   |
 help: Replace with `base=0`
   |
-2 |
-  - _ = int("0b1010"[2:], 2)
+3 - _ = int("0b1010"[2:], 2)
 3 + _ = int("0b1010", 0)
-4 | _ = int("0o777"[2:], 8)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,10 +28,8 @@ FURB166 [*] Use of `int` with explicit `base=8` after removing prefix
   |
 help: Replace with `base=0`
   |
-3 | _ = int("0b1010"[2:], 2)
-  - _ = int("0o777"[2:], 8)
+4 - _ = int("0o777"[2:], 8)
 4 + _ = int("0o777", 0)
-5 | _ = int("0xFFFF"[2:], 16)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -49,10 +45,8 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
   |
 help: Replace with `base=0`
   |
-4 | _ = int("0o777"[2:], 8)
-  - _ = int("0xFFFF"[2:], 16)
+5 - _ = int("0xFFFF"[2:], 16)
 5 + _ = int("0xFFFF", 0)
-6 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -67,10 +61,8 @@ FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
    |
 help: Replace with `base=0`
   |
-7 | b = "0b11"
-  - _ = int(b[2:], 2)
+8 - _ = int(b[2:], 2)
 8 + _ = int(b, 0)
-9 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -86,10 +78,8 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
    |
 help: Replace with `base=0`
    |
-9  |
-   - _ = int("0xFFFF"[2:], base=16)
+10 - _ = int("0xFFFF"[2:], base=16)
 10 + _ = int("0xFFFF", base=0)
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,10 +92,8 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
    |     ^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `base=0`
    |
-11 |
-   - _ = int(b"0xFFFF"[2:], 16)
+12 - _ = int(b"0xFFFF"[2:], 16)
 12 + _ = int(b"0xFFFF", 0)
-13 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -119,9 +107,7 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
    |
 help: Replace with `base=0`
    |
-18 |
-   - _ = int(get_str()[2:], 16)
+19 - _ = int(get_str()[2:], 16)
 19 + _ = int(get_str(), 0)
-20 |
    |
 note: This is an unsafe fix and may change runtime behavior

@@ -12,10 +12,7 @@ D410 [*] Missing blank line after section ("Parameters")
 6 |     a : int
   |
 help: Add blank line after "Parameters"
-   |
-9  |         _description_
-10 +
-11 |     Returns
+10 -     Returns
    |
 
 D410 [*] Missing blank line after section ("Parameters")
@@ -29,8 +26,5 @@ D410 [*] Missing blank line after section ("Parameters")
 23 |     Returns
    |
 help: Add blank line after "Parameters"
-   |
-22 |     ----------
-23 +
-24 |     Returns
+23 -     Returns
    |

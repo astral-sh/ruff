@@ -13,10 +13,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
    |
-12 |     except Exception:
-   -         logging.error("Context message here")
+13 -         logging.error("Context message here")
 13 +         logging.exception("Context message here")
-14 |
    |
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
@@ -27,10 +25,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `exception`
    |
-15 |         if True:
-   -             logging.error("Context message here")
+16 -             logging.error("Context message here")
 16 +             logging.exception("Context message here")
-17 |
    |
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
@@ -45,10 +41,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
    |
-26 |     except Exception:
-   -         logger.error("Context message here")
+27 -         logger.error("Context message here")
 27 +         logger.exception("Context message here")
-28 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -60,10 +54,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `exception`
    |
-29 |         if True:
-   -             logger.error("Context message here")
+30 -             logger.error("Context message here")
 30 +             logger.exception("Context message here")
-31 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,10 +71,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
    |
-36 |     except Exception:
-   -         log.error("Context message here")
+37 -         log.error("Context message here")
 37 +         log.exception("Context message here")
-38 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -94,10 +84,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `exception`
    |
-39 |         if True:
-   -             log.error("Context message here")
+40 -             log.error("Context message here")
 40 +             log.exception("Context message here")
-41 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -113,10 +101,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
 help: Replace with `exception`
    |
-46 |     except Exception:
-   -         self.logger.error("Context message here")
+47 -         self.logger.error("Context message here")
 47 +         self.logger.exception("Context message here")
-48 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,10 +114,8 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `exception`
    |
-49 |         if True:
-   -             self.logger.error("Context message here")
+50 -             self.logger.error("Context message here")
 50 +             self.logger.exception("Context message here")
-51 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -147,10 +131,11 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
     |
 help: Replace with `exception`
     |
-99  |     except Exception:
-    -         error("Context message here")
-100 +         exception("Context message here")
-101 |
+ 95 ~     from logging import error, exception
+ 96 |
+  …
+ 99 |     except Exception:
+100 ~         exception("Context message here")
     |
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
@@ -161,10 +146,11 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `exception`
     |
+ 95 ~     from logging import error, exception
+ 96 |
+  …
 102 |         if True:
-    -             error("Context message here")
-103 +             exception("Context message here")
-104 |
+103 ~             exception("Context message here")
     |
 
 TRY400 [*] Use `logging.exception` instead of `logging.error`
@@ -176,7 +162,9 @@ TRY400 [*] Use `logging.exception` instead of `logging.error`
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with `exception`
     |
+135 ~     from logging import error, exception
+136 |
+  …
 142 |         except Exception:
-    -             error("Context message here")
-143 +             exception("Context message here")
+143 ~             exception("Context message here")
     |

@@ -13,7 +13,7 @@ F811 [*] Redefinition of unused `List` from line 4
   |
 help: Remove definition: `List`
   |
-4 |     List,
-  -     List,
-5 | )
+3 + from typing import (
+4 +     List,
+5 + )
   |

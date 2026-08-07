@@ -9,10 +9,7 @@ D211 [*] No blank lines allowed before class docstring
 170 |     """With leading space."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove blank line(s) before class docstring
-    |
-168 | class WithLeadingSpace:
-    -
-169 |     """With leading space."""
+169 - 
     |
 
 D211 [*] No blank lines allowed before class docstring
@@ -25,8 +22,5 @@ D211 [*] No blank lines allowed before class docstring
 182 |     pass
     |
 help: Remove blank line(s) before class docstring
-    |
-179 | class TrailingSpace:
-    -
-180 |     """TrailingSpace."""
+180 - 
     |

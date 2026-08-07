@@ -12,12 +12,10 @@ E502 [*] Redundant backslash
 11 |     7)
    |
 help: Remove redundant backslash
-   |
-8  |
-   - a = (3 -\
-9  + a = (3 -
-10 |     2 +   \
-   |
+  |
+9 - a = (3 -\
+9 + a = (3 -
+  |
 
 E502 [*] Redundant backslash
   --> E502.py:10:11
@@ -29,10 +27,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-9  | a = (3 -\
-   -     2 +   \
+10 -     2 +   \
 10 +     2 +   
-11 |     7)
    |
 
 E502 [*] Redundant backslash
@@ -46,10 +42,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-13 | z = 5 + \
-   -     (3 -\
+14 -     (3 -\
 14 +     (3 -
-15 |     2 +   \
    |
 
 E502 [*] Redundant backslash
@@ -64,10 +58,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-14 |     (3 -\
-   -     2 +   \
+15 -     2 +   \
 15 +     2 +   
-16 |     7) + \
    |
 
 E502 [*] Redundant backslash
@@ -81,10 +73,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-22 | b = [
-   -     2 + 4 + 5 + \
+23 -     2 + 4 + 5 + \
 23 +     2 + 4 + 5 + 
-24 |     44 \
    |
 
 E502 [*] Redundant backslash
@@ -99,10 +89,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-23 |     2 + 4 + 5 + \
-   -     44 \
+24 -     44 \
 24 +     44 
-25 |     - 5
    |
 
 E502 [*] Redundant backslash
@@ -116,10 +104,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-28 | c = (True and
-   -     False \
+29 -     False \
 29 +     False 
-30 |     or False \
    |
 
 E502 [*] Redundant backslash
@@ -134,10 +120,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-29 |     False \
-   -     or False \
+30 -     or False \
 30 +     or False 
-31 |     and True \
    |
 
 E502 [*] Redundant backslash
@@ -151,10 +135,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-30 |     or False \
-   -     and True \
+31 -     and True \
 31 +     and True 
-32 | )
    |
 
 E502 [*] Redundant backslash
@@ -168,10 +150,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-43 | s = {
-   -     'x': 2 + \
+44 -     'x': 2 + \
 44 +     'x': 2 + 
-45 |     2
    |
 
 E502 [*] Redundant backslash
@@ -183,10 +163,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-54 |
-   - x = {2 + 4 \
+55 - x = {2 + 4 \
 55 + x = {2 + 4 
-56 |   + 3}
    |
 
 E502 [*] Redundant backslash
@@ -201,10 +179,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-60 |     + 3  # \
-   -     + 4 \
+61 -     + 4 \
 61 +     + 4 
-62 |     + 3
    |
 
 E502 [*] Redundant backslash
@@ -218,10 +194,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-81 |
-   - x = ("abc" \
+82 - x = ("abc" \
 82 + x = ("abc" 
-83 |     "xyz")
    |
 
 E502 [*] Redundant backslash
@@ -235,10 +209,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-85 | x = [
-   -     "a" + \
+86 -     "a" + \
 86 +     "a" + 
-87 | f"""
    |
 
 E502 [*] Redundant backslash
@@ -253,10 +225,8 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-88 | b
-   - """ + \
+89 - """ + \
 89 + """ + 
-90 |     "c"
    |
 
 E502 [*] Redundant backslash
@@ -269,8 +239,6 @@ E502 [*] Redundant backslash
    |
 help: Remove redundant backslash
    |
-94 | def foo():
-   -     x = (a + \
+95 -     x = (a + \
 95 +     x = (a + 
-96 |         2)
    |

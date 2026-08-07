@@ -12,10 +12,8 @@ PYI010 [*] Function body must contain only `...`
   |
 help: Replace function body with `...`
   |
-5 | def buzz():
-  -     print("buzz")  # ERROR PYI010
+6 -     print("buzz")  # ERROR PYI010
 6 +     ...  # ERROR PYI010
-7 |
   |
 
 PYI010 [*] Function body must contain only `...`
@@ -28,12 +26,10 @@ PYI010 [*] Function body must contain only `...`
 11 | def bizz():
    |
 help: Replace function body with `...`
-   |
-8  | def foo2():
-   -     123  # ERROR PYI010
-9  +     ...  # ERROR PYI010
-10 |
-   |
+  |
+9 -     123  # ERROR PYI010
+9 +     ...  # ERROR PYI010
+  |
 
 PYI010 [*] Function body must contain only `...`
   --> PYI010.pyi:12:5
@@ -46,8 +42,6 @@ PYI010 [*] Function body must contain only `...`
    |
 help: Replace function body with `...`
    |
-11 | def bizz():
-   -     x = 123  # ERROR PYI010
+12 -     x = 123  # ERROR PYI010
 12 +     ...  # ERROR PYI010
-13 |
    |

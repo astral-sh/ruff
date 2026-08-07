@@ -12,13 +12,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
   |
 help: Move into type-checking block
   |
-  - def f():
 1 + from typing import TYPE_CHECKING
-2 +
+2 ~ 
 3 + if TYPE_CHECKING:
-4 |     from pandas import DataFrame
-5 + def f():
-6 |
+4 +     from pandas import DataFrame
+5 | def f():
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -33,15 +31,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame
-5  | def f():
---------------------------------------------------------------------------------
-12 | def f():
-   -     from pandas import DataFrame
-13 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -56,15 +50,11 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     import pandas as pd
-5  | def f():
---------------------------------------------------------------------------------
-19 | def f():
-   -     import pandas as pd
-20 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     import pandas as pd
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -79,15 +69,11 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     import pandas as pd
-5  | def f():
---------------------------------------------------------------------------------
-26 | def f():
-   -     import pandas as pd
-27 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     import pandas as pd
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -102,15 +88,11 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     import pandas as pd
-5  | def f():
---------------------------------------------------------------------------------
-33 | def f():
-   -     import pandas as pd
-34 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     import pandas as pd
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -125,15 +107,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame
-5  | def f():
---------------------------------------------------------------------------------
-41 | def f():
-   -     from pandas import DataFrame
-42 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -149,15 +127,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame
-5  | def f():
---------------------------------------------------------------------------------
-50 |
-   -     from pandas import DataFrame
-51 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -172,15 +146,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame, Series
-5  | def f():
---------------------------------------------------------------------------------
-67 | def f():
-   -     from pandas import DataFrame, Series
-68 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame, Series
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -195,15 +165,11 @@ TC002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame, Series
-5  | def f():
---------------------------------------------------------------------------------
-67 | def f():
-   -     from pandas import DataFrame, Series
-68 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame, Series
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -218,15 +184,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame, Series
-5  | def f():
---------------------------------------------------------------------------------
-74 | def f():
-   -     from pandas import DataFrame, Series
-75 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame, Series
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -241,15 +203,11 @@ TC002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame, Series
-5  | def f():
---------------------------------------------------------------------------------
-74 | def f():
-   -     from pandas import DataFrame, Series
-75 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame, Series
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -264,15 +222,11 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame, Series
-5  | def f():
---------------------------------------------------------------------------------
-92 | def f():
-   -     from pandas import DataFrame, Series
-93 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame, Series
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -287,14 +241,10 @@ TC002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from pandas import DataFrame, Series
-5  | def f():
---------------------------------------------------------------------------------
-92 | def f():
-   -     from pandas import DataFrame, Series
-93 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from pandas import DataFrame, Series
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior

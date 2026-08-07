@@ -15,13 +15,9 @@ Q001 [*] Double quote multiline found but single quotes preferred
   |
 help: Replace double multiline quotes with single quotes
   |
-4 |
-  - """
 5 + '''
-6 | this is not a docstring
-  - """
+6 + this is not a docstring
 7 + '''
-8 |
   |
 
 Q001 [*] Double quote multiline found but single quotes preferred
@@ -38,13 +34,9 @@ Q001 [*] Double quote multiline found but single quotes preferred
    |
 help: Replace double multiline quotes with single quotes
    |
-15 |
-   -     """
-16 +     '''
-17 |     this is not a docstring
-   -     """
+16 ~     '''
+17 +     this is not a docstring
 18 +     '''
-19 |
    |
 
 Q001 [*] Double quote multiline found but single quotes preferred
@@ -60,12 +52,8 @@ Q001 [*] Double quote multiline found but single quotes preferred
    |
 help: Replace double multiline quotes with single quotes
    |
-20 |     # The colon in the list indexing below is an edge case for the docstring scanner
-   -     def f(self, bar="""
-   -         definitely not a docstring""",
-21 +     def f(self, bar='''
-22 +         definitely not a docstring''',
-23 |         val=l[Cls():3]):
+21 ~     def f(self, bar='''
+22 ~         definitely not a docstring''',
    |
 
 Q001 [*] Double quote multiline found but single quotes preferred
@@ -82,13 +70,9 @@ Q001 [*] Double quote multiline found but single quotes preferred
    |
 help: Replace double multiline quotes with single quotes
    |
-29 |
-   -         """
-30 +         '''
-31 |         this is not a docstring
-   -         """
+30 ~         '''
+31 +         this is not a docstring
 32 +         '''
-33 |
    |
 
 Q001 [*] Double quote multiline found but single quotes preferred
@@ -103,11 +87,7 @@ Q001 [*] Double quote multiline found but single quotes preferred
    |
 help: Replace double multiline quotes with single quotes
    |
-34 |         if l:
-   -             """
-35 +             '''
-36 |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
-   -             """
+35 ~             '''
+36 +             Looks like a docstring, but in reality it isn't - only modules, classes and functions
 37 +             '''
-38 |             pass
    |

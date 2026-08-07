@@ -12,10 +12,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 help: Remove `super()` parameters
    |
-16 |     def wrong(self):
-   -         parent = super(Child, self)  # wrong
+17 -         parent = super(Child, self)  # wrong
 17 +         parent = super()  # wrong
-18 |         super(Child, self).method  # wrong
    |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -30,10 +28,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 help: Remove `super()` parameters
    |
-17 |         parent = super(Child, self)  # wrong
-   -         super(Child, self).method  # wrong
+18 -         super(Child, self).method  # wrong
 18 +         super().method  # wrong
-19 |         super(
    |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -49,13 +45,11 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
    | |_________^
 help: Remove `super()` parameters
    |
-18 |         super(Child, self).method  # wrong
-   -         super(
-   -             Child,
-   -             self,
-   -         ).method()  # wrong
+19 -         super(
+20 -             Child,
+21 -             self,
+22 -         ).method()  # wrong
 19 +         super().method()  # wrong
-20 |
    |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -69,10 +63,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 help: Remove `super()` parameters
    |
-35 |     def normal(self):
-   -         super(MyClass, self).f()  # can use super()
+36 -         super(MyClass, self).f()  # can use super()
 36 +         super().f()  # can use super()
-37 |         super().f()
    |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -85,10 +77,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 help: Remove `super()` parameters
    |
-70 |         def inner_argument(self):
-   -             super(MyClass, self).f()  # can use super()
+71 -             super(MyClass, self).f()  # can use super()
 71 +             super().f()  # can use super()
-72 |             super().f()
    |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -102,10 +92,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 help: Remove `super()` parameters
    |
-97 |     def normal(self):
-   -         super(DataClass, self).f()  # Error
+98 -         super(DataClass, self).f()  # Error
 98 +         super().f()  # Error
-99 |         super().f()  # OK
    |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -117,10 +105,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |              ^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-115 |     def bar(self):
-    -         super(__class__, self).foo()
+116 -         super(__class__, self).foo()
 116 +         super().foo()
-117 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -140,14 +126,12 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-136 |     def with_comments(self):
-    -         super(
-    -             # super helpful comment
-    -             ClassForCommentEnthusiasts,
-    -             self
-    -         ).f()
+137 -         super(
+138 -             # super helpful comment
+139 -             ClassForCommentEnthusiasts,
+140 -             self
+141 -         ).f()
 137 +         super().f()
-138 |         super(
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -168,14 +152,12 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-141 |         ).f()
-    -         super(
-    -             ClassForCommentEnthusiasts,
-    -             # even more helpful comment
-    -             self
-    -         ).f()
+142 -         super(
+143 -             ClassForCommentEnthusiasts,
+144 -             # even more helpful comment
+145 -             self
+146 -         ).f()
 142 +         super().f()
-143 |         super(
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -193,14 +175,12 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     | |_________^
 help: Remove `super()` parameters
     |
-146 |         ).f()
-    -         super(
-    -             ClassForCommentEnthusiasts,
-    -             self
-    -             # also a comment
-    -         ).f()
+147 -         super(
+148 -             ClassForCommentEnthusiasts,
+149 -             self
+150 -             # also a comment
+151 -         ).f()
 147 +         super().f()
-148 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -250,10 +230,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-166 |     def method3(self):
-    -         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
+167 -         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
 167 +         super().some_method()  # Should be fixed - no keywords
-168 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -268,10 +246,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-177 |         if False: __class__ # Python injects __class__ into scope
-    -         builtins.super(ChildD1, self).f()
+178 -         builtins.super(ChildD1, self).f()
 178 +         builtins.super().f()
-179 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -286,10 +262,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-182 |         if False: super # Python injects __class__ into scope
-    -         builtins.super(ChildD2, self).f()
+183 -         builtins.super(ChildD2, self).f()
 183 +         builtins.super().f()
-184 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -303,10 +277,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-186 |     def f(self):
-    -         builtins.super(ChildD3, self).f()
+187 -         builtins.super(ChildD3, self).f()
 187 +         builtins.super().f()
-188 |         super # Python injects __class__ into scope
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -320,10 +292,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-192 |     def f(self):
-    -         builtins_alias.super(ChildD4, self).f()
+193 -         builtins_alias.super(ChildD4, self).f()
 193 +         builtins_alias.super().f()
-194 |         super # Python injects __class__ into scope
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -338,10 +308,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-199 |         super # Python injects __class__ into scope
-    -         builtins.super(ChildD5, self).f()
+200 -         builtins.super(ChildD5, self).f()
 200 +         builtins.super().f()
-201 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -356,10 +324,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-205 |         __class__ # Python injects __class__ into scope
-    -         builtins.super(ChildD6, self).f()
+206 -         builtins.super(ChildD6, self).f()
 206 +         builtins.super().f()
-207 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -374,10 +340,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-211 |             __class__ # Python injects __class__ into scope
-    -         builtins.super(ChildD7, self).f()
+212 -         builtins.super(ChildD7, self).f()
 212 +         builtins.super().f()
-213 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -392,10 +356,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-218 |         super # Python injects __class__ into scope
-    -         builtins.super(ChildD8, self).f()
+219 -         builtins.super(ChildD8, self).f()
 219 +         builtins.super().f()
-220 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -410,10 +372,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-225 |         __class__ # Python injects __class__ into scope
-    -         builtins.super(ChildD9, self).f()
+226 -         builtins.super(ChildD9, self).f()
 226 +         builtins.super().f()
-227 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -425,10 +385,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |                       ^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-232 |         super # Python injects __class__ into scope
-    -         builtins.super(ChildD10, self).f()
+233 -         builtins.super(ChildD10, self).f()
 233 +         builtins.super().f()
-234 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -440,10 +398,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |                  ^^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-341 |         def __init__(self, foo):
-    -             super(Outer.Inner, self).__init__(foo)  # UP008: matches enclosing class chain
+342 -             super(Outer.Inner, self).__init__(foo)  # UP008: matches enclosing class chain
 342 +             super().__init__(foo)  # UP008: matches enclosing class chain
-343 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -458,10 +414,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 help: Remove `super()` parameters
     |
-376 |             def __init__(self, foo):
-    -                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
+377 -                 super(A.B.C, self).__init__(foo)  # UP008: matches full chain
 377 +                 super().__init__(foo)  # UP008: matches full chain
-378 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -473,10 +427,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |               ^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-387 |     def f(self):
-    -         super (Whitespace, self).f()  # can use super()
+388 -         super (Whitespace, self).f()  # can use super()
 388 +         super ().f()  # can use super()
-389 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -488,10 +440,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-394 |             def f(self):
-    -                 super(LocalOuter.LocalInner, self).f()  # can use super()
+395 -                 super(LocalOuter.LocalInner, self).f()  # can use super()
 395 +                 super().f()  # can use super()
-396 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -502,10 +452,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |                           ^^^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-398 | class LambdaMethod(BaseClass):
-    -     f = lambda self: super(LambdaMethod, self).f()  # can use super()
+399 -     f = lambda self: super(LambdaMethod, self).f()  # can use super()
 399 +     f = lambda self: super().f()  # can use super()
-400 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -517,10 +465,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |              ^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-404 |     def f(cls):
-    -         super(ClassMethod, cls).f()  # can use super()
+405 -         super(ClassMethod, cls).f()  # can use super()
 405 +         super().f()  # can use super()
-406 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -532,10 +478,8 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |              ^^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-409 |     async def f(self):
-    -         super(AsyncMethod, self).f()  # can use super()
+410 -         super(AsyncMethod, self).f()  # can use super()
 410 +         super().f()  # can use super()
-411 |
     |
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
@@ -547,7 +491,6 @@ UP008 [*] Use `super()` instead of `super(__class__, self)`
     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove `super()` parameters
     |
-415 |         def f(self):
-    -             super (OuterWithWhitespace.Inner, self).f()  # can use super()
+416 -             super (OuterWithWhitespace.Inner, self).f()  # can use super()
 416 +             super ().f()  # can use super()
     |

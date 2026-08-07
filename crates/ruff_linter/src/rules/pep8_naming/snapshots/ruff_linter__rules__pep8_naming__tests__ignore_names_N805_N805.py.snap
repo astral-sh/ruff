@@ -11,10 +11,8 @@ N805 [*] First argument of a method should be named `self`
   |
 help: Rename `this` to `self`
   |
-6 | class Class:
-  -     def badAllowed(this):
+7 -     def badAllowed(this):
 7 +     def badAllowed(self):
-8 |         pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,10 +27,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `this` to `self`
    |
-9  |
-   -     def stillBad(this):
+10 -     def stillBad(this):
 10 +     def stillBad(self):
-11 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,10 +43,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `this` to `self`
    |
-14 |
-   -         def badAllowed(this):
+15 -         def badAllowed(this):
 15 +         def badAllowed(self):
-16 |             pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,10 +59,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `this` to `self`
    |
-17 |
-   -         def stillBad(this):
+18 -         def stillBad(this):
 18 +         def stillBad(self):
-19 |             pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -82,10 +74,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `cls` to `self`
    |
-21 |     @pydantic.validator
-   -     def badAllowed(cls, my_field: str) -> str:
+22 -     def badAllowed(cls, my_field: str) -> str:
 22 +     def badAllowed(self, my_field: str) -> str:
-23 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -99,10 +89,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `cls` to `self`
    |
-25 |     @pydantic.validator
-   -     def stillBad(cls, my_field: str) -> str:
+26 -     def stillBad(cls, my_field: str) -> str:
 26 +     def stillBad(self, my_field: str) -> str:
-27 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -116,10 +104,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `cls` to `self`
    |
-29 |     @pydantic.validator("my_field")
-   -     def badAllowed(cls, my_field: str) -> str:
+30 -     def badAllowed(cls, my_field: str) -> str:
 30 +     def badAllowed(self, my_field: str) -> str:
-31 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -133,10 +119,8 @@ N805 [*] First argument of a method should be named `self`
    |
 help: Rename `cls` to `self`
    |
-33 |     @pydantic.validator("my_field")
-   -     def stillBad(cls, my_field: str) -> str:
+34 -     def stillBad(cls, my_field: str) -> str:
 34 +     def stillBad(self, my_field: str) -> str:
-35 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 

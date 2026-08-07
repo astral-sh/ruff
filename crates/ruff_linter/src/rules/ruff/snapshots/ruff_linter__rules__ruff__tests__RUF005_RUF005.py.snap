@@ -55,10 +55,8 @@ RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
    |
 help: Replace with `[1, 2, 3, *foo]`
    |
-38 | foo = [4, 5, 6]
-   - bar = [1, 2, 3] + foo
+39 - bar = [1, 2, 3] + foo
 39 + bar = [1, 2, 3, *foo]
-40 | zoob = tuple(bar)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -74,10 +72,8 @@ RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
    |
 help: Replace with `(7, 8, 9, *zoob)`
    |
-40 | zoob = tuple(bar)
-   - quux = (7, 8, 9) + zoob
+41 - quux = (7, 8, 9) + zoob
 41 + quux = (7, 8, 9, *zoob)
-42 | spam = quux + (10, 11, 12)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -93,10 +89,8 @@ RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
    |
 help: Replace with `(*quux, 10, 11, 12)`
    |
-41 | quux = (7, 8, 9) + zoob
-   - spam = quux + (10, 11, 12)
+42 - spam = quux + (10, 11, 12)
 42 + spam = (*quux, 10, 11, 12)
-43 | spom = list(spam)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -112,10 +106,8 @@ RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
    |
 help: Replace with `[*spom, 13, 14, 15]`
    |
-43 | spom = list(spam)
-   - eggs = spom + [13, 14, 15]
+44 - eggs = spom + [13, 14, 15]
 44 + eggs = [*spom, 13, 14, 15]
-45 | elatement = ("we all say",) + yay()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -131,10 +123,8 @@ RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
    |
 help: Replace with `("we all say", *yay())`
    |
-44 | eggs = spom + [13, 14, 15]
-   - elatement = ("we all say",) + yay()
+45 - elatement = ("we all say",) + yay()
 45 + elatement = ("we all say", *yay())
-46 | excitement = ("we all think",) + Fun().yay()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -149,10 +139,8 @@ RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
    |
 help: Replace with `("we all think", *Fun().yay())`
    |
-45 | elatement = ("we all say",) + yay()
-   - excitement = ("we all think",) + Fun().yay()
+46 - excitement = ("we all think",) + Fun().yay()
 46 + excitement = ("we all think", *Fun().yay())
-47 | astonishment = ("we all feel",) + Fun.words
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -168,10 +156,8 @@ RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
    |
 help: Replace with `("we all feel", *Fun.words)`
    |
-46 | excitement = ("we all think",) + Fun().yay()
-   - astonishment = ("we all feel",) + Fun.words
+47 - astonishment = ("we all feel",) + Fun.words
 47 + astonishment = ("we all feel", *Fun.words)
-48 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -187,10 +173,8 @@ RUF005 [*] Consider iterable unpacking instead of concatenation
    |
 help: Replace with iterable unpacking
    |
-48 |
-   - chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
+49 - chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 49 + chain = ["a", "b", "c", *eggs, *list(("yes", "no", "pants") + zoob)]
-50 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -206,10 +190,8 @@ RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
    |
 help: Replace with `("yes", "no", "pants", *zoob)`
    |
-48 |
-   - chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
+49 - chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
 49 + chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants", *zoob))
-50 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -225,10 +207,8 @@ RUF005 [*] Consider `(*zoob,)` instead of concatenation
    |
 help: Replace with `(*zoob,)`
    |
-50 |
-   - baz = () + zoob
+51 - baz = () + zoob
 51 + baz = (*zoob,)
-52 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -245,11 +225,9 @@ RUF005 [*] Consider `[*foo]` instead of concatenation
    |
 help: Replace with `[*foo]`
    |
-52 |
-   - [] + foo + [
-   - ]
+53 - [] + foo + [
+54 - ]
 53 + [*foo]
-54 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -265,10 +243,8 @@ RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of c
    |
 help: Replace with `[sys.executable, "-m", "pylint", *args, path]`
    |
-55 |
-   - pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+56 - pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
 56 + pylint_call = [sys.executable, "-m", "pylint", *args, path]
-57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -282,10 +258,8 @@ RUF005 [*] Consider iterable unpacking instead of concatenation
    |
 help: Replace with iterable unpacking
    |
-56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-   - pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+57 - pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 57 + pylint_call_tuple = (sys.executable, "-m", "pylint", *args, path, path2)
-58 | b = a + [2, 3] + [4]
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -301,10 +275,8 @@ RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
    |
 help: Replace with `[*a, 2, 3, 4]`
    |
-57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-   - b = a + [2, 3] + [4]
+58 - b = a + [2, 3] + [4]
 58 + b = [*a, 2, 3, 4]
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -319,9 +291,7 @@ RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
    |
 help: Replace with `[*a(), 'b']`
    |
-60 | # Uses the non-preferred quote style, which should be retained.
-   - f"{a() + ['b']}"
+61 - f"{a() + ['b']}"
 61 + f"{[*a(), 'b']}"
-62 |
    |
 note: This is an unsafe fix and may change runtime behavior

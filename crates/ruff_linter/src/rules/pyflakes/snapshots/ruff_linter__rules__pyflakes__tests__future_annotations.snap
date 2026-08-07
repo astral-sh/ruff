@@ -12,9 +12,9 @@ F401 [*] `models.Nut` imported but unused
   |
 help: Remove unused import: `models.Nut`
   |
-7 |     Fruit,
-  -     Nut,
-8 | )
+6 + from models import (
+7 +     Fruit,
+8 + )
   |
 
 F821 Undefined name `Bar`

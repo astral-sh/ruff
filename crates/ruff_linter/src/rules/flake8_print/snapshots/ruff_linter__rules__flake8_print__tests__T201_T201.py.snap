@@ -13,9 +13,7 @@ T201 [*] `print` found
   |
 help: Remove `print`
   |
-3 |
-  - print("Hello, world!")  # T201
-4 | print("Hello, world!", file=None)  # T201
+4 - print("Hello, world!")  # T201
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -30,9 +28,7 @@ T201 [*] `print` found
   |
 help: Remove `print`
   |
-4 | print("Hello, world!")  # T201
-  - print("Hello, world!", file=None)  # T201
-5 | print("Hello, world!", file=sys.stdout)  # T201
+5 - print("Hello, world!", file=None)  # T201
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,9 +43,7 @@ T201 [*] `print` found
   |
 help: Remove `print`
   |
-5 | print("Hello, world!", file=None)  # T201
-  - print("Hello, world!", file=sys.stdout)  # T201
-6 | print("Hello, world!", file=sys.stderr)  # T201
+6 - print("Hello, world!", file=sys.stdout)  # T201
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,8 +59,6 @@ T201 [*] `print` found
   |
 help: Remove `print`
   |
-6 | print("Hello, world!", file=sys.stdout)  # T201
-  - print("Hello, world!", file=sys.stderr)  # T201
-7 |
+7 - print("Hello, world!", file=sys.stderr)  # T201
   |
 note: This is an unsafe fix and may change runtime behavior

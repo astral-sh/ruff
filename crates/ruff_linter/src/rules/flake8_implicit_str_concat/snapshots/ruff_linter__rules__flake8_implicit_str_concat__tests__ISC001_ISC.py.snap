@@ -11,9 +11,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
   |
 help: Combine string literals
   |
-  - _ = "a" "b" "c"
+1 - _ = "a" "b" "c"
 1 + _ = "ab" "c"
-2 |
   |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -26,9 +25,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
   |
 help: Combine string literals
   |
-  - _ = "a" "b" "c"
+1 - _ = "a" "b" "c"
 1 + _ = "a" "bc"
-2 |
   |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -43,10 +41,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-37 |
-   - _ = """a""" """b"""
+38 - _ = """a""" """b"""
 38 + _ = """ab"""
-39 |
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -64,10 +60,9 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-40 | _ = """a
-   - b""" """c
+40 ~ _ = """a
 41 + bc
-42 | d"""
+42 + d"""
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -82,10 +77,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-43 |
-   - _ = f"""a""" f"""b"""
+44 - _ = f"""a""" f"""b"""
 44 + _ = f"""ab"""
-45 |
    |
 
 ISC001 Implicitly concatenated string literals on one line
@@ -136,10 +129,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-51 |
-   - _ = rf"a" rf"b"
+52 - _ = rf"a" rf"b"
 52 + _ = rf"ab"
-53 |
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -153,10 +144,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-63 | # Multiple strings nested inside a f-string
-   - _ = f"a {'b' 'c' 'd'} e"
+64 - _ = f"a {'b' 'c' 'd'} e"
 64 + _ = f"a {'bc' 'd'} e"
-65 | _ = f"""abc {"def" "ghi"} jkl"""
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -170,10 +159,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-63 | # Multiple strings nested inside a f-string
-   - _ = f"a {'b' 'c' 'd'} e"
+64 - _ = f"a {'b' 'c' 'd'} e"
 64 + _ = f"a {'b' 'cd'} e"
-65 | _ = f"""abc {"def" "ghi"} jkl"""
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -188,10 +175,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-64 | _ = f"a {'b' 'c' 'd'} e"
-   - _ = f"""abc {"def" "ghi"} jkl"""
+65 - _ = f"""abc {"def" "ghi"} jkl"""
 65 + _ = f"""abc {"defghi"} jkl"""
-66 | _ = f"""abc {
    |
 
 ISC001 Implicitly concatenated string literals on one line
@@ -227,10 +212,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-71 | # Nested f-strings
-   - _ = "a" f"b {f"c" f"d"} e" "f"
+72 - _ = "a" f"b {f"c" f"d"} e" "f"
 72 + _ = "a" f"b {f"cd"} e" "f"
-73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -245,10 +228,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   - _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+73 - _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 73 + _ = f"b {f"cd {f"e" f"f"} g"} h"
-74 | _ = f"b {f"abc" \
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -263,10 +244,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   - _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+73 - _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 73 + _ = f"b {f"c" f"d {f"ef"} g"} h"
-74 | _ = f"b {f"abc" \
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -280,10 +259,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-83 | # See https://github.com/astral-sh/ruff/issues/12936
-   - _ = "\12""0" # fix should be "\0120"
+84 - _ = "\12""0" # fix should be "\0120"
 84 + _ = "\0120" # fix should be "\0120"
-85 | _ = "\\12""0" # fix should be "\\120"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -298,10 +275,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-84 | _ = "\12""0" # fix should be "\0120"
-   - _ = "\\12""0" # fix should be "\\120"
+85 - _ = "\\12""0" # fix should be "\\120"
 85 + _ = "\\120" # fix should be "\\120"
-86 | _ = "\\\12""0" # fix should be "\\\0120"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -316,10 +291,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-85 | _ = "\\12""0" # fix should be "\\120"
-   - _ = "\\\12""0" # fix should be "\\\0120"
+86 - _ = "\\\12""0" # fix should be "\\\0120"
 86 + _ = "\\\0120" # fix should be "\\\0120"
-87 | _ = "\12 0""0" # fix should be "\12 00"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -334,10 +307,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-86 | _ = "\\\12""0" # fix should be "\\\0120"
-   - _ = "\12 0""0" # fix should be "\12 00"
+87 - _ = "\12 0""0" # fix should be "\12 00"
 87 + _ = "\12 00" # fix should be "\12 00"
-88 | _ = r"\12"r"0" # fix should be r"\120"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -352,10 +323,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-87 | _ = "\12 0""0" # fix should be "\12 00"
-   - _ = r"\12"r"0" # fix should be r"\120"
+88 - _ = r"\12"r"0" # fix should be r"\120"
 88 + _ = r"\120" # fix should be r"\120"
-89 | _ = "\12 and more""0" # fix should be "\12 and more0"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -370,10 +339,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-88 | _ = r"\12"r"0" # fix should be r"\120"
-   - _ = "\12 and more""0" # fix should be "\12 and more0"
+89 - _ = "\12 and more""0" # fix should be "\12 and more0"
 89 + _ = "\12 and more0" # fix should be "\12 and more0"
-90 | _ = "\8""0" # fix should be "\80"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -388,10 +355,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-89 | _ = "\12 and more""0" # fix should be "\12 and more0"
-   - _ = "\8""0" # fix should be "\80"
+90 - _ = "\8""0" # fix should be "\80"
 90 + _ = "\80" # fix should be "\80"
-91 | _ = "\12""8" # fix should be "\128"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -406,10 +371,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-90 | _ = "\8""0" # fix should be "\80"
-   - _ = "\12""8" # fix should be "\128"
+91 - _ = "\12""8" # fix should be "\128"
 91 + _ = "\128" # fix should be "\128"
-92 | _ = "\12""foo" # fix should be "\12foo"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -423,10 +386,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |
 help: Combine string literals
    |
-91 | _ = "\12""8" # fix should be "\128"
-   - _ = "\12""foo" # fix should be "\12foo"
+92 - _ = "\12""foo" # fix should be "\12foo"
 92 + _ = "\12foo" # fix should be "\12foo"
-93 | _ = "\12" ""  # fix should be "\12"
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -438,10 +399,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
    |     ^^^^^^^^
 help: Combine string literals
    |
-92 | _ = "\12""foo" # fix should be "\12foo"
-   - _ = "\12" ""  # fix should be "\12"
+93 - _ = "\12" ""  # fix should be "\12"
 93 + _ = "\12"  # fix should be "\12"
-94 |
    |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -456,10 +415,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
     |
 help: Combine string literals
     |
-192 | # ISC001
-    - t"The quick " t"brown fox."
+193 - t"The quick " t"brown fox."
 193 + t"The quick brown fox."
-194 |
     |
 
 ISC001 Implicitly concatenated string literals on one line
@@ -495,10 +452,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
     |
 help: Combine string literals
     |
-205 | # nested examples with both t and f-strings
-    - _ = "a" f"b {t"c" t"d"} e" "f"
+206 - _ = "a" f"b {t"c" t"d"} e" "f"
 206 + _ = "a" f"b {t"cd"} e" "f"
-207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
     |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -513,10 +468,8 @@ ISC001 [*] Implicitly concatenated string literals on one line
     |
 help: Combine string literals
     |
-206 | _ = "a" f"b {t"c" t"d"} e" "f"
-    - _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+207 - _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
 207 + _ = t"b {f"cd {t"e" t"f"} g"} h"
-208 | _ = f"b {t"abc" \
     |
 
 ISC001 [*] Implicitly concatenated string literals on one line
@@ -531,8 +484,6 @@ ISC001 [*] Implicitly concatenated string literals on one line
     |
 help: Combine string literals
     |
-206 | _ = "a" f"b {t"c" t"d"} e" "f"
-    - _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+207 - _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
 207 + _ = t"b {f"c" f"d {t"ef"} g"} h"
-208 | _ = f"b {t"abc" \
     |

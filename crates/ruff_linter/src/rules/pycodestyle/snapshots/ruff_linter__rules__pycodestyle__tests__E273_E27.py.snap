@@ -13,11 +13,8 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
    |
-10 | #: E273
-   - True and		False
-11 + True and False
-12 | #: E273 E274
-   |
+11 | True and False
+   |         +
 
 E273 [*] Tab after keyword
   --> E27.py:13:5
@@ -31,11 +28,8 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
    |
-12 | #: E273 E274
-   - True		and	False
-13 + True and	False
-14 | #: E271
-   |
+13 | True and    False
+   |     +
 
 E273 [*] Tab after keyword
   --> E27.py:13:10
@@ -49,11 +43,8 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
    |
-12 | #: E273 E274
-   - True		and	False
-13 + True		and False
-14 | #: E271
-   |
+13 | True        and False
+   |                +
 
 E273 [*] Tab after keyword
   --> E27.py:27:6
@@ -67,11 +58,8 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
    |
-26 | #: E273
-   - a and	b
-27 + a and b
-28 | #: E274
-   |
+27 | a and b
+   |      +
 
 E273 [*] Tab after keyword
   --> E27.py:31:10
@@ -85,11 +73,8 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
    |
-30 | #: E273 E274
-   - this		and	False
-31 + this		and False
-32 | #: Okay
-   |
+31 | this        and False
+   |                +
 
 E273 [*] Tab after keyword
   --> E27.py:74:5
@@ -102,8 +87,5 @@ E273 [*] Tab after keyword
    |
 help: Replace with single space
    |
-73 | #: E273
-   - type	Number = int
-74 + type Number = int
-75 |
-   |
+74 | type Number = int
+   |     +

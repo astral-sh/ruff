@@ -13,10 +13,8 @@ RUF032 [*] `Decimal()` called with float literal argument
   |
 help: Replace with string literal
   |
-5 |
-  - decimal.Decimal(0.0)  # Should error
+6 - decimal.Decimal(0.0)  # Should error
 6 + decimal.Decimal("0.0")  # Should error
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -32,10 +30,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-11 |
-   - decimal.Decimal(10.0)  # Should error
+12 - decimal.Decimal(10.0)  # Should error
 12 + decimal.Decimal("10.0")  # Should error
-13 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -51,10 +47,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-17 |
-   - decimal.Decimal(-10.0)  # Should error
+18 - decimal.Decimal(-10.0)  # Should error
 18 + decimal.Decimal("-10.0")  # Should error
-19 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -70,10 +64,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-32 |
-   - val = Decimal(0.0)  # Should error
+33 - val = Decimal(0.0)  # Should error
 33 + val = Decimal("0.0")  # Should error
-34 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -89,10 +81,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-38 |
-   - val = Decimal(10.0)  # Should error
+39 - val = Decimal(10.0)  # Should error
 39 + val = Decimal("10.0")  # Should error
-40 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -108,10 +98,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-44 |
-   - val = Decimal(-10.0)  # Should error
+45 - val = Decimal(-10.0)  # Should error
 45 + val = Decimal("-10.0")  # Should error
-46 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -127,10 +115,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-55 |
-   - val = Decimal(++4.0) # Suggest `Decimal("4.0")`
+56 - val = Decimal(++4.0) # Suggest `Decimal("4.0")`
 56 + val = Decimal("4.0") # Suggest `Decimal("4.0")`
-57 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -143,10 +129,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |               ^^^^^^^^^^^
 help: Replace with string literal
    |
-57 |
-   - val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
+58 - val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
 58 + val = Decimal("-4.0") # Suggest `Decimal("-4.0")` 
-59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -162,10 +146,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-87 |
-   - val = decimal.Decimal(0.0)  # Should error
+88 - val = decimal.Decimal(0.0)  # Should error
 88 + val = decimal.Decimal("0.0")  # Should error
-89 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -181,10 +163,8 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-91 |
-   - val = decimal.Decimal(10.0)  # Should error
+92 - val = decimal.Decimal(10.0)  # Should error
 92 + val = decimal.Decimal("10.0")  # Should error
-93 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -200,9 +180,7 @@ RUF032 [*] `Decimal()` called with float literal argument
    |
 help: Replace with string literal
    |
-95 |
-   - val = decimal.Decimal(-10.0)  # Should error
+96 - val = decimal.Decimal(-10.0)  # Should error
 96 + val = decimal.Decimal("-10.0")  # Should error
-97 |
    |
 note: This is an unsafe fix and may change runtime behavior

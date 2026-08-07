@@ -12,10 +12,8 @@ E711 [*] Comparison to `None` should be `cond is None`
   |
 help: Replace with `cond is None`
   |
-1 | #: E711
-  - if res == None:
+2 - if res == None:
 2 + if res is None:
-3 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,10 +29,8 @@ E711 [*] Comparison to `None` should be `cond is not None`
   |
 help: Replace with `cond is not None`
   |
-4 | #: E711
-  - if res != None:
+5 - if res != None:
 5 + if res is not None:
-6 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ E711 [*] Comparison to `None` should be `cond is None`
    |
 help: Replace with `cond is None`
   |
-7 | #: E711
-  - if None == res:
+8 - if None == res:
 8 + if None is res:
-9 |     pass
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ E711 [*] Comparison to `None` should be `cond is not None`
    |
 help: Replace with `cond is not None`
    |
-10 | #: E711
-   - if None != res:
+11 - if None != res:
 11 + if None is not res:
-12 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ E711 [*] Comparison to `None` should be `cond is None`
    |
 help: Replace with `cond is None`
    |
-13 | #: E711
-   - if res[1] == None:
+14 - if res[1] == None:
 14 + if res[1] is None:
-15 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ E711 [*] Comparison to `None` should be `cond is not None`
    |
 help: Replace with `cond is not None`
    |
-16 | #: E711
-   - if res[1] != None:
+17 - if res[1] != None:
 17 + if res[1] is not None:
-18 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -126,10 +114,8 @@ E711 [*] Comparison to `None` should be `cond is not None`
    |
 help: Replace with `cond is not None`
    |
-19 | #: E711
-   - if None != res[1]:
+20 - if None != res[1]:
 20 + if None is not res[1]:
-21 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -144,10 +130,8 @@ E711 [*] Comparison to `None` should be `cond is None`
    |
 help: Replace with `cond is None`
    |
-22 | #: E711
-   - if None == res[1]:
+23 - if None == res[1]:
 23 + if None is res[1]:
-24 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -162,10 +146,8 @@ E711 [*] Comparison to `None` should be `cond is None`
    |
 help: Replace with `cond is None`
    |
-25 |
-   - if x == None != None:
+26 - if x == None != None:
 26 + if x is None is not None:
-27 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -180,9 +162,7 @@ E711 [*] Comparison to `None` should be `cond is not None`
    |
 help: Replace with `cond is not None`
    |
-25 |
-   - if x == None != None:
+26 - if x == None != None:
 26 + if x is None is not None:
-27 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior

@@ -11,15 +11,10 @@ UP049 [*] Generic class uses private type parameters
   |
 help: Rename type parameter to remove leading underscores
   |
-1 | # simple case, replace _T in signature and body
-  - class Generic[_T]:
-  -     buf: list[_T]
-2 + class Generic[T]:
-3 +     buf: list[T]
+2 ~ class Generic[T]:
+3 ~     buf: list[T]
 4 |
-  -     def append(self, t: _T):
-5 +     def append(self, t: T):
-6 |         self.buf.append(t)
+5 ~     def append(self, t: T):
   |
 
 UP049 [*] Generic function uses private type parameters
@@ -33,12 +28,8 @@ UP049 [*] Generic function uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
    |
-9  | # simple case, replace _T in signature and body
-   - def second[_T](var: tuple[_T]) -> _T:
-   -     y: _T = var[1]
-10 + def second[T](var: tuple[T]) -> T:
-11 +     y: T = var[1]
-12 |     return y
+10 ~ def second[T](var: tuple[T]) -> T:
+11 ~     y: T = var[1]
    |
 
 UP049 [*] Generic function uses private type parameters
@@ -53,10 +44,8 @@ UP049 [*] Generic function uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
    |
-16 | def many_generics[
-   -     _T,  # first generic
+17 -     _T,  # first generic
 17 +     T,  # first generic
-18 |     _U,  # second generic
    |
 
 UP049 [*] Generic function uses private type parameters
@@ -71,10 +60,8 @@ UP049 [*] Generic function uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
    |
-17 |     _T,  # first generic
-   -     _U,  # second generic
+18 -     _U,  # second generic
 18 +     U,  # second generic
-19 | ](args):
    |
 
 UP049 [*] Generic function uses private type parameters
@@ -87,12 +74,8 @@ UP049 [*] Generic function uses private type parameters
    |
 help: Rename type parameter to remove leading underscores
    |
-26 |
-   - def f[_T](v):
-   -     cast("_T", v)
-27 + def f[T](v):
-28 +     cast("T", v)
+27 ~ def f[T](v):
+28 ~     cast("T", v)
 29 |     cast("Literal['_T']")
-   -     cast("list[_T]", v)
-30 +     cast("list[T]", v)
+30 ~     cast("list[T]", v)
    |

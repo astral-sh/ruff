@@ -13,10 +13,7 @@ D214 [*] Section is over-indented ("Returns")
   |
 help: Remove over-indentation from "Returns"
   |
-2 |
-  -     Returns
-3 + Returns
-4 | -----
+3 | Returns
   |
 
 D214 [*] Section is over-indented ("Args")
@@ -31,8 +28,5 @@ D214 [*] Section is over-indented ("Args")
   |
 help: Remove over-indentation from "Args"
   |
-6 |
-  -     Args
-7 + Args
-8 | -----
+7 | Args
   |

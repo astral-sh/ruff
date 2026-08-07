@@ -11,9 +11,8 @@ C406 [*] Unnecessary list literal (rewrite as a dict literal)
   |
 help: Rewrite as a dict literal
   |
-  - d1 = dict([(1, 2)])
+1 - d1 = dict([(1, 2)])
 1 + d1 = {1: 2}
-2 | d2 = dict(((1, 2),))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,10 +27,8 @@ C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
   |
 help: Rewrite as a dict literal
   |
-1 | d1 = dict([(1, 2)])
-  - d2 = dict(((1, 2),))
+2 - d2 = dict(((1, 2),))
 2 + d2 = {1: 2,}
-3 | d3 = dict([])
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,10 +44,8 @@ C406 [*] Unnecessary list literal (rewrite as a dict literal)
   |
 help: Rewrite as a dict literal
   |
-2 | d2 = dict(((1, 2),))
-  - d3 = dict([])
+3 - d3 = dict([])
 3 + d3 = {}
-4 | d4 = dict(())
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,9 +60,7 @@ C406 [*] Unnecessary tuple literal (rewrite as a dict literal)
   |
 help: Rewrite as a dict literal
   |
-3 | d3 = dict([])
-  - d4 = dict(())
+4 - d4 = dict(())
 4 + d4 = {}
-5 | d5 = dict()
   |
 note: This is an unsafe fix and may change runtime behavior

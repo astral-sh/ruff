@@ -10,10 +10,8 @@ UP006 [*] Use `list` instead of `typing.List` for type annotation
   |
 help: Replace with `list`
   |
-4 |
-  - def f(x: typing.List[str]) -> None:
+5 - def f(x: typing.List[str]) -> None:
 5 + def f(x: list[str]) -> None:
-6 |     ...
   |
 
 UP006 [*] Use `list` instead of `List` for type annotation
@@ -24,9 +22,7 @@ UP006 [*] Use `list` instead of `List` for type annotation
 10 |     ...
    |
 help: Replace with `list`
-   |
-8  |
-   - def g(x: List[str]) -> None:
-9  + def g(x: list[str]) -> None:
-10 |     ...
-   |
+  |
+9 - def g(x: List[str]) -> None:
+9 + def g(x: list[str]) -> None:
+  |

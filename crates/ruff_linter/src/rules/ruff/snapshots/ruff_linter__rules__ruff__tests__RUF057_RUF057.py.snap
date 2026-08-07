@@ -11,10 +11,8 @@ RUF057 [*] Value being rounded is already an integer
   |
 help: Remove unnecessary `round` call
   |
-5 |
-  - round(42)                                         # Error (safe)
+6 - round(42)                                         # Error (safe)
 6 + 42                                         # Error (safe)
-7 | round(42, None)                                   # Error (safe)
   |
 
 RUF057 [*] Value being rounded is already an integer
@@ -28,10 +26,8 @@ RUF057 [*] Value being rounded is already an integer
   |
 help: Remove unnecessary `round` call
   |
-6 | round(42)                                         # Error (safe)
-  - round(42, None)                                   # Error (safe)
+7 - round(42, None)                                   # Error (safe)
 7 + 42                                   # Error (safe)
-8 | round(42, 2)                                      # Error (safe)
   |
 
 RUF057 [*] Value being rounded is already an integer
@@ -46,10 +42,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
   |
-7 | round(42, None)                                   # Error (safe)
-  - round(42, 2)                                      # Error (safe)
+8 - round(42, 2)                                      # Error (safe)
 8 + 42                                      # Error (safe)
-9 | round(42, -2)                                     # No error
   |
 
 RUF057 [*] Value being rounded is already an integer
@@ -62,10 +56,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-23 |
-   - round(4 + 2)                                      # Error (safe)
+24 - round(4 + 2)                                      # Error (safe)
 24 + 4 + 2                                      # Error (safe)
-25 | round(4 + 2, None)                                # Error (safe)
    |
 
 RUF057 [*] Value being rounded is already an integer
@@ -79,10 +71,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-24 | round(4 + 2)                                      # Error (safe)
-   - round(4 + 2, None)                                # Error (safe)
+25 - round(4 + 2, None)                                # Error (safe)
 25 + 4 + 2                                # Error (safe)
-26 | round(4 + 2, 2)                                   # Error (safe)
    |
 
 RUF057 [*] Value being rounded is already an integer
@@ -97,10 +87,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-25 | round(4 + 2, None)                                # Error (safe)
-   - round(4 + 2, 2)                                   # Error (safe)
+26 - round(4 + 2, 2)                                   # Error (safe)
 26 + 4 + 2                                   # Error (safe)
-27 | round(4 + 2, -2)                                  # No error
    |
 
 RUF057 [*] Value being rounded is already an integer
@@ -113,10 +101,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-41 |
-   - round(inferred_int)                               # Error (unsafe)
+42 - round(inferred_int)                               # Error (unsafe)
 42 + inferred_int                               # Error (unsafe)
-43 | round(inferred_int, None)                         # Error (unsafe)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -131,10 +117,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-42 | round(inferred_int)                               # Error (unsafe)
-   - round(inferred_int, None)                         # Error (unsafe)
+43 - round(inferred_int, None)                         # Error (unsafe)
 43 + inferred_int                         # Error (unsafe)
-44 | round(inferred_int, 2)                            # Error (unsafe)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -150,10 +134,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-43 | round(inferred_int, None)                         # Error (unsafe)
-   - round(inferred_int, 2)                            # Error (unsafe)
+44 - round(inferred_int, 2)                            # Error (unsafe)
 44 + inferred_int                            # Error (unsafe)
-45 | round(inferred_int, -2)                           # No error
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -170,10 +152,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-70 | # See https://github.com/astral-sh/ruff/issues/15598
-   - round(-
 71 + (-
-72 | 1)
+72 + 1)
    |
 
 RUF057 [*] Value being rounded is already an integer
@@ -190,13 +170,8 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-72 | 1)
-   - round(1
-   - *1
-   - )
 73 + (1
 74 + *1)
-75 |
    |
 
 RUF057 [*] Value being rounded is already an integer
@@ -212,11 +187,10 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-77 | # fix should be unsafe if comment is in call range
-   - round(# a comment
-78 | 17
-   - )
-79 | round(
+78 - round(# a comment
+79 - 17
+80 - )
+78 + 17
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -234,11 +208,9 @@ RUF057 [*] Value being rounded is already an integer
    |
 help: Remove unnecessary `round` call
    |
-80 | )
-   - round(
-   -     17 # a comment
-   - )
+81 - round(
+82 -     17 # a comment
+83 - )
 81 + 17
-82 |
    |
 note: This is an unsafe fix and may change runtime behavior

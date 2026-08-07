@@ -11,10 +11,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-11 | a, b, c = 1, 0, 2
-   - x = a or b and c  # RUF021: => `a or (b and c)`
+12 - x = a or b and c  # RUF021: => `a or (b and c)`
 12 + x = a or (b and c)  # RUF021: => `a or (b and c)`
-13 | x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -29,10 +27,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-12 | x = a or b and c  # RUF021: => `a or (b and c)`
-   - x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
+13 - x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
 13 + x = a or (b and c)  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
-14 |
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -46,10 +42,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-15 | a, b, c = 0, 1, 2
-   - y = a and b or c  # RUF021: => `(a and b) or c`
+16 - y = a and b or c  # RUF021: => `(a and b) or c`
 16 + y = (a and b) or c  # RUF021: => `(a and b) or c`
-17 |
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -62,10 +56,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-18 | a, b, c, d = 1, 2, 0, 3
-   - if a or b or c and d:  # RUF021: => `a or b or (c and d)`
+19 - if a or b or c and d:  # RUF021: => `a or b or (c and d)`
 19 + if a or b or (c and d):  # RUF021: => `a or b or (c and d)`
-20 |     pass
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -79,10 +71,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-25 |     pass
-   - elif a or b and c or d:  # RUF021: => `a or (b and c) or d`
+26 - elif a or b and c or d:  # RUF021: => `a or (b and c) or d`
 26 + elif a or (b and c) or d:  # RUF021: => `a or (b and c) or d`
-27 |     pass
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -95,10 +85,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-29 | a, b, c, d = 0, 1, 0, 2
-   - while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
+30 - while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
 30 + while (a and b) or c and d:  # RUF021: => `(and b) or (c and d)`
-31 |     pass
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -111,10 +99,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-29 | a, b, c, d = 0, 1, 0, 2
-   - while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
+30 - while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
 30 + while a and b or (c and d):  # RUF021: => `(and b) or (c and d)`
-31 |     pass
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -129,10 +115,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-34 | # RUF021: => `a or b or c or (d and e)`:
-   - z = [a for a in range(5) if a or b or c or d and e]
+35 - z = [a for a in range(5) if a or b or c or d and e]
 35 + z = [a for a in range(5) if a or b or c or (d and e)]
-36 |
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -146,10 +130,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-37 | a, b, c, d = 0, 1, 3, 0
-   - assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
+38 - assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 38 + assert (not a and b) or c or d  # RUF021: => `(not a and b) or c or d`
-39 |
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -164,10 +146,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-39 |
-   - if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
+40 - if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
 40 + if ((not a) and b) or c or d:  # RUF021: => `((not a) and b) or c or d`
-41 |     if (not a and b) or c or d:  # OK
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -184,12 +164,8 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-45 |     some_reasonably_long_condition
-   -     or some_other_reasonably_long_condition
-   -     and some_third_reasonably_long_condition
-46 +     or (some_other_reasonably_long_condition
+46 ~     or (some_other_reasonably_long_condition
 47 +     and some_third_reasonably_long_condition)
-48 |     or some_fourth_reasonably_long_condition
    |
 
 RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
@@ -209,13 +185,9 @@ RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` toget
    |
 help: Parenthesize the `and` subexpression
    |
-47 |     and some_third_reasonably_long_condition
-   -     or some_fourth_reasonably_long_condition
-48 +     or (some_fourth_reasonably_long_condition
-49 |     and some_fifth_reasonably_long_condition
-50 |     # a comment
-51 |     and some_sixth_reasonably_long_condition
-   -     and some_seventh_reasonably_long_condition
+48 ~     or (some_fourth_reasonably_long_condition
+49 +     and some_fifth_reasonably_long_condition
+50 +     # a comment
+51 +     and some_sixth_reasonably_long_condition
 52 +     and some_seventh_reasonably_long_condition)
-53 |     # another comment
    |

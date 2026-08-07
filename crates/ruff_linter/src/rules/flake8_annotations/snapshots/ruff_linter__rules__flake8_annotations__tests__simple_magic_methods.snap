@@ -11,11 +11,8 @@ ANN204 [*] Missing return type annotation for special method `__str__`
   |
 help: Add return type annotation: `str`
   |
-1 | class Foo:
-  -     def __str__(self):
-2 +     def __str__(self) -> str:
-3 |         ...
-  |
+2 |     def __str__(self) -> str:
+  |                       ++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__repr__`
@@ -29,11 +26,8 @@ ANN204 [*] Missing return type annotation for special method `__repr__`
   |
 help: Add return type annotation: `str`
   |
-4 |
-  -     def __repr__(self):
-5 +     def __repr__(self) -> str:
-6 |         ...
-  |
+5 |     def __repr__(self) -> str:
+  |                        ++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__len__`
@@ -47,11 +41,8 @@ ANN204 [*] Missing return type annotation for special method `__len__`
   |
 help: Add return type annotation: `int`
   |
-7 |
-  -     def __len__(self):
-8 +     def __len__(self) -> int:
-9 |         ...
-  |
+8 |     def __len__(self) -> int:
+  |                       ++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__length_hint__`
@@ -65,11 +56,8 @@ ANN204 [*] Missing return type annotation for special method `__length_hint__`
    |
 help: Add return type annotation: `int`
    |
-10 |
-   -     def __length_hint__(self):
-11 +     def __length_hint__(self) -> int:
-12 |         ...
-   |
+11 |     def __length_hint__(self) -> int:
+   |                               ++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__init__`
@@ -83,11 +71,8 @@ ANN204 [*] Missing return type annotation for special method `__init__`
    |
 help: Add return type annotation: `None`
    |
-13 |
-   -     def __init__(self):
-14 +     def __init__(self) -> None:
-15 |         ...
-   |
+14 |     def __init__(self) -> None:
+   |                        +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__del__`
@@ -101,11 +86,8 @@ ANN204 [*] Missing return type annotation for special method `__del__`
    |
 help: Add return type annotation: `None`
    |
-16 |
-   -     def __del__(self):
-17 +     def __del__(self) -> None:
-18 |         ...
-   |
+17 |     def __del__(self) -> None:
+   |                       +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__bool__`
@@ -119,11 +101,8 @@ ANN204 [*] Missing return type annotation for special method `__bool__`
    |
 help: Add return type annotation: `bool`
    |
-19 |
-   -     def __bool__(self):
-20 +     def __bool__(self) -> bool:
-21 |         ...
-   |
+20 |     def __bool__(self) -> bool:
+   |                        +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__bytes__`
@@ -137,11 +116,8 @@ ANN204 [*] Missing return type annotation for special method `__bytes__`
    |
 help: Add return type annotation: `bytes`
    |
-22 |
-   -     def __bytes__(self):
-23 +     def __bytes__(self) -> bytes:
-24 |         ...
-   |
+23 |     def __bytes__(self) -> bytes:
+   |                         ++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__format__`
@@ -155,11 +131,8 @@ ANN204 [*] Missing return type annotation for special method `__format__`
    |
 help: Add return type annotation: `str`
    |
-25 |
-   -     def __format__(self, format_spec):
-26 +     def __format__(self, format_spec) -> str:
-27 |         ...
-   |
+26 |     def __format__(self, format_spec) -> str:
+   |                                       ++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__contains__`
@@ -173,11 +146,8 @@ ANN204 [*] Missing return type annotation for special method `__contains__`
    |
 help: Add return type annotation: `bool`
    |
-28 |
-   -     def __contains__(self, item):
-29 +     def __contains__(self, item) -> bool:
-30 |         ...
-   |
+29 |     def __contains__(self, item) -> bool:
+   |                                  +++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__complex__`
@@ -191,11 +161,8 @@ ANN204 [*] Missing return type annotation for special method `__complex__`
    |
 help: Add return type annotation: `complex`
    |
-31 |
-   -     def __complex__(self):
-32 +     def __complex__(self) -> complex:
-33 |         ...
-   |
+32 |     def __complex__(self) -> complex:
+   |                           ++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__int__`
@@ -209,11 +176,8 @@ ANN204 [*] Missing return type annotation for special method `__int__`
    |
 help: Add return type annotation: `int`
    |
-34 |
-   -     def __int__(self):
-35 +     def __int__(self) -> int:
-36 |         ...
-   |
+35 |     def __int__(self) -> int:
+   |                       ++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__float__`
@@ -227,11 +191,8 @@ ANN204 [*] Missing return type annotation for special method `__float__`
    |
 help: Add return type annotation: `float`
    |
-37 |
-   -     def __float__(self):
-38 +     def __float__(self) -> float:
-39 |         ...
-   |
+38 |     def __float__(self) -> float:
+   |                         ++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__index__`
@@ -245,9 +206,6 @@ ANN204 [*] Missing return type annotation for special method `__index__`
    |
 help: Add return type annotation: `int`
    |
-40 |
-   -     def __index__(self):
-41 +     def __index__(self) -> int:
-42 |         ...
-   |
+41 |     def __index__(self) -> int:
+   |                         ++++++
 note: This is an unsafe fix and may change runtime behavior

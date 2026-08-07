@@ -12,13 +12,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
   |
 help: Move into type-checking block
   |
-  - def f():
 1 + from typing import TYPE_CHECKING
-2 +
+2 ~ 
 3 + if TYPE_CHECKING:
-4 |     from django.contrib.auth.models import AbstractBaseUser
-5 + def f():
-6 |
+4 +     from django.contrib.auth.models import AbstractBaseUser
+5 | def f():
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -33,15 +31,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-12 | def f():
-   -     from django.contrib.auth.models import AbstractBaseUser
-13 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -56,15 +50,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-19 | def f():
-   -     from django.contrib.auth.models import AbstractBaseUser
-20 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -80,15 +70,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-28 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-29 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -104,15 +90,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-37 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-38 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,15 +110,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-46 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-47 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -152,15 +130,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-55 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-56 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -176,15 +150,11 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-64 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-65 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -200,14 +170,10 @@ TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` 
    |
 help: Move into type-checking block
    |
-1  + from typing import TYPE_CHECKING
-2  +
-3  + if TYPE_CHECKING:
-4  +     from django.contrib.auth.models import AbstractBaseUser
-5  | def f():
---------------------------------------------------------------------------------
-73 |
-   -     from django.contrib.auth.models import AbstractBaseUser
-74 |
+ 1 + from typing import TYPE_CHECKING
+ 2 ~ 
+ 3 + if TYPE_CHECKING:
+ 4 +     from django.contrib.auth.models import AbstractBaseUser
+ 5 | def f():
    |
 note: This is an unsafe fix and may change runtime behavior

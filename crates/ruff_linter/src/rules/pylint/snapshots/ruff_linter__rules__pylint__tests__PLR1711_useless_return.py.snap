@@ -10,9 +10,7 @@ PLR1711 [*] Useless `return` statement at end of function
   |     ^^^^^^^^^^^
 help: Remove useless `return` statement
   |
-5 |     print(sys.version)
-  -     return None  # [useless-return]
-6 |
+6 -     return None  # [useless-return]
   |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -24,9 +22,7 @@ PLR1711 [*] Useless `return` statement at end of function
    |     ^^^^^^^^^^^
 help: Remove useless `return` statement
    |
-10 |     print(sys.version)
-   -     return None  # [useless-return]
-11 |
+11 -     return None  # [useless-return]
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -38,9 +34,7 @@ PLR1711 [*] Useless `return` statement at end of function
    |     ^^^^^^^^^^^
 help: Remove useless `return` statement
    |
-15 |     print(sys.version)
-   -     return None  # [useless-return]
-16 |
+16 -     return None  # [useless-return]
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -52,9 +46,7 @@ PLR1711 [*] Useless `return` statement at end of function
    |         ^^^^^^^^^^^
 help: Remove useless `return` statement
    |
-21 |         print(sys.version)
-   -         return None  # [useless-return]
-22 |
+22 -         return None  # [useless-return]
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -66,9 +58,7 @@ PLR1711 [*] Useless `return` statement at end of function
    |     ^^^^^^^^^^^
 help: Remove useless `return` statement
    |
-49 |     print(sys.version)
-   -     return None  # [useless-return]
-50 |
+50 -     return None  # [useless-return]
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -80,6 +70,5 @@ PLR1711 [*] Useless `return` statement at end of function
    |         ^^^^^^^^^^^
 help: Remove useless `return` statement
    |
-59 |         print(f"{key} not found")
-   -         return None
+60 -         return None
    |

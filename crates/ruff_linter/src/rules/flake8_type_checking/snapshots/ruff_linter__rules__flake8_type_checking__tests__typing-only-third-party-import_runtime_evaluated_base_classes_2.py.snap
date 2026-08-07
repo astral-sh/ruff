@@ -13,16 +13,14 @@ TC002 [*] Move third-party import `geopandas` into a type-checking block
   |
 help: Move into type-checking block
    |
-2  |
-   - import geopandas as gpd  # TC002
-3  | import pydantic
---------------------------------------------------------------------------------
-7  | import numpy
-8  + from typing import TYPE_CHECKING
-9  +
-10 + if TYPE_CHECKING:
-11 +     import geopandas as gpd
-12 |
+ 3 + 
+ 4 | import pydantic
+ …
+ 8 | import numpy
+ 9 + from typing import TYPE_CHECKING
+10 ~ 
+11 + if TYPE_CHECKING:
+12 +     import geopandas as gpd
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -37,15 +35,13 @@ TC002 [*] Move third-party import `pyproj` into a type-checking block
   |
 help: Move into type-checking block
    |
-4  | import pydantic
-   - import pyproj  # TC002
-5  | from pydantic import BaseModel
-6  |
-7  | import numpy
-8  + from typing import TYPE_CHECKING
-9  +
-10 + if TYPE_CHECKING:
-11 +     import pyproj
-12 |
+ 5 + 
+ 6 | from pydantic import BaseModel
+ 7 |
+ 8 | import numpy
+ 9 + from typing import TYPE_CHECKING
+10 ~ 
+11 + if TYPE_CHECKING:
+12 +     import pyproj
    |
 note: This is an unsafe fix and may change runtime behavior

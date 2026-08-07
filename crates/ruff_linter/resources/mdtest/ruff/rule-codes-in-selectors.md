@@ -28,10 +28,8 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |      ^^^^
 help: Replace rule code with `unused-import`
   |
-2 | select = [
-  -     "F401",  # snapshot: rule-codes-in-selectors
+3 -     "F401",  # snapshot: rule-codes-in-selectors
 3 +     "unused-import",  # snapshot: rule-codes-in-selectors
-4 |     'F402',  # snapshot: rule-codes-in-selectors
   |
 
 
@@ -42,10 +40,8 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |      ^^^^
 help: Replace rule code with `import-shadowed-by-loop-var`
   |
-3 |     "F401",  # snapshot: rule-codes-in-selectors
-  -     'F402',  # snapshot: rule-codes-in-selectors
+4 -     'F402',  # snapshot: rule-codes-in-selectors
 4 +     'import-shadowed-by-loop-var',  # snapshot: rule-codes-in-selectors
-5 |     """F403""",  # snapshot: rule-codes-in-selectors
   |
 
 
@@ -56,10 +52,8 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |        ^^^^
 help: Replace rule code with `undefined-local-with-import-star`
   |
-4 |     'F402',  # snapshot: rule-codes-in-selectors
-  -     """F403""",  # snapshot: rule-codes-in-selectors
+5 -     """F403""",  # snapshot: rule-codes-in-selectors
 5 +     """undefined-local-with-import-star""",  # snapshot: rule-codes-in-selectors
-6 |     '''F404''',  # snapshot: rule-codes-in-selectors
   |
 
 
@@ -70,10 +64,8 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |        ^^^^
 help: Replace rule code with `late-future-import`
   |
-5 |     """F403""",  # snapshot: rule-codes-in-selectors
-  -     '''F404''',  # snapshot: rule-codes-in-selectors
+6 -     '''F404''',  # snapshot: rule-codes-in-selectors
 6 +     '''late-future-import''',  # snapshot: rule-codes-in-selectors
-7 | ]
   |
 ```
 
@@ -98,8 +90,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |                      ^^^^
 help: Replace rule code with `import-shadowed-by-loop-var`
   |
-2 | # snapshot: rule-codes-in-selectors
-  - select = ["'F401'", "F402"]
+3 - select = ["'F401'", "F402"]
 3 + select = ["'F401'", "import-shadowed-by-loop-var"]
   |
 ```

@@ -13,10 +13,8 @@ PYI013 [*] Non-empty class body must not contain `...`
   |
 help: Remove unnecessary `...`
   |
-4 |     value: int
-  -     ...  # Error
+5 -     ...  # Error
 5 +     # Error
-6 |
   |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -29,10 +27,8 @@ PYI013 [*] Non-empty class body must not contain `...`
   |
 help: Remove unnecessary `...`
   |
-7 | class OneAttributeClass2:
-  -     ...  # Error
+8 -     ...  # Error
 8 +     # Error
-9 |     value: int
   |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -45,9 +41,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-11 | class MyClass:
-   -     ...
-12 |     value: int
+12 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -60,9 +54,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-15 | class TwoEllipsesClass:
-   -     ...
-16 |     ...  # Error
+16 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -77,10 +69,8 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-16 |     ...
-   -     ...  # Error
+17 -     ...  # Error
 17 +     # Error
-18 |
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -95,10 +85,8 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-23 |
-   -     ...  # Error
+24 -     ...  # Error
 24 +     # Error
-25 |
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -113,10 +101,8 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-27 |     value: int
-   -     ...  # Error
+28 -     ...  # Error
 28 +     # Error
-29 |
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -129,10 +115,8 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-30 | class NonEmptyChild2(Exception):
-   -     ...  # Error
+31 -     ...  # Error
 31 +     # Error
-32 |     value: int
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -147,10 +131,8 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-35 |     value: int
-   -     ...  # Error
+36 -     ...  # Error
 36 +     # Error
-37 |
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -165,8 +147,6 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-42 |     value: int
-   -     ... # preserve me
+43 -     ... # preserve me
 43 +     # preserve me
-44 |
    |

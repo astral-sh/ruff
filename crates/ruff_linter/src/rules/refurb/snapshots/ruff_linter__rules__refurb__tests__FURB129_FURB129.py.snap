@@ -13,10 +13,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
   |
 help: Remove `readlines()`
   |
-6 | with open("FURB129.py") as f:
-  -     for _line in f.readlines():
+7 -     for _line in f.readlines():
 7 +     for _line in f:
-8 |         pass
   |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -30,12 +28,10 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
    |
 help: Remove `readlines()`
-   |
-8  |         pass
-   -     a = [line.lower() for line in f.readlines()]
-9  +     a = [line.lower() for line in f]
-10 |     b = {line.upper() for line in f.readlines()}
-   |
+  |
+9 -     a = [line.lower() for line in f.readlines()]
+9 +     a = [line.lower() for line in f]
+  |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
   --> FURB129.py:10:35
@@ -48,10 +44,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-9  |     a = [line.lower() for line in f.readlines()]
-   -     b = {line.upper() for line in f.readlines()}
+10 -     b = {line.upper() for line in f.readlines()}
 10 +     b = {line.upper() for line in f}
-11 |     c = {line.lower(): line.upper() for line in f.readlines()}
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -66,10 +60,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-10 |     b = {line.upper() for line in f.readlines()}
-   -     c = {line.lower(): line.upper() for line in f.readlines()}
+11 -     c = {line.lower(): line.upper() for line in f.readlines()}
 11 +     c = {line.lower(): line.upper() for line in f}
-12 |
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -82,10 +74,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-13 | with Path("FURB129.py").open() as f:
-   -     for _line in f.readlines():
+14 -     for _line in f.readlines():
 14 +     for _line in f:
-15 |         pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -99,10 +89,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-16 |
-   - for _line in open("FURB129.py").readlines():
+17 - for _line in open("FURB129.py").readlines():
 17 + for _line in open("FURB129.py"):
-18 |     pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -116,10 +104,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-19 |
-   - for _line in Path("FURB129.py").open().readlines():
+20 - for _line in Path("FURB129.py").open().readlines():
 20 + for _line in Path("FURB129.py").open():
-21 |     pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -134,10 +120,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-25 |     f = Path("FURB129.py").open()
-   -     for _line in f.readlines():
+26 -     for _line in f.readlines():
 26 +     for _line in f:
-27 |         pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -150,10 +134,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-31 | def func(f: io.BytesIO):
-   -     for _line in f.readlines():
+32 -     for _line in f.readlines():
 32 +     for _line in f:
-33 |         pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -168,10 +150,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-37 |     with (open("FURB129.py") as f, foo as bar):
-   -         for _line in f.readlines():
+38 -         for _line in f.readlines():
 38 +         for _line in f:
-39 |             pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -184,10 +164,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-46 | with builtins.open("FURB129.py") as f:
-   -     for line in f.readlines():
+47 -     for line in f.readlines():
 47 +     for line in f:
-48 |         pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -200,10 +178,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-53 | with o("FURB129.py") as f:
-   -     for line in f.readlines():
+54 -     for line in f.readlines():
 54 +     for line in f:
-55 |         pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -217,10 +193,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |
 help: Remove `readlines()`
    |
-92 | with open("furb129.py") as f:
-   -     for line in (f).readlines():
+93 -     for line in (f).readlines():
 93 +     for line in (f):
-94 |         pass
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -231,10 +205,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
    |                       ^^^^^^^^^^^^^^^
 help: Remove `readlines()`
    |
-96 | with open("furb129.py") as f:
-   -     [line for line in (f).readlines()]
+97 -     [line for line in (f).readlines()]
 97 +     [line for line in (f)]
-98 |
    |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -248,10 +220,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
     |
 help: Remove `readlines()`
     |
-100 | with open("furb129.py") as f:
-    -     for line in (((f))).readlines():
+101 -     for line in (((f))).readlines():
 101 +     for line in (((f))):
-102 |         pass
     |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -265,10 +235,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
     |
 help: Remove `readlines()`
     |
-102 |         pass
-    -     for line in(f).readlines():
+103 -     for line in(f).readlines():
 103 +     for line in(f):
-104 |         pass
     |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -282,10 +250,8 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
     |
 help: Remove `readlines()`
     |
-106 |     # Test case for issue #17683 (missing space before keyword)
-    -     print([line for line in f.readlines()if True])
+107 -     print([line for line in f.readlines()if True])
 107 +     print([line for line in f if True])
-108 |
     |
 
 FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
@@ -302,11 +268,9 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
     |
 help: Remove `readlines()`
     |
-111 |     for line in (  # 1
-    -         fp.  # 3  # 2
-    -         readlines(  # 4
-    -         )  # 5
+112 -         fp.  # 3  # 2
+113 -         readlines(  # 4
+114 -         )  # 5
 112 +         fp  # 5
-113 |     ):
     |
 note: This is an unsafe fix and may change runtime behavior

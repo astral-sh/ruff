@@ -13,15 +13,12 @@ PTH100 [*] `os.path.abspath()` should be replaced by `Path.resolve()`
   |
 help: Replace with `Path(...).resolve()`
   |
-2 | import os.path
 3 + import pathlib
-4 |
+4 + 
 5 | p = "/foo"
 6 | q = "bar"
 7 |
-  - a = os.path.abspath(p)
-8 + a = pathlib.Path(p).resolve()
-9 | aa = os.chmod(p)
+8 ~ a = pathlib.Path(p).resolve()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,14 +45,12 @@ PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
    |
 help: Replace with `Path(...).mkdir()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
-9  | aa = os.chmod(p)
-   - aaa = os.mkdir(p)
-10 + aaa = pathlib.Path(p).mkdir()
-11 | os.makedirs(p)
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
+ 9 | aa = os.chmod(p)
+10 ~ aaa = pathlib.Path(p).mkdir()
    |
 
 PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
@@ -70,14 +65,12 @@ PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    |
 help: Replace with `Path(...).mkdir(parents=True)`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 10 | aaa = os.mkdir(p)
-   - os.makedirs(p)
 11 + pathlib.Path(p).mkdir(parents=True)
-12 | os.rename(p)
    |
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`
@@ -116,14 +109,12 @@ PTH106 [*] `os.rmdir()` should be replaced by `Path.rmdir()`
    |
 help: Replace with `Path(...).rmdir()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 13 | os.replace(p)
-   - os.rmdir(p)
 14 + pathlib.Path(p).rmdir()
-15 | os.remove(p)
    |
 
 PTH107 [*] `os.remove()` should be replaced by `Path.unlink()`
@@ -138,14 +129,12 @@ PTH107 [*] `os.remove()` should be replaced by `Path.unlink()`
    |
 help: Replace with `Path(...).unlink()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 14 | os.rmdir(p)
-   - os.remove(p)
 15 + pathlib.Path(p).unlink()
-16 | os.unlink(p)
    |
 
 PTH108 [*] `os.unlink()` should be replaced by `Path.unlink()`
@@ -160,14 +149,12 @@ PTH108 [*] `os.unlink()` should be replaced by `Path.unlink()`
    |
 help: Replace with `Path(...).unlink()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 15 | os.remove(p)
-   - os.unlink(p)
 16 + pathlib.Path(p).unlink()
-17 | os.getcwd(p)
    |
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
@@ -194,14 +181,12 @@ PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
    |
 help: Replace with `Path(...).exists()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 17 | os.getcwd(p)
-   - b = os.path.exists(p)
-18 + b = pathlib.Path(p).exists()
-19 | bb = os.path.expanduser(p)
+18 ~ b = pathlib.Path(p).exists()
    |
 
 PTH111 [*] `os.path.expanduser()` should be replaced by `Path.expanduser()`
@@ -216,14 +201,12 @@ PTH111 [*] `os.path.expanduser()` should be replaced by `Path.expanduser()`
    |
 help: Replace with `Path(...).expanduser()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 18 | b = os.path.exists(p)
-   - bb = os.path.expanduser(p)
-19 + bb = pathlib.Path(p).expanduser()
-20 | bbb = os.path.isdir(p)
+19 ~ bb = pathlib.Path(p).expanduser()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -239,14 +222,12 @@ PTH112 [*] `os.path.isdir()` should be replaced by `Path.is_dir()`
    |
 help: Replace with `Path(...).is_dir()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 19 | bb = os.path.expanduser(p)
-   - bbb = os.path.isdir(p)
-20 + bbb = pathlib.Path(p).is_dir()
-21 | bbbb = os.path.isfile(p)
+20 ~ bbb = pathlib.Path(p).is_dir()
    |
 
 PTH113 [*] `os.path.isfile()` should be replaced by `Path.is_file()`
@@ -261,14 +242,12 @@ PTH113 [*] `os.path.isfile()` should be replaced by `Path.is_file()`
    |
 help: Replace with `Path(...).is_file()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 20 | bbb = os.path.isdir(p)
-   - bbbb = os.path.isfile(p)
-21 + bbbb = pathlib.Path(p).is_file()
-22 | bbbbb = os.path.islink(p)
+21 ~ bbbb = pathlib.Path(p).is_file()
    |
 
 PTH114 [*] `os.path.islink()` should be replaced by `Path.is_symlink()`
@@ -283,14 +262,12 @@ PTH114 [*] `os.path.islink()` should be replaced by `Path.is_symlink()`
    |
 help: Replace with `Path(...).is_symlink()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 21 | bbbb = os.path.isfile(p)
-   - bbbbb = os.path.islink(p)
-22 + bbbbb = pathlib.Path(p).is_symlink()
-23 | os.readlink(p)
+22 ~ bbbbb = pathlib.Path(p).is_symlink()
    |
 
 PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
@@ -305,14 +282,12 @@ PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
    |
 help: Replace with `Path(...).readlink()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 22 | bbbbb = os.path.islink(p)
-   - os.readlink(p)
 23 + pathlib.Path(p).readlink()
-24 | os.stat(p)
    |
 
 PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
@@ -338,14 +313,12 @@ PTH117 [*] `os.path.isabs()` should be replaced by `Path.is_absolute()`
    |
 help: Replace with `Path(...).is_absolute()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 24 | os.stat(p)
-   - os.path.isabs(p)
 25 + pathlib.Path(p).is_absolute()
-26 | os.path.join(p, q)
    |
 
 PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
@@ -393,14 +366,12 @@ PTH119 [*] `os.path.basename()` should be replaced by `Path.name`
    |
 help: Replace with `Path(...).name`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 28 | os.sep.join((p, q))
-   - os.path.basename(p)
 29 + pathlib.Path(p).name
-30 | os.path.dirname(p)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -416,14 +387,12 @@ PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
    |
 help: Replace with `Path(...).parent`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 29 | os.path.basename(p)
-   - os.path.dirname(p)
 30 + pathlib.Path(p).parent
-31 | os.path.samefile(p)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -462,14 +431,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 32 | os.path.splitext(p)
-   - with open(p) as fp:
-33 + with pathlib.Path(p).open() as fp:
-34 |     fp.read()
+33 ~ with pathlib.Path(p).open() as fp:
    |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -484,14 +451,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 34 |     fp.read()
-   - open(p).close()
-35 + pathlib.Path(p).open().close()
-36 | os.getcwdb(p)
+35 ~ pathlib.Path(p).open().close()
    |
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
@@ -539,14 +504,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 46 | open(p, opener=opener)
-   - open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 47 + pathlib.Path(p).open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
-48 | open(p, 'r', - 1, None, None, None, True, None)
    |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -560,14 +523,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 47 | open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
-   - open(p, 'r', - 1, None, None, None, True, None)
 48 + pathlib.Path(p).open('r', - 1, None, None, None)
-49 | open(p, 'r', - 1, None, None, None, False, opener)
    |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -582,14 +543,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 65 |
-   - open(b"foo")
 66 + pathlib.Path(b"foo").open()
-67 | byte_str = b"bar"
    |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -604,14 +563,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 67 | byte_str = b"bar"
-   - open(byte_str)
 68 + pathlib.Path(byte_str).open()
-69 |
    |
 
 PTH123 [*] `open()` should be replaced by `Path.open()`
@@ -626,14 +583,12 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
    |
 help: Replace with `Path.open()`
    |
-2  | import os.path
-3  + import pathlib
-4  |
---------------------------------------------------------------------------------
+ 3 + import pathlib
+ 4 + 
+ 5 | p = "/foo"
+ …
 71 |     return b"foo"
-   - open(bytes_str_func())
 72 + pathlib.Path(bytes_str_func()).open()
-73 |
    |
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
@@ -647,14 +602,12 @@ PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
     |
 help: Replace with `Path.cwd()`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 108 |
-    - os.getcwd()
 109 + pathlib.Path.cwd()
-110 | os.getcwdb()
     |
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
@@ -668,14 +621,12 @@ PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
     |
 help: Replace with `Path.cwd()`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 109 | os.getcwd()
-    - os.getcwdb()
 110 + pathlib.Path.cwd()
-111 |
     |
 
 PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
@@ -690,14 +641,12 @@ PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
     |
 help: Replace with `Path(...).mkdir()`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 111 |
-    - os.mkdir(path="directory")
 112 + pathlib.Path("directory").mkdir()
-113 |
     |
 
 PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
@@ -712,18 +661,12 @@ PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
     |
 help: Replace with `Path(...).mkdir()`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 113 |
-    - os.mkdir(
-    -     # comment 1
-    -     "directory",
-    -     mode=0o777
-    - )
 114 + pathlib.Path("directory").mkdir(mode=0o777)
-115 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -739,14 +682,12 @@ PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
     |
 help: Replace with `Path(...).mkdir(parents=True)`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 121 |
-    - os.makedirs("name", 0o777, exist_ok=False)
 122 + pathlib.Path("name").mkdir(0o777, exist_ok=False, parents=True)
-123 |
     |
 
 PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
@@ -761,14 +702,12 @@ PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
     |
 help: Replace with `Path(...).mkdir(parents=True)`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 123 |
-    - os.makedirs("name", 0o777, False)
 124 + pathlib.Path("name").mkdir(0o777, True, False)
-125 |
     |
 
 PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
@@ -783,14 +722,12 @@ PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
     |
 help: Replace with `Path(...).mkdir(parents=True)`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 125 |
-    - os.makedirs(name="name", mode=0o777, exist_ok=False)
 126 + pathlib.Path("name").mkdir(mode=0o777, exist_ok=False, parents=True)
-127 |
     |
 
 PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
@@ -815,14 +752,12 @@ PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
     |
 help: Replace with `Path(...).chmod(...)`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 130 | # https://github.com/astral-sh/ruff/issues/20134
-    - os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
 131 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=      False)
-132 | os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
     |
 
 PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
@@ -837,14 +772,12 @@ PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
     |
 help: Replace with `Path(...).chmod(...)`
     |
-2   | import os.path
-3   + import pathlib
-4   |
---------------------------------------------------------------------------------
+  3 + import pathlib
+  4 + 
+  5 | p = "/foo"
+  …
 131 | os.chmod("pth1_link", mode=0o600, follow_symlinks=      False    )
-    - os.chmod("pth1_link", mode=0o600, follow_symlinks=True)
 132 + pathlib.Path("pth1_link").chmod(mode=0o600, follow_symlinks=True)
-133 |
     |
 
 PTH101 `os.chmod()` should be replaced by `Path.chmod()`
@@ -904,12 +837,9 @@ PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
     |
 help: Replace with `Path(...).rename(...)`
     |
-142 | import sys
 143 + import pathlib
-144 |
-    - if os.rename("pth1.py", "pth1.py.bak"):
-145 + if pathlib.Path("pth1.py").rename("pth1.py.bak"):
-146 |     print("rename: truthy")
+144 + 
+145 ~ if pathlib.Path("pth1.py").rename("pth1.py.bak"):
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -925,14 +855,12 @@ PTH105 [*] `os.replace()` should be replaced by `Path.replace()`
     |
 help: Replace with `Path(...).replace(...)`
     |
-142 | import sys
 143 + import pathlib
-144 |
---------------------------------------------------------------------------------
+144 + 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+  …
 149 |
-    - if os.replace("pth1.py.bak", "pth1.py"):
-150 + if pathlib.Path("pth1.py.bak").replace("pth1.py"):
-151 |     print("replace: truthy")
+150 ~ if pathlib.Path("pth1.py.bak").replace("pth1.py"):
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -947,14 +875,12 @@ PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
     |
 help: Replace with `Path.cwd()`
     |
-142 | import sys
 143 + import pathlib
-144 |
---------------------------------------------------------------------------------
+144 + 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+  …
 155 | try:
-    -     for _ in os.getcwd():
-156 +     for _ in pathlib.Path.cwd():
-157 |         print("getcwd: iterable")
+156 ~     for _ in pathlib.Path.cwd():
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -969,14 +895,12 @@ PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
     |
 help: Replace with `Path.cwd()`
     |
-142 | import sys
 143 + import pathlib
-144 |
---------------------------------------------------------------------------------
+144 + 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+  …
 162 | try:
-    -     for _ in os.getcwdb():
-163 +     for _ in pathlib.Path.cwd():
-164 |         print("getcwdb: iterable")
+163 ~     for _ in pathlib.Path.cwd():
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -991,14 +915,12 @@ PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
     |
 help: Replace with `Path(...).readlink()`
     |
-142 | import sys
 143 + import pathlib
-144 |
---------------------------------------------------------------------------------
+144 + 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+  …
 169 | try:
-    -     for _ in os.readlink(sys.executable):
-170 +     for _ in pathlib.Path(sys.executable).readlink():
-171 |         print("readlink: iterable")
+170 ~     for _ in pathlib.Path(sys.executable).readlink():
     |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -1010,11 +932,10 @@ PTH101 [*] `os.chmod()` should be replaced by `Path.chmod()`
     | ^^^^^^^^
 help: Replace with `Path(...).chmod(...)`
     |
-142 | import sys
 143 + import pathlib
-144 |
---------------------------------------------------------------------------------
+144 + 
+145 | if os.rename("pth1.py", "pth1.py.bak"):
+  …
 187 | os.chmod(_AttrHolder.fd, 0o644)    # Suppressed: resolved as `int`
-    - os.chmod(_AttrHolder.name, 0o644)  # Diagnostic + fix: resolved as `str`
-188 + pathlib.Path(_AttrHolder.name).chmod(0o644)  # Diagnostic + fix: resolved as `str`
+188 ~ pathlib.Path(_AttrHolder.name).chmod(0o644)  # Diagnostic + fix: resolved as `str`
     |

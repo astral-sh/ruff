@@ -11,10 +11,8 @@ RUF036 [*] `None` not at the end of the type union.
   |
 help: Move `None` to the end of the type union
   |
-3 |
-  - def func1(arg: None | int): ...
+4 - def func1(arg: None | int): ...
 4 + def func1(arg: int | None): ...
-5 |
   |
 
 RUF036 [*] `None` not at the end of the type union.
@@ -29,10 +27,8 @@ RUF036 [*] `None` not at the end of the type union.
   |
 help: Move `None` to the end of the type union
   |
-5 |
-  - def func2() -> None | int: ...
+6 - def func2() -> None | int: ...
 6 + def func2() -> int | None: ...
-7 |
   |
 
 RUF036 `None` not at the end of the type union.
@@ -59,10 +55,8 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-9  |
-   - def func4(arg: U[None, int]): ...
+10 - def func4(arg: U[None, int]): ...
 10 + def func4(arg: U[int, None]): ...
-11 |
    |
 
 RUF036 [*] `None` not at the end of the type union.
@@ -77,10 +71,8 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-11 |
-   - def func5() -> U[None, int]: ...
+12 - def func5() -> U[None, int]: ...
 12 + def func5() -> U[int, None]: ...
-13 |
    |
 
 RUF036 [*] `None` not at the end of the type union.
@@ -95,10 +87,8 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-13 |
-   - def func6(arg: U[None, None, int]): ...
+14 - def func6(arg: U[None, None, int]): ...
 14 + def func6(arg: U[int, None, None]): ...
-15 |
    |
 
 RUF036 `None` not at the end of the type union.
@@ -135,10 +125,8 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-21 | # Multiple annotations in the same function
-   - def func9(x: None | int) -> None | int: ...
+22 - def func9(x: None | int) -> None | int: ...
 22 + def func9(x: int | None) -> None | int: ...
-23 |
    |
 
 RUF036 [*] `None` not at the end of the type union.
@@ -152,10 +140,8 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-21 | # Multiple annotations in the same function
-   - def func9(x: None | int) -> None | int: ...
+22 - def func9(x: None | int) -> None | int: ...
 22 + def func9(x: None | int) -> int | None: ...
-23 |
    |
 
 RUF036 [*] `None` not at the end of the type union.
@@ -169,10 +155,8 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-24 | # 3+ member PEP 604 chains
-   - def func10(arg: None | int | str): ...
+25 - def func10(arg: None | int | str): ...
 25 + def func10(arg: int | str | None): ...
-26 |
    |
 
 RUF036 [*] `None` not at the end of the type union.
@@ -187,8 +171,6 @@ RUF036 [*] `None` not at the end of the type union.
    |
 help: Move `None` to the end of the type union
    |
-26 |
-   - def func11(arg: None | int | str | bytes): ...
+27 - def func11(arg: None | int | str | bytes): ...
 27 + def func11(arg: int | str | bytes | None): ...
-28 |
    |

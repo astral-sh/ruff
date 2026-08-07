@@ -12,11 +12,9 @@ F401 [*] `os` imported but unused
 7 | _ = math.pi
   |
 help: Remove unused import: `os`
- ::: cell 1
+ ::: cell 1:4:1
   |
-4 |
-  - import os
-5 |
+4 - import os
   |
 
 F401 [*] `sys` imported but unused
@@ -26,8 +24,7 @@ F401 [*] `sys` imported but unused
 2 | import sys
   |        ^^^
 help: Remove unused import: `sys`
- ::: cell 2
+ ::: cell 2:1:1
   |
-1 | %%timeit
-  - import sys
+1 - import sys
   |

@@ -43,11 +43,8 @@ PGH004 [*] Use a colon when specifying `noqa` rule codes
    |
 help: Add missing colon
    |
-17 | # PGH004
-   - x = 2  # noqa X100
-18 + x = 2  # noqa: X100
-19 |
-   |
+18 | x = 2  # noqa: X100
+   |              +
 note: This is an unsafe fix and may change runtime behavior
 
 PGH004 [*] Use a colon when specifying `noqa` rule codes
@@ -61,9 +58,6 @@ PGH004 [*] Use a colon when specifying `noqa` rule codes
    |
 help: Add missing colon
    |
-20 | # PGH004
-   - x = 2  # noqa X100, X200
-21 + x = 2  # noqa: X100, X200
-22 |
-   |
+21 | x = 2  # noqa: X100, X200
+   |              +
 note: This is an unsafe fix and may change runtime behavior

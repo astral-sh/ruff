@@ -13,12 +13,9 @@ PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny: TypeAlias = Any
   |
 help: Add `TypeAlias` annotation
   |
-  - from typing import Literal, Any
-1 + from typing import Literal, Any, TypeAlias
+1 ~ from typing import Literal, Any, TypeAlias
 2 |
-  - NewAny = Any
-3 + NewAny: TypeAlias = Any
-4 | OptionalStr = typing.Optional[str]
+3 ~ NewAny: TypeAlias = Any
   |
 
 PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias = typing.Optional[str]`
@@ -32,13 +29,10 @@ PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `OptionalStr: TypeAlias 
   |
 help: Add `TypeAlias` annotation
   |
-  - from typing import Literal, Any
-1 + from typing import Literal, Any, TypeAlias
+1 ~ from typing import Literal, Any, TypeAlias
 2 |
 3 | NewAny = Any
-  - OptionalStr = typing.Optional[str]
-4 + OptionalStr: TypeAlias = typing.Optional[str]
-5 | Foo = Literal["foo"]
+4 ~ OptionalStr: TypeAlias = typing.Optional[str]
   |
 
 PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Literal["foo"]`
@@ -53,14 +47,11 @@ PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: TypeAlias = Litera
   |
 help: Add `TypeAlias` annotation
   |
-  - from typing import Literal, Any
-1 + from typing import Literal, Any, TypeAlias
+1 ~ from typing import Literal, Any, TypeAlias
 2 |
 3 | NewAny = Any
 4 | OptionalStr = typing.Optional[str]
-  - Foo = Literal["foo"]
-5 + Foo: TypeAlias = Literal["foo"]
-6 | IntOrStr = int | str
+5 ~ Foo: TypeAlias = Literal["foo"]
   |
 
 PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = int | str`
@@ -74,15 +65,11 @@ PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrStr: TypeAlias = i
   |
 help: Add `TypeAlias` annotation
   |
-  - from typing import Literal, Any
-1 + from typing import Literal, Any, TypeAlias
+1 ~ from typing import Literal, Any, TypeAlias
 2 |
-3 | NewAny = Any
-4 | OptionalStr = typing.Optional[str]
+…
 5 | Foo = Literal["foo"]
-  - IntOrStr = int | str
-6 + IntOrStr: TypeAlias = int | str
-7 | AliasNone = None
+6 ~ IntOrStr: TypeAlias = int | str
   |
 
 PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = None`
@@ -97,14 +84,11 @@ PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNone: TypeAlias = 
   |
 help: Add `TypeAlias` annotation
   |
-  - from typing import Literal, Any
-1 + from typing import Literal, Any, TypeAlias
+1 ~ from typing import Literal, Any, TypeAlias
 2 |
---------------------------------------------------------------------------------
+…
 6 | IntOrStr = int | str
-  - AliasNone = None
-7 + AliasNone: TypeAlias = None
-8 |
+7 ~ AliasNone: TypeAlias = None
   |
 
 PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = None`
@@ -118,12 +102,9 @@ PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `FLAG_THIS: TypeAlias = 
    |
 help: Add `TypeAlias` annotation
    |
-   - from typing import Literal, Any
-1  + from typing import Literal, Any, TypeAlias
-2  |
---------------------------------------------------------------------------------
+ 1 ~ from typing import Literal, Any, TypeAlias
+ 2 |
+ …
 16 | class NotAnEnum:
-   -     FLAG_THIS = None
-17 +     FLAG_THIS: TypeAlias = None
-18 |
+17 ~     FLAG_THIS: TypeAlias = None
    |

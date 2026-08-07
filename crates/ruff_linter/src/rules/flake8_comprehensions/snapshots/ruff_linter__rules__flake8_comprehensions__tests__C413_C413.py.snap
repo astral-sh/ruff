@@ -13,10 +13,8 @@ C413 [*] Unnecessary `list()` call around `sorted()`
   |
 help: Remove unnecessary `list()` call
   |
-2 | list(x)
-  - list(sorted(x))
+3 - list(sorted(x))
 3 + sorted(x)
-4 | reversed(sorted(x))
   |
 
 C413 [*] Unnecessary `reversed()` call around `sorted()`
@@ -31,10 +29,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
   |
 help: Remove unnecessary `reversed()` call
   |
-3 | list(sorted(x))
-  - reversed(sorted(x))
+4 - reversed(sorted(x))
 4 + sorted(x, reverse=True)
-5 | reversed(sorted(x, key=lambda e: e))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
   |
 help: Remove unnecessary `reversed()` call
   |
-4 | reversed(sorted(x))
-  - reversed(sorted(x, key=lambda e: e))
+5 - reversed(sorted(x, key=lambda e: e))
 5 + sorted(x, key=lambda e: e, reverse=True)
-6 | reversed(sorted(x, reverse=True))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
   |
 help: Remove unnecessary `reversed()` call
   |
-5 | reversed(sorted(x, key=lambda e: e))
-  - reversed(sorted(x, reverse=True))
+6 - reversed(sorted(x, reverse=True))
 6 + sorted(x, reverse=False)
-7 | reversed(sorted(x, key=lambda e: e, reverse=True))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
   |
 help: Remove unnecessary `reversed()` call
   |
-6 | reversed(sorted(x, reverse=True))
-  - reversed(sorted(x, key=lambda e: e, reverse=True))
+7 - reversed(sorted(x, key=lambda e: e, reverse=True))
 7 + sorted(x, key=lambda e: e, reverse=False)
-8 | reversed(sorted(x, reverse=True, key=lambda e: e))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
   |
-7 | reversed(sorted(x, key=lambda e: e, reverse=True))
-  - reversed(sorted(x, reverse=True, key=lambda e: e))
+8 - reversed(sorted(x, reverse=True, key=lambda e: e))
 8 + sorted(x, reverse=False, key=lambda e: e)
-9 | reversed(sorted(x, reverse=False))
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -125,12 +113,10 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
 11 | reversed(sorted(x, reverse=not x))
    |
 help: Remove unnecessary `reversed()` call
-   |
-8  | reversed(sorted(x, reverse=True, key=lambda e: e))
-   - reversed(sorted(x, reverse=False))
-9  + sorted(x, reverse=True)
-10 | reversed(sorted(x, reverse=x))
-   |
+  |
+9 - reversed(sorted(x, reverse=False))
+9 + sorted(x, reverse=True)
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 C413 [*] Unnecessary `reversed()` call around `sorted()`
@@ -144,10 +130,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-9  | reversed(sorted(x, reverse=False))
-   - reversed(sorted(x, reverse=x))
+10 - reversed(sorted(x, reverse=x))
 10 + sorted(x, reverse=not x)
-11 | reversed(sorted(x, reverse=not x))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -163,10 +147,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-10 | reversed(sorted(x, reverse=x))
-   - reversed(sorted(x, reverse=not x))
+11 - reversed(sorted(x, reverse=not x))
 11 + sorted(x, reverse=x)
-12 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -180,10 +162,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7289
-   - reversed(sorted(i for i in range(42)))
+14 - reversed(sorted(i for i in range(42)))
 14 + sorted((i for i in range(42)), reverse=True)
-15 | reversed(sorted((i for i in range(42)), reverse=True))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -199,10 +179,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-14 | reversed(sorted(i for i in range(42)))
-   - reversed(sorted((i for i in range(42)), reverse=True))
+15 - reversed(sorted((i for i in range(42)), reverse=True))
 15 + sorted((i for i in range(42)), reverse=False)
-16 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -216,10 +194,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-17 | # Regression test for: https://github.com/astral-sh/ruff/issues/10335
-   - reversed(sorted([1, 2, 3], reverse=False or True))
+18 - reversed(sorted([1, 2, 3], reverse=False or True))
 18 + sorted([1, 2, 3], reverse=not (False or True))
-19 | reversed(sorted([1, 2, 3], reverse=(False or True)))
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -235,10 +211,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-18 | reversed(sorted([1, 2, 3], reverse=False or True))
-   - reversed(sorted([1, 2, 3], reverse=(False or True)))
+19 - reversed(sorted([1, 2, 3], reverse=(False or True)))
 19 + sorted([1, 2, 3], reverse=not (False or True))
-20 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -255,12 +229,8 @@ C413 [*] Unnecessary `reversed()` call around `sorted()`
    |
 help: Remove unnecessary `reversed()` call
    |
-23 | # See https://github.com/astral-sh/ruff/issues/15789
-   - reversed(sorted
-   - (""))
 24 + (sorted
 25 + ("", reverse=True))
-26 | list(sorted
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -277,10 +247,8 @@ C413 [*] Unnecessary `list()` call around `sorted()`
    |
 help: Remove unnecessary `list()` call
    |
-25 | (""))
-   - list(sorted
 26 + (sorted
-27 |     (""))
+27 +     (""))
    |
 
 C413 [*] Unnecessary `list()` call around `sorted()`
@@ -293,8 +261,6 @@ C413 [*] Unnecessary `list()` call around `sorted()`
    | |_______^
 help: Remove unnecessary `list()` call
    |
-27 |     (""))
-   - list(sorted
 28 + (sorted
-29 | ("xy"))
+29 + ("xy"))
    |

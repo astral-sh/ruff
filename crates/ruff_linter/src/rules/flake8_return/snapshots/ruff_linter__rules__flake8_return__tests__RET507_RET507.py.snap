@@ -13,10 +13,8 @@ RET507 [*] Unnecessary `elif` after `continue` statement
    |
 help: Remove unnecessary `elif`
   |
-7 |             continue
-  -         elif i < w:
+8 -         elif i < w:
 8 +         if i < w:
-9 |             continue
   |
 
 RET507 [*] Unnecessary `elif` after `continue` statement
@@ -31,10 +29,8 @@ RET507 [*] Unnecessary `elif` after `continue` statement
    |
 help: Remove unnecessary `elif`
    |
-21 |             continue
-   -         elif z:
+22 -         elif z:
 22 +         if z:
-23 |             c = 2
    |
 
 RET507 [*] Unnecessary `else` after `continue` statement
@@ -48,11 +44,9 @@ RET507 [*] Unnecessary `else` after `continue` statement
    |
 help: Remove unnecessary `else`
    |
-35 |             continue
-   -         else:
-   -             a = z
+36 -         else:
+37 -             a = z
 36 +         a = z
-37 |
    |
 
 RET507 [*] Unnecessary `else` after `continue` statement
@@ -67,13 +61,8 @@ RET507 [*] Unnecessary `else` after `continue` statement
    |
 help: Remove unnecessary `else`
    |
-46 |                 continue
-   -             else:
-   -                 c = 3
-   -                 continue
 47 +             c = 3
 48 +             continue
-49 |         else:
    |
 
 RET507 [*] Unnecessary `else` after `continue` statement
@@ -88,11 +77,9 @@ RET507 [*] Unnecessary `else` after `continue` statement
    |
 help: Remove unnecessary `else`
    |
-62 |             continue
-   -         else:
-   -             c = 3
+63 -         else:
+64 -             c = 3
 63 +         c = 3
-64 |         continue
    |
 
 RET507 [*] Unnecessary `else` after `continue` statement
@@ -107,11 +94,9 @@ RET507 [*] Unnecessary `else` after `continue` statement
    |
 help: Remove unnecessary `else`
    |
-73 |                 continue
-   -             else:
-   -                 b = 2
+74 -             else:
+75 -                 b = 2
 74 +             b = 2
-75 |         else:
    |
 
 RET507 [*] Unnecessary `else` after `continue` statement
@@ -126,15 +111,8 @@ RET507 [*] Unnecessary `else` after `continue` statement
    |
 help: Remove unnecessary `else`
    |
-84 |             continue
-   -         else:
-   -             try:
-   -                 return
-   -             except ValueError:
-   -                 continue
 85 +         try:
 86 +             return
 87 +         except ValueError:
 88 +             continue
-89 |
    |

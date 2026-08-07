@@ -10,9 +10,7 @@ AIR302 [*] `airflow.hooks.oracle_hook.OracleHook` is moved into `oracle` provide
   | ^^^^^^^^^^
 help: Install `apache-airflow-providers-oracle>=1.0.0` and use `OracleHook` from `airflow.providers.oracle.hooks.oracle` instead.
   |
-2 |
-  - from airflow.hooks.oracle_hook import OracleHook
-3 + from airflow.providers.oracle.hooks.oracle import OracleHook
-4 |
+3 + 
+4 + from airflow.providers.oracle.hooks.oracle import OracleHook
   |
 note: This is an unsafe fix and may change runtime behavior

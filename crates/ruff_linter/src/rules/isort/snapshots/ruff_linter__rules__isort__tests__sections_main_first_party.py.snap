@@ -16,10 +16,10 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
   |
-2 |
-  - import __main__
-3 | import third_party
-4 |
+1 + import os
+2 + 
+3 + import third_party
+4 + 
 5 + import __main__
-6 | import first_party
+6 + import first_party
   |

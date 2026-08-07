@@ -13,11 +13,8 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-37 | #: E275
-   - from w import(e, f)
-38 + from w import (e, f)
-39 | #: E275
-   |
+38 | from w import (e, f)
+   |              +
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:40:24
@@ -31,11 +28,8 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-39 | #: E275
-   - from importable.module import(e, f)
-40 + from importable.module import (e, f)
-41 | #: E275
-   |
+40 | from importable.module import (e, f)
+   |                              +
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:43:28
@@ -49,11 +43,8 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-42 | try:
-   -     from importable.module import(e, f)
-43 +     from importable.module import (e, f)
-44 | except ImportError:
-   |
+43 |     from importable.module import (e, f)
+   |                                  +
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:47:1
@@ -67,11 +58,8 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-46 | #: E275
-   - if(foo):
-47 + if (foo):
-48 |     pass
-   |
+47 | if (foo):
+   |   +
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:55:5
@@ -85,11 +73,8 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-54 | if True:
-   -     assert(1)
-55 +     assert (1)
-56 | #: Okay
-   |
+55 |     assert (1)
+   |           +
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:77:1
@@ -102,11 +87,8 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-76 | #: E275
-   - match(foo):
-77 + match (foo):
-78 |     case(1):
-   |
+77 | match (foo):
+   |      +
 
 E275 [*] Missing whitespace after keyword
   --> E27.py:78:5
@@ -119,8 +101,5 @@ E275 [*] Missing whitespace after keyword
    |
 help: Added missing whitespace after keyword
    |
-77 | match(foo):
-   -     case(1):
-78 +     case (1):
-79 |         pass
-   |
+78 |     case (1):
+   |         +

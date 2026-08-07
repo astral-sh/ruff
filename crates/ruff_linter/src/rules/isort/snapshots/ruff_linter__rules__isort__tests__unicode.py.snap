@@ -14,11 +14,8 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
   |
-1 + import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
-2 + import numpy as ℂℇℊℋℌℍℎℐℑℒℓℕℤΩℨKÅℬℭℯℰℱℹℴ
-3 | from astropy.constants import hbar as ℏ
-4 | from numpy import pi as π
-  - import numpy as ℂℇℊℋℌℍℎℐℑℒℓℕℤΩℨKÅℬℭℯℰℱℹℴ
-  - import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
-5 |
+1 ~ import numpy as CƐgHHHhIILlNZΩZKÅBCeEFio
+2 ~ import numpy as ℂℇℊℋℌℍℎℐℑℒℓℕℤΩℨKÅℬℭℯℰℱℹℴ
+3 ~ from astropy.constants import hbar as ℏ
+4 ~ from numpy import pi as π
   |

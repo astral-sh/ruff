@@ -13,11 +13,8 @@ B912 [*] `map()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-4 | map(lambda x: x, [1, 2, 3])
-  - map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6])
-5 + map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], strict=False)
-6 | map(lambda x, y, z: x + y + z, [1, 2, 3], [4, 5, 6], [7, 8, 9])
-  |
+5 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], strict=False)
+  |                                             ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -32,11 +29,8 @@ B912 [*] `map()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-5 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6])
-  - map(lambda x, y, z: x + y + z, [1, 2, 3], [4, 5, 6], [7, 8, 9])
-6 + map(lambda x, y, z: x + y + z, [1, 2, 3], [4, 5, 6], [7, 8, 9], strict=False)
-7 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]))
-  |
+6 | map(lambda x, y, z: x + y + z, [1, 2, 3], [4, 5, 6], [7, 8, 9], strict=False)
+  |                                                               ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -51,12 +45,8 @@ B912 [*] `map()` without an explicit `strict=` parameter
   |
 help: Add explicit value for parameter `strict=`
   |
-6 | map(lambda x, y, z: x + y + z, [1, 2, 3], [4, 5, 6], [7, 8, 9])
-  - map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]))
 7 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]), strict=False)
-8 + map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]), strict=False)
-9 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True))
-  |
+  |                                                                           ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -70,12 +60,9 @@ B912 [*] `map()` without an explicit `strict=` parameter
 11 | # Errors (limited iterators).
    |
 help: Add explicit value for parameter `strict=`
-   |
-8  | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9]), strict=False)
-   - map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True))
-9  + map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True), strict=False)
-10 |
-   |
+  |
+9 | map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], *map(lambda x: x, [7, 8, 9], strict=True), strict=False)
+  |                                                                                        ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -88,11 +75,8 @@ B912 [*] `map()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
    |
-11 | # Errors (limited iterators).
-   - map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1))
-12 + map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1), strict=False)
-13 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4))
-   |
+12 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1), strict=False)
+   |                                                ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -107,11 +91,8 @@ B912 [*] `map()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
    |
-12 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, 1))
-   - map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4))
-13 + map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4), strict=False)
-14 |
-   |
+13 | map(lambda x, y: x + y, [1, 2, 3], repeat(1, times=4), strict=False)
+   |                                                      ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -126,11 +107,8 @@ B912 [*] `map()` without an explicit `strict=` parameter
    |
 help: Add explicit value for parameter `strict=`
    |
-16 | # Still an error even though it uses the qualified name
-   - builtins.map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6])
-17 + builtins.map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], strict=False)
-18 |
-   |
+17 | builtins.map(lambda x, y: x + y, [1, 2, 3], [4, 5, 6], strict=False)
+   |                                                      ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior
 
 B912 [*] `map()` without an explicit `strict=` parameter
@@ -141,8 +119,6 @@ B912 [*] `map()` without an explicit `strict=` parameter
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Add explicit value for parameter `strict=`
    |
-35 | # Regression https://github.com/astral-sh/ruff/issues/20997
-   - map(f, *lots_of_iterators)
-36 + map(f, *lots_of_iterators, strict=False)
-   |
+36 | map(f, *lots_of_iterators, strict=False)
+   |                          ++++++++++++++
 note: This is an unsafe fix and may change runtime behavior

@@ -24,10 +24,11 @@ NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.inf` instead.
   |
 help: Replace with `numpy.inf`
   |
+2 ~     import numpy as np
+3 |
+4 |     np.obj2sctype(int)
 5 |
-  -     np.PINF
-6 +     np.inf
-7 |
+6 ~     np.inf
   |
 
 NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` instead.
@@ -42,10 +43,8 @@ NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` instead.
    |
 help: Replace with `0.0`
   |
-7 |
-  -     np.PZERO
+8 -     np.PZERO
 8 +     0.0
-9 |
   |
 
 NPY201 `np.recfromcsv` will be removed in NumPy 2.0. Use `np.genfromtxt` with comma delimiter instead.
@@ -82,10 +81,11 @@ NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `numpy.round` instead.
    |
 help: Replace with `numpy.round`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 13 |
-   -     np.round_(12.34)
-14 +     np.round(12.34)
-15 |
+14 ~     np.round(12.34)
    |
 
 NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast.literal_eval` instead.
@@ -100,13 +100,12 @@ NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast.literal_eval` i
    |
 help: Replace with `ast.literal_eval`
    |
-1  + from ast import literal_eval
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from ast import literal_eval
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 16 |
-   -     np.safe_eval
-17 +     literal_eval
-18 |
+17 ~     literal_eval
    |
 
 NPY201 `np.sctype2char` will be removed without replacement in NumPy 2.0
@@ -165,10 +164,11 @@ NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Use `numpy.complex64
    |
 help: Replace with `numpy.complex64`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 27 |
-   -     np.singlecomplex(12+1j)
-28 +     np.complex64(12+1j)
-29 |
+28 ~     np.complex64(12+1j)
    |
 
 NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `numpy.bytes_` instead.
@@ -183,10 +183,11 @@ NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `numpy.bytes_` instead
    |
 help: Replace with `numpy.bytes_`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 29 |
-   -     np.string_("asdf")
-30 +     np.bytes_("asdf")
-31 |
+30 ~     np.bytes_("asdf")
    |
 
 NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `inspect.getsource` instead.
@@ -201,13 +202,12 @@ NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `inspect.getsource` ins
    |
 help: Replace with `inspect.getsource`
    |
-1  + from inspect import getsource
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from inspect import getsource
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 32 |
-   -     np.source
-33 +     getsource
-34 |
+33 ~     getsource
    |
 
 NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.tracemalloc_domain` instead.
@@ -222,13 +222,12 @@ NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.
    |
 help: Replace with `numpy.lib.tracemalloc_domain`
    |
-1  + from numpy.lib import tracemalloc_domain
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from numpy.lib import tracemalloc_domain
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 34 |
-   -     np.tracemalloc_domain
-35 +     tracemalloc_domain
-36 |
+35 ~     tracemalloc_domain
    |
 
 NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
@@ -243,10 +242,11 @@ NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
    |
 help: Replace with `numpy.str_`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 35 |
-   -     np.unicode_("asf")
-36 +     np.str_("asf")
-37 |
+36 ~     np.str_("asf")
    |
 
 NPY201 `np.who` will be removed in NumPy 2.0. Use an IDE variable explorer or `locals()` instead.
@@ -272,10 +272,11 @@ NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `numpy.vstack` inste
    |
 help: Replace with `numpy.vstack`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 39 |
-   -     np.row_stack(([1,2], [3,4]))
-40 +     np.vstack(([1,2], [3,4]))
-41 |
+40 ~     np.vstack(([1,2], [3,4]))
    |
 
 NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
@@ -290,10 +291,11 @@ NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
    |
 help: Replace with `numpy.all`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 41 |
-   -     np.alltrue([True, True])
-42 +     np.all([True, True])
-43 |
+42 ~     np.all([True, True])
    |
 
 NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
@@ -308,10 +310,11 @@ NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
    |
 help: Replace with `numpy.any`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 43 |
-   -     np.sometrue([True, False])
-44 +     np.any([True, False])
-45 |
+44 ~     np.any([True, False])
    |
 
 NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
@@ -326,10 +329,11 @@ NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` ins
    |
 help: Replace with `numpy.cumprod`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 45 |
-   -     np.cumproduct([1, 2, 3])
-46 +     np.cumprod([1, 2, 3])
-47 |
+46 ~     np.cumprod([1, 2, 3])
    |
 
 NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
@@ -344,10 +348,11 @@ NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
    |
 help: Replace with `numpy.prod`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 47 |
-   -     np.product([1, 2, 3])
-48 +     np.prod([1, 2, 3])
-49 |
+48 ~     np.prod([1, 2, 3])
    |
 
 NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on NumPy 2.0, or ignore this warning on earlier versions.
@@ -362,10 +367,11 @@ NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on Num
    |
 help: Replace with `numpy.trapezoid` (requires NumPy 2.0 or greater)
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 49 |
-   -     np.trapz([1, 2, 3])
-50 +     np.trapezoid([1, 2, 3])
-51 |
+50 ~     np.trapezoid([1, 2, 3])
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -392,13 +398,12 @@ NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `numpy.exceptions.Ax
    |
 help: Replace with `numpy.exceptions.AxisError`
    |
-1  + from numpy.exceptions import AxisError
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from numpy.exceptions import AxisError
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 54 |
-   -     np.AxisError
-55 +     AxisError
-56 |
+55 ~     AxisError
    |
 
 NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
@@ -413,13 +418,12 @@ NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptio
    |
 help: Replace with `numpy.exceptions.ComplexWarning`
    |
-1  + from numpy.exceptions import ComplexWarning
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from numpy.exceptions import ComplexWarning
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 56 |
-   -     np.ComplexWarning
-57 +     ComplexWarning
-58 |
+57 ~     ComplexWarning
    |
 
 NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
@@ -434,13 +438,12 @@ NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char
    |
 help: Replace with `numpy.char.compare_chararrays`
    |
-1  + from numpy.char import compare_chararrays
-2  | def func():
---------------------------------------------------------------------------------
+ 1 + from numpy.char import compare_chararrays
+ 2 | def func():
+ 3 |     import numpy as np
+ …
 58 |
-   -     np.compare_chararrays
-59 +     compare_chararrays
-60 |
+59 ~     compare_chararrays
    |
 
 NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
@@ -455,10 +458,11 @@ NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
    |
 help: Replace with `numpy.all`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 62 |     except TypeError:
-   -         np.alltrue([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
-63 +         np.all([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
-64 |
+63 ~         np.all([True, True])  # Should emit a warning here (`except TypeError`, not `except AttributeError`)
    |
 
 NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
@@ -472,8 +476,9 @@ NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
    |
 help: Replace with `numpy.any`
    |
+ 2 ~     import numpy as np
+ 3 |
+ …
 67 |     except AttributeError:
-   -         np.sometrue([True, True])  # Should emit a warning here
-68 +         np.any([True, True])  # Should emit a warning here
-69 |                                    # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
+68 ~         np.any([True, True])  # Should emit a warning here
    |

@@ -12,10 +12,8 @@ UP024 [*] Replace aliased errors with `OSError`
   |
 help: Replace `EnvironmentError` with builtin `OSError`
   |
-5 |     pass
-  - except EnvironmentError:
+6 - except EnvironmentError:
 6 + except OSError:
-7 |     pass
   |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -29,10 +27,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `IOError` with builtin `OSError`
    |
-10 |     pass
-   - except IOError:
+11 - except IOError:
 11 + except OSError:
-12 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -46,10 +42,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `WindowsError` with builtin `OSError`
    |
-15 |     pass
-   - except WindowsError:
+16 - except WindowsError:
 16 + except OSError:
-17 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -63,10 +57,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `mmap.error` with builtin `OSError`
    |
-20 |     pass
-   - except mmap.error:
+21 - except mmap.error:
 21 + except OSError:
-22 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -80,10 +72,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `select.error` with builtin `OSError`
    |
-25 |     pass
-   - except select.error:
+26 - except select.error:
 26 + except OSError:
-27 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -97,10 +87,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `socket.error` with builtin `OSError`
    |
-30 |     pass
-   - except socket.error:
+31 - except socket.error:
 31 + except OSError:
-32 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -114,10 +102,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `error` with builtin `OSError`
    |
-35 |     pass
-   - except error:
+36 - except error:
 36 + except OSError:
-37 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -132,10 +118,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace with builtin `OSError`
    |
-42 |     pass
-   - except (IOError,):
+43 - except (IOError,):
 43 + except OSError:
-44 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -150,10 +134,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace with builtin `OSError`
    |
-46 |     pass
-   - except (mmap.error,):
+47 - except (mmap.error,):
 47 + except OSError:
-48 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -167,10 +149,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace with builtin `OSError`
    |
-50 |     pass
-   - except (EnvironmentError, IOError, OSError, select.error):
+51 - except (EnvironmentError, IOError, OSError, select.error):
 51 + except OSError:
-52 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -184,10 +164,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace with builtin `OSError`
    |
-57 |     pass
-   - except (IOError, KeyError, OSError):
+58 - except (IOError, KeyError, OSError):
 58 + except (KeyError, OSError):
-59 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -202,10 +180,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace with builtin `OSError`
    |
-64 |     pass
-   - except (IOError, error):
+65 - except (IOError, error):
 65 + except (OSError, error):
-66 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -219,10 +195,8 @@ UP024 [*] Replace aliased errors with `OSError`
    |
 help: Replace `mmap.error` with builtin `OSError`
    |
-86 |     pass
-   - except (mmap).error:
+87 - except (mmap).error:
 87 + except OSError:
-88 |     pass
    |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -236,10 +210,8 @@ UP024 [*] Replace aliased errors with `OSError`
     |
 help: Replace with builtin `OSError`
     |
-104 |         mac_address = get_primary_mac_address()
-    -     except(IOError, OSError) as ex:
+105 -     except(IOError, OSError) as ex:
 105 +     except OSError as ex:
-106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
     |
 
 UP024 [*] Replace aliased errors with `OSError`
@@ -253,8 +225,6 @@ UP024 [*] Replace aliased errors with `OSError`
     |
 help: Replace `os.error` with builtin `OSError`
     |
-113 |     pass
-    - except os.error:
+114 - except os.error:
 114 + except OSError:
-115 |     pass
     |

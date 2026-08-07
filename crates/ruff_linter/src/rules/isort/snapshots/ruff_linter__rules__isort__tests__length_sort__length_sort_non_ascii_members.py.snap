@@ -18,19 +18,15 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_^
 help: Organize imports
    |
-1  | from module1 import (
-   -     loooooooooooooong,
-2  +     short,
-3  |     σηορτ,
-4  +     shoort,
-5  |     mediuuuuum,
-   -     shoort,
-   -     looooooooooooooong,
-6  |     μεδιυυυυυμ,
-   -     short,
-7  |     mediuuuuuum,
-8  +     loooooooooooooong,
-9  |     λοοοοοοοοοοοοοονγ,
+ 1 + from module1 import (
+ 2 +     short,
+ 3 ~     σηορτ,
+ 4 +     shoort,
+ 5 +     mediuuuuum,
+ 6 ~     μεδιυυυυυμ,
+ 7 +     mediuuuuuum,
+ 8 +     loooooooooooooong,
+ 9 ~     λοοοοοοοοοοοοοονγ,
 10 +     looooooooooooooong,
-11 | )
+11 + )
    |

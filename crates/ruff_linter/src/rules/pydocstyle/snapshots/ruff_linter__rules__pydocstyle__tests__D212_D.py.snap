@@ -12,11 +12,7 @@ D212 [*] Multi-line docstring summary should start at the first line
     | |_______^
 help: Remove whitespace after opening quotes
     |
-128 | def asdlkfasd():
-    -     """
-    -     Wrong.
-129 +     """Wrong.
-130 |     """
+129 |     """Wrong.
     |
 
 D212 [*] Multi-line docstring summary should start at the first line
@@ -30,12 +26,7 @@ D212 [*] Multi-line docstring summary should start at the first line
     | |_____________^
 help: Remove whitespace after opening quotes
     |
-596 | def one_liner():
-    -     """
-    -
-    -     Wrong."""
-597 +     """Wrong."""
-598 |
+597 |     """Wrong."""
     |
 
 D212 [*] Multi-line docstring summary should start at the first line
@@ -49,10 +40,5 @@ D212 [*] Multi-line docstring summary should start at the first line
     | |______________^
 help: Remove whitespace after opening quotes
     |
-623 | def one_liner():
-    -     """
-    -
-    -     "Wrong."""
-624 +     """"Wrong."""
-625 |
+624 |     """"Wrong."""
     |

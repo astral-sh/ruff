@@ -11,9 +11,8 @@ SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
 help: Replace with `bool(...)
   |
-  - a = True if b else False  # SIM210
+1 - a = True if b else False  # SIM210
 1 + a = bool(b)  # SIM210
-2 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,10 +28,8 @@ SIM210 [*] Remove unnecessary `True if ... else False`
   |
 help: Remove unnecessary `True if ... else False`
   |
-2 |
-  - a = True if b != c else False  # SIM210
+3 - a = True if b != c else False  # SIM210
 3 + a = b != c  # SIM210
-4 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -48,10 +45,8 @@ SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
 help: Replace with `bool(...)
   |
-4 |
-  - a = True if b + c else False  # SIM210
+5 - a = True if b + c else False  # SIM210
 5 + a = bool(b + c)  # SIM210
-6 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -74,10 +69,7 @@ SIM210 [*] Remove unnecessary `True if ... else False`
    | |____________________________________________________________________________^
 help: Remove unnecessary `True if ... else False`
    |
-18 | # Regression test for: https://github.com/astral-sh/ruff/issues/7076
-   - samesld = True if (psl.privatesuffix(urlparse(response.url).netloc) ==
-   -                                    psl.privatesuffix(src.netloc)) else False
-19 + samesld = (psl.privatesuffix(urlparse(response.url).netloc) ==
+19 ~ samesld = (psl.privatesuffix(urlparse(response.url).netloc) ==
 20 +                                    psl.privatesuffix(src.netloc))
    |
 note: This is an unsafe fix and may change runtime behavior

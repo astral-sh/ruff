@@ -459,7 +459,6 @@ mod tests {
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         help: Import from `shlex`
           |
-          - from pipes import quote, Template
         1 + from pipes import Template
         2 + from shlex import quote
           |

@@ -12,12 +12,11 @@ TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is u
     |                    --------- Used at runtime here
 help: Move out of type-checking block
     |
-1   + from pandas import DataFrame
-2   | def f():
---------------------------------------------------------------------------------
+  1 + from pandas import DataFrame
+  2 | def f():
+  3 |     from pandas import DataFrame
+  …
 110 |     if TYPE_CHECKING:
-    -         from pandas import DataFrame
-111 +         pass
-112 |
+111 ~         pass
     |
 note: This is an unsafe fix and may change runtime behavior

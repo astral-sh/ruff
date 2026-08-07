@@ -12,11 +12,8 @@ E222 [*] Multiple spaces after operator
    |
 help: Replace with single space
    |
-27 | #: E222
-   - a = a +  1
-28 + a = a + 1
-29 | b = b + 10
-   |
+28 | a = a + 1
+   |        +
 
 E222 [*] Multiple spaces after operator
   --> E22.py:31:4
@@ -30,11 +27,8 @@ E222 [*] Multiple spaces after operator
    |
 help: Replace with single space
    |
-30 | #: E222 E222
-   - x =            -1
-31 + x = -1
-32 | y =            -2
-   |
+31 | x = -1
+   |    +
 
 E222 [*] Multiple spaces after operator
   --> E22.py:32:4
@@ -48,11 +42,8 @@ E222 [*] Multiple spaces after operator
    |
 help: Replace with single space
    |
-31 | x =            -1
-   - y =            -2
-32 + y = -2
-33 | long_variable = 3
-   |
+32 | y = -2
+   |    +
 
 E222 [*] Multiple spaces after operator
   --> E22.py:35:7
@@ -66,11 +57,8 @@ E222 [*] Multiple spaces after operator
    |
 help: Replace with single space
    |
-34 | #: E222 E222
-   - x[0] =          1
-35 + x[0] = 1
-36 | x[1] =          2
-   |
+35 | x[0] = 1
+   |       +
 
 E222 [*] Multiple spaces after operator
   --> E22.py:36:7
@@ -84,11 +72,8 @@ E222 [*] Multiple spaces after operator
    |
 help: Replace with single space
    |
-35 | x[0] =          1
-   - x[1] =          2
-36 + x[1] = 2
-37 | long_variable = 3
-   |
+36 | x[1] = 2
+   |       +
 
 E222 [*] Multiple spaces after operator
    --> E22.py:184:9
@@ -101,8 +86,5 @@ E222 [*] Multiple spaces after operator
     |
 help: Replace with single space
     |
-183 |
-    - if a  ==  1:
-184 + if a  == 1:
-185 |     print(a)
-    |
+184 | if a  == 1:
+    |         +

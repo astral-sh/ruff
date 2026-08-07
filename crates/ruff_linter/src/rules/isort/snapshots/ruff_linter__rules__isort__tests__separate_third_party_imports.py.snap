@@ -11,11 +11,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_________^
 help: Organize imports
   |
-  - import pandas as pd
 1 + import os
-2 | import sys
-3 +
-4 | import numpy as np
-  - import os
+2 + import sys
+3 + 
+4 + import numpy as np
 5 + import pandas as pd
   |

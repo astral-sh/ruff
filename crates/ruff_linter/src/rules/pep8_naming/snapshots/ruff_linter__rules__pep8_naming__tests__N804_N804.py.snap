@@ -12,10 +12,8 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `self` to `cls`
    |
-29 |
-   -     def __init_subclass__(self, default_name, **kwargs):
+30 -     def __init_subclass__(self, default_name, **kwargs):
 30 +     def __init_subclass__(cls, default_name, **kwargs):
-31 |         ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -29,10 +27,8 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `self` to `cls`
    |
-37 |     @classmethod
-   -     def bad_class_method_with_positional_only_argument(self, x, /, other):
+38 -     def bad_class_method_with_positional_only_argument(self, x, /, other):
 38 +     def bad_class_method_with_positional_only_argument(cls, x, /, other):
-39 |         ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -46,10 +42,8 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `self` to `cls`
    |
-42 | class MetaClass(ABCMeta):
-   -     def bad_method(self):
+43 -     def bad_method(self):
 43 +     def bad_method(cls):
-44 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -118,14 +112,9 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `this` to `cls`
    |
-69 | class RenamingInMethodBodyClass(ABCMeta):
-   -     def bad_method(this):
-   -         this = this
-   -         this
-70 +     def bad_method(cls):
-71 +         cls = cls
-72 +         cls
-73 |
+70 ~     def bad_method(cls):
+71 ~         cls = cls
+72 ~         cls
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -140,12 +129,8 @@ N804 [*] First argument of a class method should be named `cls`
    |
 help: Rename `this` to `cls`
    |
-73 |
-   -     def bad_method(this):
-   -         self = this
-74 +     def bad_method(cls):
-75 +         self = cls
-76 |
+74 ~     def bad_method(cls):
+75 ~         self = cls
    |
 note: This is an unsafe fix and may change runtime behavior
 

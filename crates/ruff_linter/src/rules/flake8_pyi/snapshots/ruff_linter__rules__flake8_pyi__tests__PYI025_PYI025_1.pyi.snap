@@ -12,11 +12,8 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
   |
-7 | def f():
-  -     from collections.abc import Set  # PYI025
-8 +     from collections.abc import Set as AbstractSet  # PYI025
-9 |
-  |
+8 |     from collections.abc import Set as AbstractSet  # PYI025
+  |                                     ++++++++++++++
 
 PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
   --> PYI025_1.pyi:11:51
@@ -29,11 +26,8 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
    |
-10 | def f():
-   -     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-11 +     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
-12 |
-   |
+11 |     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # PYI025
+   |                                                       ++++++++++++++
 
 PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
   --> PYI025_1.pyi:16:37
@@ -47,22 +41,16 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
    |
-15 |     if True:
-   -         from collections.abc import Set
-16 +         from collections.abc import Set as AbstractSet
+16 ~         from collections.abc import Set as AbstractSet
 17 |     else:
-   -         Set = 1
-18 +         AbstractSet = 1
+18 ~         AbstractSet = 1
 19 |
---------------------------------------------------------------------------------
+ …
 23 |
-   -     del Set
-24 +     del AbstractSet
+24 ~     del AbstractSet
 25 |
 26 |     def f():
-   -         print(Set)
-27 +         print(AbstractSet)
-28 |
+27 ~         print(AbstractSet)
    |
 
 PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
@@ -77,28 +65,20 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
    |
-19 |
-   -     x: Set = set()
-20 +     x: AbstractSet = set()
+20 ~     x: AbstractSet = set()
 21 |
-   -     x: Set
-22 +     x: AbstractSet
+22 ~     x: AbstractSet
 23 |
---------------------------------------------------------------------------------
+ …
 32 |
-   - from collections.abc import Set
-33 + from collections.abc import Set as AbstractSet
+33 ~ from collections.abc import Set as AbstractSet
 34 |
 35 | def f():
 36 |     """Test: global symbol renaming."""
-   -     global Set
-37 +     global AbstractSet
+37 ~     global AbstractSet
 38 |
-   -     Set = 1
-   -     print(Set)
-39 +     AbstractSet = 1
-40 +     print(AbstractSet)
-41 |
+39 ~     AbstractSet = 1
+40 ~     print(AbstractSet)
    |
 
 PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
@@ -113,16 +93,11 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
    |
 help: Alias `Set` to `AbstractSet`
    |
-43 |     """Test: nonlocal symbol renaming."""
-   -     from collections.abc import Set
-44 +     from collections.abc import Set as AbstractSet
+44 ~     from collections.abc import Set as AbstractSet
 45 |
 46 |     def g():
-   -         nonlocal Set
-47 +         nonlocal AbstractSet
+47 ~         nonlocal AbstractSet
 48 |
-   -         Set = 1
-   -         print(Set)
-49 +         AbstractSet = 1
-50 +         print(AbstractSet)
+49 ~         AbstractSet = 1
+50 ~         print(AbstractSet)
    |

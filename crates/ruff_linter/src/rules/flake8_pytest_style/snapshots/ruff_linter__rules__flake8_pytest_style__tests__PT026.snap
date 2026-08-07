@@ -11,10 +11,7 @@ PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
 help: Remove `usefixtures` decorator or pass parameters
    |
-18 |
-   - @pytest.mark.usefixtures()
-19 +
-20 | def test_error_with_parens():
+19 - @pytest.mark.usefixtures()
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,9 +25,6 @@ PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
 help: Remove `usefixtures` decorator or pass parameters
    |
-23 |
-   - @pytest.mark.usefixtures
-24 +
-25 | def test_error_no_parens():
+24 - @pytest.mark.usefixtures
    |
 note: This is an unsafe fix and may change runtime behavior

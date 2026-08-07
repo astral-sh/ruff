@@ -20,7 +20,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Optional`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,7 +34,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Optional`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -56,9 +54,7 @@ help: Convert to `X | None`
 3 | from typing import Optional
 4 |
 5 |
-  - def f(x: Optional[str]) -> None:
-6 + def f(x: str | None) -> None:
-7 |     ...
+6 ~ def f(x: str | None) -> None:
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -72,12 +68,11 @@ UP045 [*] Use `X | None` for type annotations
    |
 help: Convert to `X | None`
    |
-1  + from __future__ import annotations
-2  | import typing
---------------------------------------------------------------------------------
-9  |
-   - def f(x: typing.Optional[str]) -> None:
-10 + def f(x: str | None) -> None:
-11 |     ...
+ 1 + from __future__ import annotations
+ 2 | import typing
+ 3 | from typing import Optional
+ …
+ 9 |
+10 ~ def f(x: str | None) -> None:
    |
 note: This is an unsafe fix and may change runtime behavior

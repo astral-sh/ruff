@@ -11,9 +11,8 @@ C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-  - t = tuple()
+1 - t = tuple()
 1 + t = ()
-2 | l = list()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -28,10 +27,8 @@ C408 [*] Unnecessary `list()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-1 | t = tuple()
-  - l = list()
+2 - l = list()
 2 + l = []
-3 | d1 = dict()
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -47,10 +44,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
   |
 help: Rewrite as a literal
   |
-2 | l = list()
-  - d1 = dict()
+3 - d1 = dict()
 3 + d1 = {}
-4 | d2 = dict(a=1)
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -65,10 +60,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-15 | f'{dict(x="y")}'
-   - f"{dict()}"
+16 - f"{dict()}"
 16 + f"{ {} }"
-17 | f"a {dict()} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -84,10 +77,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-16 | f"{dict()}"
-   - f"a {dict()} b"
+17 - f"a {dict()} b"
 17 + f"a { {} } b"
-18 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -105,13 +96,9 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-23 |
-   - dict(
 24 + {
 25 |     # comment
-   - )
 26 + }
-27 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -128,10 +115,8 @@ C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-27 |
-   - tuple(  # comment
-28 + (  # comment
-29 | )
+28 ~ (  # comment
+29 ~ )
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -146,10 +131,8 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-32 | t'{dict(x="y")}'
-   - t"{dict()}"
+33 - t"{dict()}"
 33 + t"{ {} }"
-34 | t"a {dict()} b"
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -165,9 +148,7 @@ C408 [*] Unnecessary `dict()` call (rewrite as a literal)
    |
 help: Rewrite as a literal
    |
-33 | t"{dict()}"
-   - t"a {dict()} b"
+34 - t"a {dict()} b"
 34 + t"a { {} } b"
-35 |
    |
 note: This is an unsafe fix and may change runtime behavior

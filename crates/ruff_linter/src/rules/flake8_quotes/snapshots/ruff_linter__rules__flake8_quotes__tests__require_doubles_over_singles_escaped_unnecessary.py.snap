@@ -11,9 +11,8 @@ Q004 [*] Unnecessary escape on inner quote character
   |
 help: Remove backslash
   |
-  - this_should_raise_Q004 = "This is a \'string\'"
+1 - this_should_raise_Q004 = "This is a \'string\'"
 1 + this_should_raise_Q004 = "This is a 'string'"
-2 | this_should_raise_Q004 = "'This' is a \'string\'"
   |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -27,10 +26,8 @@ Q004 [*] Unnecessary escape on inner quote character
   |
 help: Remove backslash
   |
-1 | this_should_raise_Q004 = "This is a \'string\'"
-  - this_should_raise_Q004 = "'This' is a \'string\'"
+2 - this_should_raise_Q004 = "'This' is a \'string\'"
 2 + this_should_raise_Q004 = "'This' is a 'string'"
-3 | this_is_fine = 'This is a "string"'
   |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -43,12 +40,10 @@ Q004 [*] Unnecessary escape on inner quote character
 10 | )
    |
 help: Remove backslash
-   |
-8  |     "This is a"
-   -     "\'string\'"
-9  +     "'string'"
-10 | )
-   |
+  |
+9 -     "\'string\'"
+9 +     "'string'"
+  |
 
 Q004 [*] Unnecessary escape on inner quote character
   --> singles_escaped_unnecessary.py:13:1
@@ -61,10 +56,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-12 | # Same as above, but with f-strings
-   - f"This is a \'string\'"  # Q004
+13 - f"This is a \'string\'"  # Q004
 13 + f"This is a 'string'"  # Q004
-14 | f"'This' is a \'string\'"  # Q004
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -79,10 +72,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-13 | f"This is a \'string\'"  # Q004
-   - f"'This' is a \'string\'"  # Q004
+14 - f"'This' is a \'string\'"  # Q004
 14 + f"'This' is a 'string'"  # Q004
-15 | f'This is a "string"'
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -96,10 +87,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-20 |     f"This is a"
-   -     f"\'string\'"  # Q004
+21 -     f"\'string\'"  # Q004
 21 +     f"'string'"  # Q004
-22 | )
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -114,10 +103,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-30 | # but as the actual string itself is invalid pre 3.12, we don't catch it.
-   - f"\'foo\' {"foo"}"  # Q004
+31 - f"\'foo\' {"foo"}"  # Q004
 31 + f"'foo' {"foo"}"  # Q004
-32 | f"\'foo\' {f"foo"}"  # Q004
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -131,10 +118,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-31 | f"\'foo\' {"foo"}"  # Q004
-   - f"\'foo\' {f"foo"}"  # Q004
+32 - f"\'foo\' {f"foo"}"  # Q004
 32 + f"'foo' {f"foo"}"  # Q004
-33 | f"\'foo\' {f"\'foo\'"} \'\'"  # Q004
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -149,10 +134,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-32 | f"\'foo\' {f"foo"}"  # Q004
-   - f"\'foo\' {f"\'foo\'"} \'\'"  # Q004
+33 - f"\'foo\' {f"\'foo\'"} \'\'"  # Q004
 33 + f"'foo' {f"\'foo\'"} ''"  # Q004
-34 |
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -167,10 +150,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-32 | f"\'foo\' {f"foo"}"  # Q004
-   - f"\'foo\' {f"\'foo\'"} \'\'"  # Q004
+33 - f"\'foo\' {f"\'foo\'"} \'\'"  # Q004
 33 + f"\'foo\' {f"'foo'"} \'\'"  # Q004
-34 |
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -184,10 +165,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-35 | f"normal {f"nested"} normal"
-   - f"\'normal\' {f"nested"} normal"  # Q004
+36 - f"\'normal\' {f"nested"} normal"  # Q004
 36 + f"'normal' {f"nested"} normal"  # Q004
-37 | f"\'normal\' {f"nested"} 'single quotes'"
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -202,10 +181,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-36 | f"\'normal\' {f"nested"} normal"  # Q004
-   - f"\'normal\' {f"nested"} 'single quotes'"
+37 - f"\'normal\' {f"nested"} 'single quotes'"
 37 + f"'normal' {f"nested"} 'single quotes'"
-38 | f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -219,10 +196,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-37 | f"\'normal\' {f"nested"} 'single quotes'"
-   - f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
+38 - f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
 38 + f"'normal' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
-39 | f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -236,10 +211,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-37 | f"\'normal\' {f"nested"} 'single quotes'"
-   - f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
+38 - f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
 38 + f"\'normal\' {f"'nested' {"other"} normal"} 'single quotes'"  # Q004
-39 | f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -254,10 +227,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-38 | f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
-   - f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
+39 - f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
 39 + f"'normal' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
-40 |
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -272,10 +243,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-38 | f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
-   - f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
+39 - f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
 39 + f"\'normal\' {f"'nested' {"other"} 'single quotes'"} normal"  # Q004
-40 |
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -290,10 +259,8 @@ Q004 [*] Unnecessary escape on inner quote character
    |
 help: Remove backslash
    |
-42 | this_is_fine = "This is an \\'escaped\\' quote"
-   - this_should_raise_Q004 = "This is an \\\'escaped\\\' quote with an extra backslash"  # Q004
+43 - this_should_raise_Q004 = "This is an \\\'escaped\\\' quote with an extra backslash"  # Q004
 43 + this_should_raise_Q004 = "This is an \\'escaped\\' quote with an extra backslash"  # Q004
-44 |
    |
 
 Q004 [*] Unnecessary escape on inner quote character
@@ -304,7 +271,6 @@ Q004 [*] Unnecessary escape on inner quote character
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Remove backslash
    |
-45 | # Invalid escapes in bytestrings are also triggered:
-   - x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce\'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004
+46 - x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce\'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004
 46 + x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004
    |

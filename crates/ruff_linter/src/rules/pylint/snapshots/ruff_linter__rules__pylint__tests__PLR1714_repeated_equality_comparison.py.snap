@@ -12,10 +12,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
   |
 help: Merge multiple comparisons
   |
-1 | # Errors.
-  - foo == "a" or foo == "b"
+2 - foo == "a" or foo == "b"
 2 + foo in {"a", "b"}
-3 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -31,10 +29,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b"}`.
   |
 help: Merge multiple comparisons
   |
-3 |
-  - foo != "a" and foo != "b"
+4 - foo != "a" and foo != "b"
 4 + foo not in {"a", "b"}
-5 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,10 +46,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
   |
 help: Merge multiple comparisons
   |
-5 |
-  - foo == "a" or foo == "b" or foo == "c"
+6 - foo == "a" or foo == "b" or foo == "c"
 6 + foo in {"a", "b", "c"}
-7 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -69,10 +63,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
    |
 help: Merge multiple comparisons
   |
-7 |
-  - foo != "a" and foo != "b" and foo != "c"
+8 - foo != "a" and foo != "b" and foo != "c"
 8 + foo not in {"a", "b", "c"}
-9 |
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -88,10 +80,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in (a, "b", 3)`. Use a `
    |
 help: Merge multiple comparisons
    |
-9  |
-   - foo == a or foo == "b" or foo == 3  # Mixed types.
+10 - foo == a or foo == "b" or foo == 3  # Mixed types.
 10 + foo in (a, "b", 3)  # Mixed types.
-11 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -107,10 +97,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
    |
 help: Merge multiple comparisons
    |
-11 |
-   - "a" == foo or "b" == foo or "c" == foo
+12 - "a" == foo or "b" == foo or "c" == foo
 12 + foo in {"a", "b", "c"}
-13 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -126,10 +114,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
    |
 help: Merge multiple comparisons
    |
-13 |
-   - "a" != foo and "b" != foo and "c" != foo
+14 - "a" != foo and "b" != foo and "c" != foo
 14 + foo not in {"a", "b", "c"}
-15 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -145,10 +131,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
    |
 help: Merge multiple comparisons
    |
-15 |
-   - "a" == foo or foo == "b" or "c" == foo
+16 - "a" == foo or foo == "b" or "c" == foo
 16 + foo in {"a", "b", "c"}
-17 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -164,10 +148,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in (bar, baz, qux)`. Use
    |
 help: Merge multiple comparisons
    |
-17 |
-   - foo == bar or baz == foo or qux == foo
+18 - foo == bar or baz == foo or qux == foo
 18 + foo in (bar, baz, qux)
-19 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -183,10 +165,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
    |
 help: Merge multiple comparisons
    |
-19 |
-   - foo == "a" or "b" == foo or foo == "c"
+20 - foo == "a" or "b" == foo or foo == "c"
 20 + foo in {"a", "b", "c"}
-21 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -202,10 +182,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
    |
 help: Merge multiple comparisons
    |
-21 |
-   - foo != "a" and "b" != foo and foo != "c"
+22 - foo != "a" and "b" != foo and foo != "c"
 22 + foo not in {"a", "b", "c"}
-23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -221,10 +199,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
    |
 help: Merge multiple comparisons
    |
-23 |
-   - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
+24 - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 24 + foo in {"a", "b"} or "c" == bar or "d" == bar  # Multiple targets
-25 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -240,10 +216,8 @@ PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
    |
 help: Merge multiple comparisons
    |
-23 |
-   - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
+24 - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 24 + foo == "a" or foo == "b" or bar in {"c", "d"}  # Multiple targets
-25 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -259,10 +233,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo.bar in {"a", "b"}`.
    |
 help: Merge multiple comparisons
    |
-25 |
-   - foo.bar == "a" or foo.bar == "b"  # Attributes.
+26 - foo.bar == "a" or foo.bar == "b"  # Attributes.
 26 + foo.bar in {"a", "b"}  # Attributes.
-27 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -278,10 +250,8 @@ PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
    |
 help: Merge multiple comparisons
    |
-60 |
-   - foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
+61 - foo == "a" or ("c" == bar or "d" == bar) or foo == "b"  # Multiple targets
 61 + foo == "a" or (bar in {"c", "d"}) or foo == "b"  # Multiple targets
-62 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -297,10 +267,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
    |
 help: Merge multiple comparisons
    |
-62 |
-   - foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+63 - foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
 63 + foo in {"a", "b"} or "c" != bar and "d" != bar  # Multiple targets
-64 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -316,10 +284,8 @@ PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
    |
 help: Merge multiple comparisons
    |
-62 |
-   - foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
+63 - foo == "a" or foo == "b" or "c" != bar and "d" != bar  # Multiple targets
 63 + foo == "a" or foo == "b" or bar not in {"c", "d"}  # Multiple targets
-64 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -335,10 +301,8 @@ PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
    |
 help: Merge multiple comparisons
    |
-64 |
-   - foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
+65 - foo == "a" or ("c" != bar and "d" != bar) or foo == "b"  # Multiple targets
 65 + foo == "a" or (bar not in {"c", "d"}) or foo == "b"  # Multiple targets
-66 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -354,10 +318,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {1, True}`.
    |
 help: Merge multiple comparisons
    |
-68 |
-   - foo == 1 or foo == True # Different types, same hashed value
+69 - foo == 1 or foo == True # Different types, same hashed value
 69 + foo in {1, True} # Different types, same hashed value
-70 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -373,10 +335,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {1, 1.0}`.
    |
 help: Merge multiple comparisons
    |
-70 |
-   - foo == 1 or foo == 1.0 # Different types, same hashed value
+71 - foo == 1 or foo == 1.0 # Different types, same hashed value
 71 + foo in {1, 1.0} # Different types, same hashed value
-72 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -392,10 +352,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {False, 0}`.
    |
 help: Merge multiple comparisons
    |
-72 |
-   - foo == False or foo == 0 # Different types, same hashed value
+73 - foo == False or foo == 0 # Different types, same hashed value
 73 + foo in {False, 0} # Different types, same hashed value
-74 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -411,10 +369,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {0.0, 0j}`.
    |
 help: Merge multiple comparisons
    |
-74 |
-   - foo == 0.0 or foo == 0j # Different types, same hashed value
+75 - foo == 0.0 or foo == 0j # Different types, same hashed value
 75 + foo in {0.0, 0j} # Different types, same hashed value
-76 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -427,8 +383,7 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {"bar", "bar", "buzz"
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Merge multiple comparisons
    |
-78 |
-   - foo == "bar" or foo == "bar" or foo == "buzz" # All but one members identical
+79 - foo == "bar" or foo == "bar" or foo == "buzz" # All but one members identical
 79 + foo in {"bar", "bar", "buzz"} # All but one members identical
    |
 note: This is an unsafe fix and may change runtime behavior

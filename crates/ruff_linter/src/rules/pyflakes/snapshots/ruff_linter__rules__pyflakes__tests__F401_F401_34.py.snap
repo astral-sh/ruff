@@ -13,9 +13,7 @@ F401 [*] `typing.Union` imported but unused
    |
 help: Remove unused import: `typing.Union`
    |
-44 | def f():
-   -     from typing import Union
-45 |
+45 -     from typing import Union
    |
 
 F401 [*] `typing.Union` imported but unused
@@ -29,7 +27,5 @@ F401 [*] `typing.Union` imported but unused
    |
 help: Remove unused import: `typing.Union`
    |
-57 | def f():
-   -     from typing import Union
-58 |
+58 -     from typing import Union
    |

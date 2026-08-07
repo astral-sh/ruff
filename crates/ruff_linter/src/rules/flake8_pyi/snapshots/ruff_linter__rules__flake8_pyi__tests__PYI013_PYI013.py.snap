@@ -10,9 +10,7 @@ PYI013 [*] Non-empty class body must not contain `...`
   |     ^^^
 help: Remove unnecessary `...`
   |
-2 |     value: int
-  -     ...
-3 |
+3 -     ...
   |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -25,9 +23,7 @@ PYI013 [*] Non-empty class body must not contain `...`
   |
 help: Remove unnecessary `...`
   |
-6 | class OneAttributeClass2:
-  -     ...
-7 |     value: int
+7 -     ...
   |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -40,9 +36,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-12 |     ...
-   -     ...
-13 |
+12 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -54,9 +48,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |     ^^^
 help: Remove unnecessary `...`
    |
-12 |     ...
-   -     ...
-13 |
+13 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -68,9 +60,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |     ^^^
 help: Remove unnecessary `...`
    |
-20 |
-   -     ...
-21 |
+21 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -82,9 +72,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |     ^^^
 help: Remove unnecessary `...`
    |
-25 |     value: int
-   -     ...
-26 |
+26 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -97,9 +85,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-29 | class NonEmptyChild2(Exception):
-   -     ...
-30 |     value: int
+30 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -114,9 +100,7 @@ PYI013 [*] Non-empty class body must not contain `...`
    |
 help: Remove unnecessary `...`
    |
-35 |     value: int
-   -     ...
-36 |
+36 -     ...
    |
 
 PYI013 [*] Non-empty class body must not contain `...`
@@ -128,8 +112,6 @@ PYI013 [*] Non-empty class body must not contain `...`
    |     ^^^
 help: Remove unnecessary `...`
    |
-43 |     value: int
-   -     ... # preserve me
+44 -     ... # preserve me
 44 +     # preserve me
-45 |
    |

@@ -14,11 +14,8 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 help: Organize imports
   |
-2 |     case 1:
 3 +         import os
-4 |         import sys
-  -         import os
-5 |     case 2:
+4 +         import sys
   |
 
 I001 [*] Import block is un-sorted or un-formatted
@@ -31,8 +28,6 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________________^
 help: Organize imports
   |
-5 |     case 2:
 6 +         import abc
-7 |         import collections
-  -         import abc
+7 +         import collections
   |

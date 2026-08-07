@@ -12,8 +12,5 @@ E265 [*] Block comment should start with `# `
   |
 help: Format space
   |
-2 | #
-  - #!
-3 + # !
-4 | #:
-  |
+3 | # !
+  |  +

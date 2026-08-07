@@ -20,7 +20,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -35,7 +34,6 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -50,6 +48,5 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 help: Add `from __future__ import annotations`
   |
 1 + from __future__ import annotations
-2 | import typing
   |
 note: This is an unsafe fix and may change runtime behavior

@@ -8,9 +8,7 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
   |               ^^^^^^
 help: Remove unused import: `.unused`
   |
-4 |
-  - from . import unused  # F401: recommend add to all w/o fix
-5 |
+5 - from . import unused  # F401: recommend add to all w/o fix
   |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -21,8 +19,6 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
   |                          ^^^^
 help: Remove unused import: `.renamed`
   |
-7 |
-  - from . import renamed as bees  # F401: recommend add to all w/o fix
-8 |
+8 - from . import renamed as bees  # F401: recommend add to all w/o fix
   |
 note: This is an unsafe fix and may change runtime behavior

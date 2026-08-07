@@ -12,7 +12,5 @@ F401 [*] `a` imported but unused
   |
 help: Remove unused import: `a`
   |
-2 | # refined logic only applied _within_ scope
-  - import a
-3 | def foo():
+3 - import a
   |
