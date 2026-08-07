@@ -206,19 +206,6 @@ pub(crate) enum TypeRelation {
     SubtypingAssuming,
 }
 
-/// Determines when comparisons involving type variables are evaluated.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) enum TypeVarEvaluation {
-    /// Check immediately whether the relation holds for all or any valid specializations,
-    /// depending on whether the type variable is inferable.
-    Eager,
-
-    /// Move comparisons involving a type variable into the constraint set for later evaluation.
-    ///
-    /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
-    Lazy,
-}
-
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
@@ -236,6 +223,26 @@ impl TypeRelation {
             }
         }
     }
+
+    pub(super) const fn description(self) -> &'static str {
+        match self {
+            TypeRelation::Assignability => "assignable to",
+            _ => "a subtype of",
+        }
+    }
+}
+
+/// Determines when comparisons involving type variables are evaluated.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub(crate) enum TypeVarEvaluation {
+    /// Check immediately whether the relation holds for all or any valid specializations,
+    /// depending on whether the type variable is inferable.
+    Eager,
+
+    /// Move comparisons involving a type variable into the constraint set for later evaluation.
+    ///
+    /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
+    Lazy,
 }
 
 #[salsa::tracked]
@@ -406,14 +413,45 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
+        self.relation_error_context(db, env, TypeRelation::Assignability, target)
+    }
+
+    /// Re-run the pure redundancy check with error context collection enabled.
+    ///
+    /// This should normally be called when `is_pure_redundant_with` has returned `false`
+    /// and we are now about to emit a diagnostic where additional context could be
+    /// useful.
+    ///
+    /// This is a separate method so that we can skip this expensive check when diagnostics
+    /// are suppressed.
+    pub(crate) fn pure_redundancy_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        self.relation_error_context(db, env, TypeRelation::Redundancy { pure: true }, target)
+    }
+
+    /// Re-run the relation check with error context collection enabled.
+    ///
+    /// This is a separate method so that we can skip this expensive check when diagnostics
+    /// are suppressed.
+    pub(crate) fn relation_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        relation: TypeRelation,
+        target: Type<'db>,
+    ) -> ErrorContextTree<'db> {
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
             env,
             constraints: &builder,
             inferable: TypeVarSet::None,
-            relation: TypeRelation::Assignability,
+            relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: Some(ErrorContextTree::new()),
+            context_tree: Some(ErrorContextTree::new(relation)),
             given: ConstraintSet::from_bool(&builder, false),
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
@@ -615,7 +653,34 @@ impl<'db> Type<'db> {
         is_redundant_with_impl(db, TypePair::new(db, program, self, other))
     }
 
-    fn has_relation_to<'c>(
+    /// Return `true` if `self` is redundant with `other` under the pure redundancy relation.
+    ///
+    /// Unlike [`Self::is_redundant_with`], this does not apply shortcuts intended for simplifying
+    /// unions.
+    pub(super) fn is_pure_redundant_with(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        if self == other {
+            return true;
+        }
+
+        let program = env.program(db);
+        let env = ProgramEnvironment::from_program(program);
+        self.has_relation_to(
+            db,
+            &env,
+            other,
+            &ConstraintSetBuilder::new(),
+            TypeVarSet::None,
+            TypeRelation::Redundancy { pure: true },
+        )
+        .is_always_satisfied(db, &env)
+    }
+
+    pub(super) fn has_relation_to<'c>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -964,7 +1029,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
-            context_tree: Some(ErrorContextTree::new()),
+            context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -988,7 +1053,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: Some(ErrorContextTree::new()),
+            context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -1033,7 +1098,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     /// Return the collected error context, or an empty tree if collection was disabled.
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
-        self.context_tree.unwrap_or_else(ErrorContextTree::new)
+        self.context_tree
+            .unwrap_or_else(|| ErrorContextTree::new(self.relation))
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
@@ -1818,12 +1884,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 {
                     let elements_without_context = elements.len() - elements_context.len();
                     if elements_without_context > 0 && elements_without_context < elements.len() {
-                        elements_context.push(
+                        elements_context.push(ErrorContextTree::from_context(
                             ErrorContext::NotAssignableToNOtherUnionElements {
                                 n: elements_without_context,
-                            }
-                            .into(),
-                        );
+                            },
+                            self.relation,
+                        ));
                     }
                     self.set_context(
                         ErrorContext::NotAssignableToAnyUnionElement {

@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::relation::TypeRelation;
 /// This module defines a tree structure for collecting contextual information about type relation errors
 /// ("why is this complex type not assignable to that other complex type?").
 use std::cell::{Cell, RefCell};
@@ -175,6 +176,7 @@ impl<'db> ErrorContext<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        relation: TypeRelation,
         help_messages: &mut FxOrderSet<HelpMessages>,
     ) -> Option<String> {
         let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
@@ -199,9 +201,10 @@ impl<'db> ErrorContext<'db> {
                     [*element, *union, *target],
                 );
                 format!(
-                    "element `{}` of union `{}` is not assignable to `{}`",
+                    "element `{}` of union `{}` is not {} `{}`",
                     element.display_with(db, env, settings.clone()),
                     union.display_with(db, env, settings.expand_numeric_tower_unions()),
+                    relation.description(),
                     target.display_with(db, env, settings),
                 )
             }
@@ -209,8 +212,9 @@ impl<'db> ErrorContext<'db> {
                 let settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, [*source, *union]);
                 format!(
-                    "type `{}` is not assignable to any element of the union `{}`",
+                    "type `{}` is not {} any element of the union `{}`",
                     source.display_with(db, env, settings.clone()),
+                    relation.description(),
                     union.display_with(db, env, settings.expand_numeric_tower_unions()),
                 )
             }
@@ -223,8 +227,9 @@ impl<'db> ErrorContext<'db> {
                 element,
                 intersection,
             } => format!(
-                "type `{}` is not assignable to element `{}` of intersection `{}`",
+                "type `{}` is not {} element `{}` of intersection `{}`",
                 source.display(db, env),
+                relation.description(),
                 element.display(db, env),
                 intersection.display(db, env),
             ),
@@ -232,8 +237,9 @@ impl<'db> ErrorContext<'db> {
                 intersection,
                 target,
             } => format!(
-                "no element of intersection `{}` is assignable to `{}`",
+                "no element of intersection `{}` is {} `{}`",
                 intersection.display(db, env),
+                relation.description(),
                 target.display(db, env),
             ),
             Self::TypedDictFieldMissing { field_name, source } => {
@@ -283,39 +289,44 @@ impl<'db> ErrorContext<'db> {
                 source_field,
                 target_field,
             } => format!(
-                "field \"{field_name}\" on {source} has type `{source_field}` which is not assignable to type `{target_field}` expected by {target}",
+                "field \"{field_name}\" on {source} has type `{source_field}` which is not {relation} type `{target_field}` expected by {target}",
                 source = typed_dict_name(source),
                 target = typed_dict_name(target),
+                relation = relation.description(),
                 source_field = source_field.display(db, env),
                 target_field = target_field.display(db, env),
             ),
             Self::TypedDictNotAssignableToDict(typed_dict) => {
-                help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);
+                help_messages.insert(HelpMessages::TypedDictNotAssignableToDict(relation));
                 help_messages.insert(HelpMessages::ConsiderUsingMappingInsteadOfDict);
 
                 format!(
-                    "{source} is not assignable to `dict`",
-                    source = typed_dict_name(typed_dict)
+                    "{source} is not {relation} `dict`",
+                    source = typed_dict_name(typed_dict),
+                    relation = relation.description()
                 )
             }
             Self::OpenTypedDictNotAssignableToMapping { source, target } => {
                 let name = source.defining_class().map(|class| class.name(db));
                 help_messages.insert(HelpMessages::OpenTypedDictNotAssignableToMapping {
                     typed_dict_name: name.cloned(),
+                    relation,
                 });
                 help_messages.insert(HelpMessages::ExplainOpenTypedDictUnsoundness {
                     typed_dict_name: name.cloned(),
                 });
 
                 format!(
-                    "{source} is not assignable to `{target}`",
+                    "{source} is not {relation} `{target}`",
                     source = typed_dict_name(source),
+                    relation = relation.description(),
                     target = target.display(db, env)
                 )
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
-                "incompatible return types: `{source}` is not assignable to `{target}`",
+                "incompatible return types: `{source}` is not {relation} `{target}`",
                 source = source.display(db, env),
+                relation = relation.description(),
                 target = target.display(db, env),
             ),
             Self::IncompatibleParameterTypes {
@@ -325,8 +336,9 @@ impl<'db> ErrorContext<'db> {
             } => {
                 // reversed order due to contravariance of parameter types
                 format!(
-                    "{parameter} has an incompatible type: `{target}` is not assignable to `{source}`",
+                    "{parameter} has an incompatible type: `{target}` is not {relation} `{source}`",
                     source = source.display(db, env),
+                    relation = relation.description(),
                     target = target.display(db, env),
                 )
             }
@@ -391,7 +403,8 @@ impl<'db> ErrorContext<'db> {
                 source_len,
                 target_len,
             } => format!(
-                "a tuple of length {source_len} is not assignable to a tuple of length {}",
+                "a tuple of length {source_len} is not {} a tuple of length {}",
+                relation.description(),
                 target_len.display_minimum(),
             ),
             Self::TupleElementNotCompatible {
@@ -408,22 +421,25 @@ impl<'db> ErrorContext<'db> {
                     (n, c) => format!("tuple element {n} of {c}"),
                 };
                 format!(
-                    "{which} is not compatible: `{source}` is not assignable to `{target}`",
+                    "{which} is not compatible: `{source}` is not {relation} `{target}`",
                     source = source.display(db, env),
+                    relation = relation.description(),
                     target = target.display(db, env)
                 )
             }
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
                 if let Type::ProtocolInstance(_) = ty {
                     format!(
-                        "protocol `{}` is not assignable to protocol `{}`",
+                        "protocol `{}` is not {} protocol `{}`",
                         ty.display(db, env),
+                        relation.description(),
                         protocol.display(db, env),
                     )
                 } else {
                     format!(
-                        "type `{}` is not assignable to protocol `{}`",
+                        "type `{}` is not {} protocol `{}`",
                         ty.display(db, env),
+                        relation.description(),
                         protocol.display(db, env),
                     )
                 }
@@ -444,8 +460,9 @@ impl<'db> ErrorContext<'db> {
                 format!("protocol member `{member_name}` is incompatible")
             }
             Self::ProtocolMemberReadTypeIncompatible { source, target } => format!(
-                "read type `{source}` is not assignable to `{target}`",
+                "read type `{source}` is not {relation} `{target}`",
                 source = source.display(db, env),
+                relation = relation.description(),
                 target = target.display(db, env),
             ),
             Self::ProtocolMemberNotWritable => "the member is not writable".to_string(),
@@ -460,12 +477,19 @@ impl<'db> ErrorContext<'db> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum HelpMessages {
     RequiredFieldCouldBeRemoved,
-    TypedDictNotAssignableToDict,
+    TypedDictNotAssignableToDict(TypeRelation),
     ConsiderUsingMappingInsteadOfDict,
     TopCallableExplanation,
-    ConsiderAddingADefaultValue { parameter_name: Option<Name> },
-    OpenTypedDictNotAssignableToMapping { typed_dict_name: Option<Name> },
-    ExplainOpenTypedDictUnsoundness { typed_dict_name: Option<Name> },
+    ConsiderAddingADefaultValue {
+        parameter_name: Option<Name>,
+    },
+    OpenTypedDictNotAssignableToMapping {
+        typed_dict_name: Option<Name>,
+        relation: TypeRelation,
+    },
+    ExplainOpenTypedDictUnsoundness {
+        typed_dict_name: Option<Name>,
+    },
 }
 
 impl std::fmt::Display for HelpMessages {
@@ -474,18 +498,24 @@ impl std::fmt::Display for HelpMessages {
             HelpMessages::RequiredFieldCouldBeRemoved => {
                 f.write_str("The required field could be removed through a destructive operation like `del` on the target.")
             }
-            HelpMessages::TypedDictNotAssignableToDict => {
-                f.write_str("A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.")
+            HelpMessages::TypedDictNotAssignableToDict(relation) => {
+                write!(
+                    f,
+                    "A TypedDict is not usually {} any `dict[..]` type; \
+                    `dict` types allow destructive operations like `clear()`.",
+                    relation.description()
+                )
             }
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
                 f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
             }
-            HelpMessages::OpenTypedDictNotAssignableToMapping {typed_dict_name} => {
+            HelpMessages::OpenTypedDictNotAssignableToMapping {typed_dict_name, relation} => {
                 let name = typed_dict_name.as_ref().map(|name|format!("`{name}`")).unwrap_or_else(||"this TypedDict".to_string());
                 write!(
                     f,
-                    "{name} would be assignable to this `Mapping` type \
-                    if it were declared with `closed=True`, but TypedDicts are open by default."
+                    "{name} would be {relation} this `Mapping` type \
+                    if it were declared with `closed=True`, but TypedDicts are open by default.",
+                    relation = relation.description()
                 )
             }
             HelpMessages::ExplainOpenTypedDictUnsoundness {typed_dict_name} => {
@@ -529,16 +559,18 @@ impl<'db> ErrorContextNode<'db> {
         matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn render_tree(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        relation: TypeRelation,
         output_lines: &mut Vec<String>,
         help_messages: &mut FxOrderSet<HelpMessages>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(line) = self.context.render(db, env, help_messages) {
+        if let Some(line) = self.context.render(db, env, relation, help_messages) {
             output_lines.push(format!("{prefix}{line}"));
         }
 
@@ -553,6 +585,7 @@ impl<'db> ErrorContextNode<'db> {
             child.render_tree(
                 db,
                 env,
+                relation,
                 output_lines,
                 help_messages,
                 &child_prefix,
@@ -566,34 +599,35 @@ impl<'db> ErrorContextNode<'db> {
 pub(crate) struct ErrorContextTree<'db> {
     root: Rc<RefCell<ErrorContextNode<'db>>>,
     enabled: Cell<bool>,
+    relation: TypeRelation,
 }
 
 impl PartialEq for ErrorContextTree<'_> {
     fn eq(&self, other: &Self) -> bool {
-        *self.root.borrow() == *other.root.borrow()
+        *self.root.borrow() == *other.root.borrow() && self.relation == other.relation
     }
 }
 
 impl Eq for ErrorContextTree<'_> {}
 
-impl<'db> From<ErrorContext<'db>> for ErrorContextTree<'db> {
-    fn from(context: ErrorContext<'db>) -> Self {
+impl<'db> ErrorContextTree<'db> {
+    /// Create a new, empty error context tree with collection enabled.
+    pub(crate) fn new(relation: TypeRelation) -> Self {
+        Self {
+            root: Rc::default(),
+            enabled: Cell::new(true),
+            relation,
+        }
+    }
+
+    pub(crate) fn from_context(context: ErrorContext<'db>, relation: TypeRelation) -> Self {
         Self {
             root: Rc::new(RefCell::new(ErrorContextNode {
                 context,
                 children: Vec::new(),
             })),
             enabled: Cell::new(true),
-        }
-    }
-}
-
-impl<'db> ErrorContextTree<'db> {
-    /// Create a new, empty error context tree with collection enabled.
-    pub(crate) fn new() -> Self {
-        Self {
-            root: Rc::default(),
-            enabled: Cell::new(true),
+            relation,
         }
     }
 
@@ -644,6 +678,7 @@ impl<'db> ErrorContextTree<'db> {
         ErrorContextTree {
             root: Rc::new(RefCell::new(std::mem::take(&mut *self.root.borrow_mut()))),
             enabled: Cell::new(self.enabled.get()),
+            relation: self.relation,
         }
     }
 
@@ -656,9 +691,15 @@ impl<'db> ErrorContextTree<'db> {
     ) {
         let mut output_lines = Vec::new();
         let mut help_messages = FxOrderSet::default();
-        self.root
-            .borrow()
-            .render_tree(db, env, &mut output_lines, &mut help_messages, "", "");
+        self.root.borrow().render_tree(
+            db,
+            env,
+            self.relation,
+            &mut output_lines,
+            &mut help_messages,
+            "",
+            "",
+        );
         for line in output_lines {
             diag.info(line);
         }
