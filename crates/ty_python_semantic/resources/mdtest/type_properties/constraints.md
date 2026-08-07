@@ -778,6 +778,15 @@ def f[S, T, U]():
     ...
 ```
 
+A shared concrete bound still establishes a relationship between type variables when that
+relationship is explicitly queried.
+
+```py
+def concrete_pivot[T, U]() -> None:
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(int, U, object)
+    static_assert(constraints.implies_subtype_of(T, U))
+```
+
 ## Other simplifications
 
 ### Ordering of intersection and union elements

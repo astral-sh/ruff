@@ -7424,6 +7424,8 @@ impl PathFold for IsNeverSatisfiedVisitor {
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
+    /// Sequent indices grouped by antecedent, so a new assignment only revisits affected rules.
+    sequents_by_antecedent: FxHashMap<ConstraintId, Vec<usize>>,
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
@@ -7512,6 +7514,7 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            sequents_by_antecedent: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
@@ -7814,7 +7817,11 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
-        self.sequents.extend_from_slice(&single_map.sequents);
+        Self::extend_sequents(
+            &mut self.sequents,
+            &mut self.sequents_by_antecedent,
+            &single_map.sequents,
+        );
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
@@ -7836,7 +7843,40 @@ impl PathAssignments {
             }
 
             let pair_map = SequentMap::for_constraint_pair(db, env, storage, a, b);
-            self.sequents.extend_from_slice(&pair_map.sequents);
+            Self::extend_sequents(
+                &mut self.sequents,
+                &mut self.sequents_by_antecedent,
+                &pair_map.sequents,
+            );
+        }
+    }
+
+    /// Index every antecedent when a cached sequent map is attached to this path.
+    ///
+    /// A sequent can start applying only when one of its antecedents is assigned. Indexing both
+    /// sides of pair rules preserves the complete transitive closure without rescanning unrelated
+    /// rules after every original or derived assignment.
+    fn extend_sequents(
+        sequents: &mut Vec<Sequent>,
+        sequents_by_antecedent: &mut FxHashMap<ConstraintId, Vec<usize>>,
+        additional: &[Sequent],
+    ) {
+        for &sequent in additional {
+            let index = sequents.len();
+            sequents.push(sequent);
+
+            match sequent {
+                Sequent::SingleTautology { ante } | Sequent::SingleImplication { ante, .. } => {
+                    sequents_by_antecedent.entry(ante).or_default().push(index);
+                }
+                Sequent::PairImpossibility { ante1, ante2 }
+                | Sequent::PairImplication { ante1, ante2, .. } => {
+                    sequents_by_antecedent.entry(ante1).or_default().push(index);
+                    if ante1 != ante2 {
+                        sequents_by_antecedent.entry(ante2).or_default().push(index);
+                    }
+                }
+            }
         }
     }
 
@@ -7950,17 +7990,18 @@ impl PathAssignments {
             }
         }
 
-        // Then use our sequents to add additional facts that we know to be true.
-        //
-        // TODO: This is very naive at the moment, partly for expediency, and partly because we
-        // don't anticipate the sequent maps to be very large. We might consider avoiding the
-        // brute-force search.
-
+        // Then use the sequents affected by this assignment to derive any additional facts.
         self.new_assignments.clear();
         self.discover_constraint(db, env, storage, assignment.constraint());
 
-        for i in 0..self.sequents.len() {
-            let sequent = self.sequents[i];
+        let affected_count = self
+            .sequents_by_antecedent
+            .get(&assignment.constraint())
+            .map_or(0, Vec::len);
+        for affected_index in 0..affected_count {
+            let sequent_index =
+                self.sequents_by_antecedent[&assignment.constraint()][affected_index];
+            let sequent = self.sequents[sequent_index];
             self.check_sequent(db, env, storage, sequent)?;
         }
 

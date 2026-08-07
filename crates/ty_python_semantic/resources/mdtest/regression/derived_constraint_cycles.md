@@ -200,4 +200,18 @@ def value_or_choice[T](value: T) -> Choice | T:
 consume(value_or_choice([]))
 ```
 
+## Independent bounds in an overloaded constructor
+
+An overloaded constructor can constrain many element type variables independently while its receiver
+carries a separate generic relationship. Derived relationships between the element type variables
+must not cause the solver to repeatedly recheck their shared concrete bound.
+
+```py
+from collections.abc import Iterable, Iterator, Sequence
+from itertools import product
+
+def cartesian(values: Sequence[Iterable[int]]) -> Iterator[tuple[int, ...]]:
+    return product(*values)
+```
+
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660
