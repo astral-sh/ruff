@@ -404,6 +404,9 @@ pub enum KnownModule {
     PydanticSettingsMain,
     #[strum(serialize = "pydantic.types")]
     PydanticTypes,
+    Pytest,
+    #[strum(serialize = "_pytest.fixtures")]
+    PytestFixtures,
 }
 
 impl KnownModule {
@@ -448,6 +451,8 @@ impl KnownModule {
             Self::PydanticRootModel => "pydantic.root_model",
             Self::PydanticSettingsMain => "pydantic_settings.main",
             Self::PydanticTypes => "pydantic.types",
+            Self::Pytest => "pytest",
+            Self::PytestFixtures => "_pytest.fixtures",
         }
     }
 
@@ -477,7 +482,9 @@ impl KnownModule {
             | Self::PydanticMain
             | Self::PydanticRootModel
             | Self::PydanticSettingsMain
-            | Self::PydanticTypes => true,
+            | Self::PydanticTypes
+            | Self::Pytest
+            | Self::PytestFixtures => true,
             Self::Builtins
             | Self::Enum
             | Self::Types
