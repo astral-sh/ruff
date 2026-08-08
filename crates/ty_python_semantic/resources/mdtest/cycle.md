@@ -385,6 +385,70 @@ class Cached:
 reveal_type(Cached().metadata)  # revealed: int
 ```
 
+## Guarded instance attributes when the subclass is checked first
+
+Checking the subclass first preserves both diagnostics in the guarded initializer.
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+```
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__  # error: [invalid-assignment]
+            self.missing  # error: [unresolved-attribute]
+```
+
+## Guarded instance attributes when the base is checked first
+
+Checking the base first produces the same diagnostics as checking the subclass first.
+
+`base.py`:
+
+```py
+class Base:
+    def __init__(self):
+        if not hasattr(self, "x"):
+            self.x = self.__str__  # error: [invalid-assignment]
+            self.missing  # error: [unresolved-attribute]
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    x = Base.__str__
+```
+
+## Existing class attributes keep guarded initializers unreachable
+
+A defined attribute remains present on both its declaring class and its subclasses.
+
+```py
+class Base:
+    x = 1
+
+    def initialize(self):
+        if not hasattr(self, "x"):
+            self.x = self.missing
+
+class Child(Base):
+    def initialize(self):
+        if not hasattr(self, "x"):
+            self.x = self.missing
+```
+
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
 
 This example was minimized from
