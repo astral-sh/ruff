@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{Expr, ExprList, ExprName, ExprTuple, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::{Binding, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
@@ -185,6 +186,13 @@ fn for_loop_writes(
         return;
     }
 
+    // The fix converts the loop body into a generator expression, which forbids a walrus
+    // operator from rebinding a comprehension iteration variable (PEP 572). Skip the
+    // diagnostic entirely when `write_arg` contains such a named expression.
+    if write_arg_rebinds_loop_var(write_arg, binding_names) {
+        return;
+    }
+
     let locator = checker.locator();
     let content = match (for_stmt.target.as_ref(), write_arg) {
         (Expr::Name(for_target), Expr::Name(write_arg)) if for_target.id == write_arg.id => {
@@ -223,6 +231,28 @@ fn for_loop_writes(
             for_stmt.range,
         )
         .set_fix(fix);
+}
+
+/// Return `true` if `write_arg` contains a named (walrus) expression whose target
+/// rebinds one of the loop iteration variables.
+///
+/// Converting `for line in src: dst.write(line := ...)` to a generator expression
+/// `dst.writelines(line := ... for line in src)` is a `SyntaxError` (PEP 572 forbids
+/// an assignment expression from rebinding a comprehension iteration variable).
+fn write_arg_rebinds_loop_var(write_arg: &Expr, binding_names: &[&ExprName]) -> bool {
+    if binding_names.is_empty() {
+        return false;
+    }
+    any_over_expr(write_arg, |expr| {
+        if let Expr::Named(named) = expr {
+            if let Expr::Name(target) = named.target.as_ref() {
+                return binding_names
+                    .iter()
+                    .any(|loop_var| loop_var.id == target.id);
+            }
+        }
+        false
+    })
 }
 
 fn loop_variables_are_used_outside_loop(
