@@ -1397,6 +1397,31 @@ impl<'db> DefinitionInference<'db> {
                         DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
                 }
             }
+        } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let module = parsed_module(db, python_file).load(db);
+            let index = semantic_index(db, program_file);
+
+            if assignment.value(&module).is_none()
+                && index
+                    .use_def_map(definition.file_scope(db))
+                    .bindings_at_definition(definition)
+                    .any(|binding| {
+                        binding
+                            .binding
+                            .is_defined_and(|binding| binding.kind(db).is_loop_header())
+                    })
+            {
+                // Loop-carried assignments need this annotation as context before validating
+                // the declaration can infer their binding types.
+                let annotation = assignment.annotation(&module);
+                let expression = index.expression(annotation);
+                let declared_type =
+                    infer_same_file_expression_type(db, expression, TypeContext::default());
+
+                types = DefinitionTypes::Declaration(TypeAndQualifiers::declared(declared_type));
+            }
         }
 
         Self {
