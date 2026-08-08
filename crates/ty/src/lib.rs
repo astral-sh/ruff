@@ -5,6 +5,7 @@ mod python_version;
 mod rule;
 mod version;
 
+use std::collections::HashMap;
 use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
@@ -614,6 +615,8 @@ fn exit_status_from_diagnostics(
 struct IndicatifReporter {
     collector: CollectReporter,
 
+    progress: indicatif::MultiProgress,
+
     /// A reporter that is ready, containing a progress bar to report to.
     ///
     /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
@@ -621,13 +624,21 @@ struct IndicatifReporter {
     /// process and we don't want to display an empty "0/0" bar.
     bar: indicatif::ProgressBar,
 
+    script_bars: Mutex<HashMap<SystemPathBuf, indicatif::ProgressBar>>,
+
     printer: Printer,
 }
 
 impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
+        let progress =
+            indicatif::MultiProgress::with_draw_target(indicatif::ProgressDrawTarget::hidden());
+        let bar = progress.add(indicatif::ProgressBar::hidden());
+
         Self {
-            bar: indicatif::ProgressBar::hidden(),
+            progress,
+            bar,
+            script_bars: Mutex::default(),
             collector: CollectReporter::default(),
             printer,
         }
@@ -647,7 +658,35 @@ impl ty_project::ProgressReporter for IndicatifReporter {
             .unwrap()
             .progress_chars("--"),
         );
-        self.bar.set_draw_target(self.printer.progress_target());
+        self.progress
+            .set_draw_target(self.printer.progress_target());
+        self.bar.tick();
+    }
+
+    fn report_script_initialization_started(&self, path: &SystemPath) {
+        if self.progress.is_hidden() {
+            return;
+        }
+
+        let bar = self
+            .progress
+            .insert_before(&self.bar, indicatif::ProgressBar::hidden());
+        bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
+        bar.set_message(format!("   {} {path}", "Syncing".bold().cyan()));
+
+        self.script_bars
+            .lock()
+            .unwrap()
+            .insert(path.to_path_buf(), bar);
+    }
+
+    fn report_script_initialization_finished(&self, path: &SystemPath) {
+        let Some(bar) = self.script_bars.lock().unwrap().remove(path) else {
+            return;
+        };
+
+        bar.finish_and_clear();
+        self.progress.remove(&bar);
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {

@@ -333,6 +333,37 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Script-only uv integration must not invoke uv to discover the enclosing workspace.
+#[test]
+fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 'unselected-workspace-root'")?;
+    case.write_file(
+        "packages/member/member.py",
+        "import shared\nvalue: int = 'selected-member'",
+    )?;
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env("TY_UV", "scripts")
+        .env("UV", "missing-uv-executable")
+        .env("TY_OUTPUT_FORMAT", "concise");
+
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:1:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:2:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Failures to invoke uv are visible by default instead of silently disabling integration.
 #[test]
 fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
@@ -414,7 +445,7 @@ fn reports_uv_workspace_python_version_source() -> anyhow::Result<()> {
         assert!(!output.status.success());
         assert!(!stdout.contains("specified on the command line"));
         if output_format == "full" {
-            assert!(stdout.contains("provided by uv workspace metadata"));
+            assert!(stdout.contains("provided by uv metadata"));
         }
     }
 
