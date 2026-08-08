@@ -130,25 +130,27 @@ fn receiver_kind(
     );
 
     match function_kind {
-        FunctionType::ClassMethod => {
-            if is_class_method(
-                name,
-                decorator_list,
-                parent_scope,
-                semantic,
-                &checker.settings().pep8_naming.classmethod_decorators,
-            ) {
+        // Trust the classification unconditionally for an implicit classmethod (e.g.
+        // `__init_subclass__`), but only for an explicitly decorated one if it has exactly one
+        // decorator, and that decorator is the one that makes it a classmethod. Otherwise, an
+        // unrelated decorator (`@some_decorator`) or a stacked one alongside `@classmethod` could
+        // change how the receiver is bound, so we bail out rather than risk a false positive.
+        FunctionType::ClassMethod => match decorator_list {
+            [] => Some(ReceiverKind::Class),
+            [decorator]
+                if is_class_method(
+                    decorator,
+                    semantic,
+                    &checker.settings().pep8_naming.classmethod_decorators,
+                ) =>
+            {
                 Some(ReceiverKind::Class)
-            } else {
-                None
             }
-        }
+            _ => None,
+        },
         FunctionType::NewMethod if decorator_list.is_empty() => Some(ReceiverKind::Class),
         FunctionType::Method if decorator_list.is_empty() => Some(ReceiverKind::Instance),
-        FunctionType::StaticMethod => None,
-        FunctionType::ClassMethod => None,
-        FunctionType::NewMethod => None,
-        FunctionType::Method => None,
         FunctionType::Function => None,
+        _ => None,
     }
 }
