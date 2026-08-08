@@ -339,8 +339,11 @@ first determine what the new provenance-aware lower/upper bounds already make po
 fully static bounds are supported. In the static-sequent phase, concrete endpoint containment,
 overlap, contradiction, and pivot proofs must require structurally static endpoints and use
 constraint-set subtyping rather than assignability. Solver TypeVars are opaque symbolic atoms for
-this eligibility check. Use an owned Salsa-tracked relation where cycle recovery is required, and
-validate and skip derived candidates that settle as unsatisfiable after a coinductive cycle.
+this eligibility check. Where recursive cycle handling is required, reuse the existing Salsa-tracked
+owned assignability relation: structural eligibility makes it equivalent to subtyping for concrete
+endpoints while still allowing symbolic TypeVars to carry an existing gradual witness. Preserve the
+single-range constructor invariant that its derived relation is satisfiable rather than treating a
+settled-unsatisfiable range as an expected candidate to skip.
 
 Structurally universal TypeVar rules may still carry an existing gradual witness through a
 relationship. Keep the existing dedicated same-TypeVar, different-TypeVar, and nested-TypeVar
@@ -432,7 +435,7 @@ expanding `Solutions`:
 - [x] Phase 4: preserve evidence-derived variance and add complete-path pruning.
 - [x] Static-sequent integration phase: restrict concrete sequents and characterize temporary
     regressions in a non-mergeable intermediate revision. Change `kqntvqkmuuqp`, commit
-    `f5d21fd5194b720803865f6160fbbb430b0c4eb2`.
+    `148c3d7cf8cbcce6bdab30fb5b77bd6926b8c42d`.
 - [ ] Phase 5: activate the domain-conjoined TDD, simplify default solving, and restore every
     temporary static-phase regression.
 
@@ -555,12 +558,14 @@ This revision is an implementation checkpoint, not a landable tip.
     sequent closure. Define structural sequent eligibility locally in `constraints.rs`, treating
     solver TypeVars as opaque and rejecting actual dynamic concrete components.
 1. Apply the gate per participating endpoint to concrete implication, overlap/intersection, pair
-    impossibility, contradiction, and pivot proofs. Use constraint-set subtyping for eligible
-    concrete proofs and an owned Salsa-tracked query for recursive cycle handling.
+    impossibility, contradiction, and pivot proofs. Use constraint-set subtyping for ordinary
+    eligible concrete proofs. Where recursive cycle handling is required, reuse the existing
+    Salsa-tracked owned assignability query; structural eligibility makes it equivalent to
+    subtyping for concrete endpoints without starting an inconsistent second coinductive query.
 1. Audit symbolic and derived sequent constructors. Preserve structurally universal propagation of
     an existing gradual witness, but prevent gradual concrete pivots or unrelated TDD branches from
-    manufacturing evidence. Validate provisionally discovered coinductive candidates and skip
-    those that settle as unsatisfiable.
+    manufacturing evidence. Preserve the single-range constructor invariant that its derived
+    relation is satisfiable rather than silently accepting or skipping an invalid range.
 1. Keep support-derived validity domains and behavior-changing pruning consumers inactive. Do not
     compensate in TDD abstraction or solution combination.
 1. Run focused generic-function, constraint-algebra, and ordering tests. For each changed behavior,
