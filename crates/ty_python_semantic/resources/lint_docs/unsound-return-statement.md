@@ -110,6 +110,10 @@ This rule is disabled by default. It is intended for advanced users wanting addi
 checks from their type checker, not for users who have just started to use type checkers on their
 Python code.
 
+## See also
+
+- `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound `return` statements
+
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/
 [ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/
 [ann204]: https://docs.astral.sh/ruff/rules/missing-return-type-special-method/
