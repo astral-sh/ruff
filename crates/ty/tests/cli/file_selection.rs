@@ -90,6 +90,27 @@ fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Resu
     Ok(())
 }
 
+#[test]
+fn exclude_scripts_ignores_scripts_with_invalid_toml() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 1"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python =
+            # ///
+            value: int = "script"
+            "#,
+        ),
+    ])?;
+
+    let output = case.command().arg("--exclude-scripts").output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    Ok(())
+}
+
 /// Test exclude CLI argument functionality
 #[test]
 fn exclude_argument() -> anyhow::Result<()> {
