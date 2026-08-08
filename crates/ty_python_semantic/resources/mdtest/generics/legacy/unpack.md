@@ -40,9 +40,8 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(collect())  # revealed: tuple[Unknown, ...]
-reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 ```
 
 ## Callable parameters
@@ -66,8 +65,7 @@ def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
-# TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
-# from the callback.
+# error: [invalid-argument-type]
 reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
@@ -162,7 +160,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
+# error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
 ```
 

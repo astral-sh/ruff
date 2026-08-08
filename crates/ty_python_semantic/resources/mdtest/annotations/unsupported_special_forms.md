@@ -1,9 +1,9 @@
 # Unsupported special forms
 
-## Not yet supported
+## Partially supported
 
-Several special forms are unsupported by ty currently. However, we also don't emit false-positive
-errors if you use one in an annotation:
+Several special forms are only partially supported by ty. Valid uses should not produce false
+positives, while the forms modeled precisely should still be checked:
 
 ```py
 from typing_extensions import Self, TypeVarTuple, Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, TypeAlias, Callable, TypeVar
@@ -45,8 +45,10 @@ def ex3(msg: str):
 def first_arg_int(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-first_arg_int("not an int", "42", "42")  # TODO: should error
-first_arg_int(56, "42", 56)  # TODO: should error
+# error: [invalid-argument-type]
+first_arg_int("not an int", "42", "42")
+# error: [invalid-argument-type]
+first_arg_int(56, "42", 56)
 ```
 
 ## Allowed `Unpack` contexts

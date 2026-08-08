@@ -1588,21 +1588,46 @@ impl<'db> Signature<'db> {
             || unspecialized_return_ty,
             |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
         );
+        let variadic_expansion = self
+            .parameters
+            .variadic()
+            .filter(|(_, parameter)| parameter.has_starred_annotation())
+            .and_then(|(index, _)| {
+                let expanded = parameters
+                    .len()
+                    .checked_add(1)?
+                    .checked_sub(self.parameters.len())?;
+                Some((index, expanded))
+            });
 
         let mut remaining = Vec::with_capacity(parameters.len());
         let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
-            if partial_application.is_positionally_bound(index) {
+            let source_index = if let Some((variadic_index, expanded)) = variadic_expansion {
+                if index < variadic_index {
+                    index
+                } else if index < variadic_index.saturating_add(expanded) {
+                    variadic_index
+                } else {
+                    index.saturating_sub(expanded).saturating_add(1)
+                }
+            } else {
+                index
+            };
+
+            if partial_application.is_positionally_bound(source_index) {
                 continue;
             }
 
-            let parameter = partial_application.keyword_default(index).map_or_else(
-                || parameter.clone(),
-                |default_ty| parameter.clone().with_default_type(default_ty),
-            );
+            let parameter = partial_application
+                .keyword_default(source_index)
+                .map_or_else(
+                    || parameter.clone(),
+                    |default_ty| parameter.clone().with_default_type(default_ty),
+                );
 
             if first_keyword_bound_positional_or_keyword.is_none()
-                && partial_application.is_keyword_bound(index)
+                && partial_application.is_keyword_bound(source_index)
                 && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
             {
                 first_keyword_bound_positional_or_keyword = Some(remaining.len());

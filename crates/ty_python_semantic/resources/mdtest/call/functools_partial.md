@@ -539,6 +539,68 @@ reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> s
 reveal_type(list(map(p, paths)))  # revealed: list[str]
 ```
 
+### Unbound `TypeVarTuple` callable bound with `partial`
+
+Binding fixed wrapper parameters must not specialize an untouched variadic tuple to the empty tuple.
+The returned partial must remain callable with the same arguments as its callbacks.
+
+```py
+from collections.abc import Callable
+from functools import partial
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def wrapper(
+    callback: Callable[[Unpack[Ts]], None],
+    *args: Unpack[Ts],
+) -> None: ...
+def decorate(callback: Callable[[Unpack[Ts]], None]) -> Callable[[Unpack[Ts]], None]:
+    # TODO: An untouched TypeVarTuple should remain generic in a partial application.
+    # error: [invalid-return-type]
+    # error: [invalid-argument-type]
+    return partial(wrapper, callback)
+
+def accept(value: int) -> None: ...
+
+bound = decorate(accept)
+reveal_type(bound)  # revealed: (int, /) -> None
+bound(1)
+# error: [invalid-argument-type]
+bound("wrong")
+```
+
+### Bound `TypeVarTuple` callable with `partial`
+
+Binding the arguments of a TypeVarTuple-backed callback leaves a zero-argument partial, not a
+partial that still requires the already-bound arguments.
+
+```py
+from collections.abc import Awaitable, Callable
+from functools import partial
+from typing import TypeVar
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+R = TypeVar("R")
+
+def from_thread(
+    callback: Callable[[Unpack[Ts]], Awaitable[R]],
+    *args: Unpack[Ts],
+    token: object | None = None,
+) -> R:
+    raise NotImplementedError
+
+async def sleep(seconds: float) -> None: ...
+async def check(token: object | None) -> None:
+    bound = partial(from_thread, sleep, 0, token=token)
+    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
+    reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
+    bound()  # error: [missing-argument]
+    # TODO: This should reject the extra argument once the bound pack is removed.
+    bound(1)
+```
+
 ### ParamSpec callable bound with `partial`
 
 ```py
