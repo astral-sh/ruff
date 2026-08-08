@@ -1885,6 +1885,14 @@ impl<'db> ConstraintBounds<'db> {
         self.upper.is_some()
     }
 
+    fn is_concrete(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        iter::chain(self.lower, self.upper).all(|bound| {
+            !bound.has_typevar(db, env)
+                && !bound.has_unspecialized_type_var(db, env)
+                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        })
+    }
+
     fn materialized_lower(self) -> Type<'db> {
         self.lower.unwrap_or(Type::Never)
     }
@@ -2814,7 +2822,7 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let mut path = interior.path_assignments(storage, source_order);
+                let mut path = interior.path_assignments(db, env, storage, source_order);
                 path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                     .is_continue()
             }
@@ -2880,7 +2888,7 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
-                    let mut path = interior.path_assignments(storage, source_order);
+                    let mut path = interior.path_assignments(db, env, storage, source_order);
                     path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                         .is_continue()
                 };
@@ -4018,17 +4026,6 @@ impl<'db> PathBounds<'db> {
         }
 
         let mut source_orders = storage.calculate_source_orders(source_order);
-        if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
-            db,
-            env,
-            storage,
-            &source_orders,
-            node,
-            inferable,
-        ) {
-            return path_bounds;
-        }
-
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order);
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
@@ -4051,7 +4048,7 @@ impl<'db> PathBounds<'db> {
         // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(storage, path_source_order);
+        let mut path = interior.path_assignments(db, env, storage, path_source_order);
         let _ = path.visit(db, env, storage, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
@@ -4097,81 +4094,6 @@ impl<'db> PathBounds<'db> {
         }
 
         PathBounds::Constrained(result.into_boxed_slice())
-    }
-
-    /// Accumulates a conjunction of concrete bound constraints without constructing a
-    /// [`PathAssignments`] or its sequent map.
-    ///
-    /// There are no relationships to derive between these constraints, as the upper and lower
-    /// bounds do not contain typevars. The normal solution-selection logic still validates each
-    /// accumulated bound against the typevar's declared bound or constraints.
-    fn compute_simple_bound_conjunction(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        source_orders: &FxIndexSet<ConstraintId>,
-        node: NodeId,
-        inferable: TypeVarSet<'db>,
-    ) -> Option<Self> {
-        match node.node() {
-            Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
-            Node::AlwaysFalse => return Some(PathBounds::Unsatisfiable),
-            Node::Interior(_) => {}
-        }
-
-        let mut constraints = Vec::default();
-        let mut current = node;
-        loop {
-            match current.node() {
-                Node::AlwaysTrue => break,
-                Node::AlwaysFalse => return None,
-                Node::Interior(_) => {
-                    let interior = storage.interior_node_data(current);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return None;
-                    }
-
-                    let constraint = storage.constraint_data(interior.constraint);
-                    if !constraint.typevar.is_inferable(db, inferable) {
-                        return None;
-                    }
-
-                    if iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
-                        bound.has_typevar(db, env) || bound.has_unspecialized_type_var(db, env)
-                    }) {
-                        return None;
-                    }
-
-                    current = interior.if_true;
-                    constraints.push((
-                        constraint.typevar,
-                        constraint.bounds,
-                        source_orders
-                            .get_index_of(&interior.constraint)
-                            .expect("every TDD constraint should have a source order"),
-                    ));
-                }
-            }
-        }
-
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
-            FxIndexMap::default();
-        constraints.sort_by_key(|(_, _, source_order)| *source_order);
-        for (typevar, constraint, _) in constraints {
-            let bounds = mappings.entry(typevar).or_default();
-            if let Some(lower) = constraint.lower {
-                bounds.add_lower(db, env, lower);
-            }
-            if let Some(upper) = constraint.upper {
-                bounds.add_upper(db, env, upper);
-            }
-        }
-
-        let path = mappings
-            .drain(..)
-            .map(|(bound_typevar, bounds)| bounds.finish(db, env, bound_typevar))
-            .collect();
-        Some(PathBounds::Constrained(Box::new([path])))
     }
 
     pub(crate) fn solve(
@@ -4833,7 +4755,7 @@ impl InteriorNode {
             }
         }
 
-        let mut path = self.path_assignments(storage, source_order);
+        let mut path = self.path_assignments(db, env, storage, source_order);
         let mut visitor = AbstractVisitor { should_remove };
         let ControlFlow::Continue(result) = path.visit(db, env, storage, self.node(), &mut visitor);
         result
@@ -4911,9 +4833,11 @@ impl InteriorNode {
         result
     }
 
-    fn path_assignments(
+    fn path_assignments<'db>(
         self,
-        storage: &mut ConstraintSetStorage<'_>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
@@ -4932,7 +4856,26 @@ impl InteriorNode {
                 .get_index_of(constraint)
                 .expect("every BDD constraint should have a source-order entry")
         });
-        PathAssignments::new(constraints)
+
+        if !self.node().is_single_conjunction(storage) {
+            return PathAssignments::new(storage, constraints, FxHashSet::default());
+        }
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for constraint_id in &constraints {
+            let constraint = storage.constraint_data(*constraint_id);
+            let typevar = storage.typevar_id(db, constraint.typevar);
+            if constraint.bounds.is_concrete(db, env) {
+                independent_typevars.insert(typevar);
+            } else {
+                dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
+            }
+        }
+
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
+        PathAssignments::new(storage, constraints, independent_typevars)
     }
 
     /// Returns a simplified version of a BDD.
@@ -7063,6 +7006,13 @@ pub(crate) struct PathAssignments {
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
 
+    /// Type variables mentioned only by concrete constraints in the original conjunction.
+    independent_typevars: FxHashSet<TypeVarId>,
+    /// Source-order indices of constraints mentioning each type variable.
+    constraint_indices_by_typevar: FxHashMap<TypeVarId, SmallVec<[usize; 2]>>,
+    /// Source-order indices of constraints mentioning no independent type variables.
+    dependent_constraint_indices: SmallVec<[usize; 8]>,
+
     /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
 
@@ -7127,20 +7077,57 @@ impl Ord for AssignmentFuel {
 }
 
 impl PathAssignments {
-    fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
-        let discovered = constraints
-            .into_iter()
-            .map(|constraint| (constraint, false))
-            .collect();
-        Self {
+    fn new(
+        storage: &ConstraintSetStorage<'_>,
+        constraints: impl IntoIterator<Item = ConstraintId>,
+        independent_typevars: FxHashSet<TypeVarId>,
+    ) -> Self {
+        let mut path = Self {
             sequents: Vec::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
-            discovered,
+            discovered: FxIndexMap::default(),
             elaborated_pairs: FxHashSet::default(),
+            independent_typevars,
+            constraint_indices_by_typevar: FxHashMap::default(),
+            dependent_constraint_indices: SmallVec::new(),
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
+        };
+
+        for constraint in constraints {
+            let (index, previous) = path.discovered.insert_full(constraint, false);
+            if previous.is_none() {
+                path.index_constraint(storage, constraint, index);
+            }
+        }
+
+        path
+    }
+
+    fn index_constraint(
+        &mut self,
+        storage: &ConstraintSetStorage<'_>,
+        constraint: ConstraintId,
+        index: usize,
+    ) {
+        if self.independent_typevars.is_empty() {
+            self.dependent_constraint_indices.push(index);
+            return;
+        }
+
+        let mut independent = false;
+        for typevar in storage.constraint_support(constraint).iter() {
+            independent |= self.independent_typevars.contains(&typevar);
+            self.constraint_indices_by_typevar
+                .entry(typevar)
+                .or_default()
+                .push(index);
+        }
+
+        if !independent {
+            self.dependent_constraint_indices.push(index);
         }
     }
 
@@ -7442,22 +7429,44 @@ impl PathAssignments {
             return;
         }
 
+        if existing.is_none() {
+            self.index_constraint(storage, constraint, constraint_index);
+        }
+
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
         self.sequents.extend_from_slice(&single_map.sequents);
 
-        for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
-            if *existing == constraint {
+        let mut candidates: SmallVec<[usize; 8]> = SmallVec::new();
+        let mut independent = false;
+        for typevar in storage.constraint_support(constraint).iter() {
+            independent |= self.independent_typevars.contains(&typevar);
+            if let Some(indices) = self.constraint_indices_by_typevar.get(&typevar) {
+                candidates.extend(indices.iter().copied());
+            }
+        }
+
+        if !independent {
+            candidates.extend(self.dependent_constraint_indices.iter().copied());
+        }
+        candidates.sort_unstable();
+        candidates.dedup();
+
+        for existing_index in candidates {
+            let Some((&existing, _)) = self.discovered.get_index(existing_index) else {
+                continue;
+            };
+            if existing == constraint {
                 continue;
             }
 
-            if SequentMap::pair_cannot_produce_sequents(db, env, storage, *existing, constraint) {
+            if SequentMap::pair_cannot_produce_sequents(db, env, storage, existing, constraint) {
                 continue;
             }
 
             let (a, b) = if existing_index < constraint_index {
-                (*existing, constraint)
+                (existing, constraint)
             } else {
-                (constraint, *existing)
+                (constraint, existing)
             };
             if !self.elaborated_pairs.insert((a, b)) {
                 // We've already elaborated this pair of constraints.
@@ -8431,7 +8440,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_lower_bound_conjunction_skips_sequent_analysis() {
+    fn simple_lower_bound_conjunction_analyzes_matching_typevar() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8445,13 +8454,7 @@ mod tests {
             || ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, str),
         );
         let inferable = TypeVarSet::from_typevars(db, [t]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
+        let pair_sequents = builder.storage.borrow().pair_sequent_cache.len();
 
         let solutions = set.solutions(db, &env, &builder, inferable);
         assert_eq!(
@@ -8463,12 +8466,11 @@ mod tests {
         );
 
         let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents + 1);
     }
 
     #[test]
-    fn simple_exact_bound_conjunction_skips_sequent_analysis() {
+    fn simple_exact_bound_conjunction_skips_pair_sequent_analysis() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8482,13 +8484,7 @@ mod tests {
             || ConstraintSet::constrain_typevar(db, &env, &builder, u, int, int),
         );
         let inferable = TypeVarSet::from_typevars(db, [t, u]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
+        let pair_sequents = builder.storage.borrow().pair_sequent_cache.len();
 
         let Solutions::Constrained(solutions) = set.solutions(db, &env, &builder, inferable) else {
             panic!("expected constrained solutions");
@@ -8505,12 +8501,11 @@ mod tests {
         }));
 
         let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
     }
 
     #[test]
-    fn simple_unsatisfiable_exact_bound_conjunction_skips_sequent_analysis() {
+    fn simple_unsatisfiable_exact_bound_conjunction_analyzes_matching_typevar() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8524,13 +8519,7 @@ mod tests {
             || ConstraintSet::constrain_typevar(db, &env, &builder, t, str, str),
         );
         let inferable = TypeVarSet::from_typevars(db, [t]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
+        let pair_sequents = builder.storage.borrow().pair_sequent_cache.len();
 
         assert_eq!(
             set.solutions(db, &env, &builder, inferable),
@@ -8538,8 +8527,7 @@ mod tests {
         );
 
         let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents + 1);
     }
 
     #[test]
@@ -9171,7 +9159,7 @@ mod tests {
     }
 
     #[test]
-    fn constraint_ordering_changes_derived_upper_bound_display() {
+    fn constraint_ordering_preserves_independent_concrete_solutions() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -9197,12 +9185,7 @@ mod tests {
                     .and(storage, int_t)
                     .and(storage, u_int)
             },
-            // TODO: Constraint-ID permutations can still change which equivalent upper-bound
-            // intersection is constructed first.
-            [
-                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
-                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
-            ],
+            ["never=false always=false merged=[T=int, U=int] paths=[T=int, U=int]"],
         );
     }
 
@@ -9542,16 +9525,20 @@ mod tests {
         }
     }
 
-    fn path_assignments_for(
-        builder: &ConstraintSetBuilder<'_>,
+    fn path_assignments_for<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
+        let mut storage = builder.storage.borrow_mut();
         match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
+            Node::AlwaysTrue | Node::AlwaysFalse => {
+                PathAssignments::new(&storage, [], FxHashSet::default())
+            }
             Node::Interior(interior) => {
-                let mut storage = builder.storage.borrow_mut();
-                interior.path_assignments(&mut storage, source_order)
+                interior.path_assignments(db, env, &mut storage, source_order)
             }
         }
     }
@@ -9560,6 +9547,7 @@ mod tests {
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
         let db = &db;
+        let env = db.program_environment();
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
@@ -9569,7 +9557,7 @@ mod tests {
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(&builder, set.node, set.source_order);
+        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
         let storage = builder.storage.borrow();
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
@@ -9627,7 +9615,7 @@ mod tests {
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(&builder, set.node, set.source_order);
+            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
@@ -9664,7 +9652,7 @@ mod tests {
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(&builder, set.node, set.source_order);
+            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };
