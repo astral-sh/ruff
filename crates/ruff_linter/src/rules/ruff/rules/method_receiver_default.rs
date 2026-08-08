@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
-use ruff_python_semantic::analyze::function_type::{self, FunctionType};
+use ruff_python_semantic::analyze::function_type::{self, FunctionType, is_class_method};
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
@@ -66,35 +66,6 @@ impl Violation for MethodReceiverDefault {
     }
 }
 
-/// Determine the receiver kind for a function, if it has a receiver parameter.
-fn receiver_kind(
-    name: &str,
-    decorator_list: &[ast::Decorator],
-    parent_scope: &Scope,
-    checker: &Checker,
-) -> Option<ReceiverKind> {
-    let function_kind = function_type::classify(
-        name,
-        decorator_list,
-        parent_scope,
-        checker.semantic(),
-        &checker.settings().pep8_naming.classmethod_decorators,
-        &checker.settings().pep8_naming.staticmethod_decorators,
-    );
-
-    match function_kind {
-        // Single @classmethod only
-        FunctionType::ClassMethod if decorator_list.len() == 1 => Some(ReceiverKind::Class),
-        FunctionType::NewMethod if decorator_list.is_empty() => Some(ReceiverKind::Class),
-        FunctionType::Method if decorator_list.is_empty() => Some(ReceiverKind::Instance),
-        FunctionType::StaticMethod => None,
-        FunctionType::ClassMethod => None,
-        FunctionType::NewMethod => None,
-        FunctionType::Method => None,
-        FunctionType::Function => None,
-    }
-}
-
 /// RUF077 — Method receiver parameter should not have a default value
 pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     let ScopeKind::Function(ast::StmtFunctionDef {
@@ -137,5 +108,47 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
         let diagnostic = MethodReceiverDefault { receiver_kind };
 
         checker.report_diagnostic(diagnostic, default_expr.range());
+    }
+}
+
+/// Determine the receiver kind for a function, if it has a receiver parameter.
+fn receiver_kind(
+    name: &str,
+    decorator_list: &[ast::Decorator],
+    parent_scope: &Scope,
+    checker: &Checker,
+) -> Option<ReceiverKind> {
+    let semantic = checker.semantic();
+
+    let function_kind = function_type::classify(
+        name,
+        decorator_list,
+        parent_scope,
+        semantic,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
+    );
+
+    match function_kind {
+        FunctionType::ClassMethod => {
+            if is_class_method(
+                name,
+                decorator_list,
+                parent_scope,
+                semantic,
+                &checker.settings().pep8_naming.classmethod_decorators,
+            ) {
+                Some(ReceiverKind::Class)
+            } else {
+                None
+            }
+        }
+        FunctionType::NewMethod if decorator_list.is_empty() => Some(ReceiverKind::Class),
+        FunctionType::Method if decorator_list.is_empty() => Some(ReceiverKind::Instance),
+        FunctionType::StaticMethod => None,
+        FunctionType::ClassMethod => None,
+        FunctionType::NewMethod => None,
+        FunctionType::Method => None,
+        FunctionType::Function => None,
     }
 }
