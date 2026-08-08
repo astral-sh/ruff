@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_useless_expression_strings_enabled;
 
 use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
@@ -25,6 +26,12 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// ```python
 /// foo = 1 + 1
 /// ```
+///
+/// In [preview], this rule also flags string and f-string literals that are
+/// not used as docstrings or [attribute docstrings] (a string immediately
+/// following an assignment at the module, class, or `__init__` level). A
+/// string immediately following the docstring (an "additional docstring" in
+/// [PEP 257]'s terms) is discarded at runtime and is also flagged.
 ///
 /// ## Notebook behavior
 /// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
@@ -50,6 +57,10 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// with errors.ExceptionRaisedContext():
 ///     _ = obj.attribute
 /// ```
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+/// [attribute docstrings]: https://peps.python.org/pep-0257/#what-is-a-docstring
+/// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.100")]
 pub(crate) struct UselessExpression {
@@ -67,6 +78,10 @@ impl Violation for UselessExpression {
                 "Found useless attribute access. Either assign it to a variable or remove it."
                     .to_string()
             }
+            Kind::String => {
+                "Found useless string statement. Either convert it to a comment or remove it."
+                    .to_string()
+            }
         }
     }
 }
@@ -78,12 +93,20 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
-    // Ignore strings, to avoid false positives with docstrings.
-    if matches!(
-        value,
-        Expr::FString(_) | Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-    ) {
+    if value.is_ellipsis_literal_expr() {
         return;
+    }
+
+    if matches!(value, Expr::FString(_) | Expr::StringLiteral(_)) {
+        // In preview, ignore only docstrings and attribute docstrings; any
+        // other standalone string has no effect. On stable, ignore all
+        // strings to avoid false positives with docstrings.
+        if !is_useless_expression_strings_enabled(checker.settings())
+            || checker.semantic().in_pep_257_docstring()
+            || checker.semantic().in_attribute_docstring()
+        {
+            return;
+        }
     }
 
     if checker.source_type.is_ipynb()
@@ -111,16 +134,17 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(
-        UselessExpression {
-            kind: Kind::Expression,
-        },
-        value.range(),
-    );
+    let kind = if matches!(value, Expr::FString(_) | Expr::StringLiteral(_)) {
+        Kind::String
+    } else {
+        Kind::Expression
+    };
+    checker.report_diagnostic(UselessExpression { kind }, value.range());
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Kind {
     Expression,
     Attribute,
+    String,
 }
