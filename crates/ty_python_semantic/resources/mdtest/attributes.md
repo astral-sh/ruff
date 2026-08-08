@@ -259,6 +259,9 @@ reveal_type(c_instance.b)  # revealed: int
 
 #### Augmented assignments
 
+An augmented assignment contributes its result to the inferred type of an unannotated instance
+attribute.
+
 ```py
 class Weird:
     def __iadd__(self, other: None) -> str:
@@ -269,9 +272,8 @@ class C:
         self.w = Weird()
         self.w += None
 
-# TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Weird
+# TODO: Infer only `str`, since the initial `Weird` value has been overwritten.
+reveal_type(C().w)  # revealed: Weird | str
 ```
 
 #### Nested augmented assignments after narrowing

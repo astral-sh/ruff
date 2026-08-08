@@ -136,12 +136,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = subscript;
 
         match ctx {
-            ExprContext::Load => self.infer_subscript_load(subscript),
+            ExprContext::Load => self
+                .infer_subscript_load(subscript)
+                .unwrap_or_else(|recovery_ty| recovery_ty),
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 self.store_typed_dict_key_expected_type(slice, value_ty);
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
+                let _ = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
@@ -154,20 +156,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
+                let _ = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
         }
     }
 
-    pub(super) fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+    /// Infer a subscript load, returning its recovery type if the subscription fails.
+    pub(super) fn infer_subscript_load(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+    ) -> Result<Type<'db>, Type<'db>> {
         let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
         // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
         if value_ty.is_generic_alias() {
-            return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
+            return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
         self.infer_subscript_load_impl(value_ty, subscript)
@@ -177,7 +183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         value_ty: Type<'db>,
         subscript: &ast::ExprSubscript,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
 
@@ -186,7 +192,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value: _,
             slice,
-            ctx: expr_context,
+            ctx: _,
         } = subscript;
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
@@ -210,13 +216,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    self.infer_subscript_expression_types(
-                        subscript,
-                        value_ty,
-                        slice_ty,
-                        *expr_context,
-                    );
-                    return ty;
+                    return self
+                        .infer_subscript_expression_types(
+                            subscript,
+                            value_ty,
+                            slice_ty,
+                            ExprContext::Load,
+                        )
+                        .map(|_| ty)
+                        .map_err(|_| ty);
                 }
             }
         }
@@ -235,43 +243,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // updating all of the subscript logic below to use custom callables for all of the _other_
                 // special cases, too.
                 if class.is_tuple(db) {
-                    return tuple_generic_alias(env, self.infer_tuple_type_expression(subscript));
+                    return Ok(tuple_generic_alias(
+                        env,
+                        self.infer_tuple_type_expression(subscript),
+                    ));
                 } else if class.is_known(db, KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
-                    return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                    return Ok(Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(db, argument_ty),
-                    ));
+                    )));
                 }
 
                 if let Some(generic_context) = class.generic_context(db)
                     && let Some(class) = class.as_static()
                 {
-                    return self.infer_explicit_class_specialization(
+                    return Ok(self.infer_explicit_class_specialization(
                         subscript,
                         value_ty,
                         class,
                         generic_context,
-                    );
+                    ));
                 }
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(db) {
-                    return self.infer_explicit_type_alias_type_specialization(
+                    return Ok(self.infer_explicit_type_alias_type_specialization(
                         subscript,
                         value_ty,
                         type_alias,
                         generic_context,
-                    );
+                    ));
                 }
             }
             Type::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Tuple => {
-                    return tuple_generic_alias(env, self.infer_tuple_type_expression(subscript));
+                    return Ok(tuple_generic_alias(
+                        env,
+                        self.infer_tuple_type_expression(subscript),
+                    ));
                 }
                 SpecialFormType::Literal => match self.infer_literal_parameter_type(slice) {
                     Ok(result) => {
-                        return Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
-                            db, result,
+                        return Ok(Type::KnownInstance(KnownInstanceType::Literal(
+                            InternedType::new(db, result),
                         )));
                     }
                     Err(nodes) => {
@@ -285,16 +299,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             a literal value (int, bool, str, or bytes), or an enum member",
                             );
                         }
-                        return Type::unknown();
+                        return Ok(Type::unknown());
                     }
                 },
                 SpecialFormType::Annotated => {
-                    return self
+                    return Ok(self
                         .parse_subscription_of_annotated_special_form(
                             subscript,
                             AnnotatedExprContext::TypeExpression,
                         )
-                        .inner_type();
+                        .inner_type());
                 }
                 SpecialFormType::Optional => {
                     if matches!(**slice, ast::Expr::Tuple(_))
@@ -310,9 +324,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // `Optional[None]` is equivalent to `None`:
                     if ty.is_none(db) {
-                        return ty;
+                        return Ok(ty);
                     }
-                    return Type::KnownInstance(KnownInstanceType::UnionType(
+                    return Ok(Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::new(
                             db,
                             None,
@@ -323,7 +337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 Type::none(db, env),
                             )),
                         ),
-                    ));
+                    )));
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
@@ -346,18 +360,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
 
-                        return union_type;
+                        return Ok(union_type);
                     }
                     _ => {
-                        return self.infer_expression(slice, TypeContext::default());
+                        return Ok(self.infer_expression(slice, TypeContext::default()));
                     }
                 },
                 SpecialFormType::Type => {
                     // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
                     let argument_ty = self.infer_type_expression(slice);
-                    return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                    return Ok(Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(db, argument_ty),
-                    ));
+                    )));
                 }
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     let callable = self
@@ -365,7 +379,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .as_callable()
                         .expect("always returns Type::Callable");
 
-                    return Type::KnownInstance(KnownInstanceType::Callable(callable));
+                    return Ok(Type::KnownInstance(KnownInstanceType::Callable(callable)));
                 }
                 SpecialFormType::Unpack => {
                     self.store_type_expression_flags(
@@ -383,19 +397,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         previously_in_unpack_type_argument,
                     );
 
-                    return if matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                    ) || inner_ty.exact_tuple_instance_spec(db).is_some()
-                    {
-                        inner_ty
-                    } else {
-                        self.store_type_expression_flags(
-                            ast::ExprRef::from(subscript),
-                            TypeExpressionFlags::INVALID_UNPACK,
-                        );
-                        Type::unknown()
-                    };
+                    return Ok(
+                        if matches!(
+                            inner_ty,
+                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                        ) || inner_ty.exact_tuple_instance_spec(db).is_some()
+                        {
+                            inner_ty
+                        } else {
+                            self.store_type_expression_flags(
+                                ast::ExprRef::from(subscript),
+                                TypeExpressionFlags::INVALID_UNPACK,
+                            );
+                            Type::unknown()
+                        },
+                    );
                 }
                 SpecialFormType::LegacyStdlibAlias(alias) => {
                     let AliasSpec {
@@ -431,10 +447,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|arg| self.infer_type_expression(arg))
                         .collect();
 
-                    return class
+                    return Ok(class
                         .to_specialized_class_type(db, env, arg_types)
                         .map(Type::from)
-                        .unwrap_or_else(Type::unknown);
+                        .unwrap_or_else(Type::unknown));
                 }
                 _ => {}
             },
@@ -445,7 +461,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::TypeGenericAlias(_),
             ) => {
-                return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
+                return Ok(
+                    self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
+                );
             }
             Type::Dynamic(DynamicType::Unknown) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
@@ -457,15 +475,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut variables,
                 );
                 let generic_context = GenericContext::from_typevar_instances(db, env, variables);
-                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+                return Ok(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)));
             }
             _ => {}
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
-        let result_ty =
-            self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *expr_context);
-        self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
+        self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
+            .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
+            .map_err(|recovery_ty| {
+                self.narrow_expr_with_applicable_constraints(
+                    subscript,
+                    recovery_ty,
+                    &constraint_keys,
+                )
+            })
     }
 
     pub(super) fn infer_explicit_class_specialization(
@@ -1396,13 +1420,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Err(())
     }
 
+    /// Infer a subscription and report failures while preserving their recovery types.
     pub(super) fn infer_subscript_expression_types(
         &self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         expr_context: ExprContext,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
 
@@ -1462,7 +1487,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     SubscriptErrorKind::MultipleTypeVarTuples { origin },
                 );
                 error.report_diagnostics(&self.context, subscript);
-                return error.result_type();
+                return Err(error.result_type());
             }
             if has_invalid_unpack_argument {
                 let error = SubscriptError::new(
@@ -1473,7 +1498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     },
                 );
                 error.report_diagnostics(&self.context, subscript);
-                return error.result_type();
+                return Err(error.result_type());
             }
         }
 
@@ -1516,9 +1541,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => value_ty.subscript(db, env, slice_ty, expr_context),
         };
 
-        subscript_result.unwrap_or_else(|e| {
-            e.report_diagnostics(&self.context, subscript);
-            e.result_type()
+        subscript_result.map_err(|error| {
+            error.report_diagnostics(&self.context, subscript);
+            error.result_type()
         })
     }
 
@@ -1553,6 +1578,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         target: &ast::ExprSubscript,
         rhs_value: &ast::Expr,
+        object_ty: Type<'db>,
+        infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> bool {
         let env = self.program_environment();
@@ -1566,15 +1593,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let object_ty = self.infer_expression(object, TypeContext::default());
         self.store_typed_dict_key_expected_type(slice, object_ty);
-        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
 
         let is_valid_assignment = self.validate_subscript_assignment_impl(
             target,
             None,
             object_ty,
-            &mut infer_slice_ty,
+            infer_slice_ty,
             rhs_value,
             infer_rhs_value,
             true,
