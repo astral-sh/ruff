@@ -12,16 +12,11 @@ x: str  # error: [invalid-declaration] "Cannot declare type `str` for inferred t
 An incompatible binding that predates the loop must still invalidate a declaration inside it.
 
 ```py
-from typing import TypedDict
-
-class Record(TypedDict):
-    value: int
-
-record = {"value": 1}
+values = [1]
 
 while True:
-    record: Record  # error: [invalid-declaration]
-    record = {"value": 1}
+    values: list[object]  # error: [invalid-declaration]
+    values = [1]
 ```
 
 ## Incompatible declarations

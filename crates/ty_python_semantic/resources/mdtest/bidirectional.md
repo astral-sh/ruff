@@ -73,18 +73,13 @@ A declaration inside a loop provides context to assignments that reach it from a
 
 ### While loops
 
-A declaration inside a `while` loop applies to dictionary literals assigned in each iteration.
+A declaration inside a `while` loop applies to list literals assigned in each iteration.
 
 ```py
-from typing import TypedDict
-
-class Record(TypedDict):
-    value: int
-
 while True:
-    record: Record
-    record = {"value": 1}
-    reveal_type(record)  # revealed: Record
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
 ```
 
 ### For loops
@@ -92,15 +87,10 @@ while True:
 The same declaration context applies to assignments in a `for` loop.
 
 ```py
-from typing import TypedDict
-
-class Record(TypedDict):
-    value: int
-
 for _ in range(2):
-    record: Record
-    record = {"value": 1}
-    reveal_type(record)  # revealed: Record
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
 ```
 
 ### Nested dictionary values
@@ -140,15 +130,10 @@ while True:
 String annotations provide their resolved type when a loop-carried assignment needs context.
 
 ```py
-from typing import TypedDict
-
-class Record(TypedDict):
-    value: int
-
 while True:
-    record: "Record"
-    record = {"value": 1}
-    reveal_type(record)  # revealed: Record
+    values: "list[object]"
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
 ```
 
 ### Deferred forward references
