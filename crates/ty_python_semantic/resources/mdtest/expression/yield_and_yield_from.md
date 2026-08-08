@@ -137,7 +137,7 @@ def persons(f: bool) -> Generator[None, None, Person]:
 ## `yield` expression send type inference
 
 ```py
-from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
+from typing import AsyncGenerator, AsyncIterator, AsyncIterable, Iterable, Protocol, Generator, Iterator
 
 def unannotated():
     x = yield 1
@@ -169,11 +169,15 @@ def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGener
     return None
 ```
 
-`Iterator` has no send type or return type, It is equivalent to using `Generator` with send set to
-`None` and return type to `Unknown`.
+`Iterator`, `Iterable`, and custom equivalent protocols have no send type or return type. Using one
+fo these is equivalent to using `Generator` with send set to `None` and return type to `Unknown`.
 
 ```py
 def iterator_send_none() -> Iterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+def iterable_send_none() -> Iterable[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
 
@@ -181,9 +185,20 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
 
+async def async_iterable_send_none() -> AsyncIterable[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
     return 1
+
+class CustomIteratorProtocol(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+def custom_proto_send_none() -> CustomIteratorProtocol:
+    x = yield 1
+    reveal_type(x)  # revealed: None
 ```
 
 ## Generator type aliases
@@ -253,7 +268,7 @@ def generator() -> Generator[None]:
 ### Invalid `yield` type
 
 ```py
-from typing import Generator
+from typing import Generator, Iterable, Iterator, Protocol
 
 def invalid_generator() -> Generator[int, None, None]:
     # snapshot: invalid-yield
@@ -269,6 +284,32 @@ error[invalid-yield]: Yield expression type does not match annotation
 4 |     # snapshot: invalid-yield
 5 |     yield ""
   |           ^^ expression of type `Literal[""]`, expected `int`
+```
+
+More examples:
+
+```py
+def invalid_iterator() -> Iterator[None]:
+    yield ""  # error: [invalid-yield]
+
+def invalid_iterable() -> Iterable[None]:
+    yield ""  # error: [invalid-yield]
+
+class CustomIteratorProto(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+def invalid_custom_proto() -> CustomIteratorProto:
+    yield ""  # snapshot: invalid-yield
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+  --> src/mdtest_snippet.py:16:11
+   |
+15 | def invalid_custom_proto() -> CustomIteratorProto:
+   |                               ------------------- Function annotated with yield type `int` here
+16 |     yield ""  # snapshot: invalid-yield
+   |           ^^ expression of type `Literal[""]`, expected `int`
 ```
 
 ### Invalid annotation
