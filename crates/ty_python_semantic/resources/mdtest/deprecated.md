@@ -412,6 +412,31 @@ y = MyInt(2)
 z = x + y  # TODO error: [deprecated] "MyInt `+` support is broken"
 ```
 
+Unlike binary operators, unary operators like `~` already fire a diagnostic when their dunder is
+deprecated.
+
+```py
+from typing_extensions import deprecated
+
+class MyBits:
+    @deprecated("MyBits `~` support is broken")
+    def __invert__(self):
+        return self
+
+x = MyBits()
+~x  # error: [deprecated] "MyBits `~` support is broken"
+```
+
+`bool.__invert__` is one such case in typeshed: `~` on a `bool` is deprecated and will be removed in
+Python 3.16. This applies both to `bool` literals and to arbitrary values of type `bool`.
+
+```py
+~True  # error: [deprecated]
+
+def f(x: bool):
+    ~x  # error: [deprecated]
+```
+
 ## Overloads
 
 Overloads can be deprecated, but only trigger warnings when invoked.
