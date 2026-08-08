@@ -11,7 +11,7 @@ pub struct FormatAlias;
 impl FormatNodeRule<Alias> for FormatAlias {
     fn fmt_fields(&self, item: &Alias, f: &mut PyFormatter) -> FormatResult<()> {
         let Alias {
-            range: _,
+            range_end: _,
             node_index: _,
             name,
             asname,
