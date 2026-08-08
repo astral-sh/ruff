@@ -175,6 +175,7 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
 4 | import math  # noqa: F401, EXT001
   |              ^^^^^^^^^^^^^^^^^^^^
 help: Use `ruff: ignore` instead
+info: Automatic fix is unavailable because external codes are present.
 ```
 
 ### Any unmatched code disables the fix
@@ -196,6 +197,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
 2 | # ruff: noqa: F401, F402
   | ^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
+info: Automatic fix is unavailable because unused codes are present. Consider enabling `RUF100` to remove them.
 ```
 
 ### Flake8 comments are ignored
@@ -244,6 +246,7 @@ error[RUF105]: `noqa` comment used instead of `ruff: ignore`
 2 | import os  # noqa: F401, F402
   |            ^^^^^^^^^^^^^^^^^^
 help: Use `ruff: ignore` instead
+info: Automatic fix is unavailable because unused codes are present. Consider enabling `RUF100` to remove them.
 ```
 
 ### Nested pragma comment before the directive
@@ -332,6 +335,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff: file-ignore`
 2 | # ruff: noqa
   | ^^^^^^^^^^^^
 help: Use `ruff: file-ignore` instead
+info: Automatic fix is unavailable because `ruff: file-ignore` requires explicit rule codes.
 ```
 
 ## Inline self-suppression
