@@ -10,11 +10,8 @@
 //!
 //! The description of which elements can appear in a `tuple` is called a [`TupleSpec`]. Other
 //! things besides `tuple` instances can be described by a tuple spec — for instance, the targets
-//! of an unpacking assignment. A `tuple` specialization that includes `Never` as one of its
-//! fixed-length elements cannot be instantiated. We reduce the entire `tuple` type down to
-//! `Never`. The same is not true of tuple specs in general. (That means that it is [`TupleType`]
-//! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
-//! types, including `Never`.)
+//! of an unpacking assignment. A `tuple` specialization can include `Never` as a fixed-length
+//! element because a user-defined tuple subclass can inhabit that type.
 
 use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
@@ -176,13 +173,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         spec: &TupleSpec<'db>,
-    ) -> Option<Self> {
-        // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
-        // possible to instantiate the tuple as a whole.
-        if spec.fixed_elements().any(Type::is_never) {
-            return None;
-        }
-
+    ) -> Self {
         // If the variable-length portion is Never, it can only be instantiated with zero elements.
         // That means this isn't a variable-length tuple after all!
         if let TupleSpec::Variable(tuple) = spec
@@ -193,10 +184,10 @@ impl<'db> TupleType<'db> {
                     .iter_prefix_elements()
                     .chain(tuple.iter_suffix_elements()),
             ));
-            return Some(TupleType::new_internal(db, env.program(db), tuple));
+            return TupleType::new_internal(db, env.program(db), tuple);
         }
 
-        Some(TupleType::new_internal(db, env.program(db), spec))
+        TupleType::new_internal(db, env.program(db), spec)
     }
 
     pub(crate) fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
@@ -211,7 +202,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Option<Self> {
+    ) -> Self {
         TupleType::new(db, env, &TupleSpec::heterogeneous(types))
     }
 
@@ -221,7 +212,7 @@ impl<'db> TupleType<'db> {
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
-    ) -> Option<Self> {
+    ) -> Self {
         Self::mixed_with_segment(
             db,
             env,
@@ -237,7 +228,7 @@ impl<'db> TupleType<'db> {
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: VariableSegment<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
-    ) -> Option<Self> {
+    ) -> Self {
         TupleType::new(
             db,
             env,
@@ -311,7 +302,7 @@ impl<'db> TupleType<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Option<Self> {
+    ) -> Self {
         TupleType::new(
             db,
             visitor.env,
@@ -782,10 +773,6 @@ fn to_class_type_cycle_initial<'db>(
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
-///
-/// Tuple specs are used for more than just `tuple` instances, so they allow `Never` to appear as a
-/// fixed-length element type. [`TupleType`] adds that additional invariant (since a tuple that
-/// must contain an element that can't be instantiated, can't be instantiated itself).
 pub(crate) type TupleSpec<'db> = Tuple<Type<'db>, VariableSegment<'db>>;
 
 /// The variable-length portion of a [`TupleSpec`].
