@@ -92,7 +92,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             Expr::Call(ast::ExprCall {
                 func, arguments, ..
             }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
-                && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
+                && is_dataclass_field(func, checker.semantic(), &dataclass_kind) =>
             {
                 arguments.find_argument_value("default", 0)
             }
