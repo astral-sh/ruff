@@ -903,10 +903,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         impl Display for DisplayConstraintSet<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                let mut storage = self.builder.storage.borrow_mut();
-                let node = self.node.simplify_for_display(db, self.env, &mut storage);
-                Display::fmt(&node.display(db, self.env, &mut storage), f)
+                let storage = self.builder.storage.borrow();
+                Display::fmt(&self.node.display(self.db, self.env, &storage), f)
             }
         }
 
@@ -939,10 +937,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         impl Display for DisplayConstraintSet<'_, '_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                let mut storage = self.builder.storage.borrow_mut();
-                let node = self.node.simplify_for_display(db, self.env, &mut storage);
-                Display::fmt(&node.display_graph(db, self.env, &storage, self.prefix), f)
+                let storage = self.builder.storage.borrow();
+                Display::fmt(
+                    &self
+                        .node
+                        .display_graph(self.db, self.env, &storage, self.prefix),
+                    f,
+                )
             }
         }
 
@@ -1052,8 +1053,6 @@ struct ConstraintSetStorage<'db> {
     /// Existential abstraction derives new constraints in source order and returns their
     /// source-order sidecar, so distinct orderings of the same BDD must not share a cache entry.
     exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
-    restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
-    simplify_cache: FxHashMap<NodeId, NodeId>,
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
     pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap>,
@@ -1822,12 +1821,6 @@ enum IntersectionResult<'db> {
     Disjoint,
 }
 
-impl IntersectionResult<'_> {
-    fn is_disjoint(self) -> bool {
-        matches!(self, IntersectionResult::Disjoint)
-    }
-}
-
 /// The index of a bound typevar within a [`ConstraintSetStorage`].
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
@@ -2464,8 +2457,7 @@ impl ConstraintId {
     /// Returns whether this constraint implies another — i.e., whether every type that
     /// satisfies this constraint also satisfies `other`.
     ///
-    /// This is used to simplify how we display constraint sets, by removing redundant constraints
-    /// from a clause.
+    /// This is used to avoid adding redundant implications to a sequent map.
     fn implies<'db>(
         self,
         db: &'db dyn Db,
@@ -3285,159 +3277,6 @@ impl NodeId {
         }
     }
 
-    /// Returns a new BDD that returns the same results as `self`, but with some inputs fixed to
-    /// particular values. (Those variables will not be checked when evaluating the result, and
-    /// will not be present in the result.)
-    ///
-    /// Also returns whether _all_ of the restricted variables appeared in the BDD.
-    fn restrict<'db>(
-        self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        assignment: impl IntoIterator<Item = ConstraintAssignment>,
-    ) -> (Self, bool) {
-        assignment
-            .into_iter()
-            .fold((self, true), |(restricted, found), assignment| {
-                let (restricted, found_this) = restricted.restrict_one(db, storage, assignment);
-                (restricted, found && found_this)
-            })
-    }
-
-    /// Returns a new BDD that returns the same results as `self`, but with one input fixed to a
-    /// particular value. (That variable will be not be checked when evaluating the result, and
-    /// will not be present in the result.)
-    ///
-    /// Also returns whether the restricted variable appeared in the BDD.
-    fn restrict_one<'db>(
-        self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        assignment: ConstraintAssignment,
-    ) -> (Self, bool) {
-        match self.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => (self, false),
-            Node::Interior(interior) => interior.restrict_one(db, storage, assignment),
-        }
-    }
-
-    /// Returns a new BDD with any occurrence of `left ∧ right` replaced with `replacement`.
-    fn substitute_intersection<'db>(
-        self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        left: ConstraintAssignment,
-        right: ConstraintAssignment,
-        replacement: NodeId,
-    ) -> Self {
-        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
-        //   - left and right are both true
-        //   - left is false
-        //   - left is true and right is false
-        // This covers the entire truth table of `left ∧ right`.
-        let (when_left_and_right, both_found) = self.restrict(db, storage, [left, right]);
-        if !both_found {
-            // If left and right are not both present in the input BDD, we should not even attempt
-            // the substitution, since the Shannon expansion might introduce the missing variables!
-            // That confuses us below when we try to detect whether the substitution is consistent
-            // with the input.
-            return self;
-        }
-        let (when_not_left, _) = self.restrict(db, storage, [left.negated()]);
-        let (when_left_but_not_right, _) = self.restrict(db, storage, [left, right.negated()]);
-
-        // The result should test `replacement`, and when it's true, it should produce the same
-        // output that input would when `left ∧ right` is true. When replacement is false, it
-        // should fall back on testing left and right individually to make sure we produce the
-        // correct outputs in the `¬(left ∧ right)` case. So the result is
-        //
-        //   if replacement
-        //     when_left_and_right
-        //   else if not left
-        //     when_not_left
-        //   else if not right
-        //     when_left_but_not_right
-        //   else
-        //     false
-        //
-        //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
-        let (left_node, _) = Node::new_satisfied_constraint(storage, left);
-        let (right_node, _) = Node::new_satisfied_constraint(storage, right);
-        let right_result = right_node.ite(storage, ALWAYS_FALSE, when_left_but_not_right);
-        let left_result = left_node.ite(storage, right_result, when_not_left);
-        let result = replacement.ite(storage, when_left_and_right, left_result);
-
-        // Lastly, verify that the result is consistent with the input. (It must produce the same
-        // results when `left ∧ right`.) If it doesn't, the substitution isn't valid, and we should
-        // return the original BDD unmodified.
-        let intersection = left_node.and(storage, right_node);
-        let validity = replacement.iff(storage, intersection);
-        let constrained_original = self.and(storage, validity);
-        let constrained_replacement = result.and(storage, validity);
-        if constrained_original == constrained_replacement {
-            result
-        } else {
-            self
-        }
-    }
-
-    /// Returns a new BDD with any occurrence of `left ∨ right` replaced with `replacement`.
-    fn substitute_union<'db>(
-        self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        left: ConstraintAssignment,
-        right: ConstraintAssignment,
-        replacement: NodeId,
-    ) -> Self {
-        // We perform a Shannon expansion to find out what the input BDD evaluates to when:
-        //   - left and right are both true
-        //   - left is true and right is false
-        //   - left is false and right is true
-        //   - left and right are both false
-        // This covers the entire truth table of `left ∨ right`.
-        let (when_l1_r1, both_found) = self.restrict(db, storage, [left, right]);
-        if !both_found {
-            // If left and right are not both present in the input BDD, we should not even attempt
-            // the substitution, since the Shannon expansion might introduce the missing variables!
-            // That confuses us below when we try to detect whether the substitution is consistent
-            // with the input.
-            return self;
-        }
-        let (when_l0_r0, _) = self.restrict(db, storage, [left.negated(), right.negated()]);
-        let (when_l1_r0, _) = self.restrict(db, storage, [left, right.negated()]);
-        let (when_l0_r1, _) = self.restrict(db, storage, [left.negated(), right]);
-
-        // The result should test `replacement`, and when it's true, it should produce the same
-        // output that input would when `left ∨ right` is true. For OR, this is the union of what
-        // the input produces for the three cases that comprise `left ∨ right`. When `replacement`
-        // is false, the result should produce the same output that input would when
-        // `¬(left ∨ right)`, i.e. when `left ∧ right`. So the result is
-        //
-        //   if replacement
-        //     or(when_l1_r1, when_l1_r0, when_r0_l1)
-        //   else
-        //     when_l0_r0
-        let when_l0_r1_or_l1_r1 = when_l0_r1.or(storage, when_l1_r1);
-        let when_either = when_l1_r0.or(storage, when_l0_r1_or_l1_r1);
-        let result = replacement.ite(storage, when_either, when_l0_r0);
-
-        // Lastly, verify that the result is consistent with the input. (It must produce the same
-        // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
-        // return the original BDD unmodified.
-        let (left_node, _) = Node::new_satisfied_constraint(storage, left);
-        let (right_node, _) = Node::new_satisfied_constraint(storage, right);
-        let union = left_node.or(storage, right_node);
-        let validity = replacement.iff(storage, union);
-        let constrained_original = self.and(storage, validity);
-        let constrained_replacement = result.and(storage, validity);
-        if constrained_original == constrained_replacement {
-            result
-        } else {
-            self
-        }
-    }
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -3491,39 +3330,6 @@ impl NodeId {
         walk(self, storage, &mut FxHashSet::default(), f);
     }
 
-    /// Simplifies a BDD, replacing constraints with simpler or smaller constraints where possible.
-    ///
-    /// TODO: [Historical note] This is now used only for display purposes, but previously was also
-    /// used to ensure that we added the "transitive closure" to each BDD. The constraints in a BDD
-    /// are not independent; some combinations of constraints can imply other constraints. This
-    /// affects us in two ways: First, it means that certain combinations are impossible. (If
-    /// `a → b` then `a ∧ ¬b` can never happen.) Second, it means that certain constraints can be
-    /// inferred even if they do not explicitly appear in the BDD. It is important to take this
-    /// into account in several BDD operations (satisfiability, existential quantification, etc).
-    /// Before, we used this method to _add_ the transitive closure to a BDD, in an attempt to make
-    /// sure that it holds "all the facts" that would be needed to satisfy any query we might make.
-    /// We also used this method to calculate the "domain" of the BDD to help rule out invalid
-    /// inputs. However, this was at odds with using this method for display purposes, where our
-    /// goal is to _remove_ redundant information, so as to not clutter up the display. To resolve
-    /// this dilemma, all of the correctness uses have been refactored to use [`SequentMap`]
-    /// instead. It tracks the same information in a more efficient and lazy way, and never tries
-    /// to remove redundant information. For expediency, however, we did not make any changes to
-    /// this method, other than to stop tracking the domain (which was never used for display
-    /// purposes). That means we have some tech debt here, since there is a lot of duplicate logic
-    /// between `simplify_for_display` and `SequentMap`. It would be nice to update our display
-    /// logic to use the sequent map as much as possible. But that can happen later.
-    fn simplify_for_display<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> Self {
-        match self.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => self,
-            Node::Interior(interior) => interior.simplify(db, env, storage),
-        }
-    }
-
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
     /// to `true`. (This translates the boolean function that this BDD represents into DNF form.)
     fn satisfied_clauses(self, storage: &ConstraintSetStorage<'_>) -> SatisfiedClauses {
@@ -3566,32 +3372,31 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
-        storage: &'a mut ConstraintSetStorage<'db>,
+        storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
-        // To render a BDD in DNF form, you perform a depth-first search of the BDD tree, looking
-        // for any path that leads to the AlwaysTrue terminal. Each such path represents one of the
-        // intersection clauses in the DNF form. The path traverses zero or more interior nodes,
-        // and takes either the true or false edge from each one. That gives you the positive or
-        // negative individual constraints in the path's clause.
+        // Render the BDD directly as an unsimplified DNF formula. Each root-to-true path becomes
+        // one clause, with true, uncertain, and false edges contributing positive, unconstrained,
+        // and negative assignments respectively.
         struct DisplayNode<'db, 'c> {
             node: NodeId,
             db: &'db dyn Db,
             env: &'c ProgramEnvironment<'db>,
-            storage: RefCell<&'c mut ConstraintSetStorage<'db>>,
+            storage: &'c ConstraintSetStorage<'db>,
         }
 
         impl Display for DisplayNode<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
                 match self.node.node() {
                     Node::AlwaysTrue => f.write_str("always"),
                     Node::AlwaysFalse => f.write_str("never"),
-                    Node::Interior(_) => {
-                        let mut storage = self.storage.borrow_mut();
-                        let mut clauses = self.node.satisfied_clauses(&storage);
-                        clauses.simplify(db, self.env, &mut storage);
-                        Display::fmt(&clauses.display(db, self.env, &storage), f)
-                    }
+                    Node::Interior(_) => Display::fmt(
+                        &self.node.satisfied_clauses(self.storage).display(
+                            self.db,
+                            self.env,
+                            self.storage,
+                        ),
+                        f,
+                    ),
                 }
             }
         }
@@ -3600,7 +3405,7 @@ impl NodeId {
             node: self,
             db,
             env,
-            storage: RefCell::new(storage),
+            storage,
         }
     }
 
@@ -4839,78 +4644,6 @@ impl InteriorNode {
         result
     }
 
-    fn restrict_one<'db>(
-        self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        assignment: ConstraintAssignment,
-    ) -> (NodeId, bool) {
-        let key = (self.node(), assignment);
-        if let Some(result) = storage.restrict_one_cache.get(&key) {
-            return *result;
-        }
-
-        let self_interior = storage.interior_node_data(self.node());
-        let self_ordering = self_interior.constraint.ordering();
-        let result = if assignment.constraint().ordering() < self_ordering {
-            // If this node's variable is larger than the assignment's variable, then we have reached a
-            // point in the BDD where the assignment can no longer affect the result,
-            // and we can return early.
-            (self.node(), false)
-        } else {
-            // Otherwise, check if this node's variable is in the assignment. If so, substitute the
-            // variable by replacing this node with the appropriate edge(s). When restricting a
-            // TDD, the uncertain branch is folded in.
-            if assignment == self_interior.constraint.when_true() {
-                // restrict(n? C: U: D, n == true) = C ∨ U
-                (
-                    self_interior
-                        .if_true
-                        .or(storage, self_interior.if_uncertain),
-                    true,
-                )
-            } else if assignment == self_interior.constraint.when_false() {
-                // restrict(n? C: U: D, n == false) = D ∨ U
-                (
-                    self_interior
-                        .if_false
-                        .or(storage, self_interior.if_uncertain),
-                    true,
-                )
-            } else if assignment == self_interior.constraint.when_unconstrained() {
-                // restrict(n? C: U: D, n is unconstrained) = C ∨ U ∨ D
-                (
-                    self_interior
-                        .if_true
-                        .or(storage, self_interior.if_uncertain)
-                        .or(storage, self_interior.if_false),
-                    true,
-                )
-            } else {
-                let (if_true, found_in_true) =
-                    self_interior.if_true.restrict_one(db, storage, assignment);
-                let (if_uncertain, found_in_uncertain) = self_interior
-                    .if_uncertain
-                    .restrict_one(db, storage, assignment);
-                let (if_false, found_in_false) =
-                    self_interior.if_false.restrict_one(db, storage, assignment);
-                (
-                    NodeId::with_uncertain(
-                        storage,
-                        self_interior.constraint,
-                        if_true,
-                        if_uncertain,
-                        if_false,
-                    ),
-                    found_in_true || found_in_uncertain || found_in_false,
-                )
-            }
-        };
-
-        storage.restrict_one_cache.insert(key, result);
-        result
-    }
-
     fn path_assignments(
         self,
         storage: &mut ConstraintSetStorage<'_>,
@@ -4933,373 +4666,6 @@ impl InteriorNode {
                 .expect("every BDD constraint should have a source-order entry")
         });
         PathAssignments::new(constraints)
-    }
-
-    /// Returns a simplified version of a BDD.
-    ///
-    /// This is calculated by looking at the relationships that exist between the constraints that
-    /// are mentioned in the BDD. For instance, if one constraint implies another (`x → y`), then
-    /// `x ∧ ¬y` is not a valid input, and we can rewrite any occurrences of `x ∨ y` into `y`.
-    fn simplify<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> NodeId {
-        let key = self.node();
-        if let Some(result) = storage.simplify_cache.get(&key) {
-            return *result;
-        }
-
-        // To simplify a non-terminal BDD, we find all pairs of constraints that are mentioned in
-        // the BDD. If any of those pairs can be simplified to some other BDD, we perform a
-        // substitution to replace the pair with the simplification.
-        //
-        // Some of the simplifications create _new_ constraints that weren't originally present in
-        // the BDD. If we encounter one of those cases, we need to check if we can simplify things
-        // further relative to that new constraint.
-        //
-        // To handle this, we keep track of the individual constraints that we have already
-        // discovered (`seen_constraints`), and a queue of constraint pairs that we still need to
-        // check (`to_visit`).
-
-        // Seed the seen set with all of the constraints that are present in the input BDD, and the
-        // visit queue with all pairs of those constraints. (We use "combinations" because we don't
-        // need to compare a constraint against itself, and because ordering doesn't matter.)
-        let mut seen_constraints = FxHashSet::default();
-        self.node()
-            .for_each_unique_constraint(storage, &mut |constraint| {
-                seen_constraints.insert(constraint);
-            });
-        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
-            .array_combinations()
-            .map(|[left, right]| (left, right))
-            .collect();
-
-        // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
-        // be simplified.
-        let mut simplified = self.node();
-        while let Some((left_constraint, right_constraint)) = to_visit.pop() {
-            // If the constraints refer to different typevars, the only simplifications we can make
-            // are of the form `S ≤ T ∧ T ≤ int → S ≤ int`.
-            let left_constraint_data = storage.constraint_data(left_constraint);
-            let left_typevar = left_constraint_data.typevar;
-            let right_constraint_data = storage.constraint_data(right_constraint);
-            let right_typevar = right_constraint_data.typevar;
-            if !left_typevar.is_same_typevar_as(db, right_typevar) {
-                // We've structured our constraints so that a typevar's upper/lower bound can only
-                // be another typevar if the bound is "later" in our arbitrary ordering. That means
-                // we only have to check this pair of constraints in one direction — though we do
-                // have to figure out which of the two typevars is constrained, and which one is
-                // the upper/lower bound.
-                let (bound_constraint, constrained_constraint) =
-                    if left_typevar.can_be_bound_for(db, storage, right_typevar) {
-                        (left_constraint, right_constraint)
-                    } else {
-                        (right_constraint, left_constraint)
-                    };
-                let bound_constraint_data = storage.constraint_data(bound_constraint);
-                let bound_typevar = bound_constraint_data.typevar;
-                let constrained_constraint_data = storage.constraint_data(constrained_constraint);
-                let constrained_typevar = constrained_constraint_data.typevar;
-
-                // We then look for cases where the "constrained" typevar's upper and/or lower
-                // bound matches the "bound" typevar. If so, we're going to add an implication to
-                // the constraint set that replaces the upper/lower bound that matched with the
-                // bound constraint's corresponding bound.
-                let (new_lower, new_upper) = match (
-                    constrained_constraint_data.bounds.lower,
-                    constrained_constraint_data.bounds.upper,
-                ) {
-                    // (B ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ BU)
-                    (
-                        Some(Type::TypeVar(constrained_lower)),
-                        Some(Type::TypeVar(constrained_upper)),
-                    ) if constrained_lower.is_same_typevar_as(db, bound_typevar)
-                        && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
-                    {
-                        (
-                            bound_constraint_data.bounds.lower,
-                            bound_constraint_data.bounds.upper,
-                        )
-                    }
-
-                    // (CL ≤ C ≤ B) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ BU)
-                    (constrained_lower, Some(Type::TypeVar(constrained_upper)))
-                        if constrained_upper.is_same_typevar_as(db, bound_typevar) =>
-                    {
-                        (constrained_lower, bound_constraint_data.bounds.upper)
-                    }
-
-                    // (B ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (BL ≤ C ≤ CU)
-                    (Some(Type::TypeVar(constrained_lower)), constrained_upper)
-                        if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
-                    {
-                        (bound_constraint_data.bounds.lower, constrained_upper)
-                    }
-
-                    _ => continue,
-                };
-
-                let new_constraint = ConstraintId::new_with_bounds(
-                    db,
-                    env,
-                    storage,
-                    constrained_typevar,
-                    new_lower,
-                    new_upper,
-                );
-                if seen_constraints.contains(&new_constraint) {
-                    continue;
-                }
-                let (new_node, _) = Node::new_constraint(storage, new_constraint);
-                let (positive_left_node, _) =
-                    Node::new_satisfied_constraint(storage, left_constraint.when_true());
-                let (positive_right_node, _) =
-                    Node::new_satisfied_constraint(storage, right_constraint.when_true());
-                let lhs = positive_left_node.and(storage, positive_right_node);
-                let intersection = new_node.ite(storage, lhs, ALWAYS_FALSE);
-                simplified = simplified.and(storage, intersection);
-                continue;
-            }
-
-            // From here on out we know that both constraints constrain the same typevar. The
-            // clause above will propagate all that we know about the current typevar relative to
-            // other typevars, producing constraints on this typevar that have concrete lower/upper
-            // bounds. That means we can skip the simplifications below if any bound is another
-            // typevar.
-            if left_constraint_data
-                .bounds
-                .lower
-                .is_some_and(Type::is_type_var)
-                || left_constraint_data
-                    .bounds
-                    .upper
-                    .is_some_and(Type::is_type_var)
-                || right_constraint_data
-                    .bounds
-                    .lower
-                    .is_some_and(Type::is_type_var)
-                || right_constraint_data
-                    .bounds
-                    .upper
-                    .is_some_and(Type::is_type_var)
-            {
-                continue;
-            }
-
-            // Containment: The range of one constraint might completely contain the range of the
-            // other. If so, there are several potential simplifications.
-            let larger_smaller = if left_constraint.implies(db, env, storage, right_constraint) {
-                Some((right_constraint, left_constraint))
-            } else if right_constraint.implies(db, env, storage, left_constraint) {
-                Some((left_constraint, right_constraint))
-            } else {
-                None
-            };
-            if let Some((larger_constraint, smaller_constraint)) = larger_smaller {
-                let (positive_larger_node, _) =
-                    Node::new_satisfied_constraint(storage, larger_constraint.when_true());
-                let (negative_larger_node, _) =
-                    Node::new_satisfied_constraint(storage, larger_constraint.when_false());
-
-                // larger ∨ smaller = larger
-                simplified = simplified.substitute_union(
-                    db,
-                    storage,
-                    larger_constraint.when_true(),
-                    smaller_constraint.when_true(),
-                    positive_larger_node,
-                );
-
-                // ¬larger ∧ ¬smaller = ¬larger
-                simplified = simplified.substitute_intersection(
-                    db,
-                    storage,
-                    larger_constraint.when_false(),
-                    smaller_constraint.when_false(),
-                    negative_larger_node,
-                );
-
-                // smaller ∧ ¬larger = false
-                // (¬larger removes everything that's present in smaller)
-                simplified = simplified.substitute_intersection(
-                    db,
-                    storage,
-                    larger_constraint.when_false(),
-                    smaller_constraint.when_true(),
-                    ALWAYS_FALSE,
-                );
-
-                // larger ∨ ¬smaller = true
-                // (larger fills in everything that's missing in ¬smaller)
-                simplified = simplified.substitute_union(
-                    db,
-                    storage,
-                    larger_constraint.when_true(),
-                    smaller_constraint.when_false(),
-                    ALWAYS_TRUE,
-                );
-            }
-
-            // There are some simplifications we can make when the intersection of the two
-            // constraints is empty, and others that we can make when the intersection is
-            // non-empty.
-            match left_constraint.intersect(db, env, storage, right_constraint) {
-                IntersectionResult::Simplified(intersection_constraint_data) => {
-                    let intersection_constraint =
-                        storage.intern_constraint(db, env, intersection_constraint_data);
-
-                    // If the intersection is non-empty, we need to create a new constraint to
-                    // represent that intersection. We also need to add the new constraint to our
-                    // seen set and (if we haven't already seen it) to the to-visit queue.
-                    if seen_constraints.insert(intersection_constraint) {
-                        to_visit.extend(
-                            (seen_constraints.iter().copied())
-                                .filter(|seen| *seen != intersection_constraint)
-                                .map(|seen| (seen, intersection_constraint)),
-                        );
-                    }
-                    let (positive_intersection_node, _) = Node::new_satisfied_constraint(
-                        storage,
-                        intersection_constraint.when_true(),
-                    );
-                    let (negative_intersection_node, _) = Node::new_satisfied_constraint(
-                        storage,
-                        intersection_constraint.when_false(),
-                    );
-
-                    let (positive_left_node, _) =
-                        Node::new_satisfied_constraint(storage, left_constraint.when_true());
-                    let (negative_left_node, _) =
-                        Node::new_satisfied_constraint(storage, left_constraint.when_false());
-
-                    let (positive_right_node, _) =
-                        Node::new_satisfied_constraint(storage, right_constraint.when_true());
-                    let (negative_right_node, _) =
-                        Node::new_satisfied_constraint(storage, right_constraint.when_false());
-
-                    // left ∧ right = intersection
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        storage,
-                        left_constraint.when_true(),
-                        right_constraint.when_true(),
-                        positive_intersection_node,
-                    );
-
-                    // ¬left ∨ ¬right = ¬intersection
-                    simplified = simplified.substitute_union(
-                        db,
-                        storage,
-                        left_constraint.when_false(),
-                        right_constraint.when_false(),
-                        negative_intersection_node,
-                    );
-
-                    // left ∧ ¬right = left ∧ ¬intersection
-                    // (clip the negative constraint to the smallest range that actually removes
-                    // something from positive constraint)
-                    let replacement = positive_left_node.and(storage, negative_intersection_node);
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        storage,
-                        left_constraint.when_true(),
-                        right_constraint.when_false(),
-                        replacement,
-                    );
-
-                    // ¬left ∧ right = ¬intersection ∧ right
-                    // (save as above but reversed)
-                    let replacement = positive_right_node.and(storage, negative_intersection_node);
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        storage,
-                        left_constraint.when_false(),
-                        right_constraint.when_true(),
-                        replacement,
-                    );
-
-                    // left ∨ ¬right = intersection ∨ ¬right
-                    // (clip the positive constraint to the smallest range that actually adds
-                    // something to the negative constraint)
-                    let replacement = negative_right_node.or(storage, positive_intersection_node);
-                    simplified = simplified.substitute_union(
-                        db,
-                        storage,
-                        left_constraint.when_true(),
-                        right_constraint.when_false(),
-                        replacement,
-                    );
-
-                    // ¬left ∨ right = ¬left ∨ intersection
-                    // (save as above but reversed)
-                    let replacement = negative_left_node.or(storage, positive_intersection_node);
-                    simplified = simplified.substitute_union(
-                        db,
-                        storage,
-                        left_constraint.when_false(),
-                        right_constraint.when_true(),
-                        replacement,
-                    );
-                }
-
-                // If the intersection doesn't simplify to a single clause, we shouldn't update the
-                // BDD.
-                IntersectionResult::CannotSimplify => {}
-
-                IntersectionResult::Disjoint => {
-                    // All of the below hold because we just proved that the intersection of left
-                    // and right is empty.
-
-                    let (positive_left_node, _) =
-                        Node::new_satisfied_constraint(storage, left_constraint.when_true());
-                    let (positive_right_node, _) =
-                        Node::new_satisfied_constraint(storage, right_constraint.when_true());
-
-                    // left ∧ right = false
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        storage,
-                        left_constraint.when_true(),
-                        right_constraint.when_true(),
-                        ALWAYS_FALSE,
-                    );
-
-                    // ¬left ∨ ¬right = true
-                    simplified = simplified.substitute_union(
-                        db,
-                        storage,
-                        left_constraint.when_false(),
-                        right_constraint.when_false(),
-                        ALWAYS_TRUE,
-                    );
-
-                    // left ∧ ¬right = left
-                    // (there is nothing in the hole of ¬right that overlaps with left)
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        storage,
-                        left_constraint.when_true(),
-                        right_constraint.when_false(),
-                        positive_left_node,
-                    );
-
-                    // ¬left ∧ right = right
-                    // (save as above but reversed)
-                    simplified = simplified.substitute_intersection(
-                        db,
-                        storage,
-                        left_constraint.when_false(),
-                        right_constraint.when_true(),
-                        positive_right_node,
-                    );
-                }
-            }
-        }
-
-        storage.simplify_cache.insert(key, simplified);
-        simplified
     }
 }
 
@@ -5349,78 +4715,6 @@ impl ConstraintAssignment {
             ConstraintAssignment::Unconstrained(constraint) => {
                 ConstraintAssignment::Unconstrained(constraint)
             }
-        }
-    }
-
-    fn negate(&mut self) {
-        *self = self.negated();
-    }
-
-    /// Returns whether this constraint implies another — i.e., whether every type that
-    /// satisfies this constraint also satisfies `other`.
-    ///
-    /// This is used to simplify how we display constraint sets, by removing redundant constraints
-    /// from a clause.
-    fn implies<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        other: Self,
-    ) -> bool {
-        match (self, other) {
-            // For two positive constraints, one range has to fully contain the other; the smaller
-            // constraint implies the larger.
-            //
-            //     ....|----other-----|....
-            //     ......|---self---|......
-            (
-                ConstraintAssignment::Positive(self_constraint),
-                ConstraintAssignment::Positive(other_constraint),
-            ) => self_constraint.implies(db, env, storage, other_constraint),
-
-            // For two negative constraints, one range has to fully contain the other; the ranges
-            // represent "holes", though, so the constraint with the larger range implies the one
-            // with the smaller.
-            //
-            //     |-----|...other...|-----|
-            //     |---|.....self......|---|
-            (
-                ConstraintAssignment::Negative(self_constraint),
-                ConstraintAssignment::Negative(other_constraint),
-            ) => other_constraint.implies(db, env, storage, self_constraint),
-
-            // For a positive and negative constraint, the ranges have to be disjoint, and the
-            // positive range implies the negative range.
-            //
-            //     |---------------|...self...|---|
-            //     ..|---other---|................|
-            (
-                ConstraintAssignment::Positive(self_constraint),
-                ConstraintAssignment::Negative(other_constraint),
-            ) => self_constraint
-                .intersect(db, env, storage, other_constraint)
-                .is_disjoint(),
-
-            // It's theoretically possible for a negative constraint to imply a positive constraint
-            // if the positive constraint is always satisfied (`Never ≤ T ≤ object`). But we never
-            // create constraints of that form, so with our representation, a negative constraint
-            // can never imply a positive constraint.
-            //
-            //     |------other-------|
-            //     |---|...self...|---|
-            (ConstraintAssignment::Negative(_), ConstraintAssignment::Positive(_)) => false,
-
-            // An `Unconstrained` assignment means "this constraint can go either way." It does
-            // not imply any positive or negative assignment, and no positive or negative
-            // assignment implies it. The only trivially true case is Unconstrained => Unconstrained
-            // for the same constraint.
-            (
-                ConstraintAssignment::Unconstrained(self_constraint),
-                ConstraintAssignment::Unconstrained(other_constraint),
-            ) => self_constraint == other_constraint,
-            (ConstraintAssignment::Unconstrained(_), _)
-            | (_, ConstraintAssignment::Unconstrained(_)) => false,
         }
     }
 
@@ -7767,70 +7061,6 @@ impl SatisfiedClause {
             .expect("clause vector should not be empty");
     }
 
-    /// Invokes a closure with the last constraint in this clause negated. Returns the clause back
-    /// to its original state after invoking the closure.
-    fn with_negated_last_constraint(&mut self, f: impl for<'a> FnOnce(&'a Self)) {
-        if self.constraints.is_empty() {
-            return;
-        }
-        let last_index = self.constraints.len() - 1;
-        self.constraints[last_index].negate();
-        f(self);
-        self.constraints[last_index].negate();
-    }
-
-    /// Removes another clause from this clause, if it appears as a prefix of this clause. Returns
-    /// whether the prefix was removed.
-    fn remove_prefix(&mut self, prefix: &SatisfiedClause) -> bool {
-        if self.constraints.starts_with(&prefix.constraints) {
-            self.constraints.drain(0..prefix.constraints.len());
-            return true;
-        }
-        false
-    }
-
-    /// Simplifies this clause by removing constraints that are implied by other constraints in the
-    /// clause. (Clauses are the intersection of constraints, so if two clauses are redundant, we
-    /// want to remove the larger one and keep the smaller one.)
-    ///
-    /// Returns a boolean that indicates whether any simplifications were made.
-    fn simplify<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> bool {
-        let mut changes_made = false;
-        let mut i = 0;
-        // Loop through each constraint, comparing it with any constraints that appear later in the
-        // list.
-        'outer: while i < self.constraints.len() {
-            let mut j = i + 1;
-            while j < self.constraints.len() {
-                if self.constraints[j].implies(db, env, storage, self.constraints[i]) {
-                    // If constraint `i` is removed, then we don't need to compare it with any
-                    // later constraints in the list. Note that we continue the outer loop, instead
-                    // of breaking from the inner loop, so that we don't bump index `i` below.
-                    // (We'll have swapped another element into place at that index, and want to
-                    // make sure that we process it.)
-                    self.constraints.swap_remove(i);
-                    changes_made = true;
-                    continue 'outer;
-                } else if self.constraints[i].implies(db, env, storage, self.constraints[j]) {
-                    // If constraint `j` is removed, then we can continue the inner loop. We will
-                    // swap a new element into place at index `j`, and will continue comparing the
-                    // constraint at index `i` with later constraints.
-                    self.constraints.swap_remove(j);
-                    changes_made = true;
-                } else {
-                    j += 1;
-                }
-            }
-            i += 1;
-        }
-        changes_made
-    }
-
     fn display<'db>(
         &self,
         db: &'db dyn Db,
@@ -7878,90 +7108,6 @@ struct SatisfiedClauses {
 impl SatisfiedClauses {
     fn push(&mut self, clause: SatisfiedClause) {
         self.clauses.push(clause);
-    }
-
-    /// Simplifies the DNF representation, removing redundancies that do not change the underlying
-    /// function. (This is used when displaying a BDD, to make sure that the representation that we
-    /// show is as simple as possible while still producing the same results.)
-    fn simplify<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) {
-        // First simplify each clause individually, by removing constraints that are implied by
-        // other constraints in the clause.
-        for clause in &mut self.clauses {
-            clause.simplify(db, env, storage);
-        }
-
-        while self.simplify_one_round() {
-            // Keep going
-        }
-
-        // We can remove any clauses that have been simplified to the point where they are empty.
-        // (Clauses are intersections, so an empty clause is `false`, which does not contribute
-        // anything to the outer union.)
-        self.clauses.retain(|clause| !clause.constraints.is_empty());
-    }
-
-    fn simplify_one_round(&mut self) -> bool {
-        let mut changes_made = false;
-
-        // First remove any duplicate clauses. (The clause list will start out with no duplicates
-        // in the first round of simplification, because of the guarantees provided by the BDD
-        // structure. But earlier rounds of simplification might have made some clauses redundant.)
-        // Note that we have to loop through the vector element indexes manually, since we might
-        // remove elements in each iteration.
-        let mut i = 0;
-        while i < self.clauses.len() {
-            let mut j = i + 1;
-            while j < self.clauses.len() {
-                if self.clauses[i] == self.clauses[j] {
-                    self.clauses.swap_remove(j);
-                    changes_made = true;
-                } else {
-                    j += 1;
-                }
-            }
-            i += 1;
-        }
-        if changes_made {
-            return true;
-        }
-
-        // Then look for "prefix simplifications". That is, looks for patterns
-        //
-        //   (A ∧ B) ∨ (A ∧ ¬B ∧ ...)
-        //
-        // and replaces them with
-        //
-        //   (A ∧ B) ∨ (...)
-        for i in 0..self.clauses.len() {
-            let (clause, rest) = self.clauses[..=i]
-                .split_last_mut()
-                .expect("index should be in range");
-            clause.with_negated_last_constraint(|clause| {
-                for existing in rest {
-                    changes_made |= existing.remove_prefix(clause);
-                }
-            });
-
-            let (clause, rest) = self.clauses[i..]
-                .split_first_mut()
-                .expect("index should be in range");
-            clause.with_negated_last_constraint(|clause| {
-                for existing in rest {
-                    changes_made |= existing.remove_prefix(clause);
-                }
-            });
-
-            if changes_made {
-                return true;
-            }
-        }
-
-        false
     }
 
     fn display<'db>(
