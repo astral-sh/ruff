@@ -22,6 +22,39 @@ def outer_generator():
     reveal_type(result)  # revealed: str
 ```
 
+## Generic generator return types
+
+A generic yield type does not change the generator's separately annotated send or return types.
+
+```py
+from collections.abc import Generator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def generator_return(value: T) -> Generator[T, None, None]:
+    sent = yield value
+    reveal_type(sent)  # revealed: None
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `None`, found `T@generator_return`"
+    return value
+```
+
+## Delegating to a generic generator expression
+
+A generator expression over an iterable of generic values remains compatible with an iterator that
+yields the same values.
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def delegated(values: Iterable[T]) -> Iterator[T]:
+    yield from (value for value in values)
+```
+
 ## `yield from` with a custom iterable
 
 `yield from` can also be used with custom iterable types. In that case, the type of the `yield from`
