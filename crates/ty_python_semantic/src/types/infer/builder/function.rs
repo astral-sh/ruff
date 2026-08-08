@@ -298,6 +298,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 expected_return_ty,
                             )
                         {
+                            // N.B. the implementation here is the ~same as for `UNSOUND_YIELD`;
+                            // update that too if updating this!
                             report_unsound_return_statement(
                                 &self.context,
                                 return_statement.range,
@@ -365,6 +367,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         TypeRelation::Redundancy { pure: true },
                     )
                 {
+                    // N.B. the implementation here is the ~same as for `UNSOUND_YIELD`;
+                    // update that too if updating this!
                     report_unsound_return_statement(
                         &self.context,
                         return_statement.range,
