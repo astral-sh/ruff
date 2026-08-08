@@ -1,1347 +1,676 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 260
 ---
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:17:1
+  --> non_augmented_assignment.py:16:1
    |
-15 | a_float = 0.5
-16 |
-17 | some_string = some_string + "a very long end of string"
+14 | mat1, mat2 = None, None
+15 |
+16 | some_string = some_string + "a very long end of string"
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-18 | index = index - 1
-19 | a_list = a_list + ["to concat"]
+17 | index = index - 1
+18 | a_list = a_list + ["to concat"]
    |
 help: Replace with augmented assignment
    |
-16 |
+15 |
    - some_string = some_string + "a very long end of string"
-17 + some_string += "a very long end of string"
-18 | index = index - 1
+16 + some_string += "a very long end of string"
+17 | index = index - 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `-=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:18:1
+  --> non_augmented_assignment.py:17:1
    |
-17 | some_string = some_string + "a very long end of string"
-18 | index = index - 1
+16 | some_string = some_string + "a very long end of string"
+17 | index = index - 1
    | ^^^^^^^^^^^^^^^^^
-19 | a_list = a_list + ["to concat"]
-20 | some_set = some_set | {"to concat"}
+18 | a_list = a_list + ["to concat"]
+19 | some_set = some_set | {"to concat"}
    |
 help: Replace with augmented assignment
    |
-17 | some_string = some_string + "a very long end of string"
+16 | some_string = some_string + "a very long end of string"
    - index = index - 1
-18 + index -= 1
-19 | a_list = a_list + ["to concat"]
+17 + index -= 1
+18 | a_list = a_list + ["to concat"]
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:19:1
+  --> non_augmented_assignment.py:18:1
    |
-17 | some_string = some_string + "a very long end of string"
-18 | index = index - 1
-19 | a_list = a_list + ["to concat"]
+16 | some_string = some_string + "a very long end of string"
+17 | index = index - 1
+18 | a_list = a_list + ["to concat"]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-20 | some_set = some_set | {"to concat"}
-21 | to_multiply = to_multiply * 5
+19 | some_set = some_set | {"to concat"}
+20 | to_multiply = to_multiply * 5
    |
 help: Replace with augmented assignment
    |
-18 | index = index - 1
+17 | index = index - 1
    - a_list = a_list + ["to concat"]
-19 + a_list += ["to concat"]
-20 | some_set = some_set | {"to concat"}
+18 + a_list += ["to concat"]
+19 | some_set = some_set | {"to concat"}
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `|=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:20:1
+  --> non_augmented_assignment.py:19:1
    |
-18 | index = index - 1
-19 | a_list = a_list + ["to concat"]
-20 | some_set = some_set | {"to concat"}
+17 | index = index - 1
+18 | a_list = a_list + ["to concat"]
+19 | some_set = some_set | {"to concat"}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-21 | to_multiply = to_multiply * 5
-22 | to_multiply = 5 * to_multiply
+20 | to_multiply = to_multiply * 5
+21 | to_multiply = 5 * to_multiply
    |
 help: Replace with augmented assignment
    |
-19 | a_list = a_list + ["to concat"]
+18 | a_list = a_list + ["to concat"]
    - some_set = some_set | {"to concat"}
-20 + some_set |= {"to concat"}
-21 | to_multiply = to_multiply * 5
+19 + some_set |= {"to concat"}
+20 | to_multiply = to_multiply * 5
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `*=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:20:1
+   |
+18 | a_list = a_list + ["to concat"]
+19 | some_set = some_set | {"to concat"}
+20 | to_multiply = to_multiply * 5
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 | to_multiply = 5 * to_multiply
+22 | to_multiply = to_multiply * to_multiply
+   |
+help: Replace with augmented assignment
+   |
+19 | some_set = some_set | {"to concat"}
+   - to_multiply = to_multiply * 5
+20 + to_multiply *= 5
+21 | to_multiply = 5 * to_multiply
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:21:1
    |
-19 | a_list = a_list + ["to concat"]
-20 | some_set = some_set | {"to concat"}
-21 | to_multiply = to_multiply * 5
+19 | some_set = some_set | {"to concat"}
+20 | to_multiply = to_multiply * 5
+21 | to_multiply = 5 * to_multiply
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-22 | to_multiply = 5 * to_multiply
-23 | to_multiply = to_multiply * to_multiply
+22 | to_multiply = to_multiply * to_multiply
+23 | to_divide = to_divide / 5
    |
 help: Replace with augmented assignment
    |
-20 | some_set = some_set | {"to concat"}
-   - to_multiply = to_multiply * 5
+20 | to_multiply = to_multiply * 5
+   - to_multiply = 5 * to_multiply
 21 + to_multiply *= 5
-22 | to_multiply = 5 * to_multiply
+22 | to_multiply = to_multiply * to_multiply
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:22:1
    |
-20 | some_set = some_set | {"to concat"}
-21 | to_multiply = to_multiply * 5
-22 | to_multiply = 5 * to_multiply
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-23 | to_multiply = to_multiply * to_multiply
-24 | to_divide = to_divide / 5
-   |
-help: Replace with augmented assignment
-   |
-21 | to_multiply = to_multiply * 5
-   - to_multiply = 5 * to_multiply
-22 + to_multiply *= 5
-23 | to_multiply = to_multiply * to_multiply
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:23:1
-   |
-21 | to_multiply = to_multiply * 5
-22 | to_multiply = 5 * to_multiply
-23 | to_multiply = to_multiply * to_multiply
+20 | to_multiply = to_multiply * 5
+21 | to_multiply = 5 * to_multiply
+22 | to_multiply = to_multiply * to_multiply
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-24 | to_divide = to_divide / 5
-25 | to_divide = to_divide // 5
+23 | to_divide = to_divide / 5
+24 | to_divide = to_divide // 5
    |
 help: Replace with augmented assignment
    |
-22 | to_multiply = 5 * to_multiply
+21 | to_multiply = 5 * to_multiply
    - to_multiply = to_multiply * to_multiply
-23 + to_multiply *= to_multiply
-24 | to_divide = to_divide / 5
+22 + to_multiply *= to_multiply
+23 | to_divide = to_divide / 5
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `/=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:24:1
+  --> non_augmented_assignment.py:23:1
    |
-22 | to_multiply = 5 * to_multiply
-23 | to_multiply = to_multiply * to_multiply
-24 | to_divide = to_divide / 5
+21 | to_multiply = 5 * to_multiply
+22 | to_multiply = to_multiply * to_multiply
+23 | to_divide = to_divide / 5
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-25 | to_divide = to_divide // 5
-26 | to_cube = to_cube**3
+24 | to_divide = to_divide // 5
+25 | to_cube = to_cube**3
    |
 help: Replace with augmented assignment
    |
-23 | to_multiply = to_multiply * to_multiply
+22 | to_multiply = to_multiply * to_multiply
    - to_divide = to_divide / 5
-24 + to_divide /= 5
-25 | to_divide = to_divide // 5
+23 + to_divide /= 5
+24 | to_divide = to_divide // 5
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `//=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:24:1
+   |
+22 | to_multiply = to_multiply * to_multiply
+23 | to_divide = to_divide / 5
+24 | to_divide = to_divide // 5
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 | to_cube = to_cube**3
+26 | to_cube = 3**to_cube
+   |
+help: Replace with augmented assignment
+   |
+23 | to_divide = to_divide / 5
+   - to_divide = to_divide // 5
+24 + to_divide //= 5
+25 | to_cube = to_cube**3
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `**=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:25:1
    |
-23 | to_multiply = to_multiply * to_multiply
-24 | to_divide = to_divide / 5
-25 | to_divide = to_divide // 5
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-26 | to_cube = to_cube**3
-27 | to_cube = 3**to_cube
-   |
-help: Replace with augmented assignment
-   |
-24 | to_divide = to_divide / 5
-   - to_divide = to_divide // 5
-25 + to_divide //= 5
-26 | to_cube = to_cube**3
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `**=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:26:1
-   |
-24 | to_divide = to_divide / 5
-25 | to_divide = to_divide // 5
-26 | to_cube = to_cube**3
+23 | to_divide = to_divide / 5
+24 | to_divide = to_divide // 5
+25 | to_cube = to_cube**3
    | ^^^^^^^^^^^^^^^^^^^^
-27 | to_cube = 3**to_cube
-28 | to_cube = to_cube**to_cube
+26 | to_cube = 3**to_cube
+27 | to_cube = to_cube**to_cube
    |
 help: Replace with augmented assignment
    |
-25 | to_divide = to_divide // 5
+24 | to_divide = to_divide // 5
    - to_cube = to_cube**3
-26 + to_cube **= 3
-27 | to_cube = 3**to_cube
+25 + to_cube **= 3
+26 | to_cube = 3**to_cube
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `**=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:28:1
+  --> non_augmented_assignment.py:27:1
    |
-26 | to_cube = to_cube**3
-27 | to_cube = 3**to_cube
-28 | to_cube = to_cube**to_cube
+25 | to_cube = to_cube**3
+26 | to_cube = 3**to_cube
+27 | to_cube = to_cube**to_cube
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-29 | timeDiffSeconds = timeDiffSeconds % 60
-30 | flags = flags & 0x1
+28 | timeDiffSeconds = timeDiffSeconds % 60
+29 | flags = flags & 0x1
    |
 help: Replace with augmented assignment
    |
-27 | to_cube = 3**to_cube
+26 | to_cube = 3**to_cube
    - to_cube = to_cube**to_cube
-28 + to_cube **= to_cube
-29 | timeDiffSeconds = timeDiffSeconds % 60
+27 + to_cube **= to_cube
+28 | timeDiffSeconds = timeDiffSeconds % 60
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `%=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:29:1
+  --> non_augmented_assignment.py:28:1
    |
-27 | to_cube = 3**to_cube
-28 | to_cube = to_cube**to_cube
-29 | timeDiffSeconds = timeDiffSeconds % 60
+26 | to_cube = 3**to_cube
+27 | to_cube = to_cube**to_cube
+28 | timeDiffSeconds = timeDiffSeconds % 60
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-30 | flags = flags & 0x1
-31 | flags = flags | 0x1
+29 | flags = flags & 0x1
+30 | flags = flags | 0x1
    |
 help: Replace with augmented assignment
    |
-28 | to_cube = to_cube**to_cube
+27 | to_cube = to_cube**to_cube
    - timeDiffSeconds = timeDiffSeconds % 60
-29 + timeDiffSeconds %= 60
-30 | flags = flags & 0x1
+28 + timeDiffSeconds %= 60
+29 | flags = flags & 0x1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `&=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:30:1
+  --> non_augmented_assignment.py:29:1
    |
-28 | to_cube = to_cube**to_cube
-29 | timeDiffSeconds = timeDiffSeconds % 60
-30 | flags = flags & 0x1
+27 | to_cube = to_cube**to_cube
+28 | timeDiffSeconds = timeDiffSeconds % 60
+29 | flags = flags & 0x1
    | ^^^^^^^^^^^^^^^^^^^
-31 | flags = flags | 0x1
-32 | flags = flags ^ 0x1
+30 | flags = flags | 0x1
+31 | flags = flags ^ 0x1
    |
 help: Replace with augmented assignment
    |
-29 | timeDiffSeconds = timeDiffSeconds % 60
+28 | timeDiffSeconds = timeDiffSeconds % 60
    - flags = flags & 0x1
-30 + flags &= 0x1
-31 | flags = flags | 0x1
+29 + flags &= 0x1
+30 | flags = flags | 0x1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `|=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:31:1
+  --> non_augmented_assignment.py:30:1
    |
-29 | timeDiffSeconds = timeDiffSeconds % 60
-30 | flags = flags & 0x1
-31 | flags = flags | 0x1
+28 | timeDiffSeconds = timeDiffSeconds % 60
+29 | flags = flags & 0x1
+30 | flags = flags | 0x1
    | ^^^^^^^^^^^^^^^^^^^
-32 | flags = flags ^ 0x1
-33 | flags = flags << 1
+31 | flags = flags ^ 0x1
+32 | flags = flags << 1
    |
 help: Replace with augmented assignment
    |
-30 | flags = flags & 0x1
+29 | flags = flags & 0x1
    - flags = flags | 0x1
-31 + flags |= 0x1
-32 | flags = flags ^ 0x1
+30 + flags |= 0x1
+31 | flags = flags ^ 0x1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `^=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:32:1
+  --> non_augmented_assignment.py:31:1
    |
-30 | flags = flags & 0x1
-31 | flags = flags | 0x1
-32 | flags = flags ^ 0x1
+29 | flags = flags & 0x1
+30 | flags = flags | 0x1
+31 | flags = flags ^ 0x1
    | ^^^^^^^^^^^^^^^^^^^
-33 | flags = flags << 1
-34 | flags = flags >> 1
+32 | flags = flags << 1
+33 | flags = flags >> 1
    |
 help: Replace with augmented assignment
    |
-31 | flags = flags | 0x1
+30 | flags = flags | 0x1
    - flags = flags ^ 0x1
-32 + flags ^= 0x1
-33 | flags = flags << 1
+31 + flags ^= 0x1
+32 | flags = flags << 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `<<=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:33:1
+  --> non_augmented_assignment.py:32:1
    |
-31 | flags = flags | 0x1
-32 | flags = flags ^ 0x1
-33 | flags = flags << 1
+30 | flags = flags | 0x1
+31 | flags = flags ^ 0x1
+32 | flags = flags << 1
    | ^^^^^^^^^^^^^^^^^^
-34 | flags = flags >> 1
-35 | mat1 = mat1 @ mat2
+33 | flags = flags >> 1
+34 | mat1 = mat1 @ mat2
    |
 help: Replace with augmented assignment
    |
-32 | flags = flags ^ 0x1
+31 | flags = flags ^ 0x1
    - flags = flags << 1
-33 + flags <<= 1
-34 | flags = flags >> 1
+32 + flags <<= 1
+33 | flags = flags >> 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `>>=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:34:1
+  --> non_augmented_assignment.py:33:1
    |
-32 | flags = flags ^ 0x1
-33 | flags = flags << 1
-34 | flags = flags >> 1
+31 | flags = flags ^ 0x1
+32 | flags = flags << 1
+33 | flags = flags >> 1
    | ^^^^^^^^^^^^^^^^^^
-35 | mat1 = mat1 @ mat2
-36 | a_list[1] = a_list[1] + 1
+34 | mat1 = mat1 @ mat2
+35 | a_list[1] = a_list[1] + 1
    |
 help: Replace with augmented assignment
    |
-33 | flags = flags << 1
+32 | flags = flags << 1
    - flags = flags >> 1
-34 + flags >>= 1
-35 | mat1 = mat1 @ mat2
+33 + flags >>= 1
+34 | mat1 = mat1 @ mat2
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `@=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:35:1
+  --> non_augmented_assignment.py:34:1
    |
-33 | flags = flags << 1
-34 | flags = flags >> 1
-35 | mat1 = mat1 @ mat2
+32 | flags = flags << 1
+33 | flags = flags >> 1
+34 | mat1 = mat1 @ mat2
    | ^^^^^^^^^^^^^^^^^^
-36 | a_list[1] = a_list[1] + 1
+35 | a_list[1] = a_list[1] + 1
    |
 help: Replace with augmented assignment
    |
-34 | flags = flags >> 1
+33 | flags = flags >> 1
    - mat1 = mat1 @ mat2
-35 + mat1 @= mat2
-36 | a_list[1] = a_list[1] + 1
+34 + mat1 @= mat2
+35 | a_list[1] = a_list[1] + 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:36:1
+  --> non_augmented_assignment.py:35:1
    |
-34 | flags = flags >> 1
-35 | mat1 = mat1 @ mat2
-36 | a_list[1] = a_list[1] + 1
+33 | flags = flags >> 1
+34 | mat1 = mat1 @ mat2
+35 | a_list[1] = a_list[1] + 1
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-37 |
-38 | a_list[0:2] = a_list[0:2] * 3
+36 |
+37 | a_list[0:2] = a_list[0:2] * 3
    |
 help: Replace with augmented assignment
    |
-35 | mat1 = mat1 @ mat2
+34 | mat1 = mat1 @ mat2
    - a_list[1] = a_list[1] + 1
-36 + a_list[1] += 1
-37 |
+35 + a_list[1] += 1
+36 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR6104 [*] Use `*=` to perform an augmented assignment directly
+  --> non_augmented_assignment.py:37:1
+   |
+35 | a_list[1] = a_list[1] + 1
+36 |
+37 | a_list[0:2] = a_list[0:2] * 3
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | a_list[:2] = a_list[:2] * 3
+39 | a_list[1:] = a_list[1:] * 3
+   |
+help: Replace with augmented assignment
+   |
+36 |
+   - a_list[0:2] = a_list[0:2] * 3
+37 + a_list[0:2] *= 3
+38 | a_list[:2] = a_list[:2] * 3
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:38:1
    |
-36 | a_list[1] = a_list[1] + 1
-37 |
-38 | a_list[0:2] = a_list[0:2] * 3
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-39 | a_list[:2] = a_list[:2] * 3
-40 | a_list[1:] = a_list[1:] * 3
+37 | a_list[0:2] = a_list[0:2] * 3
+38 | a_list[:2] = a_list[:2] * 3
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 | a_list[1:] = a_list[1:] * 3
+40 | a_list[:] = a_list[:] * 3
    |
 help: Replace with augmented assignment
    |
-37 |
-   - a_list[0:2] = a_list[0:2] * 3
-38 + a_list[0:2] *= 3
-39 | a_list[:2] = a_list[:2] * 3
+37 | a_list[0:2] = a_list[0:2] * 3
+   - a_list[:2] = a_list[:2] * 3
+38 + a_list[:2] *= 3
+39 | a_list[1:] = a_list[1:] * 3
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:39:1
    |
-38 | a_list[0:2] = a_list[0:2] * 3
-39 | a_list[:2] = a_list[:2] * 3
+37 | a_list[0:2] = a_list[0:2] * 3
+38 | a_list[:2] = a_list[:2] * 3
+39 | a_list[1:] = a_list[1:] * 3
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-40 | a_list[1:] = a_list[1:] * 3
-41 | a_list[:] = a_list[:] * 3
+40 | a_list[:] = a_list[:] * 3
    |
 help: Replace with augmented assignment
    |
-38 | a_list[0:2] = a_list[0:2] * 3
-   - a_list[:2] = a_list[:2] * 3
-39 + a_list[:2] *= 3
-40 | a_list[1:] = a_list[1:] * 3
+38 | a_list[:2] = a_list[:2] * 3
+   - a_list[1:] = a_list[1:] * 3
+39 + a_list[1:] *= 3
+40 | a_list[:] = a_list[:] * 3
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
   --> non_augmented_assignment.py:40:1
    |
-38 | a_list[0:2] = a_list[0:2] * 3
-39 | a_list[:2] = a_list[:2] * 3
-40 | a_list[1:] = a_list[1:] * 3
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-41 | a_list[:] = a_list[:] * 3
-   |
-help: Replace with augmented assignment
-   |
-39 | a_list[:2] = a_list[:2] * 3
-   - a_list[1:] = a_list[1:] * 3
-40 + a_list[1:] *= 3
-41 | a_list[:] = a_list[:] * 3
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:41:1
-   |
-39 | a_list[:2] = a_list[:2] * 3
-40 | a_list[1:] = a_list[1:] * 3
-41 | a_list[:] = a_list[:] * 3
+38 | a_list[:2] = a_list[:2] * 3
+39 | a_list[1:] = a_list[1:] * 3
+40 | a_list[:] = a_list[:] * 3
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-42 |
-43 | index = index * (index + 10)
+41 |
+42 | index = index * (index + 10)
    |
 help: Replace with augmented assignment
    |
-40 | a_list[1:] = a_list[1:] * 3
+39 | a_list[1:] = a_list[1:] * 3
    - a_list[:] = a_list[:] * 3
-41 + a_list[:] *= 3
-42 |
+40 + a_list[:] *= 3
+41 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `*=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:43:1
+  --> non_augmented_assignment.py:42:1
    |
-41 | a_list[:] = a_list[:] * 3
-42 |
-43 | index = index * (index + 10)
+40 | a_list[:] = a_list[:] * 3
+41 |
+42 | index = index * (index + 10)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Replace with augmented assignment
    |
-42 |
+41 |
    - index = index * (index + 10)
-43 + index *= (index + 10)
-44 |
+42 + index *= (index + 10)
+43 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:48:9
+  --> non_augmented_assignment.py:47:9
    |
-46 | class T:
-47 |     def t(self):
-48 |         self.a = self.a + 1
+45 | class T:
+46 |     def t(self):
+47 |         self.a = self.a + 1
    |         ^^^^^^^^^^^^^^^^^^^
 help: Replace with augmented assignment
    |
-47 |     def t(self):
+46 |     def t(self):
    -         self.a = self.a + 1
-48 +         self.a += 1
-49 |
+47 +         self.a += 1
+48 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:52:1
+  --> non_augmented_assignment.py:51:1
    |
-51 | obj = T()
-52 | obj.a = obj.a + 1
+50 | obj = T()
+51 | obj.a = obj.a + 1
    | ^^^^^^^^^^^^^^^^^
 help: Replace with augmented assignment
    |
-51 | obj = T()
+50 | obj = T()
    - obj.a = obj.a + 1
-52 + obj.a += 1
-53 |
+51 + obj.a += 1
+52 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:55:1
+  --> non_augmented_assignment.py:54:1
    |
-55 | a = a+-1
+54 | a = a+-1
    | ^^^^^^^^
-56 |
-57 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+55 |
+56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
    |
 help: Replace with augmented assignment
    |
-54 |
+53 |
    - a = a+-1
-55 + a += -1
-56 |
+54 + a += -1
+55 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:59:1
+  --> non_augmented_assignment.py:58:1
    |
-57 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
-58 | test = 0x5
-59 | test = test + 0xBA
+56 | # Regression tests for https://github.com/astral-sh/ruff/issues/11672
+57 | test = 0x5
+58 | test = test + 0xBA
    | ^^^^^^^^^^^^^^^^^^
-60 |
-61 | test2 = b""
+59 |
+60 | test2 = b""
    |
 help: Replace with augmented assignment
    |
-58 | test = 0x5
+57 | test = 0x5
    - test = test + 0xBA
-59 + test += 0xBA
-60 |
+58 + test += 0xBA
+59 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:62:1
+  --> non_augmented_assignment.py:61:1
    |
-61 | test2 = b""
-62 | test2 = test2 + b"\000"
+60 | test2 = b""
+61 | test2 = test2 + b"\000"
    | ^^^^^^^^^^^^^^^^^^^^^^^
-63 |
-64 | test3 = ""
+62 |
+63 | test3 = ""
    |
 help: Replace with augmented assignment
    |
-61 | test2 = b""
+60 | test2 = b""
    - test2 = test2 + b"\000"
-62 + test2 += b"\000"
-63 |
+61 + test2 += b"\000"
+62 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:65:1
+  --> non_augmented_assignment.py:64:1
    |
-64 |   test3 = ""
-65 | / test3 = test3 + (   a := R""
-66 | |                          f"oo"   )
+63 |   test3 = ""
+64 | / test3 = test3 + (   a := R""
+65 | |                          f"oo"   )
    | |__________________________________^
-67 |
-68 |   test4 = []
+66 |
+67 |   test4 = []
    |
 help: Replace with augmented assignment
    |
-64 | test3 = ""
+63 | test3 = ""
    - test3 = test3 + (   a := R""
-65 + test3 += (   a := R""
-66 |                          f"oo"   )
+64 + test3 += (   a := R""
+65 |                          f"oo"   )
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:69:1
+  --> non_augmented_assignment.py:68:1
    |
-68 |   test4 = []
-69 | / test4 = test4 + ( e
-70 | |                   for e in
-71 | |                   range(10)
-72 | |                   )
+67 |   test4 = []
+68 | / test4 = test4 + ( e
+69 | |                   for e in
+70 | |                   range(10)
+71 | |                   )
    | |___________________^
-73 |
-74 |   test5 = test5 + (
+72 |
+73 |   test5 = test5 + (
    |
 help: Replace with augmented assignment
    |
-68 | test4 = []
+67 | test4 = []
    - test4 = test4 + ( e
-69 + test4 += (( e
-70 |                   for e in
-71 |                   range(10)
+68 + test4 += (( e
+69 |                   for e in
+70 |                   range(10)
    -                   )
-72 +                   ))
-73 |
+71 +                   ))
+72 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:74:1
+  --> non_augmented_assignment.py:73:1
    |
-72 |                     )
-73 |
-74 | / test5 = test5 + (
-75 | |     4
-76 | |     *
-77 | |     10
-78 | | )
+71 |                     )
+72 |
+73 | / test5 = test5 + (
+74 | |     4
+75 | |     *
+76 | |     10
+77 | | )
    | |_^
-79 |
-80 |   test6 = test6 + \
+78 |
+79 |   test6 = test6 + \
    |
 help: Replace with augmented assignment
    |
-73 |
+72 |
    - test5 = test5 + (
-74 + test5 += (
-75 |     4
+73 + test5 += (
+74 |     4
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:80:1
+  --> non_augmented_assignment.py:79:1
    |
-78 |   )
-79 |
-80 | / test6 = test6 + \
-81 | |         (
-82 | |             4
-83 | |             *
-84 | |             10
-85 | |         )
+77 |   )
+78 |
+79 | / test6 = test6 + \
+80 | |         (
+81 | |             4
+82 | |             *
+83 | |             10
+84 | |         )
    | |_________^
-86 |
-87 |   test7 = \
+85 |
+86 |   test7 = \
    |
 help: Replace with augmented assignment
    |
-79 |
+78 |
    - test6 = test6 + \
    -         (
-80 + test6 += (
-81 |             4
+79 + test6 += (
+80 |             4
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:87:1
+  --> non_augmented_assignment.py:86:1
    |
-85 |           )
-86 |
-87 | / test7 = \
-88 | |         100 \
-89 | |     + test7
+84 |           )
+85 |
+86 | / test7 = \
+87 | |         100 \
+88 | |     + test7
    | |___________^
-90 |
-91 |   test8 = \
+89 |
+90 |   test8 = \
    |
 help: Replace with augmented assignment
    |
-86 |
+85 |
    - test7 = \
    -         100 \
    -     + test7
-87 + test7 += 100
-88 |
+86 + test7 += 100
+87 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PLR6104 [*] Use `+=` to perform an augmented assignment directly
-  --> non_augmented_assignment.py:91:1
+  --> non_augmented_assignment.py:90:1
    |
-89 |       + test7
-90 |
-91 | / test8 = \
-92 | |     886 \
-93 | |     + \
-94 | |  \
-95 | |     test8
+88 |       + test7
+89 |
+90 | / test8 = \
+91 | |     886 \
+92 | |     + \
+93 | |  \
+94 | |     test8
    | |_________^
 help: Replace with augmented assignment
    |
-90 |
+89 |
    - test8 = \
    -     886 \
    -     + \
    -  \
    -     test8
-91 + test8 += 886
-92 |
+90 + test8 += 886
+91 |
    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:100:1
-    |
- 98 | # Regression tests for https://github.com/astral-sh/ruff/issues/11656
- 99 | # Chains of an associative operator.
-100 | to_multiply = to_multiply * 2 * a_number * 4
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-101 | some_string = some_string + "2" + some_string + "4"
-102 | a_list = a_list + [1] + [2]
-    |
-help: Replace with augmented assignment
-    |
-99  | # Chains of an associative operator.
-    - to_multiply = to_multiply * 2 * a_number * 4
-100 + to_multiply *= 2 * a_number * 4
-101 | some_string = some_string + "2" + some_string + "4"
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:101:1
-    |
- 99 | # Chains of an associative operator.
-100 | to_multiply = to_multiply * 2 * a_number * 4
-101 | some_string = some_string + "2" + some_string + "4"
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-102 | a_list = a_list + [1] + [2]
-103 | some_set = some_set | {"to"} | {"concat"}
-    |
-help: Replace with augmented assignment
-    |
-100 | to_multiply = to_multiply * 2 * a_number * 4
-    - some_string = some_string + "2" + some_string + "4"
-101 + some_string += "2" + some_string + "4"
-102 | a_list = a_list + [1] + [2]
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:102:1
-    |
-100 | to_multiply = to_multiply * 2 * a_number * 4
-101 | some_string = some_string + "2" + some_string + "4"
-102 | a_list = a_list + [1] + [2]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-103 | some_set = some_set | {"to"} | {"concat"}
-104 | flags = flags & 0x1 & 0x2
-    |
-help: Replace with augmented assignment
-    |
-101 | some_string = some_string + "2" + some_string + "4"
-    - a_list = a_list + [1] + [2]
-102 + a_list += [1] + [2]
-103 | some_set = some_set | {"to"} | {"concat"}
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `|=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:103:1
-    |
-101 | some_string = some_string + "2" + some_string + "4"
-102 | a_list = a_list + [1] + [2]
-103 | some_set = some_set | {"to"} | {"concat"}
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-104 | flags = flags & 0x1 & 0x2
-105 | flags = flags | 0x1 | 0x2
-    |
-help: Replace with augmented assignment
-    |
-102 | a_list = a_list + [1] + [2]
-    - some_set = some_set | {"to"} | {"concat"}
-103 + some_set |= {"to"} | {"concat"}
-104 | flags = flags & 0x1 & 0x2
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `&=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:104:1
-    |
-102 | a_list = a_list + [1] + [2]
-103 | some_set = some_set | {"to"} | {"concat"}
-104 | flags = flags & 0x1 & 0x2
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-105 | flags = flags | 0x1 | 0x2
-106 | flags = flags ^ 0x1 ^ 0x2
-    |
-help: Replace with augmented assignment
-    |
-103 | some_set = some_set | {"to"} | {"concat"}
-    - flags = flags & 0x1 & 0x2
-104 + flags &= 0x1 & 0x2
-105 | flags = flags | 0x1 | 0x2
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `|=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:105:1
-    |
-103 | some_set = some_set | {"to"} | {"concat"}
-104 | flags = flags & 0x1 & 0x2
-105 | flags = flags | 0x1 | 0x2
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-106 | flags = flags ^ 0x1 ^ 0x2
-107 | index = index + 1 + 2 + 3 + 4
-    |
-help: Replace with augmented assignment
-    |
-104 | flags = flags & 0x1 & 0x2
-    - flags = flags | 0x1 | 0x2
-105 + flags |= 0x1 | 0x2
-106 | flags = flags ^ 0x1 ^ 0x2
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `^=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:106:1
-    |
-104 | flags = flags & 0x1 & 0x2
-105 | flags = flags | 0x1 | 0x2
-106 | flags = flags ^ 0x1 ^ 0x2
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-107 | index = index + 1 + 2 + 3 + 4
-108 | index = index * (index + 10) * 2
-    |
-help: Replace with augmented assignment
-    |
-105 | flags = flags | 0x1 | 0x2
-    - flags = flags ^ 0x1 ^ 0x2
-106 + flags ^= 0x1 ^ 0x2
-107 | index = index + 1 + 2 + 3 + 4
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:107:1
-    |
-105 | flags = flags | 0x1 | 0x2
-106 | flags = flags ^ 0x1 ^ 0x2
-107 | index = index + 1 + 2 + 3 + 4
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-108 | index = index * (index + 10) * 2
-109 | to_multiply = to_multiply * 2 * (a_number + 1)
-    |
-help: Replace with augmented assignment
-    |
-106 | flags = flags ^ 0x1 ^ 0x2
-    - index = index + 1 + 2 + 3 + 4
-107 + index += 1 + 2 + 3 + 4
-108 | index = index * (index + 10) * 2
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:108:1
-    |
-106 | flags = flags ^ 0x1 ^ 0x2
-107 | index = index + 1 + 2 + 3 + 4
-108 | index = index * (index + 10) * 2
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-109 | to_multiply = to_multiply * 2 * (a_number + 1)
-110 | index = index \
-    |
-help: Replace with augmented assignment
-    |
-107 | index = index + 1 + 2 + 3 + 4
-    - index = index * (index + 10) * 2
-108 + index *= (index + 10) * 2
-109 | to_multiply = to_multiply * 2 * (a_number + 1)
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:109:1
-    |
-107 | index = index + 1 + 2 + 3 + 4
-108 | index = index * (index + 10) * 2
-109 | to_multiply = to_multiply * 2 * (a_number + 1)
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-110 | index = index \
-111 |     + 1 \
-    |
-help: Replace with augmented assignment
-    |
-108 | index = index * (index + 10) * 2
-    - to_multiply = to_multiply * 2 * (a_number + 1)
-109 + to_multiply *= 2 * (a_number + 1)
-110 | index = index \
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:110:1
-    |
-108 |   index = index * (index + 10) * 2
-109 |   to_multiply = to_multiply * 2 * (a_number + 1)
-110 | / index = index \
-111 | |     + 1 \
-112 | |     + 2
-    | |_______^
-113 |
-114 |   # A parenthesized group of the same operator is an operand of the chain, not a link in it, so it
-    |
-help: Replace with augmented assignment
-    |
-109 | to_multiply = to_multiply * 2 * (a_number + 1)
-    - index = index \
-    -     + 1 \
-    -     + 2
-110 + index += (1 \
-111 +     + 2)
-112 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:116:1
-    |
-114 | # A parenthesized group of the same operator is an operand of the chain, not a link in it, so it
-115 | # stays grouped.
-116 | index = index + 1 + (2 + 3) + 4
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-117 |
-118 | # Targets that aren't a plain name, including one spread over several lines.
-    |
-help: Replace with augmented assignment
-    |
-115 | # stays grouped.
-    - index = index + 1 + (2 + 3) + 4
-116 + index += 1 + (2 + 3) + 4
-117 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:119:1
-    |
-118 | # Targets that aren't a plain name, including one spread over several lines.
-119 | a_list[1] = a_list[1] + 1 + 2
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-120 | a_list[
-121 |     1
-    |
-help: Replace with augmented assignment
-    |
-118 | # Targets that aren't a plain name, including one spread over several lines.
-    - a_list[1] = a_list[1] + 1 + 2
-119 + a_list[1] += 1 + 2
-120 | a_list[
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:120:1
-    |
-118 |   # Targets that aren't a plain name, including one spread over several lines.
-119 |   a_list[1] = a_list[1] + 1 + 2
-120 | / a_list[
-121 | |     1
-122 | | ] = a_list[
-123 | |     1
-124 | | ] + 2 + 3
-    | |_________^
-125 |
-126 |   # Parentheses around the target don't reach the AST, so the comparison against the assignment
-    |
-help: Replace with augmented assignment
-    |
-121 |     1
-    - ] = a_list[
-    -     1
-    - ] + 2 + 3
-122 + ] += 2 + 3
-123 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:128:1
-    |
-126 | # Parentheses around the target don't reach the AST, so the comparison against the assignment
-127 | # target still matches.
-128 | index = (index) + 1 + 2
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-129 |
-130 | # In a chain, the operands that stay on the right-hand side keep their order, so a side effect in
-    |
-help: Replace with augmented assignment
-    |
-127 | # target still matches.
-    - index = (index) + 1 + 2
-128 + index += 1 + 2
-129 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:132:1
-    |
-130 | # In a chain, the operands that stay on the right-hand side keep their order, so a side effect in
-131 | # one of them still runs exactly once, at the same point in the evaluation.
-132 | to_multiply = to_multiply * (a_number := 2) * 3
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-133 |
-134 | # Floating-point addition is not associative, so this fix can change the last bits of the result.
-    |
-help: Replace with augmented assignment
-    |
-131 | # one of them still runs exactly once, at the same point in the evaluation.
-    - to_multiply = to_multiply * (a_number := 2) * 3
-132 + to_multiply *= (a_number := 2) * 3
-133 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:136:1
-    |
-134 | # Floating-point addition is not associative, so this fix can change the last bits of the result.
-135 | # It is reported anyway, in line with the rest of the rule's unsafe fixes.
-136 | a_float = a_float + 0.1 + 0.2
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-137 |
-138 | # `**` is right-associative, so `to_cube**2**3` is `to_cube ** (2**3)`: not a chain at all, but a
-    |
-help: Replace with augmented assignment
-    |
-135 | # It is reported anyway, in line with the rest of the rule's unsafe fixes.
-    - a_float = a_float + 0.1 + 0.2
-136 + a_float += 0.1 + 0.2
-137 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `**=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:140:1
-    |
-138 | # `**` is right-associative, so `to_cube**2**3` is `to_cube ** (2**3)`: not a chain at all, but a
-139 | # single operation whose left operand happens to be the target.
-140 | to_cube = to_cube**2**3
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-141 |
-142 | # The parentheses that keep these continuation lines legal are dropped along with the rest of the
-    |
-help: Replace with augmented assignment
-    |
-139 | # single operation whose left operand happens to be the target.
-    - to_cube = to_cube**2**3
-140 + to_cube **= 2**3
-141 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:144:1
-    |
-142 |   # The parentheses that keep these continuation lines legal are dropped along with the rest of the
-143 |   # statement, so the fix has to add its own.
-144 | / index = (
-145 | |     index
-146 | |     + 1
-147 | |     + 2
-148 | | )
-    | |_^
-149 |   index = (
-150 |       index
-    |
-help: Replace with augmented assignment
-    |
-143 | # statement, so the fix has to add its own.
-    - index = (
-    -     index
-    -     + 1
-    -     + 2
-    - )
-144 + index += (1
-145 +     + 2)
-146 | index = (
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:149:1
-    |
-147 |       + 2
-148 |   )
-149 | / index = (
-150 | |     index
-151 | |     + 1  # a comment inside the chain
-152 | |     + 2
-153 | | )
-    | |_^
-154 |   to_multiply = (
-155 |       to_multiply
-    |
-help: Replace with augmented assignment
-    |
-148 | )
-    - index = (
-    -     index
-    -     + 1  # a comment inside the chain
-    -     + 2
-    - )
-149 + index += (1  # a comment inside the chain
-150 +     + 2)
-151 | to_multiply = (
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:154:1
-    |
-152 |       + 2
-153 |   )
-154 | / to_multiply = (
-155 | |     to_multiply
-156 | |     * 2
-157 | |     * (a_number + 1)
-158 | | )
-    | |_^
-159 |   index = (
-160 |       1
-    |
-help: Replace with augmented assignment
-    |
-153 | )
-    - to_multiply = (
-    -     to_multiply
-    -     * 2
-    -     * (a_number + 1)
-    - )
-154 + to_multiply *= (2
-155 +     * (a_number + 1))
-156 | index = (
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:159:1
-    |
-157 |       * (a_number + 1)
-158 |   )
-159 | / index = (
-160 | |     1
-161 | |     + 2
-162 | |     + index
-163 | | )
-    | |_^
-164 |   some_string = (
-165 |       some_string
-    |
-help: Replace with augmented assignment
-    |
-158 | )
-    - index = (
-    -     1
-    -     + 2
-    -     + index
-    - )
-159 + index += (1
-160 +     + 2)
-161 | some_string = (
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:164:1
-    |
-162 |       + index
-163 |   )
-164 | / some_string = (
-165 | |     some_string
-166 | |     + "implicitly"
-167 | |       "concatenated"
-168 | | )
-    | |_^
-169 |
-170 |   # Chains where the target is the rightmost operand, and every other operand is a number.
-    |
-help: Replace with augmented assignment
-    |
-163 | )
-    - some_string = (
-    -     some_string
-    -     + "implicitly"
-    -       "concatenated"
-    - )
-164 + some_string += ("implicitly"
-165 +       "concatenated")
-166 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:171:1
-    |
-170 | # Chains where the target is the rightmost operand, and every other operand is a number.
-171 | to_multiply = 2 * 3 * to_multiply
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-172 | index = 1 + 2 + index
-173 | index = 1 + 2 * 3 + index
-    |
-help: Replace with augmented assignment
-    |
-170 | # Chains where the target is the rightmost operand, and every other operand is a number.
-    - to_multiply = 2 * 3 * to_multiply
-171 + to_multiply *= 2 * 3
-172 | index = 1 + 2 + index
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:172:1
-    |
-170 | # Chains where the target is the rightmost operand, and every other operand is a number.
-171 | to_multiply = 2 * 3 * to_multiply
-172 | index = 1 + 2 + index
-    | ^^^^^^^^^^^^^^^^^^^^^
-173 | index = 1 + 2 * 3 + index
-174 | to_multiply = 2 * 3 * 4 * to_multiply
-    |
-help: Replace with augmented assignment
-    |
-171 | to_multiply = 2 * 3 * to_multiply
-    - index = 1 + 2 + index
-172 + index += 1 + 2
-173 | index = 1 + 2 * 3 + index
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:173:1
-    |
-171 | to_multiply = 2 * 3 * to_multiply
-172 | index = 1 + 2 + index
-173 | index = 1 + 2 * 3 + index
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-174 | to_multiply = 2 * 3 * 4 * to_multiply
-175 | flags = 0x1 | 0x2 | flags
-    |
-help: Replace with augmented assignment
-    |
-172 | index = 1 + 2 + index
-    - index = 1 + 2 * 3 + index
-173 + index += 1 + 2 * 3
-174 | to_multiply = 2 * 3 * 4 * to_multiply
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:174:1
-    |
-172 | index = 1 + 2 + index
-173 | index = 1 + 2 * 3 + index
-174 | to_multiply = 2 * 3 * 4 * to_multiply
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-175 | flags = 0x1 | 0x2 | flags
-    |
-help: Replace with augmented assignment
-    |
-173 | index = 1 + 2 * 3 + index
-    - to_multiply = 2 * 3 * 4 * to_multiply
-174 + to_multiply *= 2 * 3 * 4
-175 | flags = 0x1 | 0x2 | flags
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `|=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:175:1
-    |
-173 | index = 1 + 2 * 3 + index
-174 | to_multiply = 2 * 3 * 4 * to_multiply
-175 | flags = 0x1 | 0x2 | flags
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-176 |
-177 | # Unary `+`, `-` and `~` applied to a number still give a number.
-    |
-help: Replace with augmented assignment
-    |
-174 | to_multiply = 2 * 3 * 4 * to_multiply
-    - flags = 0x1 | 0x2 | flags
-175 + flags |= 0x1 | 0x2
-176 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:178:1
-    |
-177 | # Unary `+`, `-` and `~` applied to a number still give a number.
-178 | index = -1 + index
-    | ^^^^^^^^^^^^^^^^^^
-179 | index = -1 + -2 + index
-180 | to_multiply = +2 * -3 * to_multiply
-    |
-help: Replace with augmented assignment
-    |
-177 | # Unary `+`, `-` and `~` applied to a number still give a number.
-    - index = -1 + index
-178 + index += -1
-179 | index = -1 + -2 + index
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:179:1
-    |
-177 | # Unary `+`, `-` and `~` applied to a number still give a number.
-178 | index = -1 + index
-179 | index = -1 + -2 + index
-    | ^^^^^^^^^^^^^^^^^^^^^^^
-180 | to_multiply = +2 * -3 * to_multiply
-181 | flags = ~0x1 | 0x2 | flags
-    |
-help: Replace with augmented assignment
-    |
-178 | index = -1 + index
-    - index = -1 + -2 + index
-179 + index += -1 + -2
-180 | to_multiply = +2 * -3 * to_multiply
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `*=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:180:1
-    |
-178 | index = -1 + index
-179 | index = -1 + -2 + index
-180 | to_multiply = +2 * -3 * to_multiply
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-181 | flags = ~0x1 | 0x2 | flags
-    |
-help: Replace with augmented assignment
-    |
-179 | index = -1 + -2 + index
-    - to_multiply = +2 * -3 * to_multiply
-180 + to_multiply *= +2 * -3
-181 | flags = ~0x1 | 0x2 | flags
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `|=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:181:1
-    |
-179 | index = -1 + -2 + index
-180 | to_multiply = +2 * -3 * to_multiply
-181 | flags = ~0x1 | 0x2 | flags
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Replace with augmented assignment
-    |
-180 | to_multiply = +2 * -3 * to_multiply
-    - flags = ~0x1 | 0x2 | flags
-181 + flags |= ~0x1 | 0x2
-182 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-PLR6104 [*] Use `+=` to perform an augmented assignment directly
-   --> non_augmented_assignment.py:186:9
-    |
-184 | class U:
-185 |     def u(self):
-186 |         self.a = self.a + 1 + 2
-    |         ^^^^^^^^^^^^^^^^^^^^^^^
-help: Replace with augmented assignment
-    |
-185 |     def u(self):
-    -         self.a = self.a + 1 + 2
-186 +         self.a += 1 + 2
-187 |
-    |
 note: This is an unsafe fix and may change runtime behavior
