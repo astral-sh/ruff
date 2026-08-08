@@ -723,7 +723,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
         Expr::Call(ast::ExprCall {
             func: _,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) => {
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {

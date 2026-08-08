@@ -792,7 +792,7 @@ impl<'src> Parser<'src> {
         ast::ExprCall {
             func: Box::new(func),
             arguments,
-            range: self.node_range(start),
+            range_start: start,
             node_index: AtomicNodeIndex::NONE,
         }
     }

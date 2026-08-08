@@ -422,7 +422,10 @@ custom_source_order = true
 
 [Expr.nodes.ExprCall]
 doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
+custom_debug = true
+custom_range = true
 fields = [
+  { name = "range_start", type = "ruff_text_size::TextSize", skip_visit = true },
   { name = "func", type = "Expr" },
   { name = "arguments", type = "Arguments" },
 ]

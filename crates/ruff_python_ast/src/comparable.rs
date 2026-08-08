@@ -560,7 +560,7 @@ impl<'a> From<&'a ast::InterpolatedStringElement> for ComparableInterpolatedStri
             ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
                 value,
                 ..
-            }) => Self::Literal(value.as_ref().into()),
+            }) => Self::Literal(value.as_str().into()),
             ast::InterpolatedStringElement::Interpolation(formatted_value) => {
                 formatted_value.into()
             }
@@ -1235,7 +1235,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             ast::Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => Self::Call(ExprCall {
                 func: func.into(),

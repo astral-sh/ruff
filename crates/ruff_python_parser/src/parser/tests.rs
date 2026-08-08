@@ -1,4 +1,5 @@
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -50,6 +51,31 @@ fn test_expr_mode_valid_syntax() {
     let parsed = parse_expression(source).unwrap();
 
     insta::assert_debug_snapshot!(parsed.expr());
+}
+
+#[test]
+fn call_and_related_ranges_include_parentheses() {
+    let source = "(((func)))(arg=(value))";
+    let parsed = parse_expression(source).unwrap();
+    let Expr::Call(call) = parsed.expr() else {
+        panic!("expected a call expression, got {:?}", parsed.expr());
+    };
+
+    assert_eq!(call.range(), TextRange::up_to(source.text_len()));
+    assert_eq!(
+        call.arguments.keywords[0].range(),
+        TextRange::new(TextSize::new(11), source.text_len() - TextSize::new(1))
+    );
+
+    let source = "@((decorator))\ndef f(): pass\n";
+    let suite = parse_module(source).unwrap().into_suite();
+    let [Stmt::FunctionDef(function)] = suite.as_slice() else {
+        panic!("expected a function definition, got {suite:?}");
+    };
+    assert_eq!(
+        function.decorator_list[0].range(),
+        TextRange::new(TextSize::new(0), TextSize::new(14))
+    );
 }
 
 #[test]

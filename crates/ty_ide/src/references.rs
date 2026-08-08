@@ -616,7 +616,7 @@ impl<'a> LocalReferencesFinder<'a> {
         let [part] = string_expr.value.as_slice() else {
             return;
         };
-        if part.value.as_ref() != self.target_text {
+        if part.value.as_str() != self.target_text {
             return;
         }
 

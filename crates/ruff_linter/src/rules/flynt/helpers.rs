@@ -16,7 +16,7 @@ fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::Interpolat
 /// Convert a string to a [`ast::InterpolatedStringLiteralElement `].
 pub(super) fn to_interpolated_string_literal_element(s: &str) -> ast::InterpolatedStringElement {
     ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
-        value: Box::from(s),
+        value: s.into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
@@ -35,7 +35,7 @@ fn is_simple_call(expr: &Expr) -> bool {
                     range: _,
                     node_index: _,
                 },
-            range: _,
+            range_start: _,
             node_index: _,
         }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
         _ => false,
@@ -63,7 +63,7 @@ pub(super) fn to_interpolated_string_element(
             node_index,
         }) => Some(ast::InterpolatedStringElement::Literal(
             ast::InterpolatedStringLiteralElement {
-                value: value.to_string().into_boxed_str(),
+                value: value.to_string().into(),
                 range: *range,
                 node_index: node_index.clone(),
             },

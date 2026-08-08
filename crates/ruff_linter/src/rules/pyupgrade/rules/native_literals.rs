@@ -39,7 +39,7 @@ impl LiteralType {
     fn as_zero_value_expr(self, checker: &Checker) -> Expr {
         match self {
             LiteralType::Str => ast::StringLiteral {
-                value: Box::default(),
+                value: compact_str::CompactString::default(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 flags: checker.default_string_flags(),
@@ -196,7 +196,7 @@ pub(crate) fn native_literals(
                 range: _,
                 node_index: _,
             },
-        range: call_range,
+        range_start: _,
         node_index: _,
     } = call;
 
@@ -289,7 +289,8 @@ pub(crate) fn native_literals(
             // Ex) `bool(True)and None` no space between `)` and the keyword `and`.
             //
             // Subtract 1 from the end of the range to include `Rpar` token in the slice.
-            if let [paren_token, next_token, ..] = tokens.after(call_range.sub_end(1.into()).end())
+            if let [paren_token, next_token, ..] =
+                tokens.after(call.range().sub_end(1.into()).end())
             {
                 needs_space = next_token.kind().is_keyword()
                     && paren_token.range().end() == next_token.range().start();
@@ -328,7 +329,7 @@ pub(crate) fn native_literals(
                 content.push(' ');
             }
 
-            let applicability = if checker.comment_ranges().intersects(call.range) {
+            let applicability = if checker.comment_ranges().intersects(call.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
