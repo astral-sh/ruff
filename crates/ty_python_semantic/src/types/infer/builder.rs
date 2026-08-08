@@ -4218,6 +4218,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Infer an annotated assignment's annotation using the file's deferred-annotation semantics.
+    fn infer_annotated_assignment_annotation(
+        &mut self,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+    ) -> TypeAndQualifiers<'db> {
+        let annotation = assignment.annotation(self.module());
+
+        // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
+        self.setup_dataclass_field_specifiers();
+        let declared = self.infer_annotation_expression_allow_pep_613(
+            annotation,
+            DeferredExpressionState::from(self.defer_annotations()),
+        );
+        self.dataclass_field_specifiers.clear();
+
+        declared
+    }
+
+    /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
+    pub(super) fn infer_annotated_assignment_cycle_initial(
+        mut self,
+        definition: Definition<'db>,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+        cycle_recovery: Type<'db>,
+    ) -> DefinitionInference<'db> {
+        let declared = self.infer_annotated_assignment_annotation(assignment);
+        self.declarations.insert(definition, declared);
+        self.cycle_recovery = Some(cycle_recovery);
+        self.finish_inferred_definition(definition)
+    }
+
     /// Infer the types in an annotated assignment definition.
     fn infer_annotated_assignment_definition(
         &mut self,
@@ -4265,13 +4296,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotation = assignment.annotation(self.module());
-        // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
-        self.setup_dataclass_field_specifiers();
-        let mut declared = self.infer_annotation_expression_allow_pep_613(
-            annotation,
-            DeferredExpressionState::from(self.defer_annotations()),
-        );
-        self.dataclass_field_specifiers.clear();
+        let mut declared = self.infer_annotated_assignment_annotation(assignment);
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
@@ -11322,7 +11347,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         self.infer_region();
+        self.finish_inferred_definition(definition)
+    }
 
+    fn finish_inferred_definition(self, definition: Definition<'db>) -> DefinitionInference<'db> {
         let Self {
             context,
             expressions,

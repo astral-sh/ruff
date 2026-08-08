@@ -67,6 +67,117 @@ def f() -> list[Literal[1]]:
     return [1]
 ```
 
+## Loop-carried assignment context
+
+A declaration inside a loop provides context to assignments that reach it from an earlier iteration.
+
+### While loops
+
+A declaration inside a `while` loop applies to list literals assigned in each iteration.
+
+```py
+while True:
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### For loops
+
+The same declaration context applies to assignments in a `for` loop.
+
+```py
+for _ in range(2):
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### Nested dictionary values
+
+A declaration inside a loop also provides context for values nested within a dictionary literal.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    values: list[float]
+
+while True:
+    record: Record
+    record = {"values": [1]}
+    reveal_type(record)  # revealed: Record
+```
+
+### Invalid dictionary values
+
+An incompatible dictionary item is reported at the assignment, not at the declaration.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    value: int
+
+while True:
+    record: Record
+    record = {"value": "invalid"}  # error: [invalid-argument-type]
+    reveal_type(record)  # revealed: Record
+```
+
+### Stringified annotations
+
+String annotations provide their resolved type when a loop-carried assignment needs context.
+
+```py
+while True:
+    values: "list[object]"
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### Deferred forward references
+
+Deferred annotations resolve a `TypedDict` defined after the loop before inferring its dictionary
+assignments.
+
+```py
+from __future__ import annotations
+from typing import TypedDict
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    reveal_type(record)  # revealed: Record
+
+    invalid: Record
+    invalid = {"value": "invalid"}  # error: [invalid-argument-type]
+
+class Record(TypedDict):
+    value: int
+```
+
+### Deferred forward references on Python 3.14
+
+Annotations are deferred by default in Python 3.14 and later.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypedDict
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    reveal_type(record)  # revealed: Record
+
+class Record(TypedDict):
+    value: int
+```
+
 ## Collection literals
 
 ### Basic
