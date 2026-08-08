@@ -90,9 +90,9 @@ approved replan.
 The incomplete Phase 5 revision `pvynqtrq` and its pause revision are diagnostic snapshots, not
 part of the implementation path. The new static-sequent phase starts after `sqkowvys` (the
 completed Phase 4 stack plus the raw-graph fix) and the approved plan-only revisions. Phase 5 is a
-child of that static revision. The detailed static requirements remain in
-`~/.pi/memory/plans/ruff/fully-static-sequents/PLAN.md`; this document is authoritative for phase
-order and completion markers.
+child of that static revision. The former standalone plan is archived at
+`~/.pi/memory/archive/plans/ruff/fully-static-sequents/PLAN.md` for historical rationale only;
+this document now owns the active static requirements, phase order, and completion markers.
 
 The implementation and landing order is:
 
