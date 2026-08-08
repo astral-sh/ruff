@@ -32,7 +32,6 @@ error[RUF077]: Instance receiver parameter should not have a default value
   |
 2 |     def method(self=None): ...  # snapshot: method-receiver-default
   |                     ^^^^
-  |
 help: Remove default value from receiver parameter
 ```
 
