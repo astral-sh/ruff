@@ -82,7 +82,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// It also regroups the operands of a chain, e.g., `x = x + y + z` becomes
-/// `x += y + z`. Floating-point addition and multiplication are not
+/// `x += y + z`. Floating-point addition and multiplication are not truly
 /// associative, so the result can differ in the last bits: `(0.1 + 0.2) + 0.3`
 /// is not `0.1 + (0.2 + 0.3)`.
 ///
@@ -209,14 +209,12 @@ fn innermost_chain_link<'a>(tokens: &Tokens, value: &'a ExprBinOp) -> &'a ExprBi
 /// Returns `true` if `expr` is a literal number or boolean, or an operation over such literals,
 /// e.g. `1`, `True`, `-2`, `(not 0)`, or `2 * 3`.
 ///
-/// Any operator applied to numbers either produces a number or raises, so the whole expression is
-/// known to be a number without having to infer any types. That includes nonsense like `2 @ 3`,
-/// which is accepted here: it raises either way, so the rewrite doesn't change the behavior.
+/// Binary operations count too, not just a single literal under unary operators: an operator applied
+/// to numbers either produces a number or raises (like `2 @ 3`), and `not` always produces a boolean,
+/// so the whole expression is known to be a number without inferring any types.
 ///
-/// `not` is included even though it says nothing about its operand's type, because it always
-/// evaluates to a boolean. The operand still has to be a literal here: `x = (not "") + x` would be
-/// just as safe to rewrite, but the check deliberately stays narrow. Note that `not` can only reach
-/// this point parenthesized, as in `x = (not 0) + x`; `not 0 + x` parses as `not (0 + x)` instead.
+/// Note that `not` can only reach this point parenthesized, as in `x = (not 0) + x`; `not 0 + x`
+/// parses as `not (0 + x)` instead.
 fn is_numeric_constant(expr: &Expr) -> bool {
     match expr {
         Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) => true,
