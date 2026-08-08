@@ -95,25 +95,31 @@ def _[T]() -> None:
     ConstraintSet.equality(T, Base)
 ```
 
-Gradual lower and upper evidence bounds behave like their bottom and top materializations,
-respectively.
+The static-sequent boundary keeps gradual range atoms distinct from ranges over their fully static
+materializations instead of using gradual assignability to prove them equivalent.
 
 ```py
 def _[T]() -> None:
+    # XXX: Phase 5 must classify whether these atoms should remain distinct or recover
+    # materialization equivalence without reintroducing gradual sequent implication.
     constraints = ConstraintSet.range(Base, T, Any)
     expected = ConstraintSet.range(Base, T, object)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ConstraintSet.range(Sequence[Base], T, Sequence[object])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Any, T, Base)
     expected = ConstraintSet.range(Never, T, Base)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ConstraintSet.range(Sequence[Never], T, Sequence[Base])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 ```
 
@@ -262,25 +268,31 @@ def _[T]() -> None:
     ~ConstraintSet.equality(T, Base)
 ```
 
-Gradual lower and upper evidence bounds behave like their bottom and top materializations,
-respectively.
+Negating the ranges preserves the same distinction between gradual atoms and fully static
+materialization ranges.
 
 ```pyi
 def _[T]() -> None:
+    # XXX: Phase 5 must classify whether these atoms should remain distinct or recover
+    # materialization equivalence without reintroducing gradual sequent implication.
     constraints = ~ConstraintSet.range(Base, T, Any)
     expected = ~ConstraintSet.range(Base, T, object)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
     expected = ~ConstraintSet.range(Sequence[Base], T, Sequence[object])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Any, T, Base)
     expected = ~ConstraintSet.range(Never, T, Base)
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ~ConstraintSet.range(Sequence[Never], T, Sequence[Base])
+    # error: [static-assert-error]
     static_assert(constraints == expected)
 ```
 
@@ -453,6 +465,29 @@ def _[T, U: Any, V]() -> None:
 
     symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
     static_assert(not ~symbolic_match)
+```
+
+### Gradual assignability does not imply transitive constraints
+
+The sequent map closes a constraint path transitively, but gradual assignability is not transitive.
+In particular, `int` is assignable to `Any` and `Any` is assignable to `str`, but `int` is not
+assignable to `str`. The middle constraint must not make the first and third constraints imply each
+other.
+
+```py
+from typing import Any, reveal_type
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def _[T]() -> None:
+    exact_int = ConstraintSet.equality(T, int)
+    upper_any = ConstraintSet.upper_bound(T, Any)
+    upper_str = ConstraintSet.upper_bound(T, str)
+    constraints = exact_int & upper_any & ~upper_str
+
+    # `T = int` satisfies both positive constraints while not satisfying `T ≤ str`.
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
 ```
 
 ### Intersection of a range and a negated range

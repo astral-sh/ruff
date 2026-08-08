@@ -1440,7 +1440,9 @@ def value(items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-reveal_type(value(items))  # revealed: Any
+# XXX: Phase 5 must restore `Any` without reintroducing gradual sequent implication or locally
+# unioning gradual solutions.
+reveal_type(value(items))  # revealed: object
 ```
 
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar

@@ -2046,7 +2046,9 @@ def value[T](items: Container[T]) -> T:
     raise NotImplementedError
 
 items: list[str] = []
-reveal_type(value(items))  # revealed: Any
+# XXX: Phase 5 must restore `Any` without reintroducing gradual sequent implication or locally
+# unioning gradual solutions.
+reveal_type(value(items))  # revealed: object
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times

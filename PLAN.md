@@ -430,16 +430,26 @@ expanding `Solutions`:
 - [x] Phase 2: replace optional constraint bounds with validity/evidence bounds.
 - [x] Phase 3: reintroduce support-derived validity-domain construction.
 - [x] Phase 4: preserve evidence-derived variance and add complete-path pruning.
-- [ ] Static-sequent integration phase: restrict concrete sequents and characterize temporary
-    regressions in a non-mergeable intermediate revision.
+- [x] Static-sequent integration phase: restrict concrete sequents and characterize temporary
+    regressions in a non-mergeable intermediate revision. Change `kqntvqkmuuqp`, commit
+    `f5d21fd5194b720803865f6160fbbb430b0c4eb2`.
 - [ ] Phase 5: activate the domain-conjoined TDD, simplify default solving, and restore every
     temporary static-phase regression.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
 revision, relevant documentation/tests, and a passing full test suite. The abandoned Phase 5 and
-standalone fully-static revisions are diagnostic evidence only. Implement the static phase in a new
-revision based on this replanning revision, then implement Phase 5 as its child; do not layer either
-onto `pvynqtrq` or copy its rejected workarounds.
+standalone fully-static revisions are diagnostic evidence only. Implement Phase 5 in a new revision
+on top of the static checkpoint and this plan-only checkpoint; do not layer it onto `pvynqtrq` or
+copy its rejected workarounds.
+
+The static checkpoint passes all 816 `ty_python_semantic` tests, all 8,908 workspace tests, workspace
+clippy, and prek. It records seven `XXX: Phase 5` markers covering gradual range algebra,
+`Container[T]`, recursive protocol inference, and mutable `TypedDict` correlation. A constraint-order
+wobble audit found that every non-normal mode already failed on the pre-static Phase 4 baseline. The
+static phase adds one temporary mask-4 mismatch for the mutable `TypedDict` case: normal ordering
+now reports the characterized `object` regression while mask 4 already retains the final `int`
+behavior. Phase 5 must restore the correlation and make those outcomes converge; do not update a
+wobble expectation to preserve the intermediate diagnostic.
 
 ### Phase 1: retain bound type-variable instances in constraint-set arenas
 
