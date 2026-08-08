@@ -4236,6 +4236,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         declared
     }
 
+    /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
+    pub(super) fn infer_annotated_assignment_cycle_initial(
+        mut self,
+        definition: Definition<'db>,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+        cycle_recovery: Type<'db>,
+    ) -> DefinitionInference<'db> {
+        let declared = self.infer_annotated_assignment_annotation(assignment);
+        self.declarations.insert(definition, declared);
+        self.cycle_recovery = Some(cycle_recovery);
+        self.finish_inferred_definition(definition)
+    }
+
     /// Infer the types in an annotated assignment definition.
     fn infer_annotated_assignment_definition(
         &mut self,
@@ -11334,19 +11347,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         self.infer_region();
-        self.finish_inferred_definition(definition)
-    }
-
-    /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
-    pub(super) fn finish_annotated_assignment_cycle_initial(
-        mut self,
-        definition: Definition<'db>,
-        assignment: &AnnotatedAssignmentDefinitionKind,
-        cycle_recovery: Type<'db>,
-    ) -> DefinitionInference<'db> {
-        let declared = self.infer_annotated_assignment_annotation(assignment);
-        self.declarations.insert(definition, declared);
-        self.cycle_recovery = Some(cycle_recovery);
         self.finish_inferred_definition(definition)
     }
 

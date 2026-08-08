@@ -1424,7 +1424,7 @@ impl<'db> DefinitionInference<'db> {
                     index,
                     &module,
                 )
-                .finish_annotated_assignment_cycle_initial(
+                .infer_annotated_assignment_cycle_initial(
                     definition,
                     assignment,
                     cycle_recovery,
