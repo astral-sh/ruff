@@ -8,7 +8,9 @@ use std::sync::Arc;
 use serde::{Deserialize, Deserializer};
 use toml::Spanned;
 
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::Db;
+use ruff_db::files::{File, system_path_to_file};
+use ruff_db::system::SystemPathBuf;
 use ruff_text_size::{TextRange, TextSize};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,6 +21,12 @@ pub enum ValueSource {
     /// Ideally, we'd use [`ruff_db::files::File`] but we can't because the database hasn't been
     /// created when loading the configuration.
     File(Arc<SystemPathBuf>),
+
+    /// Value loaded from inline metadata in a standalone script.
+    ///
+    /// Unlike project configuration, scripts are parsed after the database exists, so their
+    /// existing Salsa file can be retained directly, including for virtual files.
+    ScriptMetadata(File),
 
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
@@ -35,9 +43,11 @@ pub enum ValueSource {
 }
 
 impl ValueSource {
-    pub fn file(&self) -> Option<&SystemPath> {
+    /// Resolves the file containing this setting, if its source is file-backed.
+    pub fn file(&self, db: &dyn Db) -> Option<File> {
         match self {
-            ValueSource::File(path) => Some(&**path),
+            ValueSource::File(path) => system_path_to_file(db, &**path).ok(),
+            ValueSource::ScriptMetadata(file) => Some(*file),
             ValueSource::Cli => None,
             ValueSource::Editor => None,
             ValueSource::UvWorkspace => None,
@@ -140,15 +150,19 @@ where
 
 impl<T> RangedValue<T> {
     pub fn new(value: T, source: ValueSource) -> Self {
-        Self::with_range(value, source, TextRange::default())
+        Self {
+            value,
+            source,
+            range: None,
+        }
     }
 
     pub fn cli(value: T) -> Self {
-        Self::with_range(value, ValueSource::Cli, TextRange::default())
+        Self::new(value, ValueSource::Cli)
     }
 
     pub fn python_extension(value: T) -> Self {
-        Self::with_range(value, ValueSource::Editor, TextRange::default())
+        Self::new(value, ValueSource::Editor)
     }
 
     fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
