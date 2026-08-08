@@ -63,7 +63,7 @@ pub(super) fn to_interpolated_string_element(
             node_index,
         }) => Some(ast::InterpolatedStringElement::Literal(
             ast::InterpolatedStringLiteralElement {
-                value: value.to_string().into(),
+                value: value.to_str().into(),
                 range: *range,
                 node_index: node_index.clone(),
             },

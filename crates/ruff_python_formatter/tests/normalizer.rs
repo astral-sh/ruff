@@ -115,10 +115,7 @@ impl Transformer for Normalizer {
                             if let Some(InterpolatedStringElement::Literal(existing_literal)) =
                                 self.elements.last_mut()
                             {
-                                let value = std::mem::take(&mut existing_literal.value);
-                                let mut value = value.into_string();
-                                value.push_str(literal);
-                                existing_literal.value = value.into();
+                                existing_literal.value.push_str(literal);
                                 existing_literal.range =
                                     TextRange::new(existing_literal.start(), range.end());
                             } else {

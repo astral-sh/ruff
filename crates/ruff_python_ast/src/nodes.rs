@@ -1229,7 +1229,7 @@ impl From<FString> for Expr {
 /// A newtype wrapper around a list of [`InterpolatedStringElement`].
 #[derive(Clone, Default, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
+pub struct InterpolatedStringElements(Box<[InterpolatedStringElement]>);
 
 impl InterpolatedStringElements {
     /// Returns an iterator over all the [`InterpolatedStringLiteralElement`] nodes contained in this f-string.
@@ -1244,9 +1244,8 @@ impl InterpolatedStringElements {
 }
 
 impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
-    fn from(mut elements: Vec<InterpolatedStringElement>) -> Self {
-        elements.shrink_to_fit();
-        InterpolatedStringElements(elements)
+    fn from(elements: Vec<InterpolatedStringElement>) -> Self {
+        InterpolatedStringElements(elements.into_boxed_slice())
     }
 }
 
@@ -3934,28 +3933,8 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
-    use ruff_text_size::TextRange;
-
     use crate::generated::*;
-    use crate::{
-        Arguments, AtomicNodeIndex, InterpolatedStringElement, InterpolatedStringLiteralElement,
-        Mod, Parameters,
-    };
-
-    #[test]
-    fn interpolated_string_elements_discard_excess_capacity() {
-        let mut elements = Vec::with_capacity(4);
-        elements.push(InterpolatedStringElement::Literal(
-            InterpolatedStringLiteralElement {
-                range: TextRange::default(),
-                node_index: AtomicNodeIndex::NONE,
-                value: "literal".into(),
-            },
-        ));
-
-        let elements = super::InterpolatedStringElements::from(elements);
-        assert_eq!(elements.0.capacity(), elements.len());
-    }
+    use crate::{Arguments, Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3968,6 +3947,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
+        assert_eq!(std::mem::size_of::<super::InterpolatedStringElements>(), 16);
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
