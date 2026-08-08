@@ -1318,6 +1318,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryRegularExpression) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
             }
+            if checker.is_rule_enabled(Rule::UnnecessaryRegularExpressionCompile) {
+                ruff::rules::unnecessary_regular_expression_compile(checker, call);
+            }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
