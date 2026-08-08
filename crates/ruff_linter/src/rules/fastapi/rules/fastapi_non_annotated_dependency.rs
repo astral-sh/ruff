@@ -136,7 +136,7 @@ pub(crate) fn fastapi_non_annotated_dependency(
                 default,
                 kind: dependency,
                 name: parameter.name(),
-                range: parameter.range,
+                range: parameter.range(),
             };
             seen_default = create_diagnostic(
                 checker,

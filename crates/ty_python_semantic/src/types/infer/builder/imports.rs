@@ -167,7 +167,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let ast::Alias {
-            range: _,
+            range_end: _,
             node_index: _,
             name,
             asname,

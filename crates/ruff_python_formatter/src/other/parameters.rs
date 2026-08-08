@@ -382,7 +382,7 @@ pub(crate) fn find_parameter_separators(
         let after_parameters = parameters
             .args
             .last()
-            .map(|arg| arg.range.end())
+            .map(Ranged::end)
             .or(slash.map(|(_, slash)| slash.end()));
         if let Some(preceding_end) = after_parameters {
             let range = TextRange::new(preceding_end, parameters.end());
