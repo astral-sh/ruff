@@ -1228,7 +1228,7 @@ impl From<FString> for Expr {
 /// A newtype wrapper around a list of [`InterpolatedStringElement`].
 #[derive(Clone, Default, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
+pub struct InterpolatedStringElements(Box<[InterpolatedStringElement]>);
 
 impl InterpolatedStringElements {
     /// Returns an iterator over all the [`InterpolatedStringLiteralElement`] nodes contained in this f-string.
@@ -1244,7 +1244,7 @@ impl InterpolatedStringElements {
 
 impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
     fn from(elements: Vec<InterpolatedStringElement>) -> Self {
-        InterpolatedStringElements(elements)
+        InterpolatedStringElements(elements.into_boxed_slice())
     }
 }
 
@@ -3924,6 +3924,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
+        assert_eq!(std::mem::size_of::<super::InterpolatedStringElements>(), 16);
         assert_eq!(std::mem::size_of::<Expr>(), 72);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
