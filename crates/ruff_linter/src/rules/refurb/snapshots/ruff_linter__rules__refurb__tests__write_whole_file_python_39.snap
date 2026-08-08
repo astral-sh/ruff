@@ -20,6 +20,7 @@ help: Replace with `Path("file.txt").write_text("test")`
 13 + pathlib.Path("file.txt").write_text("test")
 14 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(foobar)`
   --> FURB103_0.py:16:6
@@ -40,6 +41,7 @@ help: Replace with `Path("file.txt").write_bytes(foobar)`
 17 + pathlib.Path("file.txt").write_bytes(foobar)
 18 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
   --> FURB103_0.py:20:6
@@ -60,6 +62,7 @@ help: Replace with `Path("file.txt").write_bytes(b"abc")`
 21 + pathlib.Path("file.txt").write_bytes(b"abc")
 22 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
   --> FURB103_0.py:24:6
@@ -80,6 +83,7 @@ help: Replace with `Path("file.txt").write_text(foobar, encoding="utf8")`
 25 + pathlib.Path("file.txt").write_text(foobar, encoding="utf8")
 26 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
   --> FURB103_0.py:28:6
@@ -100,6 +104,7 @@ help: Replace with `Path("file.txt").write_text(foobar, errors="ignore")`
 29 + pathlib.Path("file.txt").write_text(foobar, errors="ignore")
 30 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
   --> FURB103_0.py:32:6
@@ -120,6 +125,7 @@ help: Replace with `Path("file.txt").write_text(foobar)`
 33 + pathlib.Path("file.txt").write_text(foobar)
 34 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
   --> FURB103_0.py:36:6
@@ -186,6 +192,7 @@ help: Replace with `Path("test.json")....`
 155 + pathlib.Path("test.json").write_bytes(json.dumps(data, indent=4).encode("utf-8"))
 156 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB103 [*] `open` and `write` should be replaced by `Path("tmp_path/pyproject.toml")....`
    --> FURB103_0.py:158:6
@@ -208,3 +215,26 @@ help: Replace with `Path("tmp_path/pyproject.toml")....`
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
 160 |         """
     |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(b"\103")`
+   --> FURB103_0.py:171:6
+    |
+169 | # before opening and does not truncate on a wrong-type argument, which is why the
+170 | # fix below must be unsafe.
+171 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+172 |     f.write(b"\103")
+    |
+help: Replace with `Path("file.txt").write_text(b"\103")`
+    |
+150 | import json
+151 + import pathlib
+152 |
+--------------------------------------------------------------------------------
+171 | # fix below must be unsafe.
+    - with open("file.txt", "w") as f:
+    -     f.write(b"\103")
+172 + pathlib.Path("file.txt").write_text(b"\103")
+    |
+note: This is an unsafe fix and may change runtime behavior

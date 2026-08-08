@@ -162,3 +162,11 @@ with open("tmp_path/pyproject.toml", "w") as f:
         other = 1.234
         """,
     ))
+
+# See: https://github.com/astral-sh/ruff/issues/26920
+# Writing `bytes` into a text-mode file raises `TypeError` *after* `open("w")`
+# has already truncated the file, so data is lost. `Path.write_text` type-checks
+# before opening and does not truncate on a wrong-type argument, which is why the
+# fix below must be unsafe.
+with open("file.txt", "w") as f:
+    f.write(b"\103")
