@@ -8723,7 +8723,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let ast::ExprCall {
-            range: _,
+            range_start: _,
             node_index: _,
             func,
             arguments,

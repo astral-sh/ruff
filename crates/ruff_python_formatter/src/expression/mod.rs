@@ -709,7 +709,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 );
             }
             Expr::Call(ast::ExprCall {
-                range: _,
+                range_start: _,
                 node_index: _,
                 func,
                 arguments: _,

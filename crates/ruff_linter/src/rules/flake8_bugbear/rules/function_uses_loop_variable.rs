@@ -128,7 +128,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 // Mark immediately-invoked lambdas as safe — the closure

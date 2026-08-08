@@ -148,7 +148,7 @@ fn match_named_tuple_assign<'a>(
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        range: _,
+        range_start: _,
         node_index: _,
     }) = value
     else {

@@ -94,7 +94,7 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
             cls,
             arguments,
         }) => Expr::Call(ast::ExprCall {
-            range,
+            range_start: range.start(),
             node_index: node_index.clone(),
             func: cls,
             arguments: ast::Arguments {

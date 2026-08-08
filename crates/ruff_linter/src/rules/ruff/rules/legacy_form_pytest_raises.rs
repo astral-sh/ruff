@@ -248,7 +248,7 @@ fn generate_with_statement(
 
     let context_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         func: legacy_call.func.clone(),
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
@@ -270,7 +270,7 @@ fn generate_with_statement(
 
     let func_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         func: Box::new(func.clone()),
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
