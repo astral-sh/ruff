@@ -1681,6 +1681,59 @@ def preserve_custom_comparison(value: str | AlwaysEqual):
         reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
 ```
 
+## String-literal origin and exclusions
+
+A string without literal origin can equal a string literal without acquiring the literal's origin.
+The successful branch remains reachable and preserves the original exclusion.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+        value.definitely_missing_attribute  # error: [unresolved-attribute]
+
+    if "hello" == value:
+        reveal_type(value)  # revealed: str & ~LiteralString
+
+    if value != "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+    else:
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+Excluding a particular string literal also leaves its runtime value possible when literal origin is
+not known. A different literal can still narrow the string normally.
+
+```py
+def without_literal_value(value: Intersection[str, Not[Literal["hello"]]]) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: str & ~Literal["hello"]
+
+    if value == "goodbye":
+        reveal_type(value)  # revealed: Literal["goodbye"]
+```
+
+Optional alternatives that cannot compare equal are still removed without discarding the possible
+string value.
+
+```py
+def optional_without_literal_origin(value: Intersection[str, Not[LiteralString]] | None) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+Once literal origin is known, excluding a string literal really does exclude its runtime value.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: Never
+```
+
 ## `x != y` where `y` is of literal type
 
 ```py
@@ -2557,7 +2610,8 @@ strict-equality-semantics = true
 
 ```py
 from enum import IntEnum, StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, LiteralString
+from ty_extensions import Intersection, Not
 
 def broad(value: str):
     if value == "a":
@@ -2570,6 +2624,13 @@ def inequality(value: str):
         reveal_type(value)  # revealed: str & ~Literal["a"]
     else:
         reveal_type(value)  # revealed: str
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]):
+    if value == "a":
+        reveal_type(value)  # revealed: str & ~LiteralString
+
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["a"]]]):
+    reveal_type(value == "a")  # revealed: Literal[False]
 
 def literal(value: Literal["a", "b"]):
     if value == "a":

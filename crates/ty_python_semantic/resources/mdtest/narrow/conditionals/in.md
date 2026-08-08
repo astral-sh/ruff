@@ -1281,8 +1281,12 @@ def _(x: bool | str):
 
 ## LiteralString
 
+Known literal-origin strings can safely narrow to the matching members of a literal tuple.
+
 ```py
+from typing import Literal
 from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
 
 def _(x: LiteralString):
     if x in ("a", "b", "c"):
@@ -1295,6 +1299,24 @@ def _(x: LiteralString | int):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
+```
+
+A string without literal origin can match a tuple member without gaining that member's origin.
+
+```py
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    if value in ("hello",):
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+An excluded value cannot appear in a tuple when the candidate already has known literal origin.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    reveal_type(value in ("hello",))  # revealed: Literal[False]
+
+    if value in ("hello",):
+        reveal_type(value)  # revealed: Never
 ```
 
 ## enums
