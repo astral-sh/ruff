@@ -18,10 +18,11 @@ Minimal diff churn is an explicit requirement:
 - Do not attempt general correlation-preserving solution combination.
 - Do not change eager existential or universal quantification; it is being replaced in a separate
     workstream.
-- Do not change Python's general gradual-type assignability or declaration semantics. Phase 5 now
-    owns the narrower sequent correction needed by domain activation: concrete logical proofs must
+- Do not change Python's general gradual-type assignability or declaration semantics. A dedicated
+    static-sequent phase before Phase 5 owns the narrower logical correction: concrete proofs must
     use fully static bounds and subtyping, while structurally valid symbolic rules may propagate an
-    existing gradual witness. Do not choose a relation based on validity/evidence provenance.
+    existing gradual witness. Phase 5 then activates domains and restores temporary compatibility
+    regressions. Do not choose a relation based on validity/evidence provenance.
 
 ## Workflow and handoff requirements
 
@@ -46,15 +47,25 @@ ultimately correct result, do not disable, comment out, or ignore tests. Instead
 assertion or mdtest expectation to the currently observed behavior and add a clear TODO describing
 the expected correct behavior. Prefer sequencing that avoids temporary regressions entirely.
 
+The static-sequent phase is the deliberate exception where temporary user-visible regressions are
+expected. Keep each regression covered at its observed intermediate behavior and add an adjacent
+`XXX` naming the behavior that Phase 5 must restore. The static-sequent revision must still pass the
+full suite, clippy, and prek. It is an implementation checkpoint only and must not be merged or used
+as a landing bookmark target independently of Phase 5.
+
 Use `jj` for source control and inspect changes with `jj diff --git` or `jj diff --stat`. Run prek
 in this Jujutsu workspace through `/home/dcreager/bin/jpk`. Never modify snapshot files or inline
 snapshot bodies manually: regenerate them with the documented test commands, inspect every
 snapshot change, and check for `.pending-snap` files when inline snapshots are involved.
 
-## Joint Phase 5: domain activation and fully static sequents
+## Staged integration: fully static sequents before Phase 5
 
-Phase 5 and fully static sequent handling are one semantic integration unit. Investigation showed
-that neither has a useful independently passing boundary:
+Fully static sequent handling and domain activation remain one merge unit, but they are implemented
+as two test-clean project revisions. The first revision establishes the sound logical boundary and
+records temporary compatibility regressions; Phase 5 activates domains and removes those
+regressions before the stack can land.
+
+Investigation established this split:
 
 - The sequent map treats gradual assignability as transitive logical implication. Exact validity
     alternatives such as `T = Any` and `T = int` can therefore become mutually implicative and be
@@ -63,11 +74,12 @@ that neither has a useful independently passing boundary:
     result for the typed-dictionary union ordering regression and passed the full constraint-set
     ordering mdtest after cycle-safe derived-candidate validation.
 - The same prototype exposed a Phase 5 pruning assumption: gradual constrained-TypeVar paths do
-    not always present one exact equality validity bound. The current pruner panics instead of
-    conservatively retaining such paths.
-- Removing gradual closure also exposes independent alternative solutions. In particular,
-    unbounded `Container[T]` inference still selects `object` rather than preserving `Any`; domain
-    pruning cannot repair an unbounded variable.
+    not always present one exact equality validity bound. Phase 5 must make pruning conservative
+    rather than panic.
+- Removing gradual closure exposes independent alternative solutions. In particular, unbounded
+    `Container[T]` inference selects `object` rather than preserving `Any`. The static phase records
+    that intermediate result with an `XXX`; Phase 5 must restore the existing behavior even though
+    declared-domain pruning alone cannot repair an unbounded variable.
 
 Do not revive either rejected workaround from the standalone prototype: selectively retaining TDD
 uncertain branches during abstraction, or locally unioning gradual solutions in `generics.rs`.
@@ -76,16 +88,17 @@ witness metadata, or a general correlation-preserving solution representation wi
 approved replan.
 
 The incomplete Phase 5 revision `pvynqtrq` and its pause revision are diagnostic snapshots, not
-part of the implementation path. Restart the joint phase from `sqkowvys` (the completed Phase 4
-stack plus the raw-graph fix), which is the parent of this replanning revision. The detailed static
-sequent requirements remain in
-`~/.pi/memory/plans/ruff/fully-static-sequents/PLAN.md`; this document is authoritative for the
-combined phase order and completion marker.
+part of the implementation path. The new static-sequent phase starts after `sqkowvys` (the
+completed Phase 4 stack plus the raw-graph fix) and the approved plan-only revisions. Phase 5 is a
+child of that static revision. The detailed static requirements remain in
+`~/.pi/memory/plans/ruff/fully-static-sequents/PLAN.md`; this document is authoritative for phase
+order and completion markers.
 
-The intended landing order is:
+The implementation and landing order is:
 
 1. completed domain-solving Phases 1–4 and the raw-graph fix;
-1. the combined Phase 5 domain activation and fully static sequent revision;
+1. a full-suite-clean but intentionally non-mergeable static-sequent revision;
+1. Phase 5 domain activation and compatibility restoration, which is the first landable tip;
 1. `dcreager/remove-remove-noninferable-2`.
 
 ## Current baseline
@@ -323,11 +336,11 @@ first determine what the new provenance-aware lower/upper bounds already make po
 ### Preserve existing gradual behavior while restricting concrete sequents
 
 `Constraint::new_node_with_bounds` already accepts gradual bounds despite a stale claim that only
-fully static bounds are supported. In the joint phase, concrete endpoint containment, overlap,
-contradiction, and pivot proofs must require structurally static endpoints and use constraint-set
-subtyping rather than assignability. Solver TypeVars are opaque symbolic atoms for this eligibility
-check. Use an owned Salsa-tracked relation where cycle recovery is required, and validate and skip
-derived candidates that settle as unsatisfiable after a coinductive cycle.
+fully static bounds are supported. In the static-sequent phase, concrete endpoint containment,
+overlap, contradiction, and pivot proofs must require structurally static endpoints and use
+constraint-set subtyping rather than assignability. Solver TypeVars are opaque symbolic atoms for
+this eligibility check. Use an owned Salsa-tracked relation where cycle recovery is required, and
+validate and skip derived candidates that settle as unsatisfiable after a coinductive cycle.
 
 Structurally universal TypeVar rules may still carry an existing gradual witness through a
 relationship. Keep the existing dedicated same-TypeVar, different-TypeVar, and nested-TypeVar
@@ -335,10 +348,10 @@ constructor paths as that boundary; do not introduce general witness provenance 
 single-range derivation assignability-based initially, with the existing PR #26873 TODO, and stop
 if focused evidence shows that this path itself creates invalid closure.
 
-Domain-conjoined path extraction and solution selection must be developed with this sequent
-boundary active. Preserve distinct gradual/static alternatives and existing gradual evidence
-without a provenance-dependent relation, equality exception, TDD abstraction special case, or
-ad hoc solution-union rule.
+Keep validity domains inactive during the static-sequent phase. Phase 5 develops domain-conjoined
+path extraction and solution selection with the new boundary active, and must preserve distinct
+gradual/static alternatives and existing gradual evidence without a provenance-dependent relation,
+equality exception, TDD abstraction special case, or ad hoc solution-union rule.
 
 Existing generic-function behavior must nevertheless be preserved:
 
@@ -417,14 +430,16 @@ expanding `Solutions`:
 - [x] Phase 2: replace optional constraint bounds with validity/evidence bounds.
 - [x] Phase 3: reintroduce support-derived validity-domain construction.
 - [x] Phase 4: preserve evidence-derived variance and add complete-path pruning.
-- [ ] Phase 5: jointly restrict concrete sequents, solve the domain-conjoined TDD, and simplify
-    default solving.
+- [ ] Static-sequent integration phase: restrict concrete sequents and characterize temporary
+    regressions in a non-mergeable intermediate revision.
+- [ ] Phase 5: activate the domain-conjoined TDD, simplify default solving, and restore every
+    temporary static-phase regression.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
 revision, relevant documentation/tests, and a passing full test suite. The abandoned Phase 5 and
-standalone fully-static revisions are diagnostic evidence only. Implement the joint phase in a new
-revision based on this replanning revision; do not layer it onto `pvynqtrq` or copy its rejected
-workarounds.
+standalone fully-static revisions are diagnostic evidence only. Implement the static phase in a new
+revision based on this replanning revision, then implement Phase 5 as its child; do not layer either
+onto `pvynqtrq` or copy its rejected workarounds.
 
 ### Phase 1: retain bound type-variable instances in constraint-set arenas
 
@@ -520,9 +535,11 @@ Suggested revision description: `[π] Preserve evidence variance and compare com
 1. Delay behavior-changing consumer integration until Phase 5.
 1. Run the full suite before marking the phase complete.
 
-### Phase 5: jointly activate domains and restrict concrete sequents
+### Static-sequent integration phase
 
-Suggested revision description: `[π] Solve domains with fully static sequents`.
+Suggested revision description: `[π] Restrict concrete sequents to fully static bounds`.
+
+This revision is an implementation checkpoint, not a landable tip.
 
 1. Add focused coverage showing that `int -> Any -> str` assignability cannot become transitive
     sequent closure. Define structural sequent eligibility locally in `constraints.rs`, treating
@@ -534,6 +551,21 @@ Suggested revision description: `[π] Solve domains with fully static sequents`.
     an existing gradual witness, but prevent gradual concrete pivots or unrelated TDD branches from
     manufacturing evidence. Validate provisionally discovered coinductive candidates and skip
     those that settle as unsatisfiable.
+1. Keep support-derived validity domains and behavior-changing pruning consumers inactive. Do not
+    compensate in TDD abstraction or solution combination.
+1. Run focused generic-function, constraint-algebra, and ordering tests. For each changed behavior,
+    assert the observed intermediate result and add an adjacent `XXX` that states the final behavior
+    Phase 5 must restore or classify. Do not disable tests, weaken unrelated assertions, or accept
+    panics as temporary behavior.
+1. Run `ty_python_semantic`, the full suite, clippy, snapshot review, and prek. Record the project
+    change and commit IDs as a non-mergeable intermediate checkpoint.
+
+### Phase 5: activate domains and restore compatibility
+
+Suggested revision description: `[π] Solve declared type-variable domains as constraint-set paths`.
+
+1. Inventory every static-phase `XXX`; Phase 5 is incomplete until all are removed and their final
+    expectations are covered.
 1. Conjoin the support-derived validity domain with the original root before path extraction in
     both direct and Salsa-cached entry points. Preserve source ordering and the simple concrete-bound
     fast path whenever possible.
@@ -549,19 +581,21 @@ Suggested revision description: `[π] Solve domains with fully static sequents`.
     `TypeVarBoundOrConstraints` or rebuilding declared alternatives independently.
 1. Preserve witnessed variance, gradual evidence, bounded lower/upper behavior, absent versus
     explicit bounds, unsolved variables, and relationships between compatible type variables.
-    Preserve current constrained `Any`/`int`, `list[Any]`/`list[int]`, ambiguous gradual evidence,
-    and unbounded `Container[T]` behavior without a local solution-union heuristic.
+    Restore constrained `Any`/`int`, `list[Any]`/`list[int]`, ambiguous gradual evidence, and
+    unbounded `Container[T]` behavior without a local solution-union heuristic.
 1. Explicitly prune subsumed complete paths in affected specialization consumers before extracting
     solutions and combining bindings independently; leave raw internal solution APIs exhaustive.
 1. Recover declaration-specific diagnostics by inspecting unconjoined paths only after a
     domain-aware solve fails. Do not apply domains before eager quantification or expand this phase
     into the separate quantifier-replacement workstream.
+1. Classify temporary constraint-algebra changes and replace each `XXX` with its justified final
+    assertion. User-visible inference regressions must be restored rather than recharacterized.
 1. Audit cache growth, path fuel, deterministic ordering, and the
     `ty_micro[pydantic_core_schema_dict]`-sensitive fast path. Favor existing user-visible tests;
     change implementation-focused expectations only when semantically required.
 1. Remove superseded TODOs and obsolete declaration-handling code after replacement coverage
     passes. Run focused tests, `ty_python_semantic`, the full suite, clippy, snapshot review, and
-    prek before marking the joint phase complete.
+    prek before marking Phase 5 complete and selecting its tip for landing.
 
 ## Focused regression coverage
 
@@ -663,8 +697,8 @@ Run prek from the Jujutsu workspace:
     with redundant bounds, while rejecting incompatible or merely overlapping domains. The
     user-visible behavior is required; a dedicated `PathBound` field is not prescribed.
 - **Gradual alternatives and sequents:** store declared gradual alternatives directly as exact
-    validity constraints, without bottom/top materialization. The joint phase must prevent
-    non-transitive gradual assignability from collapsing their paths while preserving existing
+    validity constraints, without bottom/top materialization. The static-sequent phase prevents
+    non-transitive gradual assignability from collapsing paths; Phase 5 must then restore existing
     `Any`/`int` and `list[Any]`/`list[int]` behavior. Do not reinterpret provenance as a typing
     relation or add equality-specific sequent behavior.
 - **Arena overlays:** retain full type-variable instances while continuing to intern by identity
