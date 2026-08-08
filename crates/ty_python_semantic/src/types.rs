@@ -623,6 +623,12 @@ enum MemberLookupErrorKind<'db> {
         name: Type<'db>,
     },
 
+    /// An invalid call to a module-level `__getattr__` function.
+    ModuleGetAttr {
+        callable: Type<'db>,
+        name: Type<'db>,
+    },
+
     /// An invalid attribute-interception call, represented by its receiver and attribute name.
     GetAttribute {
         receiver: Type<'db>,
@@ -647,10 +653,17 @@ impl<'db> MemberLookupError<'db> {
         self,
         context: &InferContext<'db, '_>,
         object_type: Type<'db>,
-        target: &ast::ExprAttribute,
+        target: ast::AnyNodeRef<'_>,
+        attribute: &str,
         assigned_type: Option<Type<'db>>,
     ) {
-        if matches!(target.ctx, ast::ExprContext::Del) {
+        if matches!(
+            target,
+            ast::AnyNodeRef::ExprAttribute(ast::ExprAttribute {
+                ctx: ast::ExprContext::Del,
+                ..
+            })
+        ) {
             return;
         }
 
@@ -661,6 +674,7 @@ impl<'db> MemberLookupError<'db> {
             MemberLookupErrorKind::DescriptorGet(call_context)
                 if (assigned_type.is_none()
                     || call_context.descriptor_type(db).is_data_descriptor(db, env))
+                    && let ast::AnyNodeRef::ExprAttribute(target) = target
                     && let Some(failure) = call_context.into_error(db, env) =>
             {
                 report_bad_dunder_get_call(
@@ -698,11 +712,27 @@ impl<'db> MemberLookupError<'db> {
                         &failure,
                         object_type,
                         target,
+                        attribute,
                         method,
                     );
                 }
             }
-            MemberLookupErrorKind::DescriptorGet(_) => {}
+            MemberLookupErrorKind::ModuleGetAttr { callable, name }
+                if assigned_type.is_none()
+                    && let Err(failure) =
+                        callable.try_call(db, env, &CallArguments::positional([name])) =>
+            {
+                report_bad_attribute_access_call(
+                    context,
+                    &failure,
+                    object_type,
+                    target,
+                    attribute,
+                    "__getattr__",
+                );
+            }
+            MemberLookupErrorKind::DescriptorGet(_)
+            | MemberLookupErrorKind::ModuleGetAttr { .. } => {}
         }
     }
 }
@@ -4919,7 +4949,7 @@ impl<'db> Type<'db> {
                     Place::bound(Type::int_literal(i64::from(bool_value))).into()
                 }
 
-                Type::ModuleLiteral(module) => module.static_member(db, env, name_str).into(),
+                Type::ModuleLiteral(module) => module.try_static_member(db, env, name_str),
 
                 // If a protocol does not include a member and the policy disables falling back to
                 // `object`, we return `Place::Undefined` here. This short-circuits attribute lookup
@@ -9870,7 +9900,7 @@ impl<'db> ModuleLiteralType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> MemberLookupResult<'db> {
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         let module = self.module(db);
@@ -9880,33 +9910,59 @@ impl<'db> ModuleLiteralType<'db> {
         {
             let getattr_symbol = imported_symbol(db, env, Some(file), "__getattr__", None);
             // If we found a __getattr__ function, try to call it with the name argument
-            if let Place::Defined(place) = getattr_symbol.place
-                && let Ok(outcome) = place.ty.try_call(
+            if let Place::Defined(place) = getattr_symbol.place {
+                let name_type = Type::string_literal(db, name);
+                let (return_type, error) =
+                    match place
+                        .ty
+                        .try_call(db, env, &CallArguments::positional([name_type]))
+                    {
+                        Ok(outcome) => (outcome.return_type(db, env), None),
+                        Err(CallError(_, bindings)) => (
+                            bindings.return_type(db, env),
+                            Some(MemberLookupErrorKind::ModuleGetAttr {
+                                callable: place.ty,
+                                name: name_type,
+                            }),
+                        ),
+                    };
+
+                return member_lookup_result(
                     db,
-                    env,
-                    &CallArguments::positional([Type::string_literal(db, name)]),
-                )
-            {
-                return PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace {
-                        ty: outcome.return_type(db, env),
-                        provenance: Provenance::Unknown,
-                        ..place
-                    }),
-                    qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
-                };
+                    PlaceAndQualifiers {
+                        place: Place::Defined(DefinedPlace {
+                            ty: return_type,
+                            provenance: Provenance::Unknown,
+                            ..place
+                        }),
+                        qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
+                    },
+                    error,
+                );
             }
         }
 
         Place::Undefined.into()
     }
 
+    /// Looks up a module member, treating failed `__getattr__` calls as missing members.
     fn static_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        self.try_static_member(db, env, name)
+            .unwrap_or_else(|_| Place::Undefined.into())
+    }
+
+    /// Looks up a module member while preserving failed module-level `__getattr__` calls.
+    fn try_static_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> MemberLookupResult<'db> {
         let module = self.module(db);
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
@@ -9914,7 +9970,8 @@ impl<'db> ModuleLiteralType<'db> {
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db, env)
-                .member(db, env, "__dict__");
+                .member(db, env, "__dict__")
+                .into();
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -9958,11 +10015,12 @@ impl<'db> ModuleLiteralType<'db> {
                         ..defined
                     }),
                     qualifiers: place_and_qualifiers.qualifiers,
-                };
+                }
+                .into();
             }
         }
 
-        place_and_qualifiers
+        place_and_qualifiers.into()
     }
 }
 
