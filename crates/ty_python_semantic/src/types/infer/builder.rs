@@ -9344,12 +9344,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .first_overload_or_implementation(db)
             .evaluation_mode(db);
 
-        let Some(generator_type_params) = declared_return_ty.generator_types(db, env, mode) else {
+        let generator_type_params = match mode {
+            EvaluationMode::Sync => declared_return_ty
+                .generator_types(db, env)
+                .map(|types| (types.yield_ty, types.send_ty)),
+            EvaluationMode::Async => declared_return_ty
+                .async_generator_types(db, env)
+                .map(|types| (types.yield_ty, types.send_ty)),
+        };
+        let Some((expected_yield_ty, send_ty)) = generator_type_params else {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
 
-        let expected_yield_ty = generator_type_params.yield_ty;
         let tcx = TypeContext::new(Some(expected_yield_ty));
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), tcx)
@@ -9369,7 +9376,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        generator_type_params.send_ty
+        send_ty
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -9393,11 +9400,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
         .return_ty;
 
-        let mode = enclosing_function
-            .first_overload_or_implementation(db)
-            .evaluation_mode(db);
-
-        let Some(outer_expected) = annotated_return_ty.generator_types(db, env, mode) else {
+        let Some(outer_expected) = annotated_return_ty.generator_types(db, env) else {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
@@ -9429,12 +9432,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let mode = enclosing_function
-            .first_overload_or_implementation(db)
-            .evaluation_mode(db);
-
         let inner_send_ty = iterable_type
-            .generator_send_type(db, env, mode)
+            .generator_send_type(db, env)
             .unwrap_or_else(|| Type::none(db, env));
 
         if !outer_expected

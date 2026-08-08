@@ -134,6 +134,60 @@ def persons(f: bool) -> Generator[None, None, Person]:
         return {"name": 42}
 ```
 
+## Structurally compatible generator protocols
+
+A protocol does not need to explicitly inherit from `Generator` for ty to infer its yield, send, and
+return types from its methods.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from types import TracebackType
+from typing import Generator, Protocol, overload
+
+class StructuralGenerator(Protocol):
+    def __iter__(self) -> Generator[int, bytes, str]: ...
+    def __next__(self) -> int: ...
+    def send(self, value: bytes, /) -> int: ...
+    @overload
+    def throw(
+        self,
+        typ: type[BaseException],
+        val: object = None,
+        traceback: TracebackType | None = None,
+        /,
+    ) -> int: ...
+    @overload
+    def throw(
+        self,
+        typ: BaseException,
+        val: None = None,
+        traceback: TracebackType | None = None,
+        /,
+    ) -> int: ...
+    def close(self) -> str | None: ...
+
+def structural_generator() -> StructuralGenerator:
+    sent = yield 1
+    reveal_type(sent)  # revealed: bytes
+    return "done"
+
+def delegated_generator() -> Generator[int, bytes, None]:
+    result = yield from structural_generator()
+    reveal_type(result)  # revealed: str
+
+def invalid_structural_yield() -> StructuralGenerator:
+    yield "wrong"  # error: [invalid-yield]
+    return "done"
+
+def invalid_structural_return() -> StructuralGenerator:
+    yield 1
+    return 42  # error: [invalid-return-type]
+```
+
 ## `yield` expression send type inference
 
 ```py
@@ -162,11 +216,6 @@ async def async_generator_default() -> AsyncGenerator[int]:
 async def async_generator_send_str() -> AsyncGenerator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: str
-
-def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
-    x = yield 1
-    reveal_type(x)  # revealed: int | str
-    return None
 ```
 
 `Iterator`, `Iterable`, and custom equivalent protocols have no send type or return type. Using one
@@ -323,7 +372,11 @@ def returns_str() -> str:  # error: [invalid-return-type]
 
 def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [invalid-return-type]
     x = yield 1
-    reveal_type(x)  # revealed: str
+    reveal_type(x)  # revealed: Unknown
+
+async def async_returns_sync_generator() -> Generator[int, str, None]:  # error: [invalid-return-type]
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Invalid return type
