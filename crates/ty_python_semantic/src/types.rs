@@ -115,7 +115,9 @@ pub(crate) use special_form::TypedDictModule;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
+use ty_python_core::{
+    EvaluationMode, ProgramFile, Truthiness, place_table, semantic_index, use_def_map,
+};
 
 mod attribute_write;
 mod bool;
@@ -1466,8 +1468,8 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
 #[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_field_names)]
 struct GeneratorTypes<'db> {
-    yield_ty: Option<Type<'db>>,
-    send_ty: Option<Type<'db>>,
+    yield_ty: Type<'db>,
+    send_ty: Type<'db>,
     return_ty: Option<Type<'db>>,
 }
 
@@ -1481,10 +1483,8 @@ impl<'db> GeneratorTypes<'db> {
     ) -> Self {
         let visitor = ApplyTypeMappingVisitor::new(env);
         Self {
-            yield_ty: self.yield_ty.map(|ty| ty.materialize(db, kind, &visitor)),
-            send_ty: self
-                .send_ty
-                .map(|ty| ty.materialize(db, kind.flip(), &visitor)),
+            yield_ty: self.yield_ty.materialize(db, kind, &visitor),
+            send_ty: self.send_ty.materialize(db, kind.flip(), &visitor),
             return_ty: self.return_ty.map(|ty| ty.materialize(db, kind, &visitor)),
         }
     }
@@ -6737,6 +6737,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
     ) -> Option<GeneratorTypes<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
@@ -6754,34 +6755,24 @@ impl<'db> Type<'db> {
                 && let [yield_ty, send_ty, return_ty] = specialization.types(db)
             {
                 Some(GeneratorTypes {
-                    yield_ty: Some(*yield_ty),
-                    send_ty: Some(*send_ty),
+                    yield_ty: *yield_ty,
+                    send_ty: *send_ty,
                     return_ty: Some(*return_ty),
                 })
             } else if class.is_known(db, KnownClass::AsyncGenerator)
                 && let [yield_ty, send_ty] = specialization.types(db)
             {
                 Some(GeneratorTypes {
-                    yield_ty: Some(*yield_ty),
-                    send_ty: Some(*send_ty),
+                    yield_ty: *yield_ty,
+                    send_ty: *send_ty,
                     return_ty: None,
-                })
-            } else if (class.is_known(db, KnownClass::Iterator)
-                || class.is_known(db, KnownClass::AsyncIterator))
-                && let [yield_ty] = specialization.types(db)
-            {
-                let none = Type::none(db, env);
-                Some(GeneratorTypes {
-                    yield_ty: Some(*yield_ty),
-                    send_ty: Some(none),
-                    return_ty: Some(none),
                 })
             } else {
                 None
             }
         };
 
-        match self {
+        let nominal_result = match self {
             Type::NominalInstance(instance) => instance
                 .class(db, env)
                 .iter_mro(db)
@@ -6794,22 +6785,16 @@ impl<'db> Type<'db> {
                         .materialization_kind(db)
                         .map_or(types, |kind| types.materialize(db, env, kind))
                 }),
-            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env),
+            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
             Type::Union(union) => {
-                let mut yield_builder = Some(UnionBuilder::new(db, env));
-                let mut send_builder = Some(UnionBuilder::new(db, env));
+                let mut yield_builder = UnionBuilder::new(db, env);
+                let mut send_builder = UnionBuilder::new(db, env);
                 let mut return_builder = Some(UnionBuilder::new(db, env));
 
                 for ty in union.elements(db) {
-                    let gt = ty.generator_types(db, env)?;
-                    match gt.yield_ty {
-                        Some(ty) => yield_builder = yield_builder.map(|b| b.add(ty)),
-                        None => yield_builder = None,
-                    }
-                    match gt.send_ty {
-                        Some(ty) => send_builder = send_builder.map(|b| b.add(ty)),
-                        None => send_builder = None,
-                    }
+                    let gt = ty.generator_types(db, env, mode)?;
+                    yield_builder = yield_builder.add(gt.yield_ty);
+                    send_builder = send_builder.add(gt.send_ty);
                     match gt.return_ty {
                         Some(ty) => return_builder = return_builder.map(|b| b.add(ty)),
                         None => return_builder = None,
@@ -6817,8 +6802,8 @@ impl<'db> Type<'db> {
                 }
 
                 Some(GeneratorTypes {
-                    yield_ty: yield_builder.map(UnionBuilder::build),
-                    send_ty: send_builder.map(UnionBuilder::build),
+                    yield_ty: yield_builder.build(),
+                    send_ty: send_builder.build(),
                     return_ty: return_builder.map(UnionBuilder::build),
                 })
             }
@@ -6826,28 +6811,18 @@ impl<'db> Type<'db> {
                 // Using `positive()` rather than `positive_elements_or_object()` is safe
                 // here because `object` is not a generator, so falling back to it would
                 // still return `None`.
-                let mut yield_builder = Some(IntersectionBuilder::new(db, env));
-                let mut send_builder = Some(IntersectionBuilder::new(db, env));
+                let mut yield_builder = IntersectionBuilder::new(db, env);
+                let mut send_builder = IntersectionBuilder::new(db, env);
                 let mut return_builder = Some(IntersectionBuilder::new(db, env));
                 let mut any_success = false;
 
                 for ty in intersection.positive(db) {
-                    let Some(gt) = ty.generator_types(db, env) else {
+                    let Some(gt) = ty.generator_types(db, env, mode) else {
                         continue;
                     };
                     any_success = true;
-                    match gt.yield_ty {
-                        Some(ty) => {
-                            yield_builder = yield_builder.map(|b| b.add_positive(ty));
-                        }
-                        None => yield_builder = None,
-                    }
-                    match gt.send_ty {
-                        Some(ty) => {
-                            send_builder = send_builder.map(|b| b.add_positive(ty));
-                        }
-                        None => send_builder = None,
-                    }
+                    yield_builder = yield_builder.add_positive(gt.yield_ty);
+                    send_builder = send_builder.add_positive(gt.send_ty);
                     match gt.return_ty {
                         Some(ty) => {
                             return_builder = return_builder.map(|b| b.add_positive(ty));
@@ -6861,18 +6836,45 @@ impl<'db> Type<'db> {
                 }
 
                 Some(GeneratorTypes {
-                    yield_ty: yield_builder.map(IntersectionBuilder::build),
-                    send_ty: send_builder.map(IntersectionBuilder::build),
+                    yield_ty: yield_builder.build(),
+                    send_ty: send_builder.build(),
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Never) => Some(GeneratorTypes {
-                yield_ty: Some(ty),
-                send_ty: Some(ty),
-                return_ty: Some(ty),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(GeneratorTypes {
+                yield_ty: self,
+                send_ty: self,
+                return_ty: Some(self),
             }),
             _ => None,
+        };
+
+        if let Some(nominal_result) = nominal_result {
+            return Some(nominal_result);
         }
+
+        let generator_class = match mode {
+            EvaluationMode::Sync => KnownClass::Generator,
+            EvaluationMode::Async => KnownClass::AsyncGenerator,
+        };
+
+        if !generator_class
+            .to_instance_unknown(db, env)
+            .is_assignable_to(db, env, self)
+        {
+            return None;
+        }
+
+        self.try_iterate_with_mode(db, env, mode)
+            .map(|tuple| {
+                let none = Type::none(db, env);
+                GeneratorTypes {
+                    yield_ty: tuple.homogeneous_element_type(db, env),
+                    send_ty: none,
+                    return_ty: Some(none),
+                }
+            })
+            .ok()
     }
 
     fn generator_return_type(
@@ -6880,7 +6882,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
+        self.generator_types(db, env, EvaluationMode::Sync)
             .and_then(|generator_types| generator_types.return_ty)
     }
 
@@ -6888,9 +6890,10 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
     ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
-            .and_then(|generator_types| generator_types.send_ty)
+        self.generator_types(db, env, mode)
+            .map(|generator_types| generator_types.send_ty)
     }
 
     /// Return the instance approximation, discarding whether the projection is exact.
