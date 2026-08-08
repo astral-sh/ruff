@@ -577,6 +577,17 @@ This revision is an implementation checkpoint, not a landable tip.
 
 ### Phase 5: activate domains and restore compatibility
 
+**Mandatory stop-and-escalate gate:** Start Phase 5 from the validated static checkpoint and run
+focused tests after the smallest implementation step. If any test fails unexpectedly, stop
+implementation immediately and switch to diagnosis-only work. Determine the root cause, using
+temporary debug instrumentation when useful, and report the exact command, failure, current diff,
+and supporting evidence. Propose potential fixes—ideally multiple alternatives—with their
+tradeoffs, but do not retain production-code or mdtest behavior changes, implement a fix, update an
+expectation, or continue to a later Phase 5 step without explicit user approval. The same gate
+applies if a characterized Phase 5 regression does not recover in the expected way. Preserve
+intended mdtest assertions as xfails, including `# error: [static-assert-error]`, unless the user
+explicitly approves a final expectation change.
+
 Suggested revision description: `[π] Solve declared type-variable domains as constraint-set paths`.
 
 1. Inventory every static-phase `XXX`; Phase 5 is incomplete until all are removed and their final
