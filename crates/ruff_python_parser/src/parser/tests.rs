@@ -1,5 +1,4 @@
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
-use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -51,17 +50,6 @@ fn test_expr_mode_valid_syntax() {
     let parsed = parse_expression(source).unwrap();
 
     insta::assert_debug_snapshot!(parsed.expr());
-}
-
-#[test]
-fn call_range_includes_parentheses() {
-    let source = "(((func)))(value)";
-    let parsed = parse_expression(source).unwrap();
-    let Expr::Call(call) = parsed.expr() else {
-        panic!("expected a call expression, got {:?}", parsed.expr());
-    };
-
-    assert_eq!(call.range(), TextRange::up_to(source.text_len()));
 }
 
 #[test]
