@@ -1,4 +1,5 @@
 mod args;
+mod git;
 mod logging;
 mod printer;
 mod python_version;
@@ -33,6 +34,7 @@ use ty_server::run_server;
 use ty_static::EnvVars;
 
 use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
+use crate::git::{DiagnosticBaseline, GitDiff, GitSystem};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -142,26 +144,35 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Check
     };
 
-    let system = OsSystem::new(&cwd);
-    let watch = args.watch;
-    let exit_zero = args.exit_zero;
-    let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
     let config_file = args
         .config_file
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
+    let native_system = OsSystem::new(&cwd);
+    let git_diff = args
+        .diff
+        .as_deref()
+        .map(|revision| GitDiff::discover(&native_system, &cwd, revision, config_file.as_deref()))
+        .transpose()?;
+    let git_system = git_diff
+        .as_ref()
+        .map(|diff| GitSystem::new(native_system.clone(), diff));
+    let system: &dyn System = git_system.as_ref().map_or(&native_system, |system| system);
+    let watch = args.watch;
+    let exit_zero = args.exit_zero;
+    let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
     let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
         Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, system)?
         }
         None if check_paths.iter().any(|path| system.is_file(path)) => {
             // `uv check --script` passes a file as its check path. Disable uv workspace metadata
             // for scripts until script integration is implemented in a follow-up.
-            ProjectMetadata::discover_without_uv(&project_path, &system)?
+            ProjectMetadata::discover_without_uv(&project_path, system)?
         }
-        None => ProjectMetadata::discover(&project_path, &system)?,
+        None => ProjectMetadata::discover(&project_path, system)?,
     };
 
     if watch && project_metadata.has_uv_workspace() {
@@ -170,11 +181,14 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         ));
     }
 
-    project_metadata.apply_configuration_files(&system)?;
+    project_metadata.apply_configuration_files(system)?;
 
     project_metadata.apply_override_options(args.into_options());
 
-    let mut db = ProjectDatabase::fallible(project_metadata, system)?;
+    let mut db = match git_system {
+        Some(system) => ProjectDatabase::fallible(project_metadata, system)?,
+        None => ProjectDatabase::fallible(project_metadata, native_system)?,
+    };
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
@@ -197,11 +211,20 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
     // source-text overrides, and memory reports measure the database without this optimization, so
     // they must keep the inputs mutable.
-    if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
+    if !watch
+        && git_diff.is_none()
+        && matches!(mode, MainLoopMode::Check)
+        && memory_report.is_none()
+    {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let diagnostic_baseline = git_diff
+        .map(|diff| diff.check_baseline(&mut db, printer))
+        .transpose()?;
+
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(mode, printer, diagnostic_baseline);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -279,6 +302,9 @@ impl Termination for ExitStatus {
 struct MainLoop {
     mode: MainLoopMode,
 
+    /// Diagnostics already present in the Git baseline, normalized to current positions.
+    diagnostic_baseline: Option<DiagnosticBaseline>,
+
     /// Sender that can be used to send messages to the main loop.
     sender: crossbeam_channel::Sender<MainLoopMessage>,
 
@@ -298,7 +324,11 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        mode: MainLoopMode,
+        printer: Printer,
+        diagnostic_baseline: Option<DiagnosticBaseline>,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -307,6 +337,7 @@ impl MainLoop {
         (
             Self {
                 mode,
+                diagnostic_baseline,
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
@@ -399,6 +430,11 @@ impl MainLoop {
                             if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("json") {
                                 return Ok(ExitStatus::Success);
                             }
+
+                            let result = match &mut self.diagnostic_baseline {
+                                Some(baseline) => baseline.filter(db, result),
+                                None => result,
+                            };
 
                             self.write_diagnostics(db, &result, None)?;
 
