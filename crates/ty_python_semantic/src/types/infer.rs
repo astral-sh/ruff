@@ -1415,12 +1415,20 @@ impl<'db> DefinitionInference<'db> {
             {
                 // Loop-carried assignments need this annotation as context before validating
                 // the declaration can infer their binding types.
-                let annotation = assignment.annotation(&module);
-                let expression = index.expression(annotation);
-                let declared_type =
-                    infer_same_file_expression_type(db, expression, TypeContext::default());
-
-                types = DefinitionTypes::Declaration(TypeAndQualifiers::declared(declared_type));
+                return TypeInferenceBuilder::new(
+                    db,
+                    &env,
+                    InferenceRegion::Definition(definition),
+                    python_file.file(db),
+                    program_file,
+                    index,
+                    &module,
+                )
+                .finish_annotated_assignment_cycle_initial(
+                    definition,
+                    assignment,
+                    cycle_recovery,
+                );
             }
         }
 
