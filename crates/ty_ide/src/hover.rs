@@ -167,7 +167,7 @@ fn keyword_argument_hover_contents<'db>(
         .arguments
         .iter_source_order()
         .position(|argument| {
-            matches!(argument, ast::ArgOrKeyword::Keyword(candidate) if candidate.range() == keyword.range())
+            matches!(argument, ast::ArgOrKeyword::Keyword(candidate) if candidate.range == keyword.range)
         })?;
     let argument_mapping = signature
         .argument_to_parameter_mapping

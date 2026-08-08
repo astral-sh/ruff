@@ -807,7 +807,6 @@ impl<'src> Parser<'src> {
     ) -> Vec<T> {
         let mut elements = Vec::with_capacity(capacity);
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
-        elements.shrink_to_fit();
         elements
     }
 

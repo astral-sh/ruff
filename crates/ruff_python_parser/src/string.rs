@@ -367,7 +367,7 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(ast::InterpolatedStringLiteralElement {
-            value: value.into_boxed_str().into(),
+            value: value.into_boxed_str(),
             range: self.range,
             node_index: AtomicNodeIndex::NONE,
         })
@@ -495,7 +495,7 @@ impl<'src> StringParser<'src> {
         }
 
         Ok(StringType::Str(ast::StringLiteral {
-            value: value.into_boxed_str().into(),
+            value: value.into_boxed_str(),
             range: self.range,
             flags: self.flags.into(),
             node_index: AtomicNodeIndex::NONE,

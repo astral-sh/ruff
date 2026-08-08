@@ -66,7 +66,7 @@ impl Transformer for Normalizer {
 
                 if can_join {
                     string.value = ast::StringLiteralValue::single(ast::StringLiteral {
-                        value: string.value.to_str().into(),
+                        value: Box::from(string.value.to_str()),
                         range: string.range,
                         flags: StringLiteralFlags::empty(),
                         node_index: AtomicNodeIndex::NONE,
@@ -115,7 +115,10 @@ impl Transformer for Normalizer {
                             if let Some(InterpolatedStringElement::Literal(existing_literal)) =
                                 self.elements.last_mut()
                             {
-                                existing_literal.value.push_str(literal);
+                                let value = std::mem::take(&mut existing_literal.value);
+                                let mut value = value.into_string();
+                                value.push_str(literal);
+                                existing_literal.value = value.into_boxed_str();
                                 existing_literal.range =
                                     TextRange::new(existing_literal.start(), range.end());
                             } else {
@@ -230,21 +233,21 @@ impl Transformer for Normalizer {
                 "<DOCTEST-CODE-SNIPPET: Removed by normalizer>\n",
             )
             .into_owned()
-            .into();
+            .into_boxed_str();
         string_literal.value = STRIP_RST_BLOCKS
             .replace_all(
                 &string_literal.value,
                 "<RSTBLOCK-CODE-SNIPPET: Removed by normalizer>\n",
             )
             .into_owned()
-            .into();
+            .into_boxed_str();
         string_literal.value = STRIP_MARKDOWN_BLOCKS
             .replace_all(
                 &string_literal.value,
                 "<MARKDOWN-CODE-SNIPPET: Removed by normalizer>\n",
             )
             .into_owned()
-            .into();
+            .into_boxed_str();
         // Normalize a string by (2) stripping any leading and trailing space from each
         // line, and (3) removing any blank lines from the start and end of the string.
         string_literal.value = string_literal
@@ -255,6 +258,6 @@ impl Transformer for Normalizer {
             .join("\n")
             .trim()
             .to_owned()
-            .into();
+            .into_boxed_str();
     }
 }

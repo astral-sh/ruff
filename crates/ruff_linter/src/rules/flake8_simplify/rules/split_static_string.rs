@@ -179,7 +179,7 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
             .map(|elt| {
                 let element_flags = replace_flags(elt, flags);
                 Expr::from(StringLiteral {
-                    value: (*elt).into(),
+                    value: Box::from(*elt),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     flags: element_flags,

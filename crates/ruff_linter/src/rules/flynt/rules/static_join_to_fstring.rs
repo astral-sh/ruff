@@ -107,7 +107,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         }
 
         let node = ast::StringLiteral {
-            value: content.into(),
+            value: content.into_boxed_str(),
             flags,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

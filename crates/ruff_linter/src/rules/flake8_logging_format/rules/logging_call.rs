@@ -66,7 +66,7 @@ fn logging_f_string(
                             // If the literal text contains a '%' placeholder, bail out: mixing
                             // f-string interpolation with '%' placeholders is ambiguous for our
                             // automatic conversion, so don't offer a fix for this case.
-                            if lit.value.as_str().contains('%') {
+                            if lit.value.as_ref().contains('%') {
                                 return;
                             }
                             format_string.push_str(lit.value.as_ref());

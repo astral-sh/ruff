@@ -560,7 +560,7 @@ impl<'a> From<&'a ast::InterpolatedStringElement> for ComparableInterpolatedStri
             ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
                 value,
                 ..
-            }) => Self::Literal(value.as_str().into()),
+            }) => Self::Literal(value.as_ref().into()),
             ast::InterpolatedStringElement::Interpolation(formatted_value) => {
                 formatted_value.into()
             }

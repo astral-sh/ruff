@@ -14,7 +14,6 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
-use compact_str::CompactString;
 use thin_vec::ThinVec;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -355,7 +354,7 @@ pub struct InterpolatedElement {
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: CompactString,
+    pub value: Box<str>,
 }
 
 impl InterpolatedStringLiteralElement {
@@ -1229,7 +1228,7 @@ impl From<FString> for Expr {
 /// A newtype wrapper around a list of [`InterpolatedStringElement`].
 #[derive(Clone, Default, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringElements(Box<[InterpolatedStringElement]>);
+pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
 
 impl InterpolatedStringElements {
     /// Returns an iterator over all the [`InterpolatedStringLiteralElement`] nodes contained in this f-string.
@@ -1245,7 +1244,7 @@ impl InterpolatedStringElements {
 
 impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
     fn from(elements: Vec<InterpolatedStringElement>) -> Self {
-        InterpolatedStringElements(elements.into_boxed_slice())
+        InterpolatedStringElements(elements)
     }
 }
 
@@ -1723,7 +1722,7 @@ impl fmt::Debug for StringLiteralFlags {
 pub struct StringLiteral {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: CompactString,
+    pub value: Box<str>,
     pub flags: StringLiteralFlags,
 }
 
@@ -3947,7 +3946,6 @@ mod tests {
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
-        assert_eq!(std::mem::size_of::<super::InterpolatedStringElements>(), 16);
         assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
@@ -3960,7 +3958,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 12);
-        assert_eq!(std::mem::size_of::<ExprFString>(), 64);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 56);
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
@@ -3975,7 +3973,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprSetComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprSlice>(), 40);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
