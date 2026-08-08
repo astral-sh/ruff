@@ -58,4 +58,3 @@ Module(
 1 | nonlocal x
 2 | nonlocal x, y
   | ^^^^^^^^^^^^^ Syntax Error: nonlocal declaration not allowed at module level
-  |

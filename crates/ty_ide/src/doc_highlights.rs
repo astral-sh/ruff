@@ -1,18 +1,18 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::files::File;
 use ruff_text_size::TextSize;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 /// Find all document highlights for a symbol at the given position.
 /// Document highlights are limited to the current file only.
 pub fn document_highlights(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<ReferenceTarget>> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = ruff_db::parsed::parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
 
@@ -34,9 +34,11 @@ mod tests {
 
     impl CursorTest {
         fn document_highlights(&self) -> String {
-            let Some(highlight_results) =
-                document_highlights(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(highlight_results) = document_highlights(
+                &self.db,
+                self.program_file(self.cursor.file),
+                self.cursor.offset,
+            ) else {
                 return "No highlights found".to_string();
             };
 
@@ -72,14 +74,12 @@ mod tests {
           |
         1 | from . import module_a
           |               ^^^^^^^^
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> mypackage/__init__.py:2:5
           |
         2 | x = module_a
           |     ^^^^^^^^
-          |
         ");
     }
 
@@ -127,28 +127,24 @@ def calculate_sum():
           |
         3 |     value = 10
           |     ^^^^^
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:4:15
           |
         4 |     doubled = value * 2
           |               ^^^^^
-          |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:5:14
           |
         5 |     result = value + doubled
           |              ^^^^^
-          |
 
         info[document_highlights]: Highlight 4 (Read)
          --> main.py:6:12
           |
         6 |     return value
           |            ^^^^^
-          |
         ");
     }
 
@@ -170,28 +166,24 @@ def process_data(<CURSOR>data):
           |
         2 | def process_data(data):
           |                  ^^^^
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:3:8
           |
         3 |     if data:
           |        ^^^^
-          |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:4:21
           |
         4 |         processed = data.upper()
           |                     ^^^^
-          |
 
         info[document_highlights]: Highlight 4 (Read)
          --> main.py:6:12
           |
         6 |     return data
           |            ^^^^
-          |
         ");
     }
 
@@ -213,14 +205,12 @@ calc = Calculator()
           |
         2 | class Calculator:
           |       ^^^^^^^^^^
-          |
 
         info[document_highlights]: Highlight 2 (Read)
          --> main.py:6:8
           |
         6 | calc = Calculator()
           |        ^^^^^^^^^^
-          |
         ");
     }
 
@@ -259,21 +249,18 @@ def test():
           |
         2 | a: str = "test"
           | ^
-          |
 
         info[document_highlights]: Highlight 2 (Write)
          --> main.py:4:1
           |
         4 | a: int = 10
           | ^
-          |
 
         info[document_highlights]: Highlight 3 (Read)
          --> main.py:6:7
           |
         6 | print(a)
           |       ^
-          |
         "#);
     }
 }

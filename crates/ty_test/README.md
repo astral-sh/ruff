@@ -430,6 +430,15 @@ X = 1
 ```
 ````
 
+The same placeholder can be used in `environment.extra-paths`:
+
+````markdown
+```toml
+[environment]
+extra-paths = ["/.venv/<path-to-site-packages>"]
+```
+````
+
 ## Documentation of tests
 
 Arbitrary Markdown syntax (including of course normal prose paragraphs) is permitted (and ignored by

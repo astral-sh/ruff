@@ -98,6 +98,20 @@
             "boolean",
             "null"
           ]
+        },
+        "strict-equality-semantics": {
+          "description": "Configure ty's behavior regarding type inference and narrowing of equality\nchecks. Defaults to `false`.\n\nBy default, ty makes various assumptions about equality checks that match the\nintuitions of most Python programmers, but may not be fully sound in all situations.\nEnabling this option makes ty more conservative about these assumptions, making it\nless likely to infer `Literal[True]` or `Literal[False]` as the result of an\nequality check. This has various effects on type checking, including fewer type\nnarrowing opportunities and more conservative assumptions regarding control flow.\n\nOne way in which ty will by default make unsound assumptions is by narrowing an\nobject `x` of type `str` to `Literal[\"a\"]` after an `if x == \"a\"` check. This is\nunsound because a subclass of `str` with value `\"a\"` will (by default) compare equal\nto `\"a\"`, but will not be of type `Literal[\"a\"]`:\n\n```pycon\n>>> # `Literal[\"a\"]` can only be inhabited by instances of exactly `str`, not\n>>> # subclasses, but str subclasses compare equal by default:\n>>> class StringSubclass(str): ...\n...\n>>> StringSubclass(\"a\") == \"a\"\nTrue\n>>>\n>>> # This also applies to `StrEnum`s:\n>>> from enum import StrEnum\n>>> class MyEnum(StrEnum):\n...     A = \"a\"\n...\n>>> MyEnum.A == \"a\"\nTrue\n```\n\nEnabling this option prevents the unsound narrowing of `x` to `Literal[\"a\"]`,\nand instead keeps it as `str`:\n\n```python\nfrom typing import Literal\n\ndef parse(value: str) -> Literal[\"a\"] | None:\n    # with `strict-equality-semantics = true`, no narrowing will occur here,\n    # and an error will be emitted on the `return` statement.\n    if value == \"a\":\n        return value\n    return None\n```\n\nAnother assumption ty makes by default is that subclasses will never override `__eq__` or\n`__ne__`. This allows ty to narrow the following union based on an equality check, despite\nthe fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's\nperfectly valid to pass an instance of a subclass into the `x` parameter of this function:\n\n```python\ndef narrow(x: Foo | None, other: Foo) -> None:\n    if x == other:\n        # with this option enabled, `x` will still have type `Foo | None` here,\n        # since it is legal to subclass `Foo` and override its `__eq__` method.\n        reveal_type(x)\n```\n\nMany operations in Python implicitly call `__eq__` under the hood; enabling this option\nwill also impact those operations. For example, this option will also impact narrowing from\n`in` checks, and narrowing in `match` statements that use value patterns:\n\n```python\ndef narrow_in(x: Foo | None, other: list[Foo]) -> None:\n    if x in other:\n        # with this option enabled, `x` will still have type `Foo | None` here,\n        # since the `in` operator implicitly calls `__eq__` on each element of `other`.\n        reveal_type(x)\n\n\ndef narrow_match(x: str) -> None:\n    match x:\n        case \"a\":\n            # with this option enabled, `x` will still have type `str` here,\n            # since this `case` branch will be taken by any object that compares\n            # equal to `\"a\"`, including subclasses of `str`.\n            reveal_type(x)\n```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "strict-generic-narrowing": {
+          "description": "Whether ty should use strict narrowing for unspecialized generic classes in\n`isinstance()` and `issubclass()` checks, as well as `match` class patterns.\n\nWhen enabled, ty narrows to the top materialization of the class. For example,\n`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,\nrepresenting the (infinite) union of all possible `list` specializations. Iterating\nover the list would yield values of type `object`.\n\nWhen disabled, ty uses gradual generic narrowing, preserving compatible type\narguments from the original type where possible. For example,\n`isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.\nIf no specialization is available, the same check narrows a value of type `object`\nto `list[Unknown]`; items of any type can then be appended to the list. Class\npatterns such as `case list():` follow the same behavior.\n\nDefaults to `false`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -321,6 +335,16 @@
     "Rules": {
       "type": "object",
       "properties": {
+        "abstract-and-final-method": {
+          "title": "detects methods that are both abstract and final",
+          "description": "## What it does\n\nChecks for methods decorated with both `@abstractmethod` and `@final`.\n\n## Why is this bad?\n\nAn abstract method must be overridden for a subclass to become concrete, but a final\nmethod cannot be overridden. Combining the decorators therefore makes it impossible\nfor a subclass to provide a concrete implementation.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @final\n    @abstractmethod\n    def method(self) -> None: ...  # error\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "abstract-method-in-final-class": {
           "title": "detects `@final` classes with unimplemented abstract methods",
           "description": "## What it does\n\nChecks for `@final` classes that have unimplemented abstract methods.\n\n## Why is this bad?\n\nA class decorated with `@final` cannot be subclassed. If such a class has abstract\nmethods that are not implemented, the class can never be properly instantiated, as\nthe abstract methods can never be implemented (since subclassing is prohibited).\n\nAt runtime, instantiation of classes with unimplemented abstract methods is only\nprevented for classes that have `ABCMeta` (or a subclass of it) as their metaclass.\nHowever, type checkers also enforce this for classes that do not use `ABCMeta`, since\nthe intent for the class to be abstract is clear from the use of `@abstractmethod`.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\nfrom typing import final\n\n\nclass Base(ABC):\n    @abstractmethod\n    def method(self) -> int: ...\n\n\n@final\n# `Derived` does not implement `method`\nclass Derived(Base):  # error\n    pass\n```",
@@ -354,6 +378,16 @@
           "title": "detects failed type assertions",
           "description": "## What it does\n\nChecks for `assert_type()` calls where the actual type\nis an unspellable subtype of the asserted type.\n\n## Why is this bad?\n\n`assert_type()` is intended to ensure that the inferred type of a value\nis exactly the same as the asserted type. But in some situations, ty\nhas nonstandard extensions to the type system that allow it to infer\nmore precise types than can be expressed in user annotations. ty emits a\ndifferent error code to `type-assertion-failure` in these situations so\nthat users can easily differentiate between the two cases.\n\n## Example\n\n```toml\n[environment]\npython-version = \"3.11\"\n```\n\n```python\nfrom typing import assert_type\n\n\ndef _(x: int):\n    assert_type(x, int)  # fine\n    if x:\n        # the actual type is `int & ~AlwaysFalsy`,\n        # which excludes types like `Literal[0]`\n        # error: [assert-type-unspellable-subtype]\n        assert_type(x, int)\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "blanket-ignore-comment": {
+          "title": "detects blanket `ty: ignore` comments",
+          "description": "## What it does\n\nChecks for `ty: ignore` comments that don't specify which rules to ignore.\n\n## Why is this bad?\n\nA blanket `ty: ignore` comment suppresses every type-checking diagnostic on the\napplicable line or file. Specifying rule codes documents which diagnostics are\nexpected and prevents the comment from silencing unrelated errors.\n\n## Examples\n\n```py\n# error\nvalue = unknown  # ty: ignore\n```\n\nUse instead:\n\n```py\nvalue = unknown  # ty: ignore[unresolved-reference]\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -822,7 +856,7 @@
         },
         "invalid-named-tuple": {
           "title": "detects invalid `NamedTuple` class definitions",
-          "description": "## What it does\n\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\n\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s or\n`AttributeError`s at runtime.\n\n## Examples\n\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,\n`_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes\nwithout a type annotation will raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```",
+          "description": "## What it does\n\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\n\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s or\n`AttributeError`s at runtime.\n\n## Examples\n\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,\n`_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes\nwithout a type annotation will raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```\n\nFinally, `NamedTuple` field annotations cannot use the `ClassVar` or `Final` type\nqualifiers. These qualifiers also cause a runtime error when annotations are evaluated eagerly:\n\n```pycon\n>>> from typing import ClassVar, NamedTuple\n>>> class Foo(NamedTuple):\n...     x: ClassVar[int]\nTypeError: typing.ClassVar[int] is not valid as type argument\n```",
           "default": "error",
           "oneOf": [
             {
@@ -942,7 +976,7 @@
         },
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
-          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n```",
+          "description": "## What it does\n\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\n\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.12\"\n```\n\n```python\nfrom typing import TypeAliasType, TypeVar\n\n\ndef get_name() -> str:\n    return \"NewAlias\"\n\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\n# TypeAliasType name must be a string literal\nNewAlias = TypeAliasType(get_name(), int)  # error\n\nT = TypeVar(\"T\")\nGenericAlias = TypeAliasType(\"GenericAlias\", list[T], type_params=(T,))  # okay\n# TypeAliasType type parameters must be type variables\nInvalidAlias = TypeAliasType(\"InvalidAlias\", list[T], type_params=(list[T],))  # error\n```",
           "default": "error",
           "oneOf": [
             {
@@ -973,16 +1007,6 @@
         "invalid-type-form": {
           "title": "detects invalid type forms",
           "description": "## What it does\n\nChecks for expressions that are used as [type expressions]\nbut cannot validly be interpreted as such.\n\n## Why is this bad?\n\nSuch expressions cannot be understood by ty.\nIn some cases, they might raise errors at runtime.\n\n## Examples\n\n```python\nfrom typing import Annotated\n\n# Int literals are not allowed in this context in type expressions\na: list[1]  # error\n# `Annotated` expects at least two arguments\nb: Annotated[int]  # error\n```\n\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "invalid-type-guard-call": {
-          "title": "detects type guard function calls that has no narrowing effect",
-          "description": "## What it does\n\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\n\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.13\"\n```\n\n```python\nfrom typing import TypeIs\n\n\ndef is_int(value: object = object()) -> TypeIs[int]:\n    return isinstance(value, int)\n\n\n# no positional narrowing target\nis_int()  # error\n\n# narrowing target passed by keyword\nis_int(value=1)  # error\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1270,6 +1294,16 @@
             }
           ]
         },
+        "pydantic-discarded-extra-argument": {
+          "title": "detects extra constructor arguments that Pydantic silently discards",
+          "description": "## What it does\n\nChecks for extra keyword arguments that Pydantic silently discards when a model uses\n`extra=\"ignore\"`, either implicitly or explicitly.\n\n## Why is this bad?\n\nA discarded argument has no effect on the constructed model, but it may indicate a misspelled field\nname or an incorrect assumption about the model's schema.\n\n## Example\n\n```python {data-mdtest=\"ignore\"}\nfrom pydantic import BaseModel\n\n\nclass User(BaseModel):\n    name: str\n    admin: bool = False\n\n\nuser = User(name=\"Alice\", admni=True)  # error: [pydantic-discarded-extra-argument]\n```\n\nIf the field name has been misspelled, fix the typo. Otherwise, consider removing the extra argument,\nor explicitly configure the model with `extra=\"allow\"`.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "raw-string-type-annotation": {
           "title": "detects raw strings in type annotation positions",
           "description": "## What it does\n\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use raw-string notation.\n\n## Examples\n\n```python\ndef test() -> r\"int\":  # error\n    return 1\n```\n\nUse instead:\n\n```python\ndef test() -> \"int\":\n    return 1\n```",
@@ -1450,6 +1484,16 @@
             }
           ]
         },
+        "unsound-return-statement": {
+          "title": "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
+          "description": "## What it does\n\nDetects `return` statements that unsoundly return a type that is not a [subtype] of the function's\nannotated return type.\n\nThis lint is a stricter version of `invalid-return-type`.\n\n## Why is this bad?\n\nBy default, type checkers consider a `return` statement valid if the inferred type of the object\nbeing returned is [assignable] to the annotated return type of the function it's in. However, this\nmakes it easy for incorrect types to percolate through your code unexpectedly due to a single\nexpression being inferred as `Any`. This can easily lead to runtime errors that are not caught by\nthe type checker:\n\n```py\nfrom typing import Any\n\n\ndef returns_any() -> Any:\n    return \"foo\"\n\n\ndef returns_int() -> int:\n    # error: \"Unsound return statement: `Any` is not a subtype of `int`\"\n    return returns_any()\n\n\n# fails at runtime, even though the type checker infers both operands as being of type `int`!\nreturns_int() + 42\n```\n\nThis rule allows you to use [\"fully static\"][fully-static] return types as \"typed boundaries\" for\nyour code. With this rule enabled, ty would emit an error on the `return returns_any()` statement\nin `returns_int`, since the `returns_any()` call is inferred as having type `Any`, and `Any` is not\na subtype of `int`. This helps prevent the unsoundness from spreading far from its original source\n(in this case, the return type of the `returns_any` function).\n\nNote that this rule is only applied to functions annotated as returning\n[fully static][fully-static] types. It will not trigger if `Any` or `Unknown` appear anywhere in\nyour return type, either implicitly or explicitly:\n\n```py\nfrom typing import Any\n\n\ndef returns_any() -> Any:\n    return \"foo\"\n\n\n# error: [missing-type-argument]\ndef returns_unparameterized_tuple() -> tuple:\n    # no error, since the return type is implicitly `tuple[Unknown, ...]`\n    # (which is what the `missing-type-argument` error is complaining about on the line above!)\n    return returns_any()\n\n\ndef returns_list_of_any() -> list[Any]:\n    # no error, since the return type is explicitly `list[Any]`\n    return returns_any()\n```\n\nThis rule works especially well when combined with ty's\n`missing-type-argument` rule, and the Ruff rules [`ANN201`][ann201],\n[`ANN202`][ann202], [`ANN204`][ann204], [`ANN205`][ann205], and [`ANN206`][ann206]. Enabling all\nthese rules at once effectively makes it much less likely that a `return` statement can lead to\nunsoundness \"leaking\" out of a function unless that function has been *explicitly* annotated with\na dynamic type in some way (`-> Any` or `-> tuple[Any]`, for example).\n\nThis rule is analogous to mypy's [`no-any-return`][no-any-return] error code, which is enabled by\nmypy’s [`--strict`][mypy-strict] mode and can also be enabled on its own using mypy’s\n[`--warn-return-any`][warn-return-any] option.\n\n## Examples\n\n```py\nfrom typing import Any\n\n\ndef returns_any() -> Any:\n    return 42\n\n\ndef returns_int() -> int:\n    # error: \"Unsound return statement: `Any` is not a subtype of `int`\"\n    return returns_any()\n```\n\nNarrow the type to a subtype of `int` to fix the diagnostic:\n\n```py\nfrom typing import Any\nfrom typing_extensions import reveal_type\n\n\ndef returns_any() -> Any:\n    return 42\n\n\ndef returns_int() -> int:\n    my_int = returns_any()\n    assert isinstance(my_int, int)\n    reveal_type(my_int)  # revealed: Any & int\n    return my_int  # no error: `Any & int` is a subtype of `int`\n```\n\n## Default level\n\nThis rule is disabled by default. It is intended for advanced users wanting additional soundness\nchecks from their type checker, not for users who have just started to use type checkers on their\nPython code.\n\n[ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/\n[ann202]: https://docs.astral.sh/ruff/rules/missing-return-type-private-function/\n[ann204]: https://docs.astral.sh/ruff/rules/missing-return-type-special-method/\n[ann205]: https://docs.astral.sh/ruff/rules/missing-return-type-static-method/\n[ann206]: https://docs.astral.sh/ruff/rules/missing-return-type-class-method/\n[assignable]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable\n[fully-static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type\n[mypy-strict]: https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict\n[no-any-return]: https://mypy.readthedocs.io/en/stable/error_code_list2.html#code-no-any-return\n[subtype]: https://typing.python.org/en/latest/spec/glossary.html#term-subtype\n[warn-return-any]: https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-warn-return-any",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-base": {
           "title": "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
           "description": "## What it does\n\nChecks for class definitions that have bases which are unsupported by ty.\n\n## Why is this bad?\n\nIf a class has a base that is an instance of a complex type such as a union type,\nty will not be able to resolve the [method resolution order] (MRO) for the class.\nThis will lead to an inferior understanding of your codebase and unpredictable\ntype-checking behavior.\n\n## Examples\n\n```python\nimport datetime\n\n\nclass A: ...\n\n\nclass B: ...\n\n\nif datetime.date.today().weekday() != 6:\n    C = A\nelse:\n    C = B\n\n\nclass D(C): ...  # error: [unsupported-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
@@ -1559,6 +1603,13 @@
             }
           ]
         },
+        "exclude-scripts": {
+          "description": "Whether to exclude files containing PEP 723 inline script metadata unless they are\nexplicitly passed on the command line.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "include": {
           "description": "A list of files and directories to check. The `include` option\nfollows a similar syntax to `.gitignore` but reversed:\nIncluding a file or directory will make it so that it (and its contents)\nare type checked.\n\n- `./src/` matches only a directory\n- `./src` matches both files and directories\n- `src` matches a file or directory named `src`\n- `*` matches any (possibly empty) sequence of characters (except `/`).\n- `**` matches zero or more path components.\n  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.\n  A sequence of more than two consecutive `*` characters is also invalid.\n- `?` matches any single character except `/`\n- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,\n  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only\nmatches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
           "anyOf": [
@@ -1576,18 +1627,6 @@
             "boolean",
             "null"
           ]
-        },
-        "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/RelativePathBuf"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "deprecated": true
         }
       },
       "additionalProperties": false

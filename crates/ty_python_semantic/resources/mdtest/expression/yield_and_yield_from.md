@@ -186,6 +186,59 @@ def iterator_yield_from() -> Generator[int, None, int]:
     return 1
 ```
 
+## Generator type aliases
+
+ty "sees through" type aliases used as return annotations when inferring a generator's yield type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import AsyncGenerator, Generator, Iterator
+
+type GeneratorAlias[T] = Generator[T]
+
+def invalid_yield() -> GeneratorAlias[int]:
+    yield "foo"  # error: [invalid-yield]
+
+def invalid_return() -> GeneratorAlias[int]:
+    yield 42
+    return "foo"  # error: [invalid-return-type]
+
+type NestedGeneratorAlias[T] = GeneratorAlias[T]
+
+def invalid_nested_yield() -> NestedGeneratorAlias[int]:
+    yield "foo"  # error: [invalid-yield]
+
+type IteratorAlias[T] = Iterator[T]
+
+def invalid_iterator_return() -> IteratorAlias[int]:
+    yield 42
+    return "foo"  # error: [invalid-return-type]
+
+type AsyncGeneratorAlias[T] = AsyncGenerator[T]
+
+async def invalid_async_yield() -> AsyncGeneratorAlias[int]:
+    yield "foo"  # error: [invalid-yield]
+```
+
+The same applies when inferring a generator's return type and send type:
+
+```py
+type FullGeneratorAlias[YieldT, SendT, ReturnT] = Generator[YieldT, SendT, ReturnT]
+
+def inner_aliased_generator() -> FullGeneratorAlias[int, bytes, str]:
+    sent = yield 42
+    reveal_type(sent)  # revealed: bytes
+    return "done"
+
+def outer_aliased_generator() -> FullGeneratorAlias[int, bytes, None]:
+    result = yield from inner_aliased_generator()
+    reveal_type(result)  # revealed: str
+```
+
 ## Error cases
 
 ### Non-iterable type
@@ -209,14 +262,13 @@ def invalid_generator() -> Generator[int, None, None]:
 
 ```snapshot
 error[invalid-yield]: Yield expression type does not match annotation
- --> src/mdtest_snippet.py:3:28
+ --> src/mdtest_snippet.py:5:11
   |
 3 | def invalid_generator() -> Generator[int, None, None]:
   |                            -------------------------- Function annotated with yield type `int` here
 4 |     # snapshot: invalid-yield
 5 |     yield ""
   |           ^^ expression of type `Literal[""]`, expected `int`
-  |
 ```
 
 ### Invalid annotation
@@ -277,14 +329,13 @@ def outer() -> Generator[int, str, None]:
 
 ```snapshot
 error[invalid-yield]: Send type does not match annotation
- --> src/mdtest_snippet.py:6:16
+ --> src/mdtest_snippet.py:8:16
   |
 6 | def outer() -> Generator[int, str, None]:
   |                ------------------------- Function annotated with send type `str` here
 7 |     # snapshot: invalid-yield
 8 |     yield from inner()
   |                ^^^^^^^ generator with send type `int`, expected `str`
-  |
 ```
 
 ### Non generator function with `Generator` annotation
@@ -301,14 +352,13 @@ reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
 
 ```snapshot
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:3:18
+ --> src/mdtest_snippet.py:5:12
   |
 3 | def non_gen() -> Generator[int, int, None]:
   |                  ------------------------- Expected `Generator[int, int, None]` because of return type
 4 |     # snapshot: invalid-return-type
 5 |     return 1
   |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
-  |
 info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
 info: └── protocol member `__iter__` is not defined on type `Literal[1]`
 ```

@@ -8,7 +8,6 @@ E304 [*] Blank lines found after function decorator (1)
 31 |     
 32 |     def with_blank_line(): ...
    |     ^^^
-   |
 help: Remove extraneous blank line(s)
    |
 30 |     @decorated

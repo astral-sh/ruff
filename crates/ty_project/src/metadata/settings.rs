@@ -5,7 +5,8 @@ use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
+use crate::metadata::options::{InnerOverrideOptions, Options, OutputFormat};
+use crate::metadata::script::script_metadata;
 use crate::{Db, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
@@ -37,15 +38,15 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn rules(&self) -> &RuleSelection {
+    fn rules(&self) -> &RuleSelection {
         &self.rules
     }
 
-    pub fn src(&self) -> &SrcSettings {
+    pub(crate) fn src(&self) -> &SrcSettings {
         &self.src
     }
 
-    pub fn to_rules(&self) -> Arc<RuleSelection> {
+    pub(crate) fn to_rules(&self) -> Arc<RuleSelection> {
         self.rules.clone()
     }
 
@@ -53,11 +54,11 @@ impl Settings {
         &self.terminal
     }
 
-    pub fn overrides(&self) -> &[Override] {
+    fn overrides(&self) -> &[Override] {
         &self.overrides
     }
 
-    pub fn analysis(&self) -> &AnalysisSettings {
+    pub(crate) fn analysis(&self) -> &AnalysisSettings {
         &self.analysis
     }
 }
@@ -79,13 +80,15 @@ impl Default for TerminalSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct SrcSettings {
-    pub respect_ignore_files: bool,
-    pub files: IncludeExcludeFilter,
+    pub(crate) respect_ignore_files: bool,
+    pub(crate) exclude_scripts: bool,
+    pub(crate) files: IncludeExcludeFilter,
 }
 impl SrcSettings {
     pub(crate) fn default() -> Self {
         Self {
             respect_ignore_files: true,
+            exclude_scripts: false,
             files: IncludeExcludeFilter::default(),
         }
     }
@@ -108,7 +111,7 @@ pub struct Override {
 
 impl Override {
     /// Returns whether this override applies to the given file path.
-    pub fn matches_file(&self, path: &ruff_db::system::SystemPath) -> bool {
+    fn matches_file(&self, path: &ruff_db::system::SystemPath) -> bool {
         use crate::glob::{GlobFilterCheckMode, IncludeResult};
 
         matches!(
@@ -122,7 +125,39 @@ impl Override {
 /// Resolves the settings for a given file.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
-    let settings = db.project().settings(db);
+    let project = db.project();
+
+    // Ignore script settings for files that aren't checked as part of the project. Check for
+    // metadata first so files without metadata don't depend on the low-durability open-file set.
+    if let Some(script) = script_metadata(db, file)
+        && crate::should_check_file(db, file)
+    {
+        let inline = script.ty().cloned().unwrap_or_default();
+        let metadata = project.metadata(db);
+        let primary = if metadata.config_file_override().is_some() {
+            metadata.options()
+        } else {
+            &inline
+        };
+        let mut options = metadata
+            .options_in_precedence_order(primary)
+            .map(Options::file_options);
+        let mut merged = options.next().unwrap_or_default();
+
+        for option in options {
+            merged.combine_with(option);
+        }
+
+        let rules = merged.rules.unwrap_or_default();
+        let analysis = merged.analysis.unwrap_or_default();
+
+        let rules = rules.to_rule_selection(db, &mut Vec::new());
+        let analysis = analysis.to_settings(db, &mut Vec::new());
+
+        return FileSettings::File(Arc::new(OverrideSettings { rules, analysis }));
+    }
+
+    let settings = project.settings(db);
 
     let path = match file.path(db) {
         ruff_db::files::FilePath::System(path) => path,
@@ -179,7 +214,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// This is to make Salsa happy because it requires that queries with only a single argument
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
 fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();
@@ -188,12 +223,14 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
         merged.combine_with((*option).clone());
     }
 
-    let global_options = db.project().metadata(db).options();
+    let metadata = db.project().metadata(db);
 
-    merged.rules.combine_with(global_options.rules.clone());
-    merged
-        .analysis
-        .combine_with(global_options.analysis.clone());
+    // Merge with the project level options by replaying the individual options
+    // in the correct precedence order.
+    for options in metadata.options_in_precedence_order(metadata.options()) {
+        merged.rules.combine_with(options.rules.clone());
+        merged.analysis.combine_with(options.analysis.clone());
+    }
 
     if merged.rules.is_none() && merged.analysis.is_none() {
         return FileSettings::Global;
@@ -221,14 +258,14 @@ pub enum FileSettings {
 }
 
 impl FileSettings {
-    pub fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
+    pub(crate) fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
         match self {
             FileSettings::Global => db.project().settings(db).rules(),
             FileSettings::File(override_settings) => &override_settings.rules,
         }
     }
 
-    pub fn analysis<'a>(&'a self, db: &'a dyn Db) -> &'a AnalysisSettings {
+    pub(crate) fn analysis<'a>(&'a self, db: &'a dyn Db) -> &'a AnalysisSettings {
         match self {
             FileSettings::Global => db.project().settings(db).analysis(),
             FileSettings::File(override_settings) => &override_settings.analysis,

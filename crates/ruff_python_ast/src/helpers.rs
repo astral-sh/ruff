@@ -310,18 +310,10 @@ where
                 range: _,
                 node_index: _,
             })
-            | Expr::List(ast::ExprList {
-                elts,
-                range: _,
-                node_index: _,
-                ..
-            })
-            | Expr::Tuple(ast::ExprTuple {
-                elts,
-                range: _,
-                node_index: _,
-                ..
-            }) => elts.iter().any(|expr| any_over_expr(expr, &mut *func)),
+            | Expr::List(ast::ExprList { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().any(|expr| any_over_expr(expr, &mut *func))
+            }
             Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,
@@ -380,18 +372,8 @@ where
                 range: _,
                 node_index: _,
             })
-            | Expr::Attribute(ast::ExprAttribute {
-                value,
-                range: _,
-                node_index: _,
-                ..
-            })
-            | Expr::Starred(ast::ExprStarred {
-                value,
-                range: _,
-                node_index: _,
-                ..
-            }) => any_over_expr(value, func),
+            | Expr::Attribute(ast::ExprAttribute { value, .. })
+            | Expr::Starred(ast::ExprStarred { value, .. }) => any_over_expr(value, func),
             Expr::Yield(ast::ExprYield {
                 value,
                 range: _,
@@ -824,7 +806,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 
 /// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
-pub const fn is_singleton(expr: &Expr) -> bool {
+const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)

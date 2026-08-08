@@ -36,6 +36,8 @@ bitflags::bitflags! {
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
+        const IMPLEMENTATION_LINK_SUPPORT = 1 << 21;
+        const TRIGGER_SIGNATURE_HELP_COMMAND = 1 << 22;
     }
 }
 
@@ -122,6 +124,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DECLARATION_LINK_SUPPORT)
     }
 
+    /// Returns `true` if the client supports location links in goto implementation.
+    pub(crate) const fn supports_implementation_link(self) -> bool {
+        self.contains(Self::IMPLEMENTATION_LINK_SUPPORT)
+    }
+
     /// Returns `true` if the client prefers markdown in hover responses.
     pub(crate) const fn prefers_markdown_in_hover(self) -> bool {
         self.contains(Self::PREFER_MARKDOWN_IN_HOVER)
@@ -195,6 +202,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
+    /// Returns `true` if the client supports the `ty.triggerParameterHints` completion command.
+    pub(crate) const fn supports_trigger_parameter_hints_command(self) -> bool {
+        self.contains(Self::TRIGGER_SIGNATURE_HELP_COMMAND)
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -266,6 +278,19 @@ impl ResolvedClientCapabilities {
             flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
         }
 
+        if client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("commands")?.get("commands")?.as_array())
+            .is_some_and(|commands| {
+                commands
+                    .iter()
+                    .any(|command| command.as_str() == Some("ty.triggerParameterHints"))
+            })
+        {
+            flags |= Self::TRIGGER_SIGNATURE_HELP_COMMAND;
+        }
+
         if text_document
             .and_then(|text_document| text_document.type_definition?.link_support)
             .unwrap_or_default()
@@ -285,6 +310,13 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::DECLARATION_LINK_SUPPORT;
+        }
+
+        if text_document
+            .and_then(|text_document| text_document.implementation?.link_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::IMPLEMENTATION_LINK_SUPPORT;
         }
 
         if text_document
@@ -443,6 +475,7 @@ pub(crate) fn server_capabilities(
         type_definition_provider: Some(true.into()),
         definition_provider: Some(true.into()),
         declaration_provider: Some(true.into()),
+        implementation_provider: Some(true.into()),
         references_provider: Some(true.into()),
         rename_provider: Some(server_rename_options().into()),
         document_highlight_provider: Some(true.into()),
@@ -523,7 +556,7 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
     }
 }
 
-pub(crate) fn server_rename_options() -> RenameOptions {
+fn server_rename_options() -> RenameOptions {
     RenameOptions {
         prepare_provider: Some(true),
         work_done_progress_options: WorkDoneProgressOptions::default(),

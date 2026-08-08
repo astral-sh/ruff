@@ -27,7 +27,7 @@ impl Tokens {
     /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens start at the same offset,
     /// it returns the index of the first one. Multiple tokens can start at the same offset in cases where
     /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
-    pub fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
+    fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
         let partition_point = self.partition_point(|token| token.start() < offset);
 
         let after = &self[partition_point..];
@@ -223,6 +223,15 @@ impl Tokens {
             TokenAt::Single(token) => token.range(),
             TokenAt::None | TokenAt::Between(..) => TextRange::empty(offset),
         }
+    }
+}
+
+impl IntoIterator for Tokens {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.raw.into_iter()
     }
 }
 

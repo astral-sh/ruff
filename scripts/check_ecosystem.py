@@ -126,7 +126,7 @@ REPOSITORIES: list[Repository] = [
     Repository("aws", "aws-sam-cli", "develop"),
     Repository("binary-husky", "gpt_academic", "master"),
     Repository("bloomberg", "pytest-memray", "main"),
-    Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
+    Repository("bokeh", "bokeh", "branch-3.10", select="ALL"),
     # Disabled due to use of explicit `select` with `E999`, which has been removed.
     # See: https://github.com/astral-sh/ruff/pull/12129
     # Repository("demisto", "content", "master"),
@@ -136,7 +136,7 @@ REPOSITORIES: list[Repository] = [
     Repository("fronzbot", "blinkpy", "dev"),
     Repository("ibis-project", "ibis", "master"),
     Repository("ing-bank", "probatus", "main"),
-    Repository("jrnl-org", "jrnl", "develop"),
+    Repository("jrnl-org", "jrnl", "main"),
     Repository("langchain-ai", "langchain", "main"),
     Repository("latchbio", "latch", "main"),
     Repository("lnbits", "lnbits", "main"),

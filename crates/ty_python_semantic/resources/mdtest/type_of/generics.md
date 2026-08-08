@@ -16,7 +16,8 @@ def _[T](x: T):
     reveal_type(type(x))  # revealed: type[T@_]
 ```
 
-`type[T]` with an unbounded type variable represents any subclass of `object`.
+`type[T]` with an unbounded type variable represents any subclass of `object`. Constructor calls are
+checked against `object.__init__`.
 
 ```py
 def unbounded[T](x: type[T]) -> T:
@@ -25,8 +26,52 @@ def unbounded[T](x: type[T]) -> T:
     reveal_type(x.__init__)  # revealed: def __init__(self) -> None
     reveal_type(x.__qualname__)  # revealed: str
     reveal_type(x())  # revealed: T@unbounded
+    # error: [too-many-positional-arguments] "Too many positional arguments to `type[T]`: expected 0, got 1"
+    x(1)
+    # error: [unknown-argument] "Argument `value` does not match any known parameter of `type[T]`"
+    x(value=1)
 
     return x()
+```
+
+An explicit `object` upper bound has the same constructor signature as an implicit `object` bound,
+including for legacy type variables:
+
+```py
+from typing import TypeVar
+
+LegacyObjectT = TypeVar("LegacyObjectT", bound=object)
+
+def explicit_object_bound[T: object](x: type[T]) -> T:
+    reveal_type(x())  # revealed: T@explicit_object_bound
+    x(1)  # error: [too-many-positional-arguments]
+    return x()
+
+def legacy_object_bound(x: type[LegacyObjectT]) -> LegacyObjectT:
+    reveal_type(x())  # revealed: LegacyObjectT@legacy_object_bound
+    x(1)  # error: [too-many-positional-arguments]
+    return x()
+```
+
+Aliases of `object` have the same constructor and callable signature as a direct `object` bound,
+even when the bound contains more than one alias:
+
+```py
+from collections.abc import Callable
+
+type ObjectAlias = object
+type ChainedObjectAlias = ObjectAlias
+
+def aliased_object_bound[T: ChainedObjectAlias](cls: type[T]) -> T:
+    # error: [too-many-positional-arguments] "Too many positional arguments to `type[T]`: expected 0, got 1"
+    cls(1)
+    # error: [unknown-argument] "Argument `value` does not match any known parameter of `type[T]`"
+    cls(value=1)
+
+    zero_argument: Callable[[], T] = cls
+    # error: [invalid-assignment]
+    one_argument: Callable[[int], T] = cls
+    return cls()
 ```
 
 `type[T]` with an upper bound of `T: A` represents any subclass of `A`.
@@ -97,7 +142,8 @@ reveal_type(union_bound(Multiply))  # revealed: Multiply
 ## Union
 
 ```py
-from ty_extensions import Intersection, Unknown
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown
 
 def _[T: int](x: type | type[T]):
     reveal_type(x())  # revealed: Any
@@ -146,6 +192,60 @@ def pep695_typevar_narrowing[T: (int, str)](x: int | str, t: type[T]) -> T:
     return x
 ```
 
+Narrowing a union of `type[T]` and a callable factory must preserve the `type[T]` alternative:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Holder(Generic[T]):
+    value: type[T] | Callable[[], type[T]]
+
+    def narrow(self) -> None:
+        if isinstance(self.value, type):
+            reveal_type(self.value)  # revealed: type[T@Holder] | ((() -> type[T@Holder]) & type)
+```
+
+## Narrowing constructor calls
+
+Narrowing a class object with `issubclass` uses the narrowed class's constructor without losing its
+original type variable:
+
+```py
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def narrowed_subclass[T](cls: type[T]) -> T:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls(1))  # revealed: T@narrowed_subclass & IntConstructor
+        return cls(1)
+    return cls()
+```
+
+Invalid positional and keyword arguments each produce only the narrowed subclass constructor's
+diagnostic:
+
+```py
+def narrowed_invalid[T](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls(value="wrong")
+```
+
+Checking a class object's identity preserves the original type variable in the same way:
+
+```py
+def narrowed_identity[T](cls: type[T]) -> T:
+    if cls is IntConstructor:
+        reveal_type(cls(1))  # revealed: T@narrowed_identity & IntConstructor
+        return cls(1)
+    return cls()
+```
+
 ## `__class__`
 
 ```py
@@ -180,8 +280,9 @@ class B:
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
 
 ```py
-from typing import Any, Callable, Protocol
-from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
+from typing import Any, Callable, NewType, Protocol, TypeVar
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of, is_disjoint_from
 
 class Callback[T](Protocol):
     def __call__(self, *args, **kwargs) -> T: ...
@@ -200,6 +301,9 @@ def _[T](_: T):
 
     static_assert(is_assignable_to(type[T], Callable[..., T] | Callable[..., Any]))
     static_assert(not is_disjoint_from(type[T], Callable[..., T] | Callable[..., Any]))
+
+    static_assert(not is_subtype_of(type[T], Intersection[Callable[[], type[T]], type]))
+    static_assert(not is_subtype_of(type[T], Intersection[Callable[[], type[T]], type] | type[int]))
 
     static_assert(not is_assignable_to(type[T], Callback[int]))
     static_assert(not is_disjoint_from(type[T], Callback[int]))
@@ -276,12 +380,35 @@ def _[T: (int, str)](_: T):
 
     static_assert(is_subtype_of(type[T], type[int] | type[str]))
     static_assert(is_subtype_of(type[T], type[int | str]))
+    static_assert(is_subtype_of(type[T], Intersection[Callable[[], type[T]], type] | type[int] | type[str]))
     static_assert(not is_disjoint_from(type[T], type[int | str]))
     static_assert(not is_disjoint_from(type[T], type[int] | type[str]))
 
 def _[T: (int | str, int)](_: T):
     static_assert(is_subtype_of(type[int], type[T]))
     static_assert(not is_disjoint_from(type[int], type[T]))
+
+def _[T, U: (Intersection[Callable[[], type], type], type)](_: T):
+    static_assert(not is_subtype_of(type[T], U))
+    static_assert(not is_subtype_of(type[T], U | type[int]))
+
+class Base: ...
+class Other: ...
+class OtherMeta(type): ...
+
+UserId = NewType("UserId", int)
+
+BoundBase = TypeVar("BoundBase", bound=Base)
+BoundList = TypeVar("BoundList", bound=list[int])
+BoundUserId = TypeVar("BoundUserId", bound=UserId)
+
+def lossy_class_object_projections(base: BoundBase, items: BoundList, user_id: BoundUserId) -> None:
+    static_assert(not is_subtype_of(type[BoundBase], TypeOf[Base]))
+    static_assert(not is_subtype_of(type[BoundList], TypeOf[list[int]]))
+    static_assert(not is_subtype_of(type[BoundBase], TypeOf[Base] | type[Other]))
+    static_assert(not is_subtype_of(type[BoundList], TypeOf[list[int]] | type[Other]))
+    static_assert(not is_subtype_of(type[BoundBase], OtherMeta | type[Other]))
+    static_assert(not is_subtype_of(type[BoundUserId], TypeOf[UserId] | type[Other]))
 ```
 
 ## Type aliases in final upper bounds
@@ -295,7 +422,8 @@ python-version = "3.12"
 
 ```py
 from typing import final
-from ty_extensions import TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 @final
 class FinalClass: ...
@@ -305,6 +433,7 @@ type Alias = FinalClass
 def accepts_exact(cls: TypeOf[FinalClass]) -> None: ...
 def bounded[T: Alias](cls: type[T]) -> None:
     accepts_exact(cls)
+    static_assert(is_subtype_of(type[T], TypeOf[FinalClass] | type[int]))
 ```
 
 ## Metaclass instances
@@ -450,7 +579,7 @@ var: type[C[int]] = C[int]
 var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
 ```
 
-However, generic `Protocol` classes are still TODO:
+Generic protocol meta-types preserve their specialization and use structural assignability:
 
 ```py
 from typing import Protocol
@@ -458,11 +587,10 @@ from typing import Protocol
 class Proto[U](Protocol):
     def some_method(self): ...
 
-# TODO: should be error: [invalid-assignment]
-var: type[Proto[int]] = C[int]
+var: type[Proto[int]] = C[int]  # error: [invalid-assignment]
 
 def _(p: type[Proto[int]]):
-    reveal_type(p)  # revealed: type[@Todo(type[T] for protocols)]
+    reveal_type(p)  # revealed: type[Proto[int]]
 ```
 
 ## Generic `@final` classes
@@ -558,9 +686,11 @@ expects_type_c_of_int_and_str(C)
 # Also OK, the specialized `C[int, str]` is assignable to `type[C[int, str]]`
 expects_type_c_of_int_and_str(C[int, str])
 
-# TODO: these should be errors
+# error: [invalid-argument-type]
 expects_type_c_of_int_and_str(C[str])
+# error: [invalid-argument-type]
 expects_type_c_of_int_and_str(C[int, str, bytes])
+# error: [invalid-argument-type]
 expects_type_c_of_int_and_str(C[str, int])
 ```
 
@@ -576,25 +706,29 @@ def expects_type_c_default_of_int_str(f: type[C[int, str]]): ...
 
 expects_type_c_default(C)
 expects_type_c_default(C[int, str])
-expects_type_c_default_of_int(C)
 expects_type_c_default_of_int(C[int])
 expects_type_c_default_of_int_str(C)
 expects_type_c_default_of_int_str(C[int, str])
 
-# TODO: these should be errors
+# error: [invalid-argument-type]
 expects_type_c_default(C[int])
+# error: [invalid-argument-type]
+expects_type_c_default_of_int(C)
+# error: [invalid-argument-type]
 expects_type_c_default_of_int(C[str])
+# error: [invalid-argument-type]
 expects_type_c_default_of_int_str(C[str, int])
 ```
 
 ## Upcasting a `type[]` type to a `Callable` type
 
-`type[T]` accepts the same parameters as `object.__init__` if `T` does not have an upper bound. If
-`T` is bound to a nominal-instance type, `type[T]` accepts the same parameters as the constructor of
-the class that the instance-type refers to.
+`type[T]` accepts the same parameters as `object.__init__` if `T` has an implicit or explicit
+`object` upper bound. If `T` has a more specific upper bound, `type[T]` accepts the same parameters
+as that bound's constructor. Bare `type` retains its permissive constructor signature.
 
 ```py
-from ty_extensions import RegularCallableTypeOf
+from collections.abc import Callable
+from ty_extensions._internal import RegularCallableTypeOf
 
 class TakesStrInConstructor:
     def __init__(self, x: int, y: str | None = None): ...
@@ -629,12 +763,20 @@ def f[
     reveal_type(type_object(""))  # revealed: Any
 
     reveal_type(type_t_unbound())  # revealed: T@f
-    # TODO: we could consider emitting an error here as well
+    # error: [too-many-positional-arguments]
     reveal_type(type_t_unbound(""))  # revealed: T@f
 
+    zero_argument_unbound: Callable[[], T] = type_t_unbound
+    # error: [invalid-assignment]
+    one_argument_unbound: Callable[[int], T] = type_t_unbound
+
     reveal_type(type_t_object_bound())  # revealed: T1@f
-    # TODO: we could consider emitting an error here as well
+    # error: [too-many-positional-arguments]
     reveal_type(type_t_object_bound(""))  # revealed: T1@f
+
+    zero_argument_object_bound: Callable[[], T1] = type_t_object_bound
+    # error: [invalid-assignment]
+    one_argument_object_bound: Callable[[int], T1] = type_t_object_bound
 
     reveal_type(type_int())  # revealed: int
     reveal_type(type_int("1"))  # revealed: int
@@ -677,10 +819,8 @@ def f[
         reveal_type(bare_type_upcast)  # revealed: (...) -> Any
         reveal_type(type_object_upcast)  # revealed: (...) -> Any
 
-        # TODO: if we did decide to override typeshed's `type.__call__` annotations (see above),
-        # we should also turn these two into `() -> T@f` / `() -> T1@f`
-        reveal_type(type_t_unbound_upcast)  # revealed: (...) -> T@f
-        reveal_type(type_t_object_bound_upcast)  # revealed: (...) -> T1@f
+        reveal_type(type_t_unbound_upcast)  # revealed: () -> T@f
+        reveal_type(type_t_object_bound_upcast)  # revealed: () -> T1@f
 
         # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
         reveal_type(type_int_upcast)

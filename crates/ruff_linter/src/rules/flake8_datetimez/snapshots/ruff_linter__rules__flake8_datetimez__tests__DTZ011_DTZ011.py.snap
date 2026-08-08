@@ -18,5 +18,4 @@ DTZ011 `datetime.date.today()` used
 8 | # unqualified
 9 | date.today()
   | ^^^^^^^^^^^^
-  |
 help: Use `datetime.datetime.now(tz=...).date()` instead

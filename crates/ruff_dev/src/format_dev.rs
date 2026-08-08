@@ -40,7 +40,8 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let mut arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    arguments.extend_exclude = Some(vec![FilePattern::Builtin("*.md")]);
     let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
     Ok((cli, config_arguments))
 }
@@ -554,7 +555,10 @@ fn format_dir_entry(
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
     let resolved_file = resolved_file.context("Iterating the files in the repository failed")?;
     // For some reason it does not filter in the beginning
-    if resolved_file.file_name() == "pyproject.toml" {
+    if ["pyproject.toml", "ruff.toml", ".ruff.toml"]
+        .iter()
+        .any(|&path| resolved_file.file_name() == path)
+    {
         return Ok((Ok(Statistics::default()), resolved_file.into_path()));
     }
 

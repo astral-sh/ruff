@@ -216,7 +216,6 @@ UP007 [*] Use `X | Y` for type annotations
 48 |     x: Union[str, int]
 49 |     x: Union["str", "int"]
    |        ^^^^^^^^^^^^^^^^^^^
-   |
 help: Convert to `X | Y`
    |
 48 |     x: Union[str, int]
@@ -324,7 +323,6 @@ UP007 [*] Use `X | Y` for type annotations
 154 | |         | Literal["LongLiteralNumberThree"]
 155 | |     ]
     | |_____^
-    |
 help: Convert to `X | Y`
     |
 150 |

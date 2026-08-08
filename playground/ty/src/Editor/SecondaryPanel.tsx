@@ -5,15 +5,13 @@ import { Suspense, use, useState } from "react";
 import classNames from "classnames";
 
 export enum SecondaryTool {
-  "AST" = "AST",
-  "Tokens" = "Tokens",
-  "Run" = "Run",
+  AST = "AST",
+  Tokens = "Tokens",
+  Run = "Run",
 }
 
 export type SecondaryPanelResult =
-  | null
-  | { status: "ok"; content: string }
-  | { status: "error"; error: string };
+  null | { status: "ok"; content: string } | { status: "error"; error: string };
 
 export interface SecondaryPanelProps {
   files: ReadonlyFiles;
@@ -152,7 +150,9 @@ function RunOutput({
       className={classNames(
         "m-2",
         "text-sm",
-        "whitespace-pre",
+        "whitespace-pre-wrap",
+        "break-all",
+        "overflow-auto",
         theme === "dark" ? "text-white" : null,
       )}
     >

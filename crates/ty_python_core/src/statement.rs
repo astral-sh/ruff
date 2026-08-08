@@ -4,6 +4,8 @@ use crate::definition::Definition;
 use crate::expression::Expression;
 use crate::node_key::NodeKey;
 use crate::scope::{FileScopeId, ScopeId};
+use crate::{Program, ProgramFile};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
@@ -13,7 +15,7 @@ use salsa;
 /// Many statements can be treated directly as definitions or expressions,
 /// and so do not require a separate Salsa allocation.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
 pub enum Statement<'db> {
     Expression(Expression<'db>),
@@ -37,9 +39,11 @@ pub enum Statement<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StatementInner<'db> {
     /// The file in which the statement occurs.
-    pub file: File,
+    #[returns(copy)]
+    pub program_file: ProgramFile<'db>,
 
     /// The scope in which the statement occurs.
+    #[returns(copy)]
     pub file_scope: FileScopeId,
 
     /// The statement node.
@@ -53,12 +57,24 @@ pub struct StatementInner<'db> {
 impl get_size2::GetSize for StatementInner<'_> {}
 
 impl<'db> StatementInner<'db> {
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.program_file(db).file(db)
+    }
+
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.program_file(db).python_file(db)
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.program_file(db))
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.scope(db).program(db)
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct StatementNodeKey(NodeKey);
 
 impl From<&ast::Stmt> for StatementNodeKey {

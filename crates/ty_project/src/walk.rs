@@ -1,4 +1,5 @@
 use crate::glob::IncludeExcludeFilter;
+use crate::metadata::script::script_metadata;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
@@ -35,7 +36,7 @@ impl<'a> ProjectFilesFilter<'a> {
         }
     }
 
-    pub(crate) fn force_exclude(&self) -> bool {
+    fn force_exclude(&self) -> bool {
         self.force_exclude
     }
 
@@ -152,14 +153,14 @@ impl ProjectFilesWalker {
                 return (Vec::new(), Vec::new());
             }
 
-            create_walker(
+            create_walker_builder(
                 db,
                 root_paths.iter().filter(|root| {
                     should_visit_incremental_path(root.as_path(), incremental_paths)
                 }),
             )
         } else {
-            create_walker(db, root_paths)
+            create_walker_builder(db, root_paths)
         };
 
         let Some(walker) = walker else {
@@ -167,6 +168,7 @@ impl ProjectFilesWalker {
         };
 
         let filter = ProjectFilesFilter::from_project(db, project);
+        let exclude_scripts = project.settings(db).src().exclude_scripts;
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
@@ -259,6 +261,18 @@ impl ProjectFilesWalker {
                             // If this returns `Err`, then the file was deleted between now and when the walk callback was called.
                             // We can ignore this.
                             if let Ok(file) = system_path_to_file(&*db, entry.path()) {
+                                if entry.depth() > 0
+                                    && exclude_scripts
+                                    && script_metadata(&*db, file).is_some()
+                                {
+                                    tracing::debug!(
+                                        "Ignoring implicitly discovered PEP 723 script `{path}` \
+                                        because `exclude-scripts` is enabled.",
+                                        path = entry.path()
+                                    );
+                                    return WalkState::Skip;
+                                }
+
                                 files.lock().unwrap().push(file);
                             }
                         }
@@ -307,24 +321,24 @@ impl ProjectFilesWalker {
     }
 }
 
-fn create_walker<I, T>(db: &dyn Db, paths: I) -> Option<WalkDirectoryBuilder>
+pub(crate) fn create_walker_builder<I, T>(db: &dyn Db, paths: I) -> Option<WalkDirectoryBuilder>
 where
     I: IntoIterator<Item = T>,
     T: AsRef<SystemPath>,
 {
     let mut paths = paths.into_iter();
 
-    let mut walker = db
+    let mut builder = db
         .system()
         .walk_directory(paths.next()?.as_ref())
         .standard_filters(db.project().settings(db).src().respect_ignore_files)
         .ignore_hidden(false);
 
     for path in paths {
-        walker = walker.add(path);
+        builder = builder.add(path);
     }
 
-    Some(walker)
+    Some(builder)
 }
 
 fn should_visit_incremental_path(

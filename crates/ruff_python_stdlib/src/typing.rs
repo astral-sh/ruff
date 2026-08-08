@@ -324,6 +324,7 @@ pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
                     | "float"
                     | "frozenset"
                     | "int"
+                    | "range"
                     | "str"
                     | "tuple"
                     | "slice"

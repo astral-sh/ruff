@@ -57,7 +57,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, 1, c=3.14)
-reveal_type(p)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### All args bound
@@ -164,7 +164,8 @@ Specializing variadic parameter types to `Any` does not make them gradual when c
 ```py
 from functools import partial
 from typing import Any, Callable, Generic, TypeVar
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 T = TypeVar("T")
 
@@ -185,7 +186,8 @@ parameters inferred for `P`:
 ```py
 from functools import partial
 from typing import Any, Callable, Generic, ParamSpec, TypeVar
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -701,7 +703,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int, str] = (1, "hello")
 p = partial(f, *args)
-reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(c: float) -> bool]
 ```
 
 ### Mixed positional and starred args
@@ -714,7 +716,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[str] = ("hello",)
 p = partial(f, 1, *args)
-reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(c: float) -> bool]
 ```
 
 ### Fallback for starred args with variable-length tuple
@@ -920,10 +922,10 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p1 = partial(f, 1)
-reveal_type(p1)  # revealed: partial[(b: str, c: int | float) -> bool]
+reveal_type(p1)  # revealed: partial[(b: str, c: float) -> bool]
 
 p2 = partial(p1, "hello")
-reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p2)  # revealed: partial[(c: float) -> bool]
 ```
 
 ## Constructors and advanced signatures
@@ -1190,7 +1192,7 @@ def f(a: int, b: str = "default", c: float = 0.0) -> bool:
     return True
 
 p = partial(f, 1, "hello")
-reveal_type(p)  # revealed: partial[(c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(c: float = ...) -> bool]
 ```
 
 ### Multiple keyword bindings
@@ -1202,7 +1204,7 @@ def f(a: int, b: str, c: float, d: bool) -> int:
     return 0
 
 p = partial(f, b="hello", d=True)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float, d: bool = True) -> int]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float, d: bool = True) -> int]
 ```
 
 ### Mixed positional-only, regular, and keyword-only
@@ -1215,15 +1217,15 @@ def f(a: int, /, b: str, *, c: float) -> bool:
 
 # Bind the positional-only param
 p1 = partial(f, 1)
-reveal_type(p1)  # revealed: partial[(b: str, *, c: int | float) -> bool]
+reveal_type(p1)  # revealed: partial[(b: str, *, c: float) -> bool]
 
 # Bind a keyword-only param by keyword
 p2 = partial(f, c=3.14)
-reveal_type(p2)  # revealed: partial[(a: int, /, b: str, *, c: int | float = ...) -> bool]
+reveal_type(p2)  # revealed: partial[(a: int, /, b: str, *, c: float = ...) -> bool]
 
 # Bind both positional-only and keyword-only
 p3 = partial(f, 1, c=3.14)
-reveal_type(p3)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p3)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### Starred args combined with keyword args
@@ -1236,7 +1238,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int] = (1,)
 p = partial(f, *args, c=3.14)
-reveal_type(p)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### Starred args with empty tuple
@@ -1254,7 +1256,7 @@ reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
 
 ### Generic function with multiple type variables
 
-TODO: preserve uninferred type variables in the resulting partial signature.
+Unresolved type variables remain generic in the resulting partial signature.
 
 ```py
 from functools import partial
@@ -1267,7 +1269,7 @@ def combine(a: T, b: U) -> tuple[T, U]:
     return (a, b)
 
 p = partial(combine, 1)
-reveal_type(p)  # revealed: partial[(b: Unknown) -> tuple[Literal[1], Unknown]]
+reveal_type(p)  # revealed: partial[[U](b: U) -> tuple[Literal[1], U]]
 ```
 
 ### Callable object (class with `__call__`)
@@ -1329,7 +1331,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float) -> bool]
 
 # Override b at call time
 reveal_type(p(1, b="world", c=3.14))  # revealed: bool
@@ -1337,7 +1339,8 @@ reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 
 ### Overriding keyword-bound generic args at call time
 
-TODO: preserve the override branch when a keyword-bound generic is rebound at call time.
+TODO: preserve the override branch when a keyword-bound generic is rebound at call time. Currently,
+bound keyword arguments specialize the stored partial signature.
 
 ```py
 from functools import partial
@@ -1351,9 +1354,7 @@ def pair(a: T, b: T) -> tuple[T, T]:
 p = partial(pair, b=1)
 reveal_type(p)  # revealed: partial[(a: int, *, b: int = 1) -> tuple[int, int]]
 p("x")  # error: [invalid-argument-type]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-p("x", b="y")
+p(1, b="y")  # error: [invalid-argument-type]
 ```
 
 ## Assignability and partial object behavior
@@ -1598,6 +1599,31 @@ def handle(
     return Response()
 
 handler: Handler = partial(handle, context=Context())
+```
+
+A `partial` result is also assignable to a protocol that models `__call__` as a callable attribute.
+
+```py
+from functools import partial
+from typing import Any, Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class PartialLike(Protocol[T]):
+    __call__: Callable[..., T]
+
+    @property
+    def func(self) -> Callable[..., T]: ...
+    @property
+    def args(self) -> tuple[Any, ...]: ...
+    @property
+    def keywords(self) -> dict[str, Any]: ...
+
+def f(x: int) -> int:
+    return x
+
+partial_like: PartialLike[int] = partial(f)
+partial_like_bad: PartialLike[str] = partial(f)  # error: [invalid-assignment]
 ```
 
 ### Accessing `__call__` directly

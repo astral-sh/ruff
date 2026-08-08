@@ -44,7 +44,6 @@ LOG004 `.exception()` call outside exception handlers
 14 | logger.exception("")
 15 | exc("")
    | ^^^^^^^
-   |
 help: Replace with `.error()`
 
 LOG004 [*] `.exception()` call outside exception handlers
@@ -90,5 +89,4 @@ LOG004 `.exception()` call outside exception handlers
 20 |     logger.exception("")
 21 |     exc("")
    |     ^^^^^^^
-   |
 help: Replace with `.error()`

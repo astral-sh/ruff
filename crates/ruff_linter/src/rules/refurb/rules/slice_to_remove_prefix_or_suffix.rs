@@ -386,15 +386,16 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 node_index: _,
                 value: string_val,
             }),
-        ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
-            |ast::ExprNumberLiteral { value, .. }| {
-                // Only support prefix removal for size at most `u32::MAX`
-                value
-                    .as_int()
-                    .and_then(ast::Int::as_usize)
-                    .is_some_and(|x| x == string_val.chars().count())
-            },
-        ),
+        ) if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(value),
+            ..
+        }) = &**operand =>
+        {
+            // Only support prefix removal for size at most `u32::MAX`
+            value
+                .as_usize()
+                .is_some_and(|x| x == string_val.chars().count())
+        }
         (
             AffixKind::EndsWith,
             ast::Expr::UnaryOp(ast::ExprUnaryOp {

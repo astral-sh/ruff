@@ -26,7 +26,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A:
     def a(self): ...
@@ -495,7 +495,7 @@ super objects are combined into a union.
 
 ```py
 from typing import Literal
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A: ...
 
@@ -562,7 +562,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class A[T]:
     def f(self, a: T) -> T:
@@ -661,6 +662,16 @@ reveal_type(super(B, A))
 reveal_type(super(B, object))
 
 super(object, object()).__class__
+```
+
+An inhabitant of `type[Protocol]` may be either a nominal subclass of the protocol or a structural
+implementation, so the protocol's presence in the class's MRO is unknown:
+
+```py
+class StructuralProtocol(typing.Protocol): ...
+
+def protocol_super(cls: type[StructuralProtocol]):
+    reveal_type(super(StructuralProtocol, cls))  # revealed: <super: <class 'StructuralProtocol'>, Unknown>
 ```
 
 Not all objects valid in a class's bases list are valid as the first argument to `super()`. For

@@ -19,7 +19,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 13 | def foo2():
 14 |     f"""hello {VARIABLE}!"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:22:5
@@ -27,7 +26,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 21 | class bar2:
 22 |     f"""hello {VARIABLE}!"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:30:5
@@ -35,7 +33,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 29 | def foo2():
 30 |     f"""hello {VARIABLE}!"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:38:5
@@ -43,7 +40,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 37 | class bar2:
 38 |     f"""hello {VARIABLE}!"""
    |     ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:46:5
@@ -51,7 +47,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 45 | def foo2():
 46 |     f"hello {VARIABLE}!"
    |     ^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:54:5
@@ -59,7 +54,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 53 | class bar2:
 54 |     f"hello {VARIABLE}!"
    |     ^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:62:5
@@ -67,7 +61,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 61 | def foo2():
 62 |     f"hello {VARIABLE}!"
    |     ^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:70:5
@@ -75,7 +68,6 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 69 | class bar2:
 70 |     f"hello {VARIABLE}!"
    |     ^^^^^^^^^^^^^^^^^^^^
-   |
 
 B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
   --> B021.py:74:5

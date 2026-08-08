@@ -1,16 +1,21 @@
 use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
-use indexmap::IndexMap;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::preformatted::PreformattedBlockScanner;
+use crate::FxIndexMap;
 
 /// Parses all reST field lists in a docstring.
 fn field_lists(raw: &str) -> Vec<FieldList> {
     FieldList::parse_all(raw)
+}
+
+/// Returns whether `line` starts a reST field-list item.
+pub(in crate::docstring) fn is_field_list_marker(line: &str) -> bool {
+    FieldHeader::parse_list_member(line).is_some()
 }
 
 /// Returns top-level field lists that begin at a reST block boundary.
@@ -27,11 +32,13 @@ pub(in crate::docstring) fn top_level_field_lists(
 }
 
 /// Returns the parameter documentation recognized in a reST docstring.
-pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
-    let mut parameters = IndexMap::new();
-    let source = crate::docstring::documentation_trim(raw);
+///
+/// `normalized_source` must have already undergone PEP-257 trimming and universal newline
+/// normalization.
+pub(super) fn parameter_documentation(normalized_source: &str) -> FxIndexMap<String, String> {
+    let mut parameters = FxIndexMap::default();
 
-    for field_list in top_level_field_lists(&source) {
+    for field_list in top_level_field_lists(normalized_source) {
         for field in field_list.fields {
             let Field::Parameter {
                 lookup_name,
@@ -1142,7 +1149,8 @@ Section::
     }
 
     fn parameter_documentation(docstring: &str) -> String {
-        let parameters = super::parameter_documentation(docstring);
+        let normalized_source = crate::docstring::documentation_trim(docstring);
+        let parameters = super::parameter_documentation(&normalized_source);
         let mut rendered = String::new();
 
         for (name, description) in parameters {

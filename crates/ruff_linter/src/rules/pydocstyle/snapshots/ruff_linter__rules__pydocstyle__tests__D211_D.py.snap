@@ -8,7 +8,6 @@ D211 [*] No blank lines allowed before class docstring
 169 |
 170 |     """With leading space."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Remove blank line(s) before class docstring
     |
 168 | class WithLeadingSpace:

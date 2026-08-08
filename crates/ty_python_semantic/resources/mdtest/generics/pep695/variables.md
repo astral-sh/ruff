@@ -124,7 +124,7 @@ When the default is a TypeVar, its upper bound must be assignable to the outer T
 def f[T1: int, S: float = T1](): ...
 
 # `T3` has bound `str`, which is not assignable to `int | float`
-# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `float` of `U` because its upper bound `str` is not assignable to `float`"
 def g[T3: str, U: float = T3](): ...
 ```
 
@@ -304,7 +304,8 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 (including other typevars).
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 class Super: ...
 class Base(Super): ...
@@ -532,7 +533,8 @@ def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
 And an intersection of a typevar with another type is always a subtype of the TypeVar:
 
 ```py
-from ty_extensions import Intersection, Not, is_disjoint_from
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import is_disjoint_from
 
 class A: ...
 
@@ -557,7 +559,8 @@ that final class.)
 
 ```py
 from typing import final
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 @final
 class FinalClass: ...
@@ -582,7 +585,8 @@ TypeVars which have non-fully-static bounds or constraints are also self-equival
 
 ```py
 from typing import final, Any
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 # fmt: off
 
@@ -600,20 +604,17 @@ def f[
 # fmt: on
 ```
 
-## Singletons and single-valued types
-
-(Note: for simplicity, all of the prose in this section refers to _singleton_ types, but all of the
-claims also apply to _single-valued_ types.)
+## Singletons
 
 An unbounded, unconstrained typevar is not a singleton, because it can be specialized to a
 non-singleton type.
 
 ```py
-from ty_extensions import is_singleton, is_single_valued, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 def unbounded_unconstrained[T](t: T) -> None:
     static_assert(not is_singleton(T))
-    static_assert(not is_single_valued(T))
 ```
 
 A bounded typevar is not a singleton, even if its bound is a singleton, since it can still be
@@ -622,7 +623,6 @@ specialized to `Never`.
 ```py
 def bounded[T: None](t: T) -> None:
     static_assert(not is_singleton(T))
-    static_assert(not is_single_valued(T))
 ```
 
 A constrained typevar is a singleton if all of its constraints are singletons. (Note that you cannot
@@ -633,13 +633,9 @@ from typing_extensions import Literal
 
 def constrained_non_singletons[T: (int, str)](t: T) -> None:
     static_assert(not is_singleton(T))
-    static_assert(not is_single_valued(T))
 
 def constrained_singletons[T: (Literal[True], Literal[False])](t: T) -> None:
     static_assert(is_singleton(T))
-
-def constrained_single_valued[T: (Literal[True], tuple[()])](t: T) -> None:
-    static_assert(is_single_valued(T))
 ```
 
 ## Unions involving typevars
@@ -837,7 +833,8 @@ The intersection of a typevar with any other type is assignable to (and if fully
 of) itself.
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, Not, static_assert
+from ty_extensions import Not, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_assignable_to(Intersection[T, None], T))

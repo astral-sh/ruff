@@ -14,6 +14,7 @@ use ruff_python_ast::PythonVersion;
 
 use super::{
     DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
+    non_default_follows_default,
 };
 
 /// ## What it does
@@ -238,13 +239,6 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         .unique_by(|tvar| tvar.name)
         .collect::<Vec<_>>();
 
-    // Skip if any TypeVar has defaults and preview mode is not enabled
-    if vars.iter().any(|tv| tv.default.is_some())
-        && !is_type_var_default_enabled(checker.settings())
-    {
-        return;
-    }
-
     create_diagnostic(
         checker,
         stmt.into(),
@@ -264,6 +258,19 @@ fn create_diagnostic(
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
 ) {
+    // If any type variables have defaults, skip the rule unless
+    // running with preview mode enabled and targeting Python 3.13+.
+    if (checker.target_version() < PythonVersion::PY313
+        || !is_type_var_default_enabled(checker.settings()))
+        && type_vars.iter().any(|type_var| type_var.default.is_some())
+    {
+        return;
+    }
+
+    if non_default_follows_default(type_vars) {
+        return;
+    }
+
     let source = checker.source();
     let tokens = checker.tokens();
     let comment_ranges = checker.comment_ranges();

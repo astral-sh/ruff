@@ -245,7 +245,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_stmt(&mut self, ast: &Stmt) {
+    fn unparse_stmt(&mut self, ast: &Stmt) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -881,7 +881,7 @@ impl<'a> Generator<'a> {
         self.p("]");
     }
 
-    pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
+    fn unparse_type_param(&mut self, ast: &TypeParam) {
         match ast {
             TypeParam::TypeVar(TypeParamTypeVar {
                 name,
@@ -918,7 +918,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {
+    fn unparse_expr(&mut self, ast: &Expr, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -1376,7 +1376,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_singleton(&mut self, singleton: Singleton) {
+    fn unparse_singleton(&mut self, singleton: Singleton) {
         match singleton {
             Singleton::None => self.p("None"),
             Singleton::True => self.p("True"),

@@ -847,6 +847,30 @@ class NotOrderedWithOverrides:
         return False
 ```
 
+### Unrecognized parameters
+
+`dataclass_transform` rejects unrecognized parameters:
+
+```py
+from typing import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
+This also works for the variant from `typing_extensions`:
+
+```py
+from typing_extensions import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
 ## Other `dataclass` parameters
 
 Other parameters from normal dataclasses can also be set on models created using
@@ -1418,6 +1442,10 @@ class InvalidModel:
     x: int = 1
     y: str  # error: [dataclass-field-order]
 
+@create_model
+class InvalidInheritedModel(ValidModel):
+    z: bytes  # error: [dataclass-field-order]
+
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
     ...
@@ -1562,6 +1590,28 @@ class TemperatureSensor(Sensor):
 t = TemperatureSensor(key=1, name="Temperature Sensor")
 reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
+```
+
+Dataclass-transform defaults remain attached to inherited fields even when a subclass is explicitly
+decorated with `@dataclass`.
+
+```py
+@dataclass_transform(kw_only_default=True)
+class KeywordOnlyModelMeta(type):
+    pass
+
+class RequiredModel(metaclass=KeywordOnlyModelMeta):
+    required: int
+
+class OptionalModel(metaclass=KeywordOnlyModelMeta):
+    optional: int = 1
+
+@dataclass(kw_only=True)
+class Child(RequiredModel, OptionalModel):
+    pass
+
+reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = 1, required: int) -> None
+Child(required=1)
 ```
 
 ## `__dataclass_fields__` and `DataclassInstance` protocol
@@ -1950,7 +2000,8 @@ type:
 
 ```py
 from typing import Protocol
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 class HasConvertedField(Protocol):
     @property
@@ -2021,7 +2072,7 @@ WithClassConverter("1", "2.5")
 
 with_class_converter = WithClassConverter("1", "2.5")
 reveal_type(with_class_converter.a)  # revealed: PermissiveNumber
-reveal_type(with_class_converter.b)  # revealed: int | float
+reveal_type(with_class_converter.b)  # revealed: float
 
 with_class_converter.a = "2"
 with_class_converter.a = 1.5  # error: [invalid-assignment]

@@ -7,6 +7,18 @@ x = 1
 x: str  # error: [invalid-declaration] "Cannot declare type `str` for inferred type `Literal[1]`"
 ```
 
+## Declarations in loops reject incompatible earlier bindings
+
+An incompatible binding that predates the loop must still invalidate a declaration inside it.
+
+```py
+values = [1]
+
+while True:
+    values: list[object]  # error: [invalid-declaration]
+    values = [1]
+```
+
 ## Incompatible declarations
 
 ```py

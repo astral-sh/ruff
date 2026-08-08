@@ -70,7 +70,6 @@ B023 Function definition does not bind loop variable `x`
 30 |     gn = (lambda: x for x in range(2))  # error
 31 |     dt = {x: lambda: x for x in range(2)}  # error
    |                      ^
-   |
 
 B023 Function definition does not bind loop variable `x`
   --> B023.py:40:34
@@ -90,7 +89,6 @@ B023 Function definition does not bind loop variable `x`
 41 |
 42 |     [lambda: x async for x in pointless_async_iterable()]  # error
    |              ^
-   |
 
 B023 Function definition does not bind loop variable `a`
   --> B023.py:50:30
@@ -143,7 +141,6 @@ B023 Function definition does not bind loop variable `j`
 60 |     for k in range(3):
 61 |         lambda: j * k  # error
    |                 ^
-   |
 
 B023 Function definition does not bind loop variable `k`
   --> B023.py:61:21
@@ -152,7 +149,6 @@ B023 Function definition does not bind loop variable `k`
 60 |     for k in range(3):
 61 |         lambda: j * k  # error
    |                     ^
-   |
 
 B023 Function definition does not bind loop variable `l`
   --> B023.py:68:10
@@ -171,7 +167,6 @@ B023 Function definition does not bind loop variable `i`
 81 | for i in range(3):
 82 |     lambda: f"{i}"
    |                ^
-   |
 
 B023 Function definition does not bind loop variable `x`
    --> B023.py:117:24
@@ -243,4 +238,3 @@ B023 Function definition does not bind loop variable `i`
 173 |         if False:
 174 |             return [lambda: i for i in range(3)]  # error
     |                             ^
-    |

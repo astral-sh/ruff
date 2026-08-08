@@ -11,7 +11,7 @@ python-version = "3.11"
 ```
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 from typing_extensions import Generic, TypeVar, TypeVarTuple, ParamSpec, Unpack
 
 T = TypeVar("T")
@@ -28,21 +28,24 @@ class StarredSingleTypeVarTuple(Generic[*Ts]): ...
 class TypeVarAndTypeVarTuple(Generic[T, Unpack[Ts]]): ...
 class StarredTypeVarAndTypeVarTuple(Generic[T, *Ts]): ...
 
-# revealed: ty_extensions.GenericContext[T@SingleTypevar]
+# revealed: ty_extensions._internal.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions._internal.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
+# revealed: ty_extensions._internal.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: ty_extensions.GenericContext[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
+# revealed: ty_extensions._internal.GenericContext[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
 
-# TODO: support `TypeVarTuple` properly (these should not reveal `None`)
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
-reveal_type(generic_context(StarredSingleTypeVarTuple))  # revealed: None
-reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))  # revealed: None
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
+# revealed: ty_extensions._internal.GenericContext[Ts@StarredSingleTypeVarTuple]
+reveal_type(generic_context(StarredSingleTypeVarTuple))
+# revealed: ty_extensions._internal.GenericContext[T@StarredTypeVarAndTypeVarTuple, Ts@StarredTypeVarAndTypeVarTuple]
+reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -60,11 +63,14 @@ You cannot use the same typevar more than once.
 class RepeatedTypevar(Generic[T, T]): ...
 ```
 
-You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
+You can only specialize `typing.Generic` with typevars, param specs, or typevar tuples.
 
 ```py
 # error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"
 class GenericOfType(Generic[int]): ...
+
+# error: [invalid-argument-type] "`<special-form 'typing.Unpack'>` is not a valid argument to `Generic`"
+class GenericOfInvalidUnpack(Generic[T, Unpack[int]]): ...
 ```
 
 You can also define a generic class by inheriting from some _other_ generic class, and specializing
@@ -75,9 +81,9 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-# revealed: ty_extensions.GenericContext[T@InheritedGeneric, S@InheritedGeneric]
+# revealed: ty_extensions._internal.GenericContext[T@InheritedGeneric, S@InheritedGeneric]
 reveal_type(generic_context(InheritedGeneric))
-# revealed: ty_extensions.GenericContext[T@InheritedGenericPartiallySpecialized]
+# revealed: ty_extensions._internal.GenericContext[T@InheritedGenericPartiallySpecialized]
 reveal_type(generic_context(InheritedGenericPartiallySpecialized))
 # revealed: None
 reveal_type(generic_context(InheritedGenericFullySpecialized))
@@ -99,7 +105,7 @@ class OuterClass(Generic[T]):
         # revealed: None
         reveal_type(generic_context(InnerClassInMethod))
 
-# revealed: ty_extensions.GenericContext[T@OuterClass]
+# revealed: ty_extensions._internal.GenericContext[T@OuterClass]
 reveal_type(generic_context(OuterClass))
 
 class ParamSpecOuterClass(Generic[P]):
@@ -111,14 +117,23 @@ class ParamSpecOuterClass(Generic[P]):
 
 ```snapshot
 error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` already bound by an enclosing scope
-  --> src/mdtest_snippet.py:64:7
+  --> src/mdtest_snippet.py:72:11
    |
-64 | class ParamSpecOuterClass(Generic[P]):
+70 | class ParamSpecOuterClass(Generic[P]):
    |       ------------------------------- ParamSpec `P` is bound in this enclosing scope
-65 |     # snapshot: shadowed-type-variable
-66 |     class InnerClass(SingleParamSpec[P]): ...
+71 |     # snapshot: shadowed-type-variable
+72 |     class InnerClass(SingleParamSpec[P]): ...
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
-   |
+```
+
+A `TypeVarTuple` must be unpacked when used as an argument to `Generic`. Even though the base is
+invalid, ty still treats the `TypeVarTuple` as a type parameter of the class during error recovery,
+so correctly unpacked uses within the class do not produce cascading errors.
+
+```py
+# error: [invalid-generic-class] "`TypeVarTuple` must be unpacked"
+class BareTypeVarTuple(Generic[Ts]):
+    values: tuple[*Ts]
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -145,12 +160,122 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
-# revealed: ty_extensions.GenericContext[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
+# revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
 reveal_type(generic_context(ExplicitInheritedGeneric))
-# revealed: ty_extensions.GenericContext[T@ExplicitInheritedGenericPartiallySpecialized]
+# revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGenericPartiallySpecialized]
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
-# revealed: ty_extensions.GenericContext[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
+# revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
+```
+
+## Specializing classes with unavailable generic context
+
+When an earlier error prevents ty from determining a class's generic context, specializing the class
+can emit a cascading `not-subscriptable` diagnostic.
+
+### Conditional typing compatibility imports
+
+Libraries support multiple Python versions by importing generic machinery from either
+`typing_extensions` or `typing`. ty does not yet recognize the resulting union as the corresponding
+typing special form.
+
+```py
+try:
+    import typing_extensions as typing
+except ImportError:
+    import typing
+
+T = typing.TypeVar("T")
+
+# TODO: Fix the conditional typing import in https://github.com/astral-sh/ty/issues/1585.
+# error: [invalid-argument-type] "`typing_extensions.TypeVar | typing.TypeVar` is not a valid argument to `Generic`"
+class Parser(typing.Generic[T]): ...
+
+# TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
+parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
+```
+
+### Decorated generic bases
+
+A decorator that ty cannot fully understand can obscure the generic context of a base class. A
+subclass that forwards type variables to that base remains possibly generic.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
+@collections.abc.Mapping.register
+class Mapping(Generic[K, V]): ...
+
+# TODO: Invalid decorator causes us to lose the generic context from the class...
+reveal_type(generic_context(Mapping))  # revealed: None
+
+class FrozenDict(Mapping[K, V]): ...
+
+# TODO: ...which then causes us to emit this
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
+mapping: FrozenDict[str, int]
+```
+
+### Unresolved generic bases
+
+```py
+from typing import TypeVar
+
+from missing import Base  # error: [unresolved-import]
+
+reveal_type(Base)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class Child(Base[T]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+child: Child[int]
+```
+
+### Conditional generic bases
+
+`base1.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+`base2.py`:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+```
+
+```py
+from typing import TypeVar
+
+try:
+    from base1 import Base
+except ImportError:
+    from base2 import Base
+
+T = TypeVar("T")
+
+# error: [unsupported-base]
+class Child(Base[T]): ...
+
+# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+child: Child[int]
 ```
 
 ## Errors for inconsistent type arguments
@@ -347,6 +472,28 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## A subclass of a fully specialized generic is not generic
+
+A subclass is generic only if its bases leave at least one type variable unspecialized. Omitting a
+type variable that has a default fully specializes the base, so the subclass cannot be specialized
+again.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+DefaultT = TypeVar("DefaultT", default=str)
+
+class Base(Generic[T, DefaultT]): ...
+class GenericSubclass(Base[int, DefaultT]): ...
+class NonGenericSubclass(Base[int]): ...
+
+reveal_type(GenericSubclass[bytes]())  # revealed: GenericSubclass[bytes]
+
+# error: [not-subscriptable] "Cannot specialize non-generic class `NonGenericSubclass`"
+NonGenericSubclass[bytes]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't
@@ -427,7 +574,7 @@ consistent with each other.
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -435,9 +582,9 @@ class C(Generic[T]):
     def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
@@ -450,22 +597,69 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
 class C(Generic[T]):
     def __init__(self, x: T) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+### Constructing the class from its own type variable
+
+A constructor call inside a generic class can use a value whose type is one of the class's type
+variables. The constructed instance keeps that type variable instead of falling back to `Unknown`,
+so an incompatible type context is rejected.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def __init__(self, value: T) -> None:
+        reveal_type(C(value))  # revealed: C[T@C]
+
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        invalid: C[int] = C(value)
+```
+
+### Constructing through a classmethod receiver
+
+A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking
+the constructor arguments. In particular, freshening the constructor must not replace the
+`TypeVarTuple` in the receiver with `Unknown`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Thunk(Generic[*Ts]):
+    def __init__(self, state: Unresolved[*Ts] | None) -> None: ...
+    @classmethod
+    def make(cls, *values: *Ts) -> Thunk[*Ts]:
+        return cls(Unresolved(values))
+
+class Unresolved(Generic[*Ts]):
+    def __init__(self, values: tuple[*Ts]) -> None: ...
 ```
 
 ### Many invariant parameters with dynamic bounds
@@ -502,7 +696,7 @@ reveal_type(W(C[A1, A2, A3, A4, A5, A6]()))  # revealed: W[A1, A2, A3, A4, A5, A
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -512,9 +706,9 @@ class C(Generic[T]):
 
     def __init__(self, x: T) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
@@ -527,7 +721,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -537,9 +731,9 @@ class C(Generic[T]):
 
     def __init__(self, x: T) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
@@ -554,9 +748,9 @@ class D(Generic[T]):
 
     def __init__(self, *args, **kwargs) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@D]
+# revealed: ty_extensions._internal.GenericContext[T@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions.GenericContext[T@D]
+# revealed: ty_extensions._internal.GenericContext[T@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
@@ -573,7 +767,7 @@ to specialize the class.
 
 ```py
 from typing_extensions import Generic, TypeVar, Self
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -586,9 +780,9 @@ class C(Generic[T, U]):
 class D(C[V, int]):
     def __init__(self, x: V) -> None: ...
 
-# revealed: ty_extensions.GenericContext[V@D]
+# revealed: ty_extensions._internal.GenericContext[V@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions.GenericContext[V@D]
+# revealed: ty_extensions._internal.GenericContext[V@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
@@ -598,7 +792,7 @@ reveal_type(D(1))  # revealed: D[int]
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -609,9 +803,9 @@ class C(Generic[T, U]):
 class D(C[T, U]):
     pass
 
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[int, str]
@@ -624,7 +818,7 @@ This is a specific example of the above, since it was reported specifically by a
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -632,9 +826,9 @@ U = TypeVar("U")
 class D(dict[T, U]):
     pass
 
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(key=1))  # revealed: D[str, int]
@@ -648,16 +842,16 @@ context. But from the user's point of view, this is another example of the above
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
 
 class C(tuple[T, U]): ...
 
-# revealed: ty_extensions.GenericContext[T@C, U@C]
+# revealed: ty_extensions._internal.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C, U@C]
+# revealed: ty_extensions._internal.GenericContext[T@C, U@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C((1, 2)))  # revealed: C[int, int]
@@ -682,7 +876,7 @@ def test_seq(x: Sequence[T]) -> Sequence[T]:
     return x
 
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
-    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t1))  # revealed: Sequence[complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
     reveal_type(test_seq(t3))  # revealed: Sequence[Never]
 ```
@@ -691,7 +885,7 @@ def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: t
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 S = TypeVar("S")
 T = TypeVar("T")
@@ -699,9 +893,9 @@ T = TypeVar("T")
 class C(Generic[T]):
     def __init__(self, x: T, y: S) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C, S@__init__]
+# revealed: ty_extensions._internal.GenericContext[T@C, S@__init__]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C(1, 1))  # revealed: C[int]
@@ -716,7 +910,7 @@ wrong_innards: C[int] = C("five", 1)
 
 ```py
 from typing_extensions import overload, Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U", covariant=True)
@@ -732,9 +926,9 @@ class C(Generic[T]):
     def __init__(self, x: int) -> None: ...
     def __init__(self, x: str | bytes | int) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C("string"))  # revealed: C[str]
@@ -764,9 +958,9 @@ class D(Generic[T, U]):
     def __init__(self, t: T, u: U) -> None: ...
     def __init__(self, *args) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
@@ -779,7 +973,7 @@ reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```py
 from dataclasses import dataclass
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 
@@ -787,9 +981,9 @@ T = TypeVar("T")
 class A(Generic[T]):
     x: T
 
-# revealed: ty_extensions.GenericContext[T@A]
+# revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(A))
-# revealed: ty_extensions.GenericContext[T@A]
+# revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(into_regular_callable(A)))
 
 reveal_type(A(x=1))  # revealed: A[int]
@@ -799,16 +993,16 @@ reveal_type(A(x=1))  # revealed: A[int]
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 T = TypeVar("T")
 U = TypeVar("U", default=T)
 
 class C(Generic[T, U]): ...
 
-# revealed: ty_extensions.GenericContext[T@C, U@C]
+# revealed: ty_extensions._internal.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[T@C, U@C]
+# revealed: ty_extensions._internal.GenericContext[T@C, U@C]
 reveal_type(generic_context(into_regular_callable(C)))
 
 reveal_type(C())  # revealed: C[Unknown, Unknown]
@@ -816,9 +1010,9 @@ reveal_type(C())  # revealed: C[Unknown, Unknown]
 class D(Generic[T, U]):
     def __init__(self) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-# revealed: ty_extensions.GenericContext[T@D, U@D]
+# revealed: ty_extensions._internal.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D())  # revealed: D[Unknown, Unknown]
@@ -863,7 +1057,7 @@ the typevars of the enclosing generic class, and introduce new (distinct) typeva
 scope for the method.
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 from typing_extensions import Generic, TypeVar
 
 T = TypeVar("T")
@@ -876,26 +1070,26 @@ class C(Generic[T]):
     def generic_method(self, t: T, u: U) -> U:
         return u
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
-# revealed: ty_extensions.GenericContext[Self@method]
+# revealed: ty_extensions._internal.GenericContext[Self@method]
 reveal_type(generic_context(C.method))
-# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+# revealed: ty_extensions._internal.GenericContext[Self@generic_method, U@generic_method]
 reveal_type(generic_context(C.generic_method))
 # revealed: None
 reveal_type(generic_context(C[int]))
-# revealed: ty_extensions.GenericContext[Self@method]
+# revealed: ty_extensions._internal.GenericContext[Self@method]
 reveal_type(generic_context(C[int].method))
-# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+# revealed: ty_extensions._internal.GenericContext[Self@generic_method, U@generic_method]
 reveal_type(generic_context(C[int].generic_method))
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 # revealed: None
 reveal_type(generic_context(c))
-# revealed: ty_extensions.GenericContext[Self@method]
+# revealed: ty_extensions._internal.GenericContext[Self@method]
 reveal_type(generic_context(c.method))
-# revealed: ty_extensions.GenericContext[Self@generic_method, U@generic_method]
+# revealed: ty_extensions._internal.GenericContext[Self@generic_method, U@generic_method]
 reveal_type(generic_context(c.generic_method))
 ```
 
@@ -1162,7 +1356,8 @@ class Quux(Generic[Unpack[Ts], T]): ...
 # TODO: should emit [invalid-type-variable-default]
 class Corge(Generic[Unpack[Us], P]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# TODO: should also emit [invalid-type-variable-default]
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
 
 # These are fine:

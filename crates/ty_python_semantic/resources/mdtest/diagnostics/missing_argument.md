@@ -32,6 +32,14 @@ h = f if coinflip() else g
 h(b=56)
 
 Foo().method()  # snapshot: missing-argument
+
+from typing import Protocol
+
+class P(Protocol):
+    def method(self, value: int) -> None: ...
+
+def check_protocol(p: P) -> None:
+    p.method()  # snapshot: missing-argument
 ```
 
 ```snapshot
@@ -40,13 +48,11 @@ error[missing-argument]: No argument provided for required parameter `a` of func
   |
 3 | f()  # snapshot
   | ^^^
-  |
 info: Parameter declared here
  --> src/module.py:1:7
   |
 1 | def f(a, b=42): ...
   |       ^
-  |
 
 
 error[missing-argument]: No argument provided for required parameter `a` of function `f`
@@ -54,7 +60,6 @@ error[missing-argument]: No argument provided for required parameter `a` of func
    |
 12 | h(b=56)
    | ^^^^^^^
-   |
 info: Union variant `def f(a, b=42) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
@@ -64,7 +69,6 @@ error[missing-argument]: No argument provided for required parameter `a` of func
    |
 12 | h(b=56)
    | ^^^^^^^
-   |
 info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
@@ -74,11 +78,21 @@ error[missing-argument]: No argument provided for required parameter `a` of boun
    |
 14 | Foo().method()  # snapshot: missing-argument
    | ^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
  --> src/module.py:5:22
   |
 5 |     def method(self, a): ...
   |                      ^
-  |
+
+
+error[missing-argument]: No argument provided for required parameter `value` of bound method `P.method`
+  --> src/main.py:22:5
+   |
+22 |     p.method()  # snapshot: missing-argument
+   |     ^^^^^^^^^^
+info: Parameter declared here
+  --> src/main.py:19:22
+   |
+19 |     def method(self, value: int) -> None: ...
+   |                      ^^^^^^^^^^
 ```

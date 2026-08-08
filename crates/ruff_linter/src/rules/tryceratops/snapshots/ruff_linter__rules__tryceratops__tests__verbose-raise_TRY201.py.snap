@@ -8,7 +8,6 @@ TRY201 [*] Use `raise` without specifying exception name
 19 |         logger.exception("process failed")
 20 |         raise e
    |               ^
-   |
 help: Remove exception name
    |
 19 |         logger.exception("process failed")
@@ -25,7 +24,6 @@ TRY201 [*] Use `raise` without specifying exception name
 62 |         if True:
 63 |             raise e
    |                   ^
-   |
 help: Remove exception name
    |
 62 |         if True:
@@ -41,7 +39,6 @@ TRY201 [*] Use `raise` without specifying exception name
 73 |             def foo():
 74 |                 raise e
    |                       ^
-   |
 help: Remove exception name
    |
 73 |             def foo():

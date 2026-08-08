@@ -71,9 +71,10 @@ pub use crate::parser::ParseOptions;
 
 use crate::parser::Parser;
 
-use ruff_python_ast::token::Tokens;
+use ruff_python_ast::token::{Token, TokenFlags, TokenKind, Tokens};
 use ruff_python_ast::{
-    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+    AtomicNodeIndex, Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral,
+    Suite,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -298,6 +299,89 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
         .unwrap()
 }
 
+/// Parses each `range` of `source` as an independent module and concatenates the results into a
+/// single [`Parsed<ModModule>`] whose nodes keep their offsets into `source`.
+///
+/// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
+/// its own while later cells can still reference earlier definitions.
+/// The `ranges` must be ordered and non-overlapping.
+///
+/// Consecutive ranges must be separated by a single-byte `\n`: each range ends just before the
+/// separator and the next range starts just after it, as Ruff's notebook cells are. A syntax error
+/// anchored at a cell's trailing offset then lands on that separator, the cell's own last line, so
+/// it is attributed to that cell rather than to the following one.
+pub fn parse_cells_unchecked(
+    source: &str,
+    ranges: impl IntoIterator<Item = TextRange>,
+    options: &ParseOptions,
+) -> Parsed<ModModule> {
+    let mut ranges = ranges.into_iter().peekable();
+    let mut body = Suite::new();
+    let mut tokens = Vec::new();
+    let mut errors = Vec::new();
+    let mut unsupported_syntax_errors = Vec::new();
+    let mut module_range: Option<TextRange> = None;
+
+    while let Some(range) = ranges.next() {
+        if let Some(previous) = module_range {
+            assert!(previous.end() <= range.start());
+        }
+
+        // The cell is lexed from `range.start()`, so the slice must keep the leading text to
+        // preserve absolute offsets into the concatenated source.
+        let cell_source = &source[TextRange::up_to(range.end())];
+        let Parsed {
+            syntax,
+            tokens: cell_tokens,
+            errors: cell_errors,
+            unsupported_syntax_errors: cell_unsupported_syntax_errors,
+        } = Parser::new_starts_at(cell_source, range.start(), options.clone())
+            .parse()
+            .try_into_module()
+            .expect("module options should parse into a module");
+
+        body.extend(syntax.body);
+        tokens.extend(cell_tokens);
+        errors.extend(cell_errors);
+        unsupported_syntax_errors.extend(cell_unsupported_syntax_errors);
+
+        // Each range excludes its trailing `\n` separator (see the doc comment above), leaving a
+        // one-byte gap in the token stream. Cover it with a `NonLogicalNewline` so token-based
+        // checks don't treat the separator as another logical line terminator. The final cell's
+        // separator is the file-final newline and is deliberately left uncovered.
+        if let Some(next) = ranges.peek() {
+            let separator = TextRange::new(range.end(), next.start());
+            assert_eq!(&source[separator], "\n");
+            tokens.push(Token::new(
+                TokenKind::NonLogicalNewline,
+                separator,
+                TokenFlags::empty(),
+            ));
+        }
+
+        module_range = Some(match module_range {
+            Some(previous) => TextRange::new(previous.start(), range.end()),
+            None => range,
+        });
+    }
+
+    body.shrink_to_fit();
+    tokens.shrink_to_fit();
+    errors.shrink_to_fit();
+    unsupported_syntax_errors.shrink_to_fit();
+
+    Parsed {
+        syntax: ModModule {
+            node_index: AtomicNodeIndex::NONE,
+            range: module_range.unwrap_or_default(),
+            body,
+        },
+        tokens: Tokens::new(tokens),
+        errors,
+        unsupported_syntax_errors,
+    }
+}
+
 /// Represents the parsed source code.
 #[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct Parsed<T> {
@@ -334,7 +418,7 @@ impl<T> Parsed<T> {
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.
-    pub fn into_errors(self) -> Vec<ParseError> {
+    fn into_errors(self) -> Vec<ParseError> {
         self.errors
     }
 
@@ -390,7 +474,7 @@ impl<T> Parsed<T> {
     ///
     /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
     /// cause [`Err`] to be returned.
-    pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
+    fn into_result(self) -> Result<Parsed<T>, ParseError> {
         if self.has_valid_syntax() {
             Ok(self)
         } else {
@@ -426,7 +510,7 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
         match self.syntax {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
@@ -458,7 +542,7 @@ impl Parsed<ModExpression> {
     }
 
     /// Returns a mutable reference to the expression contained in this parsed output.
-    pub fn expr_mut(&mut self) -> &mut Expr {
+    fn expr_mut(&mut self) -> &mut Expr {
         &mut self.syntax.body
     }
 

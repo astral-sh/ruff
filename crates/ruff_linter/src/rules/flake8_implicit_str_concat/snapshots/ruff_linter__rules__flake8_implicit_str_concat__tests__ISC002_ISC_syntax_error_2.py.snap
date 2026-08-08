@@ -50,4 +50,3 @@ invalid-syntax: f-string: unterminated string
 6 | f"" f"
 7 | f"" f"" f"
   |           ^
-  |

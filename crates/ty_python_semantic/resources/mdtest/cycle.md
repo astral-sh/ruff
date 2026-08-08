@@ -164,7 +164,7 @@ JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
+    reveal_type(x)  # revealed: Sequence[JSONValue] | float | None | Mapping[str, JSONValue]
 ```
 
 ## Self-referential legacy type variables
@@ -273,7 +273,8 @@ as gradual:
 
 ```py
 from typing import Any, Callable, Generic, TypeVar
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 T = TypeVar("T")
 flag: bool
@@ -342,7 +343,7 @@ from typing import NamedTuple, NewType
 X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
 
 list(X)
-min(X)
+min(X)  # error: [invalid-argument-type]
 T = f()
 
 X = NewType("X", C)
@@ -362,7 +363,7 @@ from typing import NamedTuple, NewType
 
 X = NewType("X", C)
 Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
-min(Y)
+min(Y)  # error: [invalid-argument-type]
 T = f()
 ```
 
@@ -406,7 +407,7 @@ reveal_type(Derived.decorate)
 `derived.py`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 import bases
 
 class Derived(bases.GenericBase["Foo", "Bar"]): ...
@@ -432,7 +433,7 @@ reveal_mro(Bar)
 
 ```py
 from typing import Generic, TypeVar, Type
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 T = TypeVar("T")
 B1 = TypeVar("B1", bound="Foo")

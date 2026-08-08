@@ -40,7 +40,6 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 14 |     f(a)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `str | Foo`
-   |
 info: element `Foo` of union `str | Foo` is not assignable to `Sized`
 info: └── type `Foo` is not assignable to protocol `Sized`
 info:     └── protocol member `__len__` is not defined on type `Foo`
@@ -49,7 +48,6 @@ info: Function defined here
   |
 7 | def f(x: Sized): ...
   |     ^ -------- Parameter declared here
-  |
 
 ```
 
@@ -59,7 +57,6 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 15 |     f(b)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 5 union elements`
-   |
 info: element `Foo` of union `list[str] | str | dict[str, str] | ... omitted 5 union elements` is not assignable to `Sized`
 info: └── type `Foo` is not assignable to protocol `Sized`
 info:     └── protocol member `__len__` is not defined on type `Foo`
@@ -68,7 +65,6 @@ info: Function defined here
   |
 7 | def f(x: Sized): ...
   |     ^ -------- Parameter declared here
-  |
 
 ```
 
@@ -78,7 +74,6 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 16 |     f(c)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 6 union elements`
-   |
 info: element `Foo` of union `list[str] | str | dict[str, str] | ... omitted 6 union elements` is not assignable to `Sized`
 info: └── type `Foo` is not assignable to protocol `Sized`
 info:     └── protocol member `__len__` is not defined on type `Foo`
@@ -87,7 +82,6 @@ info: Function defined here
   |
 7 | def f(x: Sized): ...
   |     ^ -------- Parameter declared here
-  |
 
 ```
 
@@ -97,7 +91,6 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 17 |     f(d)  # error: [invalid-argument-type]
    |       ^ Expected `Sized`, found `list[str] | str | dict[str, str] | ... omitted 7 union elements`
-   |
 info: element `Foo` of union `list[str] | str | dict[str, str] | ... omitted 7 union elements` is not assignable to `Sized`
 info: └── type `Foo` is not assignable to protocol `Sized`
 info:     └── protocol member `__len__` is not defined on type `Foo`
@@ -106,6 +99,5 @@ info: Function defined here
   |
 7 | def f(x: Sized): ...
   |     ^ -------- Parameter declared here
-  |
 
 ```
