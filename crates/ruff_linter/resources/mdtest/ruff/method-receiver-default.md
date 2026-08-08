@@ -51,12 +51,21 @@ class ClassGetitemReceiver:
 
 ## Metaclasses
 
-On a metaclass, a plain method's first parameter is conventionally `cls`, not `self`; the
-diagnostic should reflect that.
+On a metaclass, a plain method's first parameter is conventionally `cls`, not `self`, because
+instances of a metaclass are themselves classes. The diagnostic should reflect that.
 
 ```py
 class Meta(type):
-    def method(cls=None): ...  # error: [method-receiver-default]
+    def method(cls=None): ...  # snapshot: method-receiver-default
+```
+
+```snapshot
+error[RUF077]: Class receiver parameter should not have a default value
+ --> src/mdtest_snippet.py:2:20
+  |
+2 |     def method(cls=None): ...  # snapshot: method-receiver-default
+  |                    ^^^^
+help: Remove default value from receiver parameter
 ```
 
 ## Nested classes

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
+use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType, is_class_method};
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
@@ -84,13 +85,18 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    let ScopeKind::Class(_) = parent_scope.kind else {
+    let ScopeKind::Class(class_def) = parent_scope.kind else {
         return;
     };
 
     // Determine receiver kind
-    let Some(receiver_kind) = receiver_kind(name.as_str(), decorator_list, parent_scope, checker)
-    else {
+    let Some(receiver_kind) = receiver_kind(
+        name.as_str(),
+        decorator_list,
+        parent_scope,
+        class_def,
+        checker,
+    ) else {
         return;
     };
 
@@ -116,6 +122,7 @@ fn receiver_kind(
     name: &str,
     decorator_list: &[ast::Decorator],
     parent_scope: &Scope,
+    class_def: &ast::StmtClassDef,
     checker: &Checker,
 ) -> Option<ReceiverKind> {
     let semantic = checker.semantic();
@@ -149,7 +156,16 @@ fn receiver_kind(
             _ => None,
         },
         FunctionType::NewMethod if decorator_list.is_empty() => Some(ReceiverKind::Class),
-        FunctionType::Method if decorator_list.is_empty() => Some(ReceiverKind::Instance),
+        // On a metaclass, instances are themselves classes, so a plain method's first parameter
+        // (conventionally named `cls`, not `self`) is bound to a class, not an ordinary
+        // instance. Report that as a class receiver so the diagnostic matches the convention.
+        FunctionType::Method if decorator_list.is_empty() => {
+            if is_metaclass(class_def, semantic).is_yes() {
+                Some(ReceiverKind::Class)
+            } else {
+                Some(ReceiverKind::Instance)
+            }
+        }
         FunctionType::Function => None,
         _ => None,
     }
