@@ -791,24 +791,51 @@ impl<'db> StaticClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(in crate::types) fn try_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
+        match specialization {
+            None => self.try_mro_unspecialized(db),
+            Some(specialization) => self.try_mro_specialized(db, specialization),
+        }
+    }
+
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
+            let env = ProgramEnvironment::from_scope(self_.body_scope(db));
+            Err(StaticMroError::cycle(
+                db, &env,
+                self_.apply_optional_specialization(db, None),
+            ))
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, StaticMroError<'db>> {
+        tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
+        Mro::of_static_class(db, self, None)
+    }
+
     #[salsa::tracked(
         returns(as_ref),
         cycle_initial=|db, _, self_: StaticClassLiteral<'db>, specialization| {
             let env = ProgramEnvironment::from_scope(self_.body_scope(db));
             Err(StaticMroError::cycle(
                 db, &env,
-                self_.apply_optional_specialization(db, specialization),
+                self_.apply_optional_specialization(db, Some(specialization)),
             ))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(in crate::types) fn try_mro(
+    fn try_mro_specialized(
         self,
         db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
+        specialization: Specialization<'db>,
     ) -> Result<Mro<'db>, StaticMroError<'db>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, specialization)
+        Mro::of_static_class(db, self, Some(specialization))
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
