@@ -14,6 +14,7 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
+use compact_str::CompactString;
 use thin_vec::ThinVec;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -354,7 +355,7 @@ pub struct InterpolatedElement {
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<str>,
+    pub value: CompactString,
 }
 
 impl InterpolatedStringLiteralElement {
@@ -1700,7 +1701,7 @@ impl fmt::Debug for StringLiteralFlags {
 pub struct StringLiteral {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<str>,
+    pub value: CompactString,
     pub flags: StringLiteralFlags,
 }
 
@@ -3936,7 +3937,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 12);
-        assert_eq!(std::mem::size_of::<ExprFString>(), 56);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 64);
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
