@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::side_effect;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_useless_string_expression_enabled;
 
 use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 
@@ -25,6 +26,14 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// ```python
 /// foo = 1 + 1
 /// ```
+///
+/// ## Preview
+/// When [preview] is enabled, this rule also flags standalone string literals
+/// and side-effect-free f-strings that are not docstrings or attribute docstrings.
+///
+/// Strings following PEP 695 `type` statements are also treated as attribute docstrings.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## Notebook behavior
 /// For Jupyter Notebooks, this rule is not applied to the last top-level expression in a cell.
@@ -78,11 +87,17 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
-    // Ignore strings, to avoid false positives with docstrings.
-    if matches!(
-        value,
-        Expr::FString(_) | Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
-    ) {
+    // In stable mode, ignore strings to avoid false positives with docstrings. In preview mode,
+    // only ignore strings that Ruff recognizes as PEP 257 or attribute docstrings.
+    if matches!(value, Expr::FString(_) | Expr::StringLiteral(_))
+        && (!is_useless_string_expression_enabled(checker.settings())
+            || checker.semantic().in_pep_257_docstring()
+            || checker.semantic().in_attribute_docstring())
+    {
+        return;
+    }
+
+    if value.is_ellipsis_literal_expr() {
         return;
     }
 
@@ -96,8 +111,9 @@ pub(crate) fn useless_expression(checker: &Checker, value: &Expr) {
         return;
     }
 
-    // Ignore statements that have side effects.
-    if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
+    // Formatting an interpolated value can invoke user-defined `__format__` or `__str__` methods.
+    let effect = side_effect(value, |id| checker.semantic().has_builtin_binding(id));
+    if effect.is_present() || (value.is_f_string_expr() && !effect.is_absent()) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if value.is_attribute_expr() {

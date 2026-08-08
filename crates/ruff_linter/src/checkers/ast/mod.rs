@@ -53,7 +53,7 @@ use ruff_python_parser::semantic_errors::{
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
 use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
-use ruff_python_semantic::analyze::{imports, typing};
+use ruff_python_semantic::analyze::{imports, typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
@@ -178,6 +178,10 @@ pub(crate) enum ExpectedDocstringKind {
     /// class Foo:
     ///     b = 1
     ///     """This is the docstring for `Foo.b` class variable."""
+    ///
+    ///     def __init__(self) -> None:
+    ///         self.c = 1
+    ///         """This is the docstring for the `c` instance variable."""
     /// ```
     Attribute,
 }
@@ -664,6 +668,59 @@ impl<'a> Checker<'a> {
     /// `LintContext` in different analysis phases.
     pub(crate) const fn context(&self) -> &'a LintContext<'a> {
         self.context
+    }
+
+    /// Return `true` if the statement assigns an instance attribute directly in an `__init__`
+    /// method.
+    fn is_init_instance_attribute_assignment(&self, stmt: &Stmt) -> bool {
+        let semantic = self.semantic();
+        let scope = semantic.current_scope();
+        let ScopeKind::Function(function) = scope.kind else {
+            return false;
+        };
+
+        if !visibility::is_init(&function.name)
+            || !semantic
+                .first_non_type_parent_scope(scope)
+                .is_some_and(|parent| parent.kind.is_class())
+            || !matches!(
+                semantic.current_statement_parent(),
+                Some(Stmt::FunctionDef(parent)) if std::ptr::eq(parent, function)
+            )
+        {
+            return false;
+        }
+
+        let Some(instance) = function
+            .parameters
+            .posonlyargs
+            .first()
+            .or_else(|| function.parameters.args.first())
+        else {
+            return false;
+        };
+
+        let is_instance_attribute = |target: &Expr| {
+            let Some(name) = target
+                .as_attribute_expr()
+                .and_then(|attribute| attribute.value.as_name_expr())
+            else {
+                return false;
+            };
+            let Some(binding_id) = semantic.resolve_name(name) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            binding.kind.is_argument() && binding.range == instance.parameter.name.range()
+        };
+
+        match stmt {
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                matches!(targets.as_slice(), [target] if is_instance_attribute(target))
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => is_instance_attribute(target),
+            _ => false,
+        }
     }
 
     /// Return the current [`DocstringState`].
@@ -1648,8 +1705,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.docstring_state =
                         DocstringState::Expected(ExpectedDocstringKind::Attribute);
                 }
+                // Follow Pyright's convention for documenting PEP 695 type aliases:
+                // https://discuss.python.org/t/docstrings-for-new-type-aliases-as-defined-in-pep-695/39816
+                Stmt::TypeAlias(_) => {
+                    self.docstring_state =
+                        DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                }
                 _ => {}
             }
+        }
+
+        if self.is_init_instance_attribute_assignment(stmt) {
+            self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Attribute);
         }
 
         // Step 3: Clean-up
