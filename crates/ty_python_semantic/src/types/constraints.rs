@@ -901,7 +901,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         })
     }
 
-    #[expect(dead_code)] // Keep this around for debugging purposes
+    #[cfg_attr(not(test), expect(dead_code))] // Keep this around for debugging purposes
     fn display_graph<'a>(
         self,
         db: &'db dyn Db,
@@ -9792,14 +9792,13 @@ mod tests {
     #[track_caller]
     fn check_display_graph<'db, 'c>(
         db: &'db TestDb,
-        builder: &'c ConstraintSetBuilder<'db>,
+        _builder: &'c ConstraintSetBuilder<'db>,
         set: ConstraintSet<'db, 'c>,
         expected: &str,
     ) {
         let env = db.program_environment();
-        let storage = builder.storage.borrow();
         let expected = expected.trim_end();
-        let actual = set.node.display_graph(db, &env, &storage, &"").to_string();
+        let actual = set.display_graph(db, &env, &"").to_string();
         assert_eq!(expected, actual);
     }
 
