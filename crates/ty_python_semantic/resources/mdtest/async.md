@@ -28,6 +28,47 @@ async def f(x: int):
     reveal_type(result)  # revealed: int
 ```
 
+## Awaiting optional generic values
+
+Awaiting an optional generic value preserves the enclosing type variable without exposing internal
+generator type variables.
+
+```py
+import asyncio
+from typing import TypeVar
+
+T = TypeVar("T")
+
+async def awaited_value(value: T | None) -> T | None:
+    result = await asyncio.sleep(0, value)
+    reveal_type(result)  # revealed: None | T@awaited_value
+    return result
+
+async def awaited_assignment(value: T | None) -> None:
+    result: T | None = await asyncio.sleep(0, value)
+```
+
+Narrowing an awaited optional generic value also preserves the type variable's bound, allowing its
+attributes, indexing methods, and compatible function parameters to be used.
+
+```py
+class Resource:
+    def use(self) -> None: ...
+    def __getitem__(self, index: int) -> int:
+        return index
+
+R = TypeVar("R", bound=Resource)
+
+def accept(value: R) -> None: ...
+async def awaited_operations(value: R | None) -> None:
+    result = await asyncio.sleep(0, value)
+    if result is not None:
+        reveal_type(result)  # revealed: R@awaited_operations
+        result.use()
+        result[0]
+        accept(result)
+```
+
 ## Use cases
 
 ### `Future`

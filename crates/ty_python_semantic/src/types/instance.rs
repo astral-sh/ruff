@@ -581,12 +581,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `Generator` parameters must be compared nominally. The class specialization
             // already materializes each parameter according to its variance, while structural
             // inference through `close() -> ReturnT | None` can infer a spurious `None` on
-            // Python 3.13 and newer.
+            // Python 3.13 and newer. Before Python 3.13, a structural comparison can instead
+            // discard the return parameter altogether, even when a nominal generator subclass
+            // explicitly specializes it.
             // TODO: Remove the Python 3.13+ extension once
             // https://github.com/astral-sh/ty/issues/3596 is fixed.
             if nominal_instance.has_known_class(db, KnownClass::Generator)
-                && source_protocol_as_nominal
+                && (source_protocol_as_nominal
                     .is_some_and(|source| source.has_known_class(db, KnownClass::Generator))
+                    || matches!(ty, Type::NominalInstance(_))
+                        && !nominally_satisfied.is_never_satisfied(db, self.env))
             {
                 return nominally_satisfied;
             }

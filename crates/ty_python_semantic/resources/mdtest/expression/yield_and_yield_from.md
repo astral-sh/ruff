@@ -22,6 +22,39 @@ def outer_generator():
     reveal_type(result)  # revealed: str
 ```
 
+## Generic generator return types
+
+A generic yield type does not change the generator's separately annotated send or return types.
+
+```py
+from collections.abc import Generator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def generator_return(value: T) -> Generator[T, None, None]:
+    sent = yield value
+    reveal_type(sent)  # revealed: None
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `None`, found `T@generator_return`"
+    return value
+```
+
+## Delegating to a generic generator expression
+
+A generator expression over an iterable of generic values remains compatible with an iterator that
+yields the same values.
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def delegated(values: Iterable[T]) -> Iterator[T]:
+    yield from (value for value in values)
+```
+
 ## `yield from` with a custom iterable
 
 `yield from` can also be used with custom iterable types. In that case, the type of the `yield from`
@@ -134,10 +167,64 @@ def persons(f: bool) -> Generator[None, None, Person]:
         return {"name": 42}
 ```
 
+## Structurally compatible generator protocols
+
+A protocol does not need to explicitly inherit from `Generator` for ty to infer its yield, send, and
+return types from its methods.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from types import TracebackType
+from typing import Generator, Protocol, overload
+
+class StructuralGenerator(Protocol):
+    def __iter__(self) -> Generator[int, bytes, str]: ...
+    def __next__(self) -> int: ...
+    def send(self, value: bytes, /) -> int: ...
+    @overload
+    def throw(
+        self,
+        typ: type[BaseException],
+        val: object = None,
+        traceback: TracebackType | None = None,
+        /,
+    ) -> int: ...
+    @overload
+    def throw(
+        self,
+        typ: BaseException,
+        val: None = None,
+        traceback: TracebackType | None = None,
+        /,
+    ) -> int: ...
+    def close(self) -> str | None: ...
+
+def structural_generator() -> StructuralGenerator:
+    sent = yield 1
+    reveal_type(sent)  # revealed: bytes
+    return "done"
+
+def delegated_generator() -> Generator[int, bytes, None]:
+    result = yield from structural_generator()
+    reveal_type(result)  # revealed: str
+
+def invalid_structural_yield() -> StructuralGenerator:
+    yield "wrong"  # error: [invalid-yield]
+    return "done"
+
+def invalid_structural_return() -> StructuralGenerator:
+    yield 1
+    return 42  # error: [invalid-return-type]
+```
+
 ## `yield` expression send type inference
 
 ```py
-from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
+from typing import AsyncGenerator, AsyncIterator, AsyncIterable, Iterable, Protocol, Generator, Iterator
 
 def unannotated():
     x = yield 1
@@ -162,18 +249,17 @@ async def async_generator_default() -> AsyncGenerator[int]:
 async def async_generator_send_str() -> AsyncGenerator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: str
-
-def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
-    x = yield 1
-    reveal_type(x)  # revealed: int | str
-    return None
 ```
 
-`Iterator` has no send type or return type, It is equivalent to using `Generator` with send set to
-`None` and return type to `Unknown`.
+`Iterator`, `Iterable`, and custom equivalent protocols have no send type or return type. Using one
+fo these is equivalent to using `Generator` with send set to `None` and return type to `Unknown`.
 
 ```py
 def iterator_send_none() -> Iterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+def iterable_send_none() -> Iterable[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
 
@@ -181,9 +267,20 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
 
+async def async_iterable_send_none() -> AsyncIterable[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
     return 1
+
+class CustomIteratorProtocol(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+def custom_proto_send_none() -> CustomIteratorProtocol:
+    x = yield 1
+    reveal_type(x)  # revealed: None
 ```
 
 ## Generator type aliases
@@ -253,7 +350,7 @@ def generator() -> Generator[None]:
 ### Invalid `yield` type
 
 ```py
-from typing import Generator
+from typing import Generator, Iterable, Iterator, Protocol
 
 def invalid_generator() -> Generator[int, None, None]:
     # snapshot: invalid-yield
@@ -271,6 +368,32 @@ error[invalid-yield]: Yield expression type does not match annotation
   |           ^^ expression of type `Literal[""]`, expected `int`
 ```
 
+More examples:
+
+```py
+def invalid_iterator() -> Iterator[None]:
+    yield ""  # error: [invalid-yield]
+
+def invalid_iterable() -> Iterable[None]:
+    yield ""  # error: [invalid-yield]
+
+class CustomIteratorProto(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+def invalid_custom_proto() -> CustomIteratorProto:
+    yield ""  # snapshot: invalid-yield
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+  --> src/mdtest_snippet.py:16:11
+   |
+15 | def invalid_custom_proto() -> CustomIteratorProto:
+   |                               ------------------- Function annotated with yield type `int` here
+16 |     yield ""  # snapshot: invalid-yield
+   |           ^^ expression of type `Literal[""]`, expected `int`
+```
+
 ### Invalid annotation
 
 ```py
@@ -282,7 +405,11 @@ def returns_str() -> str:  # error: [invalid-return-type]
 
 def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [invalid-return-type]
     x = yield 1
-    reveal_type(x)  # revealed: str
+    reveal_type(x)  # revealed: Unknown
+
+async def async_returns_sync_generator() -> Generator[int, str, None]:  # error: [invalid-return-type]
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Invalid return type

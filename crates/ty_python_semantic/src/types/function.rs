@@ -101,7 +101,7 @@ use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
+use ty_python_core::{EvaluationMode, FileScopeId, ProgramFile, SemanticIndex, semantic_index};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct RecursiveTypeNormalizationKey {
@@ -502,6 +502,21 @@ impl<'db> OverloadLiteral<'db> {
         }
 
         Some(previous_literal)
+    }
+
+    #[salsa::tracked(returns(copy))]
+    pub(crate) fn evaluation_mode(self, db: &'db dyn Db) -> EvaluationMode {
+        if self
+            .body_scope(db)
+            .node(db)
+            .expect_function()
+            .node(&parsed_module(db, self.python_file(db)).load(db))
+            .is_async
+        {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        }
     }
 
     /// Typed internally-visible signature for this function.

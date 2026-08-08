@@ -9365,13 +9365,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let Some(generator_type_params) = declared_return_ty.generator_types(db, env) else {
+        let mode = enclosing_function
+            .first_overload_or_implementation(db)
+            .evaluation_mode(db);
+
+        let generator_type_params = match mode {
+            EvaluationMode::Sync => declared_return_ty
+                .generator_types(db, env)
+                .map(|types| (types.yield_ty, types.send_ty)),
+            EvaluationMode::Async => declared_return_ty
+                .async_generator_types(db, env)
+                .map(|types| (types.yield_ty, types.send_ty)),
+        };
+        let Some((expected_yield_ty, send_ty)) = generator_type_params else {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
 
-        let expected_yield_ty = generator_type_params.yield_ty;
-        let tcx = TypeContext::new(expected_yield_ty);
+        let tcx = TypeContext::new(Some(expected_yield_ty));
         let yielded_ty = self
             .infer_optional_expression(value.as_deref(), tcx)
             .unwrap_or_else(|| Type::none(db, env));
@@ -9379,9 +9390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_deref()
             .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
 
-        if let Some(expected_yield_ty) = expected_yield_ty
-            && !yielded_ty.is_assignable_to(db, env, expected_yield_ty)
-        {
+        if !yielded_ty.is_assignable_to(db, env, expected_yield_ty) {
             report_invalid_generator_yield_type(
                 &self.context,
                 diagnostic_node,
@@ -9392,7 +9401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        generator_type_params.send_ty.unwrap_or_else(Type::unknown)
+        send_ty
     }
 
     fn infer_yield_from_expression(&mut self, yield_from: &ast::ExprYieldFrom) -> Type<'db> {
@@ -9422,9 +9431,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
-        let tcx = TypeContext::new(outer_expected.yield_ty.map(|yielded_ty| {
-            KnownClass::Iterable.to_specialized_instance(db, env, &[yielded_ty])
-        }));
+        let tcx = TypeContext::new(Some(KnownClass::Iterable.to_specialized_instance(
+            db,
+            env,
+            &[outer_expected.yield_ty],
+        )));
         let iterable_type = self.infer_expression(value, tcx);
 
         let inner_yield_ty = iterable_type
@@ -9435,33 +9446,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_element_type(db, env)
             });
 
-        if let Some(outer_yield_ty) = outer_expected.yield_ty
-            && !inner_yield_ty.is_assignable_to(db, env, outer_yield_ty)
-        {
+        if !inner_yield_ty.is_assignable_to(db, env, outer_expected.yield_ty) {
             report_invalid_generator_yield_type(
                 &self.context,
                 value.as_ref(),
                 return_type_span.clone(),
-                outer_yield_ty,
+                outer_expected.yield_ty,
                 inner_yield_ty,
                 GeneratorMismatchKind::YieldType,
             );
         }
 
-        if let Some(outer_send_ty) = outer_expected.send_ty {
-            let inner_send_ty = iterable_type
-                .generator_send_type(db, env)
-                .unwrap_or_else(|| Type::none(db, env));
-            if !outer_send_ty.is_assignable_to(db, env, inner_send_ty) {
-                report_invalid_generator_yield_type(
-                    &self.context,
-                    value.as_ref(),
-                    return_type_span,
-                    outer_send_ty,
-                    inner_send_ty,
-                    GeneratorMismatchKind::SendType,
-                );
-            }
+        let inner_send_ty = iterable_type
+            .generator_send_type(db, env)
+            .unwrap_or_else(|| Type::none(db, env));
+
+        if !outer_expected
+            .send_ty
+            .is_assignable_to(db, env, inner_send_ty)
+        {
+            report_invalid_generator_yield_type(
+                &self.context,
+                value.as_ref(),
+                return_type_span,
+                outer_expected.send_ty,
+                inner_send_ty,
+                GeneratorMismatchKind::SendType,
+            );
         }
 
         iterable_type
