@@ -56,5 +56,8 @@ regex = { workspace = true }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
 
+[features]
+test-uv = ["ty_project/test-uv"]
+
 [lints]
 workspace = true

@@ -24,20 +24,25 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{
+    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
+    SemanticDb as _, UseUv,
+};
 
 use index::DocumentError;
 use ty_python_core::program::UseDefaultStrategy;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
+pub(crate) use self::request_queue::RequestQueue;
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
-use crate::server::{Action, publish_settings_diagnostics};
+use crate::server::{
+    Action, LazyWorkDoneProgress, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use crate::session::client::Client;
 use crate::session::index::Document;
-use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 use index::Index;
@@ -70,6 +75,9 @@ pub(crate) struct Session {
 
     /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
+
+    /// The uv integrations enabled for the lifetime of this server.
+    use_uv: UseUv,
 
     /// Resolved global settings that are shared across all workspaces.
     global_settings: Arc<GlobalSettings>,
@@ -155,6 +163,8 @@ impl Session {
             workspaces.register(uri)?;
         }
 
+        let use_uv = initialization_options.use_uv(&*native_system);
+
         Ok(Self {
             native_system,
             position_encoding,
@@ -162,6 +172,7 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
+            use_uv,
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
             resolved_client_capabilities,
@@ -240,6 +251,144 @@ impl Session {
 
                 request.resume_if_revision_changed(self.revision, client)
             });
+    }
+
+    /// Returns each project's background script synchronization wakeups.
+    pub(crate) fn script_sync_wakeups(
+        &self,
+    ) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
+        self.projects
+            .iter()
+            .map(|(root, state)| (root.clone(), state.db.script_environments().sync_wakeups()))
+            .collect()
+    }
+
+    /// Synchronizes an open script, using `availability` until its first synchronization completes.
+    pub(crate) fn synchronize_script(
+        &mut self,
+        client: &Client,
+        path: &AnySystemPath,
+        availability: ScriptEnvironmentAvailability,
+    ) {
+        let Some(system_path) = path.as_system() else {
+            return;
+        };
+        let project_root = self.project_entry(path).0.clone();
+        let capabilities = self.resolved_client_capabilities;
+        let db = &mut self
+            .projects
+            .get_mut(&project_root)
+            .expect("selected project should exist")
+            .db;
+        let Some(file) = db.files().try_system(db, system_path) else {
+            return;
+        };
+        Self::request_script_sync(db, file, client, capabilities, availability);
+    }
+
+    /// Resynchronizes closed scripts whose metadata changed after filesystem events.
+    pub(crate) fn synchronize_closed_scripts(&mut self, client: &Client) {
+        let capabilities = self.resolved_client_capabilities;
+        for state in self.projects.values_mut() {
+            let db = &mut state.db;
+            for file in db.script_environments().files() {
+                // Open documents are synchronized when opened or saved. Ignore watcher events
+                // for them because the file on disk may differ from the open document.
+                if db.is_open_file(file) {
+                    continue;
+                }
+
+                Self::request_script_sync(
+                    db,
+                    file,
+                    client,
+                    capabilities,
+                    ScriptEnvironmentAvailability::Available,
+                );
+            }
+        }
+    }
+
+    /// Gives one project's script environments an opportunity to make progress.
+    pub(crate) fn poll_script_sync(&mut self, client: &Client, project_root: &SystemPath) {
+        let changed_paths = {
+            let Some(project) = self.projects.get_mut(project_root) else {
+                tracing::debug!(
+                    "Ignored script synchronization wakeup for removed project `{project_root}`"
+                );
+                return;
+            };
+            let db = &mut project.db;
+            let environments = db.script_environments().clone();
+            environments
+                .poll_sync(db)
+                .into_iter()
+                .filter_map(|file| file.path(db).as_system_path().map(SystemPath::to_path_buf))
+                .collect()
+        };
+
+        self.script_environments_changed(client, changed_paths);
+    }
+
+    fn script_environments_changed(&mut self, client: &Client, changed_paths: Vec<SystemPathBuf>) {
+        if changed_paths.is_empty() {
+            return;
+        }
+
+        self.bump_revision();
+
+        self.resume_suspended_workspace_diagnostic_request(client);
+
+        let capabilities = self.client_capabilities();
+        if capabilities.supports_workspace_diagnostic_refresh() {
+            client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        } else {
+            for path in changed_paths {
+                let path = AnySystemPath::System(path);
+                if let Some(document) = self
+                    .file_document_handles()
+                    .find(|document| document.notebook_or_file_path() == &path)
+                {
+                    publish_diagnostics_if_needed(&document, self, client);
+                }
+            }
+        }
+
+        if capabilities.supports_semantic_tokens_refresh() {
+            client.send_request::<lsp_types::SemanticTokensRefreshRequest>(self, (), |_, ()| {});
+        }
+
+        if capabilities.supports_inlay_hint_refresh() {
+            client.send_request::<lsp_types::InlayHintRefreshRequest>(self, (), |_, ()| {});
+        }
+    }
+
+    fn request_script_sync(
+        db: &mut ProjectDatabase,
+        file: File,
+        client: &Client,
+        capabilities: ResolvedClientCapabilities,
+        availability: ScriptEnvironmentAvailability,
+    ) {
+        let environments = db.script_environments().clone();
+        environments.request_sync(db, file, availability, &|db, file| {
+            let file_path = file.path(db);
+            let display_path = file_path.as_system_path().map_or_else(
+                || file_path.to_string(),
+                |path| {
+                    path.strip_prefix(db.project().root(db))
+                        .unwrap_or(path)
+                        .to_string()
+                },
+            );
+            let title = format!("Syncing {display_path}");
+
+            Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                client,
+                &title,
+                capabilities,
+            )))
+        });
     }
 
     /// Bumps the revision.
@@ -329,7 +478,7 @@ impl Session {
     /// Refer to [`project_db`] for more details on how the project is selected.
     ///
     /// [`project_db`]: Session::project_db
-    fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
+    pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
         &mut self.project_state_mut(path).db
     }
 
@@ -340,11 +489,16 @@ impl Session {
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
+        self.project_entry(path).1
+    }
+
+    /// Returns the root and state of the project to which `path` belongs.
+    fn project_entry(&self, path: &AnySystemPath) -> (&SystemPathBuf, &ProjectState) {
         match path {
             AnySystemPath::System(system_path) => self
-                .project_state_for_path(system_path)
-                .unwrap_or_else(|| self.project_state_virtual_fallback()),
-            AnySystemPath::SystemVirtual(_virtual_path) => self.project_state_virtual_fallback(),
+                .project_entry_for_path(system_path)
+                .unwrap_or_else(|| self.project_entry_virtual_fallback()),
+            AnySystemPath::SystemVirtual(_virtual_path) => self.project_entry_virtual_fallback(),
         }
     }
 
@@ -386,22 +540,23 @@ impl Session {
 
     /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
     /// any.
-    fn project_state_for_path(&self, path: impl AsRef<SystemPath>) -> Option<&ProjectState> {
+    fn project_entry_for_path(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> Option<(&SystemPathBuf, &ProjectState)> {
         let path = path.as_ref();
         self.projects
             .range(..=path.to_path_buf())
             .rfind(|(workspace_root, _)| path.starts_with(workspace_root))
-            .map(|(_, project)| project)
     }
 
     // TODO: While ty supports multiple workspace folders, we still
     // need to figure out which project should this virtual path
     // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
     // look for the first project with an overlapping search path?)
-    fn project_state_virtual_fallback(&self) -> &ProjectState {
+    fn project_entry_virtual_fallback(&self) -> (&SystemPathBuf, &ProjectState) {
         self.projects
-            .values()
-            .next()
+            .first_key_value()
             .expect("To always have at least one project")
     }
 
@@ -589,9 +744,14 @@ impl Session {
         let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
+            ProjectMetadata::from_config_file_with_uv(
+                configuration_file.clone(),
+                &root,
+                &system,
+                self.use_uv,
+            )
         } else {
-            ProjectMetadata::discover(&root, &system)
+            ProjectMetadata::discover_with_uv(&root, &system, self.use_uv)
         };
 
         let project = metadata
@@ -630,7 +790,8 @@ impl Session {
                     root,
                     None,
                     &UseDefaultStrategy,
-                );
+                )
+                .map(|metadata| metadata.with_use_uv(self.use_uv));
                 let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
                 let default_root = db_with_default_settings
                     .project()

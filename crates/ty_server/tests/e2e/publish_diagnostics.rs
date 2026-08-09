@@ -958,3 +958,40 @@ fn collect_publish_diagnostic_notifications_with_versions(
 
     results
 }
+
+mod uv_metadata {
+    use anyhow::Result;
+    use lsp_types::{Code, PublishDiagnosticsNotification};
+    use ruff_db::system::SystemPath;
+    use ty_project::UseUv;
+
+    use crate::TestServerBuilder;
+
+    #[test]
+    fn pushed_diagnostics_wait_for_the_initial_environment() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_pull_diagnostics(false)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+
+        let synchronized = server.await_notification::<PublishDiagnosticsNotification>();
+        assert!(synchronized.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some(Code::String("uv-metadata".to_string()))
+        }));
+        assert!(!synchronized.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some(Code::String("unresolved-reference".to_string()))
+        }));
+
+        Ok(())
+    }
+}
