@@ -24,7 +24,10 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{
+    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability,
+    SemanticDb as _, UseUv,
+};
 
 use index::DocumentError;
 use ty_python_core::program::UseDefaultStrategy;
@@ -33,8 +36,11 @@ pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
-use crate::server::{Action, publish_settings_diagnostics};
+use crate::server::{
+    Action, LazyWorkDoneProgress, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use crate::session::client::Client;
 use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
@@ -70,6 +76,9 @@ pub(crate) struct Session {
 
     /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
+
+    /// The uv integrations enabled for the lifetime of this server.
+    use_uv: UseUv,
 
     /// Resolved global settings that are shared across all workspaces.
     global_settings: Arc<GlobalSettings>,
@@ -155,6 +164,8 @@ impl Session {
             workspaces.register(uri)?;
         }
 
+        let use_uv = initialization_options.use_uv(&*native_system);
+
         Ok(Self {
             native_system,
             position_encoding,
@@ -162,6 +173,7 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
+            use_uv,
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
             resolved_client_capabilities,
@@ -187,7 +199,7 @@ impl Session {
         &mut self.request_queue
     }
 
-    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
+    fn initialization_options(&self) -> &InitializationOptions {
         &self.initialization_options
     }
 
@@ -240,6 +252,135 @@ impl Session {
 
                 request.resume_if_revision_changed(self.revision, client)
             });
+    }
+
+    /// Returns each project's background script synchronization wakeups.
+    pub(crate) fn script_sync_wakeups(
+        &self,
+    ) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
+        self.projects
+            .iter()
+            .map(|(root, state)| (root.clone(), state.db.script_environments().sync_wakeups()))
+            .collect()
+    }
+
+    /// Synchronizes an open script, using `availability` until its first synchronization completes.
+    pub(crate) fn synchronize_script(
+        &mut self,
+        client: &Client,
+        path: &AnySystemPath,
+        availability: ScriptEnvironmentAvailability,
+    ) {
+        let Some(system_path) = path.as_system() else {
+            return;
+        };
+        let capabilities = self.resolved_client_capabilities;
+        let db = self.project_db_mut(path);
+        let Some(file) = db.files().try_system(db, system_path) else {
+            return;
+        };
+        Self::request_script_sync(db, file, client, capabilities, availability);
+    }
+
+    /// Resynchronizes closed scripts whose metadata changed after filesystem events.
+    pub(crate) fn synchronize_closed_scripts(&mut self, client: &Client) {
+        let capabilities = self.resolved_client_capabilities;
+        for state in self.projects.values_mut() {
+            let db = &mut state.db;
+            for file in db.script_environments().files() {
+                // Open documents are synchronized when opened or saved. Ignore watcher events
+                // for them because the file on disk may differ from the open document.
+                if db.is_open_file(file) {
+                    continue;
+                }
+
+                Self::request_script_sync(
+                    db,
+                    file,
+                    client,
+                    capabilities,
+                    ScriptEnvironmentAvailability::Available,
+                );
+            }
+        }
+    }
+
+    /// Gives one project's script environments an opportunity to make progress.
+    pub(crate) fn poll_script_sync(&mut self, client: &Client, project_root: &SystemPath) {
+        let Some(project) = self.projects.get_mut(project_root) else {
+            tracing::debug!(
+                "Ignored script synchronization wakeup for removed project `{project_root}`"
+            );
+            return;
+        };
+        let db = &mut project.db;
+        let environments = db.script_environments().clone();
+        let changed_files = environments.poll_sync(db);
+
+        self.script_environments_changed(client, project_root, changed_files);
+    }
+
+    fn script_environments_changed(
+        &mut self,
+        client: &Client,
+        project_root: &SystemPath,
+        changed_files: Vec<File>,
+    ) {
+        if changed_files.is_empty() {
+            return;
+        }
+
+        self.bump_revision();
+
+        self.resume_suspended_workspace_diagnostic_request(client);
+
+        let capabilities = self.client_capabilities();
+        if capabilities.supports_workspace_diagnostic_refresh() {
+            client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        } else if let Some(project) = self.projects.get(project_root) {
+            for file in changed_files {
+                if let Some(document) = project.db.document(file) {
+                    let document = DocumentHandle::from_document(document);
+                    publish_diagnostics_if_needed(&document, self, client);
+                }
+            }
+        }
+
+        if capabilities.supports_semantic_tokens_refresh() {
+            client.send_request::<lsp_types::SemanticTokensRefreshRequest>(self, (), |_, ()| {});
+        }
+
+        if capabilities.supports_inlay_hint_refresh() {
+            client.send_request::<lsp_types::InlayHintRefreshRequest>(self, (), |_, ()| {});
+        }
+    }
+
+    fn request_script_sync(
+        db: &mut ProjectDatabase,
+        file: File,
+        client: &Client,
+        capabilities: ResolvedClientCapabilities,
+        availability: ScriptEnvironmentAvailability,
+    ) {
+        let environments = db.script_environments().clone();
+        environments.request_sync(db, file, availability, &|db, file| {
+            let file_path = file.path(db);
+            let display_path = file_path.as_system_path().map_or_else(
+                || file_path.to_string(),
+                |path| {
+                    path.strip_prefix(db.project().root(db))
+                        .unwrap_or(path)
+                        .to_string()
+                },
+            );
+            let title = format!("Syncing {display_path}");
+
+            Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                client,
+                &title,
+                capabilities,
+            )))
+        });
     }
 
     /// Bumps the revision.
@@ -601,13 +742,14 @@ impl Session {
         let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file(
+            ProjectMetadata::from_config_file_with_uv(
                 configuration_file.clone(),
                 workspace_directory,
                 &system,
+                self.use_uv,
             )
         } else {
-            ProjectMetadata::discover(workspace_directory, &system)
+            ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
         };
 
         let project = metadata
@@ -646,7 +788,8 @@ impl Session {
                     workspace_directory.to_path_buf(),
                     None,
                     &UseDefaultStrategy,
-                );
+                )
+                .map(|metadata| metadata.with_use_uv(self.use_uv));
                 ProjectDatabase::use_defaults(metadata, system)
             }
         };

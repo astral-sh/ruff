@@ -67,7 +67,7 @@ toml = { workspace = true }
 
 [features]
 default = []
-test-uv = []
+test-uv = ["ty_server/test-uv"]
 
 [lints]
 workspace = true

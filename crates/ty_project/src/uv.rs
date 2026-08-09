@@ -41,7 +41,7 @@ pub enum UseUv {
 
 impl UseUv {
     /// Resolves the mode configured by the `TY_UV` environment variable.
-    pub(crate) fn from_system(system: &dyn System) -> Self {
+    pub fn from_system(system: &dyn System) -> Self {
         match system.env_var(EnvVars::TY_UV).as_deref() {
             Ok("1" | "true") => Self::On,
             Ok("scripts") => Self::Scripts,
