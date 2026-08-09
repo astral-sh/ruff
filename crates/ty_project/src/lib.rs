@@ -23,7 +23,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
-pub use script::ScriptEnvironments;
+pub use script::{ScriptEnvironmentAvailability, ScriptEnvironments};
 use std::backtrace::BacktraceStatus;
 use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
@@ -404,8 +404,17 @@ impl Project {
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
-                db.script_environments()
+                let initialization = db
+                    .script_environments()
                     .initialize_blocking(db, file, reporter);
+                if initialization.is_pending() {
+                    // The CLI watch loop or language server already scheduled this script's first
+                    // synchronization in the background. Until it completes, there is no
+                    // environment that can produce correct diagnostics. Applying the result
+                    // causes the diagnostics to be recomputed.
+                    reporter.report_checked_file(db, file, &[]);
+                    return;
+                }
                 let program_file = db.program_file(file);
 
                 match check_file_impl(db, program_file) {
@@ -686,10 +695,18 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.
 ///
 /// Scripts with invalid configuration still produce configuration diagnostics and retain a program
-/// for editor operations, but their semantic diagnostics must not be reported.
+/// for editor operations, but their semantic diagnostics must not be reported. Semantic checks are
+/// also skipped until a script's first environment synchronization completes.
 pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
-    db.should_check_file(file)
-        && Script::for_file(db, file).is_none_or(|script| script.has_valid_settings(db))
+    if !db.should_check_file(file) {
+        return false;
+    }
+
+    let Some(script) = Script::for_file(db, file) else {
+        return true;
+    };
+
+    script.has_valid_settings(db) && !db.script_environments().is_initialization_pending(db, file)
 }
 
 /// Returns `true` if the file should be checked.
