@@ -9778,6 +9778,11 @@ pub struct ExprCompare {
     pub comparators: Box<[Expr]>,
 }
 
+/// A call expression whose end offset is derived from its arguments.
+///
+/// The parser and error-recovery code must ensure that the call and its arguments
+/// end at the same offset.
+///
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
 #[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
