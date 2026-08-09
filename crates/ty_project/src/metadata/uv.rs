@@ -10,7 +10,8 @@ use ty_static::EnvVars;
 
 use super::python_version::SupportedPythonVersion;
 
-pub(in crate::metadata) use runner::{ScriptSyncTask, UvExecutor};
+pub(crate) use runner::{ScriptEnvironmentCacheKey, UvExecutor};
+pub use runner::{ScriptSyncResult, ScriptSyncTask, UvSyncService};
 
 mod runner;
 

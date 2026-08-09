@@ -20,6 +20,7 @@ use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
 pub use options::Options;
 use options::TyTomlError;
+pub use uv::{ScriptSyncResult, ScriptSyncTask, UvSyncService};
 
 mod configuration_file;
 pub mod options;

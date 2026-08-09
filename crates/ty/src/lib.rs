@@ -21,10 +21,11 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
-use ruff_db::{STACK_SIZE, max_parallelism};
+use ruff_db::{Db as _, STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
+use ty_project::metadata::{ScriptSyncResult, ScriptSyncTask, UvSyncService};
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, ScriptSyncProgress, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
@@ -201,7 +202,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer, &db);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -285,12 +286,14 @@ struct MainLoop {
     /// Receiver for the messages sent **to** the main loop.
     receiver: crossbeam_channel::Receiver<MainLoopMessage>,
 
-    /// Capacity-one channel used to coalesce pending workspace checks.
-    check_sender: crossbeam_channel::Sender<()>,
-    check_receiver: crossbeam_channel::Receiver<()>,
-
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
+
+    /// Workers for script refreshes requested by filesystem events.
+    script_sync: UvSyncService,
+
+    /// Progress bars shared by the checking worker and the main-loop synchronization service.
+    progress: ProgressDisplay,
 
     /// Interface for displaying information to the user.
     printer: Printer,
@@ -302,9 +305,12 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
+    fn new(
+        mode: MainLoopMode,
+        printer: Printer,
+        db: &ProjectDatabase,
+    ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
-        let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
         let cancellation_token_source = CancellationTokenSource::new();
         let cancellation_token = cancellation_token_source.token();
@@ -314,9 +320,9 @@ impl MainLoop {
                 mode,
                 sender: sender.clone(),
                 receiver,
-                check_sender,
-                check_receiver,
                 watcher: None,
+                script_sync: UvSyncService::from_project(db),
+                progress: ProgressDisplay::new(),
                 printer,
                 cancellation_token,
             },
@@ -339,8 +345,6 @@ impl MainLoop {
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        self.request_check();
-
         let result = self.main_loop(db);
 
         tracing::debug!("Exiting main loop");
@@ -348,48 +352,44 @@ impl MainLoop {
         result
     }
 
-    fn request_check(&self) {
-        // A pending request already represents a check of the latest database revision.
-        let _ = self.check_sender.try_send(());
-    }
-
     fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
+        let script_sync_results = self.script_sync.results();
+        let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
+        request_check(&check_sender);
 
-        // Apply all queued changes before starting a pending check because every applied change
-        // cancels the running check.
-        while let Ok(message) = crossbeam_channel::select_biased! {
-            recv(self.receiver) -> message => message,
-            recv(self.check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
-        } {
-            match message {
-                MainLoopMessage::CheckWorkspace => {
-                    let db = db.clone();
-                    let sender = self.sender.clone();
-
-                    // Spawn a new task that checks the project. This needs to be done in a separate thread
-                    // to prevent blocking the main loop here.
-                    rayon::spawn(move || {
-                        match salsa::Cancelled::catch(|| {
-                            let mut reporter = IndicatifReporter::from(self.printer);
-                            db.check_with_reporter(&mut reporter);
-                            reporter.into_sorted_diagnostics(&db)
-                        }) {
-                            Ok(result) => {
-                                // Send the result back to the main loop for printing.
-                                sender
-                                    .send(MainLoopMessage::CheckCompleted { result, revision })
-                                    .unwrap();
-                            }
-                            Err(cancelled) => {
-                                tracing::debug!("Check has been cancelled: {cancelled:?}");
-                            }
-                        }
-                    });
+        loop {
+            let message = crossbeam_channel::select_biased! {
+                recv(script_sync_results) -> result => {
+                    let Ok(result) = result else {
+                        break;
+                    };
+                    if self.complete_script_sync(db, result) {
+                        revision += 1;
+                        request_check(&check_sender);
+                    }
+                    tracing::debug!("Waiting for next main loop message.");
+                    continue;
                 }
+                recv(self.receiver) -> message => {
+                    let Ok(message) = message else {
+                        break;
+                    };
+                    message
+                }
+                recv(check_receiver) -> request => {
+                    if request.is_err() {
+                        break;
+                    }
+                    self.spawn_check(db, revision);
+                    tracing::debug!("Waiting for next main loop message.");
+                    continue;
+                }
+            };
 
+            match message {
                 MainLoopMessage::CheckCompleted {
                     result,
                     revision: check_revision,
@@ -400,6 +400,8 @@ impl MainLoop {
                         );
                         continue;
                     }
+
+                    self.progress.clear();
 
                     if db.project().files(db).is_empty() {
                         tracing::warn!("No python files found under the given path(s)");
@@ -488,20 +490,42 @@ impl MainLoop {
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
+                    self.progress.clear();
                     Printer::clear_screen()?;
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(&changes);
+
+                    if changes.iter().any(watch::ChangeEvent::is_rescan) {
+                        for file in db.script_environments().files() {
+                            self.schedule_script_sync(db, file);
+                        }
+                    } else {
+                        for change in &changes {
+                            let watch::ChangeEvent::Changed { path, .. } = change else {
+                                continue;
+                            };
+                            let Some(file) = db.files().try_system(db, path) else {
+                                continue;
+                            };
+
+                            if db.script_environments().contains(file) {
+                                self.schedule_script_sync(db, file);
+                            }
+                        }
+                    }
+
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
 
-                    self.request_check();
+                    request_check(&check_sender);
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
+                    self.progress.clear();
                     return Ok(ExitStatus::Interrupted);
                 }
             }
@@ -510,6 +534,33 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    fn spawn_check(&self, db: &ProjectDatabase, revision: u64) {
+        let db = db.clone();
+        let sender = self.sender.clone();
+        let progress = self.progress.clone();
+        let printer = self.printer;
+
+        // Checking runs on a separate thread so that the main loop can continue processing file
+        // changes and completed script synchronizations.
+        rayon::spawn(move || {
+            match salsa::Cancelled::catch(|| {
+                let mut reporter = IndicatifReporter::new(printer, progress);
+                db.check_with_reporter(&mut reporter);
+                reporter.into_sorted_diagnostics(&db)
+            }) {
+                Ok(result) => {
+                    // Send the result back to the main loop for printing.
+                    sender
+                        .send(MainLoopMessage::CheckCompleted { result, revision })
+                        .unwrap();
+                }
+                Err(cancelled) => {
+                    tracing::debug!("Check has been cancelled: {cancelled:?}");
+                }
+            }
+        });
     }
 
     fn write_diagnostics(
@@ -573,6 +624,34 @@ impl MainLoop {
         }
 
         Ok(())
+    }
+
+    fn schedule_script_sync(&mut self, db: &mut ProjectDatabase, file: File) {
+        let Some(task) = db.script_environments().prepare_sync(db, file) else {
+            return;
+        };
+
+        self.schedule_script_task(db, task);
+    }
+
+    fn schedule_script_task(&mut self, db: &mut ProjectDatabase, task: ScriptSyncTask) -> bool {
+        let progress = self.progress.for_script(db, task.file());
+        let mut changed = false;
+        for result in self.script_sync.schedule(db.system(), task, progress) {
+            changed |= self.complete_script_sync(db, result);
+        }
+        changed
+    }
+
+    fn complete_script_sync(&mut self, db: &mut ProjectDatabase, result: ScriptSyncResult) -> bool {
+        let environments = db.script_environments().clone();
+        let (changed, next) = environments.complete_sync(db, result);
+        if let Some(next) = next {
+            let scheduled = self.schedule_script_task(db, next);
+            changed || scheduled
+        } else {
+            changed
+        }
     }
 }
 
@@ -639,14 +718,7 @@ struct IndicatifReporter {
 }
 
 impl IndicatifReporter {
-    fn into_sorted_diagnostics(mut self, db: &dyn Db) -> Vec<Diagnostic> {
-        std::mem::take(&mut self.collector).into_sorted(db)
-    }
-}
-
-impl From<Printer> for IndicatifReporter {
-    fn from(printer: Printer) -> Self {
-        let progress = ProgressDisplay::new();
+    fn new(printer: Printer, progress: ProgressDisplay) -> Self {
         let bar = progress.progress.add(indicatif::ProgressBar::hidden());
 
         Self {
@@ -655,6 +727,10 @@ impl From<Printer> for IndicatifReporter {
             collector: CollectReporter::default(),
             printer,
         }
+    }
+
+    fn into_sorted_diagnostics(mut self, db: &dyn Db) -> Vec<Diagnostic> {
+        std::mem::take(&mut self.collector).into_sorted(db)
     }
 }
 
@@ -765,7 +841,6 @@ impl MainLoopCancellationToken {
 /// Message sent from the orchestrator to the main loop.
 #[derive(Debug)]
 enum MainLoopMessage {
-    CheckWorkspace,
     CheckCompleted {
         /// The diagnostics that were found during the check.
         result: Vec<Diagnostic>,
@@ -773,6 +848,12 @@ enum MainLoopMessage {
     },
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
+}
+
+fn request_check(sender: &crossbeam_channel::Sender<()>) {
+    // A full channel means that a check has already been requested. Keeping one pending request
+    // coalesces bursts of file changes while the main loop drains higher-priority work.
+    let _ = sender.try_send(());
 }
 
 fn set_colored_override(color: Option<TerminalColor>) {
