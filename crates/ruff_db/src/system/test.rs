@@ -137,8 +137,8 @@ impl System for TestSystem {
         self.system().cache_dir()
     }
 
-    fn which(&self, name: &str) -> WhichResult {
-        self.system().which(name)
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn run_command(
