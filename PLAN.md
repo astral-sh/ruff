@@ -21,8 +21,9 @@ Minimal diff churn is an explicit requirement:
 - Do not change Python's general gradual-type assignability or declaration semantics. A dedicated
     static-sequent phase before Phase 5 owns the narrower logical correction: concrete proofs must
     use fully static bounds and subtyping, while structurally valid symbolic rules may propagate an
-    existing gradual witness. Phase 5 then activates domains and restores temporary compatibility
-    regressions. Do not choose a relation based on validity/evidence provenance.
+    existing gradual witness. Phase 5 then activates domains and replaces legacy declaration-aware
+    solving; a potential Phase 6 restores accepted compatibility regressions. Do not choose a
+    relation based on validity/evidence provenance.
 
 ## Workflow and handoff requirements
 
@@ -47,11 +48,13 @@ ultimately correct result, do not disable, comment out, or ignore tests. Instead
 assertion or mdtest expectation to the currently observed behavior and add a clear TODO describing
 the expected correct behavior. Prefer sequencing that avoids temporary regressions entirely.
 
-The static-sequent phase is the deliberate exception where temporary user-visible regressions are
-expected. Keep each regression covered at its observed intermediate behavior and add an adjacent
-`XXX` naming the behavior that Phase 5 must restore. The static-sequent revision must still pass the
-full suite, clippy, and prek. It is an implementation checkpoint only and must not be merged or used
-as a landing bookmark target independently of Phase 5.
+The static-sequent phase was initially the only deliberate exception where temporary user-visible
+regressions were expected. Phase 5 may also retain explicitly characterized behavioral regressions
+behind adjacent `XXX` expectations, but it must complete the structural migration: declared domains
+supply the legal paths, pruning compares those paths, and `PathBounds::default_solve` must no longer
+re-read declarations or reconstruct their alternatives. Both revisions must pass the full suite,
+clippy, and prek. A potential Phase 6 may restore or explicitly resolve the accepted compatibility
+and performance debt before selecting a landing tip.
 
 Use `jj` for source control and inspect changes with `jj diff --git` or `jj diff --stat`. Run prek
 in this Jujutsu workspace through `/home/dcreager/bin/jpk`. Never modify snapshot files or inline
@@ -61,9 +64,11 @@ snapshot change, and check for `.pending-snap` files when inline snapshots are i
 ## Staged integration: fully static sequents before Phase 5
 
 Fully static sequent handling and domain activation remain one merge unit, but they are implemented
-as two test-clean project revisions. The first revision establishes the sound logical boundary and
-records temporary compatibility regressions; Phase 5 activates domains and removes those
-regressions before the stack can land.
+as test-clean project revisions. The static revision establishes the sound logical boundary and
+records temporary compatibility regressions. The Phase 5 activation checkpoint activates domains
+and records the still-observed behavior as passing `XXX` expectations. Phase 5 remains incomplete
+until structural path-only solving replaces the legacy declaration-aware solver; a potential Phase
+6 may then remove the accepted behavioral debt before the stack can land.
 
 Investigation established this split:
 
@@ -73,13 +78,14 @@ Investigation established this split:
 - A prototype static-sequent gate on the Phase 5 diagnostic stack preserved the expected `int`
     result for the typed-dictionary union ordering regression and passed the full constraint-set
     ordering mdtest after cycle-safe derived-candidate validation.
-- The same prototype exposed a Phase 5 pruning assumption: gradual constrained-TypeVar paths do
-    not always present one exact equality validity bound. Phase 5 must make pruning conservative
-    rather than panic.
+- The same prototype exposed a provenance bug that could pollute a constrained TypeVar's declared
+    validity equality with derived bounds. Every complete constrained-TypeVar domain path must
+    retain exactly one pure validity equality; derived constraints belong in `Mixed`, and consumers
+    must assert this invariant rather than accepting or skipping an invalid path.
 - Removing gradual closure exposes independent alternative solutions. In particular, unbounded
     `Container[T]` inference selects `object` rather than preserving `Any`. The static phase records
-    that intermediate result with an `XXX`; Phase 5 must restore the existing behavior even though
-    declared-domain pruning alone cannot repair an unbounded variable.
+    that intermediate result with an `XXX`; this accepted behavioral regression may be restored in
+    a potential Phase 6 because declared-domain pruning alone cannot repair an unbounded variable.
 
 Do not revive either rejected workaround from the standalone prototype: selectively retaining TDD
 uncertain branches during abstraction, or locally unioning gradual solutions in `generics.rs`.
@@ -98,7 +104,11 @@ The implementation and landing order is:
 
 1. completed domain-solving Phases 1–4 and the raw-graph fix;
 1. a full-suite-clean but intentionally non-mergeable static-sequent revision;
-1. Phase 5 domain activation and compatibility restoration, which is the first landable tip;
+1. the full-suite-clean Phase 5 domain-activation checkpoint, including enforcement of the
+    validity-equality invariant;
+1. Phase 5 structural completion, replacing legacy declaration-aware default solving;
+1. potential Phase 6 compatibility restoration and performance work, which produces the first
+    landable tip;
 1. `dcreager/remove-remove-noninferable-2`.
 
 ## Current baseline
@@ -293,10 +303,13 @@ add a single-implication sequent across validity/evidence provenance, even when 
 bounds have different strengths: declaration validity must not manufacture inference evidence,
 and evidence must not be silently relabeled as validity. This applies both to direct implications
 and to reverse implications derived from intersections. Pair-implication sequents may combine
-premises with different provenance. For same-side intersections, inherit the provenance of the
-stronger restriction. For transitive derivations, emit evidence only when every contributing
-premise is evidence; any contributing validity premise makes the derived bound validity. Continue
-using the underlying types to detect genuinely incompatible effective restrictions.
+premises with different provenance. Same-subject lattice combinations retain one operand's
+provenance only when the resulting type equals that operand; otherwise they become `Mixed`.
+Only direct declaration-domain bounds are `Validity`: transitive derivations are `Evidence` only
+when every indispensable premise is evidence, and are otherwise `Mixed`. This preserves the one
+pure validity equality contributed by a constrained TypeVar's declared alternative on every
+complete path. Continue using the underlying types to detect genuinely incompatible effective
+restrictions.
 
 Propagate provenance through accumulated `PathBound` values and factored `UpperBound` clauses.
 `default_solve` and custom `choose` callbacks select concrete solutions, so they must be able to
@@ -382,8 +395,9 @@ Compare complete paths conservatively:
 1. Both paths must contain the same type-variable identities.
 1. All type-variable bounds except one must be identical.
 1. The differing bounds must belong to a declared constrained type variable and identify exact
-    declared alternatives through their validity bounds. If either bound does not expose one exact
-    declared validity alternative, preserve both complete paths rather than panicking.
+    declared alternatives through their validity bounds. Every such complete path must expose one
+    exact declared validity equality; assert this invariant rather than accepting or skipping a
+    path whose validity bounds were polluted by a derived constraint.
 1. Both paths must retain the same inference evidence and compatible evidence-derived variance.
 1. Lower-side evidence prefers the narrower compatible declared alternative.
 1. Upper-side-only evidence prefers the broader compatible declared alternative.
@@ -436,14 +450,22 @@ expanding `Solutions`:
 - [x] Static-sequent integration phase: restrict concrete sequents and characterize temporary
     regressions in a non-mergeable intermediate revision. Change `kqntvqkmuuqp`, commit
     `148c3d7cf8cbcce6bdab30fb5b77bd6926b8c42d`.
-- [ ] Phase 5: activate the domain-conjoined TDD, simplify default solving, and restore every
-    temporary static-phase regression.
+- [x] Phase 5 activation checkpoint: activate the domain-conjoined TDD, reserve pure `Validity`
+    bounds for direct declaration domains, classify every transitive derivation with a validity
+    premise as `Mixed`, assert that constrained-TypeVar paths expose one exact validity equality,
+    and preserve accepted compatibility debt behind xfail comments. Change
+    `qtllpywmtvzrnswnvkqptllkykwpqqzp`, commit
+    `2f3d8b49b29b532ca8c629efa9eb785cab1ea20e`.
+- [ ] Phase 5 structural completion: replace legacy declaration-aware default solving with solving
+    from the effective domain-conjoined path bounds. Accepted behavioral regressions may remain as
+    passing `XXX` expectations.
+- [ ] Potential Phase 6: restore relationship preservation and the remaining recorded compatibility
+    and performance regressions, then select a landable tip.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
-revision, relevant documentation/tests, and a passing full test suite. The abandoned Phase 5 and
-standalone fully-static revisions are diagnostic evidence only. Implement Phase 5 in a new revision
-on top of the static checkpoint and this plan-only checkpoint; do not layer it onto `pvynqtrq` or
-copy its rejected workarounds.
+revision, relevant documentation/tests, and a passing full test suite. The earlier abandoned Phase 5
+prototype and standalone fully-static revisions are diagnostic evidence only. Complete Phase 5 from
+its recorded activation checkpoint; do not revive `pvynqtrq` or copy its rejected workarounds.
 
 The static checkpoint passes all 816 `ty_python_semantic` tests, all 8,908 workspace tests, workspace
 clippy, and prek. It records seven `XXX: Phase 5` markers covering gradual range algebra,
@@ -451,8 +473,8 @@ clippy, and prek. It records seven `XXX: Phase 5` markers covering gradual range
 wobble audit found that every non-normal mode already failed on the pre-static Phase 4 baseline. The
 static phase adds one temporary mask-4 mismatch for the mutable `TypedDict` case: normal ordering
 now reports the characterized `object` regression while mask 4 already retains the final `int`
-behavior. Phase 5 must restore the correlation and make those outcomes converge; do not update a
-wobble expectation to preserve the intermediate diagnostic.
+behavior. A potential Phase 6 must restore the correlation and make those outcomes converge; do not
+update a wobble expectation to preserve the intermediate diagnostic.
 
 ### Phase 1: retain bound type-variable instances in constraint-set arenas
 
@@ -488,9 +510,9 @@ Suggested revision description: `[π] Distinguish constraint validity from infer
     implication relation for underlying types.
 1. Intern otherwise-identical validity and evidence bounds separately. Never add a
     single-implication sequent across different provenance, including reverse implications derived
-    from intersections. Allow pair-implication sequents with mixed-provenance premises, preserving
-    the stronger bound's provenance for same-side intersections and deriving validity for
-    transitive bounds whenever any contributing premise is validity.
+    from intersections. Allow pair-implication sequents with mixed-provenance premises, using the
+    operation-aware same-subject rule for intersections and joining every indispensable premise's
+    provenance for transitive bounds.
 1. Keep `ConstraintBound` helpers small and local; avoid mechanical renames or broad API rewrites
     beyond the required representation change.
 1. Add narrow tests only for important bound/provenance invariants not already protected by
@@ -570,16 +592,50 @@ This revision is an implementation checkpoint, not a landable tip.
     compensate in TDD abstraction or solution combination.
 1. Run focused generic-function, constraint-algebra, and ordering tests. For each changed behavior,
     assert the observed intermediate result and add an adjacent `XXX` that states the final behavior
-    Phase 5 must restore or classify. Do not disable tests, weaken unrelated assertions, or accept
-    panics as temporary behavior.
+    the activation checkpoint or potential Phase 6 must restore or classify. Do not disable tests, weaken
+    unrelated assertions, or accept panics as temporary behavior.
 1. Run `ty_python_semantic`, the full suite, clippy, snapshot review, and prek. Record the project
     change and commit IDs as a non-mergeable intermediate checkpoint.
 
-### Phase 5: activate domains and restore compatibility
+### Phase 5: activate domains and complete structural path solving
 
-**Mandatory stop-and-escalate gate:** Start Phase 5 from the validated static checkpoint and run
-focused tests after the smallest implementation step. If any test fails unexpectedly, stop
-implementation immediately and switch to diagnosis-only work. Determine the root cause, using
+**Approved checkpoint scope clarification:** Domain activation may persist while some correlated
+TypeVar relationships and other inference behavior remain behind adjacent `XXX` expectations. That
+permission defers behavioral restoration only; it does not defer replacement of the legacy
+`PathBounds::default_solve` declaration logic. Phase 5 is complete only when solving uses the
+effective domain-conjoined path bounds without re-reading declarations or rebuilding alternatives.
+
+The activation checkpoint:
+
+- Projects non-inferable variables before deriving and conjoining validity domains, then extracts
+    paths using the conjoined support without a second projection.
+- Enables complete-path pruning in specialization consumers while asserting that every complete
+    constrained-TypeVar domain path retains one exact validity equality. Invalid producer state is
+    never accepted or skipped.
+- Preserves declaration-specific diagnostics by inspecting unconjoined paths only after a
+    domain-aware solve is unsatisfiable.
+- Preserves all indispensable premise provenance: transitive derivations remain `Evidence` only
+    when every premise is evidence, and any validity premise makes the result `Mixed`. Pure
+    `Validity` is reserved for direct declaration-domain constraints.
+- Retains the legacy declaration lookup in `PathBounds::default_solve`; removing that lookup and
+    solving structurally from path bounds is the remaining Phase 5 work.
+- Accepts, for now, concrete alternative unions such as `int | str` and `Left | Right` where a bare
+    evidence relationship such as `T := S` should survive. Relationship restoration and
+    ambiguous-`Any` behavior are potential Phase 6 work, not reasons to retain the legacy solver.
+- Records all observed mdtest changes with adjacent TODO/XXX xfail comments stating the intended
+    behavior, including gradual inference, inherited generic constructors, cycles, recursive
+    protocols, quantification, and mutable mapping/TypedDict behavior.
+
+Validation at the checkpoint passed all 820 `ty_python_semantic` tests, all 8,913 workspace tests,
+workspace clippy, snapshot review,
+and `/home/dcreager/bin/jpk`. A local Pydantic ecosystem comparison found six additional
+diagnostics consistent with the recorded inherited-generic and relationship losses. It also
+measured a repeatable median type-check time of about 2.91 seconds versus 0.384 seconds at the
+pre-activation parent; audit and resolve that regression before landing.
+
+**Stop-and-escalate gate for the remaining Phase 5 work:** Run focused tests after each small
+implementation step. If any test fails unexpectedly, stop implementation immediately and switch to
+diagnosis-only work. Determine the root cause, using
 temporary debug instrumentation when useful, and report the exact command, failure, current diff,
 and supporting evidence. Propose potential fixes—ideally multiple alternatives—with their
 tradeoffs, but do not retain production-code or mdtest behavior changes, implement a fix, update an
@@ -588,40 +644,37 @@ applies if a characterized Phase 5 regression does not recover in the expected w
 intended mdtest assertions as xfails, including `# error: [static-assert-error]`, unless the user
 explicitly approves a final expectation change.
 
-Suggested revision description: `[π] Solve declared type-variable domains as constraint-set paths`.
+Phase 5 completion checklist:
 
-1. Inventory every static-phase `XXX`; Phase 5 is incomplete until all are removed and their final
-    expectations are covered.
-1. Conjoin the support-derived validity domain with the original root before path extraction in
-    both direct and Salsa-cached entry points. Preserve source ordering and the simple concrete-bound
-    fast path whenever possible.
-1. Produce separate valid paths for declared constrained alternatives and reject incompatible
-    specializations during traversal. Diagnose any aggregated gradual validity path before changing
-    abstraction or solution combination; do not reintroduce unsound closure merely to restore the
-    old shape.
-1. Make complete-path pruning conservative: if a differing constrained-TypeVar bound does not
-    expose an exact declared equality validity bound, retain both paths rather than panicking.
-    Normal domain alternatives should still expose exact validity bounds so existing specificity,
-    static-over-gradual, and declaration-order preferences continue to work.
-1. Simplify `PathBounds::default_solve` so it selects from effective path bounds without inspecting
-    `TypeVarBoundOrConstraints` or rebuilding declared alternatives independently.
-1. Preserve witnessed variance, gradual evidence, bounded lower/upper behavior, absent versus
-    explicit bounds, unsolved variables, and relationships between compatible type variables.
-    Restore constrained `Any`/`int`, `list[Any]`/`list[int]`, ambiguous gradual evidence, and
-    unbounded `Container[T]` behavior without a local solution-union heuristic.
-1. Explicitly prune subsumed complete paths in affected specialization consumers before extracting
-    solutions and combining bindings independently; leave raw internal solution APIs exhaustive.
-1. Recover declaration-specific diagnostics by inspecting unconjoined paths only after a
-    domain-aware solve fails. Do not apply domains before eager quantification or expand this phase
-    into the separate quantifier-replacement workstream.
-1. Classify temporary constraint-algebra changes and replace each `XXX` with its justified final
-    assertion. User-visible inference regressions must be restored rather than recharacterized.
-1. Audit cache growth, path fuel, deterministic ordering, and the
-    `ty_micro[pydantic_core_schema_dict]`-sensitive fast path. Favor existing user-visible tests;
-    change implementation-focused expectations only when semantically required.
-1. Remove superseded TODOs and obsolete declaration-handling code after replacement coverage
+- [x] Inventory the static-phase `XXX` expectations and update every observed activation result with
+    an adjacent follow-up expectation.
+- [x] Conjoin the support-derived validity domain before path extraction in both direct and
+    Salsa-cached entry points while preserving source ordering and the trivial-domain fast path.
+- [x] Produce separate valid paths for declared constrained alternatives and reject incompatible
+    specializations during traversal without reintroducing gradual sequent closure.
+- [x] Preserve one exact pure validity equality for every constrained-TypeVar domain path, classify
+    derived constraints as `Mixed`, and assert the invariant during complete-path pruning.
+- [ ] Replace `PathBounds::default_solve` with solving from effective structural path bounds without
+    re-reading `TypeVarBoundOrConstraints` or rebuilding declared alternatives. Remove the
+    superseded declaration-specific selection code and helpers that become unused.
+- [ ] Preserve evidence-derived variance, effective lower/upper restrictions, absent versus explicit
+    bounds, and unsolved variables structurally. Compatible TypeVar relationships, constrained
+    `Any`/`int`, `list[Any]`/`list[int]`, ambiguous gradual evidence, and unbounded `Container[T]`
+    may remain as explicitly characterized Phase 6 regressions.
+- [x] Explicitly prune subsumed complete paths in affected specialization consumers before
+    extracting solutions and combining bindings independently; leave raw internal solution APIs
+    exhaustive.
+- [x] Recover declaration-specific diagnostics from unconjoined paths only after a domain-aware
+    solve fails. Do not apply domains before eager quantification or expand this work into the
+    separate quantifier-replacement workstream.
+- [ ] Keep accepted temporary constraint-algebra and user-visible changes covered by adjacent
+    `XXX` expectations; final classification and restoration may occur in Phase 6.
+- [ ] Leave the cache-growth, path-fuel, determinism, and
+    `ty_micro[pydantic_core_schema_dict]` performance audit for Phase 6 unless structural solving
+    introduces a new regression beyond the activation checkpoint.
+- [ ] Remove superseded TODOs and obsolete declaration-handling code after replacement coverage
     passes. Run focused tests, `ty_python_semantic`, the full suite, clippy, snapshot review, and
-    prek before marking Phase 5 complete and selecting its tip for landing.
+    prek before marking Phase 5 complete.
 
 ## Focused regression coverage
 
@@ -714,19 +767,20 @@ Run prek from the Jujutsu workspace:
     size must remain correct; avoid assuming provenance tags change the actual set of legal
     specializations.
 - **Derived constraints:** bound provenance must survive transitive, nested, canonicalized, and
-    intersected sequents without converting declaration-only restrictions into spurious evidence.
-    Start conservatively: transitive derivations with any validity premise produce validity, while
-    all-evidence derivations produce evidence.
+    intersected sequents without converting declaration-only restrictions into spurious evidence
+    or polluting the direct declaration-domain validity equality. Transitive derivations produce
+    evidence only when every indispensable premise is evidence; any validity or mixed premise
+    produces `Mixed`. Pure `Validity` is reserved for direct declaration-domain constraints.
 - **Compatible TypeVars:** conjoining `T`'s declared finite domain with witnessed `T = S`
-    currently turns `T = S` into concrete `T = int`/`T = str` alternatives. Preserve the symbolic
-    relationship for compatible constrained variables, including compatible subsets and callbacks
-    with redundant bounds, while rejecting incompatible or merely overlapping domains. The
-    user-visible behavior is required; a dedicated `PathBound` field is not prescribed.
+    currently turns `T = S` into concrete `T = int`/`T = str` alternatives. A potential Phase 6
+    must preserve the symbolic relationship for compatible constrained variables, including
+    compatible subsets and callbacks with redundant bounds, while rejecting incompatible or merely
+    overlapping domains. A dedicated `PathBound` field is not prescribed.
 - **Gradual alternatives and sequents:** store declared gradual alternatives directly as exact
     validity constraints, without bottom/top materialization. The static-sequent phase prevents
-    non-transitive gradual assignability from collapsing paths; Phase 5 must then restore existing
-    `Any`/`int` and `list[Any]`/`list[int]` behavior. Do not reinterpret provenance as a typing
-    relation or add equality-specific sequent behavior.
+    non-transitive gradual assignability from collapsing paths; a potential Phase 6 must restore
+    existing `Any`/`int` and `list[Any]`/`list[int]` behavior. Do not reinterpret provenance as a
+    typing relation or add equality-specific sequent behavior.
 - **Arena overlays:** retain full type-variable instances while continuing to intern by identity
     and avoiding unstable Salsa-ID-based ordering or unnecessary `db` parameter churn.
 - **Fast-path performance:** preserve `compute_simple_bound_conjunction` and its no-sequent-cache
