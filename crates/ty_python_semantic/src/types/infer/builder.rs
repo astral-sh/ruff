@@ -8,7 +8,7 @@ use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
-use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
@@ -61,9 +61,9 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_YIELD,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, REDUNDANT_IF_TEST,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_REFERENCE, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
     hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
@@ -121,6 +121,7 @@ use crate::types::{
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
+use ty_module_resolver::KnownModule;
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -2106,6 +2107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_statement;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+        self.check_if_test_redundancy(test);
 
         if let Err(err) = test_ty.try_bool(db, env) {
             err.report_diagnostic(&self.context, &**test);
@@ -2123,6 +2125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(test) = &test {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+                self.check_if_test_redundancy(test);
 
                 if let Err(err) = test_ty.try_bool(db, env) {
                     err.report_diagnostic(&self.context, test);
@@ -2130,6 +2133,124 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             self.infer_body(body);
+        }
+    }
+
+    fn check_if_test_redundancy(&self, test: &ast::Expr) {
+        fn untangle_test_parts<'a>(
+            test: &'a ast::Expr,
+            buffer: &mut smallvec::SmallVec<[&'a ast::Expr; 1]>,
+            builder: &TypeInferenceBuilder<'_, 'a>,
+        ) {
+            match test {
+                ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+                    for value in values {
+                        untangle_test_parts(value, buffer, builder);
+                    }
+                }
+                ast::Expr::Await(..)
+                | ast::Expr::BinOp(..)
+                | ast::Expr::Call(..)
+                | ast::Expr::Compare(..)
+                | ast::Expr::BytesLiteral(..)
+                | ast::Expr::StringLiteral(..)
+                | ast::Expr::Attribute(..)
+                | ast::Expr::Subscript(..)
+                | ast::Expr::EllipsisLiteral(..)
+                | ast::Expr::NoneLiteral(..)
+                | ast::Expr::Named(..)
+                | ast::Expr::Name(..)
+                | ast::Expr::List(..)
+                | ast::Expr::ListComp(..)
+                | ast::Expr::UnaryOp(..)
+                | ast::Expr::Dict(..)
+                | ast::Expr::Lambda(..)
+                | ast::Expr::SetComp(..)
+                | ast::Expr::Set(..)
+                | ast::Expr::DictComp(..)
+                | ast::Expr::Generator(..)
+                | ast::Expr::Yield(..)
+                | ast::Expr::YieldFrom(..)
+                | ast::Expr::FString(..)
+                | ast::Expr::TString(..)
+                | ast::Expr::Tuple(..)
+                | ast::Expr::Slice(..)
+                | ast::Expr::If(..) => {
+                    let db = builder.db();
+                    let env = builder.program_environment();
+
+                    if any_over_expr(test, |expr| {
+                        // exclude `if TYPE_CHECKING`, `if typing.TYPE_CHECKING`, `if not TYPE_CHECKING`, etc.
+                        match expr {
+                            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => {
+                                return true;
+                            }
+                            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+                                if attr == "TYPE_CHECKING" =>
+                            {
+                                return true;
+                            }
+                            _ => {}
+                        }
+
+                        // Exclude any conditions involving `sys.platform` or `os.name`, or other attribute
+                        // expressions where the value is the `sys` module or the `os` module.
+                        let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = expr else {
+                            return false;
+                        };
+                        let Type::ModuleLiteral(module) = builder.expression_type(value) else {
+                            return false;
+                        };
+                        if matches!(
+                            module.module(db).known(db),
+                            Some(KnownModule::Sys | KnownModule::Os)
+                        ) {
+                            return true;
+                        }
+
+                        // exclude any conditions involving `sys.version_info`
+                        builder.expression_type(expr).is_subtype_of(
+                            db,
+                            env,
+                            Type::sys_version_info(),
+                        )
+                    }) {
+                        return;
+                    }
+
+                    buffer.push(test);
+                }
+                ast::Expr::BooleanLiteral(..)
+                | ast::Expr::NumberLiteral(..)
+                | ast::Expr::Starred(..)
+                | ast::Expr::IpyEscapeCommand(..) => {}
+            }
+        }
+
+        if !self.context.is_lint_enabled(&REDUNDANT_IF_TEST) {
+            return;
+        }
+
+        let mut buffer = smallvec::smallvec![];
+        untangle_test_parts(test, &mut buffer, self);
+
+        for part in buffer {
+            let inferred_type = self.expression_type(part);
+            let truthiness = inferred_type.bool(self.db(), self.program_environment());
+
+            match truthiness {
+                Truthiness::AlwaysTrue => {
+                    if let Some(builder) = self.context.report_lint(&REDUNDANT_IF_TEST, part) {
+                        builder.into_diagnostic("This `if` test is always true");
+                    }
+                }
+                Truthiness::AlwaysFalse => {
+                    if let Some(builder) = self.context.report_lint(&REDUNDANT_IF_TEST, part) {
+                        builder.into_diagnostic("This `if` test is always false");
+                    }
+                }
+                Truthiness::Ambiguous => {}
+            }
         }
     }
 
@@ -8218,6 +8339,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
+        self.check_if_test_redundancy(test);
         let (body_ty, orelse_ty) =
             if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
                 // Infer the peer branch first so the body can use its type as context.

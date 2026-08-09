@@ -66,3 +66,12 @@ error[invalid-return-type]: Function can implicitly return `None`, which is not 
    |                      ^^^
 
 ```
+
+```
+warning[redundant-if-test]: This `if` test is always false
+  --> src/mdtest_snippet.py:21:8
+   |
+21 |     if cond:
+   |        ^^^^
+
+```
