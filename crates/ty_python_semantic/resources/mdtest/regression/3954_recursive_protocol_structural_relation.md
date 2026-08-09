@@ -271,8 +271,7 @@ class Recursive(Protocol[T_co]):
 
 def convert(value: Any | Recursive[T_co]) -> list[T_co]:
     result = [value]
-    # XXX: Phase 5 must restore the compact gradual solution without reintroducing gradual
-    # sequent implication.
+    # XXX: Restore the compact gradual solution without reintroducing gradual sequent implication.
     # revealed: list[T_co@convert | Recursive[Any] | Recursive[Recursive[Any]] | Recursive[Recursive[Recursive[Any]]] | Any | Recursive[T_co@convert]]
     reveal_type(result)
     return result  # error: [invalid-return-type]
@@ -289,8 +288,8 @@ Options: TypeAlias = Iterable[U] | F[U] | M
 
 def s(value: Options[U]) -> list[U]:
     result = [value]
-    # XXX: Phase 5 must restore the compact correlated solution without reintroducing gradual
-    # sequent implication.
+    # XXX: Restore the compact correlated solution without reintroducing gradual sequent
+    # implication.
     # revealed: list[U@s | Iterable[M] | F[M] | Iterable[Iterable[M]] | F[Iterable[M]] | Iterable[F[M]] | F[F[M]] | Iterable[U@s] | F[U@s] | M]
     reveal_type(result)
     return result  # error: [invalid-return-type]

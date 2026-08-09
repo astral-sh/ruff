@@ -100,8 +100,8 @@ materializations instead of using gradual assignability to prove them equivalent
 
 ```py
 def _[T]() -> None:
-    # XXX: Phase 5 must classify whether these atoms should remain distinct or recover
-    # materialization equivalence without reintroducing gradual sequent implication.
+    # XXX: Decide whether these atoms should remain distinct or recover materialization
+    # equivalence without reintroducing gradual sequent implication.
     constraints = ConstraintSet.range(Base, T, Any)
     expected = ConstraintSet.range(Base, T, object)
     # error: [static-assert-error]
@@ -273,8 +273,8 @@ materialization ranges.
 
 ```pyi
 def _[T]() -> None:
-    # XXX: Phase 5 must classify whether these atoms should remain distinct or recover
-    # materialization equivalence without reintroducing gradual sequent implication.
+    # XXX: Decide whether these atoms should remain distinct or recover materialization
+    # equivalence without reintroducing gradual sequent implication.
     constraints = ~ConstraintSet.range(Base, T, Any)
     expected = ~ConstraintSet.range(Base, T, object)
     # error: [static-assert-error]
@@ -449,8 +449,8 @@ def _[T, U: Any, V]() -> None:
     static_assert(not ~upper_bounds)
 
     both = ConstraintSet.equality(T, Both)
-    # XXX: Phase 5 must restore this simplification without using gradual assignability to derive
-    # transitive sequent implications.
+    # XXX: Restore this simplification without using gradual assignability to derive transitive
+    # sequent implications.
     # error: [static-assert-error]
     static_assert(both & upper_bounds == both)
 

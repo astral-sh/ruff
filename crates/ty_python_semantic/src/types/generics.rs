@@ -2642,7 +2642,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // was not enough: `solutions_with` still performed the expensive path traversal, and the
         // skipped projection changed precision in LiteralString tests. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
-        let solutions = match self.pending.solutions_with(
+        let solutions = match self.pending.pruned_solutions_with(
             db,
             self.env,
             self.constraints,
@@ -2997,7 +2997,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn analyze_constraint_set(&self, set: ConstraintSet<'db, 'c>) -> ConstraintSetAnalysis<'db> {
         let db = self.db;
         let mut failures = SmallVec::new();
-        let solutions = set.solutions_with(
+        let solutions = set.pruned_solutions_with(
             db,
             self.env,
             self.constraints,
@@ -3015,7 +3015,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         );
 
         match solutions {
-            Solutions::Unsatisfiable => ConstraintSetAnalysis::Unsatisfiable(failures),
+            Solutions::Unsatisfiable => {
+                if failures.is_empty()
+                    && let PathBounds::Constrained(paths) = set.unconjoined_path_bounds(
+                        db,
+                        self.env,
+                        self.constraints,
+                        self.inferable,
+                    )
+                {
+                    failures.extend(paths.iter().flatten().filter_map(|path_bound| {
+                        self.constraint_failure_from_failed_bounds(path_bound)
+                    }));
+                }
+                ConstraintSetAnalysis::Unsatisfiable(failures)
+            }
             Solutions::Unconstrained => ConstraintSetAnalysis::Unconstrained,
             Solutions::Constrained(solutions) => ConstraintSetAnalysis::Constrained(solutions),
         }

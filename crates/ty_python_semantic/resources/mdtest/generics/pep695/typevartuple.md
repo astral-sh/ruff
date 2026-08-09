@@ -234,8 +234,9 @@ class Container[T, *Ts]:
     values: tuple[T, *Ts]
 
     def interface(self) -> "Interface[Container[Any, *tuple[Any, ...]]]":
-        # TODO: This should not error once fixed `TypeVarTuple` relations are supported.
+        # TODO: These errors should disappear once fixed `TypeVarTuple` relations are supported.
         # error: [invalid-argument-type] "Argument to `Interface.__init__` is incorrect"
+        # error: [invalid-return-type]
         return Interface(self)
 
 C = TypeVar(

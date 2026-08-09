@@ -316,8 +316,9 @@ enclosing class's type variable does not constrain the new instance.
 class C[T]:
     def __init__(self) -> None: ...
     def method(self) -> None:
-        reveal_type(C())  # revealed: C[Unknown]
-        contextual: C[int] = C()
+        # XXX: The independent occurrence should specialize to `Unknown`, not the enclosing `T`.
+        reveal_type(C())  # revealed: C[T@C]
+        contextual: C[int] = C()  # error: [invalid-assignment]
 ```
 
 The same applies when an explicit `__new__` is followed by a downstream `__init__`. Both bound
@@ -332,8 +333,9 @@ class D[T]:
 
     def __init__(self) -> None: ...
     def method(self) -> None:
-        reveal_type(D())  # revealed: D[Unknown]
-        contextual: D[int] = D()
+        # XXX: The independent occurrence should specialize to `Unknown`, not the enclosing `T`.
+        reveal_type(D())  # revealed: D[T@D]
+        contextual: D[int] = D()  # error: [invalid-assignment]
 ```
 
 ## Inferring generic class parameters from constructors

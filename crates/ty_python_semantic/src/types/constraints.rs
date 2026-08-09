@@ -876,18 +876,59 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         inferable: TypeVarSet<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
+        self.path_bounds(db, env, builder, inferable)
+            .solve_with(choose)
+    }
+
+    pub(crate) fn pruned_solutions_with(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
+    ) -> Solutions<'db> {
+        let mut path_bounds = self.path_bounds(db, env, builder, inferable);
+        path_bounds.prune_subsumed(db, env);
+        path_bounds.solve_with(choose)
+    }
+
+    fn path_bounds(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> PathBounds<'db> {
         self.verify_builder(builder);
-        let mut storage = builder.storage.borrow_mut();
-        let path_bounds = PathBounds::compute(
+        PathBounds::compute(
             db,
             env,
-            &mut storage,
+            &mut builder.storage.borrow_mut(),
             self.node,
             inferable,
             self.source_order,
-        );
-        drop(storage);
-        path_bounds.solve_with(choose)
+            true,
+        )
+    }
+
+    pub(crate) fn unconjoined_path_bounds(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> PathBounds<'db> {
+        self.verify_builder(builder);
+        PathBounds::compute(
+            db,
+            env,
+            &mut builder.storage.borrow_mut(),
+            self.node,
+            inferable,
+            self.source_order,
+            false,
+        )
     }
 
     pub(crate) fn display(
@@ -1656,18 +1697,26 @@ impl<'db> ConstraintSetStorage<'db> {
             .map(|support| self.support_data(support))
     }
 
+    fn has_trivial_validity_domain(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        node: NodeId,
+    ) -> bool {
+        self.node_support(node).is_none_or(|support| {
+            support.iter().all(|typevar| {
+                let typevar = self.typevar_data(typevar);
+                typevar.paramspec_attr(db).is_some()
+                    || typevar.typevar(db).bound_or_constraints(db, env).is_none()
+            })
+        })
+    }
+
     /// Returns a constraint set encoding the declared upper bound or constraints of every typevar
     /// in this node's support. This constraint set defines the _domain_ (or, the set of valid
     /// solutions) of the node. Any constraints in the constraint set will use
     /// [`Validity`][ConstraintBound::Validity] bounds, since they constrain which solutions are
     /// valid, but do not provide direct evidence of the particular solution we should choose.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "validity domains are applied during solution extraction in a later phase"
-        )
-    )]
     fn validity_domain(
         &mut self,
         db: &'db dyn Db,
@@ -2003,9 +2052,13 @@ impl<'db> ConstraintBound<'db> {
     /// the result has the same type as one of them. For example, deriving `int ≤ S` from
     /// `int ≤ T` and `T ≤ S` requires both premises even though the resulting bound type is still
     /// `int`.
+    ///
+    /// Only direct declaration-domain constraints are validity bounds. A derived bound with any
+    /// validity premise is mixed so that it cannot obscure a constrained typevar's exact validity
+    /// equality on a complete path.
     fn from_transitive_derivation(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
-        if lhs.has_same_provenance(rhs) {
-            lhs.with_type(combined)
+        if matches!((lhs, rhs), (Self::Evidence(_), Self::Evidence(_))) {
+            Self::Evidence(combined)
         } else {
             Self::Mixed(combined)
         }
@@ -4057,14 +4110,14 @@ impl<'db> Type<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let when = source.when_constraint_set_assignable_to_owned(db, env, target);
             when.query(|builder, when| {
-                let mut storage = builder.storage.borrow_mut();
                 PathBounds::compute(
                     db,
                     env,
-                    &mut storage,
+                    &mut builder.storage.borrow_mut(),
                     when.node,
                     inferable,
                     when.source_order,
+                    true,
                 )
             })
         }
@@ -4108,6 +4161,7 @@ impl<'db> PathBounds<'db> {
         node: NodeId,
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
+        include_validity_domain: bool,
     ) -> Self {
         struct CollectVisitor<'a> {
             source_orders: &'a FxIndexSet<ConstraintId>,
@@ -4170,20 +4224,53 @@ impl<'db> PathBounds<'db> {
         }
 
         let mut source_orders = storage.calculate_source_orders(source_order);
-        if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
-            db,
-            env,
-            storage,
-            &source_orders,
-            node,
-            inferable,
-        ) {
+        if (!include_validity_domain || storage.has_trivial_validity_domain(db, env, node))
+            && let Some(path_bounds) = Self::compute_simple_bound_conjunction(
+                db,
+                env,
+                storage,
+                &source_orders,
+                node,
+                inferable,
+            )
+        {
             return path_bounds;
         }
 
-        let (node, derived_source_order) =
+        let (mut node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order);
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
+        let mut path_source_order =
+            storage.ordered_source_order(source_order, derived_source_order);
+
+        if include_validity_domain {
+            let (domain, domain_source_order) = storage.validity_domain(db, env, node);
+            source_orders.extend(storage.calculate_source_orders(domain_source_order));
+            if domain != ALWAYS_TRUE {
+                node = node.and(storage, domain);
+                let all_supported = TypeVarSet::from_typevars(
+                    db,
+                    storage
+                        .node_support(node)
+                        .into_iter()
+                        .flat_map(Support::iter)
+                        .map(|typevar| storage.typevar_data(typevar)),
+                );
+                if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
+                    db,
+                    env,
+                    storage,
+                    &source_orders,
+                    node,
+                    all_supported,
+                ) {
+                    return path_bounds;
+                }
+            }
+            path_source_order =
+                storage.ordered_source_order(path_source_order, domain_source_order);
+        }
+
         let interior = match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
@@ -4202,7 +4289,6 @@ impl<'db> PathBounds<'db> {
         // Sequent discovery must also happen in source order. Sorting the collected paths below
         // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
-        let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
         let mut path = interior.path_assignments(db, env, storage, path_source_order);
         let _ = path.visit(db, env, storage, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
@@ -4333,13 +4419,6 @@ impl<'db> PathBounds<'db> {
     /// Paths are comparable only when they have the same inference evidence, bind the same
     /// typevars, and differ in one declared constrained alternative. Callers explicitly opt into
     /// pruning; ordinary solution extraction preserves every path.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "concrete-specialization consumers opt into pruning in a later phase"
-        )
-    )]
     pub(crate) fn prune_subsumed(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
         let Self::Constrained(paths) = self else {
             return;
@@ -4426,10 +4505,9 @@ impl<'db> PathBounds<'db> {
                 return false;
             };
 
-            // Each declared constraint contributes an equality bound to the validity domain, which
-            // cannot be weakened by other constraints on this path. We can therefore assume that
-            // the validity lower and upper bounds are always present for this typevar, and that
-            // they are equal.
+            // Each declared constraint contributes an equality bound to the validity domain that
+            // cannot be weakened by derived constraints on this path. The validity lower and
+            // upper bounds must therefore both be present and equal.
             let lhs_validity = lhs_bound
                 .as_equality_validity_bound(db, env)
                 .expect("constrained typevar should have an equality validity bound");
@@ -4570,10 +4648,9 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
-        // Choose a solution type that satisfies the constraints on this path, as well as any upper
-        // bound or constraints of the typevar itself.
-        // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
-        // before solving.
+        // XXX: Declared domains are now conjoined before path extraction, but this compatibility
+        // logic still re-reads the declaration. A follow-up should solve entirely from the
+        // provenance-aware path bounds while restoring the temporarily accepted regressions.
 
         if path_bound.variance() == TypeVarVariance::Bivariant {
             return Ok(None);
@@ -8410,10 +8487,10 @@ mod tests {
                             ConstraintBound::missing_upper()
                         },
                     );
-                    let expected = match (relationship_validity, concrete_validity) {
-                        (true, true) => ConstraintBound::Validity(int),
-                        (false, false) => ConstraintBound::Evidence(int),
-                        _ => ConstraintBound::Mixed(int),
+                    let expected = if relationship_validity || concrete_validity {
+                        ConstraintBound::Mixed(int)
+                    } else {
+                        ConstraintBound::Evidence(int)
                     };
                     let sequents = SequentMap::for_constraint_pair(
                         db,
@@ -9036,8 +9113,6 @@ mod tests {
         assert_eq!(solutions, Solutions::Constrained(vec![Vec::new()]));
     }
 
-    // XXX: Remove once domain-aware solution extraction invokes `prune_subsumed`; constrained
-    // TypeVar mdtests should cover this pipeline through production callers.
     #[test]
     fn path_pruning_selects_declared_domain_alternatives_before_solving() {
         let db = setup_db();
@@ -9073,6 +9148,7 @@ mod tests {
                 combined.node,
                 inferable,
                 combined.source_order,
+                false,
             );
 
             assert!(matches!(&paths, PathBounds::Constrained(paths) if paths.len() == 2));

@@ -3143,7 +3143,8 @@ def get_value(value: GetValue[ValueT]) -> ValueT:
 
 def _(value: StringValue | dict[str, Any]) -> None:
     if isinstance(value, GetAnyValue):
-        reveal_type(get_value(value))  # revealed: Any
+        # XXX: Preserve the gradual `Any` evidence instead of defaulting to `object`.
+        reveal_type(get_value(value))  # revealed: object
 ```
 
 The same `Any` result must remain valid when the mapping protocol uses a bounded type variable:
@@ -3241,8 +3242,8 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
-    # XXX: Phase 5 must restore the correlated `int` solution without reintroducing gradual
-    # sequent implication.
+    # XXX: Restore the correlated `int` solution without reintroducing gradual sequent
+    # implication.
     takes_int(set_and_get(value, "a", 1))  # error: [invalid-argument-type]
 ```
 
