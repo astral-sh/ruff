@@ -28,15 +28,22 @@ pub(crate) struct MultipleArgnames {
     argnames: Vec<String>,
 }
 
+impl<T: Into<String>> FromIterator<T> for MultipleArgnames {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self::new(iter.into_iter().map(Into::into).collect_vec())
+    }
+}
+
 #[derive(Debug, From)]
 pub(crate) enum KnownArgnames {
     Single(SingleArgname),
     Multiple(MultipleArgnames),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) enum Argnames {
     Known(KnownArgnames),
+    #[default]
     Unknown,
 }
 
@@ -60,8 +67,13 @@ impl<T: Into<KnownArgnames>> From<T> for Argnames {
 
 impl TypeInferenceBuilder<'_, '_> {
     pub(crate) fn parse_argnames_expression(&self, argnames_argument: &ast::Expr) -> Argnames {
+        let db = self.db();
         if let Some(literal) = self.expression_type(argnames_argument).as_string_literal() {
-            self.parse_argnames_string(literal.value(self.db()), argnames_argument.range())
+            self.parse_argnames_string(literal.value(db), argnames_argument.range())
+        } else if let Some(list_expr) = argnames_argument.as_list_expr() {
+            self.parse_argnames_sequence(&list_expr.elts, list_expr.range())
+        } else if let Some(tuple_expr) = argnames_argument.as_tuple_expr() {
+            self.parse_argnames_sequence(&tuple_expr.elts, tuple_expr.range())
         } else {
             Argnames::Unknown
         }
@@ -91,6 +103,34 @@ impl TypeInferenceBuilder<'_, '_> {
         checks.into_iter().any(convert::identity)
     }
 
+    /// Converts the sequence (list or tuple elements) into multiple argnames.
+    /// If there is an error, `None` is returned and a diagnostic is generated.
+    fn parse_argnames_sequence(&self, sequence: &[ast::Expr], range: TextRange) -> Argnames {
+        self.parse_multiple_argnames_sequence(sequence, range)
+            .map(Into::into)
+            .unwrap_or_default()
+    }
+
+    fn parse_multiple_argnames_sequence(
+        &self,
+        sequence: &[ast::Expr],
+        range: TextRange,
+    ) -> Option<MultipleArgnames> {
+        // Collect so that all errors are reported.
+        let identifiers = sequence
+            .iter()
+            .map(|element| {
+                if let Some(literal_type) = self.expression_type(element).as_string_literal() {
+                    let name = literal_type.value(self.db());
+                    self.check_valid_identifier(name, range).then_some(name)
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+        Option::<MultipleArgnames>::from_iter(identifiers)
+    }
+
     /// Checks whether an individual argname is valid as a Python identifier.
     /// It generates a diagnostic if this is not the case.
     /// `request` is not treated as a valid identifier.
@@ -103,13 +143,14 @@ impl TypeInferenceBuilder<'_, '_> {
         {
             builder.into_diagnostic(format!("`{name}` is not a valid Python identifier."));
         }
-        if name == "request"
-            && let Some(builder) = self.context.report_lint(&PYTEST_REQUEST_KEYWORD, range)
-        {
-            builder.into_diagnostic(
-                "`request` is a reserved Python keyword and cannot be used during parametrization.",
-            );
+        if name == "request" {
+            if let Some(builder) = self.context.report_lint(&PYTEST_REQUEST_KEYWORD, range) {
+                builder.into_diagnostic(
+                    "`request` is a reserved Python keyword and cannot be used during parametrization.",
+                );
+            }
+            return false;
         }
-        !is_identifier
+        is_identifier
     }
 }
