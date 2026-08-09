@@ -7,7 +7,7 @@ use ty_combine::Combine;
 use ty_static::EnvVars;
 
 pub(crate) use metadata::{UvMetadata, UvMetadataError};
-pub(crate) use sync::{ScriptSyncTask, UvSyncService};
+pub(crate) use sync::{ScriptSyncRequest, ScriptSyncResult, ScriptSyncTask, UvSyncService};
 
 mod metadata;
 mod sync;
