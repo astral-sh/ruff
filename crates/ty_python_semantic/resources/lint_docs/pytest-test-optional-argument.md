@@ -1,10 +1,7 @@
 ## What it does
 
-Checks that there are no positional arguments in Pytest tests.
-
-## Why is this bad?
-
-Positional arguments are ignored.
+Check for duplicated argnames when using `pytest.mark.parametrize`.
+This will cause `pytest` to crash when executing the test.
 
 ## Examples
 
@@ -12,14 +9,13 @@ Positional arguments are ignored.
 import pytest
 
 
-@pytest.mark.parametrize("x", [(1, -1)])
-def test_negation(x: int, zero=0) -> None:  # error: [pytest-test-optional-argument]
-    assert -x == zero - x
+# In the same parametrization.
+@pytest.mark.parametrize("x, y, x", [(1, -1, 1)])  # error: [pytest-duplicate-argnames]
+def test_duplicate(x: int, y: int) -> None: ...
 
 
-# Instead, use a local variable.
-@pytest.mark.parametrize("x", [(1, -1)])
-def test_negation(x: int) -> None:
-    zero = 0
-    assert -x == zero - x
+# Or in separate ones.
+@pytest.mark.parametrize("x, y", [(1, 2)])
+@pytest.mark.parametrize("z, y", [(3, 4)])  # error: [pytest-duplicate-argnames]
+def test_duplicate(x: int, y: int, z: int) -> None: ...
 ```

@@ -162,3 +162,40 @@ def _() -> None: ...
 @pytest.mark.parametrize(["request", "valid"], [])  # error: [pytest-request-keyword]
 def _() -> None: ...
 ```
+
+## Duplicate Argnames
+
+Duplicating an argname will cause an error.
+
+```py
+import pytest
+
+# Same decorator
+@pytest.mark.parametrize("x, y, x", [(1, 2, 1)])  # error: [pytest-duplicate-argname]
+def _(x: int, y: int) -> None: ...
+
+# This time as a sequence
+@pytest.mark.parametrize(["x", "y", "x"], [(1, 2, 1)])  # error: [pytest-duplicate-argname]
+def _(x: int, y: int) -> None: ...
+
+# Separate decorators
+# Even though the top decorator is applied first,
+# it is simpler for users if the error is shown on the bottom on.
+@pytest.mark.parametrize(["x", "y"], [(1, 2)])
+@pytest.mark.parametrize(["y", "z"], [(3, 4)])  # error: [pytest-duplicate-argname]
+def _(x: int, y: int, z: int) -> None: ...
+
+# And the same with string literals
+@pytest.mark.parametrize("x, y", [(1, 2)])
+@pytest.mark.parametrize("", [])
+@pytest.mark.parametrize("y, z", [(3, 4)])  # error: [pytest-duplicate-argname]
+def _(x: int, y: int, z: int) -> None: ...
+
+# Or multiple repeats
+@pytest.mark.parametrize("x, y", [(1, 2)])
+@pytest.mark.parametrize("x, z", [(3, 4)])  # error: [pytest-duplicate-argname]
+# error: [pytest-duplicate-argname]
+# error: [pytest-duplicate-argname]
+@pytest.mark.parametrize("y, z", [(3, 4)])
+def _(x: int, y: int, z: int) -> None: ...
+```

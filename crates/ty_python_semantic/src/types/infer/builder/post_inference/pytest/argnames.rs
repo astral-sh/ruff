@@ -1,6 +1,6 @@
-use std::convert;
+use std::{convert, slice};
 
-use derive_more::{Constructor, From};
+use derive_more::{Constructor, From, IntoIterator};
 use itertools::Itertools;
 use ruff_python_ast::{self as ast};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -11,9 +11,27 @@ use crate::types::{
     infer::TypeInferenceBuilder,
 };
 
-#[derive(Debug, From, Constructor)]
+#[derive(Debug)]
 pub(crate) struct SingleArgname {
-    argname: String,
+    name: String,
+    range: TextRange,
+}
+
+impl SingleArgname {
+    pub(crate) fn new(argname: impl Into<String>, range: TextRange) -> Self {
+        Self {
+            name: argname.into(),
+            range,
+        }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 // Even though it is called multiple, it make contain a single argname.
@@ -23,14 +41,21 @@ pub(crate) struct SingleArgname {
 // def test_name(name: tuple[str]) -> None: ...
 //
 // ```
-#[derive(Debug, From, Constructor)]
+#[derive(Debug, From, Constructor, IntoIterator)]
+#[into_iterator(ref)]
 pub(crate) struct MultipleArgnames {
-    argnames: Vec<String>,
+    argnames: Vec<SingleArgname>,
 }
 
-impl<T: Into<String>> FromIterator<T> for MultipleArgnames {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self::new(iter.into_iter().map(Into::into).collect_vec())
+impl MultipleArgnames {
+    pub(crate) fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+}
+
+impl FromIterator<SingleArgname> for MultipleArgnames {
+    fn from_iter<I: IntoIterator<Item = SingleArgname>>(iter: I) -> Self {
+        Self::new(Vec::from_iter(iter))
     }
 }
 
@@ -40,23 +65,24 @@ pub(crate) enum KnownArgnames {
     Multiple(MultipleArgnames),
 }
 
+impl<'a> IntoIterator for &'a KnownArgnames {
+    type Item = &'a SingleArgname;
+
+    type IntoIter = slice::Iter<'a, SingleArgname>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            KnownArgnames::Single(argname) => slice::from_ref(argname).iter(),
+            KnownArgnames::Multiple(argnames) => argnames.iter(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) enum Argnames {
     Known(KnownArgnames),
     #[default]
     Unknown,
-}
-
-impl From<&str> for Argnames {
-    fn from(value: &str) -> Self {
-        SingleArgname::from(value.to_owned()).into()
-    }
-}
-
-impl From<Vec<&str>> for Argnames {
-    fn from(value: Vec<&str>) -> Self {
-        MultipleArgnames::from(value.into_iter().map(ToOwned::to_owned).collect_vec()).into()
-    }
 }
 
 impl<T: Into<KnownArgnames>> From<T> for Argnames {
@@ -89,8 +115,12 @@ impl TypeInferenceBuilder<'_, '_> {
             return Argnames::Unknown;
         }
         match &filtered_names[..] {
-            [name] => (*name).into(),
-            _ => filtered_names.into(),
+            [name] => SingleArgname::new(*name, range).into(),
+            _ => filtered_names
+                .into_iter()
+                .map(|name| SingleArgname::new(name, range))
+                .collect::<MultipleArgnames>()
+                .into(),
         }
     }
 
@@ -122,7 +152,8 @@ impl TypeInferenceBuilder<'_, '_> {
             .map(|element| {
                 if let Some(literal_type) = self.expression_type(element).as_string_literal() {
                     let name = literal_type.value(self.db());
-                    self.check_valid_identifier(name, range).then_some(name)
+                    self.check_valid_identifier(name, range)
+                        .then(|| SingleArgname::new(name, range))
                 } else {
                     None
                 }

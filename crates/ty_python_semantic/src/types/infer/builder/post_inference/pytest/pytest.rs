@@ -11,6 +11,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty: Type<'db>,
         node: &'ast ast::StmtFunctionDef,
     ) {
-        self.build_pytest_test(node, ty);
+        if let Some(test) = self.build_pytest_test(node, ty) {
+            self.check_duplicate_argnames(&test);
+        }
     }
 }

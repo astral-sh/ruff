@@ -15,6 +15,12 @@ pub(crate) struct Parametrization<'ast> {
     argvalues: &'ast ast::Expr,
 }
 
+impl Parametrization<'_> {
+    pub(crate) fn argnames(&self) -> &KnownArgnames {
+        &self.argnames
+    }
+}
+
 impl<'ast> TypeInferenceBuilder<'_, 'ast> {
     pub(crate) fn build_parametrizations(
         &self,

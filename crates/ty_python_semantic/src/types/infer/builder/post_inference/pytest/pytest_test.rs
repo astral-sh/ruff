@@ -1,11 +1,14 @@
 use crate::types::{
     KnownClass, Type,
+    diagnostic::PYTEST_DUPLICATE_ARGNAME,
     infer::{
         TypeInferenceBuilder,
         builder::post_inference::pytest::{parametrization::Parametrization, request::Request},
     },
 };
+use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashMap;
 
 /// Representation of a pytest test.
 /// It is only used when the argnames and argvalues should be checked, and for that purpose only.
@@ -50,5 +53,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownClass::PytestMarkDecorator.to_instance(db, env),
                 )
             })
+    }
+
+    pub(crate) fn check_duplicate_argnames<'a>(&self, test: &CheckablePytestTest) {
+        let mut argname_locations = FxHashMap::default();
+        for parametrization in &test.parametrizations {
+            for argname in parametrization.argnames() {
+                if let Some(previous_range) =
+                    argname_locations.insert(argname.name(), argname.range())
+                {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&PYTEST_DUPLICATE_ARGNAME, argname.range())
+                    {
+                        let mut diagnostic = builder
+                            .into_diagnostic(format!("Duplicate argname `{}`", argname.name()));
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            format_args!("`{}` already used here", argname.name()),
+                        );
+                        sub.annotate(Annotation::primary(self.context.span(previous_range)));
+                        diagnostic.sub(sub)
+                    }
+                }
+            }
+        }
     }
 }
