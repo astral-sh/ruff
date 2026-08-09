@@ -1,0 +1,59 @@
+name: ruff
+description: An extremely fast Python linter and code formatter, written in Rust. Combines the functionality of multiple Python linting and formatting tools in one fast, ergonomic tool.
+language: Rust (primary), Python (secondary)
+stars: 49112
+repository:
+  upstream: astral-sh/ruff
+  fork: nickhac/ruff
+  clone_url: https://github.com/nickhac/ruff.git
+
+setup:
+  steps:
+    - description: Clone the repository
+      command: git clone https://github.com/astral-sh/ruff.git
+      requires_upstream: true
+    - description: Install Rust toolchain
+      command: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      platform: unix
+    - description: Install uv (Python version manager and package installer)
+      command: curl -LsSf https://astral.sh/uv/install.sh | sh
+      platform: unix
+      optional: true
+    - description: Install cargo-insta (snapshot testing)
+      command: cargo install cargo-insta
+    - description: Install cargo-nextest (faster test runner)
+      command: cargo install cargo-nextest --locked
+      optional: true
+    - description: Install development dependencies
+      command: uv run --only-group dev --locked prek install
+    - description: Build the project
+      command: cargo build --release
+
+verification:
+  description: Verify ruff build and installation
+  commands:
+    - name: Run tests
+      command: cargo nextest run --release
+      timeout: 300
+    - name: Check formatting
+      command: cargo fmt -- --check
+    - name: Run clippy linter
+      command: cargo clippy --all-targets --all-features -- -D warnings
+    - name: Verify ruff binary works
+      command: cargo run --release --bin ruff -- --version
+      expected_output: "^ruff \\d+\\.\\d+\\.\\d+"
+    - name: Lint Python code (if present)
+      command: ruff check . --select E,W
+      optional: true
+
+entry_points:
+  binary: ./target/release/ruff
+
+tags:
+  - linter
+  - formatter
+  - python
+  - rust
+  - astral-sh
+  - cli-tool
+  - code-quality
