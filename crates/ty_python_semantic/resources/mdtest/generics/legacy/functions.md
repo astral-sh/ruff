@@ -576,6 +576,8 @@ def infer_pair(value: Pair[T]) -> T:
 
 def check_pair(value: GradualPair[U]) -> None:
     # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
+    # XXX: Phase 5 must restore `Unknown` after domain solving exposes the incompatible exact
+    # member types to the equality-intersection check.
     reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
 ```
 
