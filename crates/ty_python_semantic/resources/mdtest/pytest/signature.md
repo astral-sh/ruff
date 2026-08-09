@@ -72,3 +72,36 @@ def _(foo: int, bar: int = 3) -> None: ...
 # error: [pytest-test-argument-wrong-kind] "Pytest tests only accept keyword arguments. `**kwargs` is a variadic keyword argument."
 def _(x: int, y: int, /, z: int = 8, **kwargs) -> None: ...
 ```
+
+## Extra Decorators
+
+```py
+import pytest
+from typing import Any
+
+def opaque(f: Any) -> Any:
+    return f
+
+# Other decorator should still be checked
+@pytest.mark.skip
+def _(**kwargs) -> None: ...  # error: [pytest-test-argument-wrong-kind]
+
+# But when there's a different one, only check the parametrization
+@pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
+@opaque
+def _(**kwargs) -> None: ...
+
+# Do nothing when it's empty
+def _(**kwargs) -> None: ...
+
+# When there's a combination, still check
+@pytest.mark.xfail
+@pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
+def _(*args) -> None: ...  # error: [pytest-test-argument-wrong-kind]
+
+# Except when there's an extra decorator
+@opaque
+@pytest.mark.jump
+@pytest.mark.parametrize("a a", [])  # error: [pytest-invalid-argnames-literal]
+def _(*args) -> None: ...
+```
