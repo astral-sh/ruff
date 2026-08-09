@@ -1542,6 +1542,31 @@ mod uv_metadata {
     }
 
     #[test]
+    fn synchronizes_multiple_scripts_with_one_worker() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let script =
+            "# /// script\n# dependencies = ['attrs==25.4.0']\n# ///\nfrom attrs import define\n";
+        let case = CliTest::with_files([("first.py", script), ("second.py", script)])?;
+
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .args(["first.py", "second.py"])
+                .env(EnvVars::TY_MAX_PARALLELISM, "1"),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn cli_python_selects_script_interpreter_without_replacing_its_environment()
     -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;

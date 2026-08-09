@@ -22,6 +22,7 @@ use crate::{Db, ProjectMetadata};
 
 mod environment;
 
+pub(crate) use environment::ScriptEnvironmentCacheKey;
 pub use environment::ScriptEnvironments;
 use environment::script_environment;
 
