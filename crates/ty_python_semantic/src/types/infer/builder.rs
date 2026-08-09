@@ -611,7 +611,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     #[expect(
                         clippy::iter_over_hash_type,
-                        reason = "constraints for distinct collection definitions are merged independently"
+                        reason = "constraints for distinct collection definitions are merged \
+                            independently"
                     )]
                     for (collection_def, constraints) in &extra.collection_use_constraints {
                         self.collection_use_constraints
@@ -1716,10 +1717,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_DECLARATION, node)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot shadow implicit global attribute `{place}` with declaration of type `{}`",
+                                    "Cannot shadow implicit global attribute `{place}` \
+                                    with declaration of type `{}`",
                                     declared_type.display(db, env)
                                 ));
-                                diagnostic.info(format_args!("The global symbol `{}` must always have a type assignable to `{}`",
+                                diagnostic.info(format_args!(
+                                    "The global symbol `{}` \
+                                    must always have a type assignable to `{}`",
                                     place,
                                     module_type_implicit_declaration.display(db, env)
                                 ));
@@ -1729,11 +1733,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 let declared_type = declared_ty.inner_type();
                 if inferred_ty.is_assignable_to(db, env, declared_type) {
+                    // TODO We currently can't distinguish here between "no declared type" and
+                    // "declared types is `Unknown` (e.g. due to a bad annotation, missing
+                    // import, etc.)". Ideally we would still prefer `Unknown` declared type,
+                    // but use inferred type if there is no declared type.
                     if !should_preserve_inferred_binding_type(inferred_ty)
-                        // TODO We currently can't distinguish here between "no declared type" and
-                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                        // but use inferred type if there is no declared type.
                         && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
                         && declared_type.is_assignable_to(db, env, inferred_ty)
                     {
@@ -3925,7 +3929,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.context.report_lint(&INVALID_TYPE_ALIAS_TYPE, element)
                     {
                         builder.into_diagnostic(format_args!(
-                            "Type parameter `{}` is bound in an outer scope and cannot be used in `type_params`",
+                            "Type parameter `{}` is bound in an outer scope \
+                            and cannot be used in `type_params`",
                             typevar.name(db),
                         ));
                     }
@@ -3971,7 +3976,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         reported_default_order_error = true;
                         builder.into_diagnostic(format_args!(
-                            "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
+                            "Type parameter `{}` without a default \
+                            cannot follow earlier parameter `{}` with a default",
                             typevar.name(db),
                             typevar_with_default.name(db),
                         ));
@@ -4011,7 +4017,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_TYPE_ALIAS_TYPE, &arguments.args[1])
                 {
                     builder.into_diagnostic(format_args!(
-                        "Type parameter `{}` used in the alias value must be included in `type_params`",
+                        "Type parameter `{}` used in the alias value \
+                        must be included in `type_params`",
                         typevar.name(self.db()),
                     ));
                 }
@@ -4080,7 +4087,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
                 {
                     builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                        "`{name}.{attr_name}` is only valid \
+                        for annotating `{variadic}` function parameters",
                     ));
                 }
             } else if let ast::Expr::Attribute(attr_expr) = annotation.as_ref()
@@ -4102,7 +4110,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .report_lint(&INVALID_PARAMSPEC, annotation.as_ref())
                     {
                         builder.into_diagnostic(format_args!(
-                            "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                            "`{name}.{attr_name}` is only valid \
+                            for annotating `{variadic}` function parameters",
                         ));
                     }
                 }
@@ -4311,7 +4320,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                 builder.into_diagnostic(format_args!(
-                    "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                    "`{name}.{attr_name}` is only valid \
+                    for annotating `{variadic}` function parameters",
                 ));
             }
         } else if let ast::Expr::Attribute(attr_expr) = annotation
@@ -4332,7 +4342,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, annotation) {
                     builder.into_diagnostic(format_args!(
-                        "`{name}.{attr_name}` is only valid for annotating `{variadic}` function parameters",
+                        "`{name}.{attr_name}` is only valid \
+                        for annotating `{variadic}` function parameters",
                     ));
                 }
             }
@@ -5113,7 +5124,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diag.set_primary_annotation_message(format_args!(
                 "`{name}` has no declarations or bindings in the global scope"
             ));
-            diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
+            diag.info(
+                "This limits ty's ability to make accurate inferences \
+                about the boundness and types of global-scope symbols",
+            );
             diag.info(format_args!(
                 "Consider adding a declaration to the global scope, e.g. `{name}: int`"
             ));
@@ -6070,7 +6084,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
         debug_assert!(
             !self.index.is_standalone_expression(expression),
-            "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
+            "Calling `self.infer_expression` on a standalone-expression \
+            is not allowed because it can lead to double-inference. \
+            Use `self.infer_standalone_expression` instead."
         );
 
         self.infer_expression_impl(expression, tcx)
@@ -8269,12 +8285,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let in_stub = self.in_stub();
         let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
 
+        // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
+        // in the union/intersection.
         let callable_tcx = if let Some(tcx) = tcx.annotation
-            // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
-            // in the union/intersection.
-            && let Some(callable) = tcx
-                .filter_union(db, Type::is_callable_type)
-                .as_callable()
+            && let Some(callable) = tcx.filter_union(db, Type::is_callable_type).as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
                 [signature] => Some(signature),
@@ -8918,7 +8932,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&INVALID_ARGUMENT_TYPE, first_arg)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Cannot {action} read-only extra item \"{key}\" {preposition} TypedDict `{}`",
+                                    "Cannot {action} read-only extra item \
+                                    \"{key}\" {preposition} TypedDict `{}`",
                                     Type::TypedDict(typed_dict_ty).display(db, env),
                                 ));
                             }
@@ -9012,7 +9027,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .report_lint(&INEFFECTIVE_FINAL, call_expression)
                 {
                     let mut diagnostic = builder.into_diagnostic(
-                        "Type checkers will not prevent subclassing when `final()` is called as a function",
+                        "Type checkers will not prevent subclassing \
+                        when `final()` is called as a function",
                     );
                     diagnostic.info("Use `@final` as a decorator on a class or method instead");
                 }
@@ -10368,16 +10384,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let bound_on_instance = match value_type {
                         Type::ClassLiteral(class) => {
-                            !class
-                                .instance_member(db, env, None, attr)
-                                .is_undefined()
+                            !class.instance_member(db, env, None, attr).is_undefined()
                         }
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {
                                 SubclassOfInner::Class(class) => {
-                                    !class
-                                        .instance_member(db, env, attr)
-                                        .is_undefined()
+                                    !class.instance_member(db, env, attr).is_undefined()
                                 }
                                 SubclassOfInner::Dynamic(_) => unreachable!(
                                     "Attribute lookup on a dynamic `SubclassOf` type \
@@ -10431,14 +10443,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut diag = builder.into_diagnostic(format_args!(
                                 "Special form `{special_form}` has no attribute `{attr_name}`",
                             ));
-                            if let Ok(defined_type) = value_type.in_type_expression(db,
+                            if let Ok(defined_type) = value_type.in_type_expression(
+                                db,
                                 self.scope(),
                                 self.typevar_binding_context,
-                                self.inference_flags()
-                            ) && !defined_type
-                                .member(db, env, attr_name)
-                                .place
-                                .is_undefined()
+                                self.inference_flags(),
+                            ) && !defined_type.member(db, env, attr_name).place.is_undefined()
                             {
                                 diag.help(format_args!(
                                     "Objects with type `{ty}` have a{maybe_n} `{attr_name}` \
@@ -10574,7 +10584,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut elements_missing_the_attribute = FxIndexSet::default();
                         for element in union.elements(db) {
                             union_elements_missing_attribute(
-                                db, env,
+                                db,
+                                env,
                                 *element,
                                 attr_name,
                                 &mut elements_missing_the_attribute,
@@ -10587,17 +10598,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 let missing_types = elements_missing_the_attribute
                                     .iter()
-                                    .map(|ty| {
-                                        format!("`{}`", ty.display(db, env))
-                                    })
+                                    .map(|ty| format!("`{}`", ty.display(db, env)))
                                     .collect::<Vec<_>>()
                                     .join(", ");
 
                                 builder.into_diagnostic(format_args!(
-                                    "Attribute `{attr_name}` is not defined on {} in union `{union_like_type}`",
+                                    "Attribute `{attr_name}` is not defined on {} \
+                                    in union `{union_like_type}`",
                                     missing_types,
-                                    union_like_type =
-                                        union_like_type.display(db, env),
+                                    union_like_type = union_like_type.display(db, env),
                                 ));
                             }
                             return type_when_bound;
@@ -11257,7 +11266,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if bindings.len() > 20 {
             tracing::debug!(
-                "Inferred statement region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                "Inferred statement region `{:?}` contains {} bindings. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 bindings.len(),
             );
@@ -11265,7 +11275,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if declarations.len() > 20 {
             tracing::debug!(
-                "Inferred statement region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
+                "Inferred statement region `{:?}` contains {} declarations. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 declarations.len(),
             );
@@ -11456,7 +11467,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if bindings.len() > 20 {
             tracing::debug!(
-                "Inferred definition region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                "Inferred definition region `{:?}` contains {} bindings. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 bindings.len(),
             );
@@ -11464,7 +11476,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if declarations.len() > 20 {
             tracing::debug!(
-                "Inferred declaration region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
+                "Inferred declaration region `{:?}` contains {} declarations. \
+                Lookups by linear scan might be slow.",
                 self.region,
                 declarations.len(),
             );
@@ -11834,7 +11847,8 @@ impl<'db> FullExpressionCacheEntry<'db> {
         .then(|| {
             if self.bindings.len() > 20 {
                 tracing::debug!(
-                    "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                    "Inferred expression region `{:?}` contains {} bindings. \
+                    Lookups by linear scan might be slow.",
                     region,
                     self.bindings.len()
                 );

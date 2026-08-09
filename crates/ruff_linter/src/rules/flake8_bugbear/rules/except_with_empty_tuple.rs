@@ -43,9 +43,13 @@ impl Violation for ExceptWithEmptyTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.is_star {
-            "Using `except* ():` with an empty tuple does not catch anything; add exceptions to handle".to_string()
+            "Using `except* ():` with an empty tuple does not catch anything; \
+                add exceptions to handle"
+                .to_string()
         } else {
-            "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle".to_string()
+            "Using `except ():` with an empty tuple does not catch anything; \
+                add exceptions to handle"
+                .to_string()
         }
     }
 }

@@ -215,6 +215,11 @@ impl KnownClass {
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            Self::NotImplementedType => Some(Truthiness::Ambiguous),
+
             Self::BaseException
             | Self::Exception
             | Self::Warning
@@ -271,10 +276,6 @@ impl KnownClass {
             | Self::Mapping
             | Self::MutableMapping
             | Self::SupportsKeysAndGetItem
-            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
-            // and raises a `TypeError` in Python >=3.14
-            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
-            | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
             | Self::Awaitable
@@ -1692,6 +1693,8 @@ impl KnownClass {
     /// Return `true` if the module of `self` matches `module`
     fn check_module(self, python_version: PythonVersion, module: KnownModule) -> bool {
         match self {
+            // no equivalent class exists in typing_extensions, nor ever will
+            Self::StdlibAlias => module == self.canonical_module(python_version),
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -1716,7 +1719,6 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
-            | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
@@ -1798,8 +1800,13 @@ impl KnownClass {
             | Self::Mapping
             | Self::MutableMapping
             | Self::ProtocolMeta
-            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
-            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+            | Self::NewType => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+            Self::Deprecated => matches!(
+                module,
+                KnownModule::Warnings | KnownModule::TypingExtensions
+            ),
         }
     }
 

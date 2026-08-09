@@ -94,7 +94,7 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
                 }
             }
             // Ignore class variables
-            ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) |
+            ast::Stmt::Assign(_) | ast::Stmt::AnnAssign(_) => {}
             // and expressions (e.g. string literals)
             ast::Stmt::Expr(_) => {}
             _ => {

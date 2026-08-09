@@ -1044,7 +1044,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
 
                 match (class, class.known(db)) {
                     (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
-                    (_, Some(KnownClass::NoDefaultType)) => f.with_type(self.ty).write_str("NoDefault"),
+                    (_, Some(KnownClass::NoDefaultType)) => {
+                        f.with_type(self.ty).write_str("NoDefault")
+                    }
                     (_, Some(KnownClass::Float | KnownClass::Complex)) => {
                         f.set_invalid_type_annotation();
                         class
@@ -1056,13 +1058,18 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
                         .specialization(db)
                         .tuple(db)
-                        .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
+                        .expect(
+                            "Specialization::tuple() should always return `Some()` for \
+                            `KnownClass::Tuple`",
+                        )
                         .display_with(db, self.env, self.settings.clone())
                         .fmt_detailed(f),
-                    (ClassType::NonGeneric(class), _) => {
-                        class.display_with(db, self.settings.clone()).fmt_detailed(f)
-                    },
-                    (ClassType::Generic(alias), _) => alias.display_with(db, self.env, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::NonGeneric(class), _) => class
+                        .display_with(db, self.settings.clone())
+                        .fmt_detailed(f),
+                    (ClassType::Generic(alias), _) => alias
+                        .display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {

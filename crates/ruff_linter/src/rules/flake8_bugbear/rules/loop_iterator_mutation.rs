@@ -70,28 +70,27 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
             // Ex) Given, `for item in items:`, `item` is the index and `items` is the iterable.
             (&**target, &**target, &**iter)
         }
+        // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
+        // iterable.
         Expr::Call(ExprCall {
             func, arguments, ..
-        })
-            // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
-            // iterable.
-            if checker.semantic().match_builtin_expr(func, "enumerate") => {
-                // Ex) `items`
-                let Some(iter) = arguments.args.first() else {
-                    return;
-                };
+        }) if checker.semantic().match_builtin_expr(func, "enumerate") => {
+            // Ex) `items`
+            let Some(iter) = arguments.args.first() else {
+                return;
+            };
 
-                let Expr::Tuple(ExprTuple { elts, .. }) = &**target else {
-                    return;
-                };
+            let Expr::Tuple(ExprTuple { elts, .. }) = &**target else {
+                return;
+            };
 
-                let [index, target] = elts.as_slice() else {
-                    return;
-                };
+            let [index, target] = elts.as_slice() else {
+                return;
+            };
 
-                // Ex) `i`
-                (index, target, iter)
-            }
+            // Ex) `i`
+            (index, target, iter)
+        }
         _ => {
             return;
         }

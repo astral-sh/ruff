@@ -350,8 +350,14 @@ impl AllOptions {
         Self::from_init_options(
             serde_json::from_value(options)
                 .map_err(|err| {
-                    tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
-                    client.show_error_message("Ruff received invalid client settings - falling back to default client settings.");
+                    tracing::error!(
+                        "Failed to deserialize initialization options: {err}. \
+                        Falling back to default client settings..."
+                    );
+                    client.show_error_message(
+                        "Ruff received invalid client settings - \
+                        falling back to default client settings.",
+                    );
                 })
                 .unwrap_or_default(),
         )

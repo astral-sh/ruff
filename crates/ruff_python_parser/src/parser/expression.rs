@@ -417,11 +417,11 @@ impl<'src> Parser<'src> {
                     );
                 }
             } else {
+                // > The power operator `**` binds less tightly than an arithmetic
+                // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                //
+                // Reference: https://docs.python.org/3/reference/expressions.html#id21
                 if left_precedence > OperatorPrecedence::PosNegBitNot
-                    // > The power operator `**` binds less tightly than an arithmetic
-                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                    //
-                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
                     && left_precedence != OperatorPrecedence::Exponent
                 {
                     self.add_error(

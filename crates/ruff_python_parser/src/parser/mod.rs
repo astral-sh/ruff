@@ -393,16 +393,19 @@ impl<'src> Parser<'src> {
 
     /// Moves the parser to the next token.
     fn do_bump(&mut self, kind: TokenKind) {
-        if !matches!(
-            self.current_token_kind(),
+        if match self.current_token_kind() {
             // TODO explore including everything up to the dedent as part of the body.
-            TokenKind::Dedent
+            TokenKind::Dedent => false,
+
             // Don't include newlines in the body
-            | TokenKind::Newline
+            TokenKind::Newline => false,
+
             // TODO(micha): Including the semi feels more correct but it isn't compatible with lalrpop and breaks the
             // formatters semicolon detection. Exclude it for now
-            | TokenKind::Semi
-        ) {
+            TokenKind::Semi => false,
+
+            _ => true,
+        } {
             self.prev_token_end = self.current_token_range().end();
         }
 

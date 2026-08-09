@@ -1823,10 +1823,9 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            // We only up-rank top-level modules.
+            // Doing this for sub-modules generates too much noise.
             is_module: if c.kind == Some(CompletionKind::Module)
-                // We only up-rank top-level modules.
-                // Doing this for sub-modules generates too
-                // much noise.
                 && !c
                     .qualified
                     .as_ref()

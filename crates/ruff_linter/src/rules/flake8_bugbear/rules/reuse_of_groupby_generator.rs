@@ -40,7 +40,9 @@ pub(crate) struct ReuseOfGroupbyGenerator;
 impl Violation for ReuseOfGroupbyGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage".to_string()
+        "Using the generator returned from `itertools.groupby()` more than once \
+            will do nothing on the second usage"
+            .to_string()
     }
 }
 

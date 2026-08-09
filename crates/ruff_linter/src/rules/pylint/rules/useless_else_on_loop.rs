@@ -55,7 +55,9 @@ impl Violation for UselessElseOnLoop {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents".to_string()
+        "`else` clause on loop without a `break` statement; \
+            remove the `else` and dedent its contents"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

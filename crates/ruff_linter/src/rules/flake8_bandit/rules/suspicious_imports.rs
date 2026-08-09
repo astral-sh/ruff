@@ -31,7 +31,9 @@ pub(crate) struct SuspiciousTelnetlibImport;
 impl Violation for SuspiciousTelnetlibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.".to_string()
+        "`telnetlib` and related modules are considered insecure. \
+            Use SSH or another encrypted protocol."
+            .to_string()
     }
 }
 
@@ -56,7 +58,9 @@ pub(crate) struct SuspiciousFtplibImport;
 impl Violation for SuspiciousFtplibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.".to_string()
+        "`ftplib` and related modules are considered insecure. \
+            Use SSH, SFTP, SCP, or another encrypted protocol."
+            .to_string()
     }
 }
 
@@ -306,7 +310,10 @@ pub(crate) struct SuspiciousHttpoxyImport;
 impl Violation for SuspiciousHttpoxyImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided".to_string()
+        "`httpoxy` is a set of vulnerabilities that affect application code \
+            running inCGI, or CGI-like environments. \
+            The use of CGI for web applications should be avoided"
+            .to_string()
     }
 }
 

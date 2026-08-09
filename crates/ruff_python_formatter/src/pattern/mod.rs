@@ -288,13 +288,16 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
             }
 
             Pattern::MatchValue(value) => match &*value.value {
-                Expr::StringLiteral(_)  |
-                Expr::BytesLiteral(_) |
-                // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
-                // That's why we need to support them for formatting.
-                Expr::FString(_)  |
-                Expr::TString(_)|
-                Expr::NumberLiteral(_) | Expr::Attribute(_) | Expr::UnaryOp(_) => {
+                Expr::FString(_) => {
+                    // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
+                    // That's why we need to support them for formatting.
+                }
+                Expr::StringLiteral(_)
+                | Expr::BytesLiteral(_)
+                | Expr::TString(_)
+                | Expr::NumberLiteral(_)
+                | Expr::Attribute(_)
+                | Expr::UnaryOp(_) => {
                     // require no state update other than visit_pattern does.
                 }
 
