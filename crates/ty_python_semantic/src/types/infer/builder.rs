@@ -2156,6 +2156,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else_body: Option<&ast::Suite>,
         kind: TestKind,
     ) {
+        fn is_uppercase(name: &str) -> bool {
+            name.chars()
+                .all(|c| c.is_ascii_uppercase() || !c.is_ascii_alphabetic())
+        }
+
         fn untangle_test_parts<'a>(
             test: &'a ast::Expr,
             buffer: &mut smallvec::SmallVec<[&'a ast::Expr; 1]>,
@@ -2197,6 +2202,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | ast::Expr::If(..) => {
                     let db = builder.db();
                     let env = builder.program_environment();
+
+                    match test {
+                        ast::Expr::Name(ast::ExprName { id, .. }) if is_uppercase(id) => {
+                            return;
+                        }
+                        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+                            if is_uppercase(attr)
+                                && matches!(
+                                    builder.expression_type(value),
+                                    Type::ModuleLiteral(_) | Type::ClassLiteral(_)
+                                ) =>
+                        {
+                            return;
+                        }
+                        _ => {}
+                    }
+
                     let sys_version_info = Type::sys_version_info();
                     let not_implemented = KnownClass::NotImplementedType.to_instance(db, env);
 
