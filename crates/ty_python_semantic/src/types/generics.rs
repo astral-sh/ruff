@@ -3054,7 +3054,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<ConstraintFailure<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.evidence_lower?;
+        let argument = path_bound.inference_lower(db, self.env)?;
         let variance = if path_bound.has_upper_evidence() {
             ConstraintFailureVariance::Invariant
         } else {
