@@ -44,6 +44,8 @@ rayon = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_ranged_value = { workspace = true }
 rustc-hash = { workspace = true }
+tempfile = { workspace = true }
+ty_static = { workspace = true }
 
 [features]
 default = ["module_resolution", "ruff_instrumented", "ty_instrumented", "ty_walltime"]
@@ -99,6 +101,11 @@ required-features = ["ty_instrumented"]
 name = "module_resolution"
 harness = false
 required-features = ["module_resolution"]
+
+[[bench]]
+name = "ty_script"
+harness = false
+required-features = ["ty_walltime"]
 
 [[bench]]
 name = "ty_walltime"
