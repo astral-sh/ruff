@@ -2107,7 +2107,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_statement;
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-        self.check_if_test_redundancy(test);
+
+        let else_suite = elif_else_clauses
+            .first()
+            .and_then(|clause| clause.test.is_none().then_some(&clause.body));
+        self.check_if_test_redundancy(test, Some(body), else_suite);
 
         if let Err(err) = test_ty.try_bool(db, env) {
             err.report_diagnostic(&self.context, &**test);
@@ -2115,7 +2119,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_body(body);
 
-        for clause in elif_else_clauses {
+        for (i, clause) in elif_else_clauses.iter().enumerate() {
             let ast::ElifElseClause {
                 range: _,
                 node_index: _,
@@ -2125,7 +2129,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(test) = &test {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-                self.check_if_test_redundancy(test);
+
+                let else_suite = elif_else_clauses
+                    .get(i + 1)
+                    .and_then(|clause| clause.test.is_none().then_some(&clause.body));
+                self.check_if_test_redundancy(test, Some(body), else_suite);
 
                 if let Err(err) = test_ty.try_bool(db, env) {
                     err.report_diagnostic(&self.context, test);
@@ -2136,7 +2144,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn check_if_test_redundancy(&self, test: &ast::Expr) {
+    fn check_if_test_redundancy(
+        &self,
+        test: &ast::Expr,
+        if_body: Option<&ast::Suite>,
+        else_body: Option<&ast::Suite>,
+    ) {
         fn untangle_test_parts<'a>(
             test: &'a ast::Expr,
             buffer: &mut smallvec::SmallVec<[&'a ast::Expr; 1]>,
@@ -2195,16 +2208,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         // Exclude any conditions involving `sys.platform` or `os.name`, or other attribute
                         // expressions where the value is the `sys` module or the `os` module.
-                        let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = expr else {
-                            return false;
-                        };
-                        let Type::ModuleLiteral(module) = builder.expression_type(value) else {
-                            return false;
-                        };
-                        if matches!(
-                            module.module(db).known(db),
-                            Some(KnownModule::Sys | KnownModule::Os)
-                        ) {
+                        if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = expr
+                            && let Type::ModuleLiteral(module) = builder.expression_type(value)
+                            && matches!(
+                                module.module(db).known(db),
+                                Some(KnownModule::Sys | KnownModule::Os)
+                            )
+                        {
                             return true;
                         }
 
@@ -2229,6 +2239,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if !self.context.is_lint_enabled(&REDUNDANT_IF_TEST) {
             return;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        // If the `if` body only consists of string-literals, `raise` statements,
+        // or calls that return `Never`, the user is almost certainly engaging in
+        // defensive programming. We don't want to report a lint in this case.
+        for suite in if_body.into_iter().chain(else_body) {
+            if suite.iter().all(|stmt| match stmt {
+                ast::Stmt::Raise(_) | ast::Stmt::Assert(_) => true,
+                ast::Stmt::Expr(ast::StmtExpr { value, .. }) => match &**value {
+                    ast::Expr::StringLiteral(..) => true,
+                    ast::Expr::Call(..) => {
+                        self.expression_type(value)
+                            .is_equivalent_to(db, env, Type::Never)
+                    }
+                    _ => false,
+                },
+                _ => false,
+            }) {
+                return;
+            }
         }
 
         let mut buffer = smallvec::smallvec![];
@@ -8339,7 +8372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        self.check_if_test_redundancy(test);
+        self.check_if_test_redundancy(test, None, None);
         let (body_ty, orelse_ty) =
             if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
                 // Infer the peer branch first so the body can use its type as context.
