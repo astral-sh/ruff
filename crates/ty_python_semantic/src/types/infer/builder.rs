@@ -2137,23 +2137,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .first()
             .and_then(|clause| clause.test.is_none().then_some(&clause.body));
 
-        self.check_if_test_redundancy(test, Some(body), else_suite);
+        self.check_test_redundancy(test, Some(body), else_suite, TestKind::If);
 
         for (i, clause) in elif_else_clauses.iter().enumerate() {
             if let Some(test) = &clause.test {
                 let else_suite = elif_else_clauses
                     .get(i + 1)
                     .and_then(|clause| clause.test.is_none().then_some(&clause.body));
-                self.check_if_test_redundancy(test, Some(&clause.body), else_suite);
+                self.check_test_redundancy(test, Some(&clause.body), else_suite, TestKind::If);
             }
         }
     }
 
-    fn check_if_test_redundancy(
+    fn check_test_redundancy(
         &self,
         test: &ast::Expr,
         if_body: Option<&ast::Suite>,
         else_body: Option<&ast::Suite>,
+        kind: TestKind,
     ) {
         fn untangle_test_parts<'a>(
             test: &'a ast::Expr,
@@ -2286,12 +2287,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match truthiness {
                 Truthiness::AlwaysTrue => {
                     if let Some(builder) = self.context.report_lint(&REDUNDANT_IF_TEST, part) {
-                        builder.into_diagnostic("This `if` test is always true");
+                        builder.into_diagnostic(format_args!("This `{kind}` test is always true"));
                     }
                 }
                 Truthiness::AlwaysFalse => {
                     if let Some(builder) = self.context.report_lint(&REDUNDANT_IF_TEST, part) {
-                        builder.into_diagnostic("This `if` test is always false");
+                        builder.into_diagnostic(format_args!("This `{kind}` test is always false"));
                     }
                 }
                 Truthiness::Ambiguous => {}
@@ -5120,6 +5121,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_body(body);
         self.infer_body(orelse);
+        self.check_test_redundancy(
+            test,
+            Some(body),
+            (!orelse.is_empty()).then_some(orelse),
+            TestKind::While,
+        );
     }
 
     fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {
@@ -8261,6 +8268,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for expr in ifs {
             self.infer_maybe_standalone_expression(expr, TypeContext::default());
+            self.check_test_redundancy(expr, None, None, TestKind::If);
         }
     }
 
@@ -8384,7 +8392,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        self.check_if_test_redundancy(test, None, None);
+        self.check_test_redundancy(test, None, None, TestKind::If);
         let (body_ty, orelse_ty) =
             if is_empty_collection_type_context(tcx) && is_collection_literal(body) {
                 // Infer the peer branch first so the body can use its type as context.
@@ -12656,4 +12664,19 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 enum BoundOrConstraintsNodes<'ast> {
     Bound(&'ast ast::Expr),
     Constraints(&'ast [ast::Expr]),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum TestKind {
+    If,
+    While,
+}
+
+impl std::fmt::Display for TestKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TestKind::If => f.write_str("if"),
+            TestKind::While => f.write_str("while"),
+        }
+    }
 }
