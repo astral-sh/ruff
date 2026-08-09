@@ -277,7 +277,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
 
-                if let Some(expected_return_ty) = declared_ty.generator_return_type(db, env) {
+                if let Some(expected_return_ty) = declared_ty
+                    .generator_types(db, env)
+                    .map(|types| types.return_ty.unwrap_or_else(|| Type::none(db, env)))
+                {
                     for &return_statement in &self.return_types_and_ranges {
                         if !return_statement
                             .ty

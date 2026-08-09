@@ -69,6 +69,27 @@ def generator() -> Generator[str]:
     reveal_type(result)  # revealed: Unknown
 ```
 
+## `yield from` with an iterable annotation
+
+Unlike `Generator[YieldT, SendT, ReturnT]`, `Iterable[YieldT]` and `Iterator[YieldT]` have no type
+parameter describing the value carried by `StopIteration` when iteration ends. That value becomes
+the result of `yield from`, so ty must infer `Unknown` rather than incorrectly assuming `None`.
+Returning that result from a generator annotated as returning `int` must therefore remain valid.
+
+```py
+from collections.abc import Generator, Iterable, Iterator
+
+def delegated_iterable(values: Iterable[int]) -> Generator[int, None, int]:
+    result = yield from values
+    reveal_type(result)  # revealed: Unknown
+    return result
+
+def delegated_iterator(values: Iterator[int]) -> Generator[int, None, int]:
+    result = yield from values
+    reveal_type(result)  # revealed: Unknown
+    return result
+```
+
 ## `yield from` with a generator that return `types.GeneratorType`
 
 `types.GeneratorType` is a nominal type that implements the `typing.Generator` protocol:
@@ -109,6 +130,29 @@ def persons() -> Iterator[Person]:
     yield {"name": 42}
 ```
 
+Prior to <https://github.com/astral-sh/ruff/pull/27598>, ty incorrectly rejected generator functions
+like the one below. The `wrap` function requires its keys and values to share the same `K` type
+parameter. Although the keys here use `object` and the values use `str`, the generator promises to
+yield `Values[Any]`, so `Any` can accommodate both. The old implementation ignored that promise,
+expected `Values[object]`, and incorrectly rejected `Values[str]`.
+
+```py
+from collections.abc import Iterable
+from typing import Any, Generic, TypeVar
+
+K = TypeVar("K")
+
+class Keys(Generic[K]): ...
+class Values(Generic[K]): ...
+
+def wrap(keys: Keys[K], values: Values[K]) -> Values[K]:
+    return values
+
+def sources(keys: Keys[object], values: Values[str]) -> Iterable[Values[Any]]:
+    # Regression: this used to emit [invalid-argument-type] because ty expected `Values[object]`.
+    yield wrap(keys, values)
+```
+
 This also works with `yield from`, where the iterable expression is inferred with the outer
 generator's yield type as type context:
 
@@ -137,7 +181,7 @@ def persons(f: bool) -> Generator[None, None, Person]:
 ## `yield` expression send type inference
 
 ```py
-from typing import AsyncGenerator, AsyncIterator, Generator, Iterator
+from typing import AsyncGenerator, AsyncIterator, AsyncIterable, Iterable, Protocol, Generator, Iterator
 
 def unannotated():
     x = yield 1
@@ -162,18 +206,32 @@ async def async_generator_default() -> AsyncGenerator[int]:
 async def async_generator_send_str() -> AsyncGenerator[int, str]:
     x = yield 1
     reveal_type(x)  # revealed: str
-
-def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
-    x = yield 1
-    reveal_type(x)  # revealed: int | str
-    return None
 ```
 
-`Iterator` has no send type or return type, It is equivalent to using `Generator` with send set to
-`None` and return type to `Unknown`.
+Using a union of `Generator` and `AsyncGenerator` in a return type is invalid, as a function can
+only ever be a synchronous generator function or an asynchronous generator function.
+`Generator | AsyncGenerator` is not assignable to any of `Generator`, `AsyncGenerator`, `Iterable`
+or `AsyncIterable`, so a type checker cannot reasonably infer the yield, send and return types of
+the generator function. Our behaviour on the following snippet matches pyright and pycroscope,
+though it differs from mypy, zuban and pyrefly as of 2026/08/08:
+
+```py
+def mixing_generator_async_generator() -> Generator[int, int, None] | AsyncGenerator[int, str]:
+    # TODO: we should warn the user somehow that we're falling back to `Unknown` here instead
+    # of inferring it silently.
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
+```
+
+`Iterator`, `Iterable`, and custom equivalent protocols have no send type or return type. Using one
+of these is equivalent to using `Generator` with send set to `None` and return type to `Unknown`.
 
 ```py
 def iterator_send_none() -> Iterator[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
+def iterable_send_none() -> Iterable[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
 
@@ -181,9 +239,59 @@ async def async_iterator_send_none() -> AsyncIterator[int]:
     x = yield 1
     reveal_type(x)  # revealed: None
 
+async def async_iterable_send_none() -> AsyncIterable[int]:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+
 def iterator_yield_from() -> Generator[int, None, int]:
     yield from iterator_send_none()
     return 1
+
+class CustomIteratorProtocol(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+def custom_proto_send_none() -> CustomIteratorProtocol:
+    x = yield 1
+    reveal_type(x)  # revealed: None
+```
+
+## Unions of generator send types
+
+Generator send types are contravariant, so a value sent into a union of generators must be accepted
+by every member. That means that the inferred type of a `yield` expression inside the generator (the
+inferred type of a value sent *into* the generator) will be an intersection of the send types in the
+return-type union:
+
+```py
+from collections.abc import AsyncGenerator, Generator
+
+class Foo: ...
+class Bar: ...
+
+def generator_union() -> Generator[int, Foo, None] | Generator[int, Bar, None]:
+    received = yield 1
+    reveal_type(received)  # revealed: Foo & Bar
+```
+
+The same rule applies to asynchronous generators.
+
+```py
+async def async_generator_union() -> AsyncGenerator[int, Foo] | AsyncGenerator[int, Bar]:
+    received = yield 1
+    reveal_type(received)  # revealed: Foo & Bar
+```
+
+If the send types in the union are disjoint, this can therefore result in us inferring `Never` as
+the result of a `yield` expression and inferring the remaining code in the function as being
+unreachable. This is correct -- since we would reject any inhabited type from being sent into the
+generator, the generator can logically never accept any values being sent into it, so any code
+following the `yield` expression must be unreachable as a result:
+
+```py
+def generator_union_disjoint() -> Generator[int, int, None] | Generator[int, str, None]:
+    received = yield 1
+    reveal_type(received)  # revealed: Never
+    1 + "foo"  # no error (this region is inferred as unreachable)
 ```
 
 ## Generator type aliases
@@ -239,6 +347,185 @@ def outer_aliased_generator() -> FullGeneratorAlias[int, bytes, None]:
     reveal_type(result)  # revealed: str
 ```
 
+## Structurally compatible generator protocols
+
+A protocol does not need to explicitly inherit from `Generator` for ty to infer its yield, send, and
+return types from its methods.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from types import TracebackType
+from typing import Generator, Protocol, overload
+
+class StructuralGenerator(Protocol):
+    def __iter__(self) -> Generator[int, bytes, str]: ...
+    def __next__(self) -> int: ...
+    def send(self, value: bytes, /) -> int: ...
+    @overload
+    def throw(
+        self,
+        typ: type[BaseException],
+        val: object = None,
+        traceback: TracebackType | None = None,
+        /,
+    ) -> int: ...
+    @overload
+    def throw(
+        self,
+        typ: BaseException,
+        val: None = None,
+        traceback: TracebackType | None = None,
+        /,
+    ) -> int: ...
+    def close(self) -> str | None: ...
+
+def structural_generator() -> StructuralGenerator:
+    sent = yield 1
+    reveal_type(sent)  # revealed: bytes
+    return "done"
+
+def delegated_generator() -> Generator[int, bytes, None]:
+    result = yield from structural_generator()
+    reveal_type(result)  # revealed: str
+
+def invalid_structural_yield() -> StructuralGenerator:
+    yield "wrong"  # error: [invalid-yield]
+    return "done"
+
+def invalid_structural_return() -> StructuralGenerator:
+    yield 1
+    return 42  # error: [invalid-return-type]
+```
+
+## Iterable protocols with generator send methods
+
+A protocol can expose a generator's `send` method without declaring every other `Generator` method.
+When such a protocol is used as a generator function's return annotation, the type accepted by
+`send` determines the type of the `yield` expression, even if `send` advertises a return type that
+is broader than the iterator's yielded type.
+
+```py
+from collections.abc import AsyncIterator, Awaitable, Iterator
+from typing import Protocol, TypeVar
+
+class Sendable(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+    def send(self, value: bytes, /) -> object: ...
+
+def generator() -> Sendable:
+    received = yield 1
+    reveal_type(received)  # revealed: bytes
+    received.decode()
+```
+
+The send type remains precise when the yielded and sent values share a type variable.
+
+```py
+T = TypeVar("T")
+
+class Correlated(Protocol[T]):
+    def __iter__(self) -> Iterator[T]: ...
+    def send(self, value: T, /) -> T: ...
+
+def correlated(value: T) -> Correlated[T]:
+    received = yield value
+    reveal_type(received)  # revealed: T@correlated
+```
+
+The same rule applies to asynchronous iterable protocols exposing an `asend` method: its awaitable
+return type can be broader than the async iterator's yielded type.
+
+```py
+class AsyncSendable(Protocol):
+    def __aiter__(self) -> AsyncIterator[int]: ...
+    def asend(self, value: bytes, /) -> Awaitable[object]: ...
+
+async def async_generator() -> AsyncSendable:
+    received = yield 1
+    reveal_type(received)  # revealed: bytes
+    received.decode()
+```
+
+The correlation is also preserved when `asend` returns an awaitable of the yielded type.
+
+```py
+class AsyncCorrelated(Protocol[T]):
+    def __aiter__(self) -> AsyncIterator[T]: ...
+    def asend(self, value: T, /) -> Awaitable[T]: ...
+
+async def async_correlated(value: T) -> AsyncCorrelated[T]:
+    received = yield value
+    reveal_type(received)  # revealed: T@async_correlated
+```
+
+## Intersections of generator types
+
+An intersection of generator types should intersect their yield and return types. Until
+<https://github.com/astral-sh/ty/issues/2799> is fixed, the constraint solver incorrectly combines
+the specializations using unions, so incompatible yields and returns are accepted.
+
+```py
+from collections.abc import AsyncGenerator, Generator
+from ty_extensions import Intersection
+
+def incompatible_yield() -> Intersection[Generator[int, None, None], Generator[str, None, None]]:
+    # TODO: This should emit [invalid-yield].
+    yield 1
+
+def incompatible_return() -> Intersection[Generator[int, None, int], Generator[int, None, str]]:
+    yield 1
+    # TODO: This should emit [invalid-return-type].
+    return 1
+
+async def incompatible_async_yield() -> Intersection[AsyncGenerator[int, None], AsyncGenerator[str, None]]:
+    # TODO: This should emit [invalid-yield].
+    yield 1
+```
+
+## Regression test: generic generator yield and return types
+
+An early version of the generator type-argument solver introduced by
+<https://github.com/astral-sh/ruff/pull/27598> confused a generator's generic yield type with its
+independently annotated send and return types. Here, the generator yields values of type `T`, but
+its send and return types are both `None`: the `yield` expression must therefore have type `None`,
+and returning a value of type `T` must be rejected.
+
+```py
+from collections.abc import Generator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def generator_return(value: T) -> Generator[T, None, None]:
+    sent = yield value
+    reveal_type(sent)  # revealed: None
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `None`, found `T@generator_return`"
+    return value
+```
+
+## Regression test: delegating to a generic generator expression
+
+An early version of the generator type-argument inference introduced by
+<https://github.com/astral-sh/ruff/pull/27598> emitted a spurious `invalid-yield` diagnostic when a
+generator delegated to a generator expression over generic values. The generator expression below
+yields values of type `T`, matching the enclosing generator's `Iterator[T]` annotation, so
+`yield from` must be accepted.
+
+```py
+from collections.abc import Iterable, Iterator
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def delegated(values: Iterable[T]) -> Iterator[T]:
+    yield from (value for value in values)
+```
+
 ## Error cases
 
 ### Non-iterable type
@@ -253,7 +540,7 @@ def generator() -> Generator[None]:
 ### Invalid `yield` type
 
 ```py
-from typing import Generator
+from typing import Generator, Iterable, Iterator, Protocol
 
 def invalid_generator() -> Generator[int, None, None]:
     # snapshot: invalid-yield
@@ -271,6 +558,32 @@ error[invalid-yield]: Yield expression type does not match annotation
   |           ^^ expression of type `Literal[""]`, expected `int`
 ```
 
+More examples:
+
+```py
+def invalid_iterator() -> Iterator[None]:
+    yield ""  # error: [invalid-yield]
+
+def invalid_iterable() -> Iterable[None]:
+    yield ""  # error: [invalid-yield]
+
+class CustomIteratorProto(Protocol):
+    def __iter__(self) -> Iterator[int]: ...
+
+def invalid_custom_proto() -> CustomIteratorProto:
+    yield ""  # snapshot: invalid-yield
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+  --> src/mdtest_snippet.py:16:11
+   |
+15 | def invalid_custom_proto() -> CustomIteratorProto:
+   |                               ------------------- Function annotated with yield type `int` here
+16 |     yield ""  # snapshot: invalid-yield
+   |           ^^ expression of type `Literal[""]`, expected `int`
+```
+
 ### Invalid annotation
 
 ```py
@@ -282,7 +595,11 @@ def returns_str() -> str:  # error: [invalid-return-type]
 
 def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [invalid-return-type]
     x = yield 1
-    reveal_type(x)  # revealed: str
+    reveal_type(x)  # revealed: Unknown
+
+async def async_returns_sync_generator() -> Generator[int, str, None]:  # error: [invalid-return-type]
+    x = yield 1
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Invalid return type

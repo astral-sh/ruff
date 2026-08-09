@@ -25,6 +25,7 @@ BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
 Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
 CPY = "CPY"  # it's a Ruff rule category
+"asend" = "asend"  # e.g. the `asend` method of async generators
 
 [default]
 extend-ignore-re = [
