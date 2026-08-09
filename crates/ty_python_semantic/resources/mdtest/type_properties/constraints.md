@@ -399,18 +399,12 @@ def _[T, U, V]() -> None:
     static_assert(row_tuple & upper_bounds == row_tuple)
 
     gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
-    # TODO: This error is undesired; distinct exact equality constraints should be incompatible.
-    # error: [static-assert-error]
     static_assert(~gradual_mismatch)
 
     any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
-    # TODO: This error is undesired; distinct exact equality constraints should be incompatible.
-    # error: [static-assert-error]
     static_assert(~any_mismatch)
 
     symbolic_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
-    # TODO: This error is undesired; no specialization of `U` makes these exact bounds equivalent.
-    # error: [static-assert-error]
     static_assert(~symbolic_mismatch)
 
     symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])

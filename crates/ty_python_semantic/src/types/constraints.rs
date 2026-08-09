@@ -1878,6 +1878,12 @@ impl<'db> ConstraintBounds<'db> {
         self.upper.is_some()
     }
 
+    fn as_equality(self) -> Option<Type<'db>> {
+        let lower = self.lower?;
+        let upper = self.upper?;
+        (lower == upper).then_some(lower)
+    }
+
     fn materialized_lower(self) -> Type<'db> {
         self.lower.unwrap_or(Type::Never)
     }
@@ -2497,6 +2503,17 @@ impl ConstraintId {
     ) -> IntersectionResult<'db> {
         let self_constraint = storage.constraint_data(self);
         let other_constraint = storage.constraint_data(other);
+
+        // A typevar cannot be exactly equal to two different types under any specialization. This
+        // is stronger than checking whether the types are disjoint: two classes can have a common
+        // subclass, which makes their upper-bound constraints compatible, but that subclass is not
+        // exactly equal to either class.
+        if let Some(left) = self_constraint.bounds.as_equality()
+            && let Some(right) = other_constraint.bounds.as_equality()
+            && !left.can_be_constraint_set_equivalent_to(db, env, right)
+        {
+            return IntersectionResult::Disjoint;
+        }
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = match (self_constraint.bounds.lower, other_constraint.bounds.lower) {
