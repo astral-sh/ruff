@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
+use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -61,10 +62,10 @@ use crate::types::diagnostic::{
     INVALID_NEWTYPE, INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM,
     INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_YIELD,
+    UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
+    hint_if_stdlib_attribute_exists_on_other_versions, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_invalid_assignment,
     report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -74,8 +75,8 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_positional_patterns_for_class_pattern, report_unsupported_augmented_assignment,
-    report_unsupported_comparison,
+    report_too_many_positional_patterns_for_class_pattern, report_unsound_yield,
+    report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -9379,16 +9380,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_deref()
             .map_or_else(|| yield_expression.into(), AnyNodeRef::from);
 
-        if let Some(expected_yield_ty) = expected_yield_ty
-            && !yielded_ty.is_assignable_to(db, env, expected_yield_ty)
-        {
-            report_invalid_generator_yield_type(
-                &self.context,
+        if let Some(expected_yield_ty) = expected_yield_ty {
+            self.validate_generator_yield_type(
                 diagnostic_node,
+                YieldKind::Yield,
                 return_type_span,
                 expected_yield_ty,
                 yielded_ty,
-                GeneratorMismatchKind::YieldType,
             );
         }
 
@@ -9427,24 +9425,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }));
         let iterable_type = self.infer_expression(value, tcx);
 
-        let inner_yield_ty = iterable_type
-            .try_iterate(db, env)
-            .map(|tuple| tuple.homogeneous_element_type(db, env))
-            .unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-                err.fallback_element_type(db, env)
-            });
+        let known_inner_yield_type = match iterable_type.try_iterate(db, env) {
+            Ok(tuple) => Some(tuple.homogeneous_element_type(db, env)),
+            Err(err) => {
+                err.report_diagnostic(&self.context, iterable_type, AnyNodeRef::from(&**value));
+                err.element_type(db, env)
+            }
+        };
 
         if let Some(outer_yield_ty) = outer_expected.yield_ty
-            && !inner_yield_ty.is_assignable_to(db, env, outer_yield_ty)
+            && let Some(known_inner_yield_type) = known_inner_yield_type
         {
-            report_invalid_generator_yield_type(
-                &self.context,
-                value.as_ref(),
+            self.validate_generator_yield_type(
+                &**value,
+                YieldKind::YieldFrom,
                 return_type_span.clone(),
                 outer_yield_ty,
-                inner_yield_ty,
-                GeneratorMismatchKind::YieldType,
+                known_inner_yield_type,
             );
         }
 
@@ -9467,6 +9464,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         iterable_type
             .generator_return_type(db, env)
             .unwrap_or_else(Type::unknown)
+    }
+
+    fn validate_generator_yield_type(
+        &self,
+        yielded_value: impl Ranged,
+        yield_kind: YieldKind,
+        return_type_span: Option<Span>,
+        expected_yield_ty: Type<'db>,
+        yielded_ty: Type<'db>,
+    ) {
+        let db = self.db();
+        let env = self.program_environment();
+
+        if !yielded_ty.is_assignable_to(db, env, expected_yield_ty) {
+            report_invalid_generator_yield_type(
+                &self.context,
+                yielded_value,
+                return_type_span,
+                expected_yield_ty,
+                yielded_ty,
+                GeneratorMismatchKind::YieldType,
+            );
+        } else if self.context.is_lint_enabled(&UNSOUND_YIELD)
+            && expected_yield_ty.is_fully_static(db, env)
+            && !yielded_ty.is_pure_redundant_with(db, env, expected_yield_ty)
+        {
+            // N.B. the implementation here is the ~same as for `UNSOUND_RETURN_STATEMENT`;
+            // update that too if updating this!
+            report_unsound_yield(
+                &self.context,
+                yielded_value,
+                yield_kind,
+                return_type_span,
+                expected_yield_ty,
+                yielded_ty,
+            );
+        }
     }
 
     fn infer_await_expression(

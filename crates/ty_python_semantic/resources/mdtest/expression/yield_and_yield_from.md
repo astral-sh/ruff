@@ -362,3 +362,267 @@ error[invalid-return-type]: Return type does not match returned value
 info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
 info: └── protocol member `__iter__` is not defined on type `Literal[1]`
 ```
+
+## *Unsound* yield expressions
+
+In addition to `invalid-yield`, we also offer a disabled-by-default stricter rule `unsound-yield`.
+This rule forbids `yield` expressions that yield an instance of a type `A` unless `A` is a *subtype*
+of the annotated yield type:
+
+```toml
+[rules]
+unsound-yield = "error"
+```
+
+```py
+from typing import Any, Generator, Iterator
+
+def returns_any() -> Any:
+    return "not an integer"
+
+def generator() -> Generator[int]:
+    # snapshot: unsound-yield
+    yield returns_any()
+```
+
+```snapshot
+error[unsound-yield]: Unsound `yield`
+ --> src/mdtest_snippet.py:8:11
+  |
+6 | def generator() -> Generator[int]:
+  |                    -------------- Expected a subtype of `int` because of the yield type
+7 |     # snapshot: unsound-yield
+8 |     yield returns_any()
+  |           ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type before yielding it
+```
+
+The same check applies to generators annotated as iterators. Values that are not even assignable to
+the annotated yield type still cause us to emit only `invalid-yield`.
+
+```py
+def iterator() -> Iterator[int]:
+    yield returns_any()  # error: [unsound-yield]
+
+def invalid_generator() -> Generator[int]:
+    yield "not an integer"  # error: [invalid-yield]
+```
+
+Narrowing a dynamic value before yielding it makes the yield sound.
+
+```py
+def narrowed_generator() -> Generator[int]:
+    value = returns_any()
+    assert isinstance(value, int)
+    yield value
+
+def unannotated_generator():
+    yield returns_any()
+```
+
+An example with nested error context:
+
+```py
+def nested_generator() -> Generator[tuple[tuple[int, int]]]:
+    # snapshot: unsound-yield
+    yield ((42, returns_any()),)
+```
+
+```snapshot
+error[unsound-yield]: Unsound `yield`
+  --> src/mdtest_snippet.py:23:11
+   |
+21 | def nested_generator() -> Generator[tuple[tuple[int, int]]]:
+   |                           --------------------------------- Expected a subtype of `tuple[tuple[int, int]]` because of the yield type
+22 |     # snapshot: unsound-yield
+23 |     yield ((42, returns_any()),)
+   |           ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
+info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
+info: the first tuple element is not compatible: `tuple[Literal[42], Any]` is not a subtype of `tuple[int, int]`
+info: └── the second tuple element is not compatible: `Any` is not a subtype of `int`
+help: Consider using an `assert` to narrow the type before yielding it
+```
+
+## Unsound yield statements with gradual yield types
+
+The rule applies only when the annotated yield type is fully static. An explicit `Any`, an alias of
+`Any`, or an `Any` nested inside the yield type disables the strict check.
+
+```toml
+[rules]
+unsound-yield = "error"
+```
+
+```py
+from typing import Any, Generator, Iterator
+from typing_extensions import Never, TypeAliasType
+
+AnyAlias = TypeAliasType("AnyAlias", Any)
+
+def returns_any() -> Any:
+    return "not an integer"
+
+def dynamic_yield_type() -> Generator[Any]:
+    yield returns_any()
+
+def aliased_dynamic_yield_type() -> Generator[AnyAlias]:
+    yield returns_any()
+
+def nested_dynamic_yield_type() -> Iterator[tuple[int, Any]]:
+    yield returns_any()
+
+# error: [missing-type-argument]
+def unknown_yield_type() -> Iterator:
+    yield returns_any()
+```
+
+Only the yield type determines whether the boundary is fully static; dynamic send and return types
+do not disable the check. `Never` is also a fully static yield type.
+
+```py
+def dynamic_send_and_return_types() -> Generator[int, Any, Any]:
+    yield returns_any()  # error: [unsound-yield]
+
+def never_yields() -> Generator[Never]:
+    yield returns_any()  # error: [unsound-yield]
+```
+
+## Unsound delegated yield expressions
+
+`yield from` exposes every value produced by the delegated iterator, so its element type must also
+be a subtype of the outer generator's fully static yield type.
+
+```toml
+[rules]
+unsound-yield = "error"
+```
+
+```py
+from typing import Any, Generator, Iterator
+
+def dynamic_values() -> Generator[Any]:
+    yield "not an integer"
+
+def delegated_generator() -> Generator[int]:
+    # snapshot: unsound-yield
+    yield from dynamic_values()
+```
+
+```snapshot
+error[unsound-yield]: Unsound `yield from`
+ --> src/mdtest_snippet.py:8:16
+  |
+6 | def delegated_generator() -> Generator[int]:
+  |                              -------------- Expected a subtype of `int` because of the yield type
+7 |     # snapshot: unsound-yield
+8 |     yield from dynamic_values()
+  |                ^^^^^^^^^^^^^^^^ Yielded elements inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using `assert`s to narrow the types of the elements before yielding them
+```
+
+Nested dynamic values are rejected too, while genuinely incompatible iterators cause us to emit
+`invalid-yield` instead.
+
+```py
+def nested_dynamic_values() -> Iterator[tuple[int, Any]]:
+    yield (1, "not an integer")
+
+def nested_delegated_generator() -> Iterator[tuple[int, int]]:
+    yield from nested_dynamic_values()  # error: [unsound-yield]
+
+def invalid_delegated_generator() -> Iterator[int]:
+    yield from ["not an integer"]  # error: [invalid-yield]
+
+def valid_delegated_generator() -> Iterator[int]:
+    yield from [1, 2]
+```
+
+## Edge case: `unsound-yield` combined with `yield from` expressions that are not iterable
+
+```toml
+[rules]
+unsound-yield = "error"
+```
+
+In the following situation, we only emit `not-iterable`, even though the inferred `yield` type here
+is `Unknown` (not a subtype of `int`). Also emitting `unsound-yield` here would just add confusing
+noise to our diagnostics: `Unknown` is just a fallback type here that we "spun out of thin air"
+because `42` has no `__iter__` method to tell us any better.
+
+```py
+from typing import Iterable, Iterator, Any
+
+def non_iterable_delegated_generator() -> Iterator[int]:
+    # Here we only emit `not-iterable`, even though the inferred yield type here
+    # is `Unknown`: also emitting `unsound-yield` would just add noise
+    yield from 42  # error: [not-iterable]
+```
+
+But the following situation is different: here we emit both `not-iterable` *and* `unsound-yield`,
+because `Any` was not simply a fallback here that we "invented out of thin air". It's the annotated
+iterable type of `BrokenIterable`'s `__iter__` method:
+
+```py
+class BrokenIterable:
+    def __iter__(self, oh_no) -> Iterator[Any]:
+        raise NotImplementedError
+
+def broken_iterable_delegated_generator() -> Iterator[int]:
+    # snapshot: not-iterable
+    # snapshot: unsound-yield
+    yield from BrokenIterable()
+```
+
+```snapshot
+error[not-iterable]: Object of type `BrokenIterable` is not iterable
+  --> src/mdtest_snippet.py:14:16
+   |
+14 |     yield from BrokenIterable()
+   |                ^^^^^^^^^^^^^^^^
+info: Its `__iter__` method has an invalid signature
+info: type `BrokenIterable` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `oh_no`
+help: Parameter `oh_no` must have a default value
+info: Expected signature `def __iter__(self): ...`
+
+
+error[unsound-yield]: Unsound `yield from`
+  --> src/mdtest_snippet.py:14:16
+   |
+11 | def broken_iterable_delegated_generator() -> Iterator[int]:
+   |                                              ------------- Expected a subtype of `int` because of the yield type
+12 |     # snapshot: not-iterable
+13 |     # snapshot: unsound-yield
+14 |     yield from BrokenIterable()
+   |                ^^^^^^^^^^^^^^^^ Yielded elements inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using `assert`s to narrow the types of the elements before yielding them
+```
+
+## Unsound asynchronous yield statements
+
+The strict yield check also applies to asynchronous generators and asynchronous iterators.
+
+```toml
+[rules]
+unsound-yield = "error"
+```
+
+```py
+from typing import Any, AsyncGenerator, AsyncIterator
+
+def returns_any() -> Any:
+    return "not an integer"
+
+async def asynchronous_generator() -> AsyncGenerator[int]:
+    yield returns_any()  # error: [unsound-yield]
+
+async def asynchronous_iterator() -> AsyncIterator[int]:
+    yield returns_any()  # error: [unsound-yield]
+
+async def dynamic_asynchronous_generator() -> AsyncGenerator[Any]:
+    yield returns_any()
+```

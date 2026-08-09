@@ -84,6 +84,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
+    registry.register_lint(&UNSOUND_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
@@ -443,6 +444,15 @@ declare_lint! {
         summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
         status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
+    pub(crate) static UNSOUND_YIELD = {
+        summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -2148,6 +2158,78 @@ pub(super) fn report_invalid_generator_yield_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_yield(
+    context: &InferContext,
+    yield_value: impl Ranged,
+    kind: YieldKind,
+    return_type_span: Option<Span>,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_YIELD, yield_value) else {
+        return;
+    };
+
+    let env = context.program_environment();
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+    let actual_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_display = expected_ty.display_with(db, env, settings);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!("Unsound `{kind}`"));
+    diagnostic.set_concise_message(format_args!(
+        "Unsound `{kind}`: `{actual_display}` is not a subtype of `{expected_display}`"
+    ));
+
+    match kind {
+        YieldKind::Yield => diagnostic
+            .set_primary_annotation_message(format_args!("Inferred as `{actual_display}`")),
+        YieldKind::YieldFrom => diagnostic.set_primary_annotation_message(format_args!(
+            "Yielded elements inferred as `{actual_display}`"
+        )),
+    }
+
+    if let Some(return_type_span) = return_type_span {
+        diagnostic.annotate(
+            Annotation::secondary(return_type_span).message(format_args!(
+                "Expected a subtype of `{expected_display}` because of the yield type"
+            )),
+        );
+    }
+
+    diagnostic.info(format_args!(
+        "`{actual_display}` is assignable to `{expected_display}`, \
+        but not a subtype of `{expected_display}`"
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diagnostic);
+
+    match kind {
+        YieldKind::Yield => {
+            diagnostic.help("Consider using an `assert` to narrow the type before yielding it");
+        }
+        YieldKind::YieldFrom => diagnostic.help(
+            "Consider using `assert`s to narrow the types of the elements before yielding them",
+        ),
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(super) enum YieldKind {
+    Yield,
+    YieldFrom,
+}
+
+impl std::fmt::Display for YieldKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            YieldKind::Yield => f.write_str("yield"),
+            YieldKind::YieldFrom => f.write_str("yield from"),
+        }
+    }
 }
 
 pub(super) fn report_implicit_return_type(
