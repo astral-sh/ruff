@@ -10,6 +10,11 @@ use ty_static::EnvVars;
 
 use super::python_version::SupportedPythonVersion;
 
+pub(in crate::metadata) use runner::{ScriptSyncTask, UvExecutor};
+
+mod runner;
+
+#[derive(Clone)]
 pub(super) struct Uv {
     executable: String,
 }

@@ -6,7 +6,7 @@ use ruff_db::system::SystemPathBuf;
 use ty_static::EnvVars;
 
 use super::script_tag;
-use crate::metadata::uv::{MetadataTarget, Uv, UvMetadata, UvMetadataError, uv_executable_error};
+use crate::metadata::uv::{ScriptSyncTask, Uv, UvExecutor, UvMetadata};
 use crate::{Db, ProgressReporter};
 
 /// Lazily initialized script environments (results of calling `uv workspace metadata --script`).
@@ -42,25 +42,14 @@ impl ScriptEnvironments {
 
             let _progress = reporter.and_then(|reporter| reporter.for_script(db, file));
 
-            let metadata = Uv::new(db.system())
-                .map_err(uv_executable_error)
-                .map_err(UvMetadataError::Invocation)
-                .and_then(|uv| {
-                    uv.metadata(
-                        db.system(),
-                        MetadataTarget::Script {
-                            path,
-                            python: python.as_deref(),
-                        },
-                    )
-                });
+            let task = ScriptSyncTask {
+                path: path.to_path_buf(),
+                python,
+            };
+            let output = self.inner.executor.run(db.system(), task);
 
-            match metadata {
-                Ok(metadata) => ScriptEnvironment::new(db, Some(metadata), None),
-                Err(error) => {
-                    ScriptEnvironment::new(db, None, Some(error.to_string().into_boxed_str()))
-                }
-            }
+            let (uv_metadata, initialization_error) = script_environment_metadata(db, output);
+            ScriptEnvironment::new(db, uv_metadata, initialization_error)
         });
     }
 
@@ -108,6 +97,17 @@ pub(super) struct ScriptEnvironment {
 #[derive(Default)]
 struct ScriptEnvironmentsInner {
     by_file: FxDashMap<File, Arc<OnceLock<ScriptEnvironment>>>,
+    executor: UvExecutor,
+}
+
+fn script_environment_metadata(
+    db: &dyn Db,
+    output: std::io::Result<std::process::Output>,
+) -> (Option<UvMetadata>, Option<Box<str>>) {
+    match Uv::parse_metadata_output(db.system(), output) {
+        Ok(metadata) => (Some(metadata), None),
+        Err(error) => (None, Some(error.to_string().into_boxed_str())),
+    }
 }
 
 fn script_integration_enabled(db: &dyn Db) -> bool {
