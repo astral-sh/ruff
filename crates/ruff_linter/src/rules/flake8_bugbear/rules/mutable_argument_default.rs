@@ -3,7 +3,7 @@ use std::fmt::Write;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{parenthesized_range, TokenKind};
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
@@ -176,6 +176,26 @@ fn move_initialization(
     // If the function is a stub, this is the only necessary edit.
     if is_stub(function_def, checker.semantic()) {
         return Some(Fix::unsafe_edit(default_edit));
+    }
+
+    // The preview fix preserves the original expression source, so avoid changing the
+    // indentation inside multiline string literals.
+    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings())
+        && checker.tokens().in_range(default.range()).iter().any(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::String
+                    | TokenKind::FStringStart
+                    | TokenKind::FStringMiddle
+                    | TokenKind::FStringEnd
+                    | TokenKind::TStringStart
+                    | TokenKind::TStringMiddle
+                    | TokenKind::TStringEnd
+            ) && token.is_triple_quoted_string()
+                && locator.contains_line_break(token.range())
+        })
+    {
+        return None;
     }
 
     // Add an `if`, to set the argument to its original value if still `None`.

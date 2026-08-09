@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 Do not use mutable data structures for argument defaults
+ --> B006_multiline_string.py:2:11
+  |
+1 |   def multiline_string_default(
+2 |       value=[
+  |  ___________^
+3 | |         """first line
+4 | |         second line"""
+5 | |     ]
+  | |_____^
+6 |   ):
+7 |       return value
+  |
+help: Replace with `None`; initialize within function
+
+B006 Do not use mutable data structures for argument defaults
+  --> B006_multiline_string.py:11:11
+   |
+10 |   def multiline_fstring_default(
+11 |       value=[
+   |  ___________^
+12 | |         f"""first {1}
+13 | |         second {2}"""
+14 | |     ]
+   | |_____^
+15 |   ):
+16 |       return value
+   |
+help: Replace with `None`; initialize within function
