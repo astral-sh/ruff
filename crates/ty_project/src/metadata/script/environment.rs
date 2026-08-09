@@ -1,5 +1,6 @@
 use std::hash::Hasher;
 use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex, MutexGuard};
 use ruff_cache::{CacheKey, CacheKeyHasher};
@@ -14,6 +15,8 @@ use crate::metadata::uv::{
     ScriptEnvironmentCacheKey, ScriptSyncResult, ScriptSyncTask, Uv, UvExecutor, UvMetadata,
 };
 use crate::{Db, ProgressReporter};
+
+const CANCELLATION_CHECK_INTERVAL: Duration = Duration::from_millis(1);
 
 /// Lazily initialized script environments (results of calling `uv workspace metadata --script`).
 ///
@@ -56,7 +59,7 @@ impl ScriptEnvironments {
         loop {
             match *state {
                 ScriptEnvironmentEntryState::Initializing => {
-                    state = shared_entry.wait_until_initialized(state);
+                    state = shared_entry.wait_until_initialized(db, state);
                 }
                 ScriptEnvironmentEntryState::Ready(_)
                 | ScriptEnvironmentEntryState::Refreshing { .. } => return,
@@ -65,12 +68,16 @@ impl ScriptEnvironments {
                     let claim = InitializationClaim::new(&shared_entry);
                     drop(state);
 
+                    db.unwind_if_revision_cancelled();
                     tracing::debug!("Initializing script environment for `{}`", task.path);
 
                     let progress = reporter.and_then(|reporter| reporter.for_script(db, file));
-                    let output = self.inner.executor.run(db.system(), task);
+                    let output = self.inner.executor.run(db, task);
                     drop(progress);
 
+                    // The worker may have returned immediately before a database write cancelled
+                    // this snapshot. Never publish that stale result.
+                    db.unwind_if_revision_cancelled();
                     let (uv_metadata, initialization_error) =
                         script_environment_metadata(db, output);
                     let environment = ScriptEnvironment::new(
@@ -275,7 +282,7 @@ impl ScriptEnvironments {
             panic!("script environment was not initialized by its host");
         };
         let state = shared_entry.state.lock();
-        let state = shared_entry.wait_until_initialized(state);
+        let state = shared_entry.wait_until_initialized(db, state);
         let environment = state.environment();
         assert!(
             environment.is_some(),
@@ -358,12 +365,20 @@ impl ScriptEnvironmentEntry {
     /// Waits for a blocking initial synchronization to finish.
     fn wait_until_initialized<'entry>(
         &'entry self,
+        db: &dyn Db,
         mut state: MutexGuard<'entry, ScriptEnvironmentEntryState>,
     ) -> MutexGuard<'entry, ScriptEnvironmentEntryState> {
-        while matches!(*state, ScriptEnvironmentEntryState::Initializing) {
-            self.initialized.wait(&mut state);
+        loop {
+            // A database writer may be waiting for this snapshot to unwind before it can publish
+            // the synchronization result and notify this condition variable.
+            db.unwind_if_revision_cancelled();
+            if !matches!(*state, ScriptEnvironmentEntryState::Initializing) {
+                return state;
+            }
+
+            self.initialized
+                .wait_for(&mut state, CANCELLATION_CHECK_INTERVAL);
         }
-        state
     }
 }
 
@@ -507,13 +522,19 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::panic::AssertUnwindSafe;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     use anyhow::Context;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem, SystemPath};
+    use salsa::{Cancelled, Database as _};
     use ty_static::EnvVars;
 
-    use super::{ScriptEnvironments, ScriptSyncResult};
+    use super::{
+        InitializationClaim, ScriptEnvironmentEntryState, ScriptEnvironments, ScriptSyncResult,
+    };
     use crate::db::testing::TestDb;
     use crate::{Db as _, ProjectMetadata};
 
@@ -587,6 +608,47 @@ mod tests {
         assert!(changed);
         assert!(next.is_none());
         assert!(environments.prepare_sync(&db, file).is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn salsa_cancellation_interrupts_script_environment_wait() -> anyhow::Result<()> {
+        let root = SystemPath::new("/project").to_path_buf();
+        let path = root.join("script.py");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root));
+        db.writable_system().set_env_var(EnvVars::TY_UV, "scripts");
+        db.write_file(&path, "# /// script\n# dependencies = []\n# ///\n")?;
+        let file = system_path_to_file(&db, &path)?;
+        let snapshot = db.clone();
+        let environments = db.script_environments().clone();
+        let entry = environments.entry(file);
+        *entry.state.lock() = ScriptEnvironmentEntryState::Initializing;
+        let claim = InitializationClaim::new(&entry);
+        let (ready_sender, ready_receiver) = crossbeam::channel::bounded(1);
+        let waiting_entry = Arc::clone(&entry);
+
+        let waiter = std::thread::spawn(move || {
+            Cancelled::catch(AssertUnwindSafe(|| {
+                let state = waiting_entry.state.lock();
+                let _ = ready_sender.try_send(());
+                let state = waiting_entry.wait_until_initialized(&snapshot, state);
+                drop(state);
+            }))
+        });
+
+        ready_receiver.recv_timeout(Duration::from_secs(1))?;
+        db.trigger_cancellation();
+        drop(claim);
+
+        let result = waiter
+            .join()
+            .map_err(|_| anyhow::anyhow!("synchronization waiter panicked"))?;
+        assert!(matches!(result, Err(Cancelled::PendingWrite)));
+        assert!(matches!(
+            *entry.state.lock(),
+            ScriptEnvironmentEntryState::Vacant
+        ));
 
         Ok(())
     }

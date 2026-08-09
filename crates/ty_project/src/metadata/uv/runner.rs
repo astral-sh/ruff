@@ -1,7 +1,8 @@
 use std::process::Output;
 use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 
-use crossbeam::channel::{Receiver, Sender};
+use crossbeam::channel::{Receiver, SendTimeoutError, Sender, TryRecvError};
 use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf, WhichError};
 
@@ -10,6 +11,7 @@ use crate::{Db, ProjectDatabase, ScriptSyncProgress};
 
 const MAX_UV_WORKERS: usize = 2;
 const MAX_QUEUED_UV_TASKS: usize = 8;
+const CANCELLATION_CHECK_INTERVAL: Duration = Duration::from_millis(1);
 
 /// Identifies the script metadata and Python override used to build an environment.
 pub(crate) type ScriptEnvironmentCacheKey = u64;
@@ -62,25 +64,35 @@ pub(crate) struct UvExecutor(Arc<OnceLock<std::io::Result<UvWorkerPool>>>);
 impl UvExecutor {
     pub(in crate::metadata) fn run(
         &self,
-        system: &dyn System,
+        db: &dyn Db,
         task: ScriptSyncTask,
     ) -> std::io::Result<Output> {
-        let workers = self.worker_pool(system)?;
+        let workers = self.worker_pool(db.system())?;
+        let (_cancellation_sender, cancellation_receiver) = crossbeam::channel::bounded::<()>(0);
         let (result_sender, result_receiver) = crossbeam::channel::bounded(1);
-        workers
-            .requests
-            .send(UvJob {
-                task,
-                progress: None,
-                result: result_sender,
-                span: tracing::Span::current(),
-            })
-            .map_err(|_| worker_disconnected())?;
+        let mut request = UvJob {
+            task,
+            progress: None,
+            result: result_sender,
+            cancellation: Some(cancellation_receiver),
+            span: tracing::Span::current(),
+        };
 
-        result_receiver
-            .recv()
-            .map_err(|_| worker_disconnected())?
-            .output
+        loop {
+            match workers
+                .requests
+                .send_timeout(request, CANCELLATION_CHECK_INTERVAL)
+            {
+                Ok(()) => break,
+                Err(SendTimeoutError::Timeout(pending)) => {
+                    db.unwind_if_revision_cancelled();
+                    request = pending;
+                }
+                Err(SendTimeoutError::Disconnected(_)) => return Err(worker_disconnected()),
+            }
+        }
+
+        Self::wait_for(db, &result_receiver)
     }
 
     fn worker_pool(&self, system: &dyn System) -> std::io::Result<&UvWorkerPool> {
@@ -93,6 +105,20 @@ impl UvExecutor {
         }) {
             Ok(workers) => Ok(workers),
             Err(error) => Err(std::io::Error::new(error.kind(), error.to_string())),
+        }
+    }
+
+    fn wait_for(db: &dyn Db, result: &Receiver<ScriptSyncResult>) -> std::io::Result<Output> {
+        loop {
+            match result.recv_timeout(CANCELLATION_CHECK_INTERVAL) {
+                Ok(result) => return result.output,
+                Err(crossbeam::channel::RecvTimeoutError::Timeout) => {
+                    db.unwind_if_revision_cancelled();
+                }
+                Err(crossbeam::channel::RecvTimeoutError::Disconnected) => {
+                    return Err(worker_disconnected());
+                }
+            }
         }
     }
 }
@@ -162,6 +188,7 @@ impl UvSyncService {
             task,
             progress,
             result: self.results_sender.clone(),
+            cancellation: None,
             span: tracing::debug_span!(
                 "sync_script_environment",
                 script = %path,
@@ -236,6 +263,7 @@ struct UvJob {
     task: ScriptSyncTask,
     progress: Option<Box<dyn ScriptSyncProgress>>,
     result: Sender<ScriptSyncResult>,
+    cancellation: Option<Receiver<()>>,
     span: tracing::Span,
 }
 
@@ -273,6 +301,16 @@ struct UvWorker {
 impl UvWorker {
     fn run(self) {
         for job in &self.requests {
+            if let Some(cancellation) = &job.cancellation
+                && matches!(cancellation.try_recv(), Err(TryRecvError::Disconnected))
+            {
+                tracing::debug!(
+                    "Discarded cancelled script synchronization for `{}`",
+                    job.task.path
+                );
+                continue;
+            }
+
             let output = self.execute(&job);
             job.complete(output);
         }
@@ -319,6 +357,7 @@ mod tests {
     use ruff_db::system::{
         DbWithWritableSystem, OsSystem, System as _, SystemPath, SystemPathBuf, TestSystem,
     };
+    use salsa::{Cancelled, Database as _};
     use ty_static::EnvVars;
 
     use super::{ScriptSyncResult, ScriptSyncTask, UvExecutor, UvJob, UvSyncService, UvWorkerPool};
@@ -419,6 +458,73 @@ mod tests {
     }
 
     #[test]
+    fn database_write_cancels_pending_uv_initialization() -> anyhow::Result<()> {
+        let root = SystemPath::new("/project").to_path_buf();
+        let path = root.join("script.py");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root));
+        db.writable_system().set_env_var(EnvVars::TY_UV, "scripts");
+        db.write_file(&path, "# /// script\n# dependencies = []\n# ///\n")?;
+        let file = system_path_to_file(&db, &path)?;
+        let snapshot = db.clone();
+        let environments = db.script_environments().clone();
+        let checking_environments = environments.clone();
+
+        let (request_sender, request_receiver) = crossbeam::channel::bounded(1);
+        assert!(
+            db.script_environments()
+                .executor()
+                .0
+                .set(Ok(UvWorkerPool {
+                    requests: request_sender,
+                }))
+                .is_ok()
+        );
+
+        let checking = std::thread::spawn(move || {
+            Cancelled::catch(AssertUnwindSafe(|| {
+                checking_environments.ensure_environment_initialized(&snapshot, file, None);
+            }))
+        });
+
+        let _request = request_receiver.recv_timeout(Duration::from_secs(5))?;
+
+        // Scheduling an asynchronous refresh must not wait for the checking thread's uv call.
+        // It briefly observes the running synchronization and returns.
+        let preparing_environments = environments.clone();
+        let preparing_snapshot = db.clone();
+        let (prepared_sender, prepared_receiver) = crossbeam::channel::bounded(1);
+        let preparing = std::thread::spawn(move || {
+            let result = Cancelled::catch(AssertUnwindSafe(|| {
+                preparing_environments
+                    .prepare_sync(&preparing_snapshot, file)
+                    .is_some()
+            }));
+            if matches!(result, Ok(false)) {
+                let _ = prepared_sender.send(());
+            }
+            result
+        });
+        let prepared_without_waiting = prepared_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .is_ok();
+
+        db.trigger_cancellation();
+
+        let result = checking
+            .join()
+            .map_err(|_| anyhow::anyhow!("checking thread panicked"))?;
+        assert!(matches!(result, Err(Cancelled::PendingWrite)));
+        let prepare_result = preparing
+            .join()
+            .map_err(|_| anyhow::anyhow!("preparing thread panicked"))?;
+        assert!(prepared_without_waiting);
+        assert!(matches!(prepare_result, Ok(false)));
+        assert!(environments.prepare_sync(&db, file).is_some());
+
+        Ok(())
+    }
+
+    #[test]
     fn scheduling_makes_progress_when_shared_queue_contains_blocking_jobs() -> anyhow::Result<()> {
         let root = SystemPath::new("/project").to_path_buf();
         let first_path = root.join("first.py");
@@ -447,11 +553,13 @@ mod tests {
         };
 
         let (blocking_result, _blocking_receiver) = crossbeam::channel::bounded(1);
+        let (_cancellation_sender, cancellation) = crossbeam::channel::bounded(0);
         request_sender
             .send(UvJob {
                 task: task(),
                 progress: None,
                 result: blocking_result,
+                cancellation: Some(cancellation),
                 span: tracing::Span::none(),
             })
             .map_err(|_| anyhow::anyhow!("test worker request queue disconnected"))?;
