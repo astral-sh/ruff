@@ -18,7 +18,7 @@ mod type_hierarchy;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
-pub(crate) use diagnostics::publish_settings_diagnostics;
+pub(crate) use diagnostics::{publish_diagnostics_if_needed, publish_settings_diagnostics};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.

@@ -1479,3 +1479,125 @@ fn extract_result_ids_from_response(response: &WorkspaceDiagnosticReport) -> Vec
         })
         .collect()
 }
+
+mod uv_metadata {
+    use lsp_types::{
+        Code, Position, Range, TextDocumentContentChangeEvent,
+        TextDocumentContentChangeWholeDocument,
+    };
+    use ty_project::UseUv;
+
+    use super::{DocumentDiagnosticReport, Result, SystemPath, TestServerBuilder};
+
+    #[test]
+    fn synchronization_failure_highlights_script_metadata() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source =
+            "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nvalue = 1\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+        server.await_diagnostic_refresh();
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the script");
+        };
+
+        let diagnostic = report
+            .full_document_diagnostic_report
+            .items
+            .iter()
+            .find(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+            .ok_or_else(|| {
+                anyhow::anyhow!("expected the script synchronization error: {report:?}")
+            })?;
+
+        assert_eq!(
+            diagnostic.range,
+            Range::new(Position::new(2, 0), Position::new(4, 5))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsaved_script_uses_its_settings_and_keeps_diagnostics() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let initial = "PythonFinalizationError\nmissing\n";
+        let updated = "# /// script\n# requires-python = '>=3.13'\n# dependencies = []\n# ///\nPythonFinalizationError\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, initial)?
+            .with_file(
+                SystemPath::new("src/ty.toml"),
+                "[environment]\npython-version = '3.12'\n",
+            )?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, initial, 1);
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the ordinary file");
+        };
+        assert_eq!(report.full_document_diagnostic_report.items.len(), 2);
+
+        server.change_text_document(
+            script,
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument {
+                        text: updated.to_string(),
+                    },
+                ),
+            ],
+            2,
+        );
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the provisional script");
+        };
+        let [diagnostic] = report.full_document_diagnostic_report.items.as_slice() else {
+            anyhow::bail!("expected only the unresolved `missing` reference");
+        };
+        assert_eq!(
+            diagnostic.code,
+            Some(Code::String("unresolved-reference".to_string()))
+        );
+        assert_eq!(diagnostic.range.start.line, 5);
+
+        server.write_file(script, updated)?;
+        server.save_text_document(script);
+        server.await_diagnostic_refresh();
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the synchronized script");
+        };
+        assert!(
+            report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .any(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+        );
+
+        Ok(())
+    }
+}
