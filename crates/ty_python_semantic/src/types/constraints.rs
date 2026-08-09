@@ -1997,6 +1997,20 @@ impl<'db> ConstraintBound<'db> {
         }
     }
 
+    /// Creates a bound derived by transitivity from two constraint bounds.
+    ///
+    /// Unlike a union or intersection on one typevar, neither premise is redundant merely because
+    /// the result has the same type as one of them. For example, deriving `int ≤ S` from
+    /// `int ≤ T` and `T ≤ S` requires both premises even though the resulting bound type is still
+    /// `int`.
+    fn from_transitive_derivation(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
+        if lhs.has_same_provenance(rhs) {
+            lhs.with_type(combined)
+        } else {
+            Self::Mixed(combined)
+        }
+    }
+
     /// Applies the source range's provenance to an evidence bound derived by comparing that range.
     /// Bounds not produced by the comparison retain their existing provenance.
     fn with_source_provenance(self, source: ConstraintBounds<'db>) -> Self {
@@ -5820,8 +5834,16 @@ impl SequentMap {
                     && constrained_upper.is_same_typevar_as(db, bound_typevar) =>
             {
                 (
-                    bound_constraint_data.bounds.lower,
-                    bound_constraint_data.bounds.upper,
+                    ConstraintBound::from_transitive_derivation(
+                        bound_constraint_data.bounds.lower.ty(),
+                        constrained_constraint_data.bounds.lower,
+                        bound_constraint_data.bounds.lower,
+                    ),
+                    ConstraintBound::from_transitive_derivation(
+                        bound_constraint_data.bounds.upper.ty(),
+                        constrained_constraint_data.bounds.upper,
+                        bound_constraint_data.bounds.upper,
+                    ),
                 )
             }
 
@@ -5831,7 +5853,11 @@ impl SequentMap {
             {
                 (
                     constrained_constraint_data.bounds.lower,
-                    bound_constraint_data.bounds.upper,
+                    ConstraintBound::from_transitive_derivation(
+                        bound_constraint_data.bounds.upper.ty(),
+                        constrained_constraint_data.bounds.upper,
+                        bound_constraint_data.bounds.upper,
+                    ),
                 )
             }
 
@@ -5840,7 +5866,11 @@ impl SequentMap {
                 if constrained_lower.is_same_typevar_as(db, bound_typevar) =>
             {
                 (
-                    bound_constraint_data.bounds.lower,
+                    ConstraintBound::from_transitive_derivation(
+                        bound_constraint_data.bounds.lower.ty(),
+                        constrained_constraint_data.bounds.lower,
+                        bound_constraint_data.bounds.lower,
+                    ),
                     constrained_constraint_data.bounds.upper,
                 )
             }
@@ -5860,7 +5890,7 @@ impl SequentMap {
             {
                 (
                     constrained_constraint_data.bounds.lower,
-                    ConstraintBound::from_combination(
+                    ConstraintBound::from_transitive_derivation(
                         Type::TypeVar(bound_typevar),
                         constrained_constraint_data.bounds.upper,
                         bound_constraint_data.bounds.lower,
@@ -5882,7 +5912,7 @@ impl SequentMap {
                     ) =>
             {
                 (
-                    ConstraintBound::from_combination(
+                    ConstraintBound::from_transitive_derivation(
                         Type::TypeVar(bound_typevar),
                         constrained_constraint_data.bounds.lower,
                         bound_constraint_data.bounds.upper,
@@ -6095,7 +6125,7 @@ impl SequentMap {
                             storage,
                             constrained_typevar,
                             constrained_data.bounds.lower,
-                            ConstraintBound::from_combination(
+                            ConstraintBound::from_transitive_derivation(
                                 new_upper,
                                 constrained_data.bounds.upper,
                                 replacement,
@@ -6167,7 +6197,7 @@ impl SequentMap {
                             env,
                             storage,
                             constrained_typevar,
-                            ConstraintBound::from_combination(
+                            ConstraintBound::from_transitive_derivation(
                                 new_lower,
                                 constrained_data.bounds.lower,
                                 replacement,
@@ -6269,7 +6299,7 @@ impl SequentMap {
                                 storage,
                                 constrained_typevar,
                                 constrained_data.bounds.lower,
-                                ConstraintBound::from_combination(
+                                ConstraintBound::from_transitive_derivation(
                                     new_upper,
                                     constrained_data.bounds.upper,
                                     bound,
@@ -6314,7 +6344,7 @@ impl SequentMap {
                                 env,
                                 storage,
                                 constrained_typevar,
-                                ConstraintBound::from_combination(
+                                ConstraintBound::from_transitive_derivation(
                                     new_lower,
                                     constrained_data.bounds.lower,
                                     bound,
@@ -6443,16 +6473,36 @@ impl SequentMap {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
                         if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
                     {
-                        new_constraints(bound_typevar, right_lower, right_upper)
+                        new_constraints(
+                            bound_typevar,
+                            ConstraintBound::from_transitive_derivation(
+                                right_lower.ty(),
+                                left_lower,
+                                right_lower,
+                            ),
+                            ConstraintBound::from_transitive_derivation(
+                                right_upper.ty(),
+                                left_upper,
+                                right_upper,
+                            ),
+                        )
                     }
                     (Type::TypeVar(bound_typevar), _) => new_constraints(
                         bound_typevar,
                         ConstraintBound::missing_lower(),
-                        right_upper,
+                        ConstraintBound::from_transitive_derivation(
+                            right_upper.ty(),
+                            left_lower,
+                            right_upper,
+                        ),
                     ),
                     (_, Type::TypeVar(bound_typevar)) => new_constraints(
                         bound_typevar,
-                        right_lower,
+                        ConstraintBound::from_transitive_derivation(
+                            right_lower.ty(),
+                            left_upper,
+                            right_lower,
+                        ),
                         ConstraintBound::missing_upper(),
                     ),
                     _ => return,
@@ -8280,66 +8330,120 @@ mod tests {
     }
 
     #[test]
-    fn transitive_constraints_retain_result_bound_provenance() {
+    fn transitive_constraints_combine_premise_provenance() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
         let int = known_instance(db, KnownClass::Int);
 
-        for (relationship_validity, upper_validity) in
-            [(false, false), (false, true), (true, false), (true, true)]
-        {
-            let t = create_typevar(db, "T");
-            let u = create_typevar(db, "U");
-            let mut storage = ConstraintSetStorage::default();
-            let relationship = if relationship_validity {
-                ConstraintBound::Validity(Type::TypeVar(u))
-            } else {
-                ConstraintBound::Evidence(Type::TypeVar(u))
-            };
-            let (relationship_node, _) = Constraint::new_node_with_bounds(
-                db,
-                &env,
-                &mut storage,
-                t,
-                ConstraintBound::missing_lower(),
-                relationship,
-            );
-            let relationship = relationship_node.root_constraint(&storage);
-            let upper = if upper_validity {
-                ConstraintBound::Validity(int)
-            } else {
-                ConstraintBound::Evidence(int)
-            };
-            let upper = ConstraintId::new_with_bounds(
-                db,
-                &env,
-                &mut storage,
-                u,
-                ConstraintBound::missing_lower(),
-                upper,
-            );
-            let expected = if upper_validity {
-                ConstraintBound::Validity(int)
-            } else {
-                ConstraintBound::Evidence(int)
-            };
-            assert!(relationship.is_some_and(|relationship| {
-                let sequents =
-                    SequentMap::for_constraint_pair(db, &env, &mut storage, relationship, upper);
-                let posts: Vec<_> = sequents
-                    .sequents
-                    .iter()
-                    .filter_map(|sequent| match sequent {
-                        Sequent::PairImplication { post, .. } => Some(*post),
-                        _ => None,
-                    })
-                    .collect();
-                posts.iter().any(|post| {
-                    let post = storage.constraint_data(*post);
-                    post.typevar.is_same_typevar_as(db, t) && post.bounds.upper == expected
-                })
-            }));
+        for same_constrained_typevar in [false, true] {
+            for upper in [false, true] {
+                for (relationship_validity, concrete_validity) in
+                    [(false, false), (false, true), (true, false), (true, true)]
+                {
+                    let t = create_typevar(db, "T");
+                    let u = create_typevar(db, "U");
+                    let mut storage = ConstraintSetStorage::default();
+                    let relationship = if relationship_validity {
+                        ConstraintBound::Validity(Type::TypeVar(if same_constrained_typevar {
+                            t
+                        } else {
+                            u
+                        }))
+                    } else {
+                        ConstraintBound::Evidence(Type::TypeVar(if same_constrained_typevar {
+                            t
+                        } else {
+                            u
+                        }))
+                    };
+                    let relationship_is_lower = same_constrained_typevar == upper;
+                    let relationship_lower = if relationship_is_lower {
+                        relationship
+                    } else {
+                        ConstraintBound::missing_lower()
+                    };
+                    let relationship_upper = if relationship_is_lower {
+                        ConstraintBound::missing_upper()
+                    } else {
+                        relationship
+                    };
+                    let relationship = if same_constrained_typevar {
+                        ConstraintId::new_with_bounds(
+                            db,
+                            &env,
+                            &mut storage,
+                            u,
+                            relationship_lower,
+                            relationship_upper,
+                        )
+                    } else {
+                        let (node, _) = Constraint::new_node_with_bounds(
+                            db,
+                            &env,
+                            &mut storage,
+                            t,
+                            relationship_lower,
+                            relationship_upper,
+                        );
+                        node.root_constraint(&storage)
+                            .expect("a typevar relationship should produce one constraint")
+                    };
+                    let concrete = if concrete_validity {
+                        ConstraintBound::Validity(int)
+                    } else {
+                        ConstraintBound::Evidence(int)
+                    };
+                    let concrete = ConstraintId::new_with_bounds(
+                        db,
+                        &env,
+                        &mut storage,
+                        u,
+                        if upper {
+                            ConstraintBound::missing_lower()
+                        } else {
+                            concrete
+                        },
+                        if upper {
+                            concrete
+                        } else {
+                            ConstraintBound::missing_upper()
+                        },
+                    );
+                    let expected = match (relationship_validity, concrete_validity) {
+                        (true, true) => ConstraintBound::Validity(int),
+                        (false, false) => ConstraintBound::Evidence(int),
+                        _ => ConstraintBound::Mixed(int),
+                    };
+                    let sequents = SequentMap::for_constraint_pair(
+                        db,
+                        &env,
+                        &mut storage,
+                        relationship,
+                        concrete,
+                    );
+                    let posts: Vec<_> = sequents
+                        .sequents
+                        .iter()
+                        .filter_map(|sequent| match sequent {
+                            Sequent::PairImplication { post, .. } => Some(*post),
+                            _ => None,
+                        })
+                        .collect();
+                    assert!(
+                        posts.iter().any(|post| {
+                            let post = storage.constraint_data(*post);
+                            post.typevar.is_same_typevar_as(db, t)
+                                && if upper {
+                                    post.bounds.upper == expected
+                                } else {
+                                    post.bounds.lower == expected
+                                }
+                        }),
+                        "same_constrained_typevar={same_constrained_typevar}, upper={upper}, relationship_validity={relationship_validity}, concrete_validity={concrete_validity}",
+                    );
+                }
+            }
         }
     }
 
