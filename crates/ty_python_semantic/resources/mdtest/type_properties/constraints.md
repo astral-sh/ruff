@@ -370,6 +370,47 @@ def lower_bounds[T]():
     static_assert(union_type == intersection_constraint)
 ```
 
+### Intersection of two equality constraints
+
+A type variable cannot be exactly equal to two non-equivalent types. This is stronger than checking
+whether the types are disjoint: two classes can have a common subclass, which makes their
+upper-bound constraints compatible, but that subclass is not exactly equal to either class.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Row: ...
+class RowTuple(Row, tuple[Any, ...]): ...
+
+def _[T, U, V]() -> None:
+    row = ConstraintSet.equality(T, Row)
+    tuple_ = ConstraintSet.equality(T, tuple[Any, ...])
+    static_assert(~(row & tuple_))
+
+    equivalent = row & row
+    static_assert(equivalent == row)
+
+    upper_bounds = ConstraintSet.upper_bound(T, Row) & ConstraintSet.upper_bound(T, tuple[Any, ...])
+    static_assert(not ~upper_bounds)
+
+    row_tuple = ConstraintSet.equality(T, RowTuple)
+    static_assert(row_tuple & upper_bounds == row_tuple)
+
+    gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
+    static_assert(~gradual_mismatch)
+
+    any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
+    static_assert(~any_mismatch)
+
+    symbolic_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
+    static_assert(~symbolic_mismatch)
+
+    symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
+    static_assert(not ~symbolic_match)
+```
+
 ### Intersection of a range and a negated range
 
 The bounds of the range constraint provide a range of types that should be included; the bounds of
