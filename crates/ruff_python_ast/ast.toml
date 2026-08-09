@@ -644,9 +644,9 @@ Comprehension = {}
 Arguments = {}
 Parameters = {}
 Parameter = {}
-ParameterWithDefault = { custom_range = true }
+ParameterWithDefault = {}
 Keyword = {}
-Alias = { custom_range = true }
+Alias = {}
 WithItem = {}
 MatchCase = {}
 Decorator = {}

@@ -4044,7 +4044,19 @@ impl ruff_text_size::Ranged for crate::Parameter {
     }
 }
 
+impl ruff_text_size::Ranged for crate::ParameterWithDefault {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
 impl ruff_text_size::Ranged for crate::Keyword {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
+impl ruff_text_size::Ranged for crate::Alias {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
     }

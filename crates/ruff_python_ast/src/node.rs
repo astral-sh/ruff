@@ -376,7 +376,7 @@ impl ast::ParameterWithDefault {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ParameterWithDefault {
-            range_end: _,
+            range: _,
             node_index: _,
             parameter,
             default,
@@ -413,7 +413,7 @@ impl Alias {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Alias {
-            range_end: _,
+            range: _,
             node_index: _,
             name,
             asname,

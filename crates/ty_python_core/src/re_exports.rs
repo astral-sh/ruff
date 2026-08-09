@@ -102,7 +102,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         let ast::Alias {
             name,
             asname,
-            range_end: _,
+            range: _,
             node_index: _,
         } = alias;
 

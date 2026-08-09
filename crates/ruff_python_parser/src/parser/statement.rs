@@ -783,7 +783,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 },
                 asname: None,
-                range_end: range.end(),
+                range,
                 node_index: AtomicNodeIndex::NONE,
             };
         }
@@ -815,7 +815,7 @@ impl<'src> Parser<'src> {
         };
 
         ast::Alias {
-            range_end: self.node_range(start).end(),
+            range: self.node_range(start),
             name,
             asname,
             node_index: AtomicNodeIndex::NONE,
@@ -3297,7 +3297,7 @@ impl<'src> Parser<'src> {
         };
 
         ast::ParameterWithDefault {
-            range_end: self.node_range(start).end(),
+            range: self.node_range(start),
             parameter,
             default,
             node_index: AtomicNodeIndex::NONE,
