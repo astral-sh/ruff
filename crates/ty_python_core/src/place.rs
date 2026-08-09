@@ -52,6 +52,14 @@ impl PlaceExpr {
         PlaceExpr::Symbol(Symbol::new(name.id.clone()))
     }
 
+    /// Create the member place observed through a separately supplied attribute name.
+    ///
+    /// For example, `hasattr(value, "name")` observes the same place as `value.name`.
+    pub fn from_named_attribute(receiver: &ast::Expr, attribute: &str) -> Option<Self> {
+        MemberExprBuilder::visit_named_attribute(receiver, attribute)
+            .and_then(Self::try_from_member_expr)
+    }
+
     /// Tries to create a `PlaceExpr` from an expression.
     ///
     /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
@@ -705,6 +713,19 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.insert(place);
                 }
             }
+        }
+
+        if expr_call
+            .func
+            .as_name_expr()
+            .is_some_and(|function| function.id == "hasattr")
+            && expr_call.arguments.keywords.is_empty()
+            && let [receiver, ast::Expr::StringLiteral(attribute)] = &*expr_call.arguments.args
+            && let Some(member) =
+                PlaceExpr::from_named_attribute(receiver, attribute.value.to_str())
+            && let Some(place) = self.places.place_id((&member).into())
+        {
+            places.insert(place);
         }
 
         // `bool(expr)` can delegate to narrowing `expr` itself, e.g. `bool(x is not None)`

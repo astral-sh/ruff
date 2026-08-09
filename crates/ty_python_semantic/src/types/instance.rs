@@ -204,6 +204,14 @@ pub struct NominalInstanceType<'db>(
     NominalInstanceInner<'db>,
 );
 
+/// The flow-sensitive presence of one member on a particular receiver.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum MemberPresence {
+    Present,
+    Absent,
+    PossiblyAbsent,
+}
+
 pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     nominal: NominalInstanceType<'db>,
@@ -217,6 +225,9 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
         NominalInstanceInner::NonTuple(class) => {
             visitor.visit_type(db, class.class(db).into());
         }
+        NominalInstanceInner::Refined(refined) => {
+            walk_nominal_instance_type(db, refined.base(db), visitor);
+        }
         NominalInstanceInner::SysVersionInfo => {}
     }
 }
@@ -226,6 +237,128 @@ impl<'db> NominalInstanceType<'db> {
         Self(NominalInstanceInner::NonTuple(
             NominalInstanceClass::from_class(db, class),
         ))
+    }
+
+    /// Refine this instance with the observed presence or absence of a member.
+    ///
+    /// Facts describe one receiver at a point in control flow, not the public shape of its class.
+    /// Updating an existing fact models a later assignment or deletion without stacking wrappers.
+    pub(super) fn with_member_presence(self, db: &'db dyn Db, name: &str, present: bool) -> Self {
+        self.with_member_presence_state(
+            db,
+            name,
+            if present {
+                MemberPresence::Present
+            } else {
+                MemberPresence::Absent
+            },
+        )
+    }
+
+    /// Retain that a member may be missing after control-flow paths merge.
+    pub(super) fn with_possible_member_presence(self, db: &'db dyn Db, name: &str) -> Self {
+        self.with_member_presence_state(db, name, MemberPresence::PossiblyAbsent)
+    }
+
+    fn with_member_presence_state(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        presence: MemberPresence,
+    ) -> Self {
+        let (base, mut facts) = match self.0 {
+            NominalInstanceInner::Refined(refined) => {
+                (refined.base(db), refined.facts(db).to_vec())
+            }
+            NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(_)) => (self, Vec::new()),
+            // An explicit `Any` base can provide arbitrary attributes, while dedicated tuple,
+            // object, and version-info representations rely on their existing special behavior.
+            NominalInstanceInner::NonTuple(NominalInstanceClass::InheritsFromExplicitAny(_))
+            | NominalInstanceInner::ExactTuple(_)
+            | NominalInstanceInner::Object
+            | NominalInstanceInner::SysVersionInfo => return self,
+        };
+
+        match facts.binary_search_by(|(fact_name, _)| fact_name.as_str().cmp(name)) {
+            Ok(index) if facts[index].1 == presence => return self,
+            Ok(index) => facts[index].1 = presence,
+            Err(index) => facts.insert(index, (Name::new(name), presence)),
+        }
+
+        Self(NominalInstanceInner::Refined(RefinedNominalInstance::new(
+            db,
+            base,
+            facts.into_boxed_slice(),
+        )))
+    }
+
+    /// Return the receiver-local presence fact for `name`, if one is known.
+    pub(super) fn member_presence(self, db: &'db dyn Db, name: &str) -> Option<bool> {
+        match self.member_presence_state(db, name)? {
+            MemberPresence::Present => Some(true),
+            MemberPresence::Absent => Some(false),
+            MemberPresence::PossiblyAbsent => None,
+        }
+    }
+
+    /// Return the full receiver-local presence state, including an uncertain state.
+    pub(super) fn member_presence_state(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<MemberPresence> {
+        let NominalInstanceInner::Refined(refined) = self.0 else {
+            return None;
+        };
+        let facts = refined.facts(db);
+        facts
+            .binary_search_by(|(fact_name, _)| fact_name.as_str().cmp(name))
+            .ok()
+            .map(|index| facts[index].1)
+    }
+
+    /// Return whether this receiver carries any presence fact for the member.
+    pub(super) fn has_member_presence_fact(self, db: &'db dyn Db, name: &str) -> bool {
+        self.member_presence_state(db, name).is_some()
+    }
+
+    /// Forget one receiver-local fact while retaining facts for other members.
+    pub(super) fn without_member_presence(self, db: &'db dyn Db, name: &str) -> Self {
+        let NominalInstanceInner::Refined(refined) = self.0 else {
+            return self;
+        };
+        let facts = refined.facts(db);
+        let Ok(index) = facts.binary_search_by(|(fact_name, _)| fact_name.as_str().cmp(name))
+        else {
+            return self;
+        };
+
+        if facts.len() == 1 {
+            return refined.base(db);
+        }
+
+        let mut facts = facts.to_vec();
+        facts.remove(index);
+        Self(NominalInstanceInner::Refined(RefinedNominalInstance::new(
+            db,
+            refined.base(db),
+            facts.into_boxed_slice(),
+        )))
+    }
+
+    /// Remove receiver-local facts while preserving this instance's nominal class.
+    pub(super) fn unrefined(self, db: &'db dyn Db) -> Self {
+        match self.0 {
+            NominalInstanceInner::Refined(refined) => refined.base(db),
+            _ => self,
+        }
+    }
+
+    fn member_presence_facts(self, db: &'db dyn Db) -> &'db [(Name, MemberPresence)] {
+        match self.0 {
+            NominalInstanceInner::Refined(refined) => refined.facts(db),
+            _ => &[],
+        }
     }
 
     /// Return whether this instance's class inherits from an explicit `Any` base.
@@ -270,6 +403,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class.class(db),
+            NominalInstanceInner::Refined(refined) => refined.base(db).class(db, env),
             NominalInstanceInner::SysVersionInfo => {
                 sys_version_info_class(db, env).unwrap_or_else(|| ClassType::object(db, env))
             }
@@ -292,6 +426,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => Some(KnownClass::Tuple),
             NominalInstanceInner::NonTuple(class) => class.class(db).known(db),
+            NominalInstanceInner::Refined(refined) => refined.base(db).known_class(db),
             NominalInstanceInner::SysVersionInfo => Some(KnownClass::VersionInfo),
             NominalInstanceInner::Object => Some(KnownClass::Object),
         }
@@ -321,6 +456,7 @@ impl<'db> NominalInstanceType<'db> {
                 Some(Cow::Owned(TupleSpec::version_info_spec(db, env)))
             }
             NominalInstanceInner::Object => None,
+            NominalInstanceInner::Refined(refined) => refined.base(db).tuple_spec(db, env),
             NominalInstanceInner::NonTuple(class) => {
                 let class = class.class(db);
                 // Avoid an expensive MRO traversal for common stdlib classes.
@@ -360,6 +496,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(_) => true,
             NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
             NominalInstanceInner::NonTuple(class) => class.class(db).is_generic(),
+            NominalInstanceInner::Refined(refined) => refined.base(db).is_definition_generic(db),
         }
     }
 
@@ -377,6 +514,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(_)
+            | NominalInstanceInner::Refined(_)
             | NominalInstanceInner::SysVersionInfo
             | NominalInstanceInner::Object => None,
         }
@@ -390,6 +528,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
         let class = match self.0 {
             NominalInstanceInner::NonTuple(class) => class.class(db),
+            NominalInstanceInner::Refined(refined) => return refined.base(db).slice_literal(db),
             NominalInstanceInner::ExactTuple(_)
             | NominalInstanceInner::SysVersionInfo
             | NominalInstanceInner::Object => return None,
@@ -448,6 +587,14 @@ impl<'db> NominalInstanceType<'db> {
                     class.with_class(db, transformed),
                 )))
             }
+            NominalInstanceInner::Refined(refined) => {
+                let base = refined
+                    .base(db)
+                    .recursive_type_normalized_impl(db, env, div, nested)?;
+                Some(Self(NominalInstanceInner::Refined(
+                    RefinedNominalInstance::new(db, base, refined.facts(db).clone()),
+                )))
+            }
         }
     }
 
@@ -465,6 +612,7 @@ impl<'db> NominalInstanceType<'db> {
                 .known(db)
                 .map(KnownClass::is_singleton)
                 .unwrap_or_else(|| is_single_member_enum(db, class.class(db).class_literal(db))),
+            NominalInstanceInner::Refined(refined) => refined.base(db).is_singleton(db),
         }
     }
 
@@ -494,6 +642,22 @@ impl<'db> NominalInstanceType<'db> {
                     class.with_class(db, transformed),
                 )))
             }
+            NominalInstanceInner::Refined(refined) => {
+                let transformed =
+                    refined
+                        .base(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                match transformed {
+                    Type::NominalInstance(base) => Type::NominalInstance(Self(
+                        NominalInstanceInner::Refined(RefinedNominalInstance::new(
+                            db,
+                            base.unrefined(db),
+                            refined.facts(db).clone(),
+                        )),
+                    )),
+                    transformed => transformed,
+                }
+            }
         }
     }
 
@@ -512,6 +676,15 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => {}
             NominalInstanceInner::NonTuple(class) => {
                 class.class(db).find_legacy_typevars_impl(
+                    db,
+                    env,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }
+            NominalInstanceInner::Refined(refined) => {
+                refined.base(db).find_legacy_typevars_impl(
                     db,
                     env,
                     binding_context,
@@ -774,6 +947,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: NominalInstanceType<'db>,
         target: NominalInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if target
+            .member_presence_facts(db)
+            .iter()
+            .any(|(name, target_presence)| {
+                !matches!(
+                    (source.member_presence_state(db, name), target_presence),
+                    (_, MemberPresence::PossiblyAbsent)
+                        | (Some(MemberPresence::Present), MemberPresence::Present)
+                        | (Some(MemberPresence::Absent), MemberPresence::Absent)
+                )
+            })
+        {
+            return self.never();
+        }
+
         match (source.0, target.0) {
             (_, NominalInstanceInner::Object) => self.always(),
             (
@@ -917,6 +1105,20 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: NominalInstanceType<'db>,
         right: NominalInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if left
+            .member_presence_facts(db)
+            .iter()
+            .any(|(name, left_presence)| {
+                matches!(
+                    (left_presence, right.member_presence_state(db, name)),
+                    (MemberPresence::Present, Some(MemberPresence::Absent))
+                        | (MemberPresence::Absent, Some(MemberPresence::Present))
+                )
+            })
+        {
+            return self.always();
+        }
+
         let mut result = self.never();
         if left.is_object() || right.is_object() {
             return result;
@@ -1000,6 +1202,21 @@ impl<'db> NominalInstanceClass<'db> {
     }
 }
 
+/// A nominal class together with flow-sensitive facts about one receiver's members.
+///
+/// The base remains unrefined, and facts are sorted by name. Consequently, equivalent control-flow
+/// states share one interned value regardless of the order in which attributes were observed.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+struct RefinedNominalInstance<'db> {
+    #[returns(copy)]
+    base: NominalInstanceType<'db>,
+    #[returns(ref)]
+    facts: Box<[(Name, MemberPresence)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for RefinedNominalInstance<'_> {}
+
 /// [`NominalInstanceType`] is split into several variants internally as a pure optimization to
 /// avoid having to materialize the [`ClassType`] for tuple instances where it would be unnecessary
 /// (this is somewhat expensive!).
@@ -1022,6 +1239,8 @@ enum NominalInstanceInner<'db> {
     /// This variant includes types that are subtypes of "exact tuple" types,
     /// because they represent "all instances of a class that is a tuple subclass".
     NonTuple(NominalInstanceClass<'db>),
+    /// A nominal instance with receiver-local attribute-presence facts.
+    Refined(RefinedNominalInstance<'db>),
     /// The singleton `sys.version_info` value.
     SysVersionInfo,
 }

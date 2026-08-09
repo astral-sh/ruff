@@ -33,8 +33,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.db();
-        let requirement =
-            attribute_write_requirement(db, self.program_environment(), object_ty, attribute);
+        let env = self.program_environment();
+        // A write can create a member that was absent immediately before the assignment. Resolve
+        // its declared write requirements against the receiver's underlying class, while leaving
+        // the original receiver refinement intact when inferring the right-hand side.
+        let write_receiver = object_ty.without_member_presence(db, env, attribute);
+        let requirement = attribute_write_requirement(db, env, write_receiver, attribute);
         let mut evaluator = AssignmentAttributeWriteEvaluator {
             builder: self,
             target,

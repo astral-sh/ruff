@@ -9676,7 +9676,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         });
 
-        ty.inner_type()
+        let mut ty = ty.inner_type();
+        let scope = self.scope().file_scope_id(db);
+        let Some(use_id) = constraint_keys.iter().find_map(|(constraint_scope, key)| {
+            if *constraint_scope == scope
+                && let ConstraintKey::UseId(use_id) = key
+            {
+                Some(*use_id)
+            } else {
+                None
+            }
+        }) else {
+            return ty;
+        };
+        let use_def = self.index.use_def_map(scope);
+        let places = self.index.place_table(scope);
+
+        for (place, bindings) in use_def.associated_bindings_at_use(use_id) {
+            let PlaceExprRef::Member(member) = places.place(place) else {
+                continue;
+            };
+            let Some(attribute) = member.as_instance_attribute() else {
+                continue;
+            };
+            if !ty.has_member_presence_fact(db, env, attribute) {
+                continue;
+            }
+
+            let has_deleted_binding = bindings
+                .clone()
+                .any(|binding| matches!(binding.binding, DefinitionState::Deleted));
+            let member_bindings = bindings.clone();
+            let member = place_from_bindings_with_reachability_cache(
+                db,
+                env,
+                bindings,
+                self.reachability_cache(),
+            )
+            .place;
+
+            if member.is_definitely_bound() {
+                ty = ty.with_member_presence(db, env, attribute, true);
+            } else if member.is_undefined() && has_deleted_binding {
+                ty = ty.with_member_presence(db, env, attribute, false);
+            } else if matches!(member, Place::Defined(_)) {
+                let possible_ty = ty.with_possible_member_presence(db, env, attribute);
+                let narrowed_presence = places.symbol_id(symbol_name).and_then(|receiver| {
+                    let mut common_presence = None;
+
+                    for binding in member_bindings {
+                        let narrowed = binding.narrowing_constraint.narrow(
+                            db,
+                            env,
+                            possible_ty,
+                            receiver.into(),
+                        );
+                        if narrowed.is_never() {
+                            continue;
+                        }
+
+                        let presence = narrowed.member_presence(db, env, attribute)?;
+                        if common_presence.is_some_and(|previous| previous != presence) {
+                            return None;
+                        }
+                        common_presence = Some(presence);
+                    }
+
+                    common_presence
+                });
+
+                ty = narrowed_presence.map_or(possible_ty, |present| {
+                    possible_ty.with_member_presence(db, env, attribute, present)
+                });
+            }
+        }
+
+        ty
     }
 
     fn infer_local_place_load(
@@ -10304,12 +10379,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut assigned_type = None;
+        let mut inherited_member = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) = self.infer_place_load(
                 PlaceExprRef::from(&place_expr),
                 ast::ExprRef::Attribute(attribute),
             );
             constraint_keys.extend(keys);
+
+            let place_table = self.index.place_table(self.scope().file_scope_id(db));
+            if resolved.place.is_undefined()
+                && let Some(place_id) = place_table.place_id(PlaceExprRef::from(&place_expr))
+                && let place = place_table.place(place_id)
+                && place.is_bound()
+                && matches!(place, PlaceExprRef::Member(member) if member.is_instance_attribute())
+            {
+                // A slot assigned later in this method cannot shadow an already-present class
+                // attribute before that assignment. Consulting the completed instance summary
+                // here would make the read depend on its own future write.
+                inherited_member = value_type
+                    .member_lookup_with_policy_and_receiver(
+                        db,
+                        env,
+                        &attr.id,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        None,
+                    )
+                    .ok()
+                    .filter(|member| member.place.is_definitely_bound());
+            }
+
             if let Place::Defined(DefinedPlace {
                 ty,
                 definedness: Definedness::AlwaysDefined,
@@ -10319,11 +10418,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type
-            .try_member_lookup(db, env, &attr.id)
-            .unwrap_or_else(|error| {
-                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
-                error.fallback_member(db)
+        let fallback_place = inherited_member
+            .unwrap_or_else(|| {
+                value_type
+                    .try_member_lookup(db, env, &attr.id)
+                    .unwrap_or_else(|error| {
+                        error.report_diagnostic(
+                            &self.context,
+                            value_type,
+                            attribute,
+                            assigned_type,
+                        );
+                        error.fallback_member(db)
+                    })
             })
             .map_type(|ty| {
                 self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)

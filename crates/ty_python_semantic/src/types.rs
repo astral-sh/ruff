@@ -105,7 +105,7 @@ use crate::types::visitor::{any_over_type, dynamic_content};
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
-use instance::Protocol;
+use instance::{MemberPresence, Protocol};
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
@@ -1905,6 +1905,164 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Record whether a member is present on this receiver at the current point in control flow.
+    ///
+    /// A type variable retains its identity while its upper bound or constraints carry the
+    /// receiver-local fact. This lets ordinary member lookup and structural comparisons observe
+    /// the refinement without changing the public shape of the type.
+    pub(super) fn with_member_presence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        present: bool,
+    ) -> Type<'db> {
+        let presence = if present {
+            MemberPresence::Present
+        } else {
+            MemberPresence::Absent
+        };
+        self.map_member_presence(db, env, name, Some(presence))
+    }
+
+    /// Record that a member was initialized on only some paths reaching this receiver.
+    pub(super) fn with_possible_member_presence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Type<'db> {
+        self.map_member_presence(db, env, name, Some(MemberPresence::PossiblyAbsent))
+    }
+
+    /// Discard a receiver-local member-presence fact when its state is no longer certain.
+    pub(super) fn without_member_presence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Type<'db> {
+        self.map_member_presence(db, env, name, None)
+    }
+
+    fn map_member_presence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        presence: Option<MemberPresence>,
+    ) -> Type<'db> {
+        match self {
+            Type::NominalInstance(instance) => Type::NominalInstance(match presence {
+                Some(MemberPresence::Present) => instance.with_member_presence(db, name, true),
+                Some(MemberPresence::Absent) => instance.with_member_presence(db, name, false),
+                Some(MemberPresence::PossiblyAbsent) => {
+                    instance.with_possible_member_presence(db, name)
+                }
+                None => instance.without_member_presence(db, name),
+            }),
+            Type::TypeVar(typevar) => Type::TypeVar(typevar.map_bound_or_constraints(
+                db,
+                |bound_or_constraints| {
+                    bound_or_constraints.map(|bound_or_constraints| match bound_or_constraints {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            TypeVarBoundOrConstraints::UpperBound(
+                                bound.map_member_presence(db, env, name, presence),
+                            )
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            TypeVarBoundOrConstraints::Constraints(constraints.map(
+                                db,
+                                |constraint| {
+                                    constraint.map_member_presence(db, env, name, presence)
+                                },
+                            ))
+                        }
+                    })
+                },
+            )),
+            Type::Union(union) => union.map(db, env, |element| {
+                element.map_member_presence(db, env, name, presence)
+            }),
+            _ => self,
+        }
+    }
+
+    /// Return a member-presence fact shared by all possible values of this receiver.
+    pub(super) fn member_presence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Option<bool> {
+        if let Type::NominalInstance(instance) = self {
+            return instance.member_presence(db, name);
+        }
+
+        match self.member_presence_state(db, env, name) {
+            Some(MemberPresence::Present) => Some(true),
+            Some(MemberPresence::Absent) => Some(false),
+            Some(MemberPresence::PossiblyAbsent) | None => None,
+        }
+    }
+
+    /// Return whether any possible receiver retains a flow-sensitive fact for this member.
+    pub(super) fn has_member_presence_fact(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> bool {
+        match self {
+            Type::NominalInstance(instance) => instance.has_member_presence_fact(db, name),
+            Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.has_member_presence_fact(db, env, name)
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|element| element.has_member_presence_fact(db, env, name)),
+                None => false,
+            },
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| element.has_member_presence_fact(db, env, name)),
+            _ => false,
+        }
+    }
+
+    /// Return a receiver-local member state shared by every possible value of this type.
+    fn member_presence_state(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Option<MemberPresence> {
+        let common_presence = |elements: &[Type<'db>]| {
+            let mut elements = elements.iter();
+            let presence = elements.next()?.member_presence_state(db, env, name)?;
+            elements
+                .all(|element| element.member_presence_state(db, env, name) == Some(presence))
+                .then_some(presence)
+        };
+
+        match self {
+            Type::NominalInstance(instance) => instance.member_presence_state(db, name),
+            Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env)? {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    bound.member_presence_state(db, env, name)
+                }
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    common_presence(constraints.elements(db))
+                }
+            },
+            Type::Union(union) => common_presence(union.elements(db)),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if this type may contain preferred type mappings when provided as type context
     /// during generic call inference.
     ///
@@ -3593,9 +3751,16 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
-            Type::NominalInstance(instance) => {
-                instance.class(db, env).instance_member(db, env, name)
-            }
+            Type::NominalInstance(instance) => match instance.member_presence_state(db, name) {
+                Some(MemberPresence::Absent) => Place::Undefined.into(),
+                Some(MemberPresence::PossiblyAbsent) => Self::with_definedness(
+                    instance.class(db, env).instance_member(db, env, name),
+                    Definedness::PossiblyUndefined,
+                ),
+                Some(MemberPresence::Present) | None => {
+                    instance.class(db, env).instance_member(db, env, name)
+                }
+            },
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
                 .instance_member(db, env, name),
@@ -5212,10 +5377,33 @@ impl<'db> Type<'db> {
             }
         }
 
+        let presence = receiver
+            .unwrap_or(self)
+            .member_presence_state(db, env, name);
+        if presence == Some(MemberPresence::Absent) {
+            return Place::Undefined.into();
+        }
+
         let key = MemberLookupKey::new(db, env.program(db), self, name, policy);
-        match receiver {
+        let result = match receiver {
             Some(receiver) => member_lookup_with_policy_and_receiver_inner(db, key, receiver),
             None => member_lookup_with_policy_inner(db, key),
+        };
+
+        if presence != Some(MemberPresence::PossiblyAbsent) {
+            return result;
+        }
+
+        match result {
+            Ok(member) => Ok(Self::with_definedness(
+                member,
+                Definedness::PossiblyUndefined,
+            )),
+            Err(error) => Err(MemberLookupError::new(
+                db,
+                Self::with_definedness(error.fallback_member(db), Definedness::PossiblyUndefined),
+                error.kind(db),
+            )),
         }
     }
 

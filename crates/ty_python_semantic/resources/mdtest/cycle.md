@@ -387,7 +387,8 @@ reveal_type(Cached().metadata)  # revealed: int
 
 ## Guarded instance attributes when the subclass is checked first
 
-Checking the subclass first preserves both diagnostics in the guarded initializer.
+Checking the subclass first keeps the guarded initializer reachable without introducing an invalid
+assignment.
 
 `child.py`:
 
@@ -404,13 +405,13 @@ class Child(Base):
 class Base:
     def __init__(self):
         if not hasattr(self, "x"):
-            self.x = self.__str__  # error: [invalid-assignment]
+            self.x = self.__str__
             self.missing  # error: [unresolved-attribute]
 ```
 
 ## Guarded instance attributes when the base is checked first
 
-Checking the base first produces the same diagnostics as checking the subclass first.
+Checking the base first produces the same genuine missing-attribute diagnostic.
 
 `base.py`:
 
@@ -418,7 +419,7 @@ Checking the base first produces the same diagnostics as checking the subclass f
 class Base:
     def __init__(self):
         if not hasattr(self, "x"):
-            self.x = self.__str__  # error: [invalid-assignment]
+            self.x = self.__str__
             self.missing  # error: [unresolved-attribute]
 ```
 
@@ -429,6 +430,151 @@ from base import Base
 
 class Child(Base):
     x = Base.__str__
+```
+
+## Missing instance attributes do not satisfy protocols before assignment
+
+A receiver guarded by a negative attribute check cannot satisfy a protocol requiring that attribute.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    value: int
+
+class Example:
+    def initialize(self) -> None:
+        if not hasattr(self, "value"):
+            before: HasValue = self  # error: [invalid-assignment]
+            self.value = 1
+```
+
+## Contradictory instance-attribute checks are unreachable
+
+Without an intervening assignment, opposite checks on the same receiver cannot both succeed.
+
+```py
+class Example:
+    def initialize(self) -> None:
+        if not hasattr(self, "value"):
+            if hasattr(self, "value"):
+                self.missing
+            self.value = 1
+
+        if hasattr(self, "other"):
+            if not hasattr(self, "other"):
+                self.missing
+            self.other = 1
+```
+
+## Assigned instance attributes satisfy subsequent protocols
+
+Assigning the missing attribute updates the receiver before its later protocol check.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    value: int
+
+class Example:
+    def initialize(self) -> None:
+        if not hasattr(self, "value"):
+            self.value = 1
+            after: HasValue = self
+```
+
+## Conditionally assigned instance attributes remain possibly absent
+
+A conditional assignment does not satisfy an attribute requirement until another presence check
+confirms that the assignment occurred.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    value: int
+
+class Example:
+    def initialize(self, condition: bool) -> None:
+        if not hasattr(self, "value"):
+            if condition:
+                self.value = 1
+
+            before: HasValue = self  # error: [invalid-assignment]
+
+            if hasattr(self, "value"):
+                present: HasValue = self
+            else:
+                absent: HasValue = self  # error: [invalid-assignment]
+```
+
+## Inherited instance attributes when the base is checked first
+
+Checking the base first preserves the same inherited attribute type.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+## Inherited instance attributes when the subclass is checked first
+
+A self-referential instance assignment first reads the inherited class attribute.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
 ```
 
 ## Existing class attributes keep guarded initializers unreachable

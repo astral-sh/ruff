@@ -1389,6 +1389,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+
+        if let ScopedPlaceId::Symbol(symbol_id) = place_id
+            && self
+                .current_first_parameter_name
+                .is_some_and(|first| self.current_place_table().symbol(symbol_id).name() == first)
+        {
+            let members: SmallVec<[_; 4]> = self
+                .current_place_table()
+                .associated_place_ids(place_id)
+                .iter()
+                .copied()
+                .filter(|member| {
+                    let member = self.current_place_table().member(*member);
+                    member.is_instance_attribute() && member.is_presence_observed()
+                })
+                .collect();
+
+            for member in members {
+                self.current_use_def_map_mut()
+                    .record_associated_place_use(member.into(), use_id);
+            }
+        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -4717,6 +4739,44 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     {
                         *unpack_position = UnpackPosition::Other;
                     }
+                }
+            }
+            ast::Expr::Call(call) => {
+                let associated_member = if call
+                    .func
+                    .as_name_expr()
+                    .is_some_and(|function| function.id == "hasattr")
+                    && call.arguments.keywords.is_empty()
+                    && let [receiver, ast::Expr::StringLiteral(attribute)] = &*call.arguments.args
+                    && let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
+                    && self.current_first_parameter_name.is_some_and(|first| {
+                        receiver.as_name_expr().is_some_and(|name| name.id == first)
+                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                first,
+                                method_scope_id,
+                            )
+                    })
+                    && let Some(receiver_place) = PlaceExpr::try_from_expr(receiver)
+                    && self
+                        .current_place_table()
+                        .place_id((&receiver_place).into())
+                        .is_some()
+                    && let Some(PlaceExpr::Member(mut member)) =
+                        PlaceExpr::from_named_attribute(receiver, attribute.value.to_str())
+                {
+                    member.mark_presence_observed();
+                    Some((receiver, self.add_place(PlaceExpr::Member(member))))
+                } else {
+                    None
+                };
+
+                walk_expr(self, expr);
+
+                if let Some((receiver, member)) = associated_member
+                    && let Some(use_id) = self.current_ast_ids().try_use_id(receiver)
+                {
+                    self.current_use_def_map_mut()
+                        .record_associated_place_use(member, use_id);
                 }
             }
             ast::Expr::Named(node) => {

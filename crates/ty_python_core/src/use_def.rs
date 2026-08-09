@@ -613,10 +613,10 @@ struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
 
-    /// [`Bindings`] for each member reaching a [`ScopedUseId`].
+    /// Member identities and their bindings reaching a [`ScopedUseId`].
     ///
-    /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
-    /// is empty.
+    /// A keyword splat uses these as its complete member snapshot; an ordinary receiver use can
+    /// also retain associated instance-member states alongside its own binding.
     multi_bindings_by_use: MultiBindingsByUse,
 
     /// Retained [`PlaceState`] values for each member.
@@ -822,11 +822,13 @@ impl Default for RangeInfo {
     }
 }
 
+type AssociatedPlaceBindings = (ScopedPlaceId, Bindings);
+
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[Bindings]>)>);
+struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[AssociatedPlaceBindings]>)>);
 
 impl MultiBindingsByUse {
-    fn from_map(map: FxHashMap<ScopedUseId, Vec<Bindings>>) -> Self {
+    fn from_map(map: FxHashMap<ScopedUseId, Vec<AssociatedPlaceBindings>>) -> Self {
         let mut entries = map
             .into_iter()
             .map(|(use_id, bindings)| (use_id, bindings.into_boxed_slice()))
@@ -835,7 +837,7 @@ impl MultiBindingsByUse {
         Self(entries.into_iter().collect())
     }
 
-    fn get(&self, use_id: ScopedUseId) -> Option<&[Bindings]> {
+    fn get(&self, use_id: ScopedUseId) -> Option<&[AssociatedPlaceBindings]> {
         self.0
             .binary_search_by_key(&use_id, |(candidate, _)| *candidate)
             .ok()
@@ -905,14 +907,29 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
+        self.associated_bindings_at_use(use_id)
+            .map(|(_, bindings)| bindings)
+    }
+
+    /// Return each associated member and its bindings at this expression use.
+    ///
+    /// Keeping the member identity alongside the snapshot lets later inference update a
+    /// receiver's flow-sensitive attributes after assignments or deletions.
+    pub fn associated_bindings_at_use(
+        &self,
+        use_id: ScopedUseId,
+    ) -> impl Iterator<Item = (ScopedPlaceId, BindingWithConstraintsIterator<'_, 'db>)> {
         self.extra
             .as_deref()
             .and_then(|extra| extra.multi_bindings_by_use.get(use_id))
             .map(|member_bindings| {
-                member_bindings.iter().map(|bindings| {
-                    self.bindings_iterator(
-                        bindings.as_slice(),
-                        BoundnessAnalysis::BasedOnUnboundVisibility,
+                member_bindings.iter().map(|(place, bindings)| {
+                    (
+                        *place,
+                        self.bindings_iterator(
+                            bindings.as_slice(),
+                            BoundnessAnalysis::BasedOnUnboundVisibility,
+                        ),
                     )
                 })
             })
@@ -1781,10 +1798,10 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Live bindings associated with each so-far-recorded use.
     ///
-    /// Unlike `bindings_by_use`, this field supports associating multiple bindings with a
-    /// single use. This is only used for kwargs expressions, whose corresponding `bindings_by_use`
-    /// entry is empty.
-    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
+    /// Unlike `bindings_by_use`, this field supports associating multiple member states with a
+    /// single use. Splatted kwargs use an empty primary binding entry, while attribute-presence
+    /// checks retain the ordinary receiver binding alongside its associated member state.
+    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<AssociatedPlaceBindings>>,
 
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
@@ -2454,11 +2471,36 @@ impl<'db> UseDefMapBuilder<'db> {
             self.multi_bindings_by_use
                 .entry(use_id)
                 .or_default()
-                .push(bindings);
+                .push((place, bindings));
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
         self.record_use_bindings(Bindings::default(), use_id);
+    }
+
+    /// Associate another place's current bindings with an already-recorded expression use.
+    ///
+    /// This preserves the expression's own binding snapshot while also capturing the state of
+    /// a related member at the same point in control flow.
+    pub(super) fn record_associated_place_use(
+        &mut self,
+        place: ScopedPlaceId,
+        use_id: ScopedUseId,
+    ) {
+        let pending = self.pending_reachability.current;
+        let place_state =
+            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        let place_state = self.pending_reachability.materialize_ref_at_use(
+            place_state,
+            pending,
+            &mut self.reachability_constraints,
+        );
+        let bindings = place_state.bindings().clone();
+        self.mark_definition_ids_used(bindings.iter().map(LiveBinding::binding));
+        let associated = self.multi_bindings_by_use.entry(use_id).or_default();
+        if !associated.iter().any(|(existing, _)| *existing == place) {
+            associated.push((place, bindings));
+        }
     }
 
     fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
@@ -2840,7 +2882,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let interned_declarations =
             interned_declarations.finish(&mut self.reachability_constraints);
-        for bindings in self.multi_bindings_by_use.values_mut().flatten() {
+        for (_, bindings) in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,

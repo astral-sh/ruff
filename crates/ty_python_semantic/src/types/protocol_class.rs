@@ -3764,59 +3764,6 @@ fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableT
         && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-enum AttributePresence {
-    Present,
-    Absent,
-    Uncertain,
-}
-
-/// Establish attribute presence without mistaking an unresolved inference cycle for proof.
-#[salsa::tracked(
-    returns(copy),
-    cycle_result=|_, _, _, _, _| AttributePresence::Uncertain,
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn protocol_member_presence<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
-    ty: Type<'db>,
-    protocol: ProtocolInstanceType<'db>,
-) -> AttributePresence {
-    let env = ProgramEnvironment::from_program(program);
-
-    for member in protocol.interface(db).members(db) {
-        if ty
-            .member_lookup_with_policy(
-                db,
-                &env,
-                member.name(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-            .is_definitely_bound()
-        {
-            continue;
-        }
-
-        match ty.member(db, &env, member.name()).place {
-            Place::Defined(DefinedPlace {
-                ty: member_ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) if member_ty.is_divergent() => return AttributePresence::Uncertain,
-            Place::Defined(DefinedPlace {
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => {}
-            Place::Defined(_) => return AttributePresence::Uncertain,
-            Place::Undefined => return AttributePresence::Absent,
-        }
-    }
-
-    AttributePresence::Present
-}
-
 /// Protocol compatibility can only succeed if every required member is present.
 ///
 /// Check that necessary condition up front so we can avoid expensive per-member type
@@ -3839,10 +3786,6 @@ pub(super) fn has_all_protocol_members_defined<'db>(
                 && target_interface.members(db).all(|member| {
                     source_interface.includes_member_or_object_fallback(db, env, member.name())
                 })
-        }
-        _ if protocol.class_origin(db).is_none() => {
-            protocol_member_presence(db, env.program(db), ty, protocol)
-                == AttributePresence::Present
         }
         _ => target_interface.members(db).all(|member| {
             matches!(

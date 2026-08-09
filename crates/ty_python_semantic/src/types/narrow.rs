@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
+use crate::place::place_from_bindings;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
@@ -11,17 +12,18 @@ use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDict
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
-    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    MemberLookupPolicy, Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    callable_pattern_type, class_pattern_positional_sources,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
-use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
     CallableAndCallExpr, ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
@@ -4208,6 +4210,63 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         Some(constraints)
     }
 
+    /// Return the receiver and any known attribute-presence fact at a guarded use.
+    ///
+    /// An uninitialized local slot does not prove absence: the receiver may already have been
+    /// initialized by another method or its caller. In that case, the guard remains uncertain.
+    fn instance_attribute_presence_at_call(
+        &self,
+        expression: Expression<'db>,
+        receiver: &ast::Expr,
+        attribute: &str,
+        inference: &ExpressionInference<'db>,
+    ) -> Option<(Type<'db>, Option<bool>)> {
+        let receiver_name = receiver.as_name_expr()?;
+        let member_place = PlaceExpr::from_named_attribute(receiver, attribute)?;
+        let places = self.places();
+        let member_place_id = places.place_id(&member_place)?;
+        if !matches!(
+            places.place(member_place_id),
+            PlaceExprRef::Member(member) if member.is_instance_attribute()
+        ) {
+            return None;
+        }
+
+        let db = self.db;
+        let program_file = expression.program_file(db);
+        let index = semantic_index(db, program_file);
+        let use_def = index.use_def_map(self.scope().file_scope_id(db));
+        let use_id = receiver_name.scoped_use_id(db, program_file);
+        let bindings = use_def
+            .associated_bindings_at_use(use_id)
+            .find_map(|(place, bindings)| (place == member_place_id).then_some(bindings))?;
+        let local_member = place_from_bindings(db, &self.env, bindings).place;
+        let receiver_ty = inference.expression_type(receiver);
+
+        if local_member.is_definitely_bound() {
+            return Some((
+                receiver_ty.with_member_presence(db, &self.env, attribute, true),
+                Some(true),
+            ));
+        }
+
+        if let Some(is_present) = receiver_ty.member_presence(db, &self.env, attribute) {
+            return Some((receiver_ty, Some(is_present)));
+        }
+
+        let is_present = receiver_ty
+            .member_lookup_with_policy_and_receiver(
+                db,
+                &self.env,
+                attribute,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                None,
+            )
+            .is_ok_and(|member| member.place.is_definitely_bound());
+
+        Some((receiver_ty, is_present.then_some(true)))
+    }
+
     fn evaluate_expr_call(
         &mut self,
         expr_call: &ast::ExprCall,
@@ -4253,10 +4312,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
-                let [first_arg, second_arg] = &*expr_call.arguments.args else {
+                let [first_arg_expr, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = PlaceExpr::try_from_expr(first_arg)?;
+                let first_arg = PlaceExpr::try_from_expr(first_arg_expr)?;
                 let function = function_type.known(db)?;
                 let place = self.expect_place(&first_arg);
 
@@ -4268,6 +4327,27 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                     if !is_identifier(attr) {
                         return None;
+                    }
+
+                    if let Some((receiver_ty, is_present)) = self
+                        .instance_attribute_presence_at_call(
+                            expression,
+                            first_arg_expr,
+                            attr,
+                            inference,
+                        )
+                    {
+                        let constraint = match is_present {
+                            Some(is_present) if is_present != is_positive => {
+                                NarrowingConstraint::intersection(Type::Never)
+                            }
+                            Some(_) => return None,
+                            None => NarrowingConstraint::replacement(
+                                receiver_ty.with_member_presence(db, &self.env, attr, is_positive),
+                            ),
+                        };
+
+                        return Some(NarrowingConstraints::from_iter([(place, constraint)]));
                     }
 
                     // Since `hasattr` only checks if an attribute is readable,

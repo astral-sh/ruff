@@ -57,6 +57,14 @@ impl Member {
         self.flags.insert(MemberFlags::IS_INSTANCE_ATTRIBUTE);
     }
 
+    pub(super) fn mark_presence_observed(&mut self) {
+        self.flags.insert(MemberFlags::IS_PRESENCE_OBSERVED);
+    }
+
+    pub(super) fn is_presence_observed(&self) -> bool {
+        self.flags.contains(MemberFlags::IS_PRESENCE_OBSERVED)
+    }
+
     /// Is the place an instance attribute?
     pub fn is_instance_attribute(&self) -> bool {
         let is_instance_attribute = self.flags.contains(MemberFlags::IS_INSTANCE_ATTRIBUTE);
@@ -136,6 +144,7 @@ bitflags! {
         const IS_BOUND              = 1 << 0;
         const IS_DECLARED           = 1 << 1;
         const IS_INSTANCE_ATTRIBUTE = 1 << 2;
+        const IS_PRESENCE_OBSERVED  = 1 << 3;
     }
 }
 
@@ -307,6 +316,23 @@ impl MemberExprBuilder {
         segments.push(SegmentInfo::new(kind, start_offset));
 
         Some(MemberExprBuilder { path, segments })
+    }
+
+    /// Extend a receiver place with an attribute whose name is known separately.
+    ///
+    /// Attribute-presence checks expose the member name as a string rather than as an
+    /// `ExprAttribute`, but they still observe the same receiver-member place.
+    pub(super) fn visit_named_attribute(
+        receiver: &ast::Expr,
+        attribute: &str,
+    ) -> Option<MemberExprBuilder> {
+        let mut receiver = Self::visit_expr(receiver.into())?;
+        let start_offset = receiver.path.text_len();
+        receiver.path = CharStr::concat(&[receiver.path.as_str(), attribute]);
+        receiver
+            .segments
+            .push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
+        Some(receiver)
     }
 
     fn subscript_part(subscript_slice: &ast::Expr) -> Option<(SegmentKind, MemberPathPart<'_>)> {
