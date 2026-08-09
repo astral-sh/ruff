@@ -187,6 +187,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     // Pytest
     registry.register_lint(&PYTEST_INVALID_ARGNAMES_LITERAL);
     registry.register_lint(&PYTEST_REQUEST_KEYWORD);
+    registry.register_lint(&PYTEST_TEST_ARGUMENT_WRONG_KIND);
+    registry.register_lint(&PYTEST_TEST_OPTIONAL_ARGUMENT);
 }
 
 declare_lint! {
@@ -1332,7 +1334,7 @@ declare_lint! {
     pub(crate) static PYTEST_INVALID_ARGNAMES_LITERAL = {
         summary: "Argnames literal is not a comma separated list",
         status: LintStatus::stable("unknown"),
-        default_level: Level::Warn,
+        default_level: Level::Error,
     }
 }
 
@@ -1340,6 +1342,24 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/pytest-request-keyword.md")]
     pub(crate) static PYTEST_REQUEST_KEYWORD = {
         summary: "`request` is reserved by `pytest` as a special argument",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/pytest-test-argument-wrong-kind.md")]
+    pub(crate) static PYTEST_TEST_ARGUMENT_WRONG_KIND = {
+        summary: "Pytest tests only use positional arguments",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/pytest-test-optional-argument.md")]
+    pub(crate) static PYTEST_TEST_OPTIONAL_ARGUMENT = {
+        summary: "Pytest ignores optional arguments",
         status: LintStatus::stable("unknown"),
         default_level: Level::Warn,
     }

@@ -1,6 +1,6 @@
 # Parsing Argnames
 
-The examples in this file are just to check that argnames are parsed correctly. The should be no
+The examples in this file are just to check that argnames are parsed correctly. There should be no
 errors in any other case.
 
 ```toml
