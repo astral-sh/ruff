@@ -4779,6 +4779,7 @@ dependencies = [
  "shellexpand",
  "strum",
  "strum_macros",
+ "tempfile",
  "thiserror 2.0.19",
  "toml 1.1.4+spec-1.1.0",
  "tracing",

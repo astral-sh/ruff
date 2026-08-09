@@ -23,8 +23,8 @@ use crate::{Db, ProjectMetadata};
 mod environment;
 
 pub(crate) use environment::ScriptEnvironmentCacheKey;
-pub use environment::ScriptEnvironments;
 use environment::script_environment;
+pub use environment::{ScriptEnvironmentAvailability, ScriptEnvironments};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
