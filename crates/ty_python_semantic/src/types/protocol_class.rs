@@ -749,6 +749,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .member(db, member.name)
                     .place
                     && obj_definition == definition
+                    // Don't run this logic if there's a `__getattr__` fallback. Supporting this would
+                    // require adding the getattr's signatures to the synthetic getattribute, which
+                    // currently makes the syntheticly generated getattrbute subtype check to fail
+                    && let Place::Undefined = ty.member(db, "__getattr__").place
                 {
                     return self.type_satisfies_protocol_getattribute(db, *method, ty);
                 }
@@ -827,43 +831,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         method: CallableType<'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // `__getattr__` can also be used by `__getattribute__`, so we need to copy the overloads
-        // from these definitions to append to our synthetic getattribute
-        let getattr_signatures = if let Place::Defined(DefinedPlace { ty: getattr_ty, .. }) =
-            ty.member(db, "__getattr__").place
-        {
-            match getattr_ty {
-                Type::FunctionLiteral(func) => Some(func.signature(db)),
-                Type::Callable(callable) => Some(callable.signatures(db)),
-                _ => None,
-            }
-        } else {
-            None
-        }
-        .into_iter()
-        .flat_map(|s| s.overloads.iter().cloned());
-
         // Construct an overload per field mapping each field to what resultant value is expected
-        let signature = CallableSignature::from_overloads(
-            all_members(db, ty)
-                .into_iter()
-                .map(|m| {
-                    Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(Some(Name::new_static("self")))
-                                    .with_annotated_type(ty),
-                                Parameter::positional_only(Some(Name::new_static("name")))
-                                    .with_annotated_type(Type::string_literal(db, m.name.as_str())),
-                            ],
-                        ),
-                        m.ty,
-                    )
-                })
-                // We add the `__getattr__` overloads at the end since they are a fallback
-                .chain(getattr_signatures),
-        );
+        let signature =
+            CallableSignature::from_overloads(all_members(db, ty).into_iter().map(|m| {
+                Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(ty),
+                            Parameter::positional_only(Some(Name::new_static("name")))
+                                .with_annotated_type(Type::string_literal(db, m.name.as_str())),
+                        ],
+                    ),
+                    m.ty,
+                )
+            }));
 
         let synthetic_getattr = CallableType::new(
             db,
