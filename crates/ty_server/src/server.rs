@@ -22,7 +22,8 @@ mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use api::publish_settings_diagnostics;
+pub(crate) use api::{publish_diagnostics_if_needed, publish_settings_diagnostics};
+pub(crate) use lazy_work_done_progress::LazyWorkDoneProgress;
 pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };

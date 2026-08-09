@@ -1479,3 +1479,107 @@ fn extract_result_ids_from_response(response: &WorkspaceDiagnosticReport) -> Vec
         })
         .collect()
 }
+
+mod uv_metadata {
+    use lsp_types::{Code, TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument};
+    use ty_project::UseUv;
+
+    use super::{DocumentDiagnosticReport, Result, SystemPath, TestServerBuilder};
+
+    #[test]
+    fn failure_is_reported_after_background_initialization() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source = "# /// script\n# dependencies = []\n# ///\nvalue = 1\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+        server.await_diagnostic_refresh();
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the script");
+        };
+
+        assert!(
+            report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .any(|diagnostic| {
+                    diagnostic.code == Some(lsp_types::Code::String("uv-metadata".to_string()))
+                }),
+            "expected the script synchronization failure to be reported: {report:?}"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsaved_script_uses_default_environment_until_synchronization() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let initial = "value = 1\n";
+        let updated = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, initial)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, initial, 1);
+        server.change_text_document(
+            script,
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument {
+                        text: updated.to_string(),
+                    },
+                ),
+            ],
+            2,
+        );
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the provisional script");
+        };
+        assert!(
+            report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .any(|diagnostic| diagnostic.code
+                    == Some(Code::String("unresolved-reference".to_string())))
+        );
+
+        server.write_file(script, updated)?;
+        server.save_text_document(script);
+        server.await_diagnostic_refresh();
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the synchronized script");
+        };
+        assert!(
+            report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .any(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+        );
+
+        Ok(())
+    }
+}

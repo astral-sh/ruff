@@ -82,6 +82,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             publish_settings_diagnostics(session, client, root);
         }
 
+        session.synchronize_closed_scripts(client);
+
         let client_capabilities = session.client_capabilities();
 
         if client_capabilities.supports_workspace_diagnostic_refresh() {

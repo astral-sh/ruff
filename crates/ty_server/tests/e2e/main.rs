@@ -83,6 +83,7 @@ use lsp_types::{
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
+use ty_project::UseUv;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -601,6 +602,12 @@ impl TestServer {
         }
     }
 
+    /// Wait for and acknowledge a server-requested diagnostic refresh.
+    pub(crate) fn await_diagnostic_refresh(&mut self) {
+        let (id, ()) = self.await_request::<lsp_types::DiagnosticRefreshRequest>();
+        self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
     /// Wait for a request of the specified type from the server and return the request ID and
     /// parameters.
     ///
@@ -778,7 +785,6 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
-    #[expect(dead_code)]
     pub(crate) fn write_file(
         &self,
         path: impl AsRef<SystemPath>,
@@ -1255,6 +1261,17 @@ impl TestServerBuilder {
         self
     }
 
+    /// Configure which uv integrations the test server enables.
+    pub(crate) fn with_use_uv(mut self, use_uv: UseUv) -> Self {
+        self.initialization_options
+            .get_or_insert_default()
+            .global
+            .experimental
+            .get_or_insert_default()
+            .use_uv = Some(use_uv);
+        self
+    }
+
     /// Set an environment variable for the test server's system.
     pub(crate) fn with_env_var(
         mut self,
@@ -1303,6 +1320,27 @@ impl TestServerBuilder {
         } else {
             None
         };
+        self
+    }
+
+    /// Enable server-requested refreshes for pull diagnostics.
+    pub(crate) fn enable_workspace_diagnostic_refresh(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .diagnostics
+            .get_or_insert_default()
+            .refresh_support = Some(enabled);
+        self
+    }
+
+    /// Enable server-created work-done progress.
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn enable_work_done_progress(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .window
+            .get_or_insert_default()
+            .work_done_progress = Some(enabled);
         self
     }
 

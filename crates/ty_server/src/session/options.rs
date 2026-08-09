@@ -10,11 +10,11 @@ use serde_json::{Map, Value};
 use strum::IntoEnumIterator;
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
-use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
+use ty_project::{CheckMode, UseUv};
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
 use crate::logging::LogLevel;
@@ -46,7 +46,10 @@ pub(crate) struct InitializationOptions {
     /// Tildes (`~`) and environment variables (e.g., `$HOME`) are expanded.
     pub(crate) log_file: Option<SystemPathBuf>,
 
-    /// The remaining options that are dynamic and can change during the runtime of the server.
+    /// The remaining client options.
+    ///
+    /// Most of these options are dynamic and can change while the server is running. Static
+    /// experimental options are resolved during initialization.
     #[serde(flatten)]
     pub(crate) options: ClientOptions,
 }
@@ -68,6 +71,15 @@ impl InitializationOptions {
             Ok(options) => (options, None),
             Err(err) => (InitializationOptions::default(), Some(err)),
         }
+    }
+
+    pub(crate) fn use_uv(&self, system: &dyn System) -> UseUv {
+        self.options
+            .global
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.use_uv)
+            .unwrap_or_else(|| UseUv::from_system(system))
     }
 }
 
@@ -456,15 +468,18 @@ impl Combine for DiagnosticMode {
 
 #[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-#[expect(
-    clippy::empty_structs_with_brackets,
-    reason = "The LSP fails to deserialize the options when this is a unit type"
-)]
-pub struct Experimental {}
+pub struct Experimental {
+    /// Controls which uv integrations ty uses.
+    ///
+    /// This setting is resolved during initialization. Changing it requires restarting the server.
+    pub use_uv: Option<UseUv>,
+}
 
 impl Experimental {
-    #[expect(clippy::unused_self)]
     fn into_settings(self) -> ExperimentalSettings {
+        // `use_uv` is resolved separately before project discovery because changing it requires
+        // rebuilding every project database.
+        let Self { use_uv: _ } = self;
         ExperimentalSettings {}
     }
 }

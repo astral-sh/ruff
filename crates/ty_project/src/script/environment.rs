@@ -6,12 +6,34 @@
 //!
 //! Discovering which files need synchronization requires reading their contents. Initializing every
 //! script before checking a project would therefore require inspecting every candidate file upfront.
-//! We also want to avoid initializing environments for files that never need checking.
+//! This is particularly problematic for language-server latency: a single filesystem event can
+//! represent an entire directory, requiring ty to traverse the directory, read every file, and
+//! initialize its script environments before handling the next editor request. We also want to
+//! avoid initializing environments for files that never need checking.
 //!
 //! Instead, project checks discover and initialize script environments lazily. When checking first
 //! encounters a script without an environment, it runs uv and waits for the result before continuing.
 //! Waiting is necessary because the script's dependencies and Python version must be known to
 //! produce accurate diagnostics.
+//!
+//! The language server cannot use the same blocking behavior when opening or updating documents.
+//! Synchronization creates virtual environments and installs packages as needed; waiting for those
+//! operations would increase the latency of other editor requests. For example, semantic tokens
+//! should remain available while synchronization is running. The language server therefore
+//! schedules synchronization in the background when a script is opened or saved, or when a
+//! file-watcher event reports a change to a closed script.
+//!
+//! Until synchronization completes, an existing script continues using its most recently
+//! synchronized environment. For a newly opened script without a synchronized environment, ty
+//! defers semantic diagnostics rather than reporting incorrect missing-dependency errors. Other
+//! operations, such as semantic tokens, are never deferred and use the available environment.
+//! This avoids a rust-analyzer-like experience where editor operations wait for `cargo check` to
+//! complete before becoming available.
+//!
+//! Unsaved edits require different handling. If an edit turns an ordinary file into a script, ty
+//! uses a temporary environment derived from the script's settings. This allows checking to
+//! continue until the file is saved and synchronization is requested, rather than making existing
+//! diagnostics disappear.
 //!
 //! CLI watch mode also schedules synchronization in the background after filesystem changes, but
 //! delays the next check until those synchronizations have completed. Scripts discovered during
