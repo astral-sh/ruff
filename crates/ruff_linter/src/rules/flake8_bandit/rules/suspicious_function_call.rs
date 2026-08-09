@@ -954,7 +954,7 @@ pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
         checker,
         call.func.as_ref(),
         Some(&call.arguments),
-        call.range,
+        call.range(),
     );
 }
 

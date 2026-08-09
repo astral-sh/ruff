@@ -1728,7 +1728,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments: _,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 if let Expr::Name(ast::ExprName {
@@ -1848,7 +1848,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 self.visit_expr(func);

@@ -288,7 +288,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
-                range: TextRange::default(),
+                range_start: ruff_text_size::TextSize::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             Some(Expr::Call(call_node))

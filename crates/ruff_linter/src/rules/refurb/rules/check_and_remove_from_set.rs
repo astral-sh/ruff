@@ -197,7 +197,7 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.

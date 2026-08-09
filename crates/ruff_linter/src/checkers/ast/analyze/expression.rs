@@ -539,7 +539,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         range: _,
                         node_index: _,
                     },
-                range: _,
+                range_start: _,
                 node_index: _,
             },
         ) => {
