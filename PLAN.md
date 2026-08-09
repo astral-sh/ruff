@@ -106,7 +106,8 @@ The implementation and landing order is:
 1. a full-suite-clean but intentionally non-mergeable static-sequent revision;
 1. the full-suite-clean Phase 5 domain-activation checkpoint, including enforcement of the
     validity-equality invariant;
-1. Phase 5 structural completion, replacing legacy declaration-aware default solving;
+1. Phase 5 structural completion, replacing legacy declaration-aware default solving while keeping
+    intended Phase 6 results as adjacent xfail TODOs;
 1. potential Phase 6 compatibility restoration and performance work, which produces the first
     landable tip;
 1. `dcreager/remove-remove-noninferable-2`.
@@ -456,16 +457,27 @@ expanding `Solutions`:
     and preserve accepted compatibility debt behind xfail comments. Change
     `qtllpywmtvzrnswnvkqptllkykwpqqzp`, commit
     `2f3d8b49b29b532ca8c629efa9eb785cab1ea20e`.
-- [ ] Phase 5 structural completion: replace legacy declaration-aware default solving with solving
-    from the effective domain-conjoined path bounds. Accepted behavioral regressions may remain as
-    passing `XXX` expectations.
+- [x] Phase 5 structural completion: replace legacy declaration-aware default solving with solving
+    from the effective domain-conjoined path bounds. Accepted behavioral regressions remain passing
+    with adjacent TODO/XXX comments stating the intended behavior. Change
+    `smrkruyysnpoyswkpypttlpowomwsmrs`, commit
+    `72cbd05ee9b3124bca1b796ac5f41099e975f1b5`.
 - [ ] Potential Phase 6: restore relationship preservation and the remaining recorded compatibility
     and performance regressions, then select a landable tip.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
 revision, relevant documentation/tests, and a passing full test suite. The earlier abandoned Phase 5
-prototype and standalone fully-static revisions are diagnostic evidence only. Complete Phase 5 from
-its recorded activation checkpoint; do not revive `pvynqtrq` or copy its rejected workarounds.
+prototype and standalone fully-static revisions are diagnostic evidence only; do not revive
+`pvynqtrq` or copy its rejected workarounds. Potential Phase 6 work starts from the completed Phase 5
+structural-solving revision recorded above.
+
+The rewritten activation checkpoint and structural-completion revision each pass all 820
+`ty_python_semantic` tests, all 8,913 workspace tests, workspace clippy, snapshot review, and prek.
+Derived constraints with any validity premise are `Mixed`, while constrained TypeVar domain paths
+retain the declared alternative as their sole pure validity equality. The
+`as_equality_validity_bound` assertions protect this invariant. Relationship regressions exposed by
+correct provenance remain explicit behind adjacent TODO xfails in the revision that introduces the
+observed behavior.
 
 The static checkpoint passes all 816 `ty_python_semantic` tests, all 8,908 workspace tests, workspace
 clippy, and prek. It records seven `XXX: Phase 5` markers covering gradual range algebra,
@@ -475,6 +487,13 @@ static phase adds one temporary mask-4 mismatch for the mutable `TypedDict` case
 now reports the characterized `object` regression while mask 4 already retains the final `int`
 behavior. A potential Phase 6 must restore the correlation and make those outcomes converge; do not
 update a wobble expectation to preserve the intermediate diagnostic.
+
+The Phase 5 structural completion removes the declaration lookup and declared-alternative selection
+from `PathBounds::default_solve`. It validates the effective path interval, selects an exact validity
+equality when the domain path fixes one specialization, and otherwise solves from lower or upper
+evidence. Accepted gradual and relationship regressions remain visible behind adjacent TODO/XXX
+expectations. Validation passed all 820 `ty_python_semantic` tests, all 8,913 workspace tests,
+workspace clippy, snapshot review, and prek.
 
 ### Phase 1: retain bound type-variable instances in constraint-set arenas
 
@@ -627,8 +646,7 @@ The activation checkpoint:
     protocols, quantification, and mutable mapping/TypedDict behavior.
 
 Validation at the checkpoint passed all 820 `ty_python_semantic` tests, all 8,913 workspace tests,
-workspace clippy, snapshot review,
-and `/home/dcreager/bin/jpk`. A local Pydantic ecosystem comparison found six additional
+workspace clippy, snapshot review, and `/home/dcreager/bin/jpk`. A local Pydantic ecosystem comparison found six additional
 diagnostics consistent with the recorded inherited-generic and relationship losses. It also
 measured a repeatable median type-check time of about 2.91 seconds versus 0.384 seconds at the
 pre-activation parent; audit and resolve that regression before landing.
@@ -654,10 +672,10 @@ Phase 5 completion checklist:
     specializations during traversal without reintroducing gradual sequent closure.
 - [x] Preserve one exact pure validity equality for every constrained-TypeVar domain path, classify
     derived constraints as `Mixed`, and assert the invariant during complete-path pruning.
-- [ ] Replace `PathBounds::default_solve` with solving from effective structural path bounds without
+- [x] Replace `PathBounds::default_solve` with solving from effective structural path bounds without
     re-reading `TypeVarBoundOrConstraints` or rebuilding declared alternatives. Remove the
     superseded declaration-specific selection code and helpers that become unused.
-- [ ] Preserve evidence-derived variance, effective lower/upper restrictions, absent versus explicit
+- [x] Preserve evidence-derived variance, effective lower/upper restrictions, absent versus explicit
     bounds, and unsolved variables structurally. Compatible TypeVar relationships, constrained
     `Any`/`int`, `list[Any]`/`list[int]`, ambiguous gradual evidence, and unbounded `Container[T]`
     may remain as explicitly characterized Phase 6 regressions.
@@ -667,12 +685,12 @@ Phase 5 completion checklist:
 - [x] Recover declaration-specific diagnostics from unconjoined paths only after a domain-aware
     solve fails. Do not apply domains before eager quantification or expand this work into the
     separate quantifier-replacement workstream.
-- [ ] Keep accepted temporary constraint-algebra and user-visible changes covered by adjacent
+- [x] Keep accepted temporary constraint-algebra and user-visible changes covered by adjacent
     `XXX` expectations; final classification and restoration may occur in Phase 6.
-- [ ] Leave the cache-growth, path-fuel, determinism, and
+- [x] Leave the cache-growth, path-fuel, determinism, and
     `ty_micro[pydantic_core_schema_dict]` performance audit for Phase 6 unless structural solving
     introduces a new regression beyond the activation checkpoint.
-- [ ] Remove superseded TODOs and obsolete declaration-handling code after replacement coverage
+- [x] Remove superseded TODOs and obsolete declaration-handling code after replacement coverage
     passes. Run focused tests, `ty_python_semantic`, the full suite, clippy, snapshot review, and
     prek before marking Phase 5 complete.
 
