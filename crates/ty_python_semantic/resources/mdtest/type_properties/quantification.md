@@ -239,7 +239,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
     # XXX: Domain-aware solving currently expands the finite domain without preserving the
     # correlations in each solution.
-    # revealed: tuple[Solution[X=int, Y=X@finite_domain | int, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain] | Invariant[int]], Solution[X=str, Y=X@finite_domain | str, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain] | Invariant[str]]]
+    # revealed: tuple[Solution[X=int, Y=int, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain] | Invariant[int]], Solution[X=str, Y=str, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain] | Invariant[str]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]

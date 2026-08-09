@@ -637,8 +637,10 @@ T = TypeVar("T", list[Any], list[int])
 def identity(value: T) -> T:
     return value
 
-reveal_type(identity([1]))  # revealed: list[int]
-reveal_type(identity(["x"]))  # revealed: list[Any]
+# XXX: revealed: list[int]
+reveal_type(identity([1]))  # revealed: list[Any] | list[int]
+# XXX: revealed: list[Any]
+reveal_type(identity(["x"]))  # revealed: list[Any] | list[int]
 ```
 
 ## Typevar inference is a unification problem
