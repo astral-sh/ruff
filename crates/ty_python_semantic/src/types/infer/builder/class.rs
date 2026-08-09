@@ -90,11 +90,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             range: _,
             node_index: _,
             name,
-            type_params,
+            signature,
             decorator_list,
-            arguments: _,
             body: _,
         } = class_node;
+        let type_params = signature
+            .as_ref()
+            .and_then(|signature| signature.type_params.as_ref());
         let db = self.db();
 
         let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
@@ -132,11 +134,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut total_ordering = false;
         let has_explicit_bases = class_node
             .arguments
-            .as_deref()
+            .as_ref()
             .is_some_and(|arguments| !arguments.args.is_empty());
         let has_explicit_metaclass = class_node
             .arguments
-            .as_deref()
+            .as_ref()
             .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
         let infer_original_class_ty = |deprecated,
                                        type_check_only,
@@ -406,7 +408,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
                 || class_node
                     .arguments
-                    .as_deref()
+                    .as_ref()
                     .and_then(|args| args.find_keyword("extra_items"))
                     .is_some()
             {
@@ -440,7 +442,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        if let Some(arguments) = class.arguments.as_deref()
+        if let Some(arguments) = class.arguments.as_ref()
             && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
         {
             if original_class_type(self.db(), definition)

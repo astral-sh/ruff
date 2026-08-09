@@ -85,10 +85,11 @@ pub(crate) fn no_self_use(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
 
     let ast::StmtFunctionDef {
         name,
-        parameters,
+        signature,
         decorator_list,
         ..
     } = func;
+    let parameters = &signature.parameters;
 
     if !matches!(
         function_type::classify(

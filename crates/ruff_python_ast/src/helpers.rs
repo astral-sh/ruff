@@ -530,13 +530,16 @@ where
     fn inner(stmt: &Stmt, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                parameters,
-                type_params,
+                signature,
                 body,
                 decorator_list,
-                returns,
                 ..
             }) => {
+                let ast::FunctionSignature {
+                    parameters,
+                    type_params,
+                    returns,
+                } = signature.as_ref();
                 parameters.iter().any(|param| {
                     param
                         .default()
@@ -557,28 +560,29 @@ where
                         .is_some_and(|value| any_over_expr(value, func))
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                arguments,
-                type_params,
+                signature,
                 body,
                 decorator_list,
                 ..
             }) => {
+                let arguments = signature
+                    .as_ref()
+                    .and_then(|signature| signature.arguments.as_ref());
+                let type_params = signature
+                    .as_ref()
+                    .and_then(|signature| signature.type_params.as_ref());
                 // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
                 // definition
-                arguments
-                    .as_deref()
-                    .is_some_and(|Arguments { args, keywords, .. }| {
-                        args.iter().any(|expr| any_over_expr(expr, &mut *func))
-                            || keywords
-                                .iter()
-                                .any(|keyword| any_over_expr(&keyword.value, &mut *func))
-                    })
-                    || type_params.as_ref().is_some_and(|type_params| {
-                        type_params
+                arguments.is_some_and(|Arguments { args, keywords, .. }| {
+                    args.iter().any(|expr| any_over_expr(expr, &mut *func))
+                        || keywords
                             .iter()
-                            .any(|type_param| any_over_type_param(type_param, &mut *func))
-                    })
-                    || body.iter().any(|stmt| any_over_stmt(stmt, &mut *func))
+                            .any(|keyword| any_over_expr(&keyword.value, &mut *func))
+                }) || type_params.is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, &mut *func))
+                }) || body.iter().any(|stmt| any_over_stmt(stmt, &mut *func))
                     || decorator_list
                         .iter()
                         .any(|decorator| any_over_expr(&decorator.expression, &mut *func))

@@ -129,14 +129,13 @@ pub(crate) fn custom_type_var_instead_of_self(checker: &Checker, binding: &Bindi
 
     let ast::StmtFunctionDef {
         name: function_name,
-        parameters,
-        returns,
+        signature,
         decorator_list,
-        type_params,
         ..
     } = function_def;
-
-    let type_params = type_params.as_deref();
+    let parameters = &signature.parameters;
+    let returns = &signature.returns;
+    let type_params = signature.type_params.as_deref();
 
     // Given, e.g., `def foo(self: _S, arg: bytes)`, extract `_S`.
     let Some(self_or_cls_parameter) = parameters.posonlyargs.iter().chain(&parameters.args).next()

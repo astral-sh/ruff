@@ -2037,7 +2037,7 @@ fn add_argument_completions<'db>(
                 return;
             }
             ast::AnyNodeRef::StmtClassDef(class_def) => {
-                if let Some(arguments) = class_def.arguments.as_deref()
+                if let Some(arguments) = class_def.arguments.as_ref()
                     && arguments.range().contains_range(cursor.range)
                 {
                     add_class_arg_completions(model, class_def, completions);

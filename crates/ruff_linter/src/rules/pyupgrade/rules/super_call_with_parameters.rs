@@ -99,17 +99,13 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     // Find the enclosing callable and extract the name of its first parameter.
     let (parent_arg_name, has_local_dunder_class_var_ref) = match &callable_scope.kind {
         ScopeKind::Function(_) => {
-            let Some(
-                func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef {
-                    parameters: parent_parameters,
-                    ..
-                }),
-            ) = parents.find(|stmt| stmt.is_function_def_stmt())
+            let Some(func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. })) =
+                parents.find(|stmt| stmt.is_function_def_stmt())
             else {
                 return;
             };
 
-            let Some(parent_arg) = parent_parameters.args.first() else {
+            let Some(parent_arg) = signature.parameters.args.first() else {
                 return;
             };
 

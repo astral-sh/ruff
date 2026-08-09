@@ -119,39 +119,37 @@ impl<'a> ClauseHeader<'a> {
 
         match self {
             ClauseHeader::Class(StmtClassDef {
-                type_params,
-                arguments,
+                signature,
                 range: _,
                 node_index: _,
                 decorator_list: _,
                 name: _,
                 body: _,
             }) => {
-                if let Some(type_params) = type_params.as_deref() {
-                    visit(type_params, visitor);
-                }
-
-                if let Some(arguments) = arguments {
-                    visit(arguments.as_ref(), visitor);
+                if let Some(signature) = signature {
+                    if let Some(type_params) = signature.type_params.as_deref() {
+                        visit(type_params, visitor);
+                    }
+                    if let Some(arguments) = &signature.arguments {
+                        visit(arguments, visitor);
+                    }
                 }
             }
             ClauseHeader::Function(StmtFunctionDef {
-                type_params,
-                parameters,
+                signature,
                 range: _,
                 node_index: _,
                 is_async: _,
                 decorator_list: _,
                 name: _,
-                returns,
                 body: _,
             }) => {
-                if let Some(type_params) = type_params.as_deref() {
+                if let Some(type_params) = signature.type_params.as_deref() {
                     visit(type_params, visitor);
                 }
-                visit(parameters.as_ref(), visitor);
+                visit(&signature.parameters, visitor);
 
-                if let Some(returns) = returns.as_deref() {
+                if let Some(returns) = signature.returns.as_deref() {
                     visit(returns, visitor);
                 }
             }

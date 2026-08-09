@@ -158,7 +158,7 @@ fn validate_typed_dict_openness<'db>(
     let child_openness = child.openness(db);
     let child_items = child.items(db);
 
-    if let Some(arguments) = class_node.arguments.as_deref()
+    if let Some(arguments) = class_node.arguments.as_ref()
         && arguments.find_keyword("closed").is_some()
         && arguments.find_keyword("extra_items").is_some()
     {

@@ -521,11 +521,12 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
         return false;
     };
     let binding = semantic.binding(binding_id);
-    let Some(Stmt::FunctionDef(StmtFunctionDef { parameters, .. })) = binding.statement(semantic)
+    let Some(Stmt::FunctionDef(StmtFunctionDef { signature, .. })) = binding.statement(semantic)
     else {
         return false;
     };
-    parameters
+    signature
+        .parameters
         .kwarg
         .as_deref()
         .is_some_and(|kwarg| kwarg.name.as_str() == name.id.as_str())

@@ -9296,7 +9296,7 @@ pub struct ModExpression {
 /// and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
 ///
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtFunctionDef {
     pub node_index: crate::AtomicNodeIndex,
@@ -9304,22 +9304,19 @@ pub struct StmtFunctionDef {
     pub is_async: bool,
     pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
-    pub type_params: Option<Box<crate::TypeParams>>,
-    pub parameters: Box<crate::Parameters>,
-    pub returns: Option<Box<Expr>>,
+    pub signature: Box<crate::FunctionSignature>,
     pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtClassDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
-    pub type_params: Option<Box<crate::TypeParams>>,
-    pub arguments: Option<Box<crate::Arguments>>,
+    pub signature: Option<Box<crate::ClassSignature>>,
     pub body: thin_vec::ThinVec<Stmt>,
 }
 
@@ -10101,74 +10098,6 @@ impl ModExpression {
             node_index: _,
         } = self;
         visitor.visit_expr(body);
-    }
-}
-
-impl StmtFunctionDef {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let StmtFunctionDef {
-            is_async: _,
-            decorator_list,
-            name,
-            type_params,
-            parameters,
-            returns,
-            body,
-            range: _,
-            node_index: _,
-        } = self;
-
-        for elm in decorator_list {
-            visitor.visit_decorator(elm);
-        }
-        visitor.visit_identifier(name);
-
-        if let Some(type_params) = type_params {
-            visitor.visit_type_params(type_params);
-        }
-
-        visitor.visit_parameters(parameters);
-
-        if let Some(returns) = returns {
-            visitor.visit_annotation(returns);
-        }
-
-        visitor.visit_body(body);
-    }
-}
-
-impl StmtClassDef {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let StmtClassDef {
-            decorator_list,
-            name,
-            type_params,
-            arguments,
-            body,
-            range: _,
-            node_index: _,
-        } = self;
-
-        for elm in decorator_list {
-            visitor.visit_decorator(elm);
-        }
-        visitor.visit_identifier(name);
-
-        if let Some(type_params) = type_params {
-            visitor.visit_type_params(type_params);
-        }
-
-        if let Some(arguments) = arguments {
-            visitor.visit_arguments(arguments);
-        }
-
-        visitor.visit_body(body);
     }
 }
 

@@ -3490,7 +3490,7 @@ impl<'db> StaticClassLiteral<'db> {
             class_name.start(),
             class_node
                 .arguments
-                .as_deref()
+                .as_ref()
                 .map(Ranged::end)
                 .unwrap_or_else(|| class_name.end()),
         )

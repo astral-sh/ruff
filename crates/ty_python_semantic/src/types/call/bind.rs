@@ -8837,7 +8837,7 @@ impl<'db> BindingError<'db> {
             (Some(ast::ArgOrKeyword::Keyword(expr)), _) => expr.into(),
             (None, ast::AnyNodeRef::StmtClassDef(class_def)) => class_def
                 .arguments
-                .as_deref()
+                .as_ref()
                 .map(ast::AnyNodeRef::Arguments)
                 .unwrap_or(node),
             (None, _) => node,
@@ -8862,7 +8862,7 @@ impl<'db> BindingError<'db> {
             // is the special keyword argument `metaclass`. These need to be excluded from the
             // argument index when looking up the relevant keyword-argument node.
             (ast::AnyNodeRef::StmtClassDef(class_def), Some(argument_index)) => {
-                class_def.arguments.as_deref().and_then(|args| {
+                class_def.arguments.as_ref().and_then(|args| {
                     args.iter_source_order()
                         .filter_map(ArgOrKeyword::as_keyword)
                         .filter(|keyword| {
@@ -9147,7 +9147,7 @@ fn all_arguments_range(node: AnyNodeRef) -> TextRange {
                 class.start(),
                 class
                     .arguments
-                    .as_deref()
+                    .as_ref()
                     .map(Ranged::end)
                     .unwrap_or(class.name.end()),
             )

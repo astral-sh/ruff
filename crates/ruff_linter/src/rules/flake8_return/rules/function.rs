@@ -454,12 +454,12 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
+    let Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. }) = semantic.statement(node_id)
     else {
         return false;
     };
 
-    let Some(returns) = returns.as_ref() else {
+    let Some(returns) = signature.returns.as_ref() else {
         return false;
     };
 
@@ -764,10 +764,11 @@ fn create_stack<'a>(
 pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     let ast::StmtFunctionDef {
         decorator_list,
-        returns,
+        signature,
         body,
         ..
     } = function_def;
+    let returns = &signature.returns;
 
     let Some(stack) = create_stack(checker, function_def) else {
         return;

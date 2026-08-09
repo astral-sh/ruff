@@ -64,9 +64,10 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     let ast::StmtFunctionDef {
         name,
         decorator_list,
-        parameters,
+        signature,
         ..
     } = func;
+    let parameters = &signature.parameters;
 
     let Some(parent) = checker.semantic().first_non_type_parent_scope(scope) else {
         return;

@@ -82,7 +82,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
                 finder.walk_class_signature(
                     &class.decorator_list,
                     class.type_params.as_deref(),
-                    class.arguments.as_deref(),
+                    class.arguments.as_ref(),
                 );
                 walk_body(&mut finder, &class.body);
             }
@@ -256,7 +256,7 @@ impl<'a> SourceOrderVisitor<'a> for OutgoingCallsFinder<'a, '_> {
                 self.walk_class_signature(
                     &class.decorator_list,
                     class.type_params.as_deref(),
-                    class.arguments.as_deref(),
+                    class.arguments.as_ref(),
                 );
                 return TraversalSignal::Skip;
             }

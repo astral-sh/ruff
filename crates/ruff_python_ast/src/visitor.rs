@@ -135,13 +135,16 @@ pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
 pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
+            signature,
             body,
             decorator_list,
-            returns,
-            type_params,
             ..
         }) => {
+            let ast::FunctionSignature {
+                parameters,
+                returns,
+                type_params,
+            } = signature.as_ref();
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
@@ -155,20 +158,21 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(body);
         }
         Stmt::ClassDef(ast::StmtClassDef {
-            arguments,
+            signature,
             body,
             decorator_list,
-            type_params,
             ..
         }) => {
             for decorator in decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            if let Some(type_params) = type_params {
-                visitor.visit_type_params(type_params);
-            }
-            if let Some(arguments) = arguments {
-                visitor.visit_arguments(arguments);
+            if let Some(signature) = signature {
+                if let Some(type_params) = &signature.type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                if let Some(arguments) = &signature.arguments {
+                    visitor.visit_arguments(arguments);
+                }
             }
             visitor.visit_body(body);
         }

@@ -406,12 +406,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             is_async: _,
             name,
-            type_params,
-            parameters,
-            returns: _,
+            signature,
             body: _,
             decorator_list,
         } = function;
+        let type_params = &signature.type_params;
+        let parameters = &signature.parameters;
 
         let db = self.db();
 

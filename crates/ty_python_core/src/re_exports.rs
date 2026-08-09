@@ -178,9 +178,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
                 decorator_list,
-                arguments,
-                type_params: _, // We don't want to visit the type params of the class
-                body: _,        // We don't want to visit the body of the class
+                signature,
+                body: _, // We don't want to visit the body of the class
                 range: _,
                 node_index: _,
             }) => {
@@ -188,7 +187,10 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
-                if let Some(arguments) = arguments {
+                if let Some(arguments) = signature
+                    .as_ref()
+                    .and_then(|signature| signature.arguments.as_ref())
+                {
                     self.visit_arguments(arguments);
                 }
             }
@@ -196,10 +198,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 decorator_list,
-                parameters,
-                returns,
-                type_params: _, // We don't want to visit the type params of the function
-                body: _,        // We don't want to visit the body of the function
+                signature,
+                body: _, // We don't want to visit the body of the function
                 range: _,
                 node_index: _,
                 is_async: _,
@@ -208,8 +208,8 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
-                self.visit_parameters(parameters);
-                if let Some(returns) = returns {
+                self.visit_parameters(&signature.parameters);
+                if let Some(returns) = &signature.returns {
                     self.visit_expr(returns);
                 }
             }

@@ -99,7 +99,7 @@ impl NeedsParentheses for ExprSubscript {
                                 AnyNodeRef::ptr_eq(returns.into(), self.into())
                             }) {
                                 if function.parameters.is_empty()
-                                    && !context.comments().has(&*function.parameters)
+                                    && !context.comments().has(&function.parameters)
                                 {
                                     // Apply the `optional_parentheses` layout when the subscript
                                     // is in a return type position of a function without parameters.

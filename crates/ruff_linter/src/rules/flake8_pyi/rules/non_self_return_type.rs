@@ -261,8 +261,8 @@ fn replace_with_self_fix(
     let mut others = Vec::with_capacity(2);
 
     let remove_first_argument_type_hint = || -> Option<Edit> {
-        let ast::StmtFunctionDef { parameters, .. } = stmt.as_function_def_stmt()?;
-        let first = parameters.iter().next()?;
+        let ast::StmtFunctionDef { signature, .. } = stmt.as_function_def_stmt()?;
+        let first = signature.parameters.iter().next()?;
         let annotation = first.annotation()?;
 
         is_class_reference(semantic, annotation, &class_def.name)

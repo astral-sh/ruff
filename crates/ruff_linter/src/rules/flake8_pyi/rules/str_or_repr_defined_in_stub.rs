@@ -47,17 +47,17 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
     let Stmt::FunctionDef(ast::StmtFunctionDef {
         name,
         decorator_list,
-        returns,
-        parameters,
+        signature,
         ..
     }) = stmt
     else {
         return;
     };
 
-    let Some(returns) = returns else {
+    let Some(returns) = &signature.returns else {
         return;
     };
+    let parameters = &signature.parameters;
 
     if !matches!(name.as_str(), "__str__" | "__repr__") {
         return;

@@ -1628,36 +1628,40 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async,
                 name,
-                parameters,
+                signature,
                 body,
                 decorator_list,
-                returns,
-                type_params,
                 range: _,
                 node_index: _,
             }) => Self::FunctionDef(StmtFunctionDef {
                 is_async: *is_async,
                 name: name.as_str(),
-                parameters: parameters.into(),
+                parameters: (&signature.parameters).into(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
-                returns: returns.as_ref().map(Into::into),
-                type_params: type_params.as_ref().map(Into::into),
+                returns: signature.returns.as_ref().map(Into::into),
+                type_params: signature.type_params.as_ref().map(Into::into),
             }),
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                arguments,
+                signature,
                 body,
                 decorator_list,
-                type_params,
                 range: _,
                 node_index: _,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                arguments: arguments.as_ref().map(Into::into).unwrap_or_default(),
+                arguments: signature
+                    .as_ref()
+                    .and_then(|signature| signature.arguments.as_ref())
+                    .map(Into::into)
+                    .unwrap_or_default(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
-                type_params: type_params.as_ref().map(Into::into),
+                type_params: signature
+                    .as_ref()
+                    .and_then(|signature| signature.type_params.as_ref())
+                    .map(Into::into),
             }),
             ast::Stmt::Return(ast::StmtReturn {
                 value,

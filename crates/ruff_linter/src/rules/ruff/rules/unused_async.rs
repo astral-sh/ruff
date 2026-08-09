@@ -111,10 +111,8 @@ fn function_def_visit_preorder_except_body<'a, V>(
     V: source_order::SourceOrderVisitor<'a>,
 {
     let ast::StmtFunctionDef {
-        parameters,
+        signature,
         decorator_list,
-        returns,
-        type_params,
         ..
     } = function_def;
 
@@ -122,13 +120,13 @@ fn function_def_visit_preorder_except_body<'a, V>(
         visitor.visit_decorator(decorator);
     }
 
-    if let Some(type_params) = type_params {
+    if let Some(type_params) = &signature.type_params {
         visitor.visit_type_params(type_params);
     }
 
-    visitor.visit_parameters(parameters);
+    visitor.visit_parameters(&signature.parameters);
 
-    if let Some(expr) = returns {
+    if let Some(expr) = &signature.returns {
         visitor.visit_annotation(expr);
     }
 }
@@ -140,9 +138,8 @@ where
     V: source_order::SourceOrderVisitor<'a>,
 {
     let ast::StmtClassDef {
-        arguments,
+        signature,
         decorator_list,
-        type_params,
         ..
     } = class_def;
 
@@ -150,12 +147,13 @@ where
         visitor.visit_decorator(decorator);
     }
 
-    if let Some(type_params) = type_params {
-        visitor.visit_type_params(type_params);
-    }
-
-    if let Some(arguments) = arguments {
-        visitor.visit_arguments(arguments);
+    if let Some(signature) = signature {
+        if let Some(type_params) = &signature.type_params {
+            visitor.visit_type_params(type_params);
+        }
+        if let Some(arguments) = &signature.arguments {
+            visitor.visit_arguments(arguments);
+        }
     }
 }
 

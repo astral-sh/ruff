@@ -56,7 +56,7 @@ pub(crate) fn no_slots_in_tuple_subclass(checker: &Checker, stmt: &Stmt, class: 
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_ref() else {
         return;
     };
 

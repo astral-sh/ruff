@@ -136,9 +136,10 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         is_async,
         decorator_list,
         name,
-        parameters,
+        signature,
         ..
     } = function;
+    let parameters = &signature.parameters;
 
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
@@ -336,9 +337,10 @@ fn check_positional_args_for_overloaded_method(
     for function_def in &function_overloads {
         let StmtFunctionDef {
             is_async,
-            parameters,
+            signature,
             ..
         } = function_def;
+        let parameters = &signature.parameters;
 
         // If any overloads are an unexpected sync/async colour, don't do any checking
         if *is_async != kind.is_async() {
@@ -354,7 +356,7 @@ fn check_positional_args_for_overloaded_method(
             vararg: None,
             kwonlyargs,
             kwarg: None,
-        } = &**parameters
+        } = parameters
         else {
             return;
         };

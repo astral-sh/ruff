@@ -204,16 +204,12 @@ impl SemanticSyntaxChecker {
                     visitor.visit_pattern(&case.pattern);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params,
-                parameters,
-                ..
-            }) => {
-                if let Some(type_params) = type_params {
+            Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. }) => {
+                if let Some(type_params) = &signature.type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
                     Self::type_parameter_default_order(type_params, ctx);
                 }
-                Self::duplicate_parameter_name(parameters, ctx);
+                Self::duplicate_parameter_name(&signature.parameters, ctx);
             }
             Stmt::Global(ast::StmtGlobal { names, .. }) => {
                 for name in names {
@@ -227,10 +223,13 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                type_params: Some(type_params),
+                signature: Some(signature),
                 ..
-            })
-            | Stmt::TypeAlias(ast::StmtTypeAlias {
+            }) if let Some(type_params) = &signature.type_params => {
+                Self::duplicate_type_parameter_name(type_params, ctx);
+                Self::type_parameter_default_order(type_params, ctx);
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
                 type_params: Some(type_params),
                 ..
             }) => {
@@ -389,12 +388,12 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params,
-                parameters,
-                returns,
-                ..
-            }) => {
+            Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. }) => {
+                let ast::FunctionSignature {
+                    type_params,
+                    parameters,
+                    returns,
+                } = signature.as_ref();
                 // test_ok valid_annotation_function_py313
                 // # parse_options: {"target-version": "3.13"}
                 // def f() -> (y := 3): ...
@@ -468,10 +467,10 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                type_params: Some(type_params),
-                arguments,
+                signature: Some(signature),
                 ..
-            }) => {
+            }) if let Some(type_params) = &signature.type_params => {
+                let arguments = &signature.arguments;
                 // test_ok valid_annotation_class
                 // class F(y := list): ...
                 // def f():
@@ -577,10 +576,7 @@ impl SemanticSyntaxChecker {
     fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
-                type_params,
-                parameters,
-                ..
+                name, signature, ..
             }) => {
                 // test_err debug_shadow_function
                 // def __debug__(): ...  # function name
@@ -588,23 +584,26 @@ impl SemanticSyntaxChecker {
                 // def f(__debug__): ...  # parameter name
                 // lambda __debug__: 0  # lambda parameter name
                 Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &signature.type_params {
                     for type_param in type_params.iter() {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
-                for parameter in parameters {
+                for parameter in &signature.parameters {
                     Self::check_identifier(parameter.name(), ctx);
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                name, type_params, ..
+                name, signature, ..
             }) => {
                 // test_err debug_shadow_class
                 // class __debug__: ...  # class name
                 // class C[__debug__]: ...  # type parameter name
                 Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = signature
+                    .as_ref()
+                    .and_then(|signature| signature.type_params.as_ref())
+                {
                     for type_param in type_params.iter() {
                         Self::check_identifier(type_param.name(), ctx);
                     }

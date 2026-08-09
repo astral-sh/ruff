@@ -204,13 +204,14 @@ impl FunctionType {
 pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
-        parameters,
+        signature,
         decorator_list,
         ..
     }) = &scope.kind
     else {
         panic!("Expected ScopeKind::Function")
     };
+    let parameters = &signature.parameters;
 
     let semantic = checker.semantic();
 

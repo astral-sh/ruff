@@ -667,7 +667,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class arguments matches the arguments of the
     // base class `__init_subclass__` method.
-    if let Some(args) = class_node.arguments.as_deref() {
+    if let Some(args) = class_node.arguments.as_ref() {
         if class_kind == Some(CodeGeneratorKind::TypedDict) {
             let supports_pep_728 = context.in_stub()
                 || class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)

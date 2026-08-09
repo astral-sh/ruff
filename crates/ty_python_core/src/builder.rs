@@ -2992,15 +2992,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::FunctionDef(function_def) => {
                 let ast::StmtFunctionDef {
                     decorator_list,
-                    parameters,
-                    type_params,
+                    signature,
                     name,
-                    returns,
                     body,
                     is_async: _,
                     range: _,
                     node_index: _,
                 } = function_def;
+                let ast::FunctionSignature {
+                    parameters,
+                    type_params,
+                    returns,
+                } = signature.as_ref();
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }

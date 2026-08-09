@@ -84,17 +84,13 @@ pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClas
         return;
     }
 
-    let StmtClassDef {
-        type_params,
-        arguments,
-        ..
-    } = class_def;
-
-    let Some(type_params) = type_params else {
+    let Some(signature) = &class_def.signature else {
         return;
     };
-
-    let Some(arguments) = arguments else {
+    let Some(type_params) = &signature.type_params else {
+        return;
+    };
+    let Some(arguments) = &signature.arguments else {
         return;
     };
 

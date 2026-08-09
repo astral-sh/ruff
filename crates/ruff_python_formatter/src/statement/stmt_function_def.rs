@@ -98,11 +98,14 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
         is_async,
         decorator_list: _,
         name,
+        signature,
+        body: _,
+    } = item;
+    let ruff_python_ast::FunctionSignature {
         type_params,
         parameters,
         returns,
-        body: _,
-    } = item;
+    } = signature.as_ref();
 
     let comments = f.context().comments().clone();
 
@@ -163,7 +166,7 @@ fn format_function_header(f: &mut PyFormatter, item: &StmtFunctionDef) -> Format
                     .with_options(Parentheses::Always)
                     .fmt(f)
             } else {
-                let parenthesize = if parameters.is_empty() && !comments.has(parameters.as_ref()) {
+                let parenthesize = if parameters.is_empty() && !comments.has(parameters) {
                     // If the parameters are empty, add parentheses around literal expressions
                     // (any non splitable expression) but avoid parenthesizing subscripts and
                     // other parenthesized expressions unless necessary.

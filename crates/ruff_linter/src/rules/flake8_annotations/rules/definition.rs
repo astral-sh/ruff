@@ -644,11 +644,11 @@ pub(crate) fn definition(
         is_async: _,
         decorator_list,
         name,
-        type_params: _,
-        parameters,
-        returns,
+        signature,
         body,
     } = function;
+    let parameters = &signature.parameters;
+    let returns = &signature.returns;
 
     let is_method = definition.is_method();
 

@@ -53,14 +53,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 is_async,
                 name,
                 decorator_list,
-                returns,
-                parameters,
+                signature,
                 body,
-                type_params: _,
                 range: _,
                 node_index: _,
             },
         ) => {
+            let parameters = &signature.parameters;
+            let returns = &signature.returns;
             if checker.is_rule_enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
             }
@@ -381,14 +381,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         Stmt::ClassDef(
             class_def @ ast::StmtClassDef {
                 name,
-                arguments,
-                type_params: _,
+                signature,
                 decorator_list,
                 body,
                 range: _,
                 node_index: _,
             },
         ) => {
+            let arguments = signature
+                .as_ref()
+                .and_then(|signature| signature.arguments.as_ref());
             if checker.is_rule_enabled(Rule::NoClassmethodDecorator) {
                 pylint::rules::no_classmethod_decorator(checker, stmt);
             }
@@ -460,7 +462,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pep8_naming::rules::error_suffix_on_exception_name(
                     checker,
                     stmt,
-                    arguments.as_deref(),
+                    arguments,
                     name,
                     &checker.settings().pep8_naming.ignore_names,
                 );
@@ -471,11 +473,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     Rule::EmptyMethodWithoutAbstractDecorator,
                 ]) {
                     flake8_bugbear::rules::abstract_base_class(
-                        checker,
-                        stmt,
-                        name,
-                        arguments.as_deref(),
-                        body,
+                        checker, stmt, name, arguments, body,
                     );
                 }
             }
@@ -509,7 +507,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
             }
             if checker.is_rule_enabled(Rule::DuplicateBases) {
-                pylint::rules::duplicate_bases(checker, name, arguments.as_deref());
+                pylint::rules::duplicate_bases(checker, name, arguments);
             }
             if checker.is_rule_enabled(Rule::NoSlotsInStrSubclass) {
                 flake8_slots::rules::no_slots_in_str_subclass(checker, stmt, class_def);

@@ -102,7 +102,7 @@ impl Violation for ReplaceStrEnum {
 
 /// UP042
 pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef) {
-    let Some(arguments) = class_def.arguments.as_deref() else {
+    let Some(arguments) = class_def.arguments.as_ref() else {
         // class does not inherit anything, exit early
         return;
     };

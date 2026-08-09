@@ -4,6 +4,7 @@ use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprCall, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
     ExprStringLiteral, ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
+    StmtFunctionDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -21,6 +22,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
+use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
     Expr, ExprRef, InterpolatedStringElement, LiteralExpressionRef, OperatorPrecedence, Pattern,
     Stmt, TypeParam, int,
@@ -28,7 +30,126 @@ use crate::{
     str::{Quote, TripleQuotes},
 };
 
+/// The parts of a function definition that share its parameters allocation.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct FunctionSignature {
+    pub type_params: Option<Box<TypeParams>>,
+    pub parameters: Parameters,
+    pub returns: Option<Box<Expr>>,
+}
+
+impl Deref for StmtFunctionDef {
+    type Target = FunctionSignature;
+
+    fn deref(&self) -> &Self::Target {
+        &self.signature
+    }
+}
+
+impl fmt::Debug for StmtFunctionDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StmtFunctionDef")
+            .field("node_index", &self.node_index)
+            .field("range", &self.range)
+            .field("is_async", &self.is_async)
+            .field("decorator_list", &self.decorator_list)
+            .field("name", &self.name)
+            .field("type_params", &self.signature.type_params)
+            .field("parameters", &self.signature.parameters)
+            .field("returns", &self.signature.returns)
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
+impl StmtFunctionDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        for decorator in &self.decorator_list {
+            visitor.visit_decorator(decorator);
+        }
+        visitor.visit_identifier(&self.name);
+        if let Some(type_params) = &self.type_params {
+            visitor.visit_type_params(type_params);
+        }
+        visitor.visit_parameters(&self.parameters);
+        if let Some(returns) = &self.returns {
+            visitor.visit_annotation(returns);
+        }
+        visitor.visit_body(&self.body);
+    }
+}
+
+/// The optional type parameters and parenthesized arguments of a class definition.
+#[derive(Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct ClassSignature {
+    pub type_params: Option<Box<TypeParams>>,
+    pub arguments: Option<Arguments>,
+}
+
+impl ClassSignature {
+    const EMPTY: Self = Self {
+        type_params: None,
+        arguments: None,
+    };
+}
+
+impl Deref for StmtClassDef {
+    type Target = ClassSignature;
+
+    fn deref(&self) -> &Self::Target {
+        self.signature.as_deref().unwrap_or(&ClassSignature::EMPTY)
+    }
+}
+
+impl fmt::Debug for StmtClassDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StmtClassDef")
+            .field("node_index", &self.node_index)
+            .field("range", &self.range)
+            .field("decorator_list", &self.decorator_list)
+            .field("name", &self.name)
+            .field(
+                "type_params",
+                &self
+                    .signature
+                    .as_ref()
+                    .and_then(|signature| signature.type_params.as_ref()),
+            )
+            .field(
+                "arguments",
+                &self
+                    .signature
+                    .as_ref()
+                    .and_then(|signature| signature.arguments.as_ref()),
+            )
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
 impl StmtClassDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        for decorator in &self.decorator_list {
+            visitor.visit_decorator(decorator);
+        }
+        visitor.visit_identifier(&self.name);
+        if let Some(type_params) = &self.type_params {
+            visitor.visit_type_params(type_params);
+        }
+        if let Some(arguments) = &self.arguments {
+            visitor.visit_arguments(arguments);
+        }
+        visitor.visit_body(&self.body);
+    }
+
     /// Return an iterator over the bases of the class.
     pub fn bases(&self) -> &[Expr] {
         match &self.arguments {
@@ -3933,14 +4054,16 @@ impl From<bool> for Singleton {
 #[cfg(test)]
 mod tests {
     use crate::generated::*;
-    use crate::{Arguments, Mod, Parameters};
+    use crate::{Arguments, ClassSignature, FunctionSignature, Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 88);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 88);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 80);
+        assert_eq!(std::mem::size_of::<Stmt>(), 80);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 72);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 72);
+        assert_eq!(std::mem::size_of::<FunctionSignature>(), 72);
+        assert_eq!(std::mem::size_of::<ClassSignature>(), 48);
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 72);

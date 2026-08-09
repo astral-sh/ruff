@@ -10209,7 +10209,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let function_parameters = &*current_function.parameters;
+        let function_parameters = &current_function.parameters;
 
         // `self`/`cls` can't be a keyword-only parameter.
         if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {

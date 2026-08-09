@@ -77,12 +77,13 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,
         decorator_list,
-        parameters,
+        signature,
         ..
     }) = checker.semantic().current_scope().kind
     else {
         return;
     };
+    let parameters = &signature.parameters;
 
     let Some(parent) = &checker
         .semantic()

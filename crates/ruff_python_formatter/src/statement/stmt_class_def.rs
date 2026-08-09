@@ -20,11 +20,16 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
             range: _,
             node_index: _,
             name,
-            arguments,
+            signature,
             body,
-            type_params,
             decorator_list,
         } = item;
+        let type_params = signature
+            .as_ref()
+            .and_then(|signature| signature.type_params.as_ref());
+        let arguments = signature
+            .as_ref()
+            .and_then(|signature| signature.arguments.as_ref());
 
         let comments = f.context().comments().clone();
 
@@ -70,11 +75,11 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     &format_with(|f| {
                         write!(f, [token("class"), space(), name.format()])?;
 
-                        if let Some(type_params) = type_params.as_deref() {
+                        if let Some(type_params) = type_params {
                             write!(f, [type_params.format()])?;
                         }
 
-                        if let Some(arguments) = arguments.as_deref() {
+                        if let Some(arguments) = arguments {
                             // Drop empty the arguments node entirely (i.e., remove the parentheses) if it is empty,
                             // e.g., given:
                             // ```python

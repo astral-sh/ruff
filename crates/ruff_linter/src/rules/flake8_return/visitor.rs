@@ -95,9 +95,8 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 return;
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                parameters,
+                signature,
                 decorator_list,
-                returns,
                 ..
             }) => {
                 // Visit the decorators, etc.
@@ -106,10 +105,10 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 for decorator in decorator_list {
                     visitor::walk_decorator(self, decorator);
                 }
-                if let Some(returns) = returns {
+                if let Some(returns) = &signature.returns {
                     visitor::walk_expr(self, returns);
                 }
-                visitor::walk_parameters(self, parameters);
+                visitor::walk_parameters(self, &signature.parameters);
                 self.parents.pop();
 
                 // But don't recurse into the body.

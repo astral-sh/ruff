@@ -90,7 +90,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
         return;
     }
 
-    let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
+    let Some(Arguments { args: bases, .. }) = class.arguments.as_ref() else {
         return;
     };
 

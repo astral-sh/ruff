@@ -2108,12 +2108,14 @@ impl<'src> Parser<'src> {
 
         ast::StmtFunctionDef {
             name,
-            type_params: type_params.map(Box::new),
-            parameters: Box::new(parameters),
+            signature: Box::new(ast::FunctionSignature {
+                type_params: type_params.map(Box::new),
+                parameters,
+                returns,
+            }),
             body,
             decorator_list,
             is_async: false,
-            returns,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2173,7 +2175,7 @@ impl<'src> Parser<'src> {
         // class Foo(base for base in bases): ...
         let arguments = self
             .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments(ArgumentsContext::ClassDefinition)));
+            .then(|| self.parse_arguments(ArgumentsContext::ClassDefinition));
 
         self.expect(TokenKind::Colon);
 
@@ -2187,8 +2189,12 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             decorator_list,
             name,
-            type_params: type_params.map(Box::new),
-            arguments,
+            signature: (type_params.is_some() || arguments.is_some()).then(|| {
+                Box::new(ast::ClassSignature {
+                    type_params: type_params.map(Box::new),
+                    arguments,
+                })
+            }),
             body,
             node_index: AtomicNodeIndex::NONE,
         }
@@ -3067,12 +3073,14 @@ impl<'src> Parser<'src> {
                         range: self.missing_node_range(),
                         node_index: AtomicNodeIndex::NONE,
                     },
-                    type_params: None,
-                    parameters: Box::new(ast::Parameters {
-                        range: self.missing_node_range(),
-                        ..ast::Parameters::default()
+                    signature: Box::new(ast::FunctionSignature {
+                        type_params: None,
+                        parameters: ast::Parameters {
+                            range: self.missing_node_range(),
+                            ..ast::Parameters::default()
+                        },
+                        returns: None,
                     }),
-                    returns: None,
                     body: Suite::new(),
                 }
                 .into()

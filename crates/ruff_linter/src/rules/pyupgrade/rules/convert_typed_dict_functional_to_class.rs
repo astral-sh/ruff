@@ -175,17 +175,19 @@ fn create_class_def_stmt(
 ) -> Stmt {
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
-        arguments: Some(Box::new(Arguments {
-            args: Box::from([base_class.clone()]),
-            keywords: match total_keyword {
-                Some(keyword) => std::iter::once(keyword.clone()).collect(),
-                None => std::iter::empty().collect(),
-            },
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        signature: Some(Box::new(ast::ClassSignature {
+            arguments: Some(Arguments {
+                args: Box::from([base_class.clone()]),
+                keywords: match total_keyword {
+                    Some(keyword) => std::iter::once(keyword.clone()).collect(),
+                    None => std::iter::empty().collect(),
+                },
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+            }),
+            type_params: None,
         })),
         body,
-        type_params: None,
         decorator_list: ast::DecoratorList::new(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,

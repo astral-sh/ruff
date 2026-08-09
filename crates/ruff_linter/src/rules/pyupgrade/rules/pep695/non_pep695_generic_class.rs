@@ -163,19 +163,19 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     }
 
     let StmtClassDef {
-        name,
-        type_params,
-        arguments,
-        ..
+        name, signature, ..
     } = class_def;
+    let Some(signature) = signature else {
+        return;
+    };
 
     // it's a runtime error to mix type_params and Generic, so bail out early if we see existing
     // type_params
-    if type_params.is_some() {
+    if signature.type_params.is_some() {
         return;
     }
 
-    let Some(arguments) = arguments.as_ref() else {
+    let Some(arguments) = signature.arguments.as_ref() else {
         return;
     };
 

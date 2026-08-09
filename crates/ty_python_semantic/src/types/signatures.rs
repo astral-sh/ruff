@@ -789,7 +789,7 @@ impl<'db> Signature<'db> {
         let parameters = Parameters::from_parameters(
             db,
             definition,
-            function_node.parameters.as_ref(),
+            &function_node.parameters,
             has_implicitly_positional_first_parameter,
         );
         let return_ty = function_node

@@ -50,7 +50,7 @@ impl Violation for UselessClassMetaclassType {
 
 /// UP050
 pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtClassDef) {
-    let Some(arguments) = class_def.arguments.as_deref() else {
+    let Some(arguments) = class_def.arguments.as_ref() else {
         return;
     };
 

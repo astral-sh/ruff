@@ -953,8 +953,8 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn is_bound_parameter(&self, name: &str) -> bool {
         match self.semantic.current_scope().kind {
-            ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) => {
-                parameters.includes(name)
+            ScopeKind::Function(ast::StmtFunctionDef { signature, .. }) => {
+                signature.parameters.includes(name)
             }
             ScopeKind::Class(_)
             | ScopeKind::Lambda(_)
@@ -1250,13 +1250,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 function_def @ ast::StmtFunctionDef {
                     name,
                     body,
-                    parameters,
+                    signature,
                     decorator_list,
-                    returns,
-                    type_params,
                     ..
                 },
             ) => {
+                let ast::FunctionSignature {
+                    parameters,
+                    returns,
+                    type_params,
+                } = signature.as_ref();
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
@@ -1390,12 +1393,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 class_def @ ast::StmtClassDef {
                     name,
                     body,
-                    arguments,
+                    signature,
                     decorator_list,
-                    type_params,
                     ..
                 },
             ) => {
+                let type_params = signature
+                    .as_ref()
+                    .and_then(|signature| signature.type_params.as_ref());
+                let arguments = signature
+                    .as_ref()
+                    .and_then(|signature| signature.arguments.as_ref());
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -3109,7 +3117,7 @@ impl<'a> Checker<'a> {
                 let stmt = self.semantic.current_statement();
 
                 let Stmt::FunctionDef(ast::StmtFunctionDef {
-                    body, parameters, ..
+                    body, signature, ..
                 }) = stmt
                 else {
                     unreachable!("Expected Stmt::FunctionDef")
@@ -3117,7 +3125,7 @@ impl<'a> Checker<'a> {
 
                 self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
-                self.visit_parameters(parameters);
+                self.visit_parameters(&signature.parameters);
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);

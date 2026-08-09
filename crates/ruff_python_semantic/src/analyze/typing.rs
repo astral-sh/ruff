@@ -707,8 +707,8 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // ```
             //
             // We trust the annotation and see if the type checker matches the annotation.
-            Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) => {
-                let Some(parameter) = find_parameter(parameters, binding) else {
+            Some(Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. })) => {
+                let Some(parameter) = find_parameter(&signature.parameters, binding) else {
                     return false;
                 };
                 let Some(annotation) = parameter.annotation() else {
@@ -737,7 +737,8 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // def foo() -> int:
             //   ...
             // ```
-            Some(Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. })) => returns
+            Some(Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. })) => signature
+                .returns
                 .as_ref()
                 .is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
 
@@ -1056,10 +1057,10 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
     //   ...
     // ```
     if matches!(binding.kind, BindingKind::Argument) {
-        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
+        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. })) =
             binding.statement(semantic)
         {
-            if let Some(kwarg_parameter) = parameters.kwarg.as_deref() {
+            if let Some(kwarg_parameter) = signature.parameters.kwarg.as_deref() {
                 if kwarg_parameter.name.range() == binding.range() {
                     return true;
                 }
@@ -1109,10 +1110,10 @@ pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
     //   ...
     // ```
     if matches!(binding.kind, BindingKind::Argument) {
-        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
+        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { signature, .. })) =
             binding.statement(semantic)
         {
-            if let Some(arg_parameter) = parameters.vararg.as_deref() {
+            if let Some(arg_parameter) = signature.parameters.vararg.as_deref() {
                 if arg_parameter.name.range() == binding.range() {
                     return true;
                 }

@@ -85,23 +85,24 @@ doc = """See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.F
 and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
 
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
+custom_debug = true
+custom_source_order = true
 fields = [
   { name = "is_async", type = "bool" },
   { name = "decorator_list", type = "ThinVec<Decorator>" },
   { name = "name", type = "Identifier" },
-  { name = "type_params", type = "Box<crate::TypeParams>?" },
-  { name = "parameters", type = "Box<crate::Parameters>" },
-  { name = "returns", type = "Expr?", is_annotation = true },
+  { name = "signature", type = "Box<crate::FunctionSignature>", skip_visit = true },
   { name = "body", type = "ThinVec<Stmt>" },
 ]
 
 [Stmt.nodes.StmtClassDef]
 doc = "See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)"
+custom_debug = true
+custom_source_order = true
 fields = [
   { name = "decorator_list", type = "ThinVec<Decorator>" },
   { name = "name", type = "Identifier" },
-  { name = "type_params", type = "Box<crate::TypeParams>?" },
-  { name = "arguments", type = "Box<crate::Arguments>?" },
+  { name = "signature", type = "Box<crate::ClassSignature>?", skip_visit = true },
   { name = "body", type = "ThinVec<Stmt>" },
 ]
 

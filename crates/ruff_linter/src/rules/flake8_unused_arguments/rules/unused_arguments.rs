@@ -440,11 +440,12 @@ pub(crate) fn unused_arguments(checker: &Checker, scope: &Scope) {
         ScopeKind::Function(
             function_def @ ast::StmtFunctionDef {
                 name,
-                parameters,
+                signature,
                 decorator_list,
                 ..
             },
         ) => {
+            let parameters = &signature.parameters;
             match function_type::classify(
                 name,
                 decorator_list,

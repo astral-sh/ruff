@@ -683,20 +683,21 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef {
-                arguments,
+                signature,
                 body,
                 decorator_list,
-                type_params,
                 ..
             }) => {
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
-                if let Some(type_params) = type_params {
-                    self.visit_type_params(type_params);
-                }
-                if let Some(arguments) = arguments {
-                    self.visit_arguments(arguments);
+                if let Some(signature) = signature {
+                    if let Some(type_params) = &signature.type_params {
+                        self.visit_type_params(type_params);
+                    }
+                    if let Some(arguments) = &signature.arguments {
+                        self.visit_arguments(arguments);
+                    }
                 }
                 self.scopes.push(Scope::Class);
                 self.visit_body(body);

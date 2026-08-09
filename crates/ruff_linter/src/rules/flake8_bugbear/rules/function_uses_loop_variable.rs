@@ -87,8 +87,9 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                parameters, body, ..
+                signature, body, ..
             }) => {
+                let parameters = &signature.parameters;
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
                 visitor.visit_body(body);

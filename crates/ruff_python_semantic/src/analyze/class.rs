@@ -332,11 +332,12 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
     // Look for a __new__ method in the class body
     for stmt in &class_def.body {
         let ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-            name, parameters, ..
+            name, signature, ..
         }) = stmt
         else {
             continue;
         };
+        let parameters = &signature.parameters;
 
         if name != "__new__" {
             continue;

@@ -259,13 +259,16 @@ impl<'a> Generator<'a> {
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async,
                 name,
-                parameters,
+                signature,
                 body,
-                returns,
                 decorator_list,
-                type_params,
                 ..
             }) => {
+                let ast::FunctionSignature {
+                    parameters,
+                    returns,
+                    type_params,
+                } = signature.as_ref();
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
                     statement!({
@@ -298,10 +301,9 @@ impl<'a> Generator<'a> {
             }
             Stmt::ClassDef(ast::StmtClassDef {
                 name,
-                arguments,
+                signature,
                 body,
                 decorator_list,
-                type_params,
                 range: _,
                 node_index: _,
             }) => {
@@ -315,10 +317,16 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("class ");
                     self.p_id(name);
-                    if let Some(type_params) = type_params {
+                    if let Some(type_params) = signature
+                        .as_ref()
+                        .and_then(|signature| signature.type_params.as_ref())
+                    {
                         self.unparse_type_params(type_params);
                     }
-                    if let Some(arguments) = arguments {
+                    if let Some(arguments) = signature
+                        .as_ref()
+                        .and_then(|signature| signature.arguments.as_ref())
+                    {
                         self.p("(");
                         let mut first = true;
                         for arg_or_keyword in arguments.iter_source_order() {
