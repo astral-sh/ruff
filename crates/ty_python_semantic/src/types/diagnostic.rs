@@ -186,6 +186,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
 
     // Pytest
     registry.register_lint(&PYTEST_INVALID_ARGNAMES_LITERAL);
+    registry.register_lint(&PYTEST_REQUEST_KEYWORD);
 }
 
 declare_lint! {
@@ -1330,6 +1331,15 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/pytest-invalid-argnames-literal.md")]
     pub(crate) static PYTEST_INVALID_ARGNAMES_LITERAL = {
         summary: "Argnames literal is not a comma separated list",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/pytest-request-keyword.md")]
+    pub(crate) static PYTEST_REQUEST_KEYWORD = {
+        summary: "`request` is reserved by `pytest` as a special argument",
         status: LintStatus::stable("unknown"),
         default_level: Level::Warn,
     }

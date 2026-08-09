@@ -6,7 +6,10 @@ use ruff_python_ast::{self as ast};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::types::{diagnostic::PYTEST_INVALID_ARGNAMES_LITERAL, infer::TypeInferenceBuilder};
+use crate::types::{
+    diagnostic::{PYTEST_INVALID_ARGNAMES_LITERAL, PYTEST_REQUEST_KEYWORD},
+    infer::TypeInferenceBuilder,
+};
 
 #[derive(Debug, From, Constructor)]
 pub(crate) struct SingleArgname {
@@ -99,6 +102,13 @@ impl TypeInferenceBuilder<'_, '_> {
                 .report_lint(&PYTEST_INVALID_ARGNAMES_LITERAL, range)
         {
             builder.into_diagnostic(format!("`{name}` is not a valid Python identifier."));
+        }
+        if name == "request"
+            && let Some(builder) = self.context.report_lint(&PYTEST_REQUEST_KEYWORD, range)
+        {
+            builder.into_diagnostic(
+                "`request` is a reserved Python keyword and cannot be used during parametrization.",
+            );
         }
         !is_identifier
     }
