@@ -1113,6 +1113,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ty,
                             function.node(self.module()),
                         );
+                        self.post_inference_pytest_check_function(ty, function.node(self.module()));
                     }
                     DefinitionKind::Class(class_node) => {
                         let original_ty = match self.region {

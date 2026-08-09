@@ -183,6 +183,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+
+    // Pytest
+    registry.register_lint(&PYTEST_INVALID_ARGNAMES_LITERAL);
 }
 
 declare_lint! {
@@ -1319,6 +1322,15 @@ declare_lint! {
     pub(crate) static INVALID_LEGACY_POSITIONAL_PARAMETER = {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/pytest-invalid-argnames-literal.md")]
+    pub(crate) static PYTEST_INVALID_ARGNAMES_LITERAL = {
+        summary: "Argnames literal is not a comma separated list",
+        status: LintStatus::stable("unknown"),
         default_level: Level::Warn,
     }
 }
