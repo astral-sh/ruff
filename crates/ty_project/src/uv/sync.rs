@@ -2,13 +2,13 @@ use std::process::Output;
 use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 
-use crossbeam::channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender};
+use crossbeam::channel::{Receiver, RecvTimeoutError, SendTimeoutError, Sender, TrySendError};
 use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
 use super::{MetadataTarget, Uv, unsupported_command_execution, uv_executable_error};
-use crate::Db;
 use crate::script::ScriptEnvironmentCacheKey;
+use crate::{Db, ScriptSyncProgress};
 
 /// Synchronizes standalone script environments with uv.
 ///
@@ -24,12 +24,29 @@ use crate::script::ScriptEnvironmentCacheKey;
 /// The service only owns scheduling of `uv metadata` calls.
 /// [`ScriptEnvironments`](crate::ScriptEnvironments) is the higher level abstraction that
 /// application code should use.
-#[derive(Default)]
 pub(crate) struct UvSyncService {
     workers: OnceLock<std::io::Result<UvWorkerPool>>,
+
+    /// Channel, where to send the background results to.
+    results_sender: Sender<ScriptSyncResult>,
+
+    /// Signals when new background results are available.
+    ///
+    /// This overlaps with `results_sender`, but the main difference is that it doesn't expose the
+    /// sync result. The LSP and CLI use it as a wake up signal for when to call
+    /// [`ScriptEnvironments::poll_sync`](crate::ScriptEnvironments::poll_sync).
+    wake_sender: Sender<()>,
 }
 
 impl UvSyncService {
+    pub(crate) fn new(results_sender: Sender<ScriptSyncResult>, wake_sender: Sender<()>) -> Self {
+        Self {
+            workers: OnceLock::new(),
+            results_sender,
+            wake_sender,
+        }
+    }
+
     /// Synchronizes one script and waits for its result.
     ///
     /// Waiting cooperatively yields the current Rayon worker so it can execute other checking work.
@@ -82,6 +99,74 @@ impl UvSyncService {
                     rayon::yield_now();
                 }
                 Err(RecvTimeoutError::Disconnected) => return Err(worker_disconnected()),
+            }
+        }
+    }
+
+    /// Submits one background synchronization.
+    ///
+    /// This blocks while the bounded worker queue is full, applying backpressure until a worker
+    /// accepts another job.
+    pub(crate) fn schedule_one(
+        &self,
+        system: &dyn System,
+        task: ScriptSyncTask,
+        progress: Option<Box<dyn ScriptSyncProgress>>,
+    ) {
+        let workers = match self.worker_pool(system) {
+            Ok(workers) => workers,
+            Err(error) => {
+                self.publish_result(ScriptSyncResult {
+                    task,
+                    output: Err(error),
+                    progress,
+                });
+                return;
+            }
+        };
+
+        let path = task.request.path().to_path_buf();
+        let job = UvJob {
+            task,
+            mode: UvJobMode::Background {
+                result_sender: self.results_sender.clone(),
+                wake_sender: self.wake_sender.clone(),
+                progress,
+            },
+            span: tracing::debug_span!(
+                "script_environment_sync",
+                script = %path,
+            ),
+        };
+        match workers.jobs.send(job) {
+            Ok(()) => tracing::debug!("Queued script synchronization for `{path}`"),
+            Err(error) => {
+                let UvJob { task, mode, .. } = error.into_inner();
+                match mode {
+                    UvJobMode::Blocking { result_sender, .. } => {
+                        let _ = result_sender.send(Err(worker_disconnected()));
+                    }
+                    UvJobMode::Background { progress, .. } => {
+                        self.publish_result(ScriptSyncResult {
+                            task,
+                            output: Err(worker_disconnected()),
+                            progress,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn publish_result(&self, result: ScriptSyncResult) {
+        self.results_sender
+            .send(result)
+            .expect("the uv synchronization result receiver must remain connected");
+
+        match self.wake_sender.try_send(()) {
+            Ok(()) | Err(TrySendError::Full(())) => {}
+            Err(TrySendError::Disconnected(())) => {
+                panic!("the uv synchronization wakeup receiver must remain connected");
             }
         }
     }
@@ -155,6 +240,15 @@ struct ScriptSyncRequestData {
     path: SystemPathBuf,
     python: Option<SystemPathBuf>,
     cache_key: ScriptEnvironmentCacheKey,
+}
+
+/// The result of synchronizing a standalone script environment.
+///
+/// This owns the progress guard so progress remains active until the result is consumed.
+pub(crate) struct ScriptSyncResult {
+    pub(crate) task: ScriptSyncTask,
+    pub(crate) output: std::io::Result<Output>,
+    pub(crate) progress: Option<Box<dyn ScriptSyncProgress>>,
 }
 
 const MAX_UV_WORKERS: usize = 2;
@@ -239,8 +333,9 @@ impl UvWorker {
             };
 
             // Don't schedule jobs that have been cancelled in the meantime (salsa cancellation).
-            let UvJobMode::Blocking { cancellation, .. } = &job.mode;
-            if cancellation.is_cancelled() {
+            if let UvJobMode::Blocking { cancellation, .. } = &job.mode
+                && cancellation.is_cancelled()
+            {
                 tracing::debug!(
                     "Discarded cancelled script synchronization for `{}`",
                     job.task.request.path()
@@ -262,11 +357,29 @@ impl UvWorker {
             };
 
             // Send the result
-            let UvJob { mode, .. } = job;
+            let UvJob { task, mode, .. } = job;
             match mode {
                 UvJobMode::Blocking { result_sender, .. } => {
                     // The receiver disappears when the blocking caller is cancelled.
                     let _ = result_sender.send(output);
+                }
+                UvJobMode::Background {
+                    result_sender,
+                    wake_sender,
+                    progress,
+                } => {
+                    // The receiver disappears when the owning project is dropped.
+                    if result_sender
+                        .send(ScriptSyncResult {
+                            task,
+                            output,
+                            progress,
+                        })
+                        .is_ok()
+                    {
+                        // Signal that there's a new result.
+                        let _ = wake_sender.try_send(());
+                    }
                 }
             }
         }
@@ -285,6 +398,17 @@ enum UvJobMode {
         result_sender: Sender<std::io::Result<Output>>,
         /// Lets a worker discard a queued job after its blocking Salsa operation is cancelled.
         cancellation: UvJobCancellation,
+    },
+
+    /// The job runs as a background task.
+    ///
+    Background {
+        /// The sender end of the channel communicating with the sync service.
+        result_sender: Sender<ScriptSyncResult>,
+
+        /// The wake signal that notifies that there's a new result to process.
+        wake_sender: Sender<()>,
+        progress: Option<Box<dyn ScriptSyncProgress>>,
     },
 }
 
