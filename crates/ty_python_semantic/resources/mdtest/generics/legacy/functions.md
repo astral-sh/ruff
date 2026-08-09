@@ -436,6 +436,34 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
+## Incompatible invariant protocol members
+
+When the same inferred type variable appears in multiple invariant protocol members, those members
+must agree on one exact specialization. Gradual consistency between their types is not sufficient.
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Protocol[T]):
+    first: T
+    second: T
+
+class GradualPair(Generic[U]):
+    first: tuple[U, Any]
+    second: tuple[U, int]
+
+def infer_pair(value: Pair[T]) -> T:
+    raise NotImplementedError
+
+def check_pair(value: GradualPair[U]) -> None:
+    # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
+    # TODO: This revealed union is incorrect; the incompatible exact member types should make inference fail.
+    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+```
+
 ## Prefer specific compatible constraints over gradual constraints
 
 A gradual constraint can be compatible with a concrete argument and a more specific declared
