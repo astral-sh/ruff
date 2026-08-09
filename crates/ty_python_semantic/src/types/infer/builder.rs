@@ -2108,18 +2108,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        let else_suite = elif_else_clauses
-            .first()
-            .and_then(|clause| clause.test.is_none().then_some(&clause.body));
-        self.check_if_test_redundancy(test, Some(body), else_suite);
-
         if let Err(err) = test_ty.try_bool(db, env) {
             err.report_diagnostic(&self.context, &**test);
         }
 
         self.infer_body(body);
 
-        for (i, clause) in elif_else_clauses.iter().enumerate() {
+        for clause in elif_else_clauses {
             let ast::ElifElseClause {
                 range: _,
                 node_index: _,
@@ -2127,13 +2122,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 body,
             } = clause;
 
-            if let Some(test) = &test {
+            if let Some(test) = test {
                 let test_ty = self.infer_standalone_expression(test, TypeContext::default());
-
-                let else_suite = elif_else_clauses
-                    .get(i + 1)
-                    .and_then(|clause| clause.test.is_none().then_some(&clause.body));
-                self.check_if_test_redundancy(test, Some(body), else_suite);
 
                 if let Err(err) = test_ty.try_bool(db, env) {
                     err.report_diagnostic(&self.context, test);
@@ -2141,6 +2131,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             self.infer_body(body);
+        }
+
+        let else_suite = elif_else_clauses
+            .first()
+            .and_then(|clause| clause.test.is_none().then_some(&clause.body));
+
+        self.check_if_test_redundancy(test, Some(body), else_suite);
+
+        for (i, clause) in elif_else_clauses.iter().enumerate() {
+            if let Some(test) = &clause.test {
+                let else_suite = elif_else_clauses
+                    .get(i + 1)
+                    .and_then(|clause| clause.test.is_none().then_some(&clause.body));
+                self.check_if_test_redundancy(test, Some(&clause.body), else_suite);
+            }
         }
     }
 
@@ -2191,6 +2196,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | ast::Expr::If(..) => {
                     let db = builder.db();
                     let env = builder.program_environment();
+                    let sys_version_info = Type::sys_version_info();
+                    let not_implemented = KnownClass::NotImplementedType.to_instance(db, env);
 
                     if any_over_expr(test, |expr| {
                         // exclude `if TYPE_CHECKING`, `if typing.TYPE_CHECKING`, `if not TYPE_CHECKING`, etc.
@@ -2218,12 +2225,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return true;
                         }
 
-                        // exclude any conditions involving `sys.version_info`
-                        builder.expression_type(expr).is_subtype_of(
-                            db,
-                            env,
-                            Type::sys_version_info(),
-                        )
+                        // exclude any conditions involving `sys.version_info` or `NotImplemented`
+                        let subexpression_type = builder.expression_type(expr);
+                        subexpression_type.is_subtype_of(db, env, sys_version_info)
+                            || subexpression_type.is_subtype_of(db, env, not_implemented)
                     }) {
                         return;
                     }
@@ -2258,6 +2263,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     _ => false,
                 },
+                ast::Stmt::Return(ast::StmtReturn {
+                    value: Some(expr), ..
+                }) => self.expression_type(expr).is_subtype_of(
+                    db,
+                    env,
+                    KnownClass::NotImplementedType.to_instance(db, env),
+                ),
                 _ => false,
             }) {
                 return;
