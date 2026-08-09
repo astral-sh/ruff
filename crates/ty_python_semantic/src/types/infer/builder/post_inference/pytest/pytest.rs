@@ -27,7 +27,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .to_instance(self.db(), self.program_environment())
             && let Some(argnames) = decorator_call.arguments.find_argument("argnames", 0)
         {
-            self.parse_argnames_expression(argnames.value());
+            let _ = self.parse_argnames_expression(argnames.value());
         }
     }
 }

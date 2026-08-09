@@ -48,6 +48,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+derive_more = { version = "2.1.1", features = ["full"] }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
