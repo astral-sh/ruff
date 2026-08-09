@@ -655,10 +655,10 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                return self.with_grown_stack(Self::parse_parenthesized_expression);
+                return self.parse_parenthesized_expression();
             }
-            TokenKind::Lsqb => self.with_grown_stack(Self::parse_list_like_expression),
-            TokenKind::Lbrace => self.with_grown_stack(Self::parse_set_or_dict_like_expression),
+            TokenKind::Lsqb => self.parse_list_like_expression(),
+            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
 
             kind => {
                 if kind.is_keyword() {
@@ -688,22 +688,6 @@ impl<'src> Parser<'src> {
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
     fn parse_postfix_expression(
-        &mut self,
-        lhs: Expr,
-        start: TextSize,
-        context: ExpressionContext,
-    ) -> Expr {
-        if !matches!(
-            self.current_token_kind(),
-            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot
-        ) {
-            return lhs;
-        }
-
-        self.with_grown_stack(|parser| parser.parse_postfix_expression_inner(lhs, start, context))
-    }
-
-    fn parse_postfix_expression_inner(
         &mut self,
         mut lhs: Expr,
         start: TextSize,
@@ -1868,13 +1852,11 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.with_grown_stack(|parser| {
-                parser.parse_interpolated_string_elements(
-                    flags,
-                    InterpolatedStringElementsKind::FormatSpec(string_kind),
-                    string_kind,
-                )
-            });
+            let elements = self.parse_interpolated_string_elements(
+                flags,
+                InterpolatedStringElementsKind::FormatSpec(string_kind),
+                string_kind,
+            );
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2977,8 +2959,7 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through the `orelse` expression.
-        let orelse = self.with_grown_stack(Self::parse_conditional_expression_or_higher);
+        let orelse = self.parse_conditional_expression_or_higher();
 
         ast::ExprIf {
             body: Box::new(body),

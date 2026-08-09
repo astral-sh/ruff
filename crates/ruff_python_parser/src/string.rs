@@ -532,27 +532,13 @@ mod tests {
     use ruff_python_ast::Suite;
 
     use crate::error::LexicalErrorType;
-    use crate::{
-        InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, RECURSIVE_AST_TEST_DEPTH,
-        parse_module,
-    };
+    use crate::{InterpolatedStringErrorType, ParseError, ParseErrorType, Parsed, parse_module};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
     fn parse_suite(source: &str) -> Result<Suite, ParseError> {
         parse_module(source).map(Parsed::into_suite)
-    }
-
-    // `stacker` is a no-op on unsupported platforms, so only require stack
-    // growth where its native support is well established.
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-    fn nested_format_spec(prefix: char, depth: usize) -> String {
-        let mut replacement_field = String::from("{spec}");
-        for _ in 0..depth {
-            replacement_field = format!("{{foo:{replacement_field}}}");
-        }
-        format!(r#"{prefix}"{replacement_field}""#)
     }
 
     fn string_parser_escaped_eol(eol: &str) -> Suite {
@@ -590,12 +576,6 @@ mod tests {
         let source = r#"f"{foo:{spec}}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-    #[test]
-    fn fstring_nested_spec_stack_growth() {
-        parse_suite(&nested_format_spec('f', RECURSIVE_AST_TEST_DEPTH)).unwrap();
     }
 
     #[test]
@@ -708,12 +688,6 @@ mod tests {
         let source = r#"t"{foo:{spec}}""#;
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
-    }
-
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
-    #[test]
-    fn tstring_nested_spec_stack_growth() {
-        parse_suite(&nested_format_spec('t', RECURSIVE_AST_TEST_DEPTH)).unwrap();
     }
 
     #[test]

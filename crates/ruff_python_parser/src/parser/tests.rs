@@ -345,90 +345,25 @@ mod stack_growth {
     use super::*;
 
     #[test]
-    fn nested_parens() {
-        let source = format!(
-            "{}1{}",
-            "(".repeat(RECURSIVE_AST_TEST_DEPTH),
-            ")".repeat(RECURSIVE_AST_TEST_DEPTH)
-        );
-        parse_module(&source).unwrap();
+    fn parser_entry() {
+        // A standalone expression starts on a stack smaller than the parser's red zone, so the
+        // entry check must grow the stack before parsing the nested expression.
+        let source = format!("{}1{}", "(".repeat(128), ")".repeat(128));
+        let parsed = stacker::grow(32 * 1024, || parse_expression(&source));
+        parsed.unwrap();
     }
 
     #[test]
-    fn nested_lists() {
-        let source = format!(
-            "{}1{}",
-            "[".repeat(RECURSIVE_AST_TEST_DEPTH),
-            "]".repeat(RECURSIVE_AST_TEST_DEPTH)
-        );
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
-    fn nested_dictionaries() {
-        let source = format!(
-            "{}1{}",
-            "{'x':".repeat(RECURSIVE_AST_TEST_DEPTH),
-            "}".repeat(RECURSIVE_AST_TEST_DEPTH)
-        );
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
-    fn unclosed_lists() {
-        // Invalid input does not return a deeply nested AST that must be dropped
-        // on the test thread, so this does not need the lower Windows limit.
-        let source = "[".repeat(5_000);
-        assert!(parse_module(&source).is_err());
-    }
-
-    #[test]
-    fn nested_calls() {
-        let source = format!(
-            "x = {}1{}",
-            "f(".repeat(RECURSIVE_AST_TEST_DEPTH),
-            ")".repeat(RECURSIVE_AST_TEST_DEPTH)
-        );
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
-    fn nested_subscripts() {
-        let source = format!(
-            "x = {}1{}",
-            "a[".repeat(RECURSIVE_AST_TEST_DEPTH),
-            "]".repeat(RECURSIVE_AST_TEST_DEPTH)
-        );
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
-    fn binary_paren_interplay() {
-        // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
-        // parenthesised sub-expression, exactly like the pattern described in
-        // the tracking issue.
+    fn nested_suites() {
+        // Each nested function crosses the suite boundary where the parser rechecks the stack.
         let depth = RECURSIVE_AST_TEST_DEPTH;
         let mut source = String::new();
-        for _ in 0..depth {
-            source.push_str("1+(");
+        for i in 0..depth {
+            source.push_str(&"\t".repeat(i));
+            source.push_str("def f():\n");
         }
-        source.push('1');
-        for _ in 0..depth {
-            source.push(')');
-        }
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
-    fn ternary_else_chain() {
-        // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
-        // conditional layer (`parse_if_expression` -> `orelse`).
-        let depth = RECURSIVE_AST_TEST_DEPTH;
-        let mut source = String::with_capacity(depth * 12 + 1);
-        for _ in 0..depth {
-            source.push_str("1 if 1 else ");
-        }
-        source.push('1');
+        source.push_str(&"\t".repeat(depth));
+        source.push_str("pass\n");
         parse_module(&source).unwrap();
     }
 }

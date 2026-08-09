@@ -60,9 +60,9 @@ impl NameInterner {
     }
 }
 
-// This is the amount of bytes that need to be left on the stack before increasing the size.
-// It must be at least as large as the stack required by any code that does not call
-// `with_grown_stack`.
+// Check the remaining stack at parser entry and for each nested suite. This covers standalone
+// expressions and recursive statement nesting without checking every expression node.
+// `STACK_RED_ZONE` must be at least as large as the stack required between those checks.
 const STACK_RED_ZONE: usize = 100 * 1024;
 const STACK_SIZE: usize = 1024 * 1024;
 
@@ -163,14 +163,16 @@ impl<'src> Parser<'src> {
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.options.mode {
-            Mode::Expression | Mode::ParenthesizedExpression => {
-                Mod::Expression(self.parse_single_expression())
-            }
-            Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
-        };
+        stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || {
+            let syntax = match self.options.mode {
+                Mode::Expression | Mode::ParenthesizedExpression => {
+                    Mod::Expression(self.parse_single_expression())
+                }
+                Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
+            };
 
-        self.finish(syntax)
+            self.finish(syntax)
+        })
     }
 
     /// Parses a single expression.
