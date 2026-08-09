@@ -3159,10 +3159,12 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "tempfile",
  "tikv-jemallocator",
  "tracing",
  "ty_module_resolver",
  "ty_project",
+ "ty_static",
 ]
 
 [[package]]
