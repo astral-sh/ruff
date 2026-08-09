@@ -73,6 +73,10 @@ fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result
         .env("UV_PYTHON_DOWNLOADS", "never")
         .env("TY_OUTPUT_FORMAT", "concise")
         .env("PATH", std::env::var_os("PATH").unwrap_or_default());
+    #[cfg(windows)]
+    if let Some(path_ext) = std::env::var_os("PATHEXT") {
+        command.env("PATHEXT", path_ext);
+    }
     if let Some(virtual_env) = virtual_env {
         command.env("VIRTUAL_ENV", virtual_env);
     }
