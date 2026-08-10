@@ -5277,6 +5277,21 @@ enum Sequent {
         post: ConstraintId,
     },
 
+    /// Sequent of the form `C ∧ ¬D → false`
+    ///
+    /// In theory, this is equivalent to a `SingleImplication`. However, the two handle provenance
+    /// differently. A `SingleImplication` is used to add new positive facts, and we only allow
+    /// that to happen for certain combinations of provenance. (For example, we don't let an
+    /// `Evidence` constraint imply a `Validity` constraint.)
+    ///
+    /// Contradictions, on the other hand, apply no matter the provenance. So there are situations
+    /// where, given `C`, we don't want to add `D` (for provenance reasons), but we _do_ want to
+    /// verify that we haven't already proven `¬D`.
+    ImplicationContradiction {
+        ante: ConstraintId,
+        post: ConstraintId,
+    },
+
     /// Sequent of the form `C₁ ∧ C₂ → D`
     ///
     /// This indicates that if `C₁` and `C₂` are both true, then `D` is guaranteed to be true as
@@ -5448,18 +5463,23 @@ impl SequentMap {
         ante: ConstraintId,
         post: ConstraintId,
     ) {
+        if ante == post {
+            return;
+        }
+
         let antecedent = storage.constraint_data(ante);
         let consequent = storage.constraint_data(post);
         // Consequences on another type variable already inherit the provenance of their
         // contributing bounds; comparing their unrelated bound positions would discard valid
         // implications.
-        if ante == post
-            || (antecedent
-                .typevar
-                .is_same_typevar_as(db, consequent.typevar)
-                && !antecedent.bounds.has_same_provenance(consequent.bounds)
-                && !consequent.is_bound_projection_of(db, antecedent))
+        if antecedent
+            .typevar
+            .is_same_typevar_as(db, consequent.typevar)
+            && !antecedent.bounds.has_same_provenance(consequent.bounds)
+            && !consequent.is_bound_projection_of(db, antecedent)
         {
+            self.sequents
+                .push(Sequent::ImplicationContradiction { ante, post });
             return;
         }
 
@@ -6544,6 +6564,16 @@ impl SequentMap {
                             post.display(db, env, storage)
                         )?;
                     }
+
+                    Sequent::ImplicationContradiction { ante, post } => {
+                        maybe_write_prefix(f)?;
+                        write!(
+                            f,
+                            "{} ∧ ¬{} → false",
+                            ante.display(db, env, storage),
+                            post.display(db, env, storage),
+                        )?;
+                    }
                 }
             }
 
@@ -7462,6 +7492,9 @@ impl PathAssignments {
                 self.check_single_implication(db, env, storage, ante, post);
                 Ok(())
             }
+            Sequent::ImplicationContradiction { ante, post } => {
+                self.check_implication_contradiction(db, env, storage, ante, post)
+            }
         }
     }
 
@@ -7575,6 +7608,33 @@ impl PathAssignments {
                 AssignmentFuel::derived(fuel_cost, post_fuel),
             );
         }
+    }
+
+    fn check_implication_contradiction<'db>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &ConstraintSetStorage<'db>,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(ante.when_true()) && self.assignment_holds(post.when_false()) {
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante = %ante.display(db, env, storage),
+                post = %post.display(db, env, storage),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, env, storage)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
+        }
+
+        Ok(())
     }
 }
 
@@ -8172,57 +8232,149 @@ mod tests {
         let bool = known_instance(db, KnownClass::Bool);
         let mut storage = ConstraintSetStorage::default();
 
-        for (evidence, validity) in [(int, int), (int, bool), (bool, int)] {
+        for (first_ty, second_ty) in [(int, int), (int, bool), (bool, int)] {
+            let first_bounds = [
+                ConstraintBound::Evidence(first_ty),
+                ConstraintBound::Validity(first_ty),
+                ConstraintBound::Mixed(first_ty),
+            ];
+            let second_bounds = [
+                ConstraintBound::Evidence(second_ty),
+                ConstraintBound::Validity(second_ty),
+                ConstraintBound::Mixed(second_ty),
+            ];
             for lower in [false, true] {
-                let evidence_bounds = if lower {
-                    ConstraintBounds::new(
-                        ConstraintBound::Evidence(evidence),
-                        ConstraintBound::missing_upper(),
-                    )
-                } else {
-                    ConstraintBounds::new(
-                        ConstraintBound::missing_lower(),
-                        ConstraintBound::Evidence(evidence),
-                    )
-                };
-                let validity_bounds = if lower {
-                    ConstraintBounds::new(
-                        ConstraintBound::Validity(validity),
-                        ConstraintBound::missing_upper(),
-                    )
-                } else {
-                    ConstraintBounds::new(
-                        ConstraintBound::missing_lower(),
-                        ConstraintBound::Validity(validity),
-                    )
-                };
-                let evidence = ConstraintId::new_with_bounds(
-                    db,
-                    &env,
-                    &mut storage,
-                    t,
-                    evidence_bounds.lower,
-                    evidence_bounds.upper,
-                );
-                let validity = ConstraintId::new_with_bounds(
-                    db,
-                    &env,
-                    &mut storage,
-                    t,
-                    validity_bounds.lower,
-                    validity_bounds.upper,
-                );
-                for (first, second) in [(evidence, validity), (validity, evidence)] {
-                    let sequents =
-                        SequentMap::for_constraint_pair(db, &env, &mut storage, first, second);
-                    assert!(sequents.sequents.iter().all(|sequent| {
-                        !matches!(sequent, Sequent::SingleImplication { ante, post }
-                            if (*ante == evidence && *post == validity)
-                                || (*ante == validity && *post == evidence))
-                    }));
+                for first_bound in first_bounds {
+                    for second_bound in second_bounds {
+                        if first_bound.has_same_provenance(second_bound) {
+                            continue;
+                        }
+                        let bounds = |bound| {
+                            if lower {
+                                ConstraintBounds::new(bound, ConstraintBound::missing_upper())
+                            } else {
+                                ConstraintBounds::new(ConstraintBound::missing_lower(), bound)
+                            }
+                        };
+                        let first_bounds = bounds(first_bound);
+                        let first = ConstraintId::new_with_bounds(
+                            db,
+                            &env,
+                            &mut storage,
+                            t,
+                            first_bounds.lower,
+                            first_bounds.upper,
+                        );
+                        let second_bounds = bounds(second_bound);
+                        let second = ConstraintId::new_with_bounds(
+                            db,
+                            &env,
+                            &mut storage,
+                            t,
+                            second_bounds.lower,
+                            second_bounds.upper,
+                        );
+                        let first_implies_second =
+                            storage.cached_constraint_implies(db, &env, first, second);
+                        let second_implies_first =
+                            storage.cached_constraint_implies(db, &env, second, first);
+                        let sequents =
+                            SequentMap::for_constraint_pair(db, &env, &mut storage, first, second);
+                        assert!(sequents.sequents.iter().all(|sequent| {
+                            !matches!(sequent, Sequent::SingleImplication { ante, post }
+                                if (*ante == first && *post == second)
+                                    || (*ante == second && *post == first))
+                        }));
+                        for (ante, post, expected) in [
+                            (first, second, first_implies_second),
+                            (second, first, second_implies_first),
+                        ] {
+                            assert_eq!(
+                                sequents.sequents.iter().any(|sequent| {
+                                    matches!(sequent,
+                                        Sequent::ImplicationContradiction {
+                                            ante: actual_ante,
+                                            post: actual_post,
+                                        } if *actual_ante == ante && *actual_post == post)
+                                }),
+                                expected,
+                            );
+                        }
+                    }
                 }
             }
         }
+    }
+
+    #[test]
+    fn cross_provenance_implication_rejects_a_negative_consequence() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let int = known_instance(db, KnownClass::Int);
+        let bool = known_instance(db, KnownClass::Bool);
+        let builder = ConstraintSetBuilder::new();
+        let evidence = ConstraintSet::constrain_typevar_with_bounds(
+            db,
+            &env,
+            &builder,
+            t,
+            ConstraintBound::missing_lower(),
+            ConstraintBound::Evidence(bool),
+        );
+        let validity = ConstraintSet::constrain_typevar_with_bounds(
+            db,
+            &env,
+            &builder,
+            t,
+            ConstraintBound::missing_lower(),
+            ConstraintBound::Validity(int),
+        );
+
+        let contradictory = evidence.and(db, &builder, || validity.negate(db, &builder));
+        assert!(contradictory.is_never_satisfied(db, &env));
+
+        let satisfiable = validity.and(db, &builder, || evidence.negate(db, &builder));
+        assert!(!satisfiable.is_never_satisfied(db, &env));
+    }
+
+    #[test]
+    fn pair_derived_implication_preserves_cross_provenance_contradictions() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+        let int_or_str = UnionType::from_elements(db, &env, [int, str]);
+        let builder = ConstraintSetBuilder::new();
+        let relationship =
+            ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, Type::TypeVar(u));
+        let validity = ConstraintSet::constrain_typevar_with_bounds(
+            db,
+            &env,
+            &builder,
+            u,
+            ConstraintBound::missing_lower(),
+            ConstraintBound::Validity(int),
+        );
+        let evidence =
+            ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, int_or_str);
+        let not_evidence = evidence.negate(db, &builder);
+
+        assert!(
+            relationship
+                .and(db, &builder, || validity)
+                .and(db, &builder, || not_evidence)
+                .is_never_satisfied(db, &env)
+        );
+        assert!(
+            !relationship
+                .and(db, &builder, || not_evidence)
+                .is_never_satisfied(db, &env)
+        );
     }
 
     #[test]

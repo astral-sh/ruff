@@ -449,9 +449,6 @@ def _[T, U: Any, V]() -> None:
     static_assert(not ~upper_bounds)
 
     both = ConstraintSet.equality(T, Both)
-    # XXX: Restore this simplification without using gradual assignability to derive transitive
-    # sequent implications.
-    # error: [static-assert-error]
     static_assert(both & upper_bounds == both)
 
     symbolic_static_mismatch = ConstraintSet.equality(T, tuple[U, int]) & ConstraintSet.equality(T, tuple[U, str])
