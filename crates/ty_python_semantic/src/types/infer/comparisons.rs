@@ -8,19 +8,18 @@ use std::cell::RefCell;
 
 use crate::ProgramEnvironment;
 use crate::types::call::{CallArguments, CallDunderError};
-use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
-    ComparisonSoundnessPolicy, ContainerElementEqualityEvaluator, equality_truthiness,
-    inequality_truthiness,
+    ComparisonOperator as EqualityOperator, ComparisonSoundnessPolicy, TupleEqualityEvaluator,
+    equality_result_truthiness,
 };
 use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
+    IntersectionType, KnownBoundMethodType, KnownClass, LiteralValueType, LiteralValueType,
     LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type, TypeContext,
     TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
@@ -628,6 +627,15 @@ enum RichCompareOperator {
     Le,
 }
 
+impl From<EqualityOperator> for RichCompareOperator {
+    fn from(operator: EqualityOperator) -> Self {
+        match operator {
+            EqualityOperator::Equality => Self::Eq,
+            EqualityOperator::Inequality => Self::Ne,
+        }
+    }
+}
+
 impl From<RichCompareOperator> for ast::CmpOp {
     fn from(value: RichCompareOperator) -> Self {
         match value {
@@ -665,6 +673,35 @@ impl RichCompareOperator {
             RichCompareOperator::Ge => RichCompareOperator::Le,
         }
     }
+
+    const fn as_ordering(self) -> Option<OrderingOperator> {
+        match self {
+            RichCompareOperator::Gt => Some(OrderingOperator::Gt),
+            RichCompareOperator::Ge => Some(OrderingOperator::Ge),
+            RichCompareOperator::Lt => Some(OrderingOperator::Lt),
+            RichCompareOperator::Le => Some(OrderingOperator::Le),
+            RichCompareOperator::Eq | RichCompareOperator::Ne => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum OrderingOperator {
+    Gt,
+    Ge,
+    Lt,
+    Le,
+}
+
+impl From<OrderingOperator> for RichCompareOperator {
+    fn from(operator: OrderingOperator) -> Self {
+        match operator {
+            OrderingOperator::Gt => Self::Gt,
+            OrderingOperator::Ge => Self::Ge,
+            OrderingOperator::Lt => Self::Lt,
+            OrderingOperator::Le => Self::Le,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -689,28 +726,28 @@ impl From<MembershipOperator> for ast::CmpOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum NonEqualityOperator {
+    Ordering(OrderingOperator),
+    Membership(MembershipOperator),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum NonIdentityOperator {
-    Rich(RichCompareOperator),
+    Equality(EqualityOperator),
+    Ordering(OrderingOperator),
     Membership(MembershipOperator),
 }
 
 impl NonIdentityOperator {
-    fn truthiness<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        left: Type<'db>,
-        right: Type<'db>,
-        soundness_policy: ComparisonSoundnessPolicy,
-    ) -> Truthiness {
+    const fn as_non_equality(self) -> Option<NonEqualityOperator> {
         match self {
-            Self::Rich(RichCompareOperator::Eq) => {
-                equality_truthiness(db, env, left, right, soundness_policy)
+            NonIdentityOperator::Equality(_) => None,
+            NonIdentityOperator::Ordering(operator) => {
+                Some(NonEqualityOperator::Ordering(operator))
             }
-            Self::Rich(RichCompareOperator::Ne) => {
-                inequality_truthiness(db, env, left, right, soundness_policy)
+            NonIdentityOperator::Membership(operator) => {
+                Some(NonEqualityOperator::Membership(operator))
             }
-            _ => Truthiness::Ambiguous,
         }
     }
 }
@@ -718,8 +755,9 @@ impl NonIdentityOperator {
 impl From<NonIdentityOperator> for ast::CmpOp {
     fn from(value: NonIdentityOperator) -> Self {
         match value {
-            NonIdentityOperator::Rich(rich_op) => rich_op.into(),
-            NonIdentityOperator::Membership(membership_op) => membership_op.into(),
+            NonIdentityOperator::Equality(operator) => RichCompareOperator::from(operator).into(),
+            NonIdentityOperator::Ordering(operator) => RichCompareOperator::from(operator).into(),
+            NonIdentityOperator::Membership(operator) => operator.into(),
         }
     }
 }
@@ -813,12 +851,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 .negate_if(op == ast::CmpOp::IsNot);
             return Ok(Type::from_truthiness(db, env, truthiness));
         }
-        ast::CmpOp::Eq => NonIdentityOperator::Rich(RichCompareOperator::Eq),
-        ast::CmpOp::NotEq => NonIdentityOperator::Rich(RichCompareOperator::Ne),
-        ast::CmpOp::Lt => NonIdentityOperator::Rich(RichCompareOperator::Lt),
-        ast::CmpOp::LtE => NonIdentityOperator::Rich(RichCompareOperator::Le),
-        ast::CmpOp::Gt => NonIdentityOperator::Rich(RichCompareOperator::Gt),
-        ast::CmpOp::GtE => NonIdentityOperator::Rich(RichCompareOperator::Ge),
+        ast::CmpOp::Eq => NonIdentityOperator::Equality(EqualityOperator::Equality),
+        ast::CmpOp::NotEq => NonIdentityOperator::Equality(EqualityOperator::Inequality),
+        ast::CmpOp::Lt => NonIdentityOperator::Ordering(OrderingOperator::Lt),
+        ast::CmpOp::LtE => NonIdentityOperator::Ordering(OrderingOperator::Le),
+        ast::CmpOp::Gt => NonIdentityOperator::Ordering(OrderingOperator::Gt),
+        ast::CmpOp::GtE => NonIdentityOperator::Ordering(OrderingOperator::Ge),
         ast::CmpOp::In => NonIdentityOperator::Membership(MembershipOperator::In),
         ast::CmpOp::NotIn => NonIdentityOperator::Membership(MembershipOperator::NotIn),
     };
@@ -851,7 +889,8 @@ fn infer_binary_type_comparison_inner<'db>(
         };
 
         match op {
-            NonIdentityOperator::Rich(rich_op) => rich_comparison(rich_op),
+            NonIdentityOperator::Equality(operator) => rich_comparison(operator.into()),
+            NonIdentityOperator::Ordering(operator) => rich_comparison(operator.into()),
             NonIdentityOperator::Membership(membership_op) => {
                 membership_test_comparison(membership_op, range)
             }
@@ -861,7 +900,20 @@ fn infer_binary_type_comparison_inner<'db>(
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
 
-    if let NonIdentityOperator::Rich(rich_op) = op
+    if let NonIdentityOperator::Equality(operator) = op
+        && let Some(truthiness) =
+            equality_result_truthiness(db, env, left, right, operator, soundness_policy)
+    {
+        return Ok(Type::from_truthiness(db, env, truthiness));
+    }
+
+    let rich_op = match op {
+        NonIdentityOperator::Equality(operator) => Some(operator.into()),
+        NonIdentityOperator::Ordering(operator) => Some(operator.into()),
+        NonIdentityOperator::Membership(_) => None,
+    };
+
+    if let Some(rich_op) = rich_op
         && let Some(left_tuple) = left.tuple_instance_spec(db, env)
         && let Some(right_tuple) = right.tuple_instance_spec(db, env)
     {
@@ -877,15 +929,6 @@ fn infer_binary_type_comparison_inner<'db>(
         let truthiness = fixed_membership_truthiness(context, left, right_tuple.elements_slice())
             .negate_if(op.is_not_in());
         return Ok(Type::from_truthiness(db, env, truthiness));
-    }
-
-    // An intersection can supply a custom comparison even when another component inherits
-    // `object.__eq__`. Check its return type before using boolean-only simplifications.
-    if !left.is_intersection() && !right.is_intersection() {
-        let comparison_truthiness = op.truthiness(db, env, left, right, soundness_policy);
-        if comparison_truthiness != Truthiness::Ambiguous {
-            return Ok(Type::from_truthiness(db, env, comparison_truthiness));
-        }
     }
 
     let comparison_result = match (left, right) {
@@ -1113,30 +1156,26 @@ fn infer_binary_type_comparison_inner<'db>(
             }
         }
 
-        (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
+        (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal))
+            if let Some(operator) = op.as_non_equality() =>
+        {
             match (left_literal.kind(), right_literal.kind()) {
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => {
-                    Some(match op {
-                        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
-                            Ok(Type::bool_literal(n == m))
-                        }
-                        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
-                            Ok(Type::bool_literal(n != m))
-                        }
-                        NonIdentityOperator::Rich(RichCompareOperator::Lt) => {
+                    Some(match operator {
+                        NonEqualityOperator::Ordering(OrderingOperator::Lt) => {
                             Ok(Type::bool_literal(n < m))
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Le) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Le) => {
                             Ok(Type::bool_literal(n <= m))
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Gt) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Gt) => {
                             Ok(Type::bool_literal(n > m))
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Ge) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Ge) => {
                             Ok(Type::bool_literal(n >= m))
                         }
                         // Undefined for (int, int)
-                        NonIdentityOperator::Membership(_) => Err(UnsupportedComparisonError {
+                        NonEqualityOperator::Membership(_) => Err(UnsupportedComparisonError {
                             op: op.into(),
                             left_ty: left,
                             right_ty: right,
@@ -1196,29 +1235,23 @@ fn infer_binary_type_comparison_inner<'db>(
                 ) => {
                     let s1 = salsa_s1.value(db);
                     let s2 = salsa_s2.value(db);
-                    let result = match op {
-                        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
-                            Type::bool_literal(s1 == s2)
-                        }
-                        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
-                            Type::bool_literal(s1 != s2)
-                        }
-                        NonIdentityOperator::Rich(RichCompareOperator::Lt) => {
+                    let result = match operator {
+                        NonEqualityOperator::Ordering(OrderingOperator::Lt) => {
                             Type::bool_literal(s1 < s2)
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Le) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Le) => {
                             Type::bool_literal(s1 <= s2)
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Gt) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Gt) => {
                             Type::bool_literal(s1 > s2)
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Ge) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Ge) => {
                             Type::bool_literal(s1 >= s2)
                         }
-                        NonIdentityOperator::Membership(MembershipOperator::In) => {
+                        NonEqualityOperator::Membership(MembershipOperator::In) => {
                             Type::bool_literal(s2.contains(s1))
                         }
-                        NonIdentityOperator::Membership(MembershipOperator::NotIn) => {
+                        NonEqualityOperator::Membership(MembershipOperator::NotIn) => {
                             Type::bool_literal(!s2.contains(s1))
                         }
                     };
@@ -1228,87 +1261,29 @@ fn infer_binary_type_comparison_inner<'db>(
                 (LiteralValueTypeKind::Bytes(salsa_b1), LiteralValueTypeKind::Bytes(salsa_b2)) => {
                     let b1 = salsa_b1.value(db);
                     let b2 = salsa_b2.value(db);
-                    let result = match op {
-                        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
-                            Type::bool_literal(b1 == b2)
-                        }
-                        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
-                            Type::bool_literal(b1 != b2)
-                        }
-                        NonIdentityOperator::Rich(RichCompareOperator::Lt) => {
+                    let result = match operator {
+                        NonEqualityOperator::Ordering(OrderingOperator::Lt) => {
                             Type::bool_literal(b1 < b2)
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Le) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Le) => {
                             Type::bool_literal(b1 <= b2)
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Gt) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Gt) => {
                             Type::bool_literal(b1 > b2)
                         }
-                        NonIdentityOperator::Rich(RichCompareOperator::Ge) => {
+                        NonEqualityOperator::Ordering(OrderingOperator::Ge) => {
                             Type::bool_literal(b1 >= b2)
                         }
-                        NonIdentityOperator::Membership(MembershipOperator::In) => {
+                        NonEqualityOperator::Membership(MembershipOperator::In) => {
                             Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
                         }
-                        NonIdentityOperator::Membership(MembershipOperator::NotIn) => {
+                        NonEqualityOperator::Membership(MembershipOperator::NotIn) => {
                             Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
                         }
                     };
                     Some(Ok(result))
                 }
 
-                // Same-kind exact literals and the special relationship between `int` and `bool`
-                // are handled above. Any remaining pair of exact builtin literals compares
-                // unequal. `LiteralString` also compares unequal to non-string literals, but its
-                // comparison with an exact string literal remains ambiguous.
-                (
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::String(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::String(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                )
-                | (
-                    LiteralValueTypeKind::LiteralString,
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                )
-                | (
-                    LiteralValueTypeKind::Int(_)
-                    | LiteralValueTypeKind::Bool(_)
-                    | LiteralValueTypeKind::Bytes(_),
-                    LiteralValueTypeKind::LiteralString,
-                ) if let NonIdentityOperator::Rich(
-                    rich @ (RichCompareOperator::Eq | RichCompareOperator::Ne),
-                ) = op =>
-                {
-                    Some(Ok(Type::bool_literal(rich == RichCompareOperator::Ne)))
-                }
-                _ => None,
-            }
-        }
-
-        (
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-        ) => {
-            let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(db, env, left.constraints(db));
-            let right = constraints.load(db, env, right.constraints(db));
-            let equivalent =
-                left.iff(db, &constraints, right)
-                    .is_always_satisfied(db, env, TypeVarSet::None);
-            match op {
-                NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
-                    Some(Ok(Type::bool_literal(equivalent)))
-                }
-                NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
-                    Some(Ok(Type::bool_literal(!equivalent)))
-                }
                 _ => None,
             }
         }
@@ -1699,24 +1674,21 @@ fn infer_tuple_rich_comparison<'db>(
                     // or terminate here (if eq_result is false).
                     // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
                     eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
-                        let pairwise_compare_result = match op {
-                            RichCompareOperator::Lt
-                            | RichCompareOperator::Le
-                            | RichCompareOperator::Gt
-                            | RichCompareOperator::Ge => infer_binary_type_comparison_inner(
+                        let pairwise_compare_result = if let Some(ordering) = op.as_ordering() {
+                            infer_binary_type_comparison_inner(
                                 context,
                                 l_ty,
-                                NonIdentityOperator::Rich(op),
+                                NonIdentityOperator::Ordering(ordering),
                                 r_ty,
                                 range,
                                 visitor,
-                            )?,
+                            )?
+                        } else {
                             // For `==` and `!=`, the equality evaluator has already determined
                             // that these elements may differ.
                             // NOTE: The CPython implementation does not account for non-boolean return types
                             // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                            RichCompareOperator::Eq => Type::bool_literal(false),
-                            RichCompareOperator::Ne => Type::bool_literal(true),
+                            Type::bool_literal(op == RichCompareOperator::Ne)
                         };
 
                         builder = builder.add(pairwise_compare_result);
@@ -1750,23 +1722,20 @@ fn infer_tuple_rich_comparison<'db>(
         // compare lexicographically. However, we still need to verify that the
         // element types are comparable for ordering comparisons.
 
-        // For equality comparisons (==, !=), any two objects can be compared,
-        // and tuple equality always returns bool regardless of element __eq__ return types.
-        (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_))
-            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) =>
-        {
-            Ok(KnownClass::Bool.to_instance(db, env))
-        }
-
         // At least one variable-length: check all elements that could potentially be compared.
         // We use `try_for_each_element_pair` to iterate over all possible pairings.
         (left @ TupleSpec::Variable(_), right) | (left, right @ TupleSpec::Variable(_)) => {
+            // Any two objects can be compared for equality, and tuple equality always returns
+            // `bool` regardless of the element comparison return types.
+            let Some(ordering) = op.as_ordering() else {
+                return Ok(KnownClass::Bool.to_instance(db, env));
+            };
             let mut results = SmallVec::<[Type<'db>; 8]>::new();
             left.try_for_each_element_pair(db, right, |l_ty, r_ty| {
                 results.push(infer_binary_type_comparison_inner(
                     context,
                     l_ty,
-                    NonIdentityOperator::Rich(op),
+                    NonIdentityOperator::Ordering(ordering),
                     r_ty,
                     range,
                     visitor,
