@@ -110,8 +110,8 @@ use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    AnyOverTypeResult, TypeCollector, TypeKind, TypeVisitor, any_over_type, try_any_over_type,
+    walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -1889,6 +1889,15 @@ impl<'db> ConstraintBounds<'db> {
             !bound.has_typevar(db, env)
                 && !bound.has_unspecialized_type_var(db, env)
                 && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        })
+    }
+
+    fn has_incomplete_support(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        iter::chain(self.lower, self.upper).any(|bound| {
+            matches!(
+                try_any_over_type(db, env, bound, |_| false),
+                AnyOverTypeResult::SkippedLazyTypeAttributes
+            )
         })
     }
 
@@ -4694,7 +4703,7 @@ impl InteriorNode {
         });
 
         if !self.node().is_single_conjunction(storage) {
-            return PathAssignments::new(constraints, FxHashSet::default());
+            return PathAssignments::new(constraints, FxHashSet::default(), FxHashSet::default());
         }
 
         let mut independent_typevars = FxHashSet::default();
@@ -4711,31 +4720,23 @@ impl InteriorNode {
 
         independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
 
-        if !independent_typevars.is_empty()
-            && constraints.iter().any(|constraint_id| {
-                let constraint = storage.constraint_data(*constraint_id);
-                let support = storage.constraint_support(*constraint_id);
-
-                iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
-                    any_over_type(db, env, bound, true, |ty| {
-                        let Type::TypeVar(typevar) = ty else {
-                            return false;
-                        };
-
-                        !support.iter().any(|supported| {
-                            storage.typevar_data(supported) == typevar.identity(db)
-                        })
-                    })
-                })
-            })
-        {
-            // Constraint support intentionally does not evaluate lazy attributes such as type
-            // aliases and protocol members. Nested sequent discovery does inspect them, however,
-            // so an incomplete support set cannot safely prove that two constraints are independent.
-            independent_typevars.clear();
+        let mut incomplete_support_constraints = FxHashSet::default();
+        if !independent_typevars.is_empty() {
+            incomplete_support_constraints.extend(constraints.iter().copied().filter(
+                |constraint| {
+                    storage
+                        .constraint_data(*constraint)
+                        .bounds
+                        .has_incomplete_support(db, env)
+                },
+            ));
         }
 
-        PathAssignments::new(constraints, independent_typevars)
+        PathAssignments::new(
+            constraints,
+            independent_typevars,
+            incomplete_support_constraints,
+        )
     }
 }
 
@@ -6431,6 +6432,9 @@ pub(crate) struct PathAssignments {
     /// discovery.
     independent_typevars: FxHashSet<TypeVarId>,
 
+    /// Constraints whose lazy attributes may hide relationships absent from their support.
+    incomplete_support_constraints: FxHashSet<ConstraintId>,
+
     /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
 
@@ -6498,6 +6502,7 @@ impl PathAssignments {
     fn new(
         constraints: impl IntoIterator<Item = ConstraintId>,
         independent_typevars: FxHashSet<TypeVarId>,
+        incomplete_support_constraints: FxHashSet<ConstraintId>,
     ) -> Self {
         let discovered = constraints
             .into_iter()
@@ -6510,6 +6515,7 @@ impl PathAssignments {
             discovered,
             elaborated_pairs: FxHashSet::default(),
             independent_typevars,
+            incomplete_support_constraints,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
@@ -6814,6 +6820,16 @@ impl PathAssignments {
             return;
         }
 
+        if existing.is_none()
+            && !self.independent_typevars.is_empty()
+            && storage
+                .constraint_data(constraint)
+                .bounds
+                .has_incomplete_support(db, env)
+        {
+            self.incomplete_support_constraints.insert(constraint);
+        }
+
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
         self.sequents.extend_from_slice(&single_map.sequents);
 
@@ -6832,6 +6848,8 @@ impl PathAssignments {
                     .iter()
                     .chain(constraint_support.iter())
                     .any(|typevar| self.independent_typevars.contains(&typevar))
+                && !self.incomplete_support_constraints.contains(existing)
+                && !self.incomplete_support_constraints.contains(&constraint)
             {
                 continue;
             }
@@ -8784,7 +8802,9 @@ mod tests {
     ) -> PathAssignments {
         let mut storage = builder.storage.borrow_mut();
         match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
+            Node::AlwaysTrue | Node::AlwaysFalse => {
+                PathAssignments::new([], FxHashSet::default(), FxHashSet::default())
+            }
             Node::Interior(interior) => {
                 interior.path_assignments(db, env, &mut storage, source_order)
             }
