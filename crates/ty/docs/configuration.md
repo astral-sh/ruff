@@ -1,6 +1,33 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
+## `baseline`
+
+Path to a JSON file containing diagnostics that should be treated as baselined.
+
+Relative paths are resolved relative to the project root.
+
+**Default value**: `null`
+
+**Type**: `str`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty]
+    baseline = "ty-baseline.json"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    baseline = "ty-baseline.json"
+    ```
+
+---
+
 ## `rules`
 
 Configures the enabled rules and their severity.

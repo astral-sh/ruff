@@ -263,3 +263,72 @@ fn fix_clean_file() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn fix_skips_baselined_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("pyproject.toml", "[tool.ty]\nbaseline = 'baseline.json'\n"),
+        (
+            "unused_ignore.py",
+            "x = 1  # ty: ignore[unresolved-reference]\n",
+        ),
+    ])?;
+    assert_cmd_snapshot!(case.command().args(["--warn", "unused-ignore-comment", "--update-baseline"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated baseline `<temp_dir>/baseline.json` with 1 diagnostic.
+
+    ----- stderr -----
+    ");
+
+    case.write_file(
+        "unused_ignore.py",
+        "x = 1  # ty: ignore[unresolved-reference]\ny = 2  # ty: ignore[unresolved-reference]\n",
+    )?;
+    assert_cmd_snapshot!(case.command().args(["--warn", "unused-ignore-comment", "--fix"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Found 1 diagnostic (1 fixed, 0 remaining).
+
+    ----- stderr -----
+    ");
+    assert_snapshot!(fs::read_to_string(case.root().join("unused_ignore.py"))?, @"
+    x = 1  # ty: ignore[unresolved-reference]
+    y = 2
+    ");
+    Ok(())
+}
+
+#[test]
+fn add_ignore_skips_baselined_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("pyproject.toml", "[tool.ty]\nbaseline = 'baseline.json'\n"),
+        ("errors.py", "x: int = 'wrong'\n"),
+    ])?;
+    assert_cmd_snapshot!(case.command().arg("--update-baseline"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated baseline `<temp_dir>/baseline.json` with 1 diagnostic.
+
+    ----- stderr -----
+    ");
+
+    case.write_file("errors.py", "x: int = 'wrong'\nprint(missing)\n")?;
+    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 1 ignore comment
+
+    ----- stderr -----
+    ");
+    assert_snapshot!(fs::read_to_string(case.root().join("errors.py"))?, @r#"
+    x: int = 'wrong'
+    print(missing)  # ty: ignore[unresolved-reference]
+    "#);
+    Ok(())
+}

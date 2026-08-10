@@ -39,6 +39,7 @@ Program:
     vendored://stdlib,
   ]
 Settings: Settings {
+    baseline: None,
     rules: <RULES>,
     terminal: TerminalSettings {
         output_format: Full,

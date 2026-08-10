@@ -59,6 +59,17 @@ use ty_static::EnvVars;
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
+    /// Path to a JSON file containing diagnostics that should be treated as baselined.
+    ///
+    /// Relative paths are resolved relative to the project root.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "str",
+        example = r#"baseline = "ty-baseline.json""#
+    )]
+    pub baseline: Option<RelativePathBuf>,
+
     /// Configures the type checking environment.
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -510,6 +521,10 @@ impl Options {
         let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
+            baseline: self
+                .baseline
+                .as_ref()
+                .map(|path| path.absolute(project_root, db.system())),
             rules: Arc::new(rules),
             terminal,
             src,

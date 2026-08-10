@@ -778,7 +778,6 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
-    #[expect(dead_code)]
     pub(crate) fn write_file(
         &self,
         path: impl AsRef<SystemPath>,

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ruff_db::files::File;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
@@ -24,6 +25,7 @@ use crate::{Db, glob::IncludeExcludeFilter};
 /// Settings that are part of [`ty_python_core::program::ProgramSettings`] are not included here.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct Settings {
+    pub(super) baseline: Option<SystemPathBuf>,
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
     pub(super) src: SrcSettings,
@@ -38,6 +40,10 @@ pub struct Settings {
 }
 
 impl Settings {
+    pub fn baseline(&self) -> Option<&SystemPath> {
+        self.baseline.as_deref()
+    }
+
     fn rules(&self) -> &RuleSelection {
         &self.rules
     }

@@ -365,6 +365,10 @@ enum FixMode {
 
 impl FixMode {
     fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+        if is_hidden_lint(diagnostic) {
+            return false;
+        }
+
         let Some(primary_span) = diagnostic.primary_span() else {
             return false;
         };
@@ -391,6 +395,7 @@ impl FixMode {
             FixMode::Suppress => {
                 let suppressable_diagnostics: Vec<_> = file_diagnostics
                     .iter()
+                    .filter(|diagnostic| !is_hidden_lint(diagnostic))
                     .filter_map(|diagnostic| {
                         let lint_id = diagnostic.id().as_lint()?;
 
@@ -422,6 +427,7 @@ impl FixMode {
             }
             FixMode::ApplyFixes(applicability) => file_diagnostics
                 .iter()
+                .filter(|diagnostic| !is_hidden_lint(diagnostic))
                 .filter(|diagnostic| diagnostic.has_applicable_fix(applicability))
                 .filter_map(|diagnostic| {
                     diagnostic.fix().cloned().map(|fix| ApplicableFix {
@@ -432,6 +438,10 @@ impl FixMode {
                 .collect(),
         }
     }
+}
+
+fn is_hidden_lint(diagnostic: &Diagnostic) -> bool {
+    diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint()
 }
 
 struct ApplicableFix {
