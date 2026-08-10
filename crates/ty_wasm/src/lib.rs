@@ -1221,11 +1221,13 @@ pub enum Severity {
     Warning,
     Error,
     Fatal,
+    Hint,
 }
 
 impl From<diagnostic::Severity> for Severity {
     fn from(value: diagnostic::Severity) -> Self {
         match value {
+            diagnostic::Severity::Hint => Self::Hint,
             diagnostic::Severity::Info => Self::Info,
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,

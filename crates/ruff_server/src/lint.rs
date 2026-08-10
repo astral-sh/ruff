@@ -387,6 +387,7 @@ fn to_lsp_diagnostic(
     } else {
         (
             match diagnostic.severity() {
+                ruff_db::diagnostic::Severity::Hint => lsp_types::DiagnosticSeverity::Hint,
                 ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::Information,
                 ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::Warning,
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,
