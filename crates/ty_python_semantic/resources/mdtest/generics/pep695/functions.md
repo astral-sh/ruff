@@ -2132,9 +2132,8 @@ See: <https://github.com/astral-sh/ty/issues/2728>
 def callee[T: (int, str)](x: T) -> T:
     return x
 
-# XXX: Domain-aware solving currently unions `T`'s alternatives instead of preserving `S`.
 def caller[S: (int, str)](x: S) -> S:
-    return callee(x)  # error: [invalid-return-type]
+    return callee(x)
 
 reveal_type(caller(1))  # revealed: int
 reveal_type(caller("hello"))  # revealed: str
@@ -2146,9 +2145,8 @@ A constrained TypeVar with a subset of constraints is also compatible:
 def wide[T: (int, str, bytes)](x: T) -> T:
     return x
 
-# XXX: Preserve `S` instead of unioning its compatible alternatives.
 def narrow[S: (int, str)](x: S) -> S:
-    return wide(x)  # error: [invalid-return-type]
+    return wide(x)
 
 reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
@@ -2183,9 +2181,6 @@ A contravariant callback can contribute both another constrained type variable a
 `object` upper bound. The inferred result should retain the other type variable in either callback
 order.
 
-XXX: Domain-aware solving currently loses this relationship and unions the constrained TypeVar's
-alternatives. Restore the `S` result and remove the resulting argument and return diagnostics.
-
 ```py
 from collections.abc import Callable
 
@@ -2199,23 +2194,17 @@ def forward_object[S: (int, str)](
     specific: Callable[[S], None],
     redundant: Callable[[object], None],
 ) -> S:
-    # TODO: no error
-    result = select(specific, redundant)  # error: [invalid-argument-type]
-    # TODO: revealed: S@forward_object
-    reveal_type(result)  # revealed: int | str
-    # TODO: no error
-    return result  # error: [invalid-return-type]
+    result = select(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_object
+    return result
 
 def forward_object_reversed[S: (int, str)](
     specific: Callable[[S], None],
     redundant: Callable[[object], None],
 ) -> S:
-    # TODO: no error
-    result = select(redundant, specific)  # error: [invalid-argument-type]
-    # TODO: revealed: S@forward_object_reversed
-    reveal_type(result)  # revealed: int | str
-    # TODO: no error
-    return result  # error: [invalid-return-type]
+    result = select(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_object_reversed
+    return result
 ```
 
 A union of the type variable's constraints is also a redundant upper bound, even though it is not
@@ -2226,23 +2215,17 @@ def forward_union[S: (int, str)](
     specific: Callable[[S], None],
     redundant: Callable[[int | str], None],
 ) -> S:
-    # TODO: no error
-    result = select(specific, redundant)  # error: [invalid-argument-type]
-    # TODO: revealed: S@forward_union
-    reveal_type(result)  # revealed: int | str
-    # TODO: no error
-    return result  # error: [invalid-return-type]
+    result = select(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_union
+    return result
 
 def forward_union_reversed[S: (int, str)](
     specific: Callable[[S], None],
     redundant: Callable[[int | str], None],
 ) -> S:
-    # TODO: no error
-    result = select(redundant, specific)  # error: [invalid-argument-type]
-    # TODO: revealed: S@forward_union_reversed
-    reveal_type(result)  # revealed: str | int
-    # TODO: no error
-    return result  # error: [invalid-return-type]
+    result = select(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_union_reversed
+    return result
 ```
 
 The same relationship must survive a redundant, non-`object` nominal superclass shared by both
@@ -2263,23 +2246,17 @@ def forward_nominal[S: (Left, Right)](
     specific: Callable[[S], None],
     redundant: Callable[[Base], None],
 ) -> S:
-    # TODO: no error
-    result = select_nominal(specific, redundant)  # error: [invalid-argument-type]
-    # TODO: revealed: S@forward_nominal
-    reveal_type(result)  # revealed: Left | Right
-    # TODO: no error
-    return result  # error: [invalid-return-type]
+    result = select_nominal(specific, redundant)
+    reveal_type(result)  # revealed: S@forward_nominal
+    return result
 
 def forward_nominal_reversed[S: (Left, Right)](
     specific: Callable[[S], None],
     redundant: Callable[[Base], None],
 ) -> S:
-    # TODO: no error
-    result = select_nominal(redundant, specific)  # error: [invalid-argument-type]
-    # TODO: revealed: S@forward_nominal_reversed
-    reveal_type(result)  # revealed: Right | Left
-    # TODO: no error
-    return result  # error: [invalid-return-type]
+    result = select_nominal(redundant, specific)
+    reveal_type(result)  # revealed: S@forward_nominal_reversed
+    return result
 ```
 
 ## Display ordering

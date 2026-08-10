@@ -5863,7 +5863,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                let solutions = path_bounds.solve_with(|_path_bounds, variance, path_bound| {
                     let identity = path_bound.bound_typevar.identity(db);
                     variance_map
                         .entry(identity)
@@ -5987,7 +5987,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, bounds) and returns Some(ty) to override the default
         // solution, or None to keep it.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: &PathBound<'db>| {
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>,
+                             path_bounds: &PathBounds<'db>,
+                             bounds: &PathBound<'db>| {
             let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, self.env);
 
             // For constrained TypeVars, the inferred type is already one of the
@@ -6019,7 +6021,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             // The promotion override must not select an unsatisfiable solution.
-            let Ok(Some(solution)) = PathBounds::default_solve(db, self.env, constraints, bounds)
+            let Ok(Some(solution)) = path_bounds.default_solve(db, self.env, constraints, bounds)
             else {
                 return None;
             };
@@ -6036,18 +6038,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Some(promoted)
         };
 
-        let mut choose = |typevar: BoundTypeVarInstance<'db>, bounds: Option<&PathBound<'db>>| {
-            let bounds = bounds?;
-            let lower = bounds.evidence_lower?;
+        let mut choose =
+            |typevar: BoundTypeVarInstance<'db>,
+             context: Option<(&PathBounds<'db>, &PathBound<'db>)>| {
+                let (path_bounds, bounds) = context?;
+                let lower = bounds.evidence_lower?;
 
-            if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(db))
-                && lower.is_assignable_to(db, self.env, preferred_ty)
-            {
-                return Some(preferred_ty);
-            }
+                if let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(db))
+                    && lower.is_assignable_to(db, self.env, preferred_ty)
+                {
+                    return Some(preferred_ty);
+                }
 
-            maybe_promote(typevar, bounds)
-        };
+                maybe_promote(typevar, path_bounds, bounds)
+            };
         let inference = match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
             Err(()) => builder.build_diagnostic_inference_with(
@@ -7689,7 +7693,7 @@ impl<'db> Binding<'db> {
                 generic_context.inferable_typevars(db),
             );
 
-            let solutions = path_bounds.solve_with(|_variance, path_bound| {
+            let solutions = path_bounds.solve_with(|_path_bounds, _variance, path_bound| {
                 PathBounds::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {

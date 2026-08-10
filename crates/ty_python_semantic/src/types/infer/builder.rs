@@ -7363,7 +7363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let path_bounds =
                     identity_instance.assignable_solutions_with_inferable(db, env, tcx, inferable);
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                let solutions = path_bounds.solve_with(|_path_bounds, variance, path_bound| {
                     let identity = path_bound.bound_typevar.identity(db);
                     elt_tcx_variance
                         .entry(identity)
@@ -7720,8 +7720,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = collection_alias
             .origin(self.db())
             .apply_specialization(db, |_| {
-                builder.build_with(|current_typevar, bounds| {
-                    let lower = bounds?.evidence_lower?;
+                builder.build_with(|current_typevar, context| {
+                    let (_, bounds) = context?;
+                    let lower = bounds.evidence_lower?;
 
                     let lower = if is_empty_collection_type_context(tcx) {
                         // Constraints learned from later collection uses follow the same promotion
