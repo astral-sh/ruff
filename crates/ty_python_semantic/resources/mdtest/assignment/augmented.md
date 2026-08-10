@@ -426,23 +426,23 @@ def update(counter: Counter | None) -> None:
     counter.count += 1
 ```
 
-An augmented assignment cannot define an instance attribute: it must read an existing value before
-writing the result. Both the initial read and a later access should report the missing attribute.
+An augmented assignment should not define an otherwise missing instance attribute, because it must
+read an existing value before writing its result. We currently treat it like an ordinary
+self-referential assignment instead.
 
 ```py
 class UninitializedCounter:
     def increment(self) -> None:
-        # error: [unresolved-attribute]
+        # TODO: Report an unresolved-attribute error instead of implicitly defining the attribute.
         self.value += 1
 
-# error: [unresolved-attribute]
-reveal_type(UninitializedCounter().value)  # revealed: Unknown
+reveal_type(UninitializedCounter().value)  # revealed: Divergent
 ```
 
 ## Dynamically provided attributes
 
-A dynamic attribute hook does not make an augmented assignment a valid way to introduce an instance
-attribute. Ordinary attribute reads still use the return type of `__getattr__`.
+A dynamic attribute hook can provide the initial value read by an augmented assignment. The
+assignment currently infers a divergent attribute type instead of preserving the hook's return type.
 
 ```py
 class DynamicCounter:
@@ -450,10 +450,10 @@ class DynamicCounter:
         return 0
 
     def increment(self) -> None:
-        # error: [unresolved-attribute]
         self.value += 1
 
-reveal_type(DynamicCounter().value)  # revealed: int
+# TODO: Infer `int` from the dynamic attribute hook.
+reveal_type(DynamicCounter().value)  # revealed: Divergent
 ```
 
 The same behavior applies when the attribute is provided by `__getattribute__`.
@@ -464,10 +464,30 @@ class InterceptedCounter:
         return 0
 
     def increment(self) -> None:
-        # error: [unresolved-attribute]
         self.value += 1
 
-reveal_type(InterceptedCounter().value)  # revealed: int
+reveal_type(InterceptedCounter().value)  # revealed: Divergent
+```
+
+## Class-level defaults in diamond inheritance
+
+An overriding class-level default supplies the initial value even when another branch of the
+inheritance hierarchy declares a wider instance attribute.
+
+```py
+class Base:
+    value: int | None = None
+
+class First(Base): ...
+
+class Second(Base):
+    value: int | None
+
+class Child(First, Second):
+    value: int = 1
+
+    def update(self) -> None:
+        self.value |= 2
 ```
 
 ## Invalid subscript reads
