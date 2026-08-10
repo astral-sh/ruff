@@ -44,7 +44,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.212")]
+#[violation_metadata(stable_since = "v0.0.212", category = "complexity")]
 pub(crate) struct DuplicateIsinstanceCall {
     name: Option<String>,
 }
@@ -93,7 +93,7 @@ impl Violation for DuplicateIsinstanceCall {
 /// ## References
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213")]
+#[violation_metadata(stable_since = "v0.0.213", category = "pedantic")]
 pub(crate) struct CompareWithTuple {
     replacement: String,
 }
@@ -127,7 +127,7 @@ impl AlwaysFixableViolation for CompareWithTuple {
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = "correctness")]
 pub(crate) struct ExprAndNotExpr {
     name: String,
 }
@@ -160,7 +160,7 @@ impl AlwaysFixableViolation for ExprAndNotExpr {
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = "correctness")]
 pub(crate) struct ExprOrNotExpr {
     name: String,
 }
@@ -213,7 +213,7 @@ pub(crate) enum ContentAround {
 /// a = x or [1]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "correctness")]
 pub(crate) struct ExprOrTrue {
     expr: String,
     remove: ContentAround,
@@ -266,7 +266,7 @@ impl AlwaysFixableViolation for ExprOrTrue {
 /// a = x and []
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "correctness")]
 pub(crate) struct ExprAndFalse {
     expr: String,
     remove: ContentAround,

@@ -30,7 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E225
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MissingWhitespaceAroundOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
@@ -70,7 +70,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E226
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
@@ -110,7 +110,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E227
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
@@ -150,7 +150,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E228
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MissingWhitespaceAroundModuloOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {

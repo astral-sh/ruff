@@ -54,7 +54,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 /// [overload]: https://docs.python.org/3/library/typing.html#typing.overload
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.48")]
+#[violation_metadata(stable_since = "v0.0.48", category = "pedantic")]
 pub(crate) struct BuiltinArgumentShadowing {
     name: String,
 }

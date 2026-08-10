@@ -25,7 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.199")]
+#[violation_metadata(stable_since = "v0.0.199", category = "suspicious")]
 pub(crate) struct DeprecatedCElementTree;
 
 impl AlwaysFixableViolation for DeprecatedCElementTree {

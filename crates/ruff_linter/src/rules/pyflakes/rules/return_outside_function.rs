@@ -18,7 +18,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: `return`](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = "correctness")]
 pub(crate) struct ReturnOutsideFunction;
 
 impl Violation for ReturnOutsideFunction {

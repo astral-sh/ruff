@@ -24,7 +24,7 @@ use crate::Violation;
 /// ## References
 /// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.39")]
+#[violation_metadata(stable_since = "v0.0.39", category = "pedantic")]
 pub(crate) struct ForwardAnnotationSyntaxError {
     pub parse_error: String,
 }

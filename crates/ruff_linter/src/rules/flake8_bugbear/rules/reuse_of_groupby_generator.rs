@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///         do_something_with_the_group(values)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = "correctness")]
 pub(crate) struct ReuseOfGroupbyGenerator;
 
 impl Violation for ReuseOfGroupbyGenerator {

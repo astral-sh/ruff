@@ -42,7 +42,7 @@ use crate::checkers::ast::Checker;
 ///     X: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = "correctness")]
 pub(crate) struct ComplexAssignmentInStub;
 
 impl Violation for ComplexAssignmentInStub {

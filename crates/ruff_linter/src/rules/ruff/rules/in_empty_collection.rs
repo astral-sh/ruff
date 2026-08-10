@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// print("got it!")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = "pedantic")]
 pub(crate) struct InEmptyCollection;
 
 impl Violation for InEmptyCollection {

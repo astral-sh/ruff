@@ -56,7 +56,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## Options
 /// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.48")]
+#[violation_metadata(stable_since = "v0.0.48", category = "pedantic")]
 pub(crate) struct BuiltinAttributeShadowing {
     kind: Kind,
     name: String,

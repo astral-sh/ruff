@@ -37,7 +37,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = "correctness")]
 pub(crate) struct ShebangLeadingWhitespace;
 
 impl AlwaysFixableViolation for ShebangLeadingWhitespace {

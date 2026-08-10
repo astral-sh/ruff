@@ -33,7 +33,7 @@ enum Reason {
 /// my_mock.assert_called()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.266")]
+#[violation_metadata(stable_since = "v0.0.266", category = "correctness")]
 pub(crate) struct InvalidMockAccess {
     reason: Reason,
 }

@@ -60,7 +60,7 @@ use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_da
 ///     mutable_default: ClassVar[list[int]] = []
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = "suspicious")]
 pub(crate) struct MutableDataclassDefault;
 
 impl Violation for MutableDataclassDefault {

@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///         contents = await f.read()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "suspicious")]
 pub(crate) struct BlockingOpenCallInAsyncFunction;
 
 impl Violation for BlockingOpenCallInAsyncFunction {

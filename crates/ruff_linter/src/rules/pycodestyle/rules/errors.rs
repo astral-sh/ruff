@@ -25,7 +25,7 @@ use crate::Violation;
 /// - [UNIX Permissions introduction](https://mason.gmu.edu/~montecin/UNIXpermiss.htm)
 /// - [Command Line Basics: Symbolic Links](https://www.digitalocean.com/community/tutorials/workflow-symbolic-links)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = "correctness")]
 pub struct IOError {
     pub message: String,
 }

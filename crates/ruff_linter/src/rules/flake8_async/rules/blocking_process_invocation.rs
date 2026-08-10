@@ -37,7 +37,7 @@ use crate::checkers::ast::Checker;
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "suspicious")]
 pub(crate) struct CreateSubprocessInAsyncFunction;
 
 impl Violation for CreateSubprocessInAsyncFunction {
@@ -77,7 +77,7 @@ impl Violation for CreateSubprocessInAsyncFunction {
 ///     asyncio.create_subprocess_shell(cmd)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "suspicious")]
 pub(crate) struct RunProcessInAsyncFunction;
 
 impl Violation for RunProcessInAsyncFunction {
@@ -122,7 +122,7 @@ impl Violation for RunProcessInAsyncFunction {
 ///     await asyncio.loop.run_in_executor(None, wait_for_process)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "suspicious")]
 pub(crate) struct WaitForProcessInAsyncFunction;
 
 impl Violation for WaitForProcessInAsyncFunction {

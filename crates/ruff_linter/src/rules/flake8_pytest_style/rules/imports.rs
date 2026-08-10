@@ -23,7 +23,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// import pytest
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "pedantic")]
 pub(crate) struct PytestIncorrectPytestImport;
 
 impl Violation for PytestIncorrectPytestImport {

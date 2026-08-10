@@ -48,7 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `Lock Objects`](https://docs.python.org/3/library/threading.html#lock-objects)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "correctness")]
 pub(crate) struct UselessWithLock;
 
 impl Violation for UselessWithLock {

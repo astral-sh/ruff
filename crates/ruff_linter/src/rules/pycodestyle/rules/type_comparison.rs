@@ -49,7 +49,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.39")]
+#[violation_metadata(stable_since = "v0.0.39", category = "pedantic")]
 pub(crate) struct TypeComparison;
 
 impl Violation for TypeComparison {

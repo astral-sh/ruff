@@ -55,7 +55,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "correctness")]
 pub(crate) struct SuperWithoutBrackets;
 
 impl AlwaysFixableViolation for SuperWithoutBrackets {

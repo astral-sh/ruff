@@ -26,7 +26,7 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// def long_name(x): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.35")]
+#[violation_metadata(stable_since = "v0.0.35", category = "pedantic")]
 pub(crate) struct AmbiguousFunctionName(pub String);
 
 impl Violation for AmbiguousFunctionName {

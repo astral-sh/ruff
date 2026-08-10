@@ -45,7 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.68")]
+#[violation_metadata(stable_since = "v0.0.68", category = "pedantic")]
 pub(crate) struct MissingBlankLineAfterSummary {
     num_lines: usize,
 }

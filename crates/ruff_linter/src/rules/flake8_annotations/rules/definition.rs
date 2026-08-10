@@ -38,7 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingTypeFunctionArgument {
     name: String,
 }
@@ -74,7 +74,7 @@ impl Violation for MissingTypeFunctionArgument {
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingTypeArgs {
     name: String,
 }
@@ -110,7 +110,7 @@ impl Violation for MissingTypeArgs {
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingTypeKwargs {
     name: String,
 }
@@ -241,7 +241,7 @@ impl Violation for MissingTypeCls {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
     annotation: Option<String>,
@@ -295,7 +295,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
     annotation: Option<String>,
@@ -356,7 +356,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///
 /// - `lint.flake8-annotations.mypy-init-return`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingReturnTypeSpecialMethod {
     name: String,
     annotation: Option<String>,
@@ -408,7 +408,7 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///
 /// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingReturnTypeStaticMethod {
     name: String,
     annotation: Option<String>,
@@ -460,7 +460,7 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///
 /// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", category = "pedantic")]
 pub(crate) struct MissingReturnTypeClassMethod {
     name: String,
     annotation: Option<String>,
@@ -533,7 +533,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.108")]
+#[violation_metadata(stable_since = "v0.0.108", category = "pedantic")]
 pub(crate) struct AnyType {
     name: String,
 }

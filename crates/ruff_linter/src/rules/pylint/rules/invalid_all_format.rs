@@ -27,7 +27,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## References
 /// - [Python documentation: The `import` statement](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.237")]
+#[violation_metadata(stable_since = "v0.0.237", category = "correctness")]
 pub(crate) struct InvalidAllFormat;
 
 impl Violation for InvalidAllFormat {

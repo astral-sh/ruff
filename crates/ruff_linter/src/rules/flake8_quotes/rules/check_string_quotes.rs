@@ -37,7 +37,7 @@ use crate::rules::flake8_quotes::settings::Quote;
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.88")]
+#[violation_metadata(stable_since = "v0.0.88", category = "formatting")]
 pub(crate) struct BadQuotesInlineString {
     preferred_quote: Quote,
 }
@@ -95,7 +95,7 @@ impl Violation for BadQuotesInlineString {
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.88")]
+#[violation_metadata(stable_since = "v0.0.88", category = "formatting")]
 pub(crate) struct BadQuotesMultilineString {
     preferred_quote: Quote,
 }
@@ -151,7 +151,7 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.88")]
+#[violation_metadata(stable_since = "v0.0.88", category = "formatting")]
 pub(crate) struct BadQuotesDocstring {
     preferred_quote: Quote,
 }

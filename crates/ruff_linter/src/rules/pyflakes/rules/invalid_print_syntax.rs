@@ -47,7 +47,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.39")]
+#[violation_metadata(stable_since = "v0.0.39", category = "correctness")]
 pub(crate) struct InvalidPrintSyntax;
 
 impl Violation for InvalidPrintSyntax {

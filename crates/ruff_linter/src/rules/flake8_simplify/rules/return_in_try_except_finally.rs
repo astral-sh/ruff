@@ -41,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Defining Clean-up Actions](https://docs.python.org/3/tutorial/errors.html#defining-clean-up-actions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = "correctness")]
 pub(crate) struct ReturnInTryExceptFinally;
 
 impl Violation for ReturnInTryExceptFinally {

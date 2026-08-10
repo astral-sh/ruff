@@ -39,7 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "complexity")]
 pub(crate) struct IfExprMinMax {
     min_max: MinMax,
     expression: SourceCodeSnippet,

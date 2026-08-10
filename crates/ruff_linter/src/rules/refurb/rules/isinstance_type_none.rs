@@ -33,7 +33,7 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "complexity")]
 pub(crate) struct IsinstanceTypeNone;
 
 impl Violation for IsinstanceTypeNone {

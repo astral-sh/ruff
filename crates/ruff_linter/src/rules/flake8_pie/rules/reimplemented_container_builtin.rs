@@ -38,7 +38,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "complexity")]
 pub(crate) struct ReimplementedContainerBuiltin {
     container: Container,
 }

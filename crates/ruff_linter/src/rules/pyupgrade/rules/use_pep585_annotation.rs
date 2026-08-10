@@ -62,7 +62,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [PEP 585]: https://peps.python.org/pep-0585/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = "suspicious")]
 pub(crate) struct NonPEP585Annotation {
     from: String,
     to: String,

@@ -46,7 +46,7 @@ use crate::rules::flake8_gettext::is_ngettext_call;
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = "suspicious")]
 pub(crate) struct FormatInGetTextFuncCall {
     is_plural: bool,
 }

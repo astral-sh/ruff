@@ -56,7 +56,7 @@ use crate::checkers::ast::Checker;
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.252")]
+#[violation_metadata(stable_since = "v0.0.252", category = "pedantic")]
 pub(crate) struct RedefinedLoopName {
     name: String,
     outer_kind: OuterBindingKind,

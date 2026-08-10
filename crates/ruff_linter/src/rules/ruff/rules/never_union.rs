@@ -40,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = "correctness")]
 pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,

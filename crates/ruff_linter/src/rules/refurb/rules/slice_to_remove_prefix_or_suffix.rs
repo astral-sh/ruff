@@ -42,7 +42,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the expression contains comments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = "complexity")]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
     affix_kind: AffixKind,
     stmt_or_expression: StmtOrExpr,

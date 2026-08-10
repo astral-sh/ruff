@@ -101,7 +101,7 @@ use crate::linter::float::is_infinity_string_literal;
 /// - [NumPy documentation: `numpy.allclose`](https://numpy.org/doc/stable/reference/generated/numpy.allclose.html#numpy-allclose)
 /// - [PyTorch documentation: `torch.isclose`](https://docs.pytorch.org/docs/stable/generated/torch.isclose.html#torch-isclose)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.1")]
+#[violation_metadata(preview_since = "0.15.1", category = "pedantic")]
 pub(crate) struct FloatEqualityComparison<'a> {
     left: &'a str,
     right: &'a str,

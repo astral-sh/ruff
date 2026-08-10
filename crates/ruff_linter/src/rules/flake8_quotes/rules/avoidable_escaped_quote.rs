@@ -38,7 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.88")]
+#[violation_metadata(stable_since = "v0.0.88", category = "formatting")]
 pub(crate) struct AvoidableEscapedQuote;
 
 impl AlwaysFixableViolation for AvoidableEscapedQuote {

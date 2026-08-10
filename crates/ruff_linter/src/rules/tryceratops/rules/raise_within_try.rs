@@ -50,7 +50,7 @@ use crate::checkers::ast::Checker;
 ///         raise
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.233")]
+#[violation_metadata(stable_since = "v0.0.233", category = "pedantic")]
 pub(crate) struct RaiseWithinTry;
 
 impl Violation for RaiseWithinTry {

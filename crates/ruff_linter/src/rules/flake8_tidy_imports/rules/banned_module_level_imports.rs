@@ -43,7 +43,7 @@ use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, 
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-module-level-imports`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = "restriction")]
 pub(crate) struct BannedModuleLevelImports {
     name: String,
 }

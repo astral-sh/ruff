@@ -43,7 +43,7 @@ use crate::{FixAvailability, Violation};
 /// }
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = "correctness")]
 pub(crate) struct DuplicateValue {
     value: String,
     existing: String,

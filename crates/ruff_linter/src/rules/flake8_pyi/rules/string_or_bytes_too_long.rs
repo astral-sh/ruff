@@ -36,7 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// def foo(arg: str = ...) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = "pedantic")]
 pub(crate) struct StringOrBytesTooLong;
 
 impl AlwaysFixableViolation for StringOrBytesTooLong {

@@ -40,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.224")]
+#[violation_metadata(stable_since = "v0.0.224", category = "style")]
 pub(crate) struct FString;
 
 impl Violation for FString {

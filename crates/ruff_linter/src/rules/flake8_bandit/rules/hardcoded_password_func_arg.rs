@@ -35,7 +35,7 @@ use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal
 /// ## References
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116")]
+#[violation_metadata(stable_since = "v0.0.116", category = "security")]
 pub(crate) struct HardcodedPasswordFuncArg {
     name: String,
 }

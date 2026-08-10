@@ -25,7 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// print("Hello, world")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.228")]
+#[violation_metadata(stable_since = "v0.0.228", category = "complexity")]
 pub(crate) struct ExtraneousParentheses;
 
 impl AlwaysFixableViolation for ExtraneousParentheses {

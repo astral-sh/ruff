@@ -49,7 +49,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [D211]: https://docs.astral.sh/ruff/rules/blank-line-before-class
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "formatting")]
 pub(crate) struct IncorrectBlankLineBeforeClass;
 
 impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
@@ -102,7 +102,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineBeforeClass {
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "formatting")]
 pub(crate) struct IncorrectBlankLineAfterClass;
 
 impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
@@ -150,7 +150,7 @@ impl AlwaysFixableViolation for IncorrectBlankLineAfterClass {
 ///
 /// [D203]: https://docs.astral.sh/ruff/rules/incorrect-blank-line-before-class
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "formatting")]
 pub(crate) struct BlankLineBeforeClass;
 
 impl AlwaysFixableViolation for BlankLineBeforeClass {

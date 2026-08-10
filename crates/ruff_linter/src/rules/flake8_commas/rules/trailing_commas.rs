@@ -153,7 +153,7 @@ impl Context {
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223")]
+#[violation_metadata(stable_since = "v0.0.223", category = "formatting")]
 pub(crate) struct MissingTrailingComma;
 
 impl AlwaysFixableViolation for MissingTrailingComma {
@@ -199,7 +199,7 @@ impl AlwaysFixableViolation for MissingTrailingComma {
 /// foo = (json.dumps({"bar": 1}),)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223")]
+#[violation_metadata(stable_since = "v0.0.223", category = "pedantic")]
 pub(crate) struct TrailingCommaOnBareTuple;
 
 impl Violation for TrailingCommaOnBareTuple {
@@ -235,7 +235,7 @@ impl Violation for TrailingCommaOnBareTuple {
 ///
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.223")]
+#[violation_metadata(stable_since = "v0.0.223", category = "formatting")]
 pub(crate) struct ProhibitedTrailingComma;
 
 impl AlwaysFixableViolation for ProhibitedTrailingComma {

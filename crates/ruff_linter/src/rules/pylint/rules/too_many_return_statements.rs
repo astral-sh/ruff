@@ -52,7 +52,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## Options
 /// - `lint.pylint.max-returns`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.242")]
+#[violation_metadata(stable_since = "v0.0.242", category = "pedantic")]
 pub(crate) struct TooManyReturnStatements {
     returns: usize,
     max_returns: usize,

@@ -36,7 +36,7 @@ use crate::Violation;
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.150")]
+#[violation_metadata(stable_since = "v0.0.150", category = "correctness")]
 pub(crate) struct AwaitOutsideAsync;
 
 impl Violation for AwaitOutsideAsync {

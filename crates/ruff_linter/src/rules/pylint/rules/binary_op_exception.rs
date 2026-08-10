@@ -47,7 +47,7 @@ impl From<&ast::BoolOp> for BoolOp {
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = "correctness")]
 pub(crate) struct BinaryOpException {
     op: BoolOp,
 }

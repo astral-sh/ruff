@@ -36,7 +36,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     print("Hello")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = "suspicious")]
 pub(crate) struct IfWithSameArms;
 
 impl Violation for IfWithSameArms {

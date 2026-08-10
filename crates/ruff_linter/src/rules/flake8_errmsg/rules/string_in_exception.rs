@@ -54,7 +54,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.flake8-errmsg.max-string-length`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.183")]
+#[violation_metadata(stable_since = "v0.0.183", category = "pedantic")]
 pub(crate) struct RawStringInException;
 
 impl Violation for RawStringInException {
@@ -110,7 +110,7 @@ impl Violation for RawStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.183")]
+#[violation_metadata(stable_since = "v0.0.183", category = "pedantic")]
 pub(crate) struct FStringInException;
 
 impl Violation for FStringInException {
@@ -167,7 +167,7 @@ impl Violation for FStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.183")]
+#[violation_metadata(stable_since = "v0.0.183", category = "pedantic")]
 pub(crate) struct DotFormatInException;
 
 impl Violation for DotFormatInException {

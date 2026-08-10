@@ -73,7 +73,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python Annotations Best Practices](https://docs.python.org/3.14/howto/annotations.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = "suspicious")]
 pub(crate) struct AccessAnnotationsFromClassDict {
     python_version: PythonVersion,
 }

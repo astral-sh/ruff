@@ -65,7 +65,7 @@ use crate::rules::flake8_pytest_style::types;
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "pedantic")]
 pub(crate) struct PytestParametrizeNamesWrongType {
     single_argument: bool,
     expected: types::ParametrizeNameType,
@@ -200,7 +200,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "pedantic")]
 pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
@@ -282,7 +282,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = "correctness")]
 pub(crate) struct PytestDuplicateParametrizeTestCases {
     index: usize,
 }

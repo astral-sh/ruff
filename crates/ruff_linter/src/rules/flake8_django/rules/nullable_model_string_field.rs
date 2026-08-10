@@ -41,7 +41,7 @@ use crate::rules::flake8_django::helpers;
 ///     field = models.CharField(max_length=255, default="")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = "pedantic")]
 pub(crate) struct DjangoNullableModelStringField {
     field_name: String,
 }

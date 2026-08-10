@@ -36,7 +36,7 @@ use crate::preview::is_baseloader_safe_in_yaml_load_enabled;
 /// - [PyYAML documentation: Loading YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 /// - [Common Weakness Enumeration: CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.212")]
+#[violation_metadata(stable_since = "v0.0.212", category = "security")]
 pub(crate) struct UnsafeYAMLLoad {
     pub loader: Option<String>,
 }

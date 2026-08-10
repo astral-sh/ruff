@@ -56,7 +56,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.mccabe.max-complexity`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.127")]
+#[violation_metadata(stable_since = "v0.0.127", category = "restriction")]
 pub(crate) struct ComplexStructure {
     name: String,
     complexity: usize,

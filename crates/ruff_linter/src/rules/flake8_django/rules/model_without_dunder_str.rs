@@ -41,7 +41,7 @@ use crate::rules::flake8_django::helpers;
 ///         return f"{self.field}"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = "pedantic")]
 pub(crate) struct DjangoModelWithoutDunderStr;
 
 impl Violation for DjangoModelWithoutDunderStr {

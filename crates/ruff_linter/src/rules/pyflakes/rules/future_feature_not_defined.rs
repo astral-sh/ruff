@@ -13,7 +13,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: `__future__`](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.34")]
+#[violation_metadata(stable_since = "v0.0.34", category = "correctness")]
 pub(crate) struct FutureFeatureNotDefined {
     pub name: String,
 }

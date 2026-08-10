@@ -46,7 +46,7 @@ use crate::registry::Rule;
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = "suspicious")]
 pub(crate) struct UnrecognizedPlatformCheck;
 
 impl Violation for UnrecognizedPlatformCheck {
@@ -85,7 +85,7 @@ impl Violation for UnrecognizedPlatformCheck {
 /// ## References
 /// - [Typing documentation: Version and Platform checking](https://typing.python.org/en/latest/spec/directives.html#version-and-platform-checks)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = "suspicious")]
 pub(crate) struct UnrecognizedPlatformName {
     platform: String,
 }

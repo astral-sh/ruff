@@ -46,7 +46,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218")]
+#[violation_metadata(stable_since = "v0.0.218", category = "pedantic")]
 pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -100,7 +100,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.261")]
+#[violation_metadata(stable_since = "v0.0.261", category = "pedantic")]
 pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,

@@ -46,7 +46,7 @@ use crate::rules::flake8_pytest_style::helpers::{is_empty_or_null_string, is_pyt
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = "pedantic")]
 pub(crate) struct PytestFailWithoutMessage;
 
 impl Violation for PytestFailWithoutMessage {

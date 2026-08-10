@@ -50,7 +50,7 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.221")]
+#[violation_metadata(stable_since = "v0.0.221", category = "pedantic")]
 pub(crate) struct MagicValueComparison {
     value: String,
 }

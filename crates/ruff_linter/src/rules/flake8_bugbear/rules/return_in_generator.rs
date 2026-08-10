@@ -79,7 +79,7 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 ///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.8")]
+#[violation_metadata(preview_since = "v0.4.8", category = "pedantic")]
 pub(crate) struct ReturnInGenerator;
 
 impl Violation for ReturnInGenerator {

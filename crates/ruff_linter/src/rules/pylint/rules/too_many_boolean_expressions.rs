@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-bool-expr`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", category = "pedantic")]
 pub(crate) struct TooManyBooleanExpressions {
     expressions: usize,
     max_expressions: usize,
