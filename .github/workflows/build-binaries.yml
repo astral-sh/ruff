@@ -37,7 +37,7 @@ env:
 jobs:
   sdist:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -224,7 +224,7 @@ jobs:
 
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest-4
     strategy:
       matrix:
         target:
@@ -282,7 +282,7 @@ jobs:
 
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     strategy:
       matrix:
         platform:
@@ -372,7 +372,7 @@ jobs:
 
   musllinux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     strategy:
       matrix:
         target:
@@ -433,7 +433,7 @@ jobs:
 
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     strategy:
       matrix:
         platform:
