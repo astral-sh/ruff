@@ -2386,6 +2386,19 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Return an inferred type without substituting a default for an unsolved variable.
+    pub(crate) fn get(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        let index = self
+            .generic_context(db)
+            .variables_inner(db)
+            .get_index_of(&typevar.identity(db))?;
+        self.types(db).get(index).copied().flatten()
+    }
+
     /// Prefer a declared candidate when the inferred candidate is assignable to it.
     ///
     /// This preserves a constructor's context-derived specialization when argument inference
@@ -2587,9 +2600,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let inferred = self.constraint_set_types(Some(self.inferred_pending), |bounds| {
             PathBounds::default_solve(db, env, constraints, bounds)
         });
+        let default_depends_on_inferred = |typevar: BoundTypeVarInstance<'db>| {
+            typevar.default_type(db).is_some_and(|default| {
+                any_over_type(db, env, default, false, |ty| {
+                    matches!(
+                        ty,
+                        Type::TypeVar(dependency)
+                            if inferred.contains_key(&dependency.identity(db))
+                    )
+                })
+            })
+        };
+        let inferred_with_defaults = generic_context
+            .variables(db)
+            .any(|typevar| {
+                let identity = typevar.identity(db);
+                !inferred.contains_key(&identity)
+                    && declared.contains_key(&identity)
+                    && default_depends_on_inferred(typevar)
+            })
+            .then(|| {
+                self.typevar_inference(generic_context, &inferred)
+                    .specialization(db)
+            });
 
         // Keep the inferred candidate when the declared constraints do not change the solver's
-        // default solution. Otherwise, prefer the declared candidate.
+        // default solution. Otherwise, prefer the declared candidate. An unsolved variable's
+        // resolved default remains preferable when it also satisfies the combined constraints.
         let mut choose_valid = |typevar: BoundTypeVarInstance<'db>,
                                 bounds: Option<&PathBound<'db>>| {
             let identity = typevar.identity(db);
@@ -2609,7 +2646,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
                 (Some(_), Some(declared)) => Some(declared),
                 (Some(inferred), _) => Some(inferred),
-                (None, declared) => declared,
+                (None, declared) => inferred_with_defaults
+                    .filter(|_| default_depends_on_inferred(typevar))
+                    .and_then(|specialization| specialization.get(db, typevar))
+                    .filter(|default| {
+                        bounds.is_none_or(|bounds| {
+                            bounds
+                                .valid_preferred_solution(db, env, constraints, *default)
+                                .is_some()
+                        })
+                    })
+                    .or(declared),
             }
             .filter(|candidate| !candidate.has_provisional_marker(db, env));
 

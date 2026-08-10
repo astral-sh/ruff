@@ -1045,6 +1045,7 @@ narrower argument-derived specialization.
 
 ```py
 from collections.abc import Callable
+from typing import Any
 
 def pick[T](
     values: list[T],
@@ -1055,6 +1056,70 @@ def pick[T](
 
 def use(values: list[str]) -> str | None:
     return pick(values, key=lambda value: reveal_type(value).upper())  # revealed: str
+```
+
+An argument-derived collection type remains useful even when its element type is gradual:
+
+```py
+def use_gradual(values: list[list[Any]]) -> list[Any] | None:
+    return pick(values, key=lambda value: reveal_type(value).append(1))  # revealed: list[Any]
+```
+
+## Defaulted type variables in nested generic calls
+
+A type-variable default that refers to an earlier type variable should preserve the earlier
+variable's inferred type when a generic outer call provides compatible context:
+
+```py
+from typing import Literal
+
+def with_default[T, U = T](value: T) -> tuple[T, U]:
+    raise NotImplementedError
+
+def identity[V](value: V) -> V:
+    return value
+
+result = identity(with_default(1))
+reveal_type(result)  # revealed: tuple[Literal[1], Literal[1]]
+
+def requires_one(value: Literal[1]) -> None: ...
+
+requires_one(result[1])
+```
+
+A contextual specialization can still override the default when that default does not satisfy the
+declared type:
+
+```py
+overridden: tuple[int, str] = with_default(1)
+```
+
+## Overloaded arguments unrelated to a parameter specification
+
+An unrelated overloaded argument should not prevent a generic callable from using its declared
+return context:
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+@overload
+def unrelated(value: int) -> int: ...
+@overload
+def unrelated(value: str) -> str: ...
+def unrelated(value: int | str) -> int | str:
+    return value
+
+def returns_int() -> int:
+    return 1
+
+def contextual_result[**P, T](
+    callback: Callable[P, T],
+    unrelated_callback: Callable[..., object],
+) -> list[T]:
+    raise NotImplementedError
+
+contextual: list[int | str] = contextual_result(returns_int, unrelated)
 ```
 
 ## Prefer the declared type of generic classes and callables

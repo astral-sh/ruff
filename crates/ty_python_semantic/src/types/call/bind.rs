@@ -5506,6 +5506,44 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.inference.map(|inference| inference.specialization(db))
     }
 
+    fn has_overloaded_paramspec_argument(&self) -> bool {
+        let db = self.db;
+
+        self.enumerate_argument_types()
+            .any(|(argument_index, _, _, argument_types)| {
+                self.argument_matches[argument_index]
+                    .iter()
+                    .any(|matched_parameter| {
+                        let argument_is_overloaded = matched_parameter
+                            .argument_type
+                            .or_else(|| argument_types.get_default())
+                            .and_then(|actual| actual.try_upcast_to_callable(db, self.env))
+                            .is_some_and(|callables| {
+                                callables
+                                    .iter()
+                                    .any(|callable| callable.signatures(db).overloads.len() > 1)
+                            });
+
+                        if !argument_is_overloaded {
+                            return false;
+                        }
+
+                        let formal =
+                            self.signature.parameters()[matched_parameter.index].annotated_type();
+                        any_over_type(db, self.env, formal, false, |ty| {
+                            matches!(
+                                ty,
+                                Type::TypeVar(typevar)
+                                    if typevar.is_paramspec(db)
+                                        && typevar
+                                            .without_paramspec_attr(db)
+                                            .is_inferable(db, self.inferable_typevars)
+                            )
+                        })
+                    })
+            })
+    }
+
     fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let db = self.db;
         let Some(generic_context) = self.signature.generic_context else {
@@ -5530,21 +5568,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // context incorrectly applies `R = str` to both overloads. Keep those calls on the
             // legacy path until parameter-specification inference supports conjoined constraints.
             // Other `ParamSpec` calls still need their declared context, for example to normalize
-            // the signature of an explicitly specialized `staticmethod`. This currently checks
-            // every overloaded argument, even when that argument does not constrain the `ParamSpec`.
-            !generic_context
-                .variables(db)
-                .any(|typevar| typevar.is_paramspec(db))
-                || !self.arguments.iter_types().any(|argument_types| {
-                    argument_types
-                        .get_default()
-                        .and_then(|actual| actual.try_upcast_to_callable(db, self.env))
-                        .is_some_and(|callables| {
-                            callables
-                                .iter()
-                                .any(|callable| callable.signatures(db).overloads.len() > 1)
-                        })
-                })
+            // the signature of an explicitly specialized `staticmethod`. Only an overloaded
+            // argument matched to a parameter containing the `ParamSpec` requires the workaround.
+            !generic_context_has_paramspec(db, generic_context)
+                || !self.has_overloaded_paramspec_argument()
         });
         let mut filtered_return_context = None;
         let mut declared_constraints = None;
@@ -7026,10 +7053,20 @@ impl<'db> Binding<'db> {
                 let identity = typevar.identity(db);
 
                 let call_expression_constraints = return_type_solutions.get(&identity).copied();
+                // Raw inference distinguishes a real `Any` from the `Unknown` used to close an
+                // unsolved specialization. Other dynamic markers do not provide usable evidence.
                 let argument_constraints = self
-                    .specialization(db)
-                    .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_dynamic(db, env))
+                    .inference
+                    .and_then(|inference| {
+                        inference.get(db, typevar)?;
+                        inference.specialization(db).get(db, typevar)
+                    })
+                    .filter(|ty| {
+                        !any_over_type(db, env, *ty, false, |nested| {
+                            nested.is_dynamic()
+                                && !matches!(nested, Type::Dynamic(DynamicType::Any))
+                        })
+                    })
                     .map(|ty| ty.promote(db, env));
 
                 // The previous binding specialization already satisfies the argument constraints.
