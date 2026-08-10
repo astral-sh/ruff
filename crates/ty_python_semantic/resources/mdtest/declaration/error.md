@@ -15,8 +15,8 @@ An incompatible binding that predates the loop must still invalidate a declarati
 values = [1]
 
 while True:
-    values: list[object]  # error: [invalid-declaration]
-    values = [1]
+    values: list[str]  # error: [invalid-declaration]
+    values = ["a"]
 ```
 
 ## Incompatible declarations
