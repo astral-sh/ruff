@@ -63,6 +63,42 @@ def _(small: Literal[1, 2], large: Literal[2, 3]):
     reveal_type(small > large)  # revealed: Literal[False]
 ```
 
+## Custom equality return types
+
+Equality and inequality must preserve the custom return type from each alternative, even when other
+alternatives return a normal boolean.
+
+```py
+from typing import Literal
+
+class AEq: ...
+class ANe: ...
+class BEq: ...
+class BNe: ...
+
+class A:
+    def __eq__(self, other: object) -> AEq:  # error: [invalid-method-override]
+        return AEq()
+
+    def __ne__(self, other: object) -> ANe:  # error: [invalid-method-override]
+        return ANe()
+
+class B:
+    def __eq__(self, other: object) -> BEq:  # error: [invalid-method-override]
+        return BEq()
+
+    def __ne__(self, other: object) -> BNe:  # error: [invalid-method-override]
+        return BNe()
+
+def custom(value: A | B):
+    reveal_type(value == object())  # revealed: AEq | BEq
+    reveal_type(value != object())  # revealed: ANe | BNe
+
+def mixed(value: A | Literal[1, 2]):
+    reveal_type(value == 1)  # revealed: AEq | bool
+    reveal_type(value != 1)  # revealed: ANe | bool
+```
+
 ## Unsupported operations
 
 Make sure we emit a diagnostic if *any* of the possible comparisons is unsupported. For now, we fall
