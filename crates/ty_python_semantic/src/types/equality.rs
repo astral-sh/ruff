@@ -11,9 +11,10 @@ use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers}
 
 use super::{
     CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
+    constraints::ConstraintSetBuilder,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
 };
@@ -59,6 +60,9 @@ enum ComparisonResult<'db> {
 
     /// The comparison may evaluate to true or false, depending on runtime values.
     Ambiguous,
+
+    /// The comparison may evaluate either way, but its result is definitely a builtin `bool`.
+    AmbiguousBoolean,
 }
 
 /// The branch of a comparison for which a narrowing constraint is being computed.
@@ -104,7 +108,7 @@ impl<'db> ComparisonResult<'db> {
                 (branch == ComparisonBranch::Positive).then_some(Type::Never)
             }
             ComparisonResult::CanNarrow(narrowed) => Some(narrowed),
-            ComparisonResult::Ambiguous => None,
+            ComparisonResult::Ambiguous | ComparisonResult::AmbiguousBoolean => None,
         }
     }
 
@@ -117,6 +121,14 @@ impl<'db> ComparisonResult<'db> {
     fn discard_narrowing(self) -> Self {
         match self {
             ComparisonResult::CanNarrow(_) => ComparisonResult::Ambiguous,
+            result => result,
+        }
+    }
+
+    /// Preserve definite results while deferring ambiguous result-type inference to expressions.
+    fn defer(self) -> Self {
+        match self {
+            ComparisonResult::AmbiguousBoolean => ComparisonResult::Ambiguous,
             result => result,
         }
     }
@@ -259,7 +271,7 @@ pub(crate) fn equality_truthiness<'db>(
     right: Type<'db>,
     soundness_policy: ComparisonSoundnessPolicy,
 ) -> Truthiness {
-    comparison_truthiness(
+    equality_result_truthiness(
         db,
         env,
         left,
@@ -267,26 +279,7 @@ pub(crate) fn equality_truthiness<'db>(
         ComparisonOperator::Equality,
         soundness_policy,
     )
-}
-
-/// Return the truthiness of `left != right` when it is known for every represented runtime value.
-///
-/// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
-pub(super) fn inequality_truthiness<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    left: Type<'db>,
-    right: Type<'db>,
-    soundness_policy: ComparisonSoundnessPolicy,
-) -> Truthiness {
-    comparison_truthiness(
-        db,
-        env,
-        left,
-        right,
-        ComparisonOperator::Inequality,
-        soundness_policy,
-    )
+    .unwrap_or(Truthiness::Ambiguous)
 }
 
 /// Evaluates tuple-element equality while reusing the active-comparison-set allocation across a
@@ -338,23 +331,28 @@ impl<'db> TupleEqualityEvaluator<'db> {
     }
 }
 
-fn comparison_truthiness<'db>(
+/// Return equality truthiness when the comparison is known to produce a builtin `bool`.
+///
+/// `None` means expression inference must inspect the comparison methods to determine their
+/// result types or report invalid boolean conversions inside tuple comparisons.
+pub(super) fn equality_result_truthiness<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
     soundness_policy: ComparisonSoundnessPolicy,
-) -> Truthiness {
+) -> Option<Truthiness> {
     match ComparisonEvaluator::for_truthiness(db, env, soundness_policy).evaluate(
         left,
         right,
         ComparisonBranch::Positive,
         operator,
     ) {
-        ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
-        ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
-        ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => Truthiness::Ambiguous,
+        ComparisonResult::AlwaysTrue => Some(Truthiness::AlwaysTrue),
+        ComparisonResult::AlwaysFalse => Some(Truthiness::AlwaysFalse),
+        ComparisonResult::AmbiguousBoolean => Some(Truthiness::Ambiguous),
+        ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => None,
     }
 }
 
@@ -362,9 +360,8 @@ fn comparison_truthiness<'db>(
 ///
 /// The goal is only an optimization; both modes use the same comparison semantics and agree on
 /// which results are definite. [`Constraint`](Self::Constraint) preserves branch-specific narrowing
-/// for the left operand. [`Truthiness`](Self::Truthiness) can discard those constraints because its
-/// caller only needs to know whether every expanded alternative agrees, and can stop as soon as the
-/// comparison cannot be definite.
+/// for the left operand. [`Truthiness`](Self::Truthiness) discards those constraints while tracking
+/// whether every expanded alternative produces a builtin `bool`.
 ///
 /// For example, truthiness evaluation proves that this comparison is always false by checking the
 /// finite alternatives on both sides, without constructing a narrowing constraint:
@@ -671,14 +668,14 @@ fn evaluate_structural_comparison<'db>(
                     ComparisonResult::Ambiguous
                 }
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                evaluator.evaluate(constraints.as_type(db, env), other, branch, operator)
-            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => evaluator
+                .evaluate(constraints.as_type(db, env), other, branch, operator)
+                .defer(),
         },
         (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db, env) {
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                evaluator.evaluate(other, constraints.as_type(db, env), branch, operator)
-            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => evaluator
+                .evaluate(other, constraints.as_type(db, env), branch, operator)
+                .defer(),
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
 
@@ -744,10 +741,11 @@ fn evaluate_structural_comparison<'db>(
             LiteralOperand::Other,
         ),
 
-        (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
+        (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::AmbiguousBoolean,
         (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
             match evaluator.comparison_semantics(other, operator) {
-                Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
+                Some(KnownComparisonSemantics::Dict) => ComparisonResult::AmbiguousBoolean,
+                None => ComparisonResult::Ambiguous,
                 Some(_) => operator.result_from_equality(false),
             }
         }
@@ -768,6 +766,18 @@ fn evaluate_structural_comparison<'db>(
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(right_function)),
         ) if left_function == right_function => operator.result_from_equality(true),
+        (
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+        ) => {
+            let constraints = ConstraintSetBuilder::new();
+            let left = constraints.load(db, env, left.constraints(db));
+            let right = constraints.load(db, env, right.constraints(db));
+            operator.result_from_equality(
+                left.iff(db, &constraints, right)
+                    .is_always_satisfied(db, env),
+            )
+        }
         (left, right)
             if has_known_identity_comparison_semantics(db, env, left, operator)
                 && has_known_identity_comparison_semantics(db, env, right, operator) =>
@@ -1067,7 +1077,7 @@ fn evaluate_union_left<'db>(
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
     if evaluator.goal == ComparisonGoal::Truthiness {
-        return combine_definite_truthiness(
+        return combine_truthiness(
             elements
                 .iter()
                 .map(|element| evaluator.evaluate(*element, other, branch, operator)),
@@ -1128,7 +1138,7 @@ fn evaluate_target_union<'db>(
                 all_false = false;
                 narrowed.push(Some(narrowed_element));
             }
-            ComparisonResult::Ambiguous => {
+            ComparisonResult::Ambiguous | ComparisonResult::AmbiguousBoolean => {
                 all_true = false;
                 all_false = false;
                 narrowed.push(Some(*element));
@@ -1170,7 +1180,7 @@ fn evaluate_union_right<'db>(
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
     if evaluator.goal == ComparisonGoal::Truthiness {
-        return combine_definite_truthiness(
+        return combine_truthiness(
             elements
                 .iter()
                 .map(|element| evaluator.evaluate(left, *element, branch, operator)),
@@ -1189,32 +1199,38 @@ fn evaluate_union_right<'db>(
     )
 }
 
-/// Combine results when the caller only needs definite truthiness.
-///
-/// Any ambiguous or narrowing result, or any disagreement between definite results, makes the
-/// aggregate ambiguous. In each case, later alternatives cannot make it definite again.
-fn combine_definite_truthiness<'db>(
+/// Combine truthiness while preserving whether every alternative returns a builtin `bool`.
+fn combine_truthiness<'db>(
     results: impl IntoIterator<Item = ComparisonResult<'db>>,
 ) -> ComparisonResult<'db> {
-    let mut definite = None;
+    let mut any = false;
+    let mut all_true = true;
+    let mut all_false = true;
 
     for result in results {
-        let current = match result {
-            ComparisonResult::AlwaysTrue => true,
-            ComparisonResult::AlwaysFalse => false,
+        any = true;
+        match result {
+            ComparisonResult::AlwaysTrue => all_false = false,
+            ComparisonResult::AlwaysFalse => all_true = false,
+            ComparisonResult::AmbiguousBoolean => {
+                all_true = false;
+                all_false = false;
+            }
             ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
                 return ComparisonResult::Ambiguous;
             }
-        };
-
-        match definite {
-            Some(previous) if previous != current => return ComparisonResult::Ambiguous,
-            Some(_) => {}
-            None => definite = Some(current),
         }
     }
 
-    definite.map_or(ComparisonResult::Ambiguous, ComparisonResult::from_bool)
+    if !any {
+        ComparisonResult::Ambiguous
+    } else if all_true {
+        ComparisonResult::AlwaysTrue
+    } else if all_false {
+        ComparisonResult::AlwaysFalse
+    } else {
+        ComparisonResult::AmbiguousBoolean
+    }
 }
 
 /// Combine comparison results produced by alternatives of the non-target operand.
@@ -1253,7 +1269,7 @@ fn evaluate_against_results<'db>(
                 all_false = false;
                 builder = builder.add(narrowed);
             }
-            ComparisonResult::Ambiguous => {
+            ComparisonResult::Ambiguous | ComparisonResult::AmbiguousBoolean => {
                 all_true = false;
                 all_false = false;
                 builder = builder.add(target);
@@ -1283,7 +1299,7 @@ fn evaluate_intersection_left<'db>(
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
     if evaluator.goal == ComparisonGoal::Truthiness {
-        return combine_definite_truthiness(
+        return combine_truthiness(
             positive
                 .iter()
                 .map(|element| evaluator.evaluate(*element, other, branch, operator)),
@@ -1304,7 +1320,9 @@ fn evaluate_intersection_left<'db>(
                 any_narrowing = true;
                 builder.add_positive_in_place(narrowed);
             }
-            ComparisonResult::Ambiguous => any_ambiguous = true,
+            ComparisonResult::Ambiguous | ComparisonResult::AmbiguousBoolean => {
+                any_ambiguous = true;
+            }
         }
     }
 
@@ -1481,7 +1499,7 @@ fn compare_literal_to_other<'db>(
 
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
         return match evaluator.comparison_semantics(other, operator) {
-            Some(KnownComparisonSemantics::Str) => ComparisonResult::Ambiguous,
+            Some(KnownComparisonSemantics::Str) => ComparisonResult::AmbiguousBoolean,
             Some(_) => ComparisonResult::from_bool(operator == ComparisonOperator::Inequality),
             None => ComparisonResult::Ambiguous,
         };
@@ -1534,7 +1552,7 @@ fn compare_literal_to_other<'db>(
                 !condition_expects_equality,
             ))
         }
-        Some(_) => ComparisonResult::Ambiguous,
+        Some(_) => ComparisonResult::AmbiguousBoolean,
         None if literal_operand == LiteralOperand::Other && !condition_expects_equality => {
             ComparisonResult::CanNarrow(literal_type.negate(db, env))
         }
@@ -1575,31 +1593,43 @@ fn compare_nominal_instances<'db>(
     } else if left_semantics == KnownComparisonSemantics::Tuple
         && let Some(left_tuple) = left_instance.tuple_spec(db, env)
         && let Some(right_tuple) = right_instance.tuple_spec(db, env)
-        && let Some(left_tuple) = left_tuple.as_fixed_length()
-        && let Some(right_tuple) = right_tuple.as_fixed_length()
     {
+        let (Some(left_tuple), Some(right_tuple)) =
+            (left_tuple.as_fixed_length(), right_tuple.as_fixed_length())
+        else {
+            return ComparisonResult::AmbiguousBoolean;
+        };
         let left_elements = left_tuple.all_elements();
         let right_elements = right_tuple.all_elements();
-        if left_elements.len() != right_elements.len() {
+        // Narrowing can reject unequal lengths immediately. Expression inference still needs to
+        // inspect earlier elements because converting a custom equality result may raise.
+        if evaluator.goal == ComparisonGoal::Constraint
+            && left_elements.len() != right_elements.len()
+        {
             return operator.result_from_equality(false);
         }
 
-        let mut all_equal = true;
+        let mut any_ambiguous = false;
         for (&left, &right) in left_elements.iter().zip(right_elements) {
-            match evaluate_tuple_element_equality(evaluator, left, right) {
-                Truthiness::AlwaysTrue => {}
-                Truthiness::AlwaysFalse => return operator.result_from_equality(false),
-                Truthiness::Ambiguous => all_equal = false,
+            match evaluate_tuple_element_comparison(evaluator, left, right) {
+                ComparisonResult::AlwaysTrue => {}
+                ComparisonResult::AlwaysFalse => return operator.result_from_equality(false),
+                ComparisonResult::AmbiguousBoolean => any_ambiguous = true,
+                ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
+                    return ComparisonResult::Ambiguous;
+                }
             }
         }
 
-        if all_equal {
-            operator.result_from_equality(true)
+        if left_elements.len() != right_elements.len() {
+            operator.result_from_equality(false)
+        } else if any_ambiguous {
+            ComparisonResult::AmbiguousBoolean
         } else {
-            ComparisonResult::Ambiguous
+            operator.result_from_equality(true)
         }
     } else {
-        ComparisonResult::Ambiguous
+        ComparisonResult::AmbiguousBoolean
     }
 }
 
@@ -1608,9 +1638,24 @@ fn evaluate_tuple_element_equality<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
+    match evaluate_tuple_element_comparison(evaluator, left, right) {
+        ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
+        ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
+        ComparisonResult::CanNarrow(_)
+        | ComparisonResult::Ambiguous
+        | ComparisonResult::AmbiguousBoolean => Truthiness::Ambiguous,
+    }
+}
+
+/// Compare tuple elements without treating custom or non-reflexive results as builtin booleans.
+fn evaluate_tuple_element_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> ComparisonResult<'db> {
     let db = evaluator.db;
     if left == right && left.is_singleton(db, &evaluator.env) {
-        return Truthiness::AlwaysTrue;
+        return ComparisonResult::AlwaysTrue;
     }
 
     match evaluator.evaluate(
@@ -1619,23 +1664,22 @@ fn evaluate_tuple_element_equality<'db>(
         ComparisonBranch::Positive,
         ComparisonOperator::Equality,
     ) {
-        ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
         // Known comparison semantics are reflexive, so a false result rules out shared runtime
         // identity. Static disjointness alone is insufficient because `NewType` and similar
         // wrappers can erase their distinction at runtime.
         ComparisonResult::AlwaysFalse
-            if [left, right]
+            if ![left, right]
                 .into_iter()
                 .all(|ty| has_reflexive_equality_semantics(evaluator, ty)) =>
         {
-            Truthiness::AlwaysFalse
+            ComparisonResult::Ambiguous
         }
-        _ => Truthiness::Ambiguous,
+        result => result,
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum ComparisonOperator {
+pub(super) enum ComparisonOperator {
     Equality,
     Inequality,
 }
