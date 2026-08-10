@@ -4119,6 +4119,15 @@ pub(crate) enum PathBounds<'db> {
     Unconstrained,
     Constrained {
         paths: Vec<Box<[PathBound<'db>]>>,
+        /// A family-wide `TypeVar` relationship that is lost when the validity domain is expanded
+        /// into concrete paths.
+        ///
+        /// For example, when `callee(x: T) -> T` is called from `caller(x: S) -> S`, with both
+        /// `TypeVar`s constrained to `int` and `str`, the paths fix `T` to `int` and `str`
+        /// respectively. Solving either path in isolation therefore produces a concrete type, even
+        /// though the important fact is that the callee's `T` is whichever specialization the
+        /// caller's `S` has. This relationship belongs to the path family because no individual
+        /// path can distinguish `T := S` from its current concrete specialization.
         symbolic_default: Option<TypeVarSolution<'db>>,
     },
 }
@@ -4371,8 +4380,18 @@ impl<'db> PathBounds<'db> {
         )
     }
 
-    /// Recovers one bare `T := S` relationship only when `S`'s complete validity domain implies
-    /// the domain-conjoined constraint set after substituting `T` with `S`.
+    /// Preserves a bare `T := S` relationship that path extraction would otherwise erase.
+    ///
+    /// Validity domains are expanded before solving so that each path can be checked using ordinary
+    /// concrete bounds. That is useful for choosing constrained-TypeVar alternatives, but it loses
+    /// correlations between an inferable `TypeVar` and a `TypeVar` supplied by the caller: each
+    /// path remembers only the concrete alternative selected on that path. Without this recovery,
+    /// an identity-like call through two compatible `TypeVar`s returns the union of their
+    /// alternatives instead of retaining the caller's `TypeVar`.
+    ///
+    /// Agreement on one concrete path is not enough: seeing `T = int` alongside `S = int` does not
+    /// justify `T := S` if `S` can also be `str` but `T` cannot. The relationship is useful only if
+    /// it holds for every valid specialization of the caller's `TypeVar`.
     fn recover_symbolic_default(
         &self,
         db: &'db dyn Db,
@@ -4744,6 +4763,10 @@ impl<'db> PathBounds<'db> {
     }
 
     /// Selects the default solution for a typevar using the complete path family.
+    ///
+    /// A family-wide symbolic relationship takes precedence because an exact validity equality on
+    /// one path describes only that path's concrete alternative. Selecting the equality first
+    /// would discard the correlation that the family establishes.
     pub(crate) fn default_solve(
         &self,
         db: &'db dyn Db,
@@ -7969,135 +7992,6 @@ mod tests {
         PathBounds::Constrained {
             paths: paths.into_iter().map(Vec::into_boxed_slice).collect(),
             symbolic_default: None,
-        }
-    }
-
-    // XXX: Remove once solution extraction exercises validity domains.
-    #[test]
-    fn validity_domain_uses_supported_typevars_in_builder_order() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let int = known_instance(db, KnownClass::Int);
-        let str = known_instance(db, KnownClass::Str);
-        let bytes = known_instance(db, KnownClass::Bytes);
-        let gradual_upper = KnownClass::List.to_specialized_instance(db, &env, &[Type::any()]);
-        let bounded = create_typevar(db, "Bounded").map_bound_or_constraints(db, |_| {
-            Some(TypeVarBoundOrConstraints::UpperBound(gradual_upper))
-        });
-        let nested = create_typevar(db, "Nested")
-            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
-        let unbounded = create_typevar(db, "Unbounded");
-        let unused = create_typevar(db, "Unused")
-            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bytes)));
-        let nested_upper =
-            KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(nested)]);
-
-        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
-            let root = ConstraintSet::constrain_typevar_upper_bound(
-                db,
-                &env,
-                builder,
-                bounded,
-                nested_upper,
-            )
-            .and(db, builder, || {
-                ConstraintSet::constrain_typevar_lower_bound(db, &env, builder, unbounded, int)
-            });
-            builder.storage.borrow_mut().intern_typevar(db, unused);
-            root
-        });
-
-        owned.query(|builder, root| {
-            let mut storage = builder.storage.borrow_mut();
-            let (domain, source_order) = storage.validity_domain(db, &env, root.node);
-            let constraints: Vec<_> = storage
-                .calculate_source_orders(source_order)
-                .into_iter()
-                .map(|constraint| storage.constraint_data(constraint))
-                .collect();
-
-            assert_eq!(
-                constraints,
-                vec![
-                    Constraint {
-                        typevar: bounded,
-                        bounds: ConstraintBounds::new(
-                            ConstraintBound::missing_lower(),
-                            ConstraintBound::Validity(gradual_upper),
-                        ),
-                    },
-                    Constraint {
-                        typevar: nested,
-                        bounds: ConstraintBounds::new(
-                            ConstraintBound::missing_lower(),
-                            ConstraintBound::Validity(str),
-                        ),
-                    },
-                ]
-            );
-
-            let support: Vec<_> = storage
-                .node_support(domain)
-                .into_iter()
-                .flat_map(Support::iter)
-                .map(|typevar| storage.typevar_data(typevar))
-                .collect();
-            assert_eq!(support, vec![bounded, nested]);
-            assert_eq!(
-                storage.validity_domain(db, &env, ALWAYS_TRUE),
-                (ALWAYS_TRUE, None)
-            );
-            assert_eq!(
-                storage.validity_domain(db, &env, ALWAYS_FALSE),
-                (ALWAYS_TRUE, None)
-            );
-        });
-    }
-
-    // XXX: Remove once solution extraction exercises validity domains.
-    #[test]
-    fn validity_domain_preserves_exact_gradual_declared_constraints() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let int = known_instance(db, KnownClass::Int);
-        let list_any = KnownClass::List.to_specialized_instance(db, &env, &[Type::any()]);
-        let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
-
-        for alternatives in [[Type::any(), int], [list_any, list_int]] {
-            let typevar = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
-                Some(TypeVarBoundOrConstraints::Constraints(
-                    TypeVarConstraints::new(db, alternatives.as_slice()),
-                ))
-            });
-            let builder = ConstraintSetBuilder::new();
-            let root = ConstraintSet::constrain_typevar_lower_bound(
-                db,
-                &env,
-                &builder,
-                typevar,
-                alternatives[1],
-            );
-            let mut storage = builder.storage.borrow_mut();
-            let (_, source_order) = storage.validity_domain(db, &env, root.node);
-            let actual: Vec<_> = storage
-                .calculate_source_orders(source_order)
-                .into_iter()
-                .map(|constraint| storage.constraint_data(constraint))
-                .collect();
-            let expected: Vec<_> = alternatives
-                .into_iter()
-                .map(|alternative| Constraint {
-                    typevar,
-                    bounds: ConstraintBounds::new(
-                        ConstraintBound::Validity(alternative),
-                        ConstraintBound::Validity(alternative),
-                    ),
-                })
-                .collect();
-
-            assert_eq!(actual, expected);
         }
     }
 
