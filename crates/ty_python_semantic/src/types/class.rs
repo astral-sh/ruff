@@ -2191,7 +2191,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Look up an instance member without discarding assignments that require an existing value.
+    /// Preserve independent instance attributes and assignments that first read their target.
     ///
     /// For example, `increment` can only establish an instance attribute because it first reads
     /// the class-level default:
@@ -2204,8 +2204,8 @@ impl<'db> ClassType<'db> {
     ///         self.value += 1
     /// ```
     ///
-    /// If an instance member is not already defined, preserve the augmented assignment until MRO
-    /// lookup finds a class-level default or an inherited instance attribute.
+    /// The augmented assignment cannot establish `value` until MRO lookup finds the class default
+    /// or an independently defined instance attribute.
     fn own_instance_member_bindings(
         self,
         db: &'db dyn Db,
@@ -2213,28 +2213,21 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> ImplicitAttribute<'db> {
         let member = self.own_instance_member(db, env, name);
-        let Some((class, _)) = self.static_class_literal(db) else {
-            return ImplicitAttribute {
-                member,
-                read_dependent_bindings: None,
-            };
-        };
-
-        let implicit = StaticClassLiteral::implicit_attribute_bindings(
-            db,
-            class.body_scope(db),
-            name,
-            MethodDecorator::None,
-        );
-
         // Ordinary member lookup can deliberately suppress implicit assignments, such as those
         // targeting generated NamedTuple fields. Preserve dependent writes only when both
         // lookups agree on whether an independent instance attribute exists.
-        let read_dependent_bindings = if member.is_undefined() == implicit.member.is_undefined() {
-            implicit.read_dependent_bindings
-        } else {
-            None
-        };
+        let read_dependent_bindings = self
+            .static_class_literal(db)
+            .map(|(class, _)| {
+                StaticClassLiteral::implicit_attribute_bindings(
+                    db,
+                    class.body_scope(db),
+                    name,
+                    MethodDecorator::None,
+                )
+            })
+            .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
+            .and_then(|implicit| implicit.read_dependent_bindings);
 
         ImplicitAttribute {
             member,
@@ -2768,26 +2761,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     }
 }
 
-/// Infer an augmented assignment without allowing recursive results to expand indefinitely.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|_, id, _, _| Type::divergent(id),
-    cycle_fn=|db, cycle: &salsa::Cycle, previous: &Type<'db>, ty: Type<'db>, definition: Definition<'db>, _| {
-        let env = ProgramEnvironment::from_definition(definition);
-        ty.cycle_normalized(db, &env, *previous, cycle)
-    },
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn read_dependent_binding_type<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    specialization: Option<Specialization<'db>>,
-) -> Type<'db> {
-    infer_definition_types(db, definition)
-        .binding_type(definition)
-        .apply_optional_specialization(db, specialization)
-}
-
 /// Performs member lookups over an MRO (Method Resolution Order).
 ///
 /// This struct encapsulates the shared logic for looking up class and instance
@@ -2811,13 +2784,23 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
 
     /// Infer augmented-assignment results after finding the existing attribute they read.
     ///
+    /// ```python
+    /// class Counter:
+    ///     def __init__(self):
+    ///         self.value = (1,)
+    ///
+    ///     def update(self):
+    ///         self.value += (self.value,)
+    /// ```
+    ///
     /// Inferring these bindings earlier would recursively look up the same instance member and
     /// allow an augmented assignment to incorrectly establish an otherwise missing attribute.
-    fn read_dependent_instance_member(
+    /// Existing definition inference also normalizes recursive results such as the tuple above.
+    fn infer_read_dependent_bindings(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         bindings: &[(ClassType<'db>, ReadDependentBindings<'db>)],
-    ) -> DefinedPlace<'db> {
+    ) -> (Type<'db>, Provenance<'db>) {
         let mut union = UnionBuilder::new(db, env);
         let mut provenance = Provenance::Unknown;
 
@@ -2827,19 +2810,18 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 .and_then(|(_, specialization)| specialization);
 
             for definition in bindings.definitions(db) {
-                let inferred_ty = read_dependent_binding_type(db, *definition, specialization);
+                let inferred_ty = infer_definition_types(db, *definition)
+                    .binding_type(*definition)
+                    .apply_optional_specialization(db, specialization);
                 union = union.add(inferred_ty);
                 provenance = provenance.or(Provenance::SingleDefinition(*definition));
             }
         }
 
-        DefinedPlace {
-            ty: union.build().promote(db, env).promote_singletons(db, env),
-            origin: TypeOrigin::Inferred,
-            definedness: Definedness::AlwaysDefined,
-            public_type_policy: PublicTypePolicy::Raw,
+        (
+            union.build().promote(db, env).promote_singletons(db, env),
             provenance,
-        }
+        )
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -3009,13 +2991,14 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         union_qualifiers |= qualifiers;
 
                         if !read_dependent_bindings.is_empty() {
-                            let read_dependent_member = Self::read_dependent_instance_member(
-                                db,
-                                &self.env,
-                                &read_dependent_bindings,
-                            );
-                            union = union.add(read_dependent_member.ty);
-                            provenance = provenance.or(read_dependent_member.provenance);
+                            let (inferred_ty, inferred_provenance) =
+                                Self::infer_read_dependent_bindings(
+                                    db,
+                                    &self.env,
+                                    &read_dependent_bindings,
+                                );
+                            union = union.add(inferred_ty);
+                            provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                             read_dependent_bindings.clear();
                         }
@@ -3051,13 +3034,14 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
-                            let read_dependent_member = Self::read_dependent_instance_member(
-                                db,
-                                &self.env,
-                                &read_dependent_bindings,
-                            );
-                            union = union.add(read_dependent_member.ty);
-                            provenance = provenance.or(read_dependent_member.provenance);
+                            let (inferred_ty, inferred_provenance) =
+                                Self::infer_read_dependent_bindings(
+                                    db,
+                                    &self.env,
+                                    &read_dependent_bindings,
+                                );
+                            union = union.add(inferred_ty);
+                            provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                         }
 

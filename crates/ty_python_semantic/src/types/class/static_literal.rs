@@ -2785,7 +2785,16 @@ impl<'db> StaticClassLiteral<'db> {
             .member
     }
 
-    /// Collect independent attribute bindings and assignments that require an existing value.
+    /// Separate independently established attributes from assignments that must first read them.
+    ///
+    /// ```python
+    /// class Counter:
+    ///     def increment(self):
+    ///         self.value += 1
+    /// ```
+    ///
+    /// Here, `value` remains undefined unless a class default or inherited attribute supplies its
+    /// initial value during MRO lookup.
     pub(super) fn implicit_attribute_bindings(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,

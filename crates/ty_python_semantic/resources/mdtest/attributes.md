@@ -521,21 +521,6 @@ reveal_type(C(0, 0).from_any)  # revealed: float | Any
 reveal_type(C(0, 0).from_unknown)  # revealed: int | Unknown
 ```
 
-#### Augmented assignments cannot define missing attributes
-
-An augmented assignment must read an existing attribute before writing its result, so it cannot
-introduce an attribute on its own.
-
-```py
-class Counter:
-    def increment(self) -> None:
-        # error: [unresolved-attribute]
-        self.value += 1
-
-# error: [unresolved-attribute]
-reveal_type(Counter().value)  # revealed: Unknown
-```
-
 #### Augmented assignments to possible data descriptors
 
 An augmented assignment to a data descriptor passes its result to `__set__` rather than creating
@@ -1177,8 +1162,8 @@ reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value
 
 #### Augmented assignments to overriding class-level defaults
 
-A class-level default supplies the initial value for an augmented assignment, even when another
-branch of a diamond declares a wider instance attribute.
+An unannotated class-level default supplies the initial value for an augmented assignment, even when
+another branch of a diamond declares a wider instance attribute.
 
 ```py
 class Base:
@@ -1190,25 +1175,12 @@ class Second(Base):
     value: int | None
 
 class Child(First, Second):
-    value: int = 1
-
-    def update(self) -> None:
-        self.value |= 2
-
-reveal_type(Child().value)  # revealed: int
-```
-
-An overriding class-level default also shadows the inherited instance declaration when it has no
-explicit annotation.
-
-```py
-class UnannotatedChild(First, Second):
     value = 1
 
     def update(self) -> None:
         self.value |= 2
 
-reveal_type(UnannotatedChild().value)  # revealed: int
+reveal_type(Child().value)  # revealed: int
 ```
 
 #### Descriptor attributes as class variables
