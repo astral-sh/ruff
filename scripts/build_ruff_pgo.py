@@ -41,6 +41,11 @@ class EcosystemProject:
         return f"https://github.com/{self.repository}.git"
 
 
+# Select a small, diverse sample from our linting and formatting ecosystem
+# checks: developer tools, web and scientific libraries, real applications,
+# and type stubs. Restrict each project to representative directories and pin
+# its commit for reproducibility. Keep held-out evaluation projects separate
+# so performance comparisons remain meaningful.
 CORPUS_PROJECTS = (
     EcosystemProject(
         name="pytest",
@@ -65,6 +70,22 @@ CORPUS_PROJECTS = (
         repository="agronholm/anyio",
         revision="ffe91331adb912c5d150f5d373f7cd28a0e96a62",
         source_directories=("src/anyio",),
+    ),
+    EcosystemProject(
+        name="zulip",
+        repository="zulip/zulip",
+        revision="ccddbba7a3074283ccaac3bde35fd32b19faf042",
+        source_directories=("zerver/views", "zerver/models"),
+    ),
+    EcosystemProject(
+        name="warehouse",
+        repository="pypi/warehouse",
+        revision="5a4d2cadec641b5d6a6847d0127940e0f532f184",
+        source_directories=(
+            "warehouse/accounts",
+            "warehouse/oidc",
+            "warehouse/forklift",
+        ),
     ),
     EcosystemProject(
         name="pip",
