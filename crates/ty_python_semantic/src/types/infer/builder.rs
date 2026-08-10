@@ -5531,10 +5531,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let inferable = overload
                     .signature
                     .generic_context
-                    .map(|generic_context| {
-                        generic_context.inferable_typevars_with_bound_dependencies(db)
-                    })
-                    .unwrap_or(TypeVarSet::None);
+                    .map(|generic_context| generic_context.inferable_typevars(db))
+                    .unwrap_or(TypeVarSet::None)
+                    .merge(
+                        db,
+                        overload.signature.receiver_specialization_typevars(db, env),
+                    );
 
                 !overload
                     .return_ty

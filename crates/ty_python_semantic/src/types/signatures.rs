@@ -1295,7 +1295,8 @@ impl<'db> Signature<'db> {
 
         let constraints = ConstraintSetBuilder::new();
         let when = constraints.load(db, env, receiver_constraints);
-        let inferable = self.inferable_typevars_with_bound_dependencies(db);
+        let receiver_typevars = self.receiver_specialization_typevars(db, env);
+        let inferable = self.inferable_typevars(db).merge(db, receiver_typevars);
 
         match when.solutions(db, env, &constraints, inferable) {
             Solutions::Unsatisfiable => return None,
@@ -1312,11 +1313,12 @@ impl<'db> Signature<'db> {
             return Some(self.clone());
         };
 
-        let mut builder = SpecializationBuilder::new_with_bound_dependencies(
+        let mut builder = SpecializationBuilder::new_with_receiver_typevars(
             db,
             env,
             &constraints,
             generic_context,
+            receiver_typevars,
         );
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
@@ -1436,7 +1438,8 @@ impl<'db> Signature<'db> {
                 env,
                 expected_self_ty,
                 &constraints,
-                self.inferable_typevars_with_bound_dependencies(db),
+                self.inferable_typevars(db)
+                    .merge(db, self.receiver_specialization_typevars(db, env)),
             )
             .is_always_satisfied(db, env)
     }
@@ -1784,11 +1787,42 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db, env))
     }
 
-    fn inferable_typevars_with_bound_dependencies(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
         match self.generic_context {
-            Some(generic_context) => generic_context.inferable_typevars_with_bound_dependencies(db),
+            Some(generic_context) => generic_context.inferable_typevars(db),
             None => TypeVarSet::None,
         }
+    }
+
+    /// Returns unspecialized class typevars that a synthetic `Self` receiver can determine.
+    pub(crate) fn receiver_specialization_typevars(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> TypeVarSet<'db> {
+        let mut dependencies = Vec::new();
+        for self_typevar in self
+            .generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .filter(|typevar| typevar.typevar(db).is_self(db))
+        {
+            let Some(bound) = self_typevar.typevar(db).upper_bound(db, env) else {
+                continue;
+            };
+            let Some((_, specialization)) = bound.class_specialization(db, env) else {
+                continue;
+            };
+
+            let owner_context = specialization.generic_context(db);
+            dependencies.extend(
+                TypeVarSet::from_typevar_occurrences(db, env, [bound])
+                    .iter(db)
+                    .filter(|typevar| owner_context.contains(db, typevar.identity(db))),
+            );
+        }
+
+        TypeVarSet::from_typevars(db, dependencies)
     }
 
     pub(crate) fn is_non_generic(&self) -> bool {
@@ -2364,34 +2398,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        // `inferable` has different roles in the two type-variable evaluation modes:
-        //
-        // * Eager comparisons decide whether the relation holds immediately. An unbound generic
-        //   method's `Self` can have an upper bound such as `C[T]`, so `T` must also be
-        //   inferable; otherwise, a concrete receiver such as `C[int]` is compared against a
-        //   fixed, symbolic `T` and valid higher-order calls are rejected.
-        // * Lazy comparisons record constraints for every type variable, regardless of whether
-        //   it is inferable. Here, `signature_inferable` also determines which type variables
-        //   `reduce_inferable` existentially removes below, so it must contain only variables
-        //   actually bound by these signatures. Including an enclosing class's `T` would turn a
-        //   decorator's return constraint `T <= R` into `exists T. T <= R`, losing the
-        //   relationship needed to infer `R = T`.
-        let include_bound_dependencies = self.typevar_evaluation == TypeVarEvaluation::Eager;
         let signature_typevars = |signature: &Signature<'db>| {
             signature
                 .generic_context
-                .map_or(TypeVarSet::None, |context| {
-                    if include_bound_dependencies {
-                        context.inferable_typevars_with_bound_dependencies(db)
-                    } else {
-                        context.inferable_typevars(db)
-                    }
-                })
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db))
         };
-        let source_inferable = signature_typevars(source);
-        let target_inferable = signature_typevars(target);
-        let signature_inferable = source_inferable.merge(db, target_inferable);
-        let inferable = self.inferable.merge(db, signature_inferable);
+        let signature_typevars = signature_typevars(source).merge(db, signature_typevars(target));
+
+        // An eager relation against an unbound method also specializes identity-mapped class
+        // typevars through synthetic `Self`. These are explicit receiver dependencies, not
+        // arbitrary typevars discovered by recursively walking declared domains. Lazy relations
+        // leave them fixed so enclosing class occurrences remain visible to the caller.
+        let receiver_typevars = if self.typevar_evaluation == TypeVarEvaluation::Eager {
+            source
+                .receiver_specialization_typevars(db, env)
+                .merge(db, target.receiver_specialization_typevars(db, env))
+        } else {
+            TypeVarSet::None
+        };
+        let relation_typevars = signature_typevars.merge(db, receiver_typevars);
+        let inferable = self.inferable.merge(db, relation_typevars);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
@@ -2417,7 +2443,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(db, env, self.constraints, signature_inferable)
+        when.reduce_inferable(db, env, self.constraints, relation_typevars)
     }
 
     fn with_signature_recursion_guard(

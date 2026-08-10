@@ -5807,12 +5807,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        self.inferable_typevars = generic_context.inferable_typevars_with_bound_dependencies(db);
-        let mut builder = SpecializationBuilder::new_with_bound_dependencies(
+        let receiver_typevars = self
+            .signature
+            .receiver_specialization_typevars(db, self.env);
+        self.inferable_typevars = generic_context
+            .inferable_typevars(db)
+            .merge(db, receiver_typevars);
+        let mut builder = SpecializationBuilder::new_with_receiver_typevars(
             db,
             self.env,
             constraints,
             generic_context,
+            receiver_typevars,
         );
 
         // Type variables for which we inferred a declared type based on a partially specialized
@@ -5971,11 +5977,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new_with_bound_dependencies(
+            builder = SpecializationBuilder::new_with_receiver_typevars(
                 db,
                 self.env,
                 constraints,
                 generic_context,
+                receiver_typevars,
             );
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
@@ -7356,7 +7363,7 @@ impl<'db> Binding<'db> {
             return 0;
         };
 
-        let inferable_typevars = generic_context.inferable_typevars_with_bound_dependencies(db);
+        let inferable_typevars = generic_context.inferable_typevars(db);
         argument
             .parameters
             .iter()
@@ -7692,7 +7699,7 @@ impl<'db> Binding<'db> {
                 db,
                 env,
                 declared_return_ty,
-                generic_context.inferable_typevars_with_bound_dependencies(db),
+                generic_context.inferable_typevars(db),
             );
 
             let solutions = path_bounds.solve_with(|_variance, path_bound| {

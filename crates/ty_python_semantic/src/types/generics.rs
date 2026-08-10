@@ -25,9 +25,7 @@ use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
-use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet, walk_type_var_bounds,
-};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
@@ -505,86 +503,6 @@ impl<'db> GenericContext<'db> {
     /// Returns the typevars directly bound by this generic context.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
         TypeVarSet::from_typevars(db, self.variables(db))
-    }
-
-    /// Returns the typevars directly bound by this generic context and any typevars reachable from
-    /// their declared bounds or constraints.
-    ///
-    /// This is a transitional compatibility scope for callers that have not yet separated
-    /// receiver specialization from ordinary inference. For instance, consider a method of a
-    /// generic class:
-    ///
-    /// ```py
-    /// class C[A]:
-    ///     def method[T](self, t: T):
-    /// ```
-    ///
-    /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
-    /// also includes `A@C`. This is needed because at each call site, we need to infer the
-    /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars_with_bound_dependencies(
-        self,
-        db: &'db dyn Db,
-    ) -> TypeVarSet<'db> {
-        struct CollectTypeVars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.typevars
-                    .borrow_mut()
-                    .entry(bound_typevar.identity(db))
-                    .or_insert(bound_typevar);
-                let typevar = bound_typevar.typevar(db);
-                if let Some(bound_or_constraints) =
-                    typevar.bound_or_constraints(db, self.program_environment())
-                {
-                    walk_type_var_bounds(db, bound_or_constraints, self);
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, _, _| TypeVarSet::None,
-            heap_size=ruff_memory_usage::heap_size,
-        )]
-        fn inferable_typevars_inner<'db>(
-            db: &'db dyn Db,
-            generic_context: GenericContext<'db>,
-        ) -> TypeVarSet<'db> {
-            let env = ProgramEnvironment::from_program(generic_context.program(db));
-            let visitor = CollectTypeVars {
-                env: &env,
-                typevars: RefCell::default(),
-                recursion_guard: TypeCollector::default(),
-            };
-            for bound_typevar in generic_context.variables(db) {
-                visitor.visit_bound_type_var_type(db, bound_typevar);
-            }
-            TypeVarSet::from_typevars(db, visitor.typevars.into_inner().into_values())
-        }
-
-        inferable_typevars_inner(db, self)
     }
 
     pub(crate) fn variables(
@@ -2583,15 +2501,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Creates a transitional builder that also infers typevars reachable through bounds.
-    pub(crate) fn new_with_bound_dependencies(
+    /// Creates a context-owned builder that can also solve explicit receiver dependencies.
+    pub(crate) fn new_with_receiver_typevars(
         db: &'db dyn Db,
         env: &'c ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
+        receiver_typevars: TypeVarSet<'db>,
     ) -> Self {
         let mut builder = Self::new(db, env, constraints, generic_context);
-        builder.inferable = generic_context.inferable_typevars_with_bound_dependencies(db);
+        builder.inferable = builder.inferable.merge(db, receiver_typevars);
         builder
     }
 
@@ -4250,34 +4169,6 @@ mod tests {
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::setup_db;
-
-    #[test]
-    fn generic_context_inferable_typevars_retain_instances_from_bounds() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let u = BoundTypeVarInstance::synthetic(
-            db,
-            &env,
-            Name::new_static("U"),
-            TypeVarVariance::Invariant,
-        );
-        let t = BoundTypeVarInstance::synthetic(
-            db,
-            &env,
-            Name::new_static("T"),
-            TypeVarVariance::Invariant,
-        )
-        .map_bound_or_constraints(db, |_| {
-            Some(TypeVarBoundOrConstraints::UpperBound(Type::TypeVar(u)))
-        });
-        let context = GenericContext::from_typevar_instances(db, &env, [t]);
-
-        let inferable = context.inferable_typevars_with_bound_dependencies(db);
-        assert_eq!(inferable.iter(db).collect::<Vec<_>>(), [t, u]);
-        assert!(t.is_inferable(db, inferable));
-        assert!(u.is_inferable(db, inferable));
-    }
 
     #[test]
     fn recording_constraints_does_not_project_legacy_mappings() {
