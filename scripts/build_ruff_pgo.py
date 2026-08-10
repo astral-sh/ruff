@@ -41,11 +41,13 @@ class EcosystemProject:
         return f"https://github.com/{self.repository}.git"
 
 
-# Select a small, diverse sample from our linting and formatting ecosystem
-# checks: developer tools, web and scientific libraries, real applications,
-# and type stubs. Restrict each project to representative directories and pin
-# its commit for reproducibility. Keep held-out evaluation projects separate
-# so performance comparisons remain meaningful.
+# Train on a subset of the pinned ecosystem projects that we already use for
+# linting, formatting, or type checking. The goal is to create a representative
+# corpus that includes scientific computing, synchronous and asynchronous code,
+# applications, libraries, and type stubs.
+#
+# Nothing in this list is sacred. During development, adding Zulip and Warehouse
+# reduced Ruff's CPU time by 0.35% while increasing its wheel size by 0.44%.
 CORPUS_PROJECTS = (
     EcosystemProject(
         name="pytest",
