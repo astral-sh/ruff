@@ -474,9 +474,11 @@ expanding `Solutions`:
     provenance without allowing validity restrictions to manufacture positive inference evidence.
     Change `qynqxkpqotkuzvstnylupmuxmwrkokpm`, commit
     `c6195be50758b035dc299839995774e0d7d8cfeb`.
-- [ ] Phase 6B: recover one universally valid bare-TypeVar symbolic solution such as `T := S` from
+- [x] Phase 6B: recover one universally valid bare-TypeVar symbolic solution such as `T := S` from
     the complete domain-conjoined path family, using the existing `inferable` set as the
-    authoritative partition and a mapped-TDD implication check.
+    authoritative partition and a mapped-TDD implication check. Change
+    `tnkvtxtqvpvrqxlmxtukkqlzozmxzymk`, commit
+    `0a094f3a8fd935d34183c1ba1c62cfbc2636663c`.
 - [ ] Potential Phase 7 and later: support structured or multiple symbolic candidates such as
     `T := list[S]`, restore or classify the remaining compatibility regressions, resolve the
     recorded performance debt, and select a landable tip.
@@ -486,7 +488,8 @@ approved implementation ground truth. In particular, the contradiction-only sequ
 to provenance-suppressed implications; `PathBounds::Constrained` owns `paths` and the single
 optional symbolic default; and no caller-accessible path-local default solver remains. Custom
 chooser fallback receives immutable family context because pruning is complete before read-only
-solution selection. Do not begin Phase 6B implementation without explicit authorization.
+solution selection. Phase 6B was explicitly authorized and completed without expanding into
+structured candidates, multiple targets, or quantifier changes.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
 revision, relevant documentation/tests, and a passing full test suite. The earlier abandoned Phase 5
@@ -523,6 +526,19 @@ rejects `C and not D` when the underlying `C` implies `D` without propagating po
 provenance. Existing pair implications derive their intermediate constraint before the new sequent
 checks the contradiction, so no dedicated pair-conflict form is needed. Validation passed all 823
 `ty_python_semantic` tests, all 8,921 workspace tests, workspace clippy, snapshot review, and prek.
+
+Phase 6B discovers one bare non-inferable TypeVar candidate from the complete unpruned path family,
+substitutes it into the exact projected domain-conjoined TDD, and accepts it only when the
+non-inferable validity domain has no counterexample. The verified result is stored once at family
+scope and selected before concrete path defaults. Chooser callbacks receive the family and path as
+one optional pair; legacy exact bounds use a singleton family so the callback API cannot represent
+a path without family context. Validation passed all 823 `ty_python_semantic` tests, all 8,921
+workspace tests, workspace clippy, snapshot review, and prek. Focused successful verifications added
+1–2 constraints, 9–14 nodes, one single-sequent cache entry, and two pair-sequent cache entries per
+builder. `ty_micro[pydantic_core_schema_dict]` measured 11.861 ms at Phase 6B versus 11.814 ms at its
+Phase 6A parent, with Criterion detecting no performance change. That concrete-only benchmark does
+not reach bare-TypeVar candidate verification, so the conditional focused Pydantic ecosystem
+comparison was not required.
 
 ### Phase 1: retain bound type-variable instances in constraint-set arenas
 
