@@ -470,8 +470,10 @@ expanding `Solutions`:
     with adjacent TODO/XXX comments stating the intended behavior. Change
     `smrkruyysnpoyswkpypttlpowomwsmrs`, commit
     `72cbd05ee9b3124bca1b796ac5f41099e975f1b5`.
-- [ ] Phase 6A: make logically contradictory positive/negative assignments impossible across bound
+- [x] Phase 6A: make logically contradictory positive/negative assignments impossible across bound
     provenance without allowing validity restrictions to manufacture positive inference evidence.
+    Change `qynqxkpqotkuzvstnylupmuxmwrkokpm`, commit
+    `c6195be50758b035dc299839995774e0d7d8cfeb`.
 - [ ] Phase 6B: recover one universally valid bare-TypeVar symbolic solution such as `T := S` from
     the complete domain-conjoined path family, using the existing `inferable` set as the
     authoritative partition and a mapped-TDD implication check.
@@ -484,14 +486,13 @@ approved implementation ground truth. In particular, the contradiction-only sequ
 to provenance-suppressed implications; `PathBounds::Constrained` owns `paths` and the single
 optional symbolic default; and no caller-accessible path-local default solver remains. Custom
 chooser fallback receives immutable family context because pruning is complete before read-only
-solution selection. Do not begin implementation without explicit authorization.
+solution selection. Do not begin Phase 6B implementation without explicit authorization.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
 revision, relevant documentation/tests, and a passing full test suite. The earlier abandoned Phase 5
 prototype and standalone fully-static revisions are diagnostic evidence only; do not revive
-`pvynqtrq` or copy its rejected workarounds. Phase 6A starts from the completed Phase 5
-structural-solving revision recorded above and the subsequent approved plan-only revisions;
-Phase 6B starts only after Phase 6A and its full validation are complete.
+`pvynqtrq` or copy its rejected workarounds. Phase 6B starts from the completed Phase 6A revision
+recorded above and the subsequent plan-only checkpoint.
 
 The rewritten activation checkpoint and structural-completion revision each pass all 820
 `ty_python_semantic` tests, all 8,913 workspace tests, workspace clippy, snapshot review, and prek.
@@ -516,6 +517,12 @@ equality when the domain path fixes one specialization, and otherwise solves fro
 evidence. Accepted gradual and relationship regressions remain visible behind adjacent TODO/XXX
 expectations. Validation passed all 820 `ty_python_semantic` tests, all 8,913 workspace tests,
 workspace clippy, snapshot review, and prek.
+
+Phase 6A adds an `ImplicationContradiction` sequent for provenance-suppressed implications. It
+rejects `C and not D` when the underlying `C` implies `D` without propagating positive `D` across
+provenance. Existing pair implications derive their intermediate constraint before the new sequent
+checks the contradiction, so no dedicated pair-conflict form is needed. Validation passed all 823
+`ty_python_semantic` tests, all 8,921 workspace tests, workspace clippy, snapshot review, and prek.
 
 ### Phase 1: retain bound type-variable instances in constraint-set arenas
 
