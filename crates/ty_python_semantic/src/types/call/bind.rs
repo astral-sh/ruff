@@ -5807,9 +5807,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        self.inferable_typevars = generic_context.inferable_typevars(db);
-        let mut builder =
-            SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+        self.inferable_typevars = generic_context.inferable_typevars_with_bound_dependencies(db);
+        let mut builder = SpecializationBuilder::new_with_bound_dependencies(
+            db,
+            self.env,
+            constraints,
+            generic_context,
+        );
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -5967,8 +5971,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder =
-                SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
+            builder = SpecializationBuilder::new_with_bound_dependencies(
+                db,
+                self.env,
+                constraints,
+                generic_context,
+            );
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
 
@@ -6046,10 +6054,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             maybe_promote(typevar, bounds)
         };
-        let inference = match builder.build_inference_with(generic_context, &mut choose) {
+        let inference = match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
             Err(()) => builder.build_diagnostic_inference_with(
-                generic_context,
                 self.argument_relations()
                     .map(|relation| (relation.declared_type, relation.argument_type)),
                 choose,
@@ -6134,8 +6141,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             (error, argument_index)
         })?;
 
-        if let Some(generic_context) = self.signature.generic_context {
-            let specialization = builder.build_with(generic_context, |_, _| None);
+        if self.signature.generic_context.is_some() {
+            let specialization = builder.build_with(|_, _| None);
             let expected_ty = formal.apply_specialization(db, specialization);
 
             // The legacy solver keeps the first pack when another occurrence has a different length.
@@ -7349,7 +7356,7 @@ impl<'db> Binding<'db> {
             return 0;
         };
 
-        let inferable_typevars = generic_context.inferable_typevars(db);
+        let inferable_typevars = generic_context.inferable_typevars_with_bound_dependencies(db);
         argument
             .parameters
             .iter()
@@ -7685,7 +7692,7 @@ impl<'db> Binding<'db> {
                 db,
                 env,
                 declared_return_ty,
-                generic_context.inferable_typevars(db),
+                generic_context.inferable_typevars_with_bound_dependencies(db),
             );
 
             let solutions = path_bounds.solve_with(|_variance, path_bound| {

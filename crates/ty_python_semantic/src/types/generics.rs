@@ -502,9 +502,17 @@ impl<'db> GenericContext<'db> {
         remove_self_inner(db, self, binding_context)
     }
 
-    /// Returns the typevars that are inferable in this generic context. This set might include
-    /// more typevars than the ones directly bound by the generic context. For instance, consider a
-    /// method of a generic class:
+    /// Returns the typevars directly bound by this generic context.
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
+        TypeVarSet::from_typevars(db, self.variables(db))
+    }
+
+    /// Returns the typevars directly bound by this generic context and any typevars reachable from
+    /// their declared bounds or constraints.
+    ///
+    /// This is a transitional compatibility scope for callers that have not yet separated
+    /// receiver specialization from ordinary inference. For instance, consider a method of a
+    /// generic class:
     ///
     /// ```py
     /// class C[A]:
@@ -514,7 +522,10 @@ impl<'db> GenericContext<'db> {
     /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
+    pub(crate) fn inferable_typevars_with_bound_dependencies(
+        self,
+        db: &'db dyn Db,
+    ) -> TypeVarSet<'db> {
         struct CollectTypeVars<'a, 'db> {
             env: &'a ProgramEnvironment<'db>,
             typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
@@ -2367,6 +2378,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
     env: &'c ProgramEnvironment<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
+    generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
@@ -2552,21 +2564,35 @@ fn relation_directions<T: Copy>(
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
+    /// Creates a builder that infers only the typevars directly owned by `generic_context`.
     pub(crate) fn new(
         db: &'db dyn Db,
         env: &'c ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
+        generic_context: GenericContext<'db>,
     ) -> Self {
         Self {
             db,
             env,
             constraints,
-            inferable,
+            generic_context,
+            inferable: generic_context.inferable_typevars(db),
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
+    }
+
+    /// Creates a transitional builder that also infers typevars reachable through bounds.
+    pub(crate) fn new_with_bound_dependencies(
+        db: &'db dyn Db,
+        env: &'c ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> Self {
+        let mut builder = Self::new(db, env, constraints, generic_context);
+        builder.inferable = generic_context.inferable_typevars_with_bound_dependencies(db);
+        builder
     }
 
     /// Adds a constraint set to the pending specialization and projects its valid solutions into
@@ -2590,10 +2616,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// `None` to use the inferred type unchanged.
     pub(crate) fn build_with(
         &mut self,
-        generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let db = self.db;
+        let generic_context = self.generic_context;
         let types = self
             .solve_pending_with(generic_context, &mut choose)
             .unwrap_or_else(|()| self.solve_hash_map_with(generic_context, &mut choose));
@@ -2616,11 +2642,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Returns an error if the call-wide pending constraints are unsatisfiable.
     pub(crate) fn build_inference_with(
         &mut self,
-        generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Result<TypeVarInference<'db>, ()> {
-        let types = self.solve_pending_with(generic_context, &mut choose)?;
-        Ok(self.typevar_inference(generic_context, &types))
+        let types = self.solve_pending_with(self.generic_context, &mut choose)?;
+        Ok(self.typevar_inference(self.generic_context, &types))
     }
 
     /// Build a diagnostic specialization after the call-wide constraints were unsatisfiable.
@@ -2630,7 +2655,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// even when a migrated inference path only populated `pending`.
     pub(crate) fn build_diagnostic_inference_with(
         &mut self,
-        generic_context: GenericContext<'db>,
         argument_relations: impl IntoIterator<Item = (Type<'db>, Type<'db>)>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> TypeVarInference<'db> {
@@ -2642,8 +2666,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.project_for_legacy_fallback(&analysis);
         }
 
-        let types = self.solve_hash_map_with(generic_context, &mut choose);
-        self.typevar_inference(generic_context, &types)
+        let types = self.solve_hash_map_with(self.generic_context, &mut choose);
+        self.typevar_inference(self.generic_context, &types)
     }
 
     fn typevar_inference(
@@ -4249,7 +4273,7 @@ mod tests {
         });
         let context = GenericContext::from_typevar_instances(db, &env, [t]);
 
-        let inferable = context.inferable_typevars(db);
+        let inferable = context.inferable_typevars_with_bound_dependencies(db);
         assert_eq!(inferable.iter(db).collect::<Vec<_>>(), [t, u]);
         assert!(t.is_inferable(db, inferable));
         assert!(u.is_inferable(db, inferable));
@@ -4268,8 +4292,7 @@ mod tests {
         );
         let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
         let constraints = ConstraintSetBuilder::new();
-        let mut builder =
-            SpecializationBuilder::new(db, &env, &constraints, context.inferable_typevars(db));
+        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let int = KnownClass::Int.to_instance(db, &env);
         let set = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int);
 
@@ -4301,8 +4324,7 @@ mod tests {
         .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
         let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
         let constraints = ConstraintSetBuilder::new();
-        let mut builder =
-            SpecializationBuilder::new(db, &env, &constraints, context.inferable_typevars(db));
+        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
         let lower_only =
             ConstraintSet::constrain_typevar_lower_bound(db, &env, &constraints, typevar, str);
         let rejected = ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, str, str);
