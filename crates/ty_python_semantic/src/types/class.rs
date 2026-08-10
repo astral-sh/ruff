@@ -2097,6 +2097,33 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Preserve class attributes and augmented assignments made by classmethods.
+    ///
+    /// ```python
+    /// class Counter:
+    ///     @classmethod
+    ///     def update(cls):
+    ///         cls.value = 0
+    ///         cls.value += 1
+    /// ```
+    ///
+    /// Class-member MRO lookup resolves the augmented assignment after locating the independently
+    /// established class attribute, just as instance-member lookup resolves writes through `self`.
+    fn own_class_member_bindings(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        name: &str,
+    ) -> ImplicitAttribute<'db> {
+        self.member_with_read_dependent_bindings(
+            db,
+            self.own_class_member(db, env, inherited_generic_context, name),
+            name,
+            MethodDecorator::ClassMethod,
+        )
+    }
+
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
@@ -2212,10 +2239,25 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> ImplicitAttribute<'db> {
-        let member = self.own_instance_member(db, env, name);
+        self.member_with_read_dependent_bindings(
+            db,
+            self.own_instance_member(db, env, name),
+            name,
+            MethodDecorator::None,
+        )
+    }
+
+    /// Attach augmented assignments only when ordinary lookup preserves their independent target.
+    fn member_with_read_dependent_bindings(
+        self,
+        db: &'db dyn Db,
+        member: Member<'db>,
+        name: &str,
+        target_method_decorator: MethodDecorator,
+    ) -> ImplicitAttribute<'db> {
         // Ordinary member lookup can deliberately suppress implicit assignments, such as those
         // targeting generated NamedTuple fields. Preserve dependent writes only when both
-        // lookups agree on whether an independent instance attribute exists.
+        // lookups agree on whether an independently established attribute exists.
         let read_dependent_bindings = self
             .static_class_literal(db)
             .map(|(class, _)| {
@@ -2223,7 +2265,7 @@ impl<'db> ClassType<'db> {
                     db,
                     class.body_scope(db),
                     name,
-                    MethodDecorator::None,
+                    target_method_decorator,
                 )
             })
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
@@ -2795,7 +2837,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// Inferring these bindings earlier would recursively look up the same instance member and
     /// allow an augmented assignment to incorrectly establish an otherwise missing attribute.
-    /// Existing definition inference also normalizes recursive results such as the tuple above.
+    /// Once recursive inference produces a concrete result, top-level cycle placeholders do not
+    /// represent additional runtime values. Other inferred alternatives remain intact, as do
+    /// nested placeholders in genuinely expanding recursive types such as the tuple above.
     fn infer_read_dependent_bindings(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2818,10 +2862,22 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
-        (
-            union.build().promote(db, env).promote_singletons(db, env),
-            provenance,
-        )
+        let inferred_ty = union.build().promote(db, env).promote_singletons(db, env);
+        let inferred_ty = if let Some(elements) =
+            inferred_ty.as_union().map(|union| union.elements(db))
+            && elements.iter().any(Type::is_divergent)
+            && elements.iter().any(|ty| !ty.is_divergent())
+        {
+            UnionType::from_elements(
+                db,
+                env,
+                elements.iter().copied().filter(|ty| !ty.is_divergent()),
+            )
+        } else {
+            inferred_ty
+        };
+
+        (inferred_ty, provenance)
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -2850,6 +2906,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut dynamic_type: Option<Type<'db>> = None;
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Undefined(TypeQualifiers::empty()));
+        let mut read_dependent_bindings = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2887,14 +2944,42 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         continue;
                     }
 
+                    let implicit = class.own_class_member_bindings(
+                        db,
+                        &self.env,
+                        inherited_generic_context,
+                        name,
+                    );
+                    if let Some(bindings) = implicit.read_dependent_bindings {
+                        read_dependent_bindings.push((class, bindings));
+                    }
+
+                    let mut member = implicit.member.inner;
+                    if let Place::Defined(mut defined) = member.place
+                        && !read_dependent_bindings.is_empty()
+                    {
+                        if !defined.origin.is_declared() {
+                            let (inferred_ty, inferred_provenance) =
+                                Self::infer_read_dependent_bindings(
+                                    db,
+                                    &self.env,
+                                    &read_dependent_bindings,
+                                );
+                            defined.ty = UnionType::from_two_elements(
+                                db,
+                                &self.env,
+                                defined.ty,
+                                inferred_ty,
+                            );
+                            defined.provenance = defined.provenance.or(inferred_provenance);
+                            member.place = Place::Defined(defined);
+                        }
+
+                        read_dependent_bindings.clear();
+                    }
+
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(
-                            db,
-                            &self.env,
-                            class
-                                .own_class_member(db, &self.env, inherited_generic_context, name)
-                                .inner,
-                        )
+                        lookup_error.or_fall_back_to(db, &self.env, member)
                     });
                 }
                 ClassBase::TypedDict(module) => {
