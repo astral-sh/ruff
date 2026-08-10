@@ -14,6 +14,7 @@ pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
 };
+use self::static_literal::{ImplicitAttribute, ReadDependentBindings};
 pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
@@ -31,6 +32,7 @@ use crate::types::constraints::{
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
@@ -2189,6 +2191,32 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Look up an instance member without discarding writes that require an existing attribute.
+    fn own_instance_member_bindings(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> ImplicitAttribute<'db> {
+        if let Some((class, specialization)) = self.static_class_literal(db) {
+            return match class.own_instance_member_bindings(db, env, name) {
+                ImplicitAttribute::Defined(member) => ImplicitAttribute::Defined(
+                    member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                ),
+                implicit @ (ImplicitAttribute::Undefined | ImplicitAttribute::Deferred(_)) => {
+                    implicit
+                }
+            };
+        }
+
+        let member = self.own_instance_member(db, env, name);
+        if member.is_undefined() {
+            ImplicitAttribute::Undefined
+        } else {
+            ImplicitAttribute::Defined(member)
+        }
+    }
+
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
@@ -2736,6 +2764,36 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         }
     }
 
+    /// Infer augmented-assignment results after their initial attribute has been located.
+    fn read_dependent_instance_member(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bindings: &[(ClassType<'db>, ReadDependentBindings<'db>)],
+    ) -> Member<'db> {
+        let mut union = UnionBuilder::new(db, env);
+        let mut provenance = Provenance::Unknown;
+
+        for (class, bindings) in bindings {
+            let specialization = class
+                .static_class_literal(db)
+                .and_then(|(_, specialization)| specialization);
+
+            for definition in bindings.definitions(db) {
+                let inferred_ty = infer_definition_types(db, *definition)
+                    .binding_type(*definition)
+                    .apply_optional_specialization(db, specialization);
+                union = union.add(inferred_ty);
+                provenance = provenance.or(Provenance::SingleDefinition(*definition));
+            }
+        }
+
+        Member {
+            inner: Place::bound(union.build().promote(db, env).promote_singletons(db, env))
+                .with_provenance(provenance)
+                .with_qualifiers(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE),
+        }
+    }
+
     /// Look up a class member by iterating through the MRO.
     ///
     /// Parameters:
@@ -2839,6 +2897,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
         let mut provenance = Provenance::Unknown;
+        let mut read_dependent_bindings = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2852,37 +2911,83 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
-                    if let member @ PlaceAndQualifiers {
-                        place:
-                            Place::Defined(DefinedPlace {
-                                ty,
-                                origin,
-                                definedness: boundness,
-                                provenance: member_provenance,
-                                ..
-                            }),
-                        qualifiers,
-                    } = class.own_instance_member(db, &self.env, name).inner
-                    {
-                        if boundness == Definedness::AlwaysDefined {
-                            if origin.is_declared() {
-                                // We found a definitely-declared attribute. Discard possibly collected
-                                // inferred types from subclasses and return the declared type.
-                                return InstanceMemberResult::Done(member);
+                    match class.own_instance_member_bindings(db, &self.env, name) {
+                        ImplicitAttribute::Defined(Member {
+                            inner:
+                                member @ PlaceAndQualifiers {
+                                    place:
+                                        Place::Defined(DefinedPlace {
+                                            ty,
+                                            origin,
+                                            definedness: boundness,
+                                            provenance: member_provenance,
+                                            ..
+                                        }),
+                                    qualifiers,
+                                },
+                        }) => {
+                            if boundness == Definedness::AlwaysDefined {
+                                if origin.is_declared() {
+                                    // We found a definitely-declared attribute. Discard possibly
+                                    // collected inferred types and return the declared type.
+                                    return InstanceMemberResult::Done(member);
+                                }
+
+                                is_definitely_bound = true;
                             }
 
-                            is_definitely_bound = true;
+                            // Keep looking higher in the MRO when this attribute is not definitely
+                            // declared, unioning inferred and possibly-declared types.
+                            union = union.add(ty);
+                            provenance = provenance.or(member_provenance);
+                            union_qualifiers |= qualifiers;
+
+                            if !read_dependent_bindings.is_empty() {
+                                let read_dependent_member = Self::read_dependent_instance_member(
+                                    db,
+                                    &self.env,
+                                    &read_dependent_bindings,
+                                );
+                                if let Place::Defined(DefinedPlace {
+                                    ty,
+                                    provenance: member_provenance,
+                                    ..
+                                }) = read_dependent_member.inner.place
+                                {
+                                    union = union.add(ty);
+                                    provenance = provenance.or(member_provenance);
+                                    union_qualifiers |= read_dependent_member.inner.qualifiers;
+                                }
+                                read_dependent_bindings.clear();
+                            }
+                        }
+                        ImplicitAttribute::Deferred(bindings) => {
+                            read_dependent_bindings.push((class, bindings));
+                        }
+                        ImplicitAttribute::Undefined | ImplicitAttribute::Defined(_) => {}
+                    }
+
+                    if !read_dependent_bindings.is_empty()
+                        && let class_member @ Member {
+                            inner:
+                                PlaceAndQualifiers {
+                                    place: Place::Defined(DefinedPlace { origin, .. }),
+                                    ..
+                                },
+                        } = class.own_class_member(db, &self.env, None, name)
+                    {
+                        if origin.is_declared() {
+                            return InstanceMemberResult::Done(class_member.inner);
                         }
 
-                        // If the attribute is not definitely declared on this class, keep looking
-                        // higher up in the MRO, and build a union of all inferred types (and
-                        // possibly-declared types):
-                        union = union.add(ty);
-                        provenance = provenance.or(member_provenance);
-
-                        // TODO: We could raise a diagnostic here if there are conflicting type
-                        // qualifiers
-                        union_qualifiers |= qualifiers;
+                        return InstanceMemberResult::Done(
+                            Self::read_dependent_instance_member(
+                                db,
+                                &self.env,
+                                &read_dependent_bindings,
+                            )
+                            .inner,
+                        );
                     }
                 }
                 ClassBase::TypedDict(_) => {

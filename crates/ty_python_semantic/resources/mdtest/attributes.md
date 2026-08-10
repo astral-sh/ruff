@@ -276,6 +276,74 @@ class C:
 reveal_type(C().w)  # revealed: Weird | str
 ```
 
+#### Augmented assignments to unannotated class-level defaults
+
+An unannotated class-level default can supply the initial value read by an augmented assignment. The
+instance attribute can then contain either the original value or the result of the operation.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class C:
+    value = Before()
+
+    def update(self) -> None:
+        self.value += 1
+
+reveal_type(C().value)  # revealed: Before | After
+```
+
+#### Augmented assignments to inherited instance attributes
+
+An instance attribute established by a superclass can supply the initial value read by an augmented
+assignment in a subclass.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class Base:
+    def __init__(self) -> None:
+        self.value = Before()
+
+class Child(Base):
+    def update(self) -> None:
+        self.value += 1
+
+reveal_type(Child().value)  # revealed: Before | After
+```
+
+#### Augmented assignments with gradual operands
+
+An augmented assignment with an `Any` or untyped operand contributes its gradual result to the
+inferred instance attribute.
+
+```py
+from typing import Any
+
+class C:
+    def __init__(self, any_value: Any, unknown_value) -> None:
+        self.from_any = 0.0
+        self.from_any += any_value
+
+        self.from_unknown = 0
+        self.from_unknown += unknown_value
+
+reveal_type(C(0, 0).from_any)  # revealed: float | Any
+reveal_type(C(0, 0).from_unknown)  # revealed: int | Unknown
+```
+
 #### Augmented assignments cannot define missing attributes
 
 An augmented assignment must read an existing attribute before writing its result, so it cannot
@@ -907,6 +975,19 @@ class Child(First, Second):
         self.value |= 2
 
 reveal_type(Child().value)  # revealed: int
+```
+
+An overriding class-level default also shadows the inherited instance declaration when it has no
+explicit annotation.
+
+```py
+class UnannotatedChild(First, Second):
+    value = 1
+
+    def update(self) -> None:
+        self.value |= 2
+
+reveal_type(UnannotatedChild().value)  # revealed: int
 ```
 
 #### Descriptor attributes as class variables

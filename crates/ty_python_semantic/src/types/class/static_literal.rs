@@ -3159,7 +3159,10 @@ impl<'db> StaticClassLiteral<'db> {
         } else if read_dependent_bindings.is_empty() {
             ImplicitAttribute::Undefined
         } else {
-            ImplicitAttribute::Deferred
+            ImplicitAttribute::Deferred(ReadDependentBindings::new(
+                db,
+                read_dependent_bindings.into_boxed_slice(),
+            ))
         }
     }
 
@@ -3276,13 +3279,6 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(qualifiers),
                                 }
                             }
-                        } else if matches!(implicit, ImplicitAttribute::Deferred) {
-                            // The class-body binding supplies the initial value. A successful
-                            // augmented assignment then writes an instance attribute, so this
-                            // declaration must continue to shadow inherited instance declarations.
-                            Member {
-                                inner: declared.with_qualifiers(qualifiers),
-                            }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty
                                 .class_member(db, env, "__get__")
@@ -3374,6 +3370,35 @@ impl<'db> StaticClassLiteral<'db> {
             // It could still be implicitly defined in a method.
 
             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+        }
+    }
+
+    /// Preserve augmented assignments that need an existing value while looking up this class.
+    ///
+    /// An ordinary instance member can be returned immediately, but a read-dependent write must
+    /// remain available until MRO lookup finds either a class-level value or an inherited instance
+    /// attribute.
+    pub(super) fn own_instance_member_bindings(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> ImplicitAttribute<'db> {
+        let member = self.own_instance_member(db, env, name);
+        if !member.is_undefined() {
+            return ImplicitAttribute::Defined(member);
+        }
+
+        match Self::implicit_attribute_bindings(
+            db,
+            self.body_scope(db),
+            name,
+            MethodDecorator::None,
+        ) {
+            ImplicitAttribute::Deferred(bindings) => ImplicitAttribute::Deferred(bindings),
+            ImplicitAttribute::Defined(_) | ImplicitAttribute::Undefined => {
+                ImplicitAttribute::Undefined
+            }
         }
     }
 
@@ -3860,23 +3885,33 @@ fn explicit_bases_cycle_fn<'db>(
 /// augmented assignment such as `self.value += 1` only does so if an existing instance or class
 /// attribute can supply the value it reads first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-enum ImplicitAttribute<'db> {
+pub(super) enum ImplicitAttribute<'db> {
     /// An independent assignment or declaration defines the instance attribute.
     Defined(Member<'db>),
     /// No assignment defines the instance attribute.
     Undefined,
     /// Augmented assignments can define the attribute only if an existing value is available.
-    Deferred,
+    Deferred(ReadDependentBindings<'db>),
 }
 
 impl<'db> ImplicitAttribute<'db> {
-    fn into_member(self) -> Member<'db> {
+    pub(super) fn into_member(self) -> Member<'db> {
         match self {
             Self::Defined(member) => member,
-            Self::Undefined | Self::Deferred => Member::unbound(),
+            Self::Undefined | Self::Deferred(_) => Member::unbound(),
         }
     }
 }
+
+/// Augmented assignments that must not be inferred until their initial value is known to exist.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct ReadDependentBindings<'db> {
+    #[returns(deref)]
+    pub(super) definitions: Box<[Definition<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ReadDependentBindings<'_> {}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {
