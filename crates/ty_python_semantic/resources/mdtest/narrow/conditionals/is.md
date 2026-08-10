@@ -538,9 +538,9 @@ def literal_string(value: object, text: LiteralString) -> None:
         reveal_type(value)  # revealed: LiteralString
 ```
 
-A string without known literal origin can have the same runtime value as an excluded string literal.
-Identity preserves the existing origin exclusion instead of making the successful branch
-unreachable.
+The same string object (same memory address) can be referenced by multiple different expressions
+(due to aliasing or interning). Some of those expressions may be validly typed as having literal
+origin and others may not. Checking string identity does not assume this is impossible:
 
 ```py
 def negated_string_literal(value: Not[Literal["hello"]]) -> None:
