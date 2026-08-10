@@ -2760,6 +2760,34 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     }
 }
 
+/// Infer an augmented assignment without allowing recursive results to expand indefinitely.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_fn=|db, cycle: &salsa::Cycle, previous: &Type<'db>, ty: Type<'db>, _, definition: Definition<'db>| {
+        if cycle.iteration() > crate::TAINTED_CYCLES && ty != *previous {
+            Type::unknown()
+        } else {
+            let env = ProgramEnvironment::from_definition(definition);
+            ty.cycle_normalized(db, &env, *previous, cycle)
+        }
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn read_dependent_binding_type<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    let specialization = class
+        .static_class_literal(db)
+        .and_then(|(_, specialization)| specialization);
+
+    infer_definition_types(db, definition)
+        .binding_type(definition)
+        .apply_optional_specialization(db, specialization)
+}
+
 /// Performs member lookups over an MRO (Method Resolution Order).
 ///
 /// This struct encapsulates the shared logic for looking up class and instance
@@ -2794,14 +2822,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut provenance = Provenance::Unknown;
 
         for (class, bindings) in bindings {
-            let specialization = class
-                .static_class_literal(db)
-                .and_then(|(_, specialization)| specialization);
-
             for definition in bindings.definitions(db) {
-                let inferred_ty = infer_definition_types(db, *definition)
-                    .binding_type(*definition)
-                    .apply_optional_specialization(db, specialization);
+                let inferred_ty = read_dependent_binding_type(db, *class, *definition);
                 union = union.add(inferred_ty);
                 provenance = provenance.or(Provenance::SingleDefinition(*definition));
             }
@@ -2987,23 +3009,43 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         && let class_member @ Member {
                             inner:
                                 PlaceAndQualifiers {
-                                    place: Place::Defined(DefinedPlace { origin, .. }),
+                                    place:
+                                        Place::Defined(DefinedPlace {
+                                            ty: class_member_ty,
+                                            origin,
+                                            provenance: class_member_provenance,
+                                            ..
+                                        }),
                                     ..
                                 },
                         } = class.own_class_member(db, &self.env, None, name)
                     {
-                        if origin.is_declared() {
-                            return InstanceMemberResult::Done(class_member.inner);
+                        if class_member_ty.is_data_descriptor(db, &self.env) {
+                            read_dependent_bindings.clear();
+                            continue;
                         }
 
-                        return InstanceMemberResult::Done(
-                            Place::Defined(Self::read_dependent_instance_member(
+                        if origin.is_declared() {
+                            if union.is_empty() {
+                                return InstanceMemberResult::Done(class_member.inner);
+                            }
+
+                            union = union.add(class_member_ty);
+                            provenance = provenance.or(class_member_provenance);
+                            union_qualifiers |= class_member.inner.qualifiers;
+                        } else {
+                            let read_dependent_member = Self::read_dependent_instance_member(
                                 db,
                                 &self.env,
                                 &read_dependent_bindings,
-                            ))
-                            .with_qualifiers(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE),
-                        );
+                            );
+                            union = union.add(read_dependent_member.ty);
+                            provenance = provenance.or(read_dependent_member.provenance);
+                            union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+                        }
+
+                        is_definitely_bound = true;
+                        break;
                     }
                 }
                 ClassBase::TypedDict(_) => {
