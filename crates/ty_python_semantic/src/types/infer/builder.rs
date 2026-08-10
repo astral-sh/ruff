@@ -4600,13 +4600,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(name_expr) = target.as_name_expr()
                     && !name_expr.id.starts_with("__")
                     && !matches!(name_expr.id.as_str(), "_ignore_" | "_value_" | "_name_")
-                    // Not bare Final (bare Final is allowed on enum members)
-                    && !(declared.qualifiers.contains(TypeQualifiers::FINAL)
-                        && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
-                    // Value type would be an enum member at runtime (exclude callables,
-                    // which are never members)
-                    && !inferred_ty.is_subtype_of(db, env, Type::Callable(CallableType::unknown(self.db()))
-                            .top_materialization(db, env),
+                    && (
+                        // Not bare Final (bare Final is allowed on enum members)
+                        !(declared.qualifiers.contains(TypeQualifiers::FINAL)
+                            && matches!(declared.inner_type(), Type::Dynamic(DynamicType::Unknown)))
+                    )
+                    && (
+                        // Value type would be an enum member at runtime (exclude callables,
+                        // which are never members)
+                        !inferred_ty.is_subtype_of(
+                            db,
+                            env,
+                            Type::Callable(CallableType::unknown(self.db()))
+                                .top_materialization(db, env),
+                        )
                     )
                 {
                     let current_scope_id = self.scope().file_scope_id(self.db());
@@ -8861,13 +8868,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Type::TypedDict(typed_dict_ty) = value_type
                 && matches!(method_name, "get" | "pop" | "setdefault")
                 && !arguments.args.is_empty()
-
-                // Validate the key argument for `TypedDict` methods
-                && let Some(first_arg) = arguments.args.first()
+                && let Some(first_arg) = (
+                    // Validate the key argument for `TypedDict` methods
+                    arguments.args.first()
+                )
                 && let Some(key) = (match first_arg {
                     ast::Expr::StringLiteral(ast::ExprStringLiteral {
-                        value: key_literal,
-                        ..
+                        value: key_literal, ..
                     }) => Some(key_literal.to_str()),
                     _ => self
                         .speculate_without_diagnostics()

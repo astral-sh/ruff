@@ -2006,10 +2006,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
                     && !ty.is_type_var()
-                    // Preserve union distribution before constructing constraints. Storing the
-                    // entire union as an exact bound makes solving common generic calls involving
-                    // large unions significantly more expensive.
-                    && !ty.is_union()
+                    && (
+                        // Preserve union distribution before constructing constraints. Storing the
+                        // entire union as an exact bound makes solving common generic calls involving
+                        // large unions significantly more expensive.
+                        !ty.is_union()
+                    )
                 {
                     let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
                     let env = self.env;

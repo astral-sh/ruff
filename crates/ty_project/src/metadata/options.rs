@@ -408,7 +408,7 @@ impl Options {
 
                 tracing::debug!(
                     "Adding `{abspath}` from the `PYTHONPATH` environment variable \
-                    to extra_paths"
+                    to `extra_paths`"
                 );
 
                 extra_paths.push(abspath);

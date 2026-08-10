@@ -2067,15 +2067,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .type_expression_flags(argument)
                             .contains(TypeExpressionFlags::UNPACK)
                         {
-                            let is_typevartuple = if let Type::TypeVar(tvar) = ty {
-                                tvar.is_typevartuple(db)
-                            } else if let ast::Expr::Subscript(subscript) = argument
-                                && let Type::TypeVar(tvar) = self.expression_type(&subscript.slice)
-                            {
-                                tvar.is_typevartuple(db)
-                            } else {
-                                false
-                            };
+                            let is_typevartuple =
+                                matches!(
+                                    ty,
+                                    Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                                ) || if let ast::Expr::Subscript(subscript) = argument {
+                                    matches!(
+                                        self.expression_type(&subscript.slice),
+                                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                                    )
+                                } else {
+                                    false
+                                };
 
                             if is_typevartuple {
                                 has_unpacked_typevartuple = true;

@@ -79,13 +79,13 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
                         // skip `self`
                         .skip(1)
                         .all(|param| param.annotation().is_some() && !param.is_variadic())
-                    && (func_def.parameters.kwonlyargs.is_empty() || checker.target_version() >= PythonVersion::PY310)
-                    // `__init__` should not have complicated logic in it
-                    // only assignments
-                    && func_def
-                        .body
-                        .iter()
-                        .all(is_simple_assignment_to_attribute)
+                    && (func_def.parameters.kwonlyargs.is_empty()
+                        || checker.target_version() >= PythonVersion::PY310)
+                    && (
+                        // `__init__` should not have complicated logic in it
+                        // only assignments
+                        func_def.body.iter().all(is_simple_assignment_to_attribute)
+                    )
                 {
                     has_dunder_init = true;
                 }

@@ -673,12 +673,16 @@ fn unused_imports_in_scope<'a, 'b>(
         .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
         .flat_map(|(id, bdg)| {
             if is_refined_submodule_import_match_enabled(settings)
-                // No need to apply refined logic if there is only a single binding
-                && scope.shadowed_bindings(id).nth(1).is_some()
-                // Only apply the new logic in certain situations to avoid
-                // complexity, false positives, and intersection with
-                // `redefined-while-unused` (`F811`).
-                && has_simple_shadowed_bindings(scope, id, semantic)
+                && (
+                    // No need to apply refined logic if there is only a single binding
+                    scope.shadowed_bindings(id).nth(1).is_some()
+                )
+                && (
+                    // Only apply the new logic in certain situations to avoid
+                    // complexity, false positives, and intersection with
+                    // `redefined-while-unused` (`F811`).
+                    has_simple_shadowed_bindings(scope, id, semantic)
+                )
             {
                 unused_imports_from_binding(semantic, id, scope)
             } else if bdg.is_used() {

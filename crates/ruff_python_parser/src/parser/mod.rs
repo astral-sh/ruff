@@ -1233,24 +1233,24 @@ enum RecoveryContextKind {
 impl RecoveryContextKind {
     /// Returns `true` if a trailing comma is allowed in the current context.
     const fn allow_trailing_comma(self) -> bool {
-        matches!(
-            self,
+        match self {
+            // Only allow a trailing comma if the with item itself is parenthesized
+            RecoveryContextKind::WithItems(WithItemKind::Parenthesized) => true,
             RecoveryContextKind::Slices
-                | RecoveryContextKind::TupleElements(_)
-                | RecoveryContextKind::SetElements
-                | RecoveryContextKind::ListElements
-                | RecoveryContextKind::DictElements
-                | RecoveryContextKind::Arguments
-                | RecoveryContextKind::MatchPatternMapping
-                | RecoveryContextKind::SequenceMatchPattern(_)
-                | RecoveryContextKind::MatchPatternClassArguments
-                // Only allow a trailing comma if the with item itself is parenthesized
-                | RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
-                | RecoveryContextKind::Parameters(_)
-                | RecoveryContextKind::TypeParams
-                | RecoveryContextKind::DeleteTargets
-                | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
-        )
+            | RecoveryContextKind::TupleElements(_)
+            | RecoveryContextKind::SetElements
+            | RecoveryContextKind::ListElements
+            | RecoveryContextKind::DictElements
+            | RecoveryContextKind::Arguments
+            | RecoveryContextKind::MatchPatternMapping
+            | RecoveryContextKind::SequenceMatchPattern(_)
+            | RecoveryContextKind::MatchPatternClassArguments
+            | RecoveryContextKind::Parameters(_)
+            | RecoveryContextKind::TypeParams
+            | RecoveryContextKind::DeleteTargets
+            | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes) => true,
+            _ => false,
+        }
     }
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context.
