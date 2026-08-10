@@ -1295,7 +1295,7 @@ impl<'db> Signature<'db> {
 
         let constraints = ConstraintSetBuilder::new();
         let when = constraints.load(db, env, receiver_constraints);
-        let inferable = self.inferable_typevars(db);
+        let inferable = self.inferable_typevars_with_bound_dependencies(db);
 
         match when.solutions(db, env, &constraints, inferable) {
             Solutions::Unsatisfiable => return None,
@@ -1312,11 +1312,16 @@ impl<'db> Signature<'db> {
             return Some(self.clone());
         };
 
-        let mut builder = SpecializationBuilder::new(db, env, &constraints, inferable);
+        let mut builder = SpecializationBuilder::new_with_bound_dependencies(
+            db,
+            env,
+            &constraints,
+            generic_context,
+        );
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_with(generic_context, |typevar, bounds| {
+        let specialization = builder.build_with(|typevar, bounds| {
             if let Some(bounds) = bounds
                 && let Some(lower) = bounds.lower
                 && let Some(upper) = bounds.upper.as_single_bound(db, env)
@@ -1431,7 +1436,7 @@ impl<'db> Signature<'db> {
                 env,
                 expected_self_ty,
                 &constraints,
-                self.inferable_typevars(db),
+                self.inferable_typevars_with_bound_dependencies(db),
             )
             .is_always_satisfied(db, env)
     }
@@ -1779,9 +1784,9 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db, env))
     }
 
-    fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
+    fn inferable_typevars_with_bound_dependencies(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
         match self.generic_context {
-            Some(generic_context) => generic_context.inferable_typevars(db),
+            Some(generic_context) => generic_context.inferable_typevars_with_bound_dependencies(db),
             None => TypeVarSet::None,
         }
     }
@@ -2377,9 +2382,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .generic_context
                 .map_or(TypeVarSet::None, |context| {
                     if include_bound_dependencies {
-                        context.inferable_typevars(db)
+                        context.inferable_typevars_with_bound_dependencies(db)
                     } else {
-                        TypeVarSet::from_typevars(db, context.variables(db))
+                        context.inferable_typevars(db)
                     }
                 })
         };
