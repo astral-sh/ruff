@@ -1,4 +1,25 @@
 //! Diagnostic baseline loading, matching, and serialization.
+//!
+//! Source offsets are poor persistent identifiers: inserting or removing unrelated code can move a
+//! diagnostic without changing the underlying problem. ty therefore adapts the hash-based matching
+//! approach from [*Tracking Static Analysis Violations Over Time to Capture Developer
+//! Characteristics*][paper] (section III-C), which identifies a violation using source context on
+//! both sides of its start position.
+//!
+//! A baseline fingerprint consists of the lint rule and two hashes. The hashes cover up to 100
+//! non-whitespace characters immediately before and starting at the diagnostic's primary range.
+//! They act as independent anchors: an edit on one side can change one hash while the other still
+//! identifies the diagnostic. Removing whitespace also keeps the anchors stable across formatting
+//! and indentation changes. A current diagnostic matches an entry for the same project-relative
+//! file when the rule and at least one of the two hashes match.
+//!
+//! Matching is one-to-one and order-preserving. Baseline entries and current diagnostics are
+//! compared in deterministic source order, and a baseline entry is consumed after it matches.
+//! This preserves duplicate diagnostics without allowing one baseline entry to hide more than one
+//! current diagnostic. A match changes the diagnostic's severity to [`Severity::Hint`]; consumers
+//! decide whether hints should be displayed.
+//!
+//! [paper]: https://codeql.github.com/publications/tracking-analysis-violations.pdf
 
 use std::collections::BTreeMap;
 use std::hash::Hasher;
@@ -30,6 +51,7 @@ struct Baseline {
 )]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BaselineEntry {
+    /// Used to sort generated entries; baseline files preserve their serialized array order.
     #[serde(skip)]
     offset: TextSize,
     rule: String,
