@@ -2787,7 +2787,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Classify an implicit attribute as defined, undefined, or deferred until an existing value
     /// is available.
-    fn implicit_attribute_bindings(
+    pub(super) fn implicit_attribute_bindings(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
@@ -3243,17 +3243,13 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit = Self::implicit_attribute_bindings(
-                            db,
-                            body_scope,
-                            name,
-                            MethodDecorator::None,
-                        );
+                        let implicit =
+                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
                             ..
-                        }) = implicit.into_member().inner.place
+                        }) = implicit.inner.place
                         {
                             if declaredness == Definedness::AlwaysDefined {
                                 // If a symbol is definitely declared, and we see
@@ -3370,35 +3366,6 @@ impl<'db> StaticClassLiteral<'db> {
             // It could still be implicitly defined in a method.
 
             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-        }
-    }
-
-    /// Preserve augmented assignments that need an existing value while looking up this class.
-    ///
-    /// An ordinary instance member can be returned immediately, but a read-dependent write must
-    /// remain available until MRO lookup finds either a class-level value or an inherited instance
-    /// attribute.
-    pub(super) fn own_instance_member_bindings(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-    ) -> ImplicitAttribute<'db> {
-        let member = self.own_instance_member(db, env, name);
-        if !member.is_undefined() {
-            return ImplicitAttribute::Defined(member);
-        }
-
-        match Self::implicit_attribute_bindings(
-            db,
-            self.body_scope(db),
-            name,
-            MethodDecorator::None,
-        ) {
-            ImplicitAttribute::Deferred(bindings) => ImplicitAttribute::Deferred(bindings),
-            ImplicitAttribute::Defined(_) | ImplicitAttribute::Undefined => {
-                ImplicitAttribute::Undefined
-            }
         }
     }
 
