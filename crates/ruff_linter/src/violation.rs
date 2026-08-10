@@ -7,7 +7,7 @@ use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
 use crate::{
-    codes::{Rule, RuleStatus},
+    codes::{Category, Rule, RuleStatus},
     message::create_lint_diagnostic,
 };
 
@@ -38,6 +38,10 @@ pub trait ViolationMetadata {
 
     /// Returns the rule status for this violation.
     fn status() -> RuleStatus;
+
+    /// Returns the semantic category for this violation, or `None` for removed and internal test
+    /// rules.
+    fn category() -> Option<Category>;
 
     /// Returns the file where the violation is declared.
     fn file() -> &'static str;

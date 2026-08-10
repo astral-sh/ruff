@@ -6,7 +6,7 @@ use std::fmt::Formatter;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum_macros::EnumIter;
+use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 
 use crate::registry::Linter;
 use crate::rules;
@@ -76,6 +76,24 @@ impl serde::Serialize for NoqaCode {
     {
         serializer.serialize_str(&self.to_string())
     }
+}
+
+/// A semantic category assigned to a lint rule.
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumString, IntoStaticStr, Display, Serialize,
+)]
+#[strum(serialize_all = "kebab-case", const_into_str)]
+#[serde(rename_all = "kebab-case")]
+pub enum Category {
+    Correctness,
+    Suspicious,
+    Complexity,
+    Performance,
+    Style,
+    Security,
+    Formatting,
+    Pedantic,
+    Restriction,
 }
 
 #[derive(Debug, Copy, Clone, Serialize)]

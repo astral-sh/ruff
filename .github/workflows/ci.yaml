@@ -666,11 +666,11 @@ jobs:
       - run: python crates/ruff_python_formatter/generate.py
       - run: test -z "$(git status --porcelain)"
       # Verify that adding a plugin or rule produces clean code.
-      - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes
+      - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes --category correctness
       - run: cargo check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
-          ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
+          ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test --category correctness
       - run: cargo check
       # Lint/format/type-check py-fuzzer
       # (dogfooding with ty is done in a separate job)
