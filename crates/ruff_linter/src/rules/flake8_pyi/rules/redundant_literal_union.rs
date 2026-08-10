@@ -43,7 +43,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// non-type-checking purpose. In those cases, disabling this rule for the
 /// affected annotations may be reasonable.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = "pedantic")]
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,

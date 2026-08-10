@@ -41,7 +41,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#mutable-sequence-types)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.290")]
+#[violation_metadata(preview_since = "v0.0.290", category = "pedantic")]
 pub(crate) struct SliceCopy;
 
 impl Violation for SliceCopy {

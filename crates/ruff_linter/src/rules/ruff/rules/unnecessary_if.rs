@@ -59,7 +59,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, fix};
 /// - [`empty-type-checking-block (TC005)`]: Detects empty `if TYPE_CHECKING`
 ///   blocks specifically.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.8")]
+#[violation_metadata(preview_since = "0.15.8", category = "pedantic")]
 pub(crate) struct UnnecessaryIf;
 
 impl AlwaysFixableViolation for UnnecessaryIf {

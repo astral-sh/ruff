@@ -25,7 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Unicode HOWTO](https://docs.python.org/3/howto/unicode.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = "complexity")]
 pub(crate) struct UnicodeKindPrefix;
 
 impl AlwaysFixableViolation for UnicodeKindPrefix {

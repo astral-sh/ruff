@@ -131,7 +131,7 @@ use super::{
 /// [source of confusion]: https://peps.python.org/pep-0695/#points-of-confusion
 /// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = "complexity")]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
 }

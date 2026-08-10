@@ -37,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `for` statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.121")]
+#[violation_metadata(stable_since = "v0.0.121", category = "suspicious")]
 pub(crate) struct LoopVariableOverridesIterator {
     name: String,
 }

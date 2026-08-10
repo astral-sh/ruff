@@ -53,7 +53,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = "correctness")]
 pub(crate) struct RuntimeStringUnion;
 
 impl Violation for RuntimeStringUnion {

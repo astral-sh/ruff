@@ -26,7 +26,7 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// class Integer(object): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.35")]
+#[violation_metadata(stable_since = "v0.0.35", category = "pedantic")]
 pub(crate) struct AmbiguousClassName(pub String);
 
 impl Violation for AmbiguousClassName {

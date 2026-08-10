@@ -58,7 +58,7 @@ use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_v
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.286")]
+#[violation_metadata(preview_since = "v0.0.286", category = "pedantic")]
 pub(crate) struct NoSelfUse {
     method_name: String,
 }

@@ -46,7 +46,7 @@ impl fmt::Display for VarKind {
 /// _T = TypeVar("_T")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = "style")]
 pub(crate) struct UnprefixedTypeParam {
     kind: VarKind,
 }

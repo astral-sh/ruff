@@ -46,7 +46,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 ///
 /// [What's New in Python 3.14]: https://docs.python.org/dev/whatsnew/3.14.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = "pedantic")]
 pub(crate) struct MapWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for MapWithoutExplicitStrict {

@@ -35,7 +35,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.89")]
+#[violation_metadata(stable_since = "v0.0.89", category = "pedantic")]
 pub(crate) struct ErrorSuffixOnExceptionName {
     name: String,
 }

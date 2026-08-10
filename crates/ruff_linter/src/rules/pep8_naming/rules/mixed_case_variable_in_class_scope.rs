@@ -41,7 +41,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.89")]
+#[violation_metadata(stable_since = "v0.0.89", category = "pedantic")]
 pub(crate) struct MixedCaseVariableInClassScope {
     name: String,
 }

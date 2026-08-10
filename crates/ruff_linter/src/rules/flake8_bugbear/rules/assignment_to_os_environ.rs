@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 /// - [Python documentation: `subprocess.Popen`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102")]
+#[violation_metadata(stable_since = "v0.0.102", category = "suspicious")]
 pub(crate) struct AssignmentToOsEnviron;
 
 impl Violation for AssignmentToOsEnviron {

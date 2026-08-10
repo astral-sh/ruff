@@ -42,7 +42,7 @@ use crate::preview::is_s103_extended_dangerous_bits_enabled;
 /// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = "security")]
 pub(crate) struct BadFilePermissions {
     reason: Reason,
 }

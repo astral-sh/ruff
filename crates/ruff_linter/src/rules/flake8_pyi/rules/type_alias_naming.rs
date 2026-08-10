@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.265")]
+#[violation_metadata(stable_since = "v0.0.265", category = "style")]
 pub(crate) struct SnakeCaseTypeAlias {
     name: String,
 }
@@ -66,7 +66,7 @@ impl Violation for SnakeCaseTypeAlias {
 /// ## References
 /// - [PEP 484: Type Aliases](https://peps.python.org/pep-0484/#type-aliases)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.265")]
+#[violation_metadata(stable_since = "v0.0.265", category = "style")]
 pub(crate) struct TSuffixedTypeAlias {
     name: String,
 }

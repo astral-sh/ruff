@@ -36,7 +36,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The property class](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.7")]
+#[violation_metadata(preview_since = "0.14.7", category = "pedantic")]
 pub(crate) struct PropertyWithoutReturn {
     name: String,
 }

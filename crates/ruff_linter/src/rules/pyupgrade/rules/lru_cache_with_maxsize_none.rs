@@ -45,7 +45,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.225")]
+#[violation_metadata(stable_since = "v0.0.225", category = "style")]
 pub(crate) struct LRUCacheWithMaxsizeNone;
 
 impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {

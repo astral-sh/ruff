@@ -34,7 +34,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// This rule's fix is marked as safe, unless the expression contains comments
 /// or may have side effects.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = "complexity")]
 pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {

@@ -42,7 +42,7 @@ use crate::checkers::ast::LintContext;
 /// enable_error_code = ["ignore-without-code"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.187")]
+#[violation_metadata(stable_since = "v0.0.187", category = "restriction")]
 pub(crate) struct BlanketTypeIgnore;
 
 impl Violation for BlanketTypeIgnore {

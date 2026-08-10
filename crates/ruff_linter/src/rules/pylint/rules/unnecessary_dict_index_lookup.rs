@@ -31,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(fruit_count)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = "complexity")]
 pub(crate) struct UnnecessaryDictIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {

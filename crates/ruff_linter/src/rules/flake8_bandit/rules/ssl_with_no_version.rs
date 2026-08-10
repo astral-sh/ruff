@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1_2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = "security")]
 pub(crate) struct SslWithNoVersion;
 
 impl Violation for SslWithNoVersion {

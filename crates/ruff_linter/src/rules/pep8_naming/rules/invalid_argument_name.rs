@@ -46,7 +46,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.77")]
+#[violation_metadata(stable_since = "v0.0.77", category = "pedantic")]
 pub(crate) struct InvalidArgumentName {
     name: String,
 }

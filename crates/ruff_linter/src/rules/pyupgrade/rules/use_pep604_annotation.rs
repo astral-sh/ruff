@@ -64,7 +64,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = "style")]
 pub(crate) struct NonPEP604AnnotationUnion;
 
 impl Violation for NonPEP604AnnotationUnion {
@@ -128,7 +128,7 @@ impl Violation for NonPEP604AnnotationUnion {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = "style")]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {

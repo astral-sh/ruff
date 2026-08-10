@@ -53,7 +53,7 @@ use crate::checkers::ast::Checker;
 ///         logger.error("Oops")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = "style")]
 pub(crate) struct RaiseVanillaClass;
 
 impl Violation for RaiseVanillaClass {

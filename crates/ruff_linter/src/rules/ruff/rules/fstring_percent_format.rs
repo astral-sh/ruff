@@ -27,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// f"hello {first} {second}"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.8")]
+#[violation_metadata(preview_since = "0.15.8", category = "pedantic")]
 pub(crate) struct FStringPercentFormat;
 
 impl Violation for FStringPercentFormat {

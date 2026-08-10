@@ -40,7 +40,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [targeted for deprecation]: https://github.com/python/cpython/issues/82616
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = "suspicious")]
 pub(crate) struct SubprocessPopenPreexecFn;
 
 impl Violation for SubprocessPopenPreexecFn {

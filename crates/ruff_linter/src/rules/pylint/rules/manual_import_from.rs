@@ -33,7 +33,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Submodules](https://docs.python.org/3/reference/import.html#submodules)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = "complexity")]
 pub(crate) struct ManualFromImport {
     module: String,
     name: String,

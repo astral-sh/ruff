@@ -89,7 +89,7 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273")]
+#[violation_metadata(stable_since = "v0.0.273", category = "suspicious")]
 pub(crate) struct ImplicitOptional {
     conversion_type: ConversionType,
 }

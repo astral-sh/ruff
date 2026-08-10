@@ -73,7 +73,7 @@ use crate::{Violation, checkers::ast::Checker};
 ///
 /// [PEP-562]: https://peps.python.org/pep-0562/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.14.11", category = "pedantic")]
 pub(crate) struct NonEmptyInitModule {
     strictly_empty_init_modules: bool,
 }

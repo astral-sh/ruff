@@ -45,7 +45,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe if the call expression contains
 /// comments that would be deleted by applying the fix.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.267")]
+#[violation_metadata(stable_since = "v0.0.267", category = "complexity")]
 pub(crate) struct ExplicitFStringTypeConversion;
 
 impl Violation for ExplicitFStringTypeConversion {

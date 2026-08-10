@@ -46,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.172")]
+#[violation_metadata(stable_since = "v0.0.172", category = "pedantic")]
 pub(crate) struct EscapeSequenceInDocstring;
 
 impl Violation for EscapeSequenceInDocstring {

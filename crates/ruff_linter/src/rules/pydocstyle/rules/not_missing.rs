@@ -65,7 +65,7 @@ use crate::checkers::ast::Checker;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicModule;
 
 impl Violation for UndocumentedPublicModule {
@@ -153,7 +153,7 @@ impl Violation for UndocumentedPublicModule {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicClass;
 
 impl Violation for UndocumentedPublicClass {
@@ -245,7 +245,7 @@ impl Violation for UndocumentedPublicClass {
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicMethod;
 
 impl Violation for UndocumentedPublicMethod {
@@ -336,7 +336,7 @@ impl Violation for UndocumentedPublicMethod {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicFunction;
 
 impl Violation for UndocumentedPublicFunction {
@@ -384,7 +384,7 @@ impl Violation for UndocumentedPublicFunction {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicPackage;
 
 impl Violation for UndocumentedPublicPackage {
@@ -442,7 +442,7 @@ impl Violation for UndocumentedPublicPackage {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedMagicMethod;
 
 impl Violation for UndocumentedMagicMethod {
@@ -502,7 +502,7 @@ impl Violation for UndocumentedMagicMethod {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicNestedClass;
 
 impl Violation for UndocumentedPublicNestedClass {
@@ -551,7 +551,7 @@ impl Violation for UndocumentedPublicNestedClass {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = "pedantic")]
 pub(crate) struct UndocumentedPublicInit;
 
 impl Violation for UndocumentedPublicInit {

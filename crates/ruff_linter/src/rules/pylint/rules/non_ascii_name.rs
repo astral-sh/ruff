@@ -26,7 +26,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 672]: https://peps.python.org/pep-0672/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = "pedantic")]
 pub(crate) struct NonAsciiName {
     name: String,
     kind: Kind,

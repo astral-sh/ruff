@@ -24,7 +24,7 @@ use super::{DefinitionState, LogicalLine};
 /// a = (1, 2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MissingWhitespace {
     token: TokenKind,
 }

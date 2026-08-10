@@ -55,7 +55,7 @@ pub(crate) enum MockReference {
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.206")]
+#[violation_metadata(stable_since = "v0.0.206", category = "suspicious")]
 pub(crate) struct DeprecatedMockImport {
     reference_type: MockReference,
 }

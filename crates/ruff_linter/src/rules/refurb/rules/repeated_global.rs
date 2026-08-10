@@ -40,7 +40,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: the `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 /// - [Python documentation: the `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.9")]
+#[violation_metadata(preview_since = "v0.4.9", category = "formatting")]
 pub(crate) struct RepeatedGlobal {
     global_kind: GlobalKind,
 }

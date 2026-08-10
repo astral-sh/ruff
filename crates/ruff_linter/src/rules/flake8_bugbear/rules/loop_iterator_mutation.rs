@@ -37,7 +37,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.7")]
+#[violation_metadata(preview_since = "v0.3.7", category = "pedantic")]
 pub(crate) struct LoopIteratorMutation {
     name: Option<SourceCodeSnippet>,
 }

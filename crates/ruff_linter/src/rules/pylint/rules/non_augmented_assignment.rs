@@ -76,7 +76,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// The fix replaces the whole statement, so any comments inside it are lost.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.7")]
+#[violation_metadata(preview_since = "v0.3.7", category = "pedantic")]
 pub(crate) struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }

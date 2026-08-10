@@ -30,7 +30,7 @@ use crate::rules::flake8_logging::helpers::is_logger_method_name;
 /// logger.info("Foobar")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = "style")]
 pub(crate) struct RootLoggerCall {
     attr: String,
 }

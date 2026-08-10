@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 ///     username = await loop.run_in_executor(None, input, "Username:")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = "pedantic")]
 pub(crate) struct BlockingInputInAsyncFunction;
 
 impl Violation for BlockingInputInAsyncFunction {

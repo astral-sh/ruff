@@ -67,7 +67,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `asyncio.create_task`](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
 /// - [Python documentation: `asyncio.TaskGroup`](https://docs.python.org/3/library/asyncio-task.html#asyncio.TaskGroup)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.247")]
+#[violation_metadata(stable_since = "v0.0.247", category = "pedantic")]
 pub(crate) struct AsyncioDanglingTask {
     expr: String,
     method: Method,

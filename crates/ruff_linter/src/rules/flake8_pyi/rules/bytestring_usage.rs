@@ -28,7 +28,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = "suspicious")]
 pub(crate) struct ByteStringUsage {
     origin: ByteStringOrigin,
 }

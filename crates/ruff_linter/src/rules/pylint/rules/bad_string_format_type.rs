@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// print("%d" % 1)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = "correctness")]
 pub(crate) struct BadStringFormatType;
 
 impl Violation for BadStringFormatType {

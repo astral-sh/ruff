@@ -47,7 +47,7 @@ use crate::checkers::ast::{Checker, DiagnosticGuard};
 ///     print(f"{instrument}: {section}")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = "complexity")]
 pub(crate) struct DictIndexMissingItems<'a> {
     key: &'a str,
     dict: &'a str,

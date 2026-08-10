@@ -41,7 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, Violation};
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = "pedantic")]
 pub(crate) struct TypedArgumentDefaultInStub;
 
 impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
@@ -88,7 +88,7 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = "pedantic")]
 pub(crate) struct ArgumentDefaultInStub;
 
 impl AlwaysFixableViolation for ArgumentDefaultInStub {
@@ -133,7 +133,7 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 /// ## References
 /// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = "style")]
 pub(crate) struct AssignmentDefaultInStub;
 
 impl AlwaysFixableViolation for AssignmentDefaultInStub {
@@ -154,7 +154,7 @@ impl AlwaysFixableViolation for AssignmentDefaultInStub {
 /// Stub files exist to provide type hints, and are never executed. As such,
 /// all assignments in stub files should be annotated with a type.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = "style")]
 pub(crate) struct UnannotatedAssignmentInStub {
     name: String,
 }
@@ -186,7 +186,7 @@ impl Violation for UnannotatedAssignmentInStub {
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = "suspicious")]
 pub(crate) struct UnassignedSpecialVariableInStub {
     name: String,
 }
@@ -235,7 +235,7 @@ impl Violation for UnassignedSpecialVariableInStub {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = "style")]
 pub(crate) struct TypeAliasWithoutAnnotation {
     module: TypingModule,
     name: String,

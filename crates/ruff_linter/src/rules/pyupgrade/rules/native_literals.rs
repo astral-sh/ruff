@@ -141,7 +141,7 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
 /// - [Python documentation: `complex`](https://docs.python.org/3/library/functions.html#complex)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.193")]
+#[violation_metadata(stable_since = "v0.0.193", category = "style")]
 pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }

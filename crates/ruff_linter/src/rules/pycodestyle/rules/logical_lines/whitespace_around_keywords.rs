@@ -22,7 +22,7 @@ use super::{LogicalLine, Whitespace};
 /// True and False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MultipleSpacesAfterKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
 /// x and y
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct MultipleSpacesBeforeKeyword;
 
 impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
@@ -82,7 +82,7 @@ impl AlwaysFixableViolation for MultipleSpacesBeforeKeyword {
 /// True and False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct TabAfterKeyword;
 
 impl AlwaysFixableViolation for TabAfterKeyword {
@@ -112,7 +112,7 @@ impl AlwaysFixableViolation for TabAfterKeyword {
 /// True and False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct TabBeforeKeyword;
 
 impl AlwaysFixableViolation for TabBeforeKeyword {

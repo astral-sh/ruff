@@ -31,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct TooFewSpacesBeforeInlineComment;
 
 impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
@@ -68,7 +68,7 @@ impl AlwaysFixableViolation for TooFewSpacesBeforeInlineComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct NoSpaceAfterInlineComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
@@ -106,7 +106,7 @@ impl AlwaysFixableViolation for NoSpaceAfterInlineComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "formatting")]
 pub(crate) struct NoSpaceAfterBlockComment;
 
 impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
@@ -153,7 +153,7 @@ impl AlwaysFixableViolation for NoSpaceAfterBlockComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#comments
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = "pedantic")]
 pub(crate) struct MultipleLeadingHashesForBlockComment;
 
 impl AlwaysFixableViolation for MultipleLeadingHashesForBlockComment {

@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// os.getenv("1")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.255")]
+#[violation_metadata(stable_since = "v0.0.255", category = "correctness")]
 pub(crate) struct InvalidEnvvarValue;
 
 impl Violation for InvalidEnvvarValue {

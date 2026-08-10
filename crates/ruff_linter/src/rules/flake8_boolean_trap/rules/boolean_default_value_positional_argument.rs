@@ -99,7 +99,7 @@ use crate::rules::flake8_boolean_trap::helpers::{
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.127")]
+#[violation_metadata(stable_since = "v0.0.127", category = "pedantic")]
 pub(crate) struct BooleanDefaultValuePositionalArgument;
 
 impl Violation for BooleanDefaultValuePositionalArgument {

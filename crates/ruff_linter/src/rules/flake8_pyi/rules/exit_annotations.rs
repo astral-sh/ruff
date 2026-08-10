@@ -47,7 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     ) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = "correctness")]
 pub(crate) struct BadExitAnnotation {
     func_kind: FuncKind,
     error_kind: ErrorKind,

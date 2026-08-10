@@ -37,7 +37,7 @@ use crate::{FixAvailability, Violation};
 /// dag = DAG(dag_id="my_dag", start_date=datetime(2024, 1, 1))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6")]
+#[violation_metadata(preview_since = "0.15.6", category = "pedantic")]
 pub(crate) struct Airflow3DagDynamicValue {
     function_name: String,
 }

@@ -51,7 +51,7 @@ use crate::checkers::ast::Checker;
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = "suspicious")]
 pub(crate) struct SelfOrClsAssignment {
     method_type: MethodType,
 }

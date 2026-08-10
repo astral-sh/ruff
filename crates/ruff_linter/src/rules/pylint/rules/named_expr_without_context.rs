@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// a = 42
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.270")]
+#[violation_metadata(stable_since = "v0.0.270", category = "correctness")]
 pub(crate) struct NamedExprWithoutContext;
 
 impl Violation for NamedExprWithoutContext {

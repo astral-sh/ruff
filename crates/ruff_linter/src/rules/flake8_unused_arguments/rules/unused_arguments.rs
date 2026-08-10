@@ -36,7 +36,7 @@ use crate::registry::Rule;
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.168")]
+#[violation_metadata(stable_since = "v0.0.168", category = "pedantic")]
 pub(crate) struct UnusedFunctionArgument {
     name: String,
 }
@@ -89,7 +89,7 @@ impl Violation for UnusedFunctionArgument {
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.168")]
+#[violation_metadata(stable_since = "v0.0.168", category = "pedantic")]
 pub(crate) struct UnusedMethodArgument {
     name: String,
 }
@@ -144,7 +144,7 @@ impl Violation for UnusedMethodArgument {
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.168")]
+#[violation_metadata(stable_since = "v0.0.168", category = "pedantic")]
 pub(crate) struct UnusedClassMethodArgument {
     name: String,
 }
@@ -199,7 +199,7 @@ impl Violation for UnusedClassMethodArgument {
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.168")]
+#[violation_metadata(stable_since = "v0.0.168", category = "pedantic")]
 pub(crate) struct UnusedStaticMethodArgument {
     name: String,
 }
@@ -239,7 +239,7 @@ impl Violation for UnusedStaticMethodArgument {
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.168")]
+#[violation_metadata(stable_since = "v0.0.168", category = "pedantic")]
 pub(crate) struct UnusedLambdaArgument {
     name: String,
 }

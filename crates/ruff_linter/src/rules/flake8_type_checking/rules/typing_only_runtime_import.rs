@@ -82,7 +82,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = "pedantic")]
 pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
 }
@@ -165,7 +165,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = "pedantic")]
 pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
 }
@@ -248,7 +248,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = "pedantic")]
 pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
 }

@@ -42,7 +42,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// `**kwargs` arguments, as adding a `maxsplit` argument to such a call may lead to duplicate
 /// arguments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = "pedantic")]
 pub(crate) struct MissingMaxsplitArg<'a> {
     actual_split_type: &'a str,
     suggested_split_type: &'a str,

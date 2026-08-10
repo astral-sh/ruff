@@ -49,7 +49,7 @@ use crate::rules::pylint::helpers::num_statements;
 /// ## Options
 /// - `lint.pylint.max-statements`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = "pedantic")]
 pub(crate) struct TooManyStatements {
     statements: usize,
     max_statements: usize,

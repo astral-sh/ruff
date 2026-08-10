@@ -60,7 +60,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// - [Python documentation: `typing.Generator`](https://docs.python.org/3/library/typing.html#typing.Generator)
 /// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = "complexity")]
 pub(crate) struct UnnecessaryDefaultTypeArgs;
 
 impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {

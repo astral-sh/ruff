@@ -64,7 +64,7 @@ enum Deprecation {
 /// from collections.abc import Sequence
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.239")]
+#[violation_metadata(stable_since = "v0.0.239", category = "suspicious")]
 pub(crate) struct DeprecatedImport {
     deprecation: Deprecation,
 }
