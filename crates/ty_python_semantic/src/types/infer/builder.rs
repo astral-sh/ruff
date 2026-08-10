@@ -10471,7 +10471,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attr_name = &attr.id;
         let lookup_result = fallback_place.into_lookup_result(db, env);
-        let resolved_type = lookup_result.unwrap_or_else(|lookup_err| match lookup_err {
+        let resolved_type = lookup_result.unwrap_or_else(|lookup_err| {
+            match lookup_err {
                 LookupError::Undefined(_) => {
                     let fallback = || {
                         TypeAndQualifiers::new(
@@ -10728,6 +10729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     type_when_bound
                 }
+            }
         });
 
         let resolved_type = resolved_type.inner_type();
