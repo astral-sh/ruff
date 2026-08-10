@@ -125,7 +125,20 @@ impl<'db> ComparisonResult<'db> {
         }
     }
 
-    /// Preserve definite results while deferring ambiguous result-type inference to expressions.
+    /// Preserve definite results while deferring constrained-TypeVar correlations to inference.
+    ///
+    /// Expanding the alternatives independently loses the shared specialization that makes this
+    /// function exhaustive:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def f[T: (Literal[1], Literal[2])](value: T) -> bool:
+    ///     if value == 1:
+    ///         return True
+    ///     if value == 2:
+    ///         return False
+    /// ```
     fn defer(self) -> Self {
         match self {
             ComparisonResult::AmbiguousBoolean => ComparisonResult::Ambiguous,
@@ -306,7 +319,13 @@ impl<'db> TupleEqualityEvaluator<'db> {
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
-        let truthiness = evaluate_tuple_element_equality(&mut self.evaluator, left, right);
+        let truthiness = match evaluate_tuple_element_equality(&mut self.evaluator, left, right) {
+            ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
+            ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
+            ComparisonResult::CanNarrow(_)
+            | ComparisonResult::Ambiguous
+            | ComparisonResult::AmbiguousBoolean => Truthiness::Ambiguous,
+        };
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
         }
@@ -334,7 +353,8 @@ impl<'db> TupleEqualityEvaluator<'db> {
 /// Return equality truthiness when the comparison is known to produce a builtin `bool`.
 ///
 /// `None` means expression inference must inspect the comparison methods to determine their
-/// result types or report invalid boolean conversions inside tuple comparisons.
+/// result types or report invalid boolean conversions inside tuple comparisons. For example, an
+/// `A | int` comparison cannot be reduced to `bool` when `A.__eq__` returns a custom result.
 pub(super) fn equality_result_truthiness<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1200,6 +1220,9 @@ fn evaluate_union_right<'db>(
 }
 
 /// Combine truthiness while preserving whether every alternative returns a builtin `bool`.
+///
+/// Keep checking after boolean alternatives disagree: a later alternative might define `__eq__`
+/// with a custom return type that rules out the builtin-boolean shortcut.
 fn combine_truthiness<'db>(
     results: impl IntoIterator<Item = ComparisonResult<'db>>,
 ) -> ComparisonResult<'db> {
@@ -1611,7 +1634,7 @@ fn compare_nominal_instances<'db>(
 
         let mut any_ambiguous = false;
         for (&left, &right) in left_elements.iter().zip(right_elements) {
-            match evaluate_tuple_element_comparison(evaluator, left, right) {
+            match evaluate_tuple_element_equality(evaluator, left, right) {
                 ComparisonResult::AlwaysTrue => {}
                 ComparisonResult::AlwaysFalse => return operator.result_from_equality(false),
                 ComparisonResult::AmbiguousBoolean => any_ambiguous = true,
@@ -1633,22 +1656,11 @@ fn compare_nominal_instances<'db>(
     }
 }
 
-fn evaluate_tuple_element_equality<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> Truthiness {
-    match evaluate_tuple_element_comparison(evaluator, left, right) {
-        ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
-        ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
-        ComparisonResult::CanNarrow(_)
-        | ComparisonResult::Ambiguous
-        | ComparisonResult::AmbiguousBoolean => Truthiness::Ambiguous,
-    }
-}
-
 /// Compare tuple elements without treating custom or non-reflexive results as builtin booleans.
-fn evaluate_tuple_element_comparison<'db>(
+///
+/// Preserve unknown result types so tuple inference can diagnose invalid implicit conversions to
+/// `bool`, even when different tuple lengths already determine the comparison result.
+fn evaluate_tuple_element_equality<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     right: Type<'db>,
