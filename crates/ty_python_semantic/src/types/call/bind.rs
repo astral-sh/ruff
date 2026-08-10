@@ -5517,8 +5517,34 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
 
         let return_context = self.call_expression_tcx.annotation.filter(|tcx| {
-            tcx.filter_union(db, |ty| ty.may_prefer_declared_type(db, self.env))
+            if !tcx
+                .filter_union(db, |ty| ty.may_prefer_declared_type(db, self.env))
                 .may_prefer_declared_type(db, self.env)
+            {
+                return false;
+            }
+
+            // `ParamSpec` inference cannot preserve correlations between overloaded signatures
+            // and a contextual return type. For example, inferring `staticmethod[P, R]` from a
+            // callback with `() -> str` and `(bytes) -> bytes` under a `Callable[[], str]`
+            // context incorrectly applies `R = str` to both overloads. Keep those calls on the
+            // legacy path until parameter-specification inference supports conjoined constraints.
+            // Other `ParamSpec` calls still need their declared context, for example to normalize
+            // the signature of an explicitly specialized `staticmethod`. This currently checks
+            // every overloaded argument, even when that argument does not constrain the `ParamSpec`.
+            !generic_context
+                .variables(db)
+                .any(|typevar| typevar.is_paramspec(db))
+                || !self.arguments.iter_types().any(|argument_types| {
+                    argument_types
+                        .get_default()
+                        .and_then(|actual| actual.try_upcast_to_callable(db, self.env))
+                        .is_some_and(|callables| {
+                            callables
+                                .iter()
+                                .any(|callable| callable.signatures(db).overloads.len() > 1)
+                        })
+                })
         });
         let mut filtered_return_context = None;
         let mut declared_constraints = None;

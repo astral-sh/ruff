@@ -2578,11 +2578,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(self.typevar_inference(generic_context, &types));
         }
 
-        let declared = self.constraint_set_types(self.declared_pending);
-        let inferred = self.constraint_set_types(Some(self.inferred_pending));
         let db = self.db;
         let env = self.env;
         let constraints = self.constraints;
+        let declared = self.constraint_set_types(self.declared_pending, |bounds| {
+            bounds.solve_declared(db, env, constraints)
+        });
+        let inferred = self.constraint_set_types(Some(self.inferred_pending), |bounds| {
+            PathBounds::default_solve(db, env, constraints, bounds)
+        });
 
         // Keep the inferred candidate when the declared constraints do not change the solver's
         // default solution. Otherwise, prefer the declared candidate.
@@ -2633,11 +2637,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn constraint_set_types(
         &self,
         constraints: Option<ConstraintSet<'db, 'c>>,
+        mut solve: impl FnMut(&PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         let Some(constraints) = constraints else {
             return FxHashMap::default();
         };
-        let solutions = constraints.solutions(self.db, self.env, self.constraints, self.inferable);
+        let solutions = constraints.solutions_with(
+            self.db,
+            self.env,
+            self.constraints,
+            self.inferable,
+            |_variance, bounds| solve(bounds),
+        );
         let Solutions::Constrained(solutions) = solutions else {
             return FxHashMap::default();
         };
@@ -4177,7 +4188,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                let Some(actual_callables) = actual.try_upcast_to_callable(db, self.env) else {
+                let actual_callables = actual.try_upcast_to_callable(db, self.env).or_else(|| {
+                    // A fixed outer type variable, including `Self`, exposes the callable
+                    // interface of its upper bound.
+                    let Type::TypeVar(typevar) = actual else {
+                        return None;
+                    };
+                    if typevar.is_inferable(db, self.inferable) {
+                        return None;
+                    }
+                    let TypeVarBoundOrConstraints::UpperBound(bound) = typevar
+                        .typevar(db)
+                        .require_bound_or_constraints(db, self.env)
+                    else {
+                        return None;
+                    };
+                    bound.try_upcast_to_callable(db, self.env)
+                });
+                let Some(actual_callables) = actual_callables else {
                     return Ok(());
                 };
                 let formal_signature = formal_callable.signatures(db);

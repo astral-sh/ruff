@@ -553,6 +553,29 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+## Bounded gradual generic call contexts
+
+An explicitly declared gradual shape should remain unchanged when another invariant type argument
+makes the return context relevant. The shape's declared bound must still be checked without
+materializing it into the preferred specialization.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+class Array[DType, Shape: tuple[int, ...]]:
+    dtype: DType
+
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+def make_array[DType, Shape: tuple[int, ...]](dtype: DType) -> Array[DType, Shape]:
+    raise NotImplementedError
+
+array: Array[int, tuple[Any, ...]] = reveal_type(make_array(1))  # revealed: Array[int, tuple[Any, ...]]
+unknown_array: Array[int, tuple[Unknown, ...]] = reveal_type(make_array(1))  # revealed: Array[int, tuple[Unknown, ...]]
+```
+
 ## Generic calls with type-variable return contexts
 
 A return context containing outer type variables can constrain the inner type variables:
@@ -698,6 +721,25 @@ class Holder(Generic[T]):
 class RelatedBox(Generic[T]):
     def __init__(self, holder: Holder[T]) -> None:
         self.holder = holder
+```
+
+A constructor should also preserve an outer type variable with a union upper bound instead of
+expanding it into an intersection with each union element.
+
+```py
+class First:
+    pass
+
+class Second:
+    pass
+
+class Context[ItemT: First | Second]:
+    def make(self) -> ContextWrapper[ItemT]:
+        return ContextWrapper(self)
+
+class ContextWrapper[ItemT: First | Second]:
+    def __init__(self, context: Context[ItemT]) -> None:
+        self.context = context
 ```
 
 ## Dataclass constructors with outer return contexts

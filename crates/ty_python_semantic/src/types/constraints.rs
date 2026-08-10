@@ -4221,6 +4221,43 @@ impl<'db> PathBound<'db> {
         self.has_only_gradual_evidence
     }
 
+    /// Preserve a valid candidate supplied by a declared type context.
+    ///
+    /// The ordinary upper-only solver intersects contextual bounds with the type variable's
+    /// declared bound. That intersection is appropriate for argument inference, but it can change
+    /// an explicitly requested gradual specialization. For example, a contextual `tuple[Any, ...]`
+    /// should remain available as a candidate for `T: tuple[int, ...]` instead of first becoming
+    /// `tuple[Any, ...] & tuple[int, ...]`.
+    pub(crate) fn solve_declared(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Result<Option<Type<'db>>, ()> {
+        let candidate = match self.lower {
+            Some(lower) => Some(lower),
+            None if self.has_upper() => self.upper.as_single_bound(db, env).or_else(|| {
+                IntersectionType::bounded_from_elements(db, env, self.upper.clauses.iter().copied())
+            }),
+            None => None,
+        };
+
+        if let Some(candidate) = candidate
+            // A rigid outer variable may satisfy a bound only after intersecting with it. In that
+            // case, the unconstrained variable is not itself a valid contextual specialization.
+            && !matches!(
+                self.bound_typevar.typevar(db).bound_or_constraints(db, env),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound))
+                    if !candidate.is_assignable_to(db, env, bound)
+            )
+            && let Some(solution) = self.valid_preferred_solution(db, env, builder, candidate)
+        {
+            return Ok(Some(solution));
+        }
+
+        PathBounds::default_solve(db, env, builder, self)
+    }
+
     /// Return the valid specialization obtained by preferring `candidate` on this path.
     ///
     /// The candidate must be above the path's existing lower bound. The default solver then

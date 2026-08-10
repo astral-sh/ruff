@@ -533,6 +533,20 @@ def _(xs: Unknown | list[str]):
     tokens.extend(escaped)
 ```
 
+## `map` with bounded callable type variables
+
+A callable `self` argument retains the signature of its class bound when an outer overloaded call
+provides an incompatible `LiteralString` context.
+
+```py
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+    def format(self, values: list[int]) -> str:
+        return ", ".join(map(self, values))
+```
+
 ## Failed `map` calls retain their result type
 
 When the argument count identifies a single `map` overload, an incompatible callback still produces
