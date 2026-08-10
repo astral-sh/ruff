@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use divan::{Bencher, bench};
 use rayon::ThreadPoolBuilder;
 use ruff_db::system::{OsSystem, SystemPath, TestSystem};
@@ -15,8 +17,10 @@ fn setup_iteration(root: &SystemPath) -> ProjectDatabase {
     ] {
         system.remove_env_var(name);
     }
+    system.set_env_var(EnvVars::TY_UV, "scripts");
+    system.set_env_var(EnvVars::UV, "uv");
 
-    let metadata = ProjectMetadata::new("script", root.to_path_buf());
+    let metadata = ProjectMetadata::discover(root, &system).unwrap();
     ProjectDatabase::fallible(metadata, system).unwrap()
 }
 
@@ -44,13 +48,22 @@ def greet(user: User) -> str:
     )
     .unwrap();
 
+    // Synchronize once before measuring so this benchmark covers the warm uv cache case.
+    let output = Command::new("uv")
+        .args(["workspace", "metadata", "--sync", "--script"])
+        .arg(root.join("script.py").as_std_path())
+        .current_dir(root.as_std_path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to prepare script environment: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
     bencher
         .with_inputs(|| setup_iteration(root))
-        .bench_local_refs(|db| {
-            let diagnostics = db.check();
-            assert_eq!(diagnostics.len(), 1);
-            assert!(diagnostics[0].id().is_lint_named("unresolved-import"));
-        });
+        .bench_local_refs(|db| assert!(db.check().is_empty()));
 }
 
 fn main() {
