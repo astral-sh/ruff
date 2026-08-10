@@ -2781,12 +2781,24 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
+        Self::implicit_attribute_bindings(db, class_body_scope, name, target_method_decorator)
+            .into_member()
+    }
+
+    /// Classify an implicit attribute as defined, undefined, or deferred until an existing value
+    /// is available.
+    fn implicit_attribute_bindings(
+        db: &'db dyn Db,
+        class_body_scope: ScopeId<'db>,
+        name: &str,
+        target_method_decorator: MethodDecorator,
+    ) -> ImplicitAttribute<'db> {
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
         let names = implicit_attribute_names(db, class_body_scope);
         let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
         else {
-            return Member::unbound();
+            return ImplicitAttribute::Undefined;
         };
 
         Self::implicit_attribute_inner(
@@ -2803,15 +2815,17 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _| Member {
-            inner: Place::bound(Type::divergent(id)).into(),
-        },
+        cycle_initial=|_, id, _| ImplicitAttribute::Defined(
+            Member {
+                inner: Place::bound(Type::divergent(id)).into(),
+            },
+        ),
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn implicit_attribute_inner(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
-    ) -> Member<'db> {
+    ) -> ImplicitAttribute<'db> {
         let class_body_scope = attribute.class_body_scope(db);
         let name = attribute.name(db).as_str();
         let target_method_decorator = attribute.target_method_decorator(db);
@@ -2826,6 +2840,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
+        let mut read_dependent_bindings = Vec::new();
         let mut provenance = Provenance::Unknown;
 
         let module = parsed_module(db, python_file).load(db);
@@ -2919,11 +2934,11 @@ impl<'db> StaticClassLiteral<'db> {
                             index.expression(value),
                             TypeContext::default(),
                         );
-                        return Member {
+                        return ImplicitAttribute::Defined(Member {
                             inner: Place::bound(inferred_ty)
                                 .with_definition(declaration)
                                 .with_qualifiers(all_qualifiers),
-                        };
+                        });
                     }
 
                     // If there is no right-hand side, just record that we saw a `Final` qualifier
@@ -2931,7 +2946,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                return Member { inner: annotation };
+                return ImplicitAttribute::Defined(Member { inner: annotation });
             }
         }
 
@@ -2988,6 +3003,11 @@ impl<'db> StaticClassLiteral<'db> {
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
+
+                if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
+                    read_dependent_bindings.push(binding);
+                    continue;
+                }
 
                 if !is_method_reachable.is_always_false() {
                     is_attribute_bound = true;
@@ -3105,9 +3125,6 @@ impl<'db> StaticClassLiteral<'db> {
                             }
                         }
                     }
-                    DefinitionKind::AugmentedAssignment(_) => {
-                        Some(infer_definition_types(db, binding).binding_type(binding))
-                    }
                     DefinitionKind::NamedExpression(_) => {
                         // A named expression whose target is an attribute is syntactically prohibited
                         None
@@ -3122,19 +3139,27 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        Member {
-            inner: if is_attribute_bound {
-                Place::bound(
+        if is_attribute_bound {
+            for binding in read_dependent_bindings {
+                let inferred_ty = infer_definition_types(db, binding).binding_type(binding);
+                provenance = provenance.or(Provenance::SingleDefinition(binding));
+                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+            }
+
+            ImplicitAttribute::Defined(Member {
+                inner: Place::bound(
                     union_of_inferred_types
                         .build()
                         .promote(db, env)
                         .promote_singletons(db, env),
                 )
                 .with_provenance(provenance)
-                .with_qualifiers(qualifiers)
-            } else {
-                Place::Undefined.with_qualifiers(qualifiers)
-            },
+                .with_qualifiers(qualifiers),
+            })
+        } else if read_dependent_bindings.is_empty() {
+            ImplicitAttribute::Undefined
+        } else {
+            ImplicitAttribute::Deferred
         }
     }
 
@@ -3215,13 +3240,17 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+                        let implicit = Self::implicit_attribute_bindings(
+                            db,
+                            body_scope,
+                            name,
+                            MethodDecorator::None,
+                        );
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
                             ..
-                        }) = implicit.inner.place
+                        }) = implicit.into_member().inner.place
                         {
                             if declaredness == Definedness::AlwaysDefined {
                                 // If a symbol is definitely declared, and we see
@@ -3246,6 +3275,13 @@ impl<'db> StaticClassLiteral<'db> {
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
+                            }
+                        } else if matches!(implicit, ImplicitAttribute::Deferred) {
+                            // The class-body binding supplies the initial value. A successful
+                            // augmented assignment then writes an instance attribute, so this
+                            // declaration must continue to shadow inherited instance declarations.
+                            Member {
+                                inner: declared.with_qualifiers(qualifiers),
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty
@@ -3818,6 +3854,30 @@ fn explicit_bases_cycle_fn<'db>(
     }
 }
 
+/// The result of looking for instance attributes established by methods on one class.
+///
+/// An ordinary assignment such as `self.value = 1` establishes an instance attribute. An
+/// augmented assignment such as `self.value += 1` only does so if an existing instance or class
+/// attribute can supply the value it reads first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+enum ImplicitAttribute<'db> {
+    /// An independent assignment or declaration defines the instance attribute.
+    Defined(Member<'db>),
+    /// No assignment defines the instance attribute.
+    Undefined,
+    /// Augmented assignments can define the attribute only if an existing value is available.
+    Deferred,
+}
+
+impl<'db> ImplicitAttribute<'db> {
+    fn into_member(self) -> Member<'db> {
+        match self {
+            Self::Defined(member) => member,
+            Self::Undefined | Self::Deferred => Member::unbound(),
+        }
+    }
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {
     #[returns(copy)]
@@ -3853,13 +3913,19 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
 fn implicit_attribute_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
-    previous_member: &Member<'db>,
-    member: Member<'db>,
+    previous: &ImplicitAttribute<'db>,
+    attribute_member: ImplicitAttribute<'db>,
     attribute: ImplicitAttributeName<'db>,
-) -> Member<'db> {
-    let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
-    let inner = member
-        .inner
-        .cycle_normalized(db, &env, previous_member.inner, cycle);
-    Member { inner }
+) -> ImplicitAttribute<'db> {
+    if let (ImplicitAttribute::Defined(previous), ImplicitAttribute::Defined(current)) =
+        (previous, attribute_member)
+    {
+        let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
+        let inner = current
+            .inner
+            .cycle_normalized(db, &env, previous.inner, cycle);
+        ImplicitAttribute::Defined(Member { inner })
+    } else {
+        attribute_member
+    }
 }

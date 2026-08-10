@@ -259,8 +259,8 @@ reveal_type(c_instance.b)  # revealed: int
 
 #### Augmented assignments
 
-An augmented assignment contributes its result to the inferred type of an unannotated instance
-attribute.
+An augmented assignment contributes its result to an instance attribute that already has an
+independent binding.
 
 ```py
 class Weird:
@@ -274,6 +274,21 @@ class C:
 
 # TODO: Infer only `str`, since the initial `Weird` value has been overwritten.
 reveal_type(C().w)  # revealed: Weird | str
+```
+
+#### Augmented assignments cannot define missing attributes
+
+An augmented assignment must read an existing attribute before writing its result, so it cannot
+introduce an attribute on its own.
+
+```py
+class Counter:
+    def increment(self) -> None:
+        # error: [unresolved-attribute]
+        self.value += 1
+
+# error: [unresolved-attribute]
+reveal_type(Counter().value)  # revealed: Unknown
 ```
 
 #### Nested augmented assignments after narrowing
@@ -869,6 +884,29 @@ C.variable_with_class_default1 = "overwritten on class"
 
 reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on class"]
 reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
+```
+
+#### Augmented assignments to overriding class-level defaults
+
+A class-level default supplies the initial value for an augmented assignment, even when another
+branch of a diamond declares a wider instance attribute.
+
+```py
+class Base:
+    value: int | None = None
+
+class First(Base): ...
+
+class Second(Base):
+    value: int | None
+
+class Child(First, Second):
+    value: int = 1
+
+    def update(self) -> None:
+        self.value |= 2
+
+reveal_type(Child().value)  # revealed: int
 ```
 
 #### Descriptor attributes as class variables
