@@ -7032,12 +7032,24 @@ impl<'db> Binding<'db> {
                     .filter(|ty| !ty.has_dynamic(db, env))
                     .map(|ty| ty.promote(db, env));
 
-                // TODO: We should similarly combine both the call expression and argument constraints
-                // here. We currently only rely on argument constraints when there is no explicit declared
-                // type for the call expression.
+                // The previous binding specialization already satisfies the argument constraints.
+                // Keep its more precise solution when it is compatible with the return context;
+                // otherwise, retain the declared context for contextual diagnostics and overloads.
+                // Callable contexts must also retain their signature instead of being replaced by
+                // a callable class or function literal, which cannot drive contextual inference.
+                let solution = match (call_expression_constraints, argument_constraints) {
+                    (Some(declared), Some(inferred))
+                        if inferred.is_assignable_to(db, env, declared)
+                            && (!declared.is_callable_type() || inferred.is_callable_type()) =>
+                    {
+                        Some(inferred)
+                    }
+                    (Some(declared), _) => Some(declared),
+                    (None, inferred) => inferred,
+                };
+
                 Some(
-                    call_expression_constraints
-                        .or(argument_constraints)
+                    solution
                         // Default specialize any type variables to a marker type, which will be ignored
                         // during argument inference, allowing the concrete subset of the parameter
                         // type to still affect argument inference.

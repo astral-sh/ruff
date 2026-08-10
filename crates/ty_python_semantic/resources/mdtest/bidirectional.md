@@ -1037,6 +1037,26 @@ def _():
     reveal_type(x8)  # revealed: X
 ```
 
+## Generic callback contexts respect argument constraints
+
+An optional return annotation must not widen a callback parameter when another argument already
+determines the type variable. The return-context and argument constraints are both satisfied by the
+narrower argument-derived specialization.
+
+```py
+from collections.abc import Callable
+
+def pick[T](
+    values: list[T],
+    key: Callable[[T], object],
+    default: T | None = None,
+) -> T | None:
+    return default
+
+def use(values: list[str]) -> str | None:
+    return pick(values, key=lambda value: reveal_type(value).upper())  # revealed: str
+```
+
 ## Prefer the declared type of generic classes and callables
 
 The inferred and declared constraint sets are solved independently using the solver's normal
