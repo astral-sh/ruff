@@ -39,12 +39,15 @@ use crate::Db;
 const BASELINE_VERSION: u32 = 1;
 const CONTEXT_SIZE: usize = 100;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, get_size2::GetSize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Baseline {
+struct BaselineFile {
     version: u32,
     files: BTreeMap<String, Vec<BaselineEntry>>,
 }
+
+#[derive(Debug, Clone, Default, Eq, PartialEq, get_size2::GetSize)]
+struct Baseline(FxHashMap<String, Box<[BaselineEntry]>>);
 
 #[derive(
     Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, get_size2::GetSize,
@@ -87,10 +90,10 @@ impl BaselineError {
 ///
 /// Reading through `source_text` makes this query dependent on the baseline file's contents.
 #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
-fn load(db: &dyn Db) -> Result<FxHashMap<String, Box<[BaselineEntry]>>, BaselineError> {
+fn load(db: &dyn Db) -> Result<Baseline, BaselineError> {
     let project = db.project();
     let Some(path) = project.settings(db).baseline() else {
-        return Ok(FxHashMap::default());
+        return Ok(Baseline::default());
     };
 
     let file = match system_path_to_file(db, path) {
@@ -113,7 +116,7 @@ fn load(db: &dyn Db) -> Result<FxHashMap<String, Box<[BaselineEntry]>>, Baseline
         });
     }
 
-    let baseline: Baseline = match serde_json::from_str(source.as_str()) {
+    let baseline: BaselineFile = match serde_json::from_str(source.as_str()) {
         Ok(baseline) => baseline,
         Err(error) => {
             return Err(BaselineError {
@@ -132,11 +135,7 @@ fn load(db: &dyn Db) -> Result<FxHashMap<String, Box<[BaselineEntry]>>, Baseline
         });
     }
 
-    Ok(baseline
-        .files
-        .into_iter()
-        .map(|(path, entries)| (path, entries.into_boxed_slice()))
-        .collect())
+    Ok(Baseline::from_file(baseline))
 }
 
 pub(crate) fn settings_diagnostic(db: &dyn Db) -> Option<Diagnostic> {
@@ -149,32 +148,10 @@ pub(crate) fn demote_diagnostics(db: &dyn Db, file: File, diagnostics: &mut [Dia
     if db.project().settings(db).baseline().is_none() {
         return;
     }
-    let Ok(files) = load(db) else {
+    let Ok(baseline) = load(db) else {
         return;
     };
-    let Some(path) = project_relative_path(db, file) else {
-        return;
-    };
-    let Some(baseline_entries) = files.get(&path) else {
-        return;
-    };
-
-    let source = source_text(db, file);
-
-    let mut entries: Vec<_> = diagnostics
-        .iter()
-        .enumerate()
-        .filter_map(|(index, diagnostic)| {
-            let diagnostic = BaselineDiagnostic::from_diagnostic(diagnostic)?;
-            Some((index, diagnostic.entry(source.as_str())))
-        })
-        .collect();
-    entries.sort_by(|(_, left), (_, right)| left.cmp(right));
-    let (diagnostic_indices, entries): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
-
-    for matched_index in matched_indices(baseline_entries, &entries) {
-        diagnostics[diagnostic_indices[matched_index]].set_severity(Severity::Hint);
-    }
+    baseline.demote_diagnostics(db, file, diagnostics);
 }
 
 /// Returns `true` for lint diagnostics that can be written to a baseline.
@@ -186,29 +163,81 @@ pub fn diagnostic_is_eligible(db: &dyn Db, diagnostic: &Diagnostic) -> bool {
 
 /// Writes a new baseline containing all eligible diagnostics.
 pub fn write(db: &dyn Db, path: &SystemPath, diagnostics: &[Diagnostic]) -> anyhow::Result<usize> {
-    let baseline = Baseline::from_diagnostics(db, diagnostics);
-    let count = baseline.files.values().map(Vec::len).sum();
-    let mut serialized = serde_json::to_string_pretty(&baseline)?;
-    serialized.push('\n');
-
-    let writable = db
-        .system()
-        .as_writable()
-        .context("The active file system is read-only")?;
-    if let Some(parent) = path.parent() {
-        writable
-            .create_directory_all(parent)
-            .with_context(|| format!("Failed to create baseline directory `{parent}`"))?;
-    }
-    writable
-        .write_file(path, &serialized)
-        .with_context(|| format!("Failed to write baseline `{path}`"))?;
-    Ok(count)
+    Baseline::from_diagnostics(db, diagnostics).write(db, path)
 }
 
 impl Baseline {
+    fn from_file(file: BaselineFile) -> Self {
+        Self(
+            file.files
+                .into_iter()
+                .map(|(path, entries)| (path, entries.into_boxed_slice()))
+                .collect(),
+        )
+    }
+
+    fn into_file(self) -> BaselineFile {
+        BaselineFile {
+            version: BASELINE_VERSION,
+            files: self
+                .0
+                .into_iter()
+                .map(|(path, entries)| (path, entries.into_vec()))
+                .collect(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.values().map(|entries| entries.len()).sum()
+    }
+
+    fn write(self, db: &dyn Db, path: &SystemPath) -> anyhow::Result<usize> {
+        let count = self.len();
+        let mut serialized = serde_json::to_string_pretty(&self.into_file())?;
+        serialized.push('\n');
+
+        let writable = db
+            .system()
+            .as_writable()
+            .context("The active file system is read-only")?;
+        if let Some(parent) = path.parent() {
+            writable
+                .create_directory_all(parent)
+                .with_context(|| format!("Failed to create baseline directory `{parent}`"))?;
+        }
+        writable
+            .write_file(path, &serialized)
+            .with_context(|| format!("Failed to write baseline `{path}`"))?;
+        Ok(count)
+    }
+
+    fn demote_diagnostics(&self, db: &dyn Db, file: File, diagnostics: &mut [Diagnostic]) {
+        let Some(path) = project_relative_path(db, file) else {
+            return;
+        };
+        let Some(baseline_entries) = self.0.get(&path) else {
+            return;
+        };
+
+        let source = source_text(db, file);
+        let mut entries: Vec<_> = diagnostics
+            .iter()
+            .enumerate()
+            .filter_map(|(index, diagnostic)| {
+                let diagnostic = BaselineDiagnostic::from_diagnostic(diagnostic)?;
+                Some((index, diagnostic.entry(source.as_str())))
+            })
+            .collect();
+        entries.sort_by(|(_, left), (_, right)| left.cmp(right));
+        let (diagnostic_indices, entries): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
+
+        for matched_index in matched_indices(baseline_entries, &entries) {
+            diagnostics[diagnostic_indices[matched_index]].set_severity(Severity::Hint);
+        }
+    }
+
     fn from_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic]) -> Self {
-        let mut grouped: BTreeMap<String, Vec<BaselineDiagnostic>> = BTreeMap::new();
+        let mut grouped: FxHashMap<String, Vec<BaselineDiagnostic>> = FxHashMap::default();
         for diagnostic in diagnostics {
             let Some(diagnostic) = BaselineDiagnostic::from_diagnostic(diagnostic) else {
                 continue;
@@ -219,7 +248,11 @@ impl Baseline {
             grouped.entry(path).or_default().push(diagnostic);
         }
 
-        let mut files = BTreeMap::new();
+        let mut files = FxHashMap::default();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each file is processed independently and its entries are sorted"
+        )]
         for (path, diagnostics) in grouped {
             let file = diagnostics[0].file;
             let source = source_text(db, file);
@@ -228,13 +261,10 @@ impl Baseline {
                 .map(|diagnostic| diagnostic.entry(source.as_str()))
                 .collect();
             entries.sort();
-            files.insert(path, entries);
+            files.insert(path, entries.into_boxed_slice());
         }
 
-        Self {
-            version: BASELINE_VERSION,
-            files,
-        }
+        Self(files)
     }
 }
 
@@ -335,8 +365,8 @@ mod tests {
     use ty_python_semantic::Db as _;
 
     use super::{
-        Baseline, BaselineEntry, context_hashes, demote_diagnostics, load, matched_indices,
-        two_hash_matches, write,
+        Baseline, BaselineEntry, BaselineFile, context_hashes, demote_diagnostics, load,
+        matched_indices, two_hash_matches, write,
     };
 
     fn entry(rule: &str, preceding: &str, following: &str) -> BaselineEntry {
@@ -380,7 +410,7 @@ mod tests {
     #[test]
     fn schema_validation() {
         let unknown_top_level = r#"{"version":1,"files":{},"unknown":true}"#;
-        assert!(serde_json::from_str::<Baseline>(unknown_top_level).is_err());
+        assert!(serde_json::from_str::<BaselineFile>(unknown_top_level).is_err());
 
         let valid = r#"{
             "version": 1,
@@ -392,7 +422,7 @@ mod tests {
                 }]
             }
         }"#;
-        assert!(serde_json::from_str::<Baseline>(valid).is_ok());
+        assert!(serde_json::from_str::<BaselineFile>(valid).is_ok());
 
         let message = r#"{
             "version": 1,
@@ -405,7 +435,7 @@ mod tests {
                 }]
             }
         }"#;
-        assert!(serde_json::from_str::<Baseline>(message).is_err());
+        assert!(serde_json::from_str::<BaselineFile>(message).is_err());
     }
 
     #[test]
@@ -447,7 +477,10 @@ mod tests {
         let initial = Baseline::from_diagnostics(&db, &[warning.clone(), error.clone()]);
 
         let baseline_path = SystemPath::new("/project/baseline.json");
-        db.write_file(baseline_path, serde_json::to_string(&initial)?)?;
+        db.write_file(
+            baseline_path,
+            serde_json::to_string(&initial.clone().into_file())?,
+        )?;
         let mut diagnostics = vec![warning.clone(), error.clone()];
         demote_diagnostics(&db, source_file, &mut diagnostics);
         assert!(
