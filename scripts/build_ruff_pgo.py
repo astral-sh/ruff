@@ -46,8 +46,9 @@ class EcosystemProject:
 # corpus that includes scientific computing, synchronous and asynchronous code,
 # applications, libraries, and type stubs.
 #
-# Nothing in this list is sacred. During development, adding Zulip and Warehouse
-# reduced Ruff's CPU time by 0.35% while increasing its wheel size by 0.44%.
+# But it wasn't a highly optimized selection process. (For example, during
+# development, we added Zulip and Warehouse, which reduced Ruff's CPU time by
+# 0.35% while increasing its wheel size by 0.44%.)
 CORPUS_PROJECTS = (
     EcosystemProject(
         name="pytest",
