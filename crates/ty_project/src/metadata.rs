@@ -8,7 +8,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
-use ty_static::EnvVars;
 
 use crate::Db;
 use crate::metadata::options::{
@@ -18,10 +17,9 @@ use crate::metadata::options::{
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv;
+use crate::uv::{self, UseUv};
 pub use options::Options;
 use options::TyTomlError;
-
 mod configuration_file;
 pub mod options;
 pub mod pyproject;
@@ -72,6 +70,9 @@ pub struct ProjectMetadata {
 
     #[cfg_attr(test, serde(skip))]
     uv_workspace: Option<uv::UvMetadata>,
+
+    #[cfg_attr(test, serde(skip))]
+    use_uv: UseUv,
 }
 
 impl ProjectMetadata {
@@ -87,6 +88,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: None,
             uv_workspace: None,
+            use_uv: UseUv::Off,
         }
     }
 
@@ -94,6 +96,16 @@ impl ProjectMetadata {
         path: SystemPathBuf,
         root: &SystemPath,
         system: &dyn System,
+    ) -> Result<Self, ProjectMetadataError> {
+        Self::from_config_file_with_uv(path, root, system, UseUv::from_system(system))
+    }
+
+    /// Loads a project from a configuration file using the explicitly configured uv integrations.
+    pub fn from_config_file_with_uv(
+        path: SystemPathBuf,
+        root: &SystemPath,
+        system: &dyn System,
+        use_uv: UseUv,
     ) -> Result<Self, ProjectMetadataError> {
         tracing::debug!("Using overridden configuration file at '{path}'");
 
@@ -116,6 +128,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: Some(path),
             uv_workspace: None,
+            use_uv,
         })
     }
 
@@ -163,6 +176,7 @@ impl ProjectMetadata {
             fallback_options: None,
             config_file_override: None,
             uv_workspace: None,
+            use_uv: UseUv::Off,
         })
     }
 
@@ -179,10 +193,23 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
-        {
-            match uv::UvMetadata::discover_workspace(path, system) {
-                Ok(workspace) => Some(workspace),
+        Self::discover_with_uv(path, system, UseUv::from_system(system))
+    }
+
+    /// Discovers the closest project using the explicitly configured uv integrations.
+    pub fn discover_with_uv(
+        path: &SystemPath,
+        system: &dyn System,
+        use_uv: UseUv,
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
+        let uv_workspace = if use_uv.workspace_discovery_enabled() {
+            let metadata = uv::Uv::new(system)
+                .map_err(uv::uv_executable_error)
+                .map_err(uv::UvMetadataError::Invocation)
+                .and_then(|uv| uv.metadata(system, uv::MetadataTarget::Workspace(path)));
+
+            match metadata {
+                Ok(metadata) => Some(metadata),
                 Err(error) => {
                     tracing::warn!("{error}");
                     None
@@ -193,6 +220,7 @@ impl ProjectMetadata {
         };
 
         Self::discover_with_uv_workspace(path, system, uv_workspace)
+            .map(|metadata| metadata.with_use_uv(use_uv))
     }
 
     /// Discovers the closest project without considering uv workspace metadata.
@@ -201,6 +229,7 @@ impl ProjectMetadata {
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         Self::discover_with_uv_workspace(path, system, None)
+            .map(|metadata| metadata.with_use_uv(UseUv::from_system(system)))
     }
 
     fn discover_with_uv_workspace(
@@ -371,10 +400,22 @@ impl ProjectMetadata {
         self
     }
 
+    /// Configures which uv integrations are enabled for this project.
+    #[must_use]
+    pub fn with_use_uv(mut self, use_uv: UseUv) -> Self {
+        self.use_uv = use_uv;
+        self
+    }
+
     /// Rediscovers the project, while preserving applied options.
     pub(crate) fn rediscover(&self, system: &dyn System) -> Result<Self, ProjectMetadataError> {
         let mut metadata = if let Some(config_file) = self.config_file_override() {
-            Self::from_config_file(config_file.to_path_buf(), self.root(), system)?
+            Self::from_config_file_with_uv(
+                config_file.to_path_buf(),
+                self.root(),
+                system,
+                self.use_uv,
+            )?
         } else {
             // The active project root may have been deleted. Start rediscovery from the closest
             // existing ancestor so ty can fall back to an enclosing project.
@@ -383,7 +424,7 @@ impl ProjectMetadata {
                 .ancestors()
                 .find(|path| system.is_directory(path))
                 .unwrap_or_else(|| self.root());
-            Self::discover(rediscovery_path, system)?
+            Self::discover_with_uv(rediscovery_path, system, self.use_uv)?
         };
 
         metadata.override_options.clone_from(&self.override_options);
@@ -400,8 +441,16 @@ impl ProjectMetadata {
         self.name.as_str()
     }
 
+    pub(crate) const fn use_uv(&self) -> UseUv {
+        self.use_uv
+    }
+
     pub(crate) fn options(&self) -> &Options {
         &self.options
+    }
+
+    pub(crate) fn override_options(&self) -> Option<&Options> {
+        self.override_options.as_deref()
     }
 
     /// Returns the explicit configuration file that replaces normal project discovery, if any.
@@ -637,8 +686,7 @@ mod tests {
     use ruff_ranged_value::ValueSource;
     use ty_static::EnvVars;
 
-    use crate::metadata::{Options, value::RelativePathBuf};
-    use crate::uv::UvMetadata;
+    use crate::metadata::{Options, uv::UvMetadata, value::RelativePathBuf};
     use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]

@@ -7,16 +7,23 @@ use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
 
-use crate::metadata::options::{Options, OptionsContext};
+use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
+use crate::metadata::value::RelativePathBuf;
+use crate::uv::UvMetadata;
 use crate::{Db, ProjectMetadata};
+
+mod environment;
+
+pub use environment::ScriptEnvironments;
+use environment::script_environment;
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -76,6 +83,12 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 
     let mut diagnostics = ScriptConfigurationDiagnostics::default();
     let metadata = parse_script_metadata(file, tag, &mut diagnostics);
+    let environment = script_environment(db, file);
+    let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
+
+    if let Some(error) = environment.and_then(|environment| environment.initialization_error(db)) {
+        diagnostics.report_invalid(uv_metadata_diagnostic(file, tag, error));
+    }
 
     let configuration_root = file
         .path(db)
@@ -86,7 +99,13 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 
     let project_metadata = db.project().metadata(db);
 
-    let options = resolve_script_options(project_metadata, &metadata, file, &mut diagnostics);
+    let options = resolve_script_options(
+        project_metadata,
+        &metadata,
+        uv_metadata,
+        file,
+        &mut diagnostics,
+    );
     let settings = resolve_script_settings(db, &options, context, &mut diagnostics);
     let program_settings = resolve_script_program_settings(
         db,
@@ -171,6 +190,7 @@ fn parse_script_metadata(
 fn resolve_script_options(
     project_metadata: &ProjectMetadata,
     metadata: &ScriptMetadata,
+    uv_metadata: Option<&UvMetadata>,
     file: File,
     diagnostics: &mut ScriptConfigurationDiagnostics,
 ) -> Options {
@@ -182,10 +202,27 @@ fn resolve_script_options(
         metadata.to_options(file, diagnostics)
     };
 
+    let uv_options = uv_metadata.map(|metadata| Options {
+        environment: Some(EnvironmentOptions {
+            python_version: metadata.python_version().cloned(),
+            python: metadata
+                .environment()
+                .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
     let mut options = Options::default();
     // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.options_in_precedence_order(&inline, None) {
+    for layer in project_metadata.options_in_precedence_order(&inline, uv_options.as_ref()) {
         options.combine_with(layer.clone());
+    }
+
+    // An explicit Python environment selects uv's interpreter, not the script's site-packages.
+    if let Some(environment) = uv_metadata.and_then(UvMetadata::environment) {
+        options.environment.get_or_insert_default().python =
+            Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
     }
 
     // Unlike Project's, default to `[]` for scripts (unless explicitly specified).
@@ -271,7 +308,7 @@ fn resolve_script_program_settings(
 /// PEP 723 metadata, whose Python requirement belongs at the top level rather than in `project`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct ScriptMetadata {
+struct ScriptMetadata {
     requires_python: Option<RangedValue<VersionSpecifiers>>,
     tool: Option<Tool>,
 }
@@ -310,6 +347,14 @@ impl ScriptConfigurationDiagnostics {
     fn extend(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
         self.diagnostics.extend(diagnostics);
     }
+}
+
+fn uv_metadata_diagnostic(file: File, tag: &ScriptTag, message: &str) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, message);
+    let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
+    annotation.hide_snippet(true);
+    diagnostic.annotate(annotation);
+    diagnostic
 }
 
 fn invalid_script_metadata_diagnostic(
