@@ -820,6 +820,23 @@ reveal_type(generic_context(c.method))
 reveal_type(generic_context(c.generic_method))
 ```
 
+A class TypeVar remains fixed when a method is called from an enclosing generic function. The call
+cannot specialize that enclosing occurrence merely because it also appears in synthetic `Self`'s
+upper bound.
+
+```py
+class Container[T]:
+    def replace(self, value: T) -> T:
+        return value
+
+def preserve[T](container: Container[T], value: T) -> T:
+    return container.replace(value)
+
+def cannot_choose_outer[T](container: Container[T]) -> T:
+    # error: [invalid-argument-type]
+    return container.replace(1)
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the

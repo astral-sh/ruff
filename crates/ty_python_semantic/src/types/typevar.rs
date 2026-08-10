@@ -1747,6 +1747,54 @@ pub(crate) enum TypeVarSet<'db> {
 }
 
 impl<'db> TypeVarSet<'db> {
+    /// Collects typevar occurrences from types without traversing their declared domains.
+    pub(crate) fn from_typevar_occurrences(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        struct CollectTypeVars<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars
+                    .borrow_mut()
+                    .entry(bound_typevar.identity(db))
+                    .or_insert(bound_typevar);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let visitor = CollectTypeVars {
+            env,
+            typevars: RefCell::default(),
+            recursion_guard: TypeCollector::default(),
+        };
+        for ty in types {
+            visitor.visit_type(db, ty);
+        }
+        Self::from_typevars(db, visitor.typevars.into_inner().into_values())
+    }
+
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
