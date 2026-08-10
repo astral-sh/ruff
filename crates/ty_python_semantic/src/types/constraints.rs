@@ -317,13 +317,23 @@ impl<'db> OwnedConstraintSet<'db> {
         f(&builder, set)
     }
 
+    /// Returns the types in constraints that are still reachable from the decision diagram.
+    ///
+    /// Source ordering also retains quantified-away constraints to preserve binding order, but
+    /// their type variables must not participate in semantic walks or callable freshening.
     pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.inner.iter().flat_map(|inner| {
-            inner.constraints.iter().flat_map(|constraint| {
-                std::iter::once(Type::TypeVar(constraint.typevar))
-                    .chain(constraint.bounds.lower)
-                    .chain(constraint.bounds.upper)
-            })
+            inner
+                .nodes
+                .iter()
+                .map(|node| node.constraint)
+                .unique()
+                .map(|constraint| inner.constraints[inner.retained_constraint_index(constraint)])
+                .flat_map(|constraint| {
+                    std::iter::once(Type::TypeVar(constraint.typevar))
+                        .chain(constraint.bounds.lower)
+                        .chain(constraint.bounds.upper)
+                })
         })
     }
 }
@@ -8955,6 +8965,38 @@ mod tests {
         );
         assert_eq!(inner.typevars.len(), 3);
         assert!(owned.node.index() >= inner.nodes.len());
+    }
+
+    #[test]
+    fn owned_constraint_set_type_walk_excludes_quantified_constraints() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            let t_int = create_constraint(db, builder, t, KnownClass::Int);
+            let u_str = create_constraint(db, builder, u, KnownClass::Str);
+            t_int.and(db, builder, || u_str).reduce_inferable(
+                db,
+                &env,
+                builder,
+                TypeVarSet::from_typevars(db, [t]),
+            )
+        });
+
+        assert_eq!(
+            owned
+                .types()
+                .filter_map(Type::as_typevar)
+                .collect::<Vec<_>>(),
+            vec![u],
+        );
+        assert_eq!(
+            owned.inner.as_ref().map(|inner| inner.source_orders.len()),
+            Some(3),
+        );
     }
 
     #[test]
