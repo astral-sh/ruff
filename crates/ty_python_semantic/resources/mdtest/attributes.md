@@ -294,9 +294,48 @@ class C:
     value = Before()
 
     def update(self) -> None:
-        self.value += 1
+        self.value += 1  # error: [invalid-assignment]
 
 reveal_type(C().value)  # revealed: Before | After
+```
+
+#### Augmented assignments to conditionally defined class-level defaults
+
+A conditional class default must not hide the dynamic fallback used when that default is absent.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class FallbackAfter:
+    def __iadd__(self, other: int) -> "FallbackAfter":
+        return self
+
+class Fallback:
+    def __iadd__(self, other: int) -> FallbackAfter:
+        return FallbackAfter()
+
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        value = Before()
+
+    def __getattr__(self, name: str) -> Fallback:
+        return Fallback()
+
+    def update(self) -> None:
+        # error: [invalid-assignment]
+        # error: [possibly-missing-attribute]
+        self.value += 1
+
+reveal_type(C().value)  # revealed: Before | After | FallbackAfter | Fallback
 ```
 
 #### Augmented assignments with expanding generic results
@@ -319,9 +358,38 @@ class Counter:
     value = Grow[int]()
 
     def update(self) -> None:
-        self.value += 1
+        self.value += 1  # error: [invalid-assignment]
 
-reveal_type(Counter().value)  # revealed: Grow[int] | Unknown
+reveal_type(Counter().value)  # revealed: Grow[int] | Grow[list[int]]
+```
+
+An independently initialized attribute must use the same bounded cycle recovery.
+
+```py
+class InitializedCounter:
+    def __init__(self) -> None:
+        self.value = Grow[int]()
+
+    def update(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
+```
+
+#### Augmented assignments with expanding tuple results
+
+Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
+cycle-iteration limit.
+
+```py
+class C:
+    def __init__(self) -> None:
+        self.value = (1,)
+
+    def update(self) -> None:
+        self.value += (self.value,)
+
+reveal_type(C().value)  # revealed: tuple[int] | tuple[Divergent, ...]
 ```
 
 #### Augmented assignments to inherited instance attributes
@@ -347,6 +415,41 @@ class Child(Base):
         self.value += 1
 
 reveal_type(Child().value)  # revealed: Before | After
+```
+
+#### Augmented assignments preserve inherited instance bindings beneath class defaults
+
+A superclass initializer writes instance storage even when a subclass defines a class-level default
+with the same name. Both initial values and their augmented-assignment results remain possible.
+
+```py
+class AfterA:
+    def __iadd__(self, other: int) -> "AfterA":
+        return self
+
+class AfterB:
+    def __iadd__(self, other: int) -> "AfterB":
+        return self
+
+class BeforeA:
+    def __iadd__(self, other: int) -> AfterA:
+        return AfterA()
+
+class BeforeB:
+    def __iadd__(self, other: int) -> AfterB:
+        return AfterB()
+
+class Base:
+    def __init__(self) -> None:
+        self.value = BeforeA()
+
+class Child(Base):
+    value = BeforeB()
+
+    def update(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(Child().value)  # revealed: BeforeB | AfterB | AfterA | BeforeA
 ```
 
 #### Augmented assignments preserve subclass attribute bindings
@@ -431,6 +534,50 @@ class Counter:
 
 # error: [unresolved-attribute]
 reveal_type(Counter().value)  # revealed: Unknown
+```
+
+#### Augmented assignments to possible data descriptors
+
+An augmented assignment to a data descriptor passes its result to `__set__` rather than creating
+instance storage. When a class default might be a descriptor, preserve the existing attribute types
+without exposing the descriptor's write-only result.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class DescriptorAfter:
+    def __iadd__(self, other: int) -> "DescriptorAfter":
+        return self
+
+class DescriptorValue:
+    def __iadd__(self, other: int) -> DescriptorAfter:
+        return DescriptorAfter()
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object]) -> DescriptorValue:
+        return DescriptorValue()
+
+    def __set__(self, instance: object, value: DescriptorAfter) -> None: ...
+
+def flag() -> bool:
+    return True
+
+class C:
+    value = Descriptor() if flag() else Before()
+
+    def update(self) -> None:
+        # error: [invalid-assignment]
+        # error: [invalid-assignment]
+        self.value += 1
+
+# TODO: Include `After` from the non-descriptor branch without including `DescriptorAfter`.
+reveal_type(C().value)  # revealed: DescriptorValue | Before
 ```
 
 #### Nested augmented assignments after narrowing
@@ -1784,6 +1931,25 @@ class UsesAugmentedDescriptor(metaclass=AugmentedDescriptorMeta): ...
 
 # error: [unresolved-attribute]
 reveal_type(UsesAugmentedDescriptor().descriptor_value)  # revealed: Unknown
+```
+
+A metaclass default that might be a data descriptor likewise must not expose a class attribute on
+constructed instances.
+
+```py
+def choose_descriptor() -> bool:
+    return True
+
+class MaybeAugmentedDescriptorMeta(type):
+    descriptor_value = AugmentedDescriptor() if choose_descriptor() else 1
+
+    def update(cls) -> None:
+        cls.descriptor_value += 1  # error: [invalid-assignment]
+
+class UsesMaybeAugmentedDescriptor(metaclass=MaybeAugmentedDescriptorMeta): ...
+
+# error: [unresolved-attribute]
+reveal_type(UsesMaybeAugmentedDescriptor().descriptor_value)  # revealed: Unknown
 ```
 
 When a metaclass declaration uses a union, only the data descriptors in that union take precedence

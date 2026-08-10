@@ -2213,24 +2213,32 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> ImplicitAttribute<'db> {
         let member = self.own_instance_member(db, env, name);
-        if !member.is_undefined() {
-            return ImplicitAttribute::Defined(member);
-        }
-
         let Some((class, _)) = self.static_class_literal(db) else {
-            return ImplicitAttribute::Undefined;
+            return ImplicitAttribute {
+                member,
+                read_dependent_bindings: None,
+            };
         };
 
-        match StaticClassLiteral::implicit_attribute_bindings(
+        let implicit = StaticClassLiteral::implicit_attribute_bindings(
             db,
             class.body_scope(db),
             name,
             MethodDecorator::None,
-        ) {
-            deferred @ ImplicitAttribute::Deferred(_) => deferred,
-            ImplicitAttribute::Defined(_) | ImplicitAttribute::Undefined => {
-                ImplicitAttribute::Undefined
-            }
+        );
+
+        // Ordinary member lookup can deliberately suppress implicit assignments, such as those
+        // targeting generated NamedTuple fields. Preserve dependent writes only when both
+        // lookups agree on whether an independent instance attribute exists.
+        let read_dependent_bindings = if member.is_undefined() == implicit.member.is_undefined() {
+            implicit.read_dependent_bindings
+        } else {
+            None
+        };
+
+        ImplicitAttribute {
+            member,
+            read_dependent_bindings,
         }
     }
 
@@ -2764,25 +2772,17 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _, _| Type::divergent(id),
-    cycle_fn=|db, cycle: &salsa::Cycle, previous: &Type<'db>, ty: Type<'db>, _, definition: Definition<'db>| {
-        if cycle.iteration() > crate::TAINTED_CYCLES && ty != *previous {
-            Type::unknown()
-        } else {
-            let env = ProgramEnvironment::from_definition(definition);
-            ty.cycle_normalized(db, &env, *previous, cycle)
-        }
+    cycle_fn=|db, cycle: &salsa::Cycle, previous: &Type<'db>, ty: Type<'db>, definition: Definition<'db>, _| {
+        let env = ProgramEnvironment::from_definition(definition);
+        ty.cycle_normalized(db, &env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
 fn read_dependent_binding_type<'db>(
     db: &'db dyn Db,
-    class: ClassType<'db>,
     definition: Definition<'db>,
+    specialization: Option<Specialization<'db>>,
 ) -> Type<'db> {
-    let specialization = class
-        .static_class_literal(db)
-        .and_then(|(_, specialization)| specialization);
-
     infer_definition_types(db, definition)
         .binding_type(definition)
         .apply_optional_specialization(db, specialization)
@@ -2822,8 +2822,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut provenance = Provenance::Unknown;
 
         for (class, bindings) in bindings {
+            let specialization = class
+                .static_class_literal(db)
+                .and_then(|(_, specialization)| specialization);
+
             for definition in bindings.definitions(db) {
-                let inferred_ty = read_dependent_binding_type(db, *class, *definition);
+                let inferred_ty = read_dependent_binding_type(db, *definition, specialization);
                 union = union.add(inferred_ty);
                 provenance = provenance.or(Provenance::SingleDefinition(*definition));
             }
@@ -2939,7 +2943,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let db = self.db;
         let mut union = UnionBuilder::new(db, &self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
-        let mut is_definitely_bound = false;
+        let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
         let mut read_dependent_bindings = Vec::new();
 
@@ -2956,7 +2960,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }
                 ClassBase::Class(class) => {
                     let implicit = class.own_instance_member_bindings(db, &self.env, name);
-                    if let ImplicitAttribute::Deferred(bindings) = implicit {
+                    if let Some(bindings) = implicit.read_dependent_bindings {
                         read_dependent_bindings.push((class, bindings));
                     }
 
@@ -2970,16 +2974,28 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ..
                             }),
                         qualifiers,
-                    } = implicit.into_member().inner
+                    } = implicit.member.inner
                     {
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {
+                                if definitely_bound_member.is_some_and(|member| {
+                                    !member
+                                        .qualifiers
+                                        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                                }) && !qualifiers
+                                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                                {
+                                    // An overriding class default shadows inherited declarations,
+                                    // but inherited instance assignments must still be collected.
+                                    continue;
+                                }
+
                                 // We found a definitely-declared attribute. Discard possibly collected
                                 // inferred types from subclasses and return the declared type.
                                 return InstanceMemberResult::Done(member);
                             }
 
-                            is_definitely_bound = true;
+                            definitely_bound_member = Some(member);
                         }
 
                         // If the attribute is not definitely declared on this class, keep looking
@@ -3013,6 +3029,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                         Place::Defined(DefinedPlace {
                                             ty: class_member_ty,
                                             origin,
+                                            definedness: class_member_definedness,
                                             provenance: class_member_provenance,
                                             ..
                                         }),
@@ -3020,7 +3037,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 },
                         } = class.own_class_member(db, &self.env, None, name)
                     {
-                        if class_member_ty.is_data_descriptor(db, &self.env) {
+                        if !class_member_ty.is_definitely_non_data_descriptor(db, &self.env) {
                             read_dependent_bindings.clear();
                             continue;
                         }
@@ -3044,8 +3061,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                         }
 
-                        is_definitely_bound = true;
-                        break;
+                        read_dependent_bindings.clear();
+                        if class_member_definedness == Definedness::AlwaysDefined {
+                            definitely_bound_member = Some(class_member.inner);
+                        }
                     }
                 }
                 ClassBase::TypedDict(_) => {
@@ -3057,7 +3076,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let result = if union.is_empty() {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
-            let boundness = if is_definitely_bound {
+            let boundness = if definitely_bound_member.is_some() {
                 Definedness::AlwaysDefined
             } else {
                 Definedness::PossiblyUndefined
