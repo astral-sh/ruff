@@ -22,9 +22,10 @@ Minimal diff churn is an explicit requirement:
     static-sequent phase before Phase 5 owns the narrower logical correction: concrete proofs must
     use fully static bounds and subtyping, while structurally valid symbolic rules may propagate an
     existing gradual witness. Phase 5 then activates domains and replaces legacy declaration-aware
-    solving. Phase 6 first recovers universally valid bare-TypeVar symbolic solutions without
-    changing the typing relation; later phases restore or classify the remaining compatibility
-    regressions. Do not choose a relation based on validity/evidence provenance.
+    solving. Phase 6A first fixes cross-provenance contradiction handling, and Phase 6B then
+    recovers one universally valid bare-TypeVar symbolic solution without changing the typing
+    relation; later phases restore or classify the remaining compatibility regressions. Do not
+    choose a relation based on validity/evidence provenance.
 
 ## Workflow and handoff requirements
 
@@ -54,9 +55,9 @@ regressions were expected. Phase 5 may also retain explicitly characterized beha
 behind adjacent `XXX` expectations, but it must complete the structural migration: declared domains
 supply the legal paths, pruning compares those paths, and `PathBounds::default_solve` must no longer
 re-read declarations or reconstruct their alternatives. Both revisions must pass the full suite,
-clippy, and prek. Phase 6 restores the first approved relationship regression. Potential Phase 7
-and later work must restore or explicitly resolve the remaining compatibility and performance debt
-before selecting a landing tip.
+clippy, and prek. Phase 6A fixes the prerequisite sequent invariant, and Phase 6B restores the first
+approved relationship regression. Potential Phase 7 and later work must restore or explicitly
+resolve the remaining compatibility and performance debt before selecting a landing tip.
 
 Use `jj` for source control and inspect changes with `jj diff --git` or `jj diff --stat`. Run prek
 in this Jujutsu workspace through `/home/dcreager/bin/jpk`. Never modify snapshot files or inline
@@ -69,9 +70,10 @@ Fully static sequent handling and domain activation remain one merge unit, but t
 as test-clean project revisions. The static revision establishes the sound logical boundary and
 records temporary compatibility regressions. The Phase 5 activation checkpoint activates domains
 and records the still-observed behavior as passing `XXX` expectations. Phase 5 remains incomplete
-until structural path-only solving replaces the legacy declaration-aware solver. Phase 6 then
-recovers universally valid bare-TypeVar symbolic solutions; later phases must remove the remaining
-accepted behavioral debt before the stack can land.
+until structural path-only solving replaces the legacy declaration-aware solver. Phase 6A then
+fixes cross-provenance contradictions, and Phase 6B recovers one universally valid bare-TypeVar
+symbolic solution; later phases must remove the remaining accepted behavioral debt before the stack
+can land.
 
 Investigation established this split:
 
@@ -111,7 +113,9 @@ The implementation and landing order is:
     validity-equality invariant;
 1. Phase 5 structural completion, replacing legacy declaration-aware default solving while keeping
     intended later results as adjacent xfail TODOs;
-1. Phase 6 recovery of universally valid bare-TypeVar symbolic solutions;
+1. Phase 6A cross-provenance contradiction handling, without cross-provenance evidence
+    propagation;
+1. Phase 6B recovery of universally valid bare-TypeVar symbolic solutions;
 1. potential Phase 7 and later compatibility restoration and performance work, which produces the
     first landable tip;
 1. `dcreager/remove-remove-noninferable-2`.
@@ -466,18 +470,28 @@ expanding `Solutions`:
     with adjacent TODO/XXX comments stating the intended behavior. Change
     `smrkruyysnpoyswkpypttlpowomwsmrs`, commit
     `72cbd05ee9b3124bca1b796ac5f41099e975f1b5`.
-- [ ] Phase 6: recover universally valid bare-TypeVar symbolic solutions such as `T := S` from the
-    complete domain-conjoined path family, using the existing `inferable` set as the authoritative
-    quantifier partition and a mapped-TDD universal verification.
-- [ ] Potential Phase 7 and later: support structured symbolic candidates such as `T := list[S]`,
-    restore or classify the remaining compatibility regressions, resolve the recorded performance
-    debt, and select a landable tip.
+- [ ] Phase 6A: make logically contradictory positive/negative assignments impossible across bound
+    provenance without allowing validity restrictions to manufacture positive inference evidence.
+- [ ] Phase 6B: recover one universally valid bare-TypeVar symbolic solution such as `T := S` from
+    the complete domain-conjoined path family, using the existing `inferable` set as the
+    authoritative partition and a mapped-TDD implication check.
+- [ ] Potential Phase 7 and later: support structured or multiple symbolic candidates such as
+    `T := list[S]`, restore or classify the remaining compatibility regressions, resolve the
+    recorded performance debt, and select a landable tip.
+
+Phase 6 design grilling is complete, and the Phase 6A and Phase 6B requirements below are the
+approved implementation ground truth. In particular, the contradiction-only sequent remains limited
+to provenance-suppressed implications; `PathBounds::Constrained` owns `paths` and the single
+optional symbolic default; and no caller-accessible path-local default solver remains. Custom
+chooser fallback receives immutable family context because pruning is complete before read-only
+solution selection. Do not begin implementation without explicit authorization.
 
 Phases depend on all preceding phases and must execute in order. Every phase has its own `[π]`
 revision, relevant documentation/tests, and a passing full test suite. The earlier abandoned Phase 5
 prototype and standalone fully-static revisions are diagnostic evidence only; do not revive
-`pvynqtrq` or copy its rejected workarounds. Phase 6 starts from the completed Phase 5
-structural-solving revision recorded above and the subsequent approved plan-only revisions.
+`pvynqtrq` or copy its rejected workarounds. Phase 6A starts from the completed Phase 5
+structural-solving revision recorded above and the subsequent approved plan-only revisions;
+Phase 6B starts only after Phase 6A and its full validation are complete.
 
 The rewritten activation checkpoint and structural-completion revision each pass all 820
 `ty_python_semantic` tests, all 8,913 workspace tests, workspace clippy, snapshot review, and prek.
@@ -648,7 +662,7 @@ The activation checkpoint:
     solving structurally from path bounds is the remaining Phase 5 work.
 - Accepts, for now, concrete alternative unions such as `int | str` and `Left | Right` where a bare
     evidence relationship such as `T := S` should survive. Bare-TypeVar relationship restoration is
-    Phase 6 work; ambiguous-`Any` behavior remains later work and is not a reason to retain the
+    Phase 6B work; ambiguous-`Any` behavior remains later work and is not a reason to retain the
     legacy solver.
 - Records all observed mdtest changes with adjacent TODO/XXX xfail comments stating the intended
     behavior, including gradual inference, inherited generic constructors, cycles, recursive
@@ -703,97 +717,144 @@ Phase 5 completion checklist:
     passes. Run focused tests, `ty_python_semantic`, the full suite, clippy, snapshot review, and
     prek before marking Phase 5 complete.
 
-### Phase 6: recover universally valid bare-TypeVar symbolic solutions
+### Phase 6A: preserve cross-provenance contradictions
 
-Suggested revision description: `[π] Recover universally valid symbolic TypeVar solutions`.
+Suggested revision description: `[π] Preserve contradictions across bound provenance`.
+
+This prerequisite fixes a logical bug exposed by the Phase 6B candidate proof. Provenance controls
+whether a positive restriction may be propagated as inference evidence, but it must not make a
+logically contradictory positive/negative assignment possible. For underlying constraints `C` and
+`D` where `C` implies `D`, a path containing `C` and `not D` is impossible even when the bounds use
+different `Validity`, `Evidence`, or `Mixed` provenance.
+
+`ConstraintId::implies` already compares underlying ranges independently of provenance. The current
+`add_single_implication` suppression conflates two effects of `SingleImplication`: propagating a
+positive consequent and rejecting a negative consequent. Separate those effects:
+
+1. Add an explicit contradiction-only sequent representing `C and not D implies false`.
+1. Keep ordinary `SingleImplication` only when propagating positive `D` is provenance-safe.
+1. When underlying implication holds but provenance prohibits propagation, add only the
+    contradiction sequent. Never derive positive `Evidence(D)` from `Validity(C)`.
+1. Audit pair-derived implications. A derived constraint followed by the new single contradiction
+    should provide the same behavior; add a dedicated pair-conflict form only if focused evidence
+    shows that route is insufficient.
+1. Add focused invariant coverage showing both that opposite assignments across provenance are
+    impossible and that positive evidence still is not derived across provenance. Preserve the
+    existing tests that prohibit cross-provenance evidence implication.
+1. Run focused constraint tests after each step. If the correction changes unrelated mdtest results,
+    stop and report the exact differences before updating expectations or expanding the revision.
+1. Run `ty_python_semantic`, the full workspace suite, clippy, snapshot review, and prek. Record the
+    Phase 6A implementation change and commit IDs in this plan in a separate plan-only revision
+    before beginning Phase 6B.
+
+Do not erase provenance in the Phase 6B verifier. Phase 6A must make the ordinary provenance-aware
+TDD reject logically impossible paths while preserving the evidence/validity distinction for
+positive inference.
+
+### Phase 6B: recover one universally valid bare-TypeVar symbolic solution
+
+Suggested revision description: `[π] Recover a universally valid symbolic TypeVar solution`.
 
 This phase restores the first compatible-TypeVar regression at
 `crates/ty_python_semantic/resources/mdtest/generics/legacy/functions.md`, including the redundant
 callback-bound variants. The domain-conjoined TDD currently produces separate paths such as
-`(S = int, T = int)` and `(S = str, T = str)`. These paths prove that the symbolic solution
-`T := S` works for every valid specialization of non-inferable `S`; solving each path independently
-instead produces the incorrect union `int | str`.
+`(S = int, T = int)` and `(S = str, T = str)`. These paths suggest the symbolic solution `T := S`,
+which is correct only after one mapped-TDD check proves it for every valid non-inferable assignment.
+Solving each path independently instead produces the incorrect union `int | str`.
 
 Use the `inferable` parameter already passed to `PathBounds::compute` as the sole authoritative
-partition between existential solution variables and universally checked non-inferable variables.
-Do not reconstruct that partition from `GenericContext`, path contents, support, or any other
-source. For this example the required check is:
+partition. Do not reconstruct it from `GenericContext`, path contents, support, or another source.
+Preserve the existing `remove_noninferable` call and continue producing solutions for non-inferable
+type variables exactly as today; bidirectional inference depends on those solutions, and changing
+that behavior belongs to `dcreager/remove-remove-noninferable-2`.
+
+For candidate substitution `sigma = [T := S]`, let `C` be the exact projected,
+domain-conjoined constraint-set node used for path extraction. Build the non-inferable validity
+domain lazily only after candidate discovery, using the cached
+`BoundTypeVarInstance::bound_or_constraints` accessor rather than a duplicate descriptor. Include
+every non-inferable type variable remaining in the mapped node's support. Verify the candidate with
+ordinary Boolean TDD operations:
 
 ```text
-for every S in D(S), there exists T in D(T) such that C(T, S)
+counterexample = D(non-inferable) and not C[sigma]
 ```
 
-The candidate `T := S` is valid when the stronger condition holds:
+Accept the candidate only when `counterexample` is unsatisfiable. This is an implication check, not
+a call to `for_all`, `reduce_inferable`, `exists`, or any other quantification API. If another
+inferable type variable remains after substitution, decline the candidate rather than abstracting
+it.
 
-```text
-D(non-inferable) implies C[T := S]
-```
+Phase 6B implementation requirements:
 
-Here `C` is the same projected, domain-conjoined constraint-set node used for path extraction, and
-`D(non-inferable)` is the validity domain constructed only for type variables not present in the
-existing `inferable` set. Obtain declared bounds and constraint lists through the existing cached
-`BoundTypeVarInstance::bound_or_constraints` accessor used by validity-domain construction; do not
-introduce or retain a duplicate domain descriptor.
-
-Phase 6 implementation requirements:
-
-1. Discover at most one bare-TypeVar symbolic candidate for each inferable type variable from pure
-    `Evidence` retained in the complete path family. A candidate may come from an exact pure lower
-    bound or the single effective pure upper evidence bound. Do not treat branch-specific `Mixed`
-    derivations or `Validity` bounds as candidate evidence.
-1. Restrict this phase to candidates `T := S` where `T` is inferable according to the supplied set,
-    `S` is non-inferable, and substituting the candidate leaves no other inferable variable that
-    would require a new existential abstraction. Decline ambiguous or competing candidates and use
-    ordinary path-local solving.
-1. Verify each unique candidate once at the TDD level, not once per concrete domain path. Apply the
-    existing constraint-set type-mapping operation to the domain-conjoined node with `T` mapped to
-    `S`, then prove that the difference between `D(non-inferable)` and the mapped node is
-    unsatisfiable. This verifies the target validity domain and all other evidence, including
-    redundant `object`, union, and nominal callback bounds. It also rejects incompatible domains
-    such as `(int, bytes)` versus `(int, str)` and merely assignable constraints such as `bool`
-    versus `int`.
-1. Keep the original concrete paths. Do not synthesize a replacement path or add a general
-    correlated-solution representation. Record the successfully verified candidate once as a
-    compact family-level symbolic default associated with the computed `PathBounds`.
-1. During solution extraction, let an explicit caller choice take precedence, then use the verified
-    symbolic default for inferable `T`, and otherwise call path-local `default_solve`. Emitting the
-    same `T := S` binding for each retained concrete path may rely on existing solution combination
-    to deduplicate it. Non-inferable path bounds remain proof context and must not become solution
-    targets.
-1. Preserve raw paths for pruning, diagnostics, and other inferable variables. Perform candidate
-    discovery and verification before pruning can discard paths needed to explain the universal
-    result.
-1. Do not add a general quantifier implementation in this phase. The general check with additional
-    inferable variables would require existentially abstracting those variables after substitution;
-    leave that to the separate quantifier workstream.
-1. Keep symbolic defaults capable of storing a `Type`, but accept only a bare `TypeVar` candidate in
-    this phase. A potential Phase 7 may support structured candidates such as `T := list[S]`; mapping
-    a TypeVar subject to a structured type can create substantially more relation constraints and
-    must be designed and measured separately.
-1. Add a TODO at the family-level recovery explaining that quantifier-aware TDD solution extraction
-    should eventually preserve `T := S` before materializing one path per specialization of `S`, at
-    which point this post-extraction recovery can be removed.
-1. Limit verification to one mapped BDD per unique candidate, reuse the existing node and constraint
-    interning, and inspect TDD/node growth. Candidate mapping visits the source DAG rather than each
-    root-to-terminal path, but it remains a performance risk. Run the existing
-    `ty_micro[pydantic_core_schema_dict]` benchmark and the focused Pydantic ecosystem comparison if
-    the mapped verification affects those paths.
+1. Refactor `PathBounds::compute` orchestration to have access to the
+    `ConstraintSetBuilder`. Construct the final domain-conjoined node and extract paths under a
+    scoped mutable storage borrow; release that borrow before wrapping the node as a temporary
+    `ConstraintSet` and invoking the existing type-mapping API. Complete verification before return;
+    never retain a builder-local `NodeId` in cached `PathBounds`.
+1. Discover hypotheses from complete, unpruned paths. For an inferable target `T`, collect any
+    top-level bare non-inferable TypeVar appearing as an exact pure lower `Evidence` bound or an
+    individual pure upper `Evidence` clause. Do not inspect `Mixed`, `Validity`, nested TypeVars, or
+    perform redundancy checks during discovery. A hypothesis may appear on any path, but all bare
+    candidates found for `T` must identify the same `S`.
+1. Apply the exact-validity gate unconditionally: attempt recovery only when at least one
+    non-bivariant path for `T` has an exact validity equality that would otherwise override the
+    symbolic candidate. Other relationship regressions remain out of scope and keep adjacent
+    TODO/xfail expectations.
+1. Support exactly one inferable symbolic target in the entire `PathBounds` computation. If another
+    inferable remains after substitution, or another target has a candidate, decline recovery.
+    Store the successful result as exactly one family-level
+    `Option<TypeVarSolution<'db>>` by making `PathBounds::Constrained` a structured variant with
+    separate `paths` and `symbolic_default` fields. Keep `Unsatisfiable` and `Unconstrained` as
+    fieldless variants so they cannot carry a meaningless symbolic default. Add a TODO and, if a
+    minimal behavioral example is available, an mdtest xfail for jointly verified multi-target
+    solutions.
+1. Map the exact projected, domain-conjoined `C` with `T` replaced by `S` and preserve bound
+    provenance. Build `D(non-inferable)` lazily and use the existing builder for mapping,
+    counterexample construction, interning, source ordering, and sequent caches. Perform at most one
+    mapped-BDD verification per `PathBounds` computation and inspect retained node/cache growth.
+1. Keep every original concrete path. Do not synthesize a replacement path, deduplicate identical
+    `Solution` values, or add a general correlated-solution representation. Paths without `T` and
+    bivariant `T` paths retain their current behavior; ordinary cross-path combination may use and
+    deduplicate `T := S` emitted by other paths.
+1. Make family-aware default solving a receiver-taking operation on `PathBounds`. It returns the
+    verified symbolic default immediately, before path-local variance, satisfiability, or exact
+    validity logic. An explicit custom chooser retains precedence and remains responsible for
+    invoking family-aware default solving when it wants fallback behavior; do not change the chooser
+    return protocol. Do not expose a caller-accessible path-local solver: keep the concrete-path
+    algorithm private beneath the family-aware method. Give chooser APIs that may request fallback,
+    notably the constraint-set path through `SpecializationBuilder::build_with`, an immutable
+    `&PathBounds` alongside the current `&PathBound` (or equivalent family-aware context). Pruning
+    finishes before solving and default selection is read-only, so no mutable family reference is
+    needed.
+1. Expose unpruned `ConstraintSet::path_bounds` to affected consumers. Callers decide whether and
+    when to invoke `prune_subsumed`, then call `solve_with` while retaining the enclosing
+    `PathBounds` needed by receiver-taking default solving. Remove `pruned_solutions_with` if no
+    callers remain.
+1. Do not invoke or modify eager existential or universal abstraction. Add a TODO explaining that
+    quantifier-aware TDD solution extraction should eventually preserve `T := S` before
+    materializing one path per specialization of `S`, at which point this post-extraction recovery
+    can be removed.
+1. Keep the stored solution type capable of containing any `Type`, but accept only bare
+    `Type::TypeVar(S)` candidates. A potential Phase 7 may support structured candidates such as
+    `T := list[S]`; mapping a TypeVar subject to a structured type can create substantially more
+    relation constraints and must be designed and measured separately.
 1. Restore the intended assertions for equal constrained domains, compatible source subsets, and
     redundant `object`, union, and nominal callback bounds in both legacy and PEP 695 syntax. Keep
     focused negative coverage for incompatible domains and strict-subtype constraints.
-1. Run focused mdtests after each small step. If mapped candidate verification unexpectedly changes
-    another result, causes material TDD growth, or requires general existential handling, stop and
-    report the evidence and alternatives before broadening the phase.
-1. Run `ty_python_semantic`, the full workspace suite, clippy, snapshot review, and prek before
-    marking Phase 6 complete. Record the implementation change and commit IDs in this plan in a
-    separate plan-only revision.
+1. Run focused mdtests after each small step. If verification changes another result, produces
+    material TDD growth, or appears to require quantification or multiple targets, stop and report
+    the evidence before broadening the phase or updating an expectation. Run the existing
+    `ty_micro[pydantic_core_schema_dict]` benchmark and focused Pydantic ecosystem comparison if
+    candidate verification is reached in those scenarios.
+1. Run `ty_python_semantic`, the full workspace suite, clippy, snapshot review, and prek. Record the
+    Phase 6B implementation change and commit IDs in this plan in a separate plan-only revision.
 
 The family-level symbolic default is deliberately narrower than a general witness or correlated
-solution representation. Do not move declaration-aware alternative selection back into
-`PathBounds::default_solve`, reconstruct inferability from `GenericContext`, union gradual solutions
-locally, or revive the rejected TDD-abstraction workarounds. The old `default_solve` implementation
-is useful only as evidence that a pure TypeVar relationship should be preferred after the new
-universal check proves it valid.
+solution representation. Do not move declaration-aware alternative selection back into path-local
+solving, reconstruct inferability from another source, skip existing non-inferable solution
+production, union gradual solutions locally, or revive the rejected TDD-abstraction workarounds.
+The old `default_solve` implementation is useful only as evidence that a pure TypeVar relationship
+should be preferred after the new implication check proves it valid.
 
 ## Focused regression coverage
 
@@ -876,11 +937,13 @@ Run prek from the Jujutsu workspace:
     validity lower unions and individually tagged upper clauses, preserving provenance for
     `default_solve` and custom callbacks.
 - **Provenance-sensitive sequents:** evidence and validity constraints are separate interned
-    propositions. Never add single-implication sequents across provenance, regardless of the
-    underlying bounds' relative strength, including reverse implications from simplified
-    intersections. Pair-implication sequents can combine mixed-provenance premises: same-side
-    intersections inherit the stronger restriction's provenance, while transitive derivations
-    produce evidence only when all contributing premises are evidence.
+    propositions. Never propagate a positive single-implication consequence across provenance,
+    regardless of the underlying bounds' relative strength, including reverse implications from
+    simplified intersections. Phase 6A must nevertheless reject `C and not D` whenever underlying
+    `C` logically implies `D`, independent of provenance. Pair-implication sequents can combine
+    mixed-provenance premises: same-side intersections inherit the stronger restriction's
+    provenance, while transitive derivations produce evidence only when all contributing premises
+    are evidence.
 - **Logical identity versus provenance:** provenance-aware bounds can cause otherwise identical
     ranges to intern separately. Logical implication, sequent equivalence, source order, and TDD
     size must remain correct; avoid assuming provenance tags change the actual set of legal
@@ -891,16 +954,17 @@ Run prek from the Jujutsu workspace:
     evidence only when every indispensable premise is evidence; any validity or mixed premise
     produces `Mixed`. Pure `Validity` is reserved for direct declaration-domain constraints.
 - **Compatible TypeVars:** conjoining `T`'s declared finite domain with witnessed `T = S`
-    currently turns `T = S` into concrete `T = int`/`T = str` alternatives. Phase 6 recovers the
+    currently turns `T = S` into concrete `T = int`/`T = str` alternatives. Phase 6B recovers one
     symbolic relationship only after mapping `T` to non-inferable `S` in the complete
-    domain-conjoined TDD and proving the mapped node for all of `D(non-inferable)`. This must support
-    compatible subsets and callbacks with redundant bounds while rejecting incompatible or merely
-    assignable domains. Keep the conclusion at path-family scope; no individual concrete path proves
-    it and a dedicated per-`PathBound` witness field is not prescribed.
+    domain-conjoined TDD and proving that its non-inferable domain has no counterexample. This must
+    support compatible subsets and callbacks with redundant bounds while rejecting incompatible or
+    merely assignable domains. Keep the conclusion at path-family scope; no individual concrete path
+    proves it and a dedicated per-`PathBound` witness field is not prescribed.
 - **Mapped-candidate TDD growth:** candidate verification rebuilds the domain-conjoined DAG under a
-    type mapping once per unique candidate. Bare-TypeVar substitution should keep subjects symbolic,
-    but node growth, sequent discovery, and cache retention must be measured. Decline multiple or
-    ambiguous candidates rather than multiplying verification work.
+    type mapping only after the exact-validity gate and at most once per `PathBounds` computation.
+    Bare-TypeVar substitution should keep subjects symbolic, but node growth, sequent discovery, and
+    cache retention must be measured. Decline multiple or ambiguous candidates rather than
+    multiplying verification work.
 - **Gradual alternatives and sequents:** store declared gradual alternatives directly as exact
     validity constraints, without bottom/top materialization. The static-sequent phase prevents
     non-transitive gradual assignability from collapsing paths; a later compatibility phase must
@@ -921,8 +985,9 @@ Run prek from the Jujutsu workspace:
     declaration errors only on the diagnostic failure path.
 - **Ordering:** merge source-order sidecars consistently and retain declaration-order tie breaks
     without depending on Salsa IDs or arbitrary TDD variable ordering.
-- **Quantification:** Phase 6 uses the existing `inferable` set as its quantifier partition and
-    proves only candidates that require no remaining existential abstraction after substitution.
-    Do not reconstruct inferability from another source or expand the phase into the eager
-    quantifiers being replaced elsewhere. Future quantifier-aware extraction should subsume the
-    narrow family-level symbolic-default recovery.
+- **Quantification:** Phase 6B uses the existing `inferable` set only to classify candidate targets
+    and build the non-inferable domain. It does not call or modify `for_all`, `reduce_inferable`,
+    `exists`, or another abstraction operation, and it declines candidates that leave another
+    inferable variable after substitution. Do not reconstruct inferability from another source.
+    Future quantifier-aware extraction should subsume the narrow family-level symbolic-default
+    recovery.
