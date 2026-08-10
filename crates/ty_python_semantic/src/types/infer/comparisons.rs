@@ -293,8 +293,8 @@ enum NonIdentityOperator {
 impl From<NonIdentityOperator> for ast::CmpOp {
     fn from(value: NonIdentityOperator) -> Self {
         match value {
-            NonIdentityOperator::Rich(operator) => operator.into(),
-            NonIdentityOperator::Membership(operator) => operator.into(),
+            NonIdentityOperator::Rich(rich_op) => rich_op.into(),
+            NonIdentityOperator::Membership(membership_op) => membership_op.into(),
         }
     }
 }
@@ -378,7 +378,7 @@ fn infer_binary_type_comparison_inner<'db>(
         };
 
         match op {
-            NonIdentityOperator::Rich(operator) => rich_comparison(operator),
+            NonIdentityOperator::Rich(rich_op) => rich_comparison(rich_op),
             NonIdentityOperator::Membership(membership_op) => {
                 membership_test_comparison(membership_op, range)
             }
@@ -387,14 +387,6 @@ fn infer_binary_type_comparison_inner<'db>(
 
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
-
-    if let NonIdentityOperator::Rich(operator) = op
-        && let Some(operator) = operator.as_equality()
-        && let Some(truthiness) =
-            equality_result_truthiness(db, env, left, right, operator, soundness_policy)
-    {
-        return Ok(Type::from_truthiness(db, env, truthiness));
-    }
 
     if let NonIdentityOperator::Rich(rich_op) = op
         && let Some(left_tuple) = left.tuple_instance_spec(db, env)
@@ -434,6 +426,14 @@ fn infer_binary_type_comparison_inner<'db>(
         } else {
             KnownClass::Bool.to_instance(db, env)
         });
+    }
+
+    if let NonIdentityOperator::Rich(operator) = op
+        && let Some(operator) = operator.as_equality()
+        && let Some(truthiness) =
+            equality_result_truthiness(db, env, left, right, operator, soundness_policy)
+    {
+        return Ok(Type::from_truthiness(db, env, truthiness));
     }
 
     let comparison_result = match (left, right) {
