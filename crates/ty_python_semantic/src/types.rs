@@ -2410,20 +2410,17 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_)
             | Type::Never
             | Type::NewTypeInstance(_)
-            | Type::NominalInstance(_)
+            | Type::NominalInstance(_) => true,
             // `TypedDict` and `Protocol` can be synthesized,
             // but it's always possible to create an equivalent type using a class definition.
-            | Type::TypedDict(_)
-            | Type::ProtocolInstance(_)
+            Type::TypedDict(_) | Type::ProtocolInstance(_) => true,
             // Not all `Callable` types are spellable using the `Callable` type form,
             // but they are all spellable using callback protocols.
-            | Type::Callable(_)
+            Type::Callable(_) => true,
             // `Unknown` and `@Todo` are nonstandard extensions,
             // but they are both exactly equivalent to `Any`
-            | Type::Dynamic(_)
-            | Type::TypeVar(_)
-            | Type::TypeAlias(_)
-            | Type::SubclassOf(_) => true,
+            Type::Dynamic(_) => true,
+            Type::TypeVar(_) | Type::TypeAlias(_) | Type::SubclassOf(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
@@ -3266,7 +3263,8 @@ impl<'db> Type<'db> {
                     ty.to_meta_type(db, env)
                         .find_name_in_mro_with_policy(db, env, name, policy)
                         .expect(
-                            "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                            "`Type::find_name_in_mro()` should return `Some()` \
+                            when called on a meta-type",
                         )
                 }
             }
@@ -3287,7 +3285,8 @@ impl<'db> Type<'db> {
                 .to_meta_type(db, env)
                 .find_name_in_mro_with_policy(db, env, name, policy)
                 .expect(
-                    "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                    "`Type::find_name_in_mro()` should return `Some()` \
+                    when called on a meta-type",
                 ),
         }
     }
@@ -3333,8 +3332,9 @@ impl<'db> Type<'db> {
         let class_attr = self
             .find_name_in_mro_with_policy(db, env, name, policy)
             .expect(
-            "Calling `class_object_member` on class literals and subclass-of types should always find an MRO",
-        );
+                "Calling `class_object_member` on class literals and subclass-of types \
+                should always find an MRO",
+            );
 
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -7214,7 +7214,8 @@ impl<'db> Type<'db> {
                 )),
                 Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => {
                     Ok(todo_type!(
-                        "unrecognized `typing.TypeVarTuple` instances should be invalid type expressions"
+                        "unrecognized `typing.TypeVarTuple` instances \
+                        should be invalid type expressions"
                     ))
                 }
                 _ => Err(InvalidTypeExpressionError {
@@ -7513,22 +7514,28 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::TypeVar(bound_typevar) => bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor),
-            Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            Type::TypeVar(bound_typevar) => {
+                bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor)
+            }
+            Type::KnownInstance(known_instance) => {
+                known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
 
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
-                        Type::FunctionLiteral(function.apply_type_mapping_impl(db,
+                        Type::FunctionLiteral(function.apply_type_mapping_impl(
+                            db,
                             type_mapping,
                             tcx,
                             visitor,
                         ))
                         .promote_impl(db, visitor.env)
                     }
-                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(db,
+                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
+                        db,
                         type_mapping,
                         tcx,
                         visitor,
@@ -7538,21 +7545,33 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                method
+                    .function(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                method
+                    .self_instance(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)) => {
+            Type::NominalInstance(instance)
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                ) =>
+            {
                 match instance.known_class(db) {
-                    Some(KnownClass::Complex) => {
-                        KnownUnion::Complex.to_type(db, visitor.env)
-                    }
+                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db, visitor.env),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db, visitor.env),
                     _ => instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 }
             }
 
-            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)) => {
+            Type::NominalInstance(instance)
+                if matches!(
+                    type_mapping,
+                    TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly)
+                ) =>
+            {
                 if instance.is_singleton(db) {
                     self.promote_singletons_impl(db, visitor.env)
                 } else {
@@ -7562,7 +7581,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) => {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            },
+            }
 
             Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
@@ -7615,11 +7634,13 @@ impl<'db> Type<'db> {
                 Type::TypedDict(typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::SubclassOf(subclass_of) => subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-
-            Type::PropertyInstance(property) => {
-                Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            Type::SubclassOf(subclass_of) => {
+                subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
+
+            Type::PropertyInstance(property) => Type::PropertyInstance(
+                property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
 
             Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -7641,9 +7662,12 @@ impl<'db> Type<'db> {
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
                 ) {
                     for negative in intersection.negative(db) {
-                        builder.add_negative_in_place(
-                            negative.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
-                        );
+                        builder.add_negative_in_place(negative.apply_type_mapping_impl(
+                            db,
+                            &type_mapping.flip(),
+                            tcx,
+                            visitor,
+                        ));
                     }
                 }
                 builder.build()
@@ -7656,36 +7680,42 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
                     db,
-                    type_is
-                        .type_argument(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    type_is.type_argument(db).apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ),
                 )
             }),
 
             Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
                 type_guard.with_type(
                     db,
-                    type_guard
-                        .return_type(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    type_guard.return_type(db).apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ),
                 )
             }),
 
             Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, || {
                 TypeFormType::from_type_expression(
                     db,
-                    typeform
-                        .type_argument(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    typeform.type_argument(db).apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    ),
                 )
             }),
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() =>
-                    {
-                        self
-                    }
+                    TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
                     TypeMapping::EagerExpansion if alias.materialization_kind(db).is_some() => {
                         alias.value_type(db).expand_eagerly(db, visitor.env)
                     }
@@ -7694,19 +7724,21 @@ impl<'db> Type<'db> {
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
                     TypeMapping::EagerExpansion => {
                         alias.raw_value_type(db).expand_eagerly(db, visitor.env)
-                    },
+                    }
                     // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
                     // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
                     TypeMapping::ApplySpecialization(specialization)
-                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                    if matches!(
+                    | TypeMapping::ApplySpecializationWithMaterialization {
+                        specialization, ..
+                    } if matches!(
                         specialization,
                         ApplySpecialization::Specialization(_)
                             | ApplySpecialization::TypeAlias(_)
                             | ApplySpecialization::Partial { .. }
                     ) =>
                     {
-                        let mut current_specialization = specialization.as_specialization(db).unwrap();
+                        let mut current_specialization =
+                            specialization.as_specialization(db).unwrap();
                         if let TypeMapping::ApplySpecializationWithMaterialization {
                             materialization_kind,
                             ..
@@ -7715,21 +7747,24 @@ impl<'db> Type<'db> {
                             current_specialization = current_specialization
                                 .with_materialization_kind(db, Some(*materialization_kind));
                         }
-                        Type::TypeAlias(alias.apply_specialization(db,
-                            |generic_context| {
-                                alias
-                                    .specialization(db)
-                                    .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                                    .apply_specialization(db, current_specialization)
-                            },
-                        ))
+                        Type::TypeAlias(alias.apply_specialization(db, |generic_context| {
+                            alias
+                                .specialization(db)
+                                .unwrap_or_else(|| generic_context.default_specialization(db, None))
+                                .apply_specialization(db, current_specialization)
+                        }))
                     }
                     _ => {
                         // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                         // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                         // will detect the cycle and return the fallback value.
                         let mapped = visitor.visit(db, self, type_mapping, || {
-                            alias.value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            alias.value_type(db).apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            )
                         });
 
                         // If the type mapping does not result in any change to this type alias, keep the
@@ -7743,10 +7778,9 @@ impl<'db> Type<'db> {
                                 cyclic::TypeIdentity::RecursiveTypeAlias(_)
                             )
                         {
-                            Type::TypeAlias(alias.with_materialization_kind(
-                                db,
-                                Some(*materialization_kind),
-                            ))
+                            Type::TypeAlias(
+                                alias.with_materialization_kind(db, Some(*materialization_kind)),
+                            )
                         } else {
                             mapped
                         }
@@ -7755,40 +7789,42 @@ impl<'db> Type<'db> {
             }
 
             Type::LiteralValue(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
-                TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::FreshenBoundTypeVars { .. } |
-                TypeMapping::BindSelf { .. } |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion |
-                TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::Promote(PromotionMode::Off, _) |
-                TypeMapping::Promote(
+                TypeMapping::ApplySpecialization(_)
+                | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                | TypeMapping::BindLegacyTypevars(_)
+                | TypeMapping::FreshenBoundTypeVars { .. }
+                | TypeMapping::BindSelf { .. }
+                | TypeMapping::ReplaceSelf { .. }
+                | TypeMapping::Materialize(_)
+                | TypeMapping::ReplaceParameterDefaults
+                | TypeMapping::EagerExpansion
+                | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::Promote(PromotionMode::Off, _)
+                | TypeMapping::Promote(
                     PromotionMode::On,
                     PromotionKind::ClassLiteralsOnly | PromotionKind::SingletonsOnly,
                 ) => self,
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db, visitor.env),
-            }
+                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
+                    self.promote_impl(db, visitor.env)
+                }
+            },
 
             Type::Dynamic(_) => match type_mapping {
-                TypeMapping::ApplySpecialization(_) |
-                TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::FreshenBoundTypeVars { .. } |
-                TypeMapping::BindSelf(..) |
-                TypeMapping::ReplaceSelf { .. } |
-                TypeMapping::Promote(..) |
-                TypeMapping::ReplaceParameterDefaults |
-                TypeMapping::EagerExpansion |
-                TypeMapping::RescopeReturnCallables(_) => self,
+                TypeMapping::ApplySpecialization(_)
+                | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                | TypeMapping::BindLegacyTypevars(_)
+                | TypeMapping::FreshenBoundTypeVars { .. }
+                | TypeMapping::BindSelf(..)
+                | TypeMapping::ReplaceSelf { .. }
+                | TypeMapping::Promote(..)
+                | TypeMapping::ReplaceParameterDefaults
+                | TypeMapping::EagerExpansion
+                | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
-                }
-            }
+                },
+            },
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
@@ -7819,16 +7855,17 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
-                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_) => self,
+
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
             // some other generic context's specialization is applied to it.
-            | Type::ClassLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::SpecialForm(_) => self,
+            Type::ClassLiteral(_) => self,
         }
     }
 
@@ -9215,7 +9252,8 @@ impl TypeQualifiers {
             Self::READ_ONLY => "ReadOnly",
             _ => {
                 unreachable!(
-                    "Only a single bit should be set when calling `TypeQualifiers::name` (got {self:?})"
+                    "Only a single bit should be set \
+                    when calling `TypeQualifiers::name` (got {self:?})"
                 )
             }
         }
@@ -9411,15 +9449,18 @@ impl<'db> InvalidTypeExpression<'db> {
                 match self.error {
                     InvalidTypeExpression::RequiresOneArgument(special_form) => write!(
                         f,
-                        "`{special_form}` requires exactly one argument when used in a {location}",
+                        "`{special_form}` requires exactly one argument \
+                        when used in a {location}",
                     ),
                     InvalidTypeExpression::RequiresArguments(special_form) => write!(
                         f,
-                        "`{special_form}` requires at least one argument when used in a {location}",
+                        "`{special_form}` requires at least one argument \
+                        when used in a {location}",
                     ),
                     InvalidTypeExpression::RequiresTwoArguments(special_form) => write!(
                         f,
-                        "`{special_form}` requires at least two arguments when used in a {location}",
+                        "`{special_form}` requires at least two arguments \
+                        when used in a {location}",
                     ),
                     InvalidTypeExpression::Protocol => {
                         write!(f, "`typing.Protocol` is not allowed in {location}s")
@@ -9435,21 +9476,25 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::ConstraintSet => write!(
                         f,
-                        "`ty_extensions._internal.ConstraintSet` is not allowed in {location}s",
+                        "`ty_extensions._internal.ConstraintSet` \
+                        is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::ConstraintSetSolution => write!(
                         f,
-                        "`ty_extensions._internal.ConstraintSetSolution` is not allowed in {location}s",
+                        "`ty_extensions._internal.ConstraintSetSolution` is not allowed \
+                        in {location}s",
                     ),
                     InvalidTypeExpression::GenericContext => {
                         write!(
                             f,
-                            "`ty_extensions._internal.GenericContext` is not allowed in {location}s"
+                            "`ty_extensions._internal.GenericContext` is not allowed \
+                            in {location}s"
                         )
                     }
                     InvalidTypeExpression::Specialization => write!(
                         f,
-                        "`ty_extensions._internal.Specialization` is not allowed in {location}s",
+                        "`ty_extensions._internal.Specialization` \
+                        is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::NamedTupleSpec => {
                         write!(f, "`NamedTupleSpec` is not allowed in {location}s")
@@ -9476,9 +9521,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         } else if qualifier.requires_one_argument() {
                             write!(
                                 f,
-                                "Type qualifier `{qualifier}` is not allowed in type expressions \
-                                (only in annotation expressions, and only with \
-                                exactly one argument)",
+                                "Type qualifier `{qualifier}` is not allowed \
+                                in type expressions (only in annotation expressions, \
+                                and only with exactly one argument)",
                             )
                         } else {
                             write!(
@@ -9498,7 +9543,8 @@ impl<'db> InvalidTypeExpression<'db> {
                         f.write_str("`Self` cannot be used in a metaclass")
                     }
                     InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(_) => f.write_str(
-                        "`Self` requires `self: Self` or `cls: type[Self]` for annotated receivers",
+                        "`Self` requires `self: Self` \
+                        or `cls: type[Self]` for annotated receivers",
                     ),
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
@@ -9519,17 +9565,20 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::InvalidBareParamSpec(paramspec) => write!(
                         f,
-                        "Bare ParamSpec `{}` is not valid in this context in a {location}",
+                        "Bare ParamSpec `{}` is not valid \
+                        in this context in a {location}",
                         paramspec.name(db)
                     ),
                     InvalidTypeExpression::InvalidBareTypeVarTuple(typevartuple) => write!(
                         f,
-                        "Bare TypeVarTuple `{}` is not valid in this context in a {location}",
+                        "Bare TypeVarTuple `{}` is not valid \
+                        in this context in a {location}",
                         typevartuple.name(db)
                     ),
                     InvalidTypeExpression::Concatenate => write!(
                         f,
-                        "`typing.Concatenate` is not allowed in this context in a {location}",
+                        "`typing.Concatenate` is not allowed \
+                        in this context in a {location}",
                     ),
                 }
             }

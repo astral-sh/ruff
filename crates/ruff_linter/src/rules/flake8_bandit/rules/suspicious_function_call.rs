@@ -59,7 +59,9 @@ pub(crate) struct SuspiciousPickleUsage;
 impl Violation for SuspiciousPickleUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue".to_string()
+        "`pickle` and modules that wrap it can be unsafe \
+            when used to deserialize untrusted data, possible security issue"
+            .to_string()
     }
 }
 
@@ -446,7 +448,9 @@ pub(crate) struct SuspiciousURLOpenUsage;
 impl Violation for SuspiciousURLOpenUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.".to_string()
+        "Audit URL open for permitted schemes. \
+            Allowing use of `file:` or custom schemes is often unexpected."
+            .to_string()
     }
 }
 
@@ -534,7 +538,9 @@ pub(crate) struct SuspiciousXMLCElementTreeUsage;
 impl Violation for SuspiciousXMLCElementTreeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -579,7 +585,9 @@ pub(crate) struct SuspiciousXMLElementTreeUsage;
 impl Violation for SuspiciousXMLElementTreeUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -624,7 +632,9 @@ pub(crate) struct SuspiciousXMLExpatReaderUsage;
 impl Violation for SuspiciousXMLExpatReaderUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -669,7 +679,9 @@ pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 impl Violation for SuspiciousXMLExpatBuilderUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -714,7 +726,9 @@ pub(crate) struct SuspiciousXMLSaxUsage;
 impl Violation for SuspiciousXMLSaxUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -759,7 +773,9 @@ pub(crate) struct SuspiciousXMLMiniDOMUsage;
 impl Violation for SuspiciousXMLMiniDOMUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -804,7 +820,9 @@ pub(crate) struct SuspiciousXMLPullDOMUsage;
 impl Violation for SuspiciousXMLPullDOMUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; use `defusedxml` equivalents".to_string()
+        "Using `xml` to parse untrusted data is known to be vulnerable to XML attacks; \
+            use `defusedxml` equivalents"
+            .to_string()
     }
 }
 
@@ -893,7 +911,10 @@ pub(crate) struct SuspiciousUnverifiedContextUsage;
 impl Violation for SuspiciousUnverifiedContextUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Python allows using an insecure context via the `_create_unverified_context` that reverts to the previous behavior that does not validate certificates or perform hostname checks.".to_string()
+        "Python allows using an insecure context via the `_create_unverified_context` \
+            that reverts to the previous behavior that does not validate certificates \
+            or perform hostname checks."
+            .to_string()
     }
 }
 
@@ -945,7 +966,9 @@ pub(crate) struct SuspiciousFTPLibUsage;
 impl Violation for SuspiciousFTPLibUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "FTP-related functions are being called. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.".to_string()
+        "FTP-related functions are being called. FTP is considered insecure. \
+            Use SSH/SFTP/SCP or some other encrypted protocol."
+            .to_string()
     }
 }
 
@@ -964,17 +987,16 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     }
 
     match checker.semantic().current_expression_parent() {
-        Some(Expr::Call(parent))
-            // Avoid duplicate diagnostics. For example:
-            //
-            // ```python
-            // # vvvvvvvvvvvvvvvvvvvvvvvvv Already reported as a call expression
-            //   shelve.open(lorem, ipsum)
-            // # ^^^^^^ Should not be reported as a reference
-            // ```
-            if parent.func.range().contains_range(func.range()) => {
-                return;
-            }
+        // Avoid duplicate diagnostics. For example:
+        //
+        // ```python
+        // # vvvvvvvvvvvvvvvvvvvvvvvvv Already reported as a call expression
+        //   shelve.open(lorem, ipsum)
+        // # ^^^^^^ Should not be reported as a reference
+        // ```
+        Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range()) => {
+            return;
+        }
         Some(Expr::Attribute(_)) => {
             // Avoid duplicate diagnostics. For example:
             //

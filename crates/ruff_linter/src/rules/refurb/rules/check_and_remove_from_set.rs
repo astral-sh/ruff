@@ -84,14 +84,20 @@ pub(crate) fn check_and_remove_from_set(checker: &Checker, if_stmt: &ast::StmtIf
         return;
     };
 
-    // `
     // `set` in the check should be the same as `set` in the body
-    if check_set.id != remove_set.id
-        // `element` in the check should be the same as `element` in the body
-        || !compare(&check_element.into(), &remove_element.into())
-        // `element` shouldn't have a side effect, otherwise we might change the semantics of the program.
-        || contains_effect(check_element, |id| checker.semantic().has_builtin_binding(id))
-    {
+    if check_set.id != remove_set.id {
+        return;
+    }
+
+    // `element` in the check should be the same as `element` in the body
+    if !compare(&check_element.into(), &remove_element.into()) {
+        return;
+    }
+
+    // `element` shouldn't have a side effect, otherwise we might change the semantics of the program.
+    if contains_effect(check_element, |id| {
+        checker.semantic().has_builtin_binding(id)
+    }) {
         return;
     }
 

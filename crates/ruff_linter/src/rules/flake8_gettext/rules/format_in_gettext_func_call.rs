@@ -57,7 +57,9 @@ impl Violation for FormatInGetTextFuncCall {
         if self.is_plural {
             "`format` method in plural argument is resolved before function call".to_string()
         } else {
-            "`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`".to_string()
+            "`format` method argument is resolved before function call; \
+                consider `_(\"string %s\") % arg`"
+                .to_string()
         }
     }
 }

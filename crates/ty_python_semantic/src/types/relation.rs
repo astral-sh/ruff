@@ -287,13 +287,15 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
+            | Type::AlwaysTruthy => true,
+
             // `T` is always a subtype of itself,
             // and `T` is always a subtype of `T | None`
-            | Type::TypeVar(_)
+            Type::TypeVar(_) => true,
+
             // might inherit `Any`, but subtyping is still reflexive
-            | Type::ClassLiteral(_)
-             => true,
+            Type::ClassLiteral(_) => true,
+
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::NominalInstance(_)

@@ -1195,14 +1195,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.narrowing_aliases.retain(|name, alias| {
             // Drop aliases that narrow the reassigned place or any of its members.
             //  e.g. `is_none = x is None and ...; x = 1`
-            !alias.narrowed_places.contains(&place)
-                //  e.g. `is_none = a.x is None; a = A()`
-                && !associated_members
-                    .iter()
-                    .any(|m| alias.narrowed_places.contains(&(*m).into()))
-                // Drop the alias whose own variable is the reassigned place.
-                // e.g. `is_none = x is None; is_none = False`
-                && reassigned_alias_name != Some(name)
+            if alias.narrowed_places.contains(&place) {
+                return false;
+            }
+
+            //  e.g. `is_none = a.x is None; a = A()`
+            if associated_members
+                .iter()
+                .any(|m| alias.narrowed_places.contains(&(*m).into()))
+            {
+                return false;
+            }
+
+            // Drop the alias whose own variable is the reassigned place.
+            // e.g. `is_none = x is None; is_none = False`
+            reassigned_alias_name != Some(name)
         });
     }
 
@@ -4986,8 +4993,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
         if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern
             && let Some((last, alternatives)) = patterns.split_last()
-            // Capture-free alternatives do not affect bindings and need no flow merge.
-            && patterns.iter().any(Self::pattern_has_bindings)
+            && (
+                // Capture-free alternatives do not affect bindings and need no flow merge.
+                patterns.iter().any(Self::pattern_has_bindings)
+            )
         {
             // Start each alternative without earlier captures so repeated names do not shadow one
             // another. Complementary predicates preserve possible missing captures while all

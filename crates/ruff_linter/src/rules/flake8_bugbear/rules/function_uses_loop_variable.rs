@@ -109,15 +109,14 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
                 return;
             }
+            // Mark `return lambda: x` as safe.
             Stmt::Return(ast::StmtReturn {
                 value: Some(value),
                 range: _,
                 node_index: _,
-            })
-                // Mark `return lambda: x` as safe.
-                if value.is_lambda_expr() => {
-                    self.safe_functions.push(value);
-                }
+            }) if value.is_lambda_expr() => {
+                self.safe_functions.push(value);
+            }
             _ => {}
         }
         visitor::walk_stmt(self, stmt);

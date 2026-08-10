@@ -1734,9 +1734,11 @@ impl KnownComparisonSemantics {
             Type::NominalInstance(instance)
                 if instance.class(db, env).is_final(db)
                     || soundness_policy.allow_unsafe_equality
-                        // `object` can contain values whose classes define their own comparison
-                        // method, so treating it as exact would incorrectly eliminate those values.
-                        && !instance.has_known_class(db, KnownClass::Object) =>
+                        && (
+                            // `object` can contain values whose classes define their own comparison
+                            // method, so treating it as exact would incorrectly eliminate those values.
+                            !instance.has_known_class(db, KnownClass::Object)
+                        ) =>
             {
                 Self::of_instance(db, env, ty, operator)
             }

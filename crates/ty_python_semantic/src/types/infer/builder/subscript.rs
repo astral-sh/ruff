@@ -23,7 +23,9 @@ use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
+use crate::types::typed_dict::{
+    TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
+};
 use crate::types::typevar::TypeVarSet;
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
@@ -282,7 +284,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             };
                             builder.into_diagnostic(
                                 "Type arguments for `Literal` must be `None`, \
-                            a literal value (int, bool, str, or bytes), or an enum member",
+                                a literal value (int, bool, str, or bytes), \
+                                or an enum member",
                             );
                         }
                         return Type::unknown();
@@ -1795,7 +1798,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .report_lint(&INVALID_ASSIGNMENT, rhs_value_node)
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot assign value of type `{}` to key of type `{}` on TypedDict `{}`",
+                                "Cannot assign value of type `{}` to key of type `{}` \
+                                on TypedDict `{}`",
                                 rhs_value_ty.display(db, env),
                                 slice_ty.display(db, env),
                                 object_ty.display(db, env),
@@ -1821,7 +1825,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_ASSIGNMENT, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                "Cannot assign value of type `{assigned_d}` to key of type `{}` \
+                                on TypedDict `{value_d}`",
                                 slice_ty.display(db, env)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -1832,7 +1837,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_KEY, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "TypedDict `{value_d}` can only be subscripted with a string literal key, got key of type `{}`.",
+                                "TypedDict `{value_d}` can only be subscripted \
+                                with a string literal key, got key of type `{}`.",
                                 slice_ty.display(db, env)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -1975,10 +1981,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         let object_d = object_ty.display(db, env);
 
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Invalid subscript assignment with key of type `{}` and value of \
-                                                     type `{assigned_d}` on object of type `{object_d}`",
-                                                    slice_ty.display(db, env),
-                                                ));
+                                            "Invalid subscript assignment with key of type `{}` \
+                                            and value of type `{assigned_d}` \
+                                            on object of type `{object_d}`",
+                                            slice_ty.display(db, env),
+                                        ));
 
                                         // Special diagnostic for dictionaries
                                         if let Some([expected_key_ty, expected_value_ty]) =
@@ -2026,10 +2033,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self.context.report_lint(&CALL_NON_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__setitem__` of type `{}` may not be callable on object of type `{}`",
-                                            bindings.callable_type().display(db, env),
-                                            object_ty.display(db, env),
-                                        ));
+                                        "Method `__setitem__` of type `{}` may not be callable \
+                                        on object of type `{}`",
+                                        bindings.callable_type().display(db, env),
+                                        object_ty.display(db, env),
+                                    ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
                             }
@@ -2168,145 +2176,136 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                match object_ty.try_call_dunder(
+                let Err(err) = object_ty.try_call_dunder(
                     db,
                     env,
                     "__delitem__",
                     CallArguments::positional([slice_ty]),
                     TypeContext::default(),
-                ) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        match err {
-                            CallDunderError::PossiblyUnbound { .. } => {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                ) else {
+                    return;
+                };
+
+                match err {
+                    CallDunderError::PossiblyUnbound { .. } => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Method `__delitem__` of type `{}` may be missing",
+                                object_ty.display(db, env),
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+                        }
+                    }
+                    CallDunderError::CallError(call_error_kind, bindings, _) => {
+                        match call_error_kind {
+                            CallErrorKind::NotCallable => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&CALL_NON_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Method `__delitem__` of type `{}` may be missing",
+                                        "Method `__delitem__` of type `{}` \
+                                        is not callable on object of type `{}`",
+                                        bindings.callable_type().display(db, env),
                                         object_ty.display(db, env),
                                     ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
                             }
-                            CallDunderError::CallError(call_error_kind, bindings, _) => {
-                                match call_error_kind {
-                                    CallErrorKind::NotCallable => {
-                                        if let Some(builder) =
-                                            self.context.report_lint(&CALL_NON_CALLABLE, target)
-                                        {
-                                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__delitem__` of type `{}` is not callable \
-                                             on object of type `{}`",
-                                            bindings.callable_type().display(db, env),
-                                            object_ty.display(db, env),
-                                        ));
-                                            attach_original_type_info(&mut diagnostic);
-                                        }
-                                    }
-                                    CallErrorKind::BindingError => {
-                                        // For deletions of string literal keys on `TypedDict`, provide
-                                        // a more detailed diagnostic.
-                                        if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                            if let Some(string_literal) =
-                                                slice_ty.as_string_literal()
-                                            {
-                                                let key = string_literal.value(db);
-                                                let items = typed_dict.items(db);
+                            CallErrorKind::BindingError => {
+                                // For deletions of string literal keys on `TypedDict`, provide
+                                // a more detailed diagnostic.
+                                if let Some(typed_dict) = object_ty.as_typed_dict() {
+                                    if let Some(string_literal) = slice_ty.as_string_literal() {
+                                        let key = string_literal.value(db);
+                                        let items = typed_dict.items(db);
 
-                                                if let Some(field) = items.get(key) {
-                                                    // Key exists but is required (i.e., can't be deleted).
-                                                    report_cannot_delete_typed_dict_key(
-                                                        &self.context,
-                                                        (&*target.slice).into(),
-                                                        typed_dict,
-                                                        key,
-                                                        Some(field),
-                                                        TypedDictDeleteErrorKind::RequiredKey,
-                                                    );
-                                                } else if typed_dict
-                                                    .explicit_extra_items(db)
-                                                    .is_some_and(|extra_items| {
-                                                        extra_items.is_read_only()
-                                                    })
-                                                {
-                                                    report_cannot_delete_typed_dict_key(
-                                                        &self.context,
-                                                        (&*target.slice).into(),
-                                                        typed_dict,
-                                                        key,
-                                                        None,
-                                                        TypedDictDeleteErrorKind::ReadOnlyExtraItem,
-                                                    );
-                                                } else {
-                                                    // Key doesn't exist.
-                                                    report_cannot_delete_typed_dict_key(
-                                                        &self.context,
-                                                        (&*target.slice).into(),
-                                                        typed_dict,
-                                                        key,
-                                                        None,
-                                                        TypedDictDeleteErrorKind::UnknownKey,
-                                                    );
-                                                }
-                                            } else {
-                                                // Non-string-literal key on `TypedDict`.
-                                                if let Some(builder) = self
-                                                    .context
-                                                    .report_lint(&INVALID_ARGUMENT_TYPE, target)
-                                                {
-                                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Method `__delitem__` of type `{}` cannot be called \
-                                                     with key of type `{}` on object of type `{}`",
+                                        if let Some(field) = items.get(key) {
+                                            // Key exists but is required (i.e., can't be deleted).
+                                            report_cannot_delete_typed_dict_key(
+                                                &self.context,
+                                                (&*target.slice).into(),
+                                                typed_dict,
+                                                key,
+                                                Some(field),
+                                                TypedDictDeleteErrorKind::RequiredKey,
+                                            );
+                                        } else if typed_dict
+                                            .explicit_extra_items(db)
+                                            .is_some_and(TypedDictExtraItems::is_read_only)
+                                        {
+                                            report_cannot_delete_typed_dict_key(
+                                                &self.context,
+                                                (&*target.slice).into(),
+                                                typed_dict,
+                                                key,
+                                                None,
+                                                TypedDictDeleteErrorKind::ReadOnlyExtraItem,
+                                            );
+                                        } else {
+                                            // Key doesn't exist.
+                                            report_cannot_delete_typed_dict_key(
+                                                &self.context,
+                                                (&*target.slice).into(),
+                                                typed_dict,
+                                                key,
+                                                None,
+                                                TypedDictDeleteErrorKind::UnknownKey,
+                                            );
+                                        }
+                                    } else {
+                                        // Non-string-literal key on `TypedDict`.
+                                        if let Some(builder) =
+                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                        {
+                                            let mut diagnostic =
+                                                builder.into_diagnostic(format_args!(
+                                                    "Method `__delitem__` of type `{}` \
+                                                    cannot be called with key of type \
+                                                    `{}` on object of type `{}`",
                                                     bindings.callable_type().display(db, env),
                                                     slice_ty.display(db, env),
                                                     object_ty.display(db, env),
                                                 ));
-                                                    attach_original_type_info(&mut diagnostic);
-                                                }
-                                            }
-                                        } else {
-                                            // Non-`TypedDict` object
-                                            if let Some(builder) = self
-                                                .context
-                                                .report_lint(&INVALID_ARGUMENT_TYPE, target)
-                                            {
-                                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                "Method `__delitem__` of type `{}` cannot be called \
-                                                 with key of type `{}` on object of type `{}`",
-                                                bindings.callable_type().display(db, env),
-                                                slice_ty.display(db, env),
-                                                object_ty.display(db, env),
-                                            ));
-                                                attach_original_type_info(&mut diagnostic);
-                                            }
-                                        }
-                                    }
-                                    CallErrorKind::PossiblyNotCallable => {
-                                        if let Some(builder) =
-                                            self.context.report_lint(&CALL_NON_CALLABLE, target)
-                                        {
-                                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__delitem__` of type `{}` may not be callable \
-                                             on object of type `{}`",
-                                            bindings.callable_type().display(db, env),
-                                            object_ty.display(db, env),
-                                        ));
                                             attach_original_type_info(&mut diagnostic);
                                         }
                                     }
+                                } else {
+                                    // Non-`TypedDict` object
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__delitem__` of type `{}` cannot \
+                                            be called with key of type `{}` on \
+                                            object of type `{}`",
+                                            bindings.callable_type().display(db, env),
+                                            slice_ty.display(db, env),
+                                            object_ty.display(db, env),
+                                        ));
+                                        attach_original_type_info(&mut diagnostic);
+                                    }
                                 }
                             }
-                            CallDunderError::MethodNotAvailable => {
-                                report_not_subscriptable(
-                                    &self.context,
-                                    target,
-                                    object_ty,
-                                    "__delitem__",
-                                );
+                            CallErrorKind::PossiblyNotCallable => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Method `__delitem__` of type `{}` may not be \
+                                        callable on object of type `{}`",
+                                        bindings.callable_type().display(db, env),
+                                        object_ty.display(db, env),
+                                    ));
+                                    attach_original_type_info(&mut diagnostic);
+                                }
                             }
                         }
+                    }
+                    CallDunderError::MethodNotAvailable => {
+                        report_not_subscriptable(&self.context, target, object_ty, "__delitem__");
                     }
                 }
             }

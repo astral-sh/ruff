@@ -801,7 +801,11 @@ impl LintConfiguration {
         let ignore_init_module_imports = {
             if options.common.ignore_init_module_imports.is_some() {
                 warn_user_once!(
-                    "The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged."
+                    "The `ignore-init-module-imports` option is deprecated \
+                    and will be removed in a future release. \
+                    Ruff's handling of imports in `__init__.py` files \
+                    has been improved (in preview) and unused imports \
+                    will always be flagged."
                 );
             }
             options.common.ignore_init_module_imports
@@ -1174,11 +1178,15 @@ impl LintConfiguration {
                 [selection] => {
                     let (prefix, code) = selection.prefix_and_code();
                     return Err(anyhow!(
-                        "Selection of deprecated rule `{prefix}{code}` is not allowed when preview is enabled."
+                        "Selection of deprecated rule `{prefix}{code}` is not allowed when \
+                         preview is enabled."
                     ));
                 }
                 [..] => {
-                    let mut message = "Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:".to_string();
+                    let mut message = "\
+                        Selection of deprecated rules is not allowed \
+                            when preview is enabled. Remove selection of:"
+                        .to_string();
                     for selection in deprecated_selectors {
                         let (prefix, code) = selection.prefix_and_code();
                         message.push_str("\n\t- ");
@@ -1725,8 +1733,10 @@ fn warn_about_deprecated_top_level_lint_options(
     );
 
     warn_user_once_by_message!(
-        "The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. \
-        Please update the following options in {thing_to_update}:\n  {options_mapping}",
+        "The top-level linter settings are deprecated \
+        in favour of their counterparts in the `lint` section. \
+        Please update the following options in {thing_to_update}:\n  \
+        {options_mapping}",
     );
 }
 

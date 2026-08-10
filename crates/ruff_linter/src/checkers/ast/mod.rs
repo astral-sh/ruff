@@ -1683,13 +1683,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
             return;
         }
 
+        // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
+        // after having already traversed the source tree once. If we're now visiting the deferred nodes,
+        // we can't defer again, or we'll infinitely recurse!
         if !self.semantic.in_typing_literal()
-            // `in_deferred_type_definition()` will only be `true` if we're now visiting the deferred nodes
-            // after having already traversed the source tree once. If we're now visiting the deferred nodes,
-            // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
-            && (self.semantic.future_annotations_or_stub()||self.target_version().defers_annotations())
+            && (self.semantic.future_annotations_or_stub()
+                || self.target_version().defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(string_literal) = expr {
@@ -2780,15 +2781,14 @@ impl<'a> Checker<'a> {
 
         match parent {
             Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
+            // TODO: It is a bit unfortunate that we do this check twice. Maybe we should change how
+            // we visit this statement so the semantic flag for the type alias sticks around until
+            // after we've handled this store, so we can check the flag instead of duplicating this check.
             Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })
-                // TODO: It is a bit unfortunate that we do this check twice
-                //       maybe we should change how we visit this statement
-                //       so the semantic flag for the type alias sticks around
-                //       until after we've handled this store, so we can check
-                //       the flag instead of duplicating this check
-                if self.semantic.match_typing_expr(annotation, "TypeAlias") => {
-                    flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
-                }
+                if self.semantic.match_typing_expr(annotation, "TypeAlias") =>
+            {
+                flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
+            }
             _ => {}
         }
 

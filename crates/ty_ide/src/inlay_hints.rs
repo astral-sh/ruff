@@ -622,19 +622,23 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         Expr::Tuple(expr_tuple) => expr_tuple.elts.iter().all(type_hint_is_excessive_for_expr),
 
         // Various Literal[...] types which are always excessive to hint
-        | Expr::BytesLiteral(_)
+        Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
-        | Expr::StringLiteral(_)
+        | Expr::StringLiteral(_) => true,
         // `None` isn't terribly verbose, but still redundant
-        | Expr::NoneLiteral(_)
+        Expr::NoneLiteral(_) => true,
         // This one expands to `str` which isn't verbose but is redundant
-        | Expr::FString(_)
+        Expr::FString(_) => true,
         // This one expands to `Template` which isn't verbose but is redundant
-        | Expr::TString(_)=> true,
+        Expr::TString(_) => true,
 
         // You too `+1 and `-1`, get back here
-        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+        Expr::UnaryOp(ExprUnaryOp {
+            op: UnaryOp::UAdd | UnaryOp::USub,
+            operand,
+            ..
+        }) => matches!(**operand, Expr::NumberLiteral(_)),
 
         // Everything else is reasonable
         _ => false,

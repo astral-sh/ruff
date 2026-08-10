@@ -230,7 +230,11 @@ impl Session {
             .and_then(|request| {
                 if !self.request_queue.incoming().is_pending(&request.id) {
                     // Clear out the suspended request if the request has been cancelled.
-                    tracing::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
+                    tracing::debug!(
+                        "Skipping suspended workspace diagnostics request `{}` \
+                        because it was cancelled",
+                        request.id
+                    );
                     return None;
                 }
 
@@ -918,12 +922,14 @@ impl Session {
             match diagnostic_mode {
                 DiagnosticMode::Off => {
                     tracing::debug!(
-                        "Skipping registration of diagnostic capability because diagnostics are turned off"
+                        "Skipping registration of diagnostic capability \
+                        because diagnostics are turned off"
                     );
                 }
                 DiagnosticMode::OpenFilesOnly | DiagnosticMode::Workspace => {
                     tracing::debug!(
-                        "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+                        "Registering diagnostic capability \
+                        with {diagnostic_mode:?} diagnostic mode"
                     );
                     registrations.push(Registration {
                         id: DIAGNOSTIC_REGISTRATION_ID.into(),

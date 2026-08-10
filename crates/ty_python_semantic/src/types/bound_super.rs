@@ -110,8 +110,9 @@ impl<'db> BoundSuperError<'db> {
                     let env = context.program_environment();
                     if let Some(typevar_context) = typevar_context {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`{owner}` is a type variable with an abstract/structural type as \
-                            its bounds or constraints, in `super({pivot_class}, {owner})` call",
+                            "`{owner}` is a type variable \
+                            with an abstract/structural type as its bounds or constraints, \
+                            in `super({pivot_class}, {owner})` call",
                             pivot_class = pivot_class.display(db, env),
                             owner = owner_type.display(db, env),
                         ));
@@ -167,9 +168,11 @@ impl<'db> BoundSuperError<'db> {
                     if let Some(typevar_context) = typevar_context {
                         Self::describe_typevar(db, env, &mut diagnostic, *typevar_context);
                         diagnostic.info(format_args!(
-                            "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
-                            bounds_or_constraints =
-                                typevar_context.bound_or_constraints_type(db, env).display(db, env),
+                            "`{bounds_or_constraints}` is not an instance or subclass of \
+                             `{pivot_class}`",
+                            bounds_or_constraints = typevar_context
+                                .bound_or_constraints_type(db, env)
+                                .display(db, env),
                             pivot_class = pivot_class.display(db, env),
                         ));
                         let typevar = typevar_context.typevar(context.db());

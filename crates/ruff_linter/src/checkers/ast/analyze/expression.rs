@@ -101,8 +101,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::UnnecessaryLiteralUnion) {
                         flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                     }
+                    // Avoid duplicate checks inside `Optional`.
                     if checker.is_rule_enabled(Rule::DuplicateUnionMember)
-                        // Avoid duplicate checks inside `Optional`
                         && !checker.semantic.inside_optional()
                     {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
@@ -1593,9 +1593,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             // Avoid duplicate checks if the parent is a union, since these rules already
             // traverse nested unions.
             if !checker.semantic.in_nested_union() {
+                // Avoid duplicate checks inside `Optional`.
                 if checker.is_rule_enabled(Rule::DuplicateUnionMember)
                     && checker.semantic.in_type_definition()
-                    // Avoid duplicate checks inside `Optional`
                     && !checker.semantic.inside_optional()
                 {
                     flake8_pyi::rules::duplicate_union_member(checker, expr);
