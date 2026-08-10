@@ -1378,7 +1378,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         invalid_type_argument(self, slice)
                     }
                     value_ty @ (Type::SpecialForm(
-                        SpecialFormType::Top | SpecialFormType::Bottom,
+                        SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
                     )
                     | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))) => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
