@@ -4991,10 +4991,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
-        // Capture-free alternatives do not affect bindings and need no flow merge.
         if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern
             && let Some((last, alternatives)) = patterns.split_last()
-            && patterns.iter().any(Self::pattern_has_bindings)
+            && (
+                // Capture-free alternatives do not affect bindings and need no flow merge.
+                patterns.iter().any(Self::pattern_has_bindings)
+            )
         {
             // Start each alternative without earlier captures so repeated names do not shadow one
             // another. Complementary predicates preserve possible missing captures while all

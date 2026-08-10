@@ -215,11 +215,6 @@ impl KnownClass {
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
-            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
-            // and raises a `TypeError` in Python >=3.14
-            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
-            Self::NotImplementedType => Some(Truthiness::Ambiguous),
-
             Self::BaseException
             | Self::Exception
             | Self::Warning
@@ -299,6 +294,11 @@ impl KnownClass {
             | Self::PydanticConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict => Some(Truthiness::Ambiguous),
+
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            Self::NotImplementedType => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -1693,8 +1693,6 @@ impl KnownClass {
     /// Return `true` if the module of `self` matches `module`
     fn check_module(self, python_version: PythonVersion, module: KnownModule) -> bool {
         match self {
-            // no equivalent class exists in typing_extensions, nor ever will
-            Self::StdlibAlias => module == self.canonical_module(python_version),
             Self::Bool
             | Self::Object
             | Self::Bytes
@@ -1785,7 +1783,12 @@ impl KnownClass {
             | Self::PydanticConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict => module == self.canonical_module(python_version),
+
+            // no equivalent class exists in typing_extensions, nor ever will
+            Self::StdlibAlias => module == self.canonical_module(python_version),
+
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
+
             Self::SpecialForm
             | Self::TypeAliasType
             | Self::NoDefaultType
@@ -1803,6 +1806,7 @@ impl KnownClass {
             | Self::NewType => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+
             Self::Deprecated => matches!(
                 module,
                 KnownModule::Warnings | KnownModule::TypingExtensions

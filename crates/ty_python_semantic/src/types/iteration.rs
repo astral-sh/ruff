@@ -245,12 +245,6 @@ impl<'db> Type<'db> {
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
-                // We could infer a precise tuple spec for enum classes with members,
-                // but it's not clear whether that's worth the added complexity:
-                // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
-                // (enums can have `EnumMeta` subclasses as their metaclasses).
-                Type::ClassLiteral(_) => None,
-
                 Type::FunctionLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::BoundMethod(_)
@@ -272,6 +266,12 @@ impl<'db> Type<'db> {
                 | Type::TypeGuard(_)
                 | Type::TypeForm(_)
                 | Type::TypedDict(_) => None,
+
+                // We could infer a precise tuple spec for enum classes with members,
+                // but it's not clear whether that's worth the added complexity:
+                // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
+                // (enums can have `EnumMeta` subclasses as their metaclasses).
+                Type::ClassLiteral(_) => None,
             }
         }
 

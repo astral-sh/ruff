@@ -942,11 +942,13 @@ fn check_class_declaration<'db>(
         check_missing_overrides(context, member, class_scope, target);
     }
 
-    // accessing `.kind()` here is fine as `definition`
-    // will always be a definition in the file currently being checked
     if !subclass_overrides_superclass_declaration
         && !has_dynamic_superclass
-        && first_reachable_definition.kind(db).is_function_def()
+        && (
+            // accessing `.kind()` here is fine as `definition`
+            // will always be a definition in the file currently being checked
+            first_reachable_definition.kind(db).is_function_def()
+        )
     {
         check_explicit_overrides(context, member, class_scope, class);
     }

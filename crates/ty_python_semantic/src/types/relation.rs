@@ -257,11 +257,6 @@ impl<'db> Type<'db> {
     /// a cheap shallow check, not an exhaustive recursive check.
     const fn subtyping_is_always_reflexive(self) -> bool {
         match self {
-            // `T` is always a subtype of itself,
-            // and `T` is always a subtype of `T | None`
-            Type::TypeVar(_) => true,
-            // might inherit `Any`, but subtyping is still reflexive
-            Type::ClassLiteral(_) => true,
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
@@ -293,6 +288,14 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => true,
+
+            // `T` is always a subtype of itself,
+            // and `T` is always a subtype of `T | None`
+            Type::TypeVar(_) => true,
+
+            // might inherit `Any`, but subtyping is still reflexive
+            Type::ClassLiteral(_) => true,
+
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::NominalInstance(_)

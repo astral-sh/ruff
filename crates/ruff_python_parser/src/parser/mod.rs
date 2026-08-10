@@ -1234,8 +1234,6 @@ impl RecoveryContextKind {
     /// Returns `true` if a trailing comma is allowed in the current context.
     const fn allow_trailing_comma(self) -> bool {
         match self {
-            // Only allow a trailing comma if the with item itself is parenthesized
-            RecoveryContextKind::WithItems(WithItemKind::Parenthesized) => true,
             RecoveryContextKind::Slices
             | RecoveryContextKind::TupleElements(_)
             | RecoveryContextKind::SetElements
@@ -1249,6 +1247,10 @@ impl RecoveryContextKind {
             | RecoveryContextKind::TypeParams
             | RecoveryContextKind::DeleteTargets
             | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes) => true,
+
+            // Only allow a trailing comma if the with item itself is parenthesized
+            RecoveryContextKind::WithItems(WithItemKind::Parenthesized) => true,
+
             _ => false,
         }
     }

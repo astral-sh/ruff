@@ -687,9 +687,6 @@ impl SpecialFormType {
             | Self::Protocol
             | Self::Generic => true,
 
-            // can be used in `issubclass()` but not `isinstance()`.
-            Self::Any => false,
-
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
             | Self::Annotated
@@ -716,8 +713,11 @@ impl SpecialFormType {
             | Self::Divergent
             | Self::Todo
             | Self::TypeOf
-            | Self::Unpack => false,
-            Self::TypeForm => false,
+            | Self::Unpack
+            | Self::TypeForm => false,
+
+            // can be used in `issubclass()` but not `isinstance()`.
+            Self::Any => false,
         }
     }
 

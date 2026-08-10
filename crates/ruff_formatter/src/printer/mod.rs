@@ -2046,7 +2046,8 @@ two lines`,
 
         assert_eq!(
             printed.as_code(),
-            "The referenced group breaks.
+            "\
+The referenced group breaks.
 This group breaks because:
 It measures with the 'if_group_breaks' variant because the referenced group breaks \
 and that's just way too much text."

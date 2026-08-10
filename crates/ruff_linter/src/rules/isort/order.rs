@@ -14,17 +14,21 @@ pub(crate) fn order_imports<'a>(
 ) -> Vec<EitherImport<'a>> {
     let straight_imports = block.import.into_iter();
 
-    // Include all non-re-exports, re-exports, and star imports.
+    // Include all non-re-exports.
     let from_imports = block
         .import_from
         .into_iter()
         .chain(
+            // Include all re-exports.
             block
                 .import_from_as
                 .into_iter()
                 .map(|((import_from, ..), body)| (import_from, body)),
         )
-        .chain(block.import_from_star)
+        .chain(
+            // Include all star imports.
+            block.import_from_star,
+        )
         .map(
             |(
                 import_from,

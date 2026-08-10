@@ -7835,11 +7835,6 @@ impl<'db> Type<'db> {
                 _ => self,
             },
 
-            // A non-generic class never needs to be specialized. A generic class is specialized
-            // explicitly (via a subscript expression) or implicitly (via a call), and not because
-            // some other generic context's specialization is applied to it.
-            Type::ClassLiteral(_) => self,
-
             Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -7866,6 +7861,11 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
+
+            // A non-generic class never needs to be specialized. A generic class is specialized
+            // explicitly (via a subscript expression) or implicitly (via a call), and not because
+            // some other generic context's specialization is applied to it.
+            Type::ClassLiteral(_) => self,
         }
     }
 

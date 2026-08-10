@@ -134,8 +134,8 @@ pub fn run<C>(
             let escaped_test_name = test.name().replace('\'', "\\'");
             let _ = writeln!(
                 assertion,
-                "\nTo rerun this specific test, set the environment variable: \
-                 {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+                "\nTo rerun this specific test, \
+                set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
             );
             let _ = writeln!(
                 assertion,
