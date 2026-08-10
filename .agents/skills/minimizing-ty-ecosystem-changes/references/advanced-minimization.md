@@ -8,7 +8,7 @@ Prefer a single-file reproducer with no third-party imports, few definitions, an
 
 ## Reduction Loop
 
-Work systematically from the reproduced project. Do not skip ahead to an explanation, hand-written reproducer, or a guessed subset of relevant code. Follow the stages below in order and exhaust each stage before advancing. Try one controlled reduction at a time, run both copied ty binaries after every change, and keep the reduction only if the original difference remains. After every successful reduction, restart at step 1 because it may make earlier reductions possible.
+Work systematically from the reproduced project. NEVER skip ahead to an explanation, hand-written reproducer, or a guessed subset of relevant code. Follow the stages below in order and exhaust each stage before advancing. Try one controlled reduction at a time, run both copied ty binaries after every change, and keep the reduction only if the original difference and underlying trigger remain. After every successful reduction, restart at step 1 because it may make earlier reductions possible.
 
 1. Delete unrelated files.
 2. Remove imports, definitions, decorators, annotations, statements, and branches.
@@ -22,5 +22,7 @@ Repeat the full loop until an exhaustive pass through every stage finds no furth
 ## Final Audit
 
 Attempt to remove every remaining import and inline every remaining third-party definition. Record why any surviving import is essential. Keep these notes as working evidence; the caller decides whether they belong in its final artifact.
+
+Verify that the recorded reduction chain connects the final reproducer to the original ecosystem entry and, when diagnostic output is ambiguous, preserves the original causal fingerprint. If either check fails, return the original project excerpt as unminimized instead of substituting an unrelated example.
 
 Delete transient project and dependency copies after the investigation.

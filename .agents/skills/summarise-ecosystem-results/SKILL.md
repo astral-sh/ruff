@@ -8,7 +8,7 @@ description: Use when a user says "summarise ecosystem results", "summarize this
 ## Priorities
 
 1. Reproduce every retained behavior with the exact environment used by the Actions run.
-2. Lead the report with analysis of diagnostic changes and clear minimized examples.
+2. Lead the report with new or changed project failures, then cover meaningful flaky behavior, diagnostic changes, and clear minimized examples.
 3. Keep execution, audit, and traceability bookkeeping out of the report.
 
 ## Deliverable
@@ -21,9 +21,11 @@ If summarising an ecosystem report is the only thing you're asked to do in a Cod
 
 ## Workflow
 
-1. **Locate the evidence.** Normalize the input to a PR number, find the ty ecosystem-results comment, open the linked detailed HTML report, and identify the exact Actions run that produced it. Use the comment as the change list and the detailed report as evidence.
-2. **Reproduce from scratch.** Ignore retained memories and previous local artifacts. Load the `minimizing-ty-ecosystem-changes` skill, use its metadata helper and exact-run workflow, and reproduce each report entry before explaining or minimizing it.
-3. **Minimize and curate.** Retain the smallest clear reproducer for each distinct behavior change. Group entries only when the same base-to-PR behavior, explanation, and reproducer account for every entry in the group.
-4. **Write and verify.** Fill the report template, check every link and diagnostic, then run `uvx prek run --files PR_<number>_ECOSYSTEM_SUMMARY.md`. Present the Markdown file as the finished product.
+1. **Freeze the evidence.** Preserve any report URL or ecosystem-results comment explicitly supplied by the user before identifying the PR. For PR-only input, find its ecosystem-results comment and linked detailed report. Capture the matching Actions run and attempt as described in [references/evidence-acquisition.md](references/evidence-acquisition.md); never replace a supplied report with the PR's current report. Ignore later comment edits, PR updates, and workflow runs. Use the frozen detailed report as the authoritative change list and the comment for orientation when available.
+2. **Identify changed outcomes.** Check the detailed report for new, fixed, or changed project failures, panics, timeouts, abnormal exits, and meaningful flaky diagnostic or exit-status changes. Omit unchanged persistent failures. If neither project outcomes nor diagnostics changed, say explicitly that the run had no ecosystem impact and omit project-specific sections and reproduction details.
+3. **Reproduce from scratch.** Ignore retained memories and previous local artifacts. Load the `minimizing-ty-ecosystem-changes` skill, use its metadata helper and exact-run workflow, and reproduce each report entry before explaining or minimizing it. Reproduce flaky behavior with the reported run counts.
+4. **Minimize with provenance.** Include a standalone reproducer only when a verified reduction chain connects it to a cited ecosystem entry and preserves the same underlying trigger. If either cannot be verified, retain the original source excerpt and identify it as unminimized.
+5. **Group by cause.** Group entries only when the same base-to-PR behavior, underlying trigger, explanation, and reproducer account for every entry. Identical diagnostic text or displayed `@Todo` types do not establish equivalence.
+6. **Write and verify.** Fill the report template, record each affected project's strict or non-strict analysis mode, and include both strict-analysis flags in the comparison method when applicable. Check every link, diagnostic, reproducer's source provenance, and causal fingerprint when required, then run `uv run --only-group dev --locked prek run --files PR_<number>_ECOSYSTEM_SUMMARY.md`. Present the Markdown file as the finished product.
 
-When parallelizing step 2, read [references/subagent-handoff.md](references/subagent-handoff.md). Otherwise, keep batches small and work through them sequentially.
+When parallelizing reproduction or minimization, read [references/subagent-handoff.md](references/subagent-handoff.md). Otherwise, keep batches small and work through them sequentially.
