@@ -10,11 +10,11 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
+use self::static_literal::{AugmentedBindings, ImplicitAttribute};
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
 };
-use self::static_literal::{ImplicitAttribute, ReadDependentBindings};
 pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
@@ -2097,33 +2097,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Preserve class attributes and augmented assignments made by classmethods.
-    ///
-    /// ```python
-    /// class Counter:
-    ///     @classmethod
-    ///     def update(cls):
-    ///         cls.value = 0
-    ///         cls.value += 1
-    /// ```
-    ///
-    /// Class-member MRO lookup resolves the augmented assignment after locating the independently
-    /// established class attribute, just as instance-member lookup resolves writes through `self`.
-    fn own_class_member_bindings(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        inherited_generic_context: Option<GenericContext<'db>>,
-        name: &str,
-    ) -> ImplicitAttribute<'db> {
-        self.member_with_read_dependent_bindings(
-            db,
-            self.own_class_member(db, env, inherited_generic_context, name),
-            name,
-            MethodDecorator::ClassMethod,
-        )
-    }
-
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
@@ -2218,10 +2191,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Preserve independent instance attributes and assignments that first read their target.
-    ///
-    /// For example, `increment` can only establish an instance attribute because it first reads
-    /// the class-level default:
+    /// Pair an ordinary member lookup with augmented assignments that first read their target.
     ///
     /// ```python
     /// class Counter:
@@ -2229,36 +2199,23 @@ impl<'db> ClassType<'db> {
     ///
     ///     def increment(self):
     ///         self.value += 1
+    ///
+    ///     @classmethod
+    ///     def increment_class(cls):
+    ///         cls.value += 1
     /// ```
     ///
-    /// The augmented assignment cannot establish `value` until MRO lookup finds the class default
-    /// or an independently defined instance attribute.
-    fn own_instance_member_bindings(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        name: &str,
-    ) -> ImplicitAttribute<'db> {
-        self.member_with_read_dependent_bindings(
-            db,
-            self.own_instance_member(db, env, name),
-            name,
-            MethodDecorator::None,
-        )
-    }
-
-    /// Attach augmented assignments only when ordinary lookup preserves their independent target.
-    fn member_with_read_dependent_bindings(
+    /// MRO lookup can infer either assignment only after locating an existing `value`. If ordinary
+    /// lookup suppressed an implicit attribute, such as a generated `NamedTuple` field, its writes
+    /// must remain suppressed too.
+    fn member_with_augmented_bindings(
         self,
         db: &'db dyn Db,
         member: Member<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        // Ordinary member lookup can deliberately suppress implicit assignments, such as those
-        // targeting generated NamedTuple fields. Preserve dependent writes only when both
-        // lookups agree on whether an independently established attribute exists.
-        let read_dependent_bindings = self
+        let augmented_bindings = self
             .static_class_literal(db)
             .map(|(class, _)| {
                 StaticClassLiteral::implicit_attribute_bindings(
@@ -2269,11 +2226,11 @@ impl<'db> ClassType<'db> {
                 )
             })
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
-            .and_then(|implicit| implicit.read_dependent_bindings);
+            .and_then(|implicit| implicit.augmented_bindings);
 
         ImplicitAttribute {
             member,
-            read_dependent_bindings,
+            augmented_bindings,
         }
     }
 
@@ -2835,23 +2792,21 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///         self.value += (self.value,)
     /// ```
     ///
-    /// Inferring these bindings earlier would recursively look up the same instance member and
+    /// Inferring these bindings earlier would recursively look up the same attribute and
     /// allow an augmented assignment to incorrectly establish an otherwise missing attribute.
     /// Once recursive inference produces a concrete result, top-level cycle placeholders do not
     /// represent additional runtime values. Other inferred alternatives remain intact, as do
     /// nested placeholders in genuinely expanding recursive types such as the tuple above.
-    fn infer_read_dependent_bindings(
+    fn infer_augmented_bindings(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        bindings: &[(ClassType<'db>, ReadDependentBindings<'db>)],
+        bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
     ) -> (Type<'db>, Provenance<'db>) {
         let mut union = UnionBuilder::new(db, env);
         let mut provenance = Provenance::Unknown;
 
         for (class, bindings) in bindings {
-            let specialization = class
-                .static_class_literal(db)
-                .and_then(|(_, specialization)| specialization);
+            let (_, specialization) = class.class_literal_and_specialization(db);
 
             for definition in bindings.definitions(db) {
                 let inferred_ty = infer_definition_types(db, *definition)
@@ -2906,7 +2861,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut dynamic_type: Option<Type<'db>> = None;
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Undefined(TypeQualifiers::empty()));
-        let mut read_dependent_bindings = Vec::new();
+        let mut pending_augmented_bindings = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2944,27 +2899,26 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         continue;
                     }
 
-                    let implicit = class.own_class_member_bindings(
+                    let implicit = class.member_with_augmented_bindings(
                         db,
-                        &self.env,
-                        inherited_generic_context,
+                        class.own_class_member(db, &self.env, inherited_generic_context, name),
                         name,
+                        MethodDecorator::ClassMethod,
                     );
-                    if let Some(bindings) = implicit.read_dependent_bindings {
-                        read_dependent_bindings.push((class, bindings));
+                    if let Some(bindings) = implicit.augmented_bindings {
+                        pending_augmented_bindings.push((class, bindings));
                     }
 
                     let mut member = implicit.member.inner;
-                    if let Place::Defined(mut defined) = member.place
-                        && !read_dependent_bindings.is_empty()
+                    if let Place::Defined(defined) = &mut member.place
+                        && !pending_augmented_bindings.is_empty()
                     {
                         if !defined.origin.is_declared() {
-                            let (inferred_ty, inferred_provenance) =
-                                Self::infer_read_dependent_bindings(
-                                    db,
-                                    &self.env,
-                                    &read_dependent_bindings,
-                                );
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
                             defined.ty = UnionType::from_two_elements(
                                 db,
                                 &self.env,
@@ -2972,10 +2926,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 inferred_ty,
                             );
                             defined.provenance = defined.provenance.or(inferred_provenance);
-                            member.place = Place::Defined(defined);
                         }
 
-                        read_dependent_bindings.clear();
+                        pending_augmented_bindings.clear();
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
@@ -3012,7 +2965,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
-        let mut read_dependent_bindings = Vec::new();
+        let mut pending_augmented_bindings = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -3026,9 +2979,14 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
-                    let implicit = class.own_instance_member_bindings(db, &self.env, name);
-                    if let Some(bindings) = implicit.read_dependent_bindings {
-                        read_dependent_bindings.push((class, bindings));
+                    let implicit = class.member_with_augmented_bindings(
+                        db,
+                        class.own_instance_member(db, &self.env, name),
+                        name,
+                        MethodDecorator::None,
+                    );
+                    if let Some(bindings) = implicit.augmented_bindings {
+                        pending_augmented_bindings.push((class, bindings));
                     }
 
                     if let member @ PlaceAndQualifiers {
@@ -3075,21 +3033,20 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // qualifiers
                         union_qualifiers |= qualifiers;
 
-                        if !read_dependent_bindings.is_empty() {
-                            let (inferred_ty, inferred_provenance) =
-                                Self::infer_read_dependent_bindings(
-                                    db,
-                                    &self.env,
-                                    &read_dependent_bindings,
-                                );
+                        if !pending_augmented_bindings.is_empty() {
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
-                            read_dependent_bindings.clear();
+                            pending_augmented_bindings.clear();
                         }
                     }
 
-                    if !read_dependent_bindings.is_empty()
+                    if !pending_augmented_bindings.is_empty()
                         && let class_member @ Member {
                             inner:
                                 PlaceAndQualifiers {
@@ -3106,7 +3063,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         } = class.own_class_member(db, &self.env, None, name)
                     {
                         if !class_member_ty.is_definitely_non_data_descriptor(db, &self.env) {
-                            read_dependent_bindings.clear();
+                            pending_augmented_bindings.clear();
                             continue;
                         }
 
@@ -3119,18 +3076,17 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
-                            let (inferred_ty, inferred_provenance) =
-                                Self::infer_read_dependent_bindings(
-                                    db,
-                                    &self.env,
-                                    &read_dependent_bindings,
-                                );
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                         }
 
-                        read_dependent_bindings.clear();
+                        pending_augmented_bindings.clear();
                         if class_member_definedness == Definedness::AlwaysDefined {
                             definitely_bound_member = Some(class_member.inner);
                         }

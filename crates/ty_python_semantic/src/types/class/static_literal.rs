@@ -2785,7 +2785,7 @@ impl<'db> StaticClassLiteral<'db> {
             .member
     }
 
-    /// Separate independently established attributes from assignments that must first read them.
+    /// Separate assignments that establish an attribute from assignments that must first read it.
     ///
     /// ```python
     /// class Counter:
@@ -2793,8 +2793,8 @@ impl<'db> StaticClassLiteral<'db> {
     ///         self.value += 1
     /// ```
     ///
-    /// Here, `value` remains undefined unless a class default or inherited attribute supplies its
-    /// initial value during MRO lookup.
+    /// Here, `value` remains undefined until MRO lookup finds an independent class or instance
+    /// attribute. The same rule applies to `cls.value` in a classmethod.
     pub(super) fn implicit_attribute_bindings(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
@@ -2808,7 +2808,7 @@ impl<'db> StaticClassLiteral<'db> {
         else {
             return ImplicitAttribute {
                 member: Member::unbound(),
-                read_dependent_bindings: None,
+                augmented_bindings: None,
             };
         };
 
@@ -2830,7 +2830,7 @@ impl<'db> StaticClassLiteral<'db> {
             member: Member {
                 inner: Place::bound(Type::divergent(id)).into(),
             },
-            read_dependent_bindings: None,
+            augmented_bindings: None,
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -2852,7 +2852,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
-        let mut read_dependent_bindings = Vec::new();
+        let mut augmented_bindings = Vec::new();
         let mut provenance = Provenance::Unknown;
 
         let module = parsed_module(db, python_file).load(db);
@@ -2952,7 +2952,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_definition(declaration)
                                     .with_qualifiers(all_qualifiers),
                             },
-                            read_dependent_bindings: None,
+                            augmented_bindings: None,
                         };
                     }
 
@@ -2963,7 +2963,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 return ImplicitAttribute {
                     member: Member { inner: annotation },
-                    read_dependent_bindings: None,
+                    augmented_bindings: None,
                 };
             }
         }
@@ -3023,7 +3023,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
-                    read_dependent_bindings.push(binding);
+                    augmented_bindings.push(binding);
                     continue;
                 }
 
@@ -3174,9 +3174,8 @@ impl<'db> StaticClassLiteral<'db> {
 
         ImplicitAttribute {
             member,
-            read_dependent_bindings: (!read_dependent_bindings.is_empty()).then(|| {
-                ReadDependentBindings::new(db, read_dependent_bindings.into_boxed_slice())
-            }),
+            augmented_bindings: (!augmented_bindings.is_empty())
+                .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
         }
     }
 
@@ -3860,28 +3859,28 @@ fn explicit_bases_cycle_fn<'db>(
     }
 }
 
-/// The instance attribute bindings established by methods on one class.
+/// Attributes assigned by instance methods or classmethods on a single class.
 ///
-/// An ordinary assignment such as `self.value = 1` establishes an instance attribute. An
-/// augmented assignment such as `self.value += 1` only does so if an existing instance or class
-/// attribute can supply the value it reads first.
+/// Ordinary assignments such as `self.value = 1` or `cls.value = 1` establish an attribute
+/// directly. Augmented assignments first require an existing instance or class attribute to supply
+/// the value they read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAttribute<'db> {
     /// The attribute established by assignments that do not depend on an existing value.
     pub(super) member: Member<'db>,
     /// Augmented assignments that require an existing instance or class attribute.
-    pub(super) read_dependent_bindings: Option<ReadDependentBindings<'db>>,
+    pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
 }
 
-/// Augmented assignments that must not be inferred until their initial value is known to exist.
+/// Augmented assignments deferred until MRO lookup finds the attribute they read.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct ReadDependentBindings<'db> {
+pub(super) struct AugmentedBindings<'db> {
     #[returns(deref)]
     pub(super) definitions: Box<[Definition<'db>]>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for ReadDependentBindings<'_> {}
+impl get_size2::GetSize for AugmentedBindings<'_> {}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {
