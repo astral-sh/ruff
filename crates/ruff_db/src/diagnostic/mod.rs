@@ -286,6 +286,11 @@ impl Diagnostic {
         self.inner.severity
     }
 
+    /// Sets the severity of this diagnostic.
+    pub fn set_severity(&mut self, severity: Severity) {
+        Arc::make_mut(&mut self.inner).severity = severity;
+    }
+
     /// Returns a shared borrow of the "primary" annotation of this diagnostic
     /// if one exists.
     ///
@@ -1327,6 +1332,7 @@ impl From<crate::files::FileRange> for Span {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Severity {
+    Hint,
     Info,
     Warning,
     Error,
@@ -1336,7 +1342,7 @@ pub enum Severity {
 impl Severity {
     fn to_annotate(self) -> AnnotateLevel<'static> {
         match self {
-            Severity::Info => AnnotateLevel::INFO,
+            Severity::Hint | Severity::Info => AnnotateLevel::INFO,
             Severity::Warning => AnnotateLevel::WARNING,
             Severity::Error => AnnotateLevel::ERROR,
             // NOTE: Should we really collapse this to "error"?

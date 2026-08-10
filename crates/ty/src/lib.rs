@@ -415,6 +415,9 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
+                    let mut result = result;
+                    retain_visible_diagnostics(&mut result);
+
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
@@ -443,7 +446,8 @@ impl MainLoop {
                                 ),
                             };
 
-                            if let Ok(result) = result {
+                            if let Ok(mut result) = result {
+                                retain_visible_diagnostics(&mut result.diagnostics);
                                 let fixed_diagnostics = match mode {
                                     FixMode::AddIgnore => None,
                                     FixMode::ApplyFixes => Some(result.count),
@@ -681,6 +685,12 @@ enum FixMode {
     ApplyFixes,
 }
 
+fn retain_visible_diagnostics(diagnostics: &mut Vec<Diagnostic>) {
+    diagnostics.retain(|diagnostic| {
+        !(diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint())
+    });
+}
+
 fn exit_status_from_diagnostics(
     diagnostics: &[Diagnostic],
     terminal_settings: &TerminalSettings,
@@ -702,7 +712,7 @@ fn exit_status_from_diagnostics(
     }
 
     match max_severity {
-        Severity::Info => ExitStatus::Success,
+        Severity::Hint | Severity::Info => ExitStatus::Success,
         Severity::Warning => {
             if terminal_settings.error_on_warning {
                 ExitStatus::Failure
