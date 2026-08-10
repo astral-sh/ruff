@@ -426,6 +426,50 @@ def update(counter: Counter | None) -> None:
     counter.count += 1
 ```
 
+An augmented assignment cannot define an instance attribute: it must read an existing value before
+writing the result. Both the initial read and a later access should report the missing attribute.
+
+```py
+class UninitializedCounter:
+    def increment(self) -> None:
+        # error: [unresolved-attribute]
+        self.value += 1
+
+# error: [unresolved-attribute]
+reveal_type(UninitializedCounter().value)  # revealed: Unknown
+```
+
+## Dynamically provided attributes
+
+A dynamic attribute hook does not make an augmented assignment a valid way to introduce an instance
+attribute. Ordinary attribute reads still use the return type of `__getattr__`.
+
+```py
+class DynamicCounter:
+    def __getattr__(self, name: str) -> int:
+        return 0
+
+    def increment(self) -> None:
+        # error: [unresolved-attribute]
+        self.value += 1
+
+reveal_type(DynamicCounter().value)  # revealed: int
+```
+
+The same behavior applies when the attribute is provided by `__getattribute__`.
+
+```py
+class InterceptedCounter:
+    def __getattribute__(self, name: str) -> int:
+        return 0
+
+    def increment(self) -> None:
+        # error: [unresolved-attribute]
+        self.value += 1
+
+reveal_type(InterceptedCounter().value)  # revealed: int
+```
+
 ## Invalid subscript reads
 
 An invalid key prevents an item from being read, so the failed assignment must not produce a second

@@ -2826,6 +2826,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
+        let mut augmented_bindings = Vec::new();
         let mut provenance = Provenance::Unknown;
 
         let module = parsed_module(db, python_file).load(db);
@@ -2989,6 +2990,13 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 };
 
+                if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
+                    // An augmented assignment reads an existing attribute before assigning its
+                    // result, so it cannot establish an implicit attribute on its own.
+                    augmented_bindings.push(binding);
+                    continue;
+                }
+
                 if !is_method_reachable.is_always_false() {
                     is_attribute_bound = true;
                 }
@@ -3105,9 +3113,6 @@ impl<'db> StaticClassLiteral<'db> {
                             }
                         }
                     }
-                    DefinitionKind::AugmentedAssignment(_) => {
-                        Some(infer_definition_types(db, binding).binding_type(binding))
-                    }
                     DefinitionKind::NamedExpression(_) => {
                         // A named expression whose target is an attribute is syntactically prohibited
                         None
@@ -3119,6 +3124,14 @@ impl<'db> StaticClassLiteral<'db> {
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
+            }
+        }
+
+        if is_attribute_bound {
+            for binding in augmented_bindings {
+                let inferred_ty = infer_definition_types(db, binding).binding_type(binding);
+                provenance = provenance.or(Provenance::SingleDefinition(binding));
+                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
             }
         }
 

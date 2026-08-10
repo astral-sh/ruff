@@ -162,7 +162,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer a subscript load, returning its recovery type if the subscription fails.
+    /// Infer a subscript load, returning its inferred type when the subscription succeeds.
+    ///
+    /// If the subscription fails, report the error and return the type that should be used to
+    /// continue inference. This recovery type may be `Unknown` or, for example, the return type of
+    /// `__getitem__` when its arguments are invalid. Keeping it separate from a successful result
+    /// lets augmented assignments check their right-hand side without attempting a failed store.
     pub(super) fn infer_subscript_load(
         &mut self,
         subscript: &ast::ExprSubscript,
