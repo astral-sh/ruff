@@ -202,7 +202,6 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
-            | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
             | Self::GeneratorType
@@ -210,8 +209,7 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
-            | Self::Template
-            | Self::Path => Some(Truthiness::AlwaysTrue),
+            | Self::Template => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -273,6 +271,7 @@ impl KnownClass {
             | Self::SupportsKeysAndGetItem
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Super
             | Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -287,6 +286,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::Path
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel
