@@ -84,7 +84,8 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
+    GenericContext, Specialization, SpecializationBuilder, bind_typevar,
+    enclosing_binding_contexts, enclosing_generic_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -115,10 +116,11 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
-    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarScope, TypeVarVariance, TypedDictModule,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -8580,20 +8582,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(receiver_generic_context) = receiver_generic_context else {
             return Some(constraint);
         };
+        let call_generic_context = call_specialization.generic_context(self.db());
 
         // Method-local typevars describe requirements imposed by the method, not concrete element
         // types learned for the collection. Until collection-use constraints are represented as
         // projected constraint sets, avoid leaking those method-local typevars into the inferred
         // collection literal type.
-        if any_over_type(db, env, constraint, false, |ty| {
-            ty.as_typevar().is_some_and(|typevar| {
-                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
-            })
+        if any_over_type(db, env, constraint, false, |ty| match ty {
+            Type::TypeVar(typevar) => {
+                call_generic_context.contains(db, typevar.identity(db))
+                    && !receiver_generic_context.contains(db, typevar.identity(db))
+            }
+            // A callable's own typevars are correctly bound, but an unspecialized generic
+            // callable does not constrain the collection to one concrete element type.
+            Type::FunctionLiteral(function) => function
+                .signature(db)
+                .iter()
+                .any(|signature| !signature.is_non_generic()),
+            Type::Callable(callable) => callable
+                .signatures(db)
+                .iter()
+                .any(|signature| !signature.is_non_generic()),
+            _ => false,
         }) {
             return None;
         }
 
-        Some(constraint)
+        // Unlike method-local requirements, an argument can still constrain the collection even
+        // when its type contains a typevar from a nested inference context. Preserve that
+        // constraint, replacing only genuinely free, escaping typevars with Unknown; typevars
+        // bound by a nested callable's own signature remain in scope within that signature.
+        let in_scope_typevars = enclosing_generic_contexts(
+            self.db(),
+            self.index,
+            self.scope().file_scope_id(self.db()),
+        )
+        .fold(
+            receiver_generic_context.inferable_typevars(self.db()),
+            |in_scope_typevars, generic_context| {
+                in_scope_typevars.merge(self.db(), generic_context.inferable_typevars(self.db()))
+            },
+        );
+
+        Some(constraint.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::ReplaceOutOfScopeTypevars(TypeVarScope::new(in_scope_typevars)),
+            TypeContext::default(),
+        ))
     }
 
     fn infer_call_expression(
