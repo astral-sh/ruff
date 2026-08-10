@@ -184,7 +184,7 @@ fn resolve_script_options(
 
     let mut options = Options::default();
     // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.script_options_in_precedence_order(&inline) {
+    for layer in project_metadata.options_in_precedence_order(&inline, None) {
         options.combine_with(layer.clone());
     }
 
