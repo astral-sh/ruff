@@ -1309,7 +1309,7 @@ def choose(left: T, right: T) -> T:
 
 def caller(value: Any) -> None:
     reveal_type(identity(value))  # revealed: int | list[int]
-    # XXX: revealed: Any
+    # TODO: revealed: Any
     reveal_type(choose(value, 1))  # revealed: int
 
 def list_caller(value: list[Any]) -> None:

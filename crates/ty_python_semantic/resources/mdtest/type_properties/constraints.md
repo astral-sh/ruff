@@ -100,7 +100,7 @@ materializations instead of using gradual assignability to prove them equivalent
 
 ```py
 def _[T]() -> None:
-    # XXX: Decide whether these atoms should remain distinct or recover materialization
+    # TODO: Decide whether these atoms should remain distinct or recover materialization
     # equivalence without reintroducing gradual sequent implication.
     constraints = ConstraintSet.range(Base, T, Any)
     expected = ConstraintSet.range(Base, T, object)
@@ -273,7 +273,7 @@ materialization ranges.
 
 ```pyi
 def _[T]() -> None:
-    # XXX: Decide whether these atoms should remain distinct or recover materialization
+    # TODO: Decide whether these atoms should remain distinct or recover materialization
     # equivalence without reintroducing gradual sequent implication.
     constraints = ~ConstraintSet.range(Base, T, Any)
     expected = ~ConstraintSet.range(Base, T, object)
