@@ -1,7 +1,8 @@
 use std::path::PathBuf;
+use std::process::Output;
 
 use pep440_rs::Version;
-use ruff_db::system::{Command, System, SystemPath, SystemPathBuf, WhichError};
+use ruff_db::system::{Command, CommandExecutor, System, SystemPath, SystemPathBuf, WhichError};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
@@ -9,36 +10,86 @@ use ty_static::EnvVars;
 
 use super::python_version::SupportedPythonVersion;
 
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub(super) struct UvMetadata {
-    workspace_root: SystemPathBuf,
-    environment: Option<SystemPathBuf>,
-    python_version: Option<RangedValue<SupportedPythonVersion>>,
+pub(super) struct Uv {
+    executable: String,
 }
 
-impl UvMetadata {
-    pub(super) fn discover_workspace(
-        path: &SystemPath,
-        system: &dyn System,
-    ) -> Result<Self, UvMetadataError> {
-        let uv = match system.env_var(EnvVars::UV) {
-            Ok(uv) => uv,
-            Err(_) => system
-                .which("uv")
-                .map(SystemPathBuf::into_string)
-                .map_err(uv_executable_error)
-                .map_err(UvMetadataError::Invocation)?,
+impl Uv {
+    pub(super) fn new(system: &dyn System) -> Result<Self, WhichError> {
+        let executable = match system.env_var(EnvVars::UV) {
+            Ok(executable) => executable,
+            Err(_) => system.which("uv")?.into_string(),
         };
 
-        // `uv check` has already selected and synchronized the environment. Keep this query
-        // read-only so package selection and `--isolated` aren't overwritten by a second sync.
-        let mut command = Command::new(uv);
-        command
-            .args(["workspace", "metadata", "--frozen", "--active"])
-            .current_dir(path);
+        Ok(Self { executable })
+    }
+
+    /// Executes `uv workspace metadata` and parses and validates its output.
+    pub(super) fn metadata(
+        &self,
+        system: &dyn System,
+        target: MetadataTarget<'_>,
+    ) -> Result<UvMetadata, UvMetadataError> {
         let output = system
-            .run_command(command)
-            .map_err(UvMetadataError::Invocation)?;
+            .command_executor()
+            .ok_or_else(unsupported_command_execution)
+            .and_then(|executor| self.execute(executor, target));
+        Self::parse_metadata_output(system, output)
+    }
+
+    /// Executes `uv workspace metadata` without interpreting its output.
+    ///
+    /// This operation only requires a detached command executor, so it can run on a background
+    /// worker.
+    #[tracing::instrument(name = "Uv::execute", level = "debug", skip(self, executor))]
+    pub(super) fn execute(
+        &self,
+        executor: &dyn CommandExecutor,
+        target: MetadataTarget<'_>,
+    ) -> std::io::Result<Output> {
+        let mut command = Command::new(self.executable.as_str());
+        command.args(["workspace", "metadata"]);
+
+        match target {
+            MetadataTarget::Workspace(path) => {
+                // `uv check` has already selected and synchronized the environment. Keep this
+                // query read-only so package selection and `--isolated` aren't overwritten.
+                command.args(["--frozen", "--active"]).current_dir(path);
+            }
+            MetadataTarget::Script { path, python } => {
+                command.args(["--sync", "--script", path.as_str()]);
+                if let Some(python) = python {
+                    command.args(["--python", python.as_str()]);
+                }
+                if let Some(parent) = path.parent() {
+                    command.current_dir(parent);
+                }
+            }
+        }
+
+        tracing::debug!(
+            "Running `{} {}`",
+            command.get_executable(),
+            command.get_args().join(" ")
+        );
+
+        let start = ruff_db::Instant::now();
+        let output = executor.execute(command);
+
+        tracing::debug!(
+            "uv metadata completed in {:.3}s",
+            start.elapsed().as_secs_f64()
+        );
+
+        output
+    }
+
+    /// Parses and validates the output returned by [`Self::execute`].
+    pub(super) fn parse_metadata_output(
+        system: &dyn System,
+        output: std::io::Result<Output>,
+    ) -> Result<UvMetadata, UvMetadataError> {
+        let output = output.map_err(UvMetadataError::Invocation)?;
 
         if !output.status.success() {
             return Err(UvMetadataError::CommandFailed {
@@ -47,7 +98,51 @@ impl UvMetadata {
             });
         }
 
-        Self::from_metadata(&output.stdout, system)
+        UvMetadata::from_metadata(&output.stdout, system)
+    }
+}
+
+pub(super) fn uv_executable_error(error: WhichError) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("failed to resolve uv executable: {error}"),
+    )
+}
+
+pub(super) fn unsupported_command_execution() -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "running commands is not supported by this system",
+    )
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) enum MetadataTarget<'path> {
+    Workspace(&'path SystemPath),
+    Script {
+        path: &'path SystemPath,
+        python: Option<&'path SystemPath>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct UvMetadata {
+    workspace_root: SystemPathBuf,
+    environment: Option<SystemPathBuf>,
+    python_version: Option<RangedValue<SupportedPythonVersion>>,
+}
+
+impl UvMetadata {
+    pub(super) fn workspace_root(&self) -> &SystemPath {
+        &self.workspace_root
+    }
+
+    pub(super) fn environment(&self) -> Option<&SystemPath> {
+        self.environment.as_deref()
+    }
+
+    pub(super) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
+        self.python_version.as_ref()
     }
 
     pub(super) fn from_metadata(
@@ -77,55 +172,6 @@ impl UvMetadata {
             python_version,
         })
     }
-
-    pub(super) fn workspace_root(&self) -> &SystemPath {
-        &self.workspace_root
-    }
-
-    pub(super) fn environment(&self) -> Option<&SystemPath> {
-        self.environment.as_deref()
-    }
-
-    pub(super) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
-        self.python_version.as_ref()
-    }
-}
-
-fn uv_executable_error(error: WhichError) -> std::io::Error {
-    std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        format!("failed to resolve uv executable: {error}"),
-    )
-}
-
-fn resolve_python_version(
-    version: &Version,
-) -> Result<RangedValue<SupportedPythonVersion>, UvMetadataError> {
-    let [major, minor, ..] = version.release() else {
-        return Err(UvMetadataError::InvalidPythonVersion(version.clone()));
-    };
-    let version = format!("{major}.{minor}")
-        .parse::<SupportedPythonVersion>()
-        .map_err(|_| UvMetadataError::InvalidPythonVersion(version.clone()))?;
-
-    Ok(RangedValue::new(version, ValueSource::UvMetadata))
-}
-
-fn existing_directory(
-    path: PathBuf,
-    description: &'static str,
-    system: &dyn System,
-) -> Result<SystemPathBuf, UvMetadataError> {
-    let path = match SystemPathBuf::from_path_buf(path) {
-        Ok(path) => path,
-        Err(path) => return Err(UvMetadataError::NonUnicodePath { description, path }),
-    };
-
-    if !system.is_directory(&path) {
-        return Err(UvMetadataError::MissingDirectory { description, path });
-    }
-
-    Ok(path)
 }
 
 #[derive(Debug, Error)]
@@ -158,6 +204,36 @@ pub(super) enum UvMetadataError {
     },
 }
 
+fn existing_directory(
+    path: PathBuf,
+    description: &'static str,
+    system: &dyn System,
+) -> Result<SystemPathBuf, UvMetadataError> {
+    let path = match SystemPathBuf::from_path_buf(path) {
+        Ok(path) => path,
+        Err(path) => return Err(UvMetadataError::NonUnicodePath { description, path }),
+    };
+
+    if !system.is_directory(&path) {
+        return Err(UvMetadataError::MissingDirectory { description, path });
+    }
+
+    Ok(path)
+}
+
+fn resolve_python_version(
+    version: &Version,
+) -> Result<RangedValue<SupportedPythonVersion>, UvMetadataError> {
+    let [major, minor, ..] = version.release() else {
+        return Err(UvMetadataError::InvalidPythonVersion(version.clone()));
+    };
+    let version = format!("{major}.{minor}")
+        .parse::<SupportedPythonVersion>()
+        .map_err(|_| UvMetadataError::InvalidPythonVersion(version.clone()))?;
+
+    Ok(RangedValue::new(version, ValueSource::UvMetadata))
+}
+
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     workspace_root: PathBuf,
@@ -180,7 +256,19 @@ mod tests {
     use ruff_db::system::{SystemPath, TestSystem};
     use ty_static::EnvVars;
 
-    use super::{UvMetadata, UvMetadataError};
+    use super::{Uv, UvMetadata, UvMetadataError};
+
+    #[test]
+    fn explicit_uv_override_skips_path_lookup() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        system.set_env_var(EnvVars::UV, "custom-uv");
+
+        let uv = Uv::new(&system)?;
+
+        assert_eq!(uv.executable, "custom-uv");
+
+        Ok(())
+    }
 
     #[test]
     fn rejects_invalid_metadata() {
@@ -189,18 +277,6 @@ mod tests {
         assert!(matches!(
             UvMetadata::from_metadata(b"{", &system),
             Err(UvMetadataError::InvalidMetadata(_))
-        ));
-    }
-
-    #[test]
-    fn explicit_uv_override_skips_path_lookup() {
-        let system = TestSystem::default();
-        system.set_env_var(EnvVars::UV, "/custom/uv");
-
-        assert!(matches!(
-            UvMetadata::discover_workspace(SystemPath::new("/app"), &system),
-            Err(UvMetadataError::Invocation(error))
-                if error.kind() == std::io::ErrorKind::Unsupported
         ));
     }
 

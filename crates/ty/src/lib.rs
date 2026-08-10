@@ -26,7 +26,7 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, watch};
+use ty_project::{CollectReporter, Db, ScriptSyncProgress, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
@@ -157,8 +157,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
         None if check_paths.iter().any(|path| system.is_file(path)) => {
-            // `uv check --script` passes a file as its check path. Disable uv workspace metadata
-            // for scripts until script integration is implemented in a follow-up.
+            // `uv check --script` passes a file as its check path. Standalone scripts must not
+            // inherit the enclosing workspace; their environments are synchronized lazily.
             ProjectMetadata::discover_without_uv(&project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
@@ -372,13 +372,10 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        let mut reporter = IndicatifReporter::from(self.printer);
-                        let bar = reporter.bar.clone();
-
                         match salsa::Cancelled::catch(|| {
+                            let mut reporter = IndicatifReporter::from(self.printer);
                             db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish_and_clear();
-                            reporter.collector.into_sorted(&db)
+                            reporter.into_sorted_diagnostics(&db)
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -387,7 +384,6 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
-                                bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
@@ -630,6 +626,8 @@ fn exit_status_from_diagnostics(
 struct IndicatifReporter {
     collector: CollectReporter,
 
+    progress: ProgressDisplay,
+
     /// A reporter that is ready, containing a progress bar to report to.
     ///
     /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
@@ -640,10 +638,20 @@ struct IndicatifReporter {
     printer: Printer,
 }
 
+impl IndicatifReporter {
+    fn into_sorted_diagnostics(mut self, db: &dyn Db) -> Vec<Diagnostic> {
+        std::mem::take(&mut self.collector).into_sorted(db)
+    }
+}
+
 impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
+        let progress = ProgressDisplay::new();
+        let bar = progress.progress.add(indicatif::ProgressBar::hidden());
+
         Self {
-            bar: indicatif::ProgressBar::hidden(),
+            progress,
+            bar,
             collector: CollectReporter::default(),
             printer,
         }
@@ -663,7 +671,14 @@ impl ty_project::ProgressReporter for IndicatifReporter {
             .unwrap()
             .progress_chars("--"),
         );
-        self.bar.set_draw_target(self.printer.progress_target());
+        self.progress
+            .progress
+            .set_draw_target(self.printer.progress_target());
+        self.bar.tick();
+    }
+
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+        self.progress.for_script(db, file)
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
@@ -673,6 +688,64 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.collector.report_diagnostics(db, diagnostics);
+    }
+}
+
+impl Drop for IndicatifReporter {
+    fn drop(&mut self) {
+        self.progress.finish_checking(&self.bar);
+    }
+}
+
+/// Coordinates the file-checking bar and per-script synchronization messages.
+#[derive(Clone)]
+struct ProgressDisplay {
+    progress: indicatif::MultiProgress,
+}
+
+impl ProgressDisplay {
+    fn new() -> Self {
+        Self {
+            progress: indicatif::MultiProgress::with_draw_target(
+                indicatif::ProgressDrawTarget::hidden(),
+            ),
+        }
+    }
+
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+        if self.progress.is_hidden() {
+            return None;
+        }
+
+        let path = file.path(db).as_system_path()?;
+        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
+
+        let bar = self.progress.insert(0, indicatif::ProgressBar::hidden());
+        bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
+        bar.set_message(format!("   {} {path}", "Syncing".bold().cyan()));
+
+        Some(Box::new(ScriptProgressBar { bar }))
+    }
+
+    fn finish_checking(&self, bar: &indicatif::ProgressBar) {
+        self.progress.remove(bar);
+        self.clear();
+    }
+
+    fn clear(&self) {
+        let _ = self.progress.clear();
+    }
+}
+
+struct ScriptProgressBar {
+    bar: indicatif::ProgressBar,
+}
+
+impl ScriptSyncProgress for ScriptProgressBar {}
+
+impl Drop for ScriptProgressBar {
+    fn drop(&mut self) {
+        self.bar.finish_and_clear();
     }
 }
 

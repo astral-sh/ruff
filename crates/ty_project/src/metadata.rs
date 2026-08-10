@@ -182,8 +182,13 @@ impl ProjectMetadata {
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
         {
-            match uv::UvMetadata::discover_workspace(path, system) {
-                Ok(workspace) => Some(workspace),
+            let metadata = uv::Uv::new(system)
+                .map_err(uv::uv_executable_error)
+                .map_err(uv::UvMetadataError::Invocation)
+                .and_then(|uv| uv.metadata(system, uv::MetadataTarget::Workspace(path)));
+
+            match metadata {
+                Ok(metadata) => Some(metadata),
                 Err(error) => {
                     tracing::warn!("{error}");
                     None
