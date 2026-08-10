@@ -8117,7 +8117,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         for expr in ifs {
-            self.infer_maybe_standalone_expression(expr, TypeContext::default());
+            let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
+
+            if let Err(err) = test_ty.try_bool(db, env) {
+                err.report_diagnostic(&self.context, expr);
+            }
         }
     }
 
