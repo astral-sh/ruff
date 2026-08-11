@@ -28,6 +28,26 @@ env:
   MDTEST_EXTERNAL: "1"
 
 jobs:
+  pgo:
+    name: "PGO"
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Run PGO pipeline"
+        run: python scripts/build_ruff_pgo.py --debug
+
   determine_changes:
     name: "Determine changes"
     runs-on: ubuntu-latest
@@ -1321,6 +1341,7 @@ jobs:
     name: "all required checks passed"
     if: always()
     needs:
+      - pgo
       - cargo-fmt
       - cargo-clippy
       - cargo-test-linux
