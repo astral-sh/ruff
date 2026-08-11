@@ -67,7 +67,8 @@ pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
-    INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call, report_bad_dunder_get_call,
+    AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
+    report_bad_dunder_get_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
@@ -673,21 +674,21 @@ impl<'db> MemberLookupError<'db> {
             }
             kind @ (MemberLookupErrorKind::GetAttr { receiver, name }
             | MemberLookupErrorKind::GetAttribute { receiver, name }) => {
-                let is_fallback = matches!(kind, MemberLookupErrorKind::GetAttr { .. });
-                if is_fallback && assigned_type.is_some() {
+                let method = if matches!(kind, MemberLookupErrorKind::GetAttr { .. }) {
+                    AttributeAccessMethod::GetAttr
+                } else {
+                    AttributeAccessMethod::GetAttribute
+                };
+
+                if method == AttributeAccessMethod::GetAttr && assigned_type.is_some() {
                     return;
                 }
 
-                let method = if is_fallback {
-                    "__getattr__"
-                } else {
-                    "__getattribute__"
-                };
                 if let Err(CallDunderError::CallError(kind, bindings, _)) = receiver
                     .try_call_dunder(
                         db,
                         env,
-                        method,
+                        method.as_str(),
                         CallArguments::positional([name]),
                         TypeContext::default(),
                     )
