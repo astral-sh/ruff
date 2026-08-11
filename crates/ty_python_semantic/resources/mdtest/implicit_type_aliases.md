@@ -1354,6 +1354,27 @@ def _(
     reveal_type(invalid_subclass_of_literal)  # revealed: <class 'int'>
 ```
 
+### Subscripted generic alias inside `type[…]`
+
+A generic alias can also be specialized inside a `type[…]` annotation:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]): ...
+
+PairAlias = Pair[T, U]
+
+def explicitly_specialized(x: type[PairAlias[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def partially_specialized(x: type[PairAlias[int, T]]):
+    reveal_type(x)  # revealed: type[Pair[int, T@partially_specialized]]
+```
+
 ### `Type[…]`
 
 The same also works for `typing.Type[…]`:
