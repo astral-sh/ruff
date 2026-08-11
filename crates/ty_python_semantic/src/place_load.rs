@@ -312,12 +312,14 @@ impl<'db> Iterator for PlaceLoadResolution<'db, '_> {
 
 impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
     fn new(context: PlaceLoadResolutionContext<'db, 'ast>, place_expr: PlaceExpr) -> Self {
+        let crosses_scope_declaration =
+            context.symbol_has_scope_declaration(PlaceExprRef::from(&place_expr));
         Self {
             context,
             place_expr,
             next_node: Some(PlaceLoadResolutionNode::LocalSource),
             constraints: PlaceLoadConstraints::default(),
-            crosses_scope_declaration: false,
+            crosses_scope_declaration,
         }
     }
 
@@ -334,8 +336,6 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         {
             let indexed_symbol = place_table.symbol(symbol_id);
             symbol_is_local = indexed_symbol.is_local();
-            self.crosses_scope_declaration |=
-                indexed_symbol.is_global() || indexed_symbol.is_nonlocal();
 
             let class_body_global_fallback = self.context.is_class_body_scope() && symbol_is_local;
             if self.context.skips_non_global_scopes(symbol_id) || class_body_global_fallback {
@@ -863,6 +863,19 @@ struct PlaceLoadResolutionContext<'db, 'ast> {
 }
 
 impl<'db> PlaceLoadResolutionContext<'db, '_> {
+    fn symbol_has_scope_declaration(self, place_expr: PlaceExprRef) -> bool {
+        let Some(symbol) = place_expr.as_symbol() else {
+            return false;
+        };
+        let scope = self.scope.file_scope_id(self.db);
+        let table = self.index.place_table(scope);
+        let Some(symbol_id) = table.symbol_id(symbol.name()) else {
+            return false;
+        };
+        let symbol = table.symbol(symbol_id);
+        symbol.is_global() || symbol.is_nonlocal()
+    }
+
     fn is_class_body_scope(self) -> bool {
         self.scope.node(self.db).scope_kind().is_class()
     }
