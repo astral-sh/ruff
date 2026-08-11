@@ -30,6 +30,7 @@ exit_code: 0
       "since": "v0.0.18"
     }
   },
+  "category": "correctness",
   "source_location": {
     "file": "<FILE>",
     "line": 144

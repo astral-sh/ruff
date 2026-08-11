@@ -12,6 +12,7 @@ use types::CompiledPerFileTargetVersionList;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
 
+use crate::codes::Category;
 use crate::line_width::LineLength;
 use crate::registry::Rule;
 use crate::rules::{
@@ -770,6 +771,14 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::SysVersionSlice1), // YTT303
 ];
 
+pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
+    RuleSelector::Category(Category::Correctness),
+    RuleSelector::Category(Category::Suspicious),
+    RuleSelector::Category(Category::Complexity),
+    RuleSelector::Category(Category::Performance),
+    RuleSelector::Category(Category::Style),
+];
+
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
@@ -937,5 +946,44 @@ impl Display for TargetVersion {
             Some(value) => write!(f, "{value}"),
             None => f.write_str("none"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use itertools::Itertools;
+    use similar::{ChangeTag, TextDiff};
+
+    use crate::registry::RuleSet;
+    use crate::rule_selector::PreviewOptions;
+    use crate::settings::types::PreviewMode;
+
+    use super::{DEFAULT_SELECTORS, PREVIEW_DEFAULT_SELECTORS};
+
+    #[test]
+    fn preview_default_rules() {
+        let stable_defaults = DEFAULT_SELECTORS
+            .iter()
+            .flat_map(|selector| selector.rules(&PreviewOptions::default()))
+            .collect::<RuleSet>()
+            .to_string();
+
+        let preview_options = PreviewOptions {
+            mode: PreviewMode::Enabled,
+            require_explicit: false,
+        };
+        let preview_defaults = PREVIEW_DEFAULT_SELECTORS
+            .iter()
+            .flat_map(|selector| selector.rules(&preview_options))
+            .collect::<RuleSet>()
+            .to_string();
+
+        let diff = TextDiff::from_lines(&stable_defaults, &preview_defaults)
+            .iter_all_changes()
+            .filter(|change| change.tag() != ChangeTag::Equal)
+            .format_with("", |change, f| f(&format_args!("{}{change}", change.tag())))
+            .to_string();
+
+        insta::assert_snapshot!(diff, @"");
     }
 }
