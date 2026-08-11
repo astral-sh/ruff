@@ -506,6 +506,19 @@ class MaybeEmpty:
         return self
 ```
 
+A mixin narrowed to an unrelated class can also call that class's class methods.
+
+```py
+class Base:
+    @classmethod
+    def warn(cls) -> None: ...
+
+class Mixin:
+    def method(self) -> None:
+        assert isinstance(self, Base)
+        self.warn()
+```
+
 ## Attributes
 
 ```py

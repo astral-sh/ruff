@@ -4265,15 +4265,15 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
         // A TypeVar retains its class identity when lookup is delegated to its bound, including
-        // after narrowing adds other intersection elements. Other intersections still require the
-        // lookup type because their precise meta-type cannot yet be represented.
+        // after narrowing. Narrowing can also add an unrelated class to a mixin's `Self`, in which
+        // case the TypeVar alone is not a valid owner for descriptors from that class.
         let owner = match receiver {
             Type::TypeVar(_) => receiver,
             Type::Intersection(intersection) => intersection
                 .positive(db)
                 .iter()
                 .copied()
-                .find(|element| element.is_type_var())
+                .find(|element| element.is_type_var() && element.is_subtype_of(db, env, key.ty(db)))
                 .unwrap_or(key.ty(db)),
             _ => key.ty(db),
         }
