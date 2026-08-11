@@ -1359,7 +1359,7 @@ def _(
 A generic alias can also be specialized inside a `type[…]` annotation:
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic, TypeAlias, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -1373,6 +1373,12 @@ def explicitly_specialized(x: type[PairAlias[int, str]]):
 
 def partially_specialized(x: type[PairAlias[int, T]]):
     reveal_type(x)  # revealed: type[Pair[int, T@partially_specialized]]
+
+# The PEP 613 spelling of the same alias goes through the same path:
+PairAliasExplicit: TypeAlias = Pair[T, U]
+
+def pep_613(x: type[PairAliasExplicit[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
 ```
 
 ### `Type[…]`
