@@ -375,7 +375,8 @@ class Color(Enum):
     PURPLE = []  # error: [invalid-assignment]
 ```
 
-When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type:
+When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type on both enum
+members and method receivers:
 
 ```py
 from enum import Enum
@@ -385,6 +386,11 @@ class Color2(Enum):
     _value_: int
     RED = 1
     GREEN = 2
+
+    def read_value(self) -> int:
+        reveal_type(self._value_)  # revealed: int
+        reveal_type(self.value)  # revealed: int
+        return self.value
 
 reveal_type(Color2.RED.value)  # revealed: int
 reveal_type(Color2.RED._value_)  # revealed: int
@@ -1187,6 +1193,9 @@ class Choices(Enum):
 
     @enum_property
     def value(self) -> Any: ...
+    def read_value(self) -> Any:
+        reveal_type(self.value)  # revealed: Any
+        return self.value
 
 reveal_type(Choices.A.value)  # revealed: Any
 
@@ -1197,6 +1206,10 @@ class BaseChoices(Enum):
 
 class InheritedChoices(BaseChoices):
     A = 1
+
+    def read_value(self) -> str:
+        reveal_type(self.value)  # revealed: str
+        return self.value
 
 reveal_type(InheritedChoices.A.value)  # revealed: str
 ```
@@ -2304,54 +2317,6 @@ def value(item: EnumT) -> int | str:
     reveal_type(item.name)  # revealed: Literal["ONE", "TWO", "LEFT", "RIGHT"]
     reveal_type(item.value)  # revealed: Literal[1, 2, "left", "right"]
     return item.value
-```
-
-### Annotated enum values on method receivers
-
-An explicit `_value_` annotation also determines the type of `.value` on an enum-bounded receiver.
-
-```toml
-[rules]
-unsound-return-statement = "error"
-```
-
-```py
-from enum import Enum
-
-class Answer(Enum):
-    _value_: int
-    YES = 1
-    NO = 2
-
-    def read_value(self) -> int:
-        reveal_type(self._value_)  # revealed: int
-        reveal_type(self.value)  # revealed: int
-        return self.value
-```
-
-### Overridden special attributes on method receivers
-
-A custom `enum.property` still takes precedence over the generated enum value on an implicit
-receiver.
-
-```toml
-[environment]
-python-version = "3.11"
-```
-
-```py
-from enum import Enum, property as enum_property
-
-class Answer(Enum):
-    YES = 1
-
-    @enum_property
-    def value(self) -> str:
-        return "custom"
-
-    def method(self) -> str:
-        reveal_type(self.value)  # revealed: str
-        return self.value
 ```
 
 ## Properties of enum types
