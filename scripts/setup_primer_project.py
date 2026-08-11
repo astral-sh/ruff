@@ -27,18 +27,64 @@ uv run --python <version> --with "mypy-primer @ git+https://github.com/hauntsani
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import subprocess
 import sys
+import time
+import tomllib
 from pathlib import Path
 from typing import NoReturn
 
 from mypy_primer.model import Project
 from mypy_primer.projects import get_projects
 
+ADDITIONAL_PROJECTS = (
+    Project(
+        location="https://github.com/encode/httpx",
+        mypy_cmd=None,
+        pyright_cmd=None,
+        paths=["httpx"],
+    ),
+    Project(
+        location="https://github.com/fastapi/fastapi",
+        mypy_cmd=None,
+        pyright_cmd=None,
+        paths=["fastapi"],
+    ),
+    Project(
+        location="https://github.com/pypi/warehouse",
+        mypy_cmd=None,
+        pyright_cmd=None,
+        paths=["warehouse"],
+        deps=[
+            "pyramid",
+            "pyramid-jinja2",
+            "sqlalchemy",
+            "pydantic",
+            "requests",
+            "redis",
+            "packaging",
+            "cryptography",
+        ],
+    ),
+    Project(
+        location="https://github.com/astropy/astropy",
+        mypy_cmd=None,
+        pyright_cmd=None,
+        paths=["astropy"],
+    ),
+    Project(
+        location="https://github.com/python/typeshed",
+        mypy_cmd=None,
+        pyright_cmd=None,
+        paths=["stdlib", "stubs"],
+    ),
+)
+
 
 def find_project(name: str) -> Project:
-    projects = get_projects()
+    projects = [*get_projects(), *ADDITIONAL_PROJECTS]
     for p in projects:
         if p.name == name:
             return p
@@ -77,6 +123,128 @@ def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
     return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
 
 
+def run_git_with_retry(command: list[str], *, environment: dict[str, str]) -> None:
+    for attempt in range(3):
+        try:
+            subprocess.run(command, env=environment, check=True)
+            return
+        except subprocess.CalledProcessError:
+            if attempt == 2:
+                raise
+            delay = 2**attempt
+            print(
+                f"Git command failed; retrying in {delay}s (attempt {attempt + 2} of 3)",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
+
+
+def clone_project(
+    project: Project,
+    target_dir: Path,
+    *,
+    revision: str | None,
+    sparse_directories: list[str],
+) -> None:
+    if not sparse_directories:
+        clone_cmd = [
+            "git",
+            "clone",
+            "--recurse-submodules",
+            project.location,
+            str(target_dir),
+        ]
+        if not revision:
+            clone_cmd += ["--depth", "1"]
+        print(f"Cloning {project.location} into {target_dir}...")
+        subprocess.run(clone_cmd, check=True)
+
+        if revision:
+            print(f"Checking out revision {revision}...")
+            subprocess.run(["git", "checkout", revision], cwd=target_dir, check=True)
+            subprocess.run(
+                ["git", "submodule", "update", "--init", "--recursive"],
+                cwd=target_dir,
+                check=True,
+            )
+        return
+
+    if revision is None:
+        raise ValueError("Sparse project checkouts require an explicit revision")
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    environment = os.environ | {
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_LFS_SKIP_SMUDGE": "1",
+    }
+    git = ["git", "-c", f"core.hooksPath={os.devnull}", "-C", str(target_dir)]
+
+    if not (target_dir / ".git").is_dir():
+        print(f"Preparing {project.location}@{revision}", flush=True)
+        subprocess.run([*git, "init", "--quiet"], env=environment, check=True)
+        subprocess.run(
+            [*git, "remote", "add", "origin", project.location],
+            env=environment,
+            check=True,
+        )
+
+    remote = subprocess.run(
+        [*git, "config", "--local", "--get", "remote.origin.url"],
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if remote != project.location:
+        raise RuntimeError(
+            f"Unexpected origin for cached {project.name} checkout: "
+            f"expected {project.location}, got {remote}"
+        )
+
+    subprocess.run(
+        [*git, "sparse-checkout", "set", "--cone", *sparse_directories],
+        env=environment,
+        check=True,
+    )
+    current_revision = subprocess.run(
+        [*git, "rev-parse", "--verify", "HEAD"],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if current_revision.returncode != 0 or current_revision.stdout.strip() != revision:
+        run_git_with_retry(
+            [
+                *git,
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--no-recurse-submodules",
+                "--depth=1",
+                "--filter=blob:none",
+                "origin",
+                revision,
+            ],
+            environment=environment,
+        )
+
+    run_git_with_retry(
+        [
+            *git,
+            "checkout",
+            "--quiet",
+            "--detach",
+            "--force",
+            "--no-recurse-submodules",
+            revision,
+        ],
+        environment=environment,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project", help="Name of a mypy-primer project")
@@ -94,6 +262,38 @@ def main() -> None:
         help="Limit dependency resolution to packages uploaded before this timestamp",
     )
     parser.add_argument(
+        "--python",
+        default=sys.executable,
+        help="Python interpreter or version to use for the project virtualenv",
+    )
+    parser.add_argument(
+        "--venv-directory",
+        type=Path,
+        help="Virtualenv directory (default: <project>/.venv)",
+    )
+    parser.add_argument(
+        "--sparse",
+        action="append",
+        default=[],
+        metavar="DIRECTORY",
+        help="Fetch only this source directory; may be specified more than once",
+    )
+    parser.add_argument(
+        "--only-binary",
+        action="store_true",
+        help="Install dependencies exclusively from prebuilt wheels",
+    )
+    parser.add_argument(
+        "--install-project-dependencies",
+        action="store_true",
+        help="Also install dependencies declared in the project's pyproject.toml",
+    )
+    parser.add_argument(
+        "--skip-install",
+        action="store_true",
+        help="Only prepare the project checkout",
+    )
+    parser.add_argument(
         "--print-ty-command",
         action="store_true",
         help="Print the project-specific ty command without setting up the project",
@@ -104,44 +304,35 @@ def main() -> None:
     revision = args.revision or project.revision
 
     target_dir = Path(args.directory or project.name).resolve()
+    venv_dir = (args.venv_directory or target_dir / ".venv").resolve()
     if args.print_ty_command:
-        print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
+        print(get_ty_command(project, ty_binary="{ty}", venv_dir=venv_dir))
         return
 
-    # Use a full clone only when a historical ecosystem report revision must be checked out.
-    clone_cmd = [
-        "git",
-        "clone",
-        "--recurse-submodules",
-        project.location,
-        str(target_dir),
-    ]
-    if not revision:
-        clone_cmd += ["--depth", "1"]
-    print(f"Cloning {project.location} into {target_dir}...")
-    subprocess.run(clone_cmd, check=True)
+    clone_project(
+        project,
+        target_dir,
+        revision=revision,
+        sparse_directories=args.sparse,
+    )
+    if args.skip_install:
+        return
 
-    if revision:
-        print(f"Checking out revision {revision}...")
-        subprocess.run(["git", "checkout", revision], cwd=target_dir, check=True)
-        subprocess.run(
-            ["git", "submodule", "update", "--init", "--recursive"],
-            cwd=target_dir,
-            check=True,
-        )
-
-    # Create venv (matching primer's Venv.make_venv())
-    venv_dir = target_dir / ".venv"
     print(f"Creating virtualenv at {venv_dir}...")
     subprocess.run(
-        ["uv", "venv", str(venv_dir), "--python", sys.executable, "--seed", "--clear"],
+        ["uv", "venv", str(venv_dir), "--python", args.python, "--seed", "--clear"],
+        cwd=target_dir,
         check=True,
     )
 
-    venv_python = venv_dir / "bin" / "python"
+    venv_python = venv_dir / (
+        "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+    )
     install_base = f"uv pip install --python {shlex.quote(str(venv_python))}"
     if args.exclude_newer:
         install_base += f" --exclude-newer {shlex.quote(args.exclude_newer)}"
+    if args.only_binary:
+        install_base += " --only-binary :all:"
 
     # Run custom install command if the project defines one (matching primer's setup())
     if project.install_cmd:
@@ -151,14 +342,29 @@ def main() -> None:
         # Primer install commands are trusted project metadata and may use shell syntax.
         subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # noqa: S602
 
-    # Install listed dependencies (matching primer's setup())
-    if project.deps:
-        deps_cmd_parts = shlex.split(install_base) + project.deps
-        print(f"Installing dependencies: {', '.join(project.deps)}")
+    dependencies = project.deps or []
+    manifest = target_dir / "pyproject.toml"
+    install_project_dependencies = False
+    if args.install_project_dependencies and manifest.is_file():
+        with manifest.open("rb") as stream:
+            metadata = tomllib.load(stream)
+        install_project_dependencies = bool(
+            metadata.get("project", {}).get("dependencies", ())
+        )
+
+    if dependencies or install_project_dependencies:
+        deps_cmd_parts = shlex.split(install_base)
+        if install_project_dependencies:
+            deps_cmd_parts.extend(("--requirements", str(manifest)))
+        deps_cmd_parts.extend(dependencies)
+        print(f"Installing dependencies for {project.name}")
         subprocess.run(deps_cmd_parts, cwd=target_dir, check=True)
 
     print(f"\nDone! Project set up at {target_dir}")
-    print(f"Activate the venv with: source {venv_dir}/bin/activate")
+    activation_script = (
+        "Scripts/activate" if sys.platform == "win32" else "bin/activate"
+    )
+    print(f"Activate the venv with: source {venv_dir / activation_script}")
     print("\nProject-specific ty command:")
     print("  ty_binary=/path/to/ty")
     ty_command = get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)
