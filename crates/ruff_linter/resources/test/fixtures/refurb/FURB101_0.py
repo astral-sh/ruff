@@ -141,3 +141,39 @@ with open("file.txt", encoding="utf-8") as f:
 with open("file1.txt", encoding="utf-8") as f:
     contents: str = process_contents(f.read())
 
+
+
+# See: https://github.com/astral-sh/ruff/issues/26922
+# `open` accepts a file descriptor, but `Path` does not. `PTH123` already skips
+# these via `is_file_descriptor`.
+
+# No error: integer literal.
+with open(3) as f:
+    x = f.read()
+
+fd: int = 3
+
+# No error: name annotated as `int`.
+with open(fd) as f:
+    x = f.read()
+
+
+class FileDescriptorHolder:
+    fd: int
+
+
+# No error: class attribute annotated as `int`.
+with open(FileDescriptorHolder.fd) as f:
+    x = f.read()
+
+# FURB101: a `str` filename in the same position is still flagged.
+with open("descriptor_control.txt") as f:
+    x = f.read()
+
+# FURB101: `os.open` returns a file descriptor, but proving that requires type
+# inference, so this case is still flagged.
+import os
+
+os_fd = os.open("file.txt", os.O_RDONLY)
+with open(os_fd) as f:
+    x = f.read()

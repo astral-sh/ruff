@@ -162,3 +162,31 @@ with open("tmp_path/pyproject.toml", "w") as f:
         other = 1.234
         """,
     ))
+
+
+# See: https://github.com/astral-sh/ruff/issues/26922
+# `open` accepts a file descriptor, but `Path` does not. `PTH123` already skips
+# these via `is_file_descriptor`.
+
+# No error: integer literal.
+with open(3, "w") as f:
+    f.write("test")
+
+wfd: int = 3
+
+# No error: name annotated as `int`.
+with open(wfd, "w") as f:
+    f.write("test")
+
+
+class WriteDescriptorHolder:
+    fd: int
+
+
+# No error: class attribute annotated as `int`.
+with open(WriteDescriptorHolder.fd, "w") as f:
+    f.write("test")
+
+# FURB103: a `str` filename in the same position is still flagged.
+with open("descriptor_control.txt", "w") as f:
+    f.write("test")
