@@ -10749,9 +10749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(!value.as_i64()),
                 LiteralValueTypeKind::Bool(value) => {
-                    // `~bool` is deprecated and will be removed in Python 3.16.
-                    // Then it will become unavailable and the fallback will report it
-                    // as `unsupported-operator`.
+                    // `~bool` is currently deprecated in typeshed.
                     if let Some(dunder) = operand_type
                         .member_lookup_with_policy(
                             db,
