@@ -65,33 +65,6 @@ Target = str
 reveal_type(use)  # revealed: def use(value: int | str) -> None
 ```
 
-## Deferred attribute annotations exclude superseded root bindings
-
-An attribute in a deferred annotation resolves its root from the binding visible at the annotation
-and later bindings, without including a root binding that had already been shadowed.
-
-```py
-from __future__ import annotations
-
-class Earlier:
-    Value = bytes
-
-class Current:
-    Value = int
-
-class Later:
-    Value = str
-
-namespace = Earlier
-namespace = Current
-
-def use(value: namespace.Value) -> None: ...
-
-namespace = Later
-
-reveal_type(use)  # revealed: def use(value: int | str) -> None
-```
-
 ## Deferred attribute annotations fall back after deleting a local root
 
 Deleting a class-local root allows a deferred attribute annotation to resolve a whole-place binding

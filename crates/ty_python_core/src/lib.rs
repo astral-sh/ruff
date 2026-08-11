@@ -384,14 +384,6 @@ impl<'db> SemanticIndex<'db> {
         &self.use_def_maps[scope_id]
     }
 
-    /// Returns the scoped ID if this expression was indexed as a place use.
-    pub fn try_use_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<ast_ids::ScopedUseId> {
-        self.ast_ids.try_use_id(expression)
-    }
-
     /// Returns the set of modules that are imported anywhere in this file.
     ///
     /// This set only considers `import` statements, not `from...import` statements.

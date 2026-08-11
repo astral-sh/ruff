@@ -936,16 +936,14 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 expression,
                 definition_order,
             } => {
-                let source = table.place_id(place_expr).map(|id| {
-                    match self.index.try_use_id(expression).zip(definition_order) {
-                        Some((use_id, definition_order)) => PlaceLoadSourceKind::DeferredBindings {
-                            scope: self.scope,
-                            id,
-                            use_id,
-                            definition_order,
-                        },
-                        None => PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)),
-                    }
+                let source = table.place_id(place_expr).map(|id| match definition_order {
+                    Some(definition_order) => PlaceLoadSourceKind::DeferredBindings {
+                        scope: self.scope,
+                        id,
+                        use_id: expression.scoped_use_id(self.db, self.file),
+                        definition_order,
+                    },
+                    None => PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)),
                 });
                 assert!(
                     source.is_some(),
@@ -970,12 +968,19 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         PlaceExprPrefixLoads::from_iter(
             self.scope,
             table.parents(place_expr).filter_map(|prefix_id| {
-                let mut prefix_expr_ref = match self.mode {
-                    PlaceLoadMode::StringAnnotation => {
+                let (mut prefix_expr_ref, definition_order) = match self.mode {
+                    PlaceLoadMode::AtExpression(expression) => (expression, None),
+                    PlaceLoadMode::Deferred {
+                        expression,
+                        definition_order: Some(definition_order),
+                    } => (expression, Some(definition_order)),
+                    PlaceLoadMode::Deferred {
+                        definition_order: None,
+                        ..
+                    }
+                    | PlaceLoadMode::StringAnnotation => {
                         return Some(PlaceExprPrefixLoad::AllReachable(prefix_id));
                     }
-                    PlaceLoadMode::AtExpression(expression)
-                    | PlaceLoadMode::Deferred { expression, .. } => expression,
                 };
 
                 let prefix = table.place(prefix_id);
@@ -1001,29 +1006,15 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                         .then_some(PlaceExprPrefixLoad::DefinitelyBound);
                 }
 
-                match self.mode {
-                    PlaceLoadMode::AtExpression(_) => Some(PlaceExprPrefixLoad::AtUse(
-                        prefix_expr_ref.scoped_use_id(self.db, self.file),
-                    )),
-                    PlaceLoadMode::Deferred {
-                        definition_order, ..
-                    } => Some(
-                        self.index
-                            .try_use_id(prefix_expr_ref)
-                            .zip(definition_order)
-                            .map_or(
-                                PlaceExprPrefixLoad::AllReachable(prefix_id),
-                                |(use_id, definition_order)| PlaceExprPrefixLoad::Deferred {
-                                    id: prefix_id,
-                                    use_id,
-                                    definition_order,
-                                },
-                            ),
-                    ),
-                    PlaceLoadMode::StringAnnotation => {
-                        Some(PlaceExprPrefixLoad::AllReachable(prefix_id))
-                    }
-                }
+                let use_id = prefix_expr_ref.scoped_use_id(self.db, self.file);
+                Some(match definition_order {
+                    Some(definition_order) => PlaceExprPrefixLoad::Deferred {
+                        id: prefix_id,
+                        use_id,
+                        definition_order,
+                    },
+                    None => PlaceExprPrefixLoad::AtUse(use_id),
+                })
             }),
         )
     }
