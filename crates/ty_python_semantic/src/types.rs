@@ -4986,10 +4986,19 @@ impl<'db> Type<'db> {
                     let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
                     if let Some(bound) = bound_or_constraints
                         .map(|bound_or_constraints| bound_or_constraints.as_type(db, env))
-                        && bound.to_instance(db, env).is_some()
+                        && (bound.to_instance(db, env).is_some()
+                            || matches!(name_str, "name" | "_name_" | "value" | "_value_")
+                                && match bound {
+                                    Type::Union(union) => union
+                                        .elements(db)
+                                        .iter()
+                                        .any(|element| element.is_enum(db, env)),
+                                    _ => bound.is_enum(db, env),
+                                })
                     {
                         // A TypeVar can be bounded by a class-object type such as `type[A]`, which
-                        // requires the full lookup path rather than instance-member lookup.
+                        // requires the full lookup path rather than instance-member lookup. Enum
+                        // bounds also need full lookup for their metadata-derived attributes.
                         return bound.member_lookup_with_policy_and_receiver(
                             db,
                             env,

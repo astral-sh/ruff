@@ -2206,6 +2206,154 @@ def _(answer: Answer):
     reveal_type(answer.value)  # revealed: Literal["yes", "no"]
 ```
 
+### Special attributes on method receivers
+
+Implicit receivers and receivers annotated with `Self` retain the special attributes of their enum
+bound. Their `Self` type must still preserve the particular member at call sites.
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+from typing import Self
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    def implicit(self) -> int:
+        reveal_type(self)  # revealed: Self@implicit
+        reveal_type(self.name)  # revealed: Literal["YES", "NO"]
+        reveal_type(self._name_)  # revealed: Literal["YES", "NO"]
+        reveal_type(self.value)  # revealed: Literal[1, 2]
+        reveal_type(self._value_)  # revealed: Literal[1, 2]
+        return self.value
+
+    def explicit(self: Self) -> int:
+        reveal_type(self.value)  # revealed: Literal[1, 2]
+        return self.value
+
+    def concrete(self: "Answer") -> int:
+        reveal_type(self.value)  # revealed: Literal[1, 2]
+        return self.value
+
+    def identity(self) -> Self:
+        return self
+
+reveal_type(Answer.YES.identity())  # revealed: Literal[Answer.YES]
+```
+
+### Special attributes on bounded type variables
+
+An ordinary type variable bounded by an enum has the same special attributes as the enum itself.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+AnswerT = TypeVar("AnswerT", bound=Answer)
+
+def value(answer: AnswerT) -> int:
+    reveal_type(answer.name)  # revealed: Literal["YES", "NO"]
+    reveal_type(answer._name_)  # revealed: Literal["YES", "NO"]
+    reveal_type(answer.value)  # revealed: Literal[1, 2]
+    reveal_type(answer._value_)  # revealed: Literal[1, 2]
+    return answer.value
+```
+
+### Special attributes on constrained type variables
+
+When a type variable can be one of several enum types, its special attributes include the values
+from every possible enum.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+class Number(Enum):
+    ONE = 1
+    TWO = 2
+
+class Word(Enum):
+    LEFT = "left"
+    RIGHT = "right"
+
+EnumT = TypeVar("EnumT", Number, Word)
+
+def value(item: EnumT) -> int | str:
+    reveal_type(item.name)  # revealed: Literal["ONE", "TWO", "LEFT", "RIGHT"]
+    reveal_type(item.value)  # revealed: Literal[1, 2, "left", "right"]
+    return item.value
+```
+
+### Annotated enum values on method receivers
+
+An explicit `_value_` annotation also determines the type of `.value` on an enum-bounded receiver.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    _value_: int
+    YES = 1
+    NO = 2
+
+    def read_value(self) -> int:
+        reveal_type(self._value_)  # revealed: int
+        reveal_type(self.value)  # revealed: int
+        return self.value
+```
+
+### Overridden special attributes on method receivers
+
+A custom `enum.property` still takes precedence over the generated enum value on an implicit
+receiver.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, property as enum_property
+
+class Answer(Enum):
+    YES = 1
+
+    @enum_property
+    def value(self) -> str:
+        return "custom"
+
+    def method(self) -> str:
+        reveal_type(self.value)  # revealed: str
+        return self.value
+```
+
 ## Properties of enum types
 
 ### Implicitly final
