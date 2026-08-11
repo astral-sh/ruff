@@ -4264,13 +4264,20 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
-        // A bounded TypeVar retains its own class identity even when member lookup is delegated to
-        // its bound. Other lookup types remain necessary for intersections without precise meta-types.
-        let owner = if matches!(receiver, Type::TypeVar(_)) {
-            receiver.to_meta_type(db, env)
-        } else {
-            key.ty(db).to_meta_type(db, env)
-        };
+        // A TypeVar retains its class identity when lookup is delegated to its bound, including
+        // after narrowing adds other intersection elements. Other intersections still require the
+        // lookup type because their precise meta-type cannot yet be represented.
+        let owner = match receiver {
+            Type::TypeVar(_) => receiver,
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .copied()
+                .find(|element| element.is_type_var())
+                .unwrap_or(key.ty(db)),
+            _ => key.ty(db),
+        }
+        .to_meta_type(db, env);
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -5094,8 +5101,11 @@ impl<'db> Type<'db> {
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
-                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
-                    let receiver = receiver.unwrap_or(this);
+                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`,
+                    // unless its constraints also include non-class-object types.
+                    let receiver = receiver
+                        .filter(|receiver| receiver.to_instance_approximation(db, env).is_some())
+                        .unwrap_or(this);
                     let enum_class = match this {
                         Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of

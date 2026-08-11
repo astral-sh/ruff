@@ -933,6 +933,30 @@ def union_bound(cls: U) -> None:
     reveal_type(cls.attr)  # revealed: str | int
 ```
 
+## Attribute access on TypeVars constrained to instances and class objects
+
+A constrained type variable can contain both ordinary instances and class objects. Accessing a
+shared attribute must inspect each constraint without treating the entire type variable as a class.
+
+```py
+from typing import TypeVar
+
+class Instance:
+    @staticmethod
+    def keys() -> list[str]:
+        return []
+
+class ClassObject:
+    @staticmethod
+    def keys() -> list[str]:
+        return []
+
+T = TypeVar("T", Instance, type[ClassObject])
+
+def read(value: T) -> list[str]:
+    return value.keys()
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
