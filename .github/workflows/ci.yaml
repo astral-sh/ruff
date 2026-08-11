@@ -51,6 +51,8 @@ jobs:
       playground: ${{ steps.check_playground.outputs.changed }}
       # Flag that is set to "true" when code related to the benchmarks changes.
       benchmarks: ${{ steps.check_benchmarks.outputs.changed }}
+      # Flag that is set to "true" when release build inputs change.
+      release: ${{ steps.check_release.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,6 +69,21 @@ jobs:
         run: |
           sha=$(git merge-base HEAD "origin/${BASE_REF}")
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release build inputs changed
+        id: check_release
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':pyproject.toml' \
+            ':.github/workflows/build-binaries.yml' \
+            ':scripts/build_ruff_pgo.py' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check if the parser code changed
         id: check_parser
@@ -876,7 +893,7 @@ jobs:
     name: "PGO"
     runs-on: depot-ubuntu-24.04-8
     needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') && (needs.determine_changes.outputs.linter == 'true' || needs.determine_changes.outputs.formatter == 'true') }}
+    if: ${{ needs.determine_changes.outputs.release == 'true' && !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
