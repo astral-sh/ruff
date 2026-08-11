@@ -265,7 +265,7 @@ jobs:
 
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'depot-ubuntu-24.04-8' || 'depot-ubuntu-24.04-4' }}
     strategy:
       matrix:
         target:
