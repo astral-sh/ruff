@@ -2246,8 +2246,7 @@ reveal_type(WrappedIntAndExtraData[bytes].__init__)
 This is a regression test for <https://github.com/astral-sh/ty/issues/1427>.
 
 When a non-dataclass inherits from a generic dataclass, the generic type parameters should still be
-properly inferred during construction. Explicit access to the inherited `__init__` instead uses the
-class's default type arguments.
+properly inferred when calling the inherited `__init__` method.
 
 ```py
 from dataclasses import dataclass
@@ -2262,10 +2261,11 @@ class ChildOfParentDataclass[T](ParentDataclass[T]): ...
 def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
     return ChildOfParentDataclass(x)
 
+# TODO: ParentDataclass.__init__ should show generic types, not Unknown
 # revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
 reveal_type(ParentDataclass.__init__)
 
-# revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
+# revealed: [T](self: ParentDataclass[T], value: T) -> None
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)

@@ -1087,8 +1087,8 @@ ImplicitlyGenericChild.class_method(1)
 reveal_type(ImplicitlyGenericChild[int].static(1))  # revealed: int
 ```
 
-Explicitly accessing constructor methods also applies the default specialization. Calling the class
-itself instead keeps its type variables available for constructor inference.
+Constructor methods inherit their class's type variables into their own generic contexts, so they
+remain generic when accessed explicitly. Calling the class itself also infers its type arguments.
 
 ```py
 class ConstructorParent(Generic[T]):
@@ -1099,9 +1099,9 @@ class ConstructorParent(Generic[T]):
 
 class ConstructorChild(ConstructorParent[T]): ...
 
-# revealed: def __new__[Self](cls, value: Unknown) -> Self
+# revealed: def __new__[Self, T](cls, value: T) -> Self
 reveal_type(ConstructorChild.__new__)
-# revealed: def __init__(self, value: Unknown) -> None
+# revealed: def __init__[T](self, value: T) -> None
 reveal_type(ConstructorChild.__init__)
 reveal_type(ConstructorChild(1))  # revealed: ConstructorChild[int]
 ```
