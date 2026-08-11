@@ -11,7 +11,7 @@ self-hosted-runner:
     - namespace-profile-macos-15
     - namespace-profile-windows-2022-x86-64-16x32
     - depot-ubuntu-22.04-arm-4
-    - depot-ubuntu-24.04-arm-4
+    - depot-ubuntu-24.04-arm-8
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
