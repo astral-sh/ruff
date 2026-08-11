@@ -282,7 +282,7 @@ jobs:
 
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     strategy:
       matrix:
         platform:
@@ -433,7 +433,7 @@ jobs:
 
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     strategy:
       matrix:
         platform:
