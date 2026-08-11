@@ -1213,6 +1213,179 @@ def f(*args: int) -> int:
 reveal_type(f())  # revealed: int
 ```
 
+### Unpacked variadic arguments can require positional arguments
+
+An unpacked tuple can require arguments even though an ordinary variadic parameter can be empty.
+Fixed tuples also reject positional arguments beyond their declared length.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def at_least_one(*args: *tuple[*tuple[int, ...], int]) -> None: ...
+def exactly_two(*args: *tuple[int, str]) -> None: ...
+def exactly_zero(*args: *tuple[()]) -> None: ...
+
+at_least_one()  # error: [missing-argument]
+at_least_one(1)
+at_least_one(1, 2)
+at_least_one("wrong")  # error: [invalid-argument-type]
+at_least_one(1, "wrong")  # error: [invalid-argument-type]
+
+exactly_two()  # error: [missing-argument]
+exactly_two(1)  # error: [missing-argument]
+exactly_two(1, "two")
+exactly_two("one", "two")  # error: [invalid-argument-type]
+exactly_two(1, 2)  # error: [invalid-argument-type]
+exactly_two(1, "two", 3)  # error: [too-many-positional-arguments]
+
+exactly_zero()
+exactly_zero(1)  # error: [too-many-positional-arguments]
+```
+
+### Unpacked variadic arity errors preserve element diagnostics
+
+Matched tuple elements should still be checked when a call has the wrong arity.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def exactly_two(*args: *tuple[int, str]) -> None: ...
+
+exactly_two(1, "valid")
+exactly_two("wrong", "valid")  # error: [invalid-argument-type]
+
+# TODO: error: [invalid-argument-type]
+# error: [missing-argument]
+exactly_two("wrong")
+
+# TODO: error: [invalid-argument-type]
+# error: [too-many-positional-arguments]
+exactly_two("wrong", "valid", 3)
+
+# TODO: error: [invalid-argument-type]
+# TODO: error: [invalid-argument-type]
+# error: [too-many-positional-arguments]
+exactly_two("wrong", 2, 3)
+```
+
+The same recovery should validate fixed prefixes when a required suffix is missing.
+
+```py
+def with_suffix(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
+
+# TODO: error: [invalid-argument-type]
+# error: [missing-argument]
+with_suffix("wrong")
+```
+
+Forwarding a fixed-length tuple should preserve the same element and arity diagnostics.
+
+```py
+def forward(values: tuple[str]) -> None:
+    # TODO: error: [invalid-argument-type]
+    # error: [missing-argument]
+    exactly_two(*values)
+```
+
+Callable protocols should use the same recovery as ordinary functions.
+
+```py
+from typing import Protocol
+
+class ExactlyTwo(Protocol):
+    def __call__(self, *args: *tuple[int, str]) -> None: ...
+
+def call(callback: ExactlyTwo) -> None:
+    # TODO: error: [invalid-argument-type]
+    # error: [missing-argument]
+    callback("wrong")
+```
+
+### Unpacked variadic arguments preserve element positions
+
+Fixed prefixes, a homogeneous variadic segment, and fixed suffixes each retain their own argument
+types. A required suffix also requires any preceding defaulted positional parameter to be filled.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def mixed(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
+def with_default(first: int = 0, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+mixed(1, b"last")
+mixed(1, "middle", b"last")
+mixed("first", b"last")  # error: [invalid-argument-type]
+mixed(1, 2, b"last")  # error: [invalid-argument-type]
+mixed(1, "middle", "last")  # error: [invalid-argument-type]
+
+with_default()  # error: [missing-argument]
+with_default(first=1)  # error: [missing-argument]
+with_default(1)  # error: [missing-argument]
+with_default(1, 2)
+```
+
+### Unpacked variadic elements preserve generic bounds
+
+Ordinary type variables are inferred from individual unpacked elements, even beside an unresolved
+type-variable tuple. Their upper bounds remain enforced.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def fixed[T: str](*args: *tuple[T]) -> T:
+    return args[0]
+
+def suffix[T: str, *Ts](*args: *tuple[*Ts, T]) -> T:
+    return args[-1]
+
+reveal_type(fixed("valid"))  # revealed: Literal["valid"]
+fixed(1)  # error: [invalid-argument-type]
+
+reveal_type(suffix("prefix", "valid"))  # revealed: Literal["valid"]
+suffix("prefix", 1)  # error: [invalid-argument-type]
+```
+
+### Callable protocols enforce unpacked variadic requirements
+
+Calling a callable protocol uses the same tuple element types and argument-count bounds as calling
+an ordinary function.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class AtLeastOne(Protocol):
+    def __call__(self, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+class ExactlyOne(Protocol):
+    def __call__(self, *args: *tuple[int]) -> None: ...
+
+def call(at_least_one: AtLeastOne, exactly_one: ExactlyOne) -> None:
+    at_least_one()  # error: [missing-argument]
+    at_least_one(1)
+    at_least_one("wrong")  # error: [invalid-argument-type]
+
+    exactly_one(1)
+    exactly_one()  # error: [missing-argument]
+    exactly_one(1, 2)  # error: [too-many-positional-arguments]
+```
+
 ### Keywords argument is not required
 
 ```py
