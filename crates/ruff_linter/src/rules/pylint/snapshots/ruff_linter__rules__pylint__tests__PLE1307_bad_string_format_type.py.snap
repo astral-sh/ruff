@@ -140,3 +140,10 @@ PLE1307 Format type does not match argument type
 17 |
 18 | # False negatives
    |
+
+PLE1307 Format type does not match argument type
+  --> bad_string_format_type.py:71:1
+   |
+70 | # bool is acceptable as int/float/character.
+71 | "%d %c %f" % (True, True, True)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
