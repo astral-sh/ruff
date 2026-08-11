@@ -1297,6 +1297,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(slice, TypeContext::default());
                 KnownClass::NoneType.to_subclass_of(db, env)
             }
+            ast::Expr::Subscript(ast::ExprSubscript { value, .. }) if !is_dotted_name(value) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::Subscript(
                 subscript @ ast::ExprSubscript {
                     value,
