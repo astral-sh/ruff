@@ -5225,38 +5225,41 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             return;
         };
 
-        let matched_arguments = || {
-            self.argument_matches
+        let maximum = tuple.len().maximum();
+        let mut argument_count = 0;
+        let mut first_variable = None;
+        let mut last_variable = None;
+        let mut first_excess_argument_index = None;
+
+        for (argument_index, argument) in self.argument_matches.iter().enumerate() {
+            let match_count = argument.parameters.len();
+            let variable_segment = self
+                .variable_length_positional_arguments
                 .iter()
-                .enumerate()
-                .flat_map(|(argument_index, argument)| {
-                    let match_count = argument.parameters.len();
-                    argument
-                        .parameters
-                        .iter()
-                        .enumerate()
-                        .filter(move |(_, matched)| matched.index == parameter_index)
-                        .map(move |(position, _)| (argument_index, position, match_count))
-                })
-        };
-        let is_variable_match = |argument_index, position, match_count: usize| {
-            self.variable_length_positional_arguments
-                .iter()
-                .find(|(index, _, _)| *index == argument_index)
-                .is_some_and(|(_, prefix, suffix)| {
+                .find(|(index, _, _)| *index == argument_index);
+
+            for (position, matched) in argument.parameters.iter().enumerate() {
+                if matched.index != parameter_index {
+                    continue;
+                }
+
+                if maximum == Some(argument_count) {
+                    first_excess_argument_index = self.get_argument_index(argument_index);
+                }
+
+                if variable_segment.is_some_and(|(_, prefix, suffix)| {
                     position >= *prefix && position < match_count.saturating_sub(*suffix)
-                })
-        };
-        let argument_count = matched_arguments().count();
-        let first_variable = matched_arguments().position(|(argument_index, position, count)| {
-            is_variable_match(argument_index, position, count)
-        });
-        let last_variable = matched_arguments()
-            .enumerate()
-            .filter_map(|(index, (argument_index, position, count))| {
-                is_variable_match(argument_index, position, count).then_some(index)
-            })
-            .last();
+                }) {
+                    if first_variable.is_none() {
+                        first_variable = Some(argument_count);
+                    }
+                    last_variable = Some(argument_count);
+                }
+
+                argument_count += 1;
+            }
+        }
+
         let argument_length = first_variable
             .zip(last_variable)
             .map_or(TupleLength::Fixed(argument_count), |(first, last)| {
@@ -5269,12 +5272,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             return;
         }
 
-        if let Some(maximum) = tuple.len().maximum()
+        if let Some(maximum) = maximum
             && argument_length.minimum() > maximum
         {
-            let first_excess_argument_index = matched_arguments()
-                .nth(maximum)
-                .and_then(|(argument_index, _, _)| self.get_argument_index(argument_index));
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index,
                 expected_positional_count: self.parameters.positional().count() + maximum,
