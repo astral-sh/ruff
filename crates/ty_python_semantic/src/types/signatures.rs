@@ -1295,8 +1295,7 @@ impl<'db> Signature<'db> {
 
         let constraints = ConstraintSetBuilder::new();
         let when = constraints.load(db, env, receiver_constraints);
-        let receiver_typevars = self.receiver_specialization_typevars(db, env);
-        let inferable = self.inferable_typevars(db).merge(db, receiver_typevars);
+        let inferable = self.inferable_typevars(db);
 
         match when.solutions(db, env, &constraints, inferable) {
             Solutions::Unsatisfiable => return None,
@@ -1313,13 +1312,7 @@ impl<'db> Signature<'db> {
             return Some(self.clone());
         };
 
-        let mut builder = SpecializationBuilder::new_with_receiver_typevars(
-            db,
-            env,
-            &constraints,
-            generic_context,
-            receiver_typevars,
-        );
+        let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
         let concrete_class_receiver =
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
@@ -1438,8 +1431,7 @@ impl<'db> Signature<'db> {
                 env,
                 expected_self_ty,
                 &constraints,
-                self.inferable_typevars(db)
-                    .merge(db, self.receiver_specialization_typevars(db, env)),
+                self.inferable_typevars(db),
             )
             .is_always_satisfied(db, env)
     }
@@ -1632,8 +1624,9 @@ impl<'db> Signature<'db> {
     /// Returns this signature with the given specialization applied to parameters and return type.
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let type_mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+        let type_mapping = TypeMapping::ApplySpecialization(
+            ApplySpecialization::SpecializationWithSelfDomain(specialization),
+        );
         self.apply_type_mapping_impl(
             db,
             &type_mapping,
@@ -1792,37 +1785,6 @@ impl<'db> Signature<'db> {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => TypeVarSet::None,
         }
-    }
-
-    /// Returns unspecialized class typevars that a synthetic `Self` receiver can determine.
-    pub(crate) fn receiver_specialization_typevars(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> TypeVarSet<'db> {
-        let mut dependencies = Vec::new();
-        for self_typevar in self
-            .generic_context
-            .into_iter()
-            .flat_map(|context| context.variables(db))
-            .filter(|typevar| typevar.typevar(db).is_self(db))
-        {
-            let Some(bound) = self_typevar.typevar(db).upper_bound(db, env) else {
-                continue;
-            };
-            let Some((_, specialization)) = bound.class_specialization(db, env) else {
-                continue;
-            };
-
-            let owner_context = specialization.generic_context(db);
-            dependencies.extend(
-                TypeVarSet::from_typevar_occurrences(db, env, [bound])
-                    .iter(db)
-                    .filter(|typevar| owner_context.contains(db, typevar.identity(db))),
-            );
-        }
-
-        TypeVarSet::from_typevars(db, dependencies)
     }
 
     pub(crate) fn is_non_generic(&self) -> bool {
@@ -2405,18 +2367,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let signature_typevars = signature_typevars(source).merge(db, signature_typevars(target));
 
-        // An eager relation against an unbound method also specializes identity-mapped class
-        // typevars through synthetic `Self`. These are explicit receiver dependencies, not
-        // arbitrary typevars discovered by recursively walking declared domains. Lazy relations
-        // leave them fixed so enclosing class occurrences remain visible to the caller.
-        let receiver_typevars = if self.typevar_evaluation == TypeVarEvaluation::Eager {
-            source
-                .receiver_specialization_typevars(db, env)
-                .merge(db, target.receiver_specialization_typevars(db, env))
-        } else {
-            TypeVarSet::None
-        };
-        let relation_typevars = signature_typevars.merge(db, receiver_typevars);
+        let relation_typevars = signature_typevars;
         let inferable = self.inferable.merge(db, relation_typevars);
 
         // `inner` will create a constraint set that references these newly inferable typevars.

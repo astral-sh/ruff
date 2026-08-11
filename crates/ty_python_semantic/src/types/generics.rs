@@ -2182,6 +2182,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
     Specialization(Specialization<'db>),
+    /// Assignments from a specialization that also apply to the declared domains of retained
+    /// synthetic `Self` variables.
+    SpecializationWithSelfDomain(Specialization<'db>),
     TypeAlias(Specialization<'db>),
     Partial {
         generic_context: GenericContext<'db>,
@@ -2206,6 +2209,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     ) -> Option<Type<'db>> {
         match self {
             ApplySpecialization::Specialization(specialization)
+            | ApplySpecialization::SpecializationWithSelfDomain(specialization)
             | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
@@ -2240,6 +2244,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization(specialization)
+            | ApplySpecialization::SpecializationWithSelfDomain(specialization)
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,
@@ -2412,19 +2417,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
-    }
-
-    /// Creates a context-owned builder that can also solve explicit receiver dependencies.
-    pub(crate) fn new_with_receiver_typevars(
-        db: &'db dyn Db,
-        env: &'c ProgramEnvironment<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        generic_context: GenericContext<'db>,
-        receiver_typevars: TypeVarSet<'db>,
-    ) -> Self {
-        let mut builder = Self::new(db, env, constraints, generic_context);
-        builder.inferable = builder.inferable.merge(db, receiver_typevars);
-        builder
     }
 
     /// Adds a constraint set to the pending specialization and projects its valid solutions into

@@ -17,8 +17,9 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
-        UnionBuilder, UnionType, any_over_type, binding_type, definition_expression_type,
+        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type, binding_type,
+        definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -1203,6 +1204,29 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
+    /// Applies a specialization to this occurrence's declared domain.
+    ///
+    /// If the domain is unchanged, this preserves the original instance and its lazy domain
+    /// representation.
+    fn apply_specialization_to_domain(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        let typevar = self.typevar(db);
+        let original = typevar.bound_or_constraints(db, env);
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        let mapped = original.map(|domain| domain.apply_type_mapping_impl(db, &mapping, &visitor));
+        if mapped == original {
+            self
+        } else {
+            self.map_bound_or_constraints(db, |_| mapped)
+        }
+    }
+
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
     /// provided closure.
     pub(crate) fn map_bound_or_constraints(
@@ -1283,7 +1307,20 @@ impl<'db> BoundTypeVarInstance<'db> {
 
         match type_mapping {
             TypeMapping::ApplySpecialization(specialization) => {
-                mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self))
+                mapped_specialization_type(specialization).unwrap_or_else(|| {
+                    if self.typevar(db).is_self(db)
+                        && let ApplySpecialization::SpecializationWithSelfDomain(specialization) =
+                            specialization
+                    {
+                        Type::TypeVar(self.apply_specialization_to_domain(
+                            db,
+                            *specialization,
+                            visitor.env,
+                        ))
+                    } else {
+                        Type::TypeVar(self)
+                    }
+                })
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
@@ -1317,7 +1354,20 @@ impl<'db> BoundTypeVarInstance<'db> {
                         }
                     }
                 })
-                .unwrap_or(Type::TypeVar(self)),
+                .unwrap_or_else(|| {
+                    if self.typevar(db).is_self(db)
+                        && let ApplySpecialization::SpecializationWithSelfDomain(specialization) =
+                            specialization
+                    {
+                        Type::TypeVar(self.apply_specialization_to_domain(
+                            db,
+                            *specialization,
+                            visitor.env,
+                        ))
+                    } else {
+                        Type::TypeVar(self)
+                    }
+                }),
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, visitor.env, self) {
                     binding.self_type()
@@ -1747,54 +1797,6 @@ pub(crate) enum TypeVarSet<'db> {
 }
 
 impl<'db> TypeVarSet<'db> {
-    /// Collects typevar occurrences from types without traversing their declared domains.
-    pub(crate) fn from_typevar_occurrences(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Self {
-        struct CollectTypeVars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            typevars: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.typevars
-                    .borrow_mut()
-                    .entry(bound_typevar.identity(db))
-                    .or_insert(bound_typevar);
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        let visitor = CollectTypeVars {
-            env,
-            typevars: RefCell::default(),
-            recursion_guard: TypeCollector::default(),
-        };
-        for ty in types {
-            visitor.visit_type(db, ty);
-        }
-        Self::from_typevars(db, visitor.typevars.into_inner().into_values())
-    }
-
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
