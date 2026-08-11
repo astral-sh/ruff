@@ -963,7 +963,7 @@ impl<'db> UseDefMap<'db> {
     /// semantic-index visitation order, not necessarily source order or execution order: evaluation
     /// order can differ from source order, mutually exclusive branches are visited consecutively,
     /// and synthesized definitions are inserted where needed. IDs are meaningful only within the
-    /// same scope.
+    /// same scope and do not, by themselves, describe which definitions can reach a use.
     ///
     /// The supplied definition must belong to this map's scope. Returns `None` if it is absent
     /// from its place's reachable bindings and declarations.

@@ -1663,6 +1663,10 @@ fn place_from_binding_iterator_impl<'map, 'db>(
 
     let bindings_with_constraints =
         if let Some((current_bindings, containing_definition)) = current_bindings {
+            // Start with the control-flow-sensitive bindings reaching this use. Then add bindings
+            // reachable anywhere in the scope from the containing definition onward. This excludes
+            // earlier shadowed bindings, but can still include a later binding from a mutually
+            // exclusive branch that cannot be reached from this use.
             let containing_definition_was_visible = current_bindings
                 .clone()
                 .any(|binding| binding.binding_order == containing_definition);
