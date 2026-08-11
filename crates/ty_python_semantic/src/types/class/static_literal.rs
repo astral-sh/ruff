@@ -1281,7 +1281,20 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization))
+        let member =
+            self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization));
+
+        // An unspecialized MRO retains mappings such as `Parent[T@Child]`, so members accessed
+        // through `Child` must still use its default arguments. Constructor calls already use the
+        // identity specialization to keep class type variables available for inference.
+        if specialization.is_none()
+            && let Some(generic_context) = self.generic_context(db)
+        {
+            let specialization = generic_context.default_specialization(db, self.known(db));
+            member.map_type(|ty| ty.apply_specialization(db, specialization))
+        } else {
+            member
+        }
     }
 
     pub(crate) fn class_member_from_mro(
