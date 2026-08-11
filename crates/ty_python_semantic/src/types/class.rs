@@ -642,10 +642,11 @@ impl<'db> ClassLiteral<'db> {
             .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }
 
-    /// Return whether this class may override Python's default attribute lookup.
+    /// Return whether this class or a known base overrides Python's default attribute lookup.
     ///
     /// Dynamically constructed classes are checked conservatively because their namespaces are
-    /// not represented by a static class-body scope.
+    /// not represented by a static class-body scope. Unknown bases are considered separately by
+    /// [`Self::has_dynamic_getattribute`].
     pub(super) fn has_custom_getattribute(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Static(class) => class
@@ -658,7 +659,10 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Return whether an unknown base might provide an attribute-interception method.
+    /// Return whether an unknown base might provide `__getattribute__`.
+    ///
+    /// Such an interceptor cannot invalidate a definitely defined member, but it may supply a
+    /// missing attribute or bypass a malformed descriptor.
     pub(super) fn has_dynamic_getattribute(self, db: &'db dyn Db) -> bool {
         self.instance_flags(db)
             .contains(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE)

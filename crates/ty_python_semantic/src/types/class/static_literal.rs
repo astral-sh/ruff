@@ -867,42 +867,52 @@ impl<'db> StaticClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    /// Return the properties shared by all instances of this class.
-    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
-        fn has_own_custom_getattribute<'db>(
-            db: &'db dyn Db,
-            class: StaticClassLiteral<'db>,
-        ) -> bool {
-            if matches!(class.known(db), Some(KnownClass::Object | KnownClass::Type)) {
-                return false;
-            }
-
-            if place_table(db, class.body_scope(db))
-                .symbol_id("__getattribute__")
-                .is_some()
-            {
-                return true;
-            }
-
-            if !class.has_explicit_metaclass(db) {
-                return false;
-            }
-
-            let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
-                return true;
-            };
-
-            metaclass.iter_mro(db).any(|base| match base {
-                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
-                ClassBase::Class(base) => base.static_class_literal(db).is_none_or(|(base, _)| {
-                    implicit_attribute_names(db, base.body_scope(db))
-                        .binary_search_by(|name| name.as_str().cmp("__getattribute__"))
-                        .is_ok()
-                }),
-                ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
-            })
+    /// Return whether this class defines its own non-default `__getattribute__`.
+    ///
+    /// An explicit metaclass can install the method even when the class body does not define it:
+    ///
+    /// ```python
+    /// def interceptor(self, name): ...
+    ///
+    /// class Meta(type):
+    ///     def __init__(cls, *args):
+    ///         cls.__getattribute__ = interceptor
+    ///
+    /// class Example(metaclass=Meta): ...
+    /// ```
+    fn has_own_custom_getattribute(self, db: &'db dyn Db) -> bool {
+        if matches!(self.known(db), Some(KnownClass::Object | KnownClass::Type)) {
+            return false;
         }
 
+        if place_table(db, self.body_scope(db))
+            .symbol_id("__getattribute__")
+            .is_some()
+        {
+            return true;
+        }
+
+        if !self.has_explicit_metaclass(db) {
+            return false;
+        }
+
+        let Some(metaclass) = self.metaclass(db).to_class_type(db) else {
+            return true;
+        };
+
+        metaclass.iter_mro(db).any(|base| match base {
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Class(base) => base.static_class_literal(db).is_none_or(|(base, _)| {
+                implicit_attribute_names(db, base.body_scope(db))
+                    .binary_search(&Name::new_static("__getattribute__"))
+                    .is_ok()
+            }),
+            ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
+        })
+    }
+
+    /// Return the properties shared by all instances of this class.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
@@ -914,48 +924,45 @@ impl<'db> StaticClassLiteral<'db> {
         ) -> ClassInstanceFlags {
             let mut flags = ClassInstanceFlags::empty();
             for base in class.iter_mro(db, None) {
-                if base.is_typed_dict() {
-                    flags.insert(ClassInstanceFlags::TYPED_DICT);
-                }
-                if base.is_explicit_any_base() {
-                    flags.insert(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY);
-                }
-                if match base {
-                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                match base {
+                    ClassBase::Any => flags.insert(
+                        ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
+                            | ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE,
+                    ),
+                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                         flags.insert(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE);
-                        false
                     }
-                    ClassBase::Class(class) => class
-                        .static_class_literal(db)
-                        .is_none_or(|(class, _)| has_own_custom_getattribute(db, class)),
-                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
-                } {
-                    flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
+                    ClassBase::TypedDict(_) => flags.insert(ClassInstanceFlags::TYPED_DICT),
+                    ClassBase::Class(class)
+                        if class
+                            .static_class_literal(db)
+                            .is_none_or(|(class, _)| class.has_own_custom_getattribute(db)) =>
+                    {
+                        flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
+                    }
+                    ClassBase::Class(_) | ClassBase::Generic | ClassBase::Protocol => {}
                 }
             }
             flags
         }
 
-        if let Some(known) = self.known(db) {
-            let mut flags = if known.is_typed_dict_subclass() {
+        let mut flags = if let Some(known) = self.known(db) {
+            if known.is_typed_dict_subclass() {
                 ClassInstanceFlags::TYPED_DICT
             } else {
                 ClassInstanceFlags::empty()
-            };
-            if has_own_custom_getattribute(db, self) {
-                flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
             }
-            return flags;
-        }
+        } else if self.has_explicit_bases(db) {
+            return instance_flags_inner(db, self);
+        } else {
+            ClassInstanceFlags::empty()
+        };
 
-        if !self.has_explicit_bases(db) {
-            return if has_own_custom_getattribute(db, self) {
-                ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE
-            } else {
-                ClassInstanceFlags::empty()
-            };
-        }
-        instance_flags_inner(db, self)
+        flags.set(
+            ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE,
+            self.has_own_custom_getattribute(db),
+        );
+        flags
     }
 
     /// Return the module defining the `TypedDict` base of this class.

@@ -6600,9 +6600,10 @@ impl<'db> Type<'db> {
 
     /// Return whether a custom `__getattribute__` could affect this lookup.
     ///
-    /// Reusing the class's existing MRO classification avoids interning a member-lookup key just
-    /// to determine whether an override exists. An unknown base can still intercept a missing
-    /// attribute or bypass a failing descriptor, but cannot invalidate a definitely defined member.
+    /// Reusing the receiver class's existing MRO classification avoids interning a member-lookup
+    /// key just to determine whether an override exists. Class objects use their metaclass instead.
+    /// An unknown base can intercept a missing attribute or bypass a failing descriptor, but cannot
+    /// invalidate a definitely defined member.
     fn custom_getattribute_may_affect_lookup(
         self,
         db: &'db dyn Db,
