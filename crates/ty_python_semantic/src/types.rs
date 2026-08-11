@@ -7732,6 +7732,20 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Applies an owner specialization to a class member, including the declared domains of any
+    /// retained synthetic `Self` variables in callable signatures.
+    fn apply_optional_member_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        if let Some(specialization) = specialization {
+            self.apply_specialization_inner(db, specialization, true)
+        } else {
+            self
+        }
+    }
+
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
@@ -7793,13 +7807,13 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(db, specialization)
+        self.apply_specialization_inner(db, specialization, false)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>| {
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
             );
@@ -7811,14 +7825,22 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
+        specialize_self_domains: bool,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         let type_mapping = match specialization.materialization_kind(db) {
+            None if specialize_self_domains => TypeMapping::ApplySpecialization(
+                ApplySpecialization::SpecializationWithSelfDomain(specialization),
+            ),
             None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                 specialization,
             )),
             Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::Specialization(specialization),
+                specialization: if specialize_self_domains {
+                    ApplySpecialization::SpecializationWithSelfDomain(specialization)
+                } else {
+                    ApplySpecialization::Specialization(specialization)
+                },
                 materialization_kind,
             },
         };
@@ -9386,6 +9408,46 @@ impl<'db> TypeMapping<'_, 'db> {
                         .apply_type_mapping(db, env, self, TypeContext::default())
                         .as_typevar()
                         .unwrap_or(bound_typevar)
+                }),
+            ),
+            TypeMapping::ApplySpecialization(
+                specialization @ ApplySpecialization::SpecializationWithSelfDomain(_),
+            ) => GenericContext::from_typevar_instances(
+                db,
+                env,
+                context.variables(db).filter_map(|bound_typevar| {
+                    match specialization.get(db, bound_typevar) {
+                        Some(Type::TypeVar(mapped))
+                            if mapped.identity(db) == bound_typevar.identity(db) => {}
+                        None => {}
+                        Some(_) => return None,
+                    }
+                    Type::TypeVar(bound_typevar)
+                        .apply_type_mapping(
+                            db,
+                            env,
+                            &TypeMapping::ApplySpecialization(*specialization),
+                            TypeContext::default(),
+                        )
+                        .as_typevar()
+                }),
+            ),
+            TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::SpecializationWithSelfDomain(specialization),
+                ..
+            } => GenericContext::from_typevar_instances(
+                db,
+                env,
+                context.variables(db).filter_map(|bound_typevar| {
+                    match specialization.get(db, bound_typevar) {
+                        Some(Type::TypeVar(mapped))
+                            if mapped.identity(db) == bound_typevar.identity(db) => {}
+                        None => {}
+                        Some(_) => return None,
+                    }
+                    Type::TypeVar(bound_typevar)
+                        .apply_type_mapping(db, env, self, TypeContext::default())
+                        .as_typevar()
                 }),
             ),
             TypeMapping::ApplySpecialization(specialization)

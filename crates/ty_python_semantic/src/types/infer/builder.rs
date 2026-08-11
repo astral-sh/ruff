@@ -5532,11 +5532,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .signature
                     .generic_context
                     .map(|generic_context| generic_context.inferable_typevars(db))
-                    .unwrap_or(TypeVarSet::None)
-                    .merge(
-                        db,
-                        overload.signature.receiver_specialization_typevars(db, env),
-                    );
+                    .unwrap_or(TypeVarSet::None);
 
                 !overload
                     .return_ty

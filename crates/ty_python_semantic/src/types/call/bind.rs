@@ -5807,19 +5807,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        let receiver_typevars = self
-            .signature
-            .receiver_specialization_typevars(db, self.env);
-        self.inferable_typevars = generic_context
-            .inferable_typevars(db)
-            .merge(db, receiver_typevars);
-        let mut builder = SpecializationBuilder::new_with_receiver_typevars(
-            db,
-            self.env,
-            constraints,
-            generic_context,
-            receiver_typevars,
-        );
+        self.inferable_typevars = generic_context.inferable_typevars(db);
+        let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
 
         // Type variables for which we inferred a declared type based on a partially specialized
         // type from an outer generic context. For these type variables, we may infer types that
@@ -5977,13 +5966,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Note that this will still lead to an invalid specialization, but may
         // produce more precise diagnostics.
         if !assignable_to_declared_type {
-            builder = SpecializationBuilder::new_with_receiver_typevars(
-                db,
-                self.env,
-                constraints,
-                generic_context,
-                receiver_typevars,
-            );
+            builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
             self.constraint_set_errors.fill(false);
 
