@@ -2643,7 +2643,6 @@ X = TypedDict("X", {"type": Literal["x"]})
 Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
 
 def takes_bare_dict(value: dict[Any]) -> None: ...
-
 def _(item: Item) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
     takes_bare_dict(dict(item))
