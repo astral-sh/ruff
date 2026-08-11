@@ -5265,6 +5265,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
         if !argument_length.is_variable() && argument_count < tuple.len().minimum() {
             missing.push(ParameterContext::new(parameter, parameter_index, false));
+            // TODO: Check matched tuple elements even when required elements are missing.
             return;
         }
 
@@ -5279,6 +5280,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 expected_positional_count: self.parameters.positional().count() + maximum,
                 provided_positional_count: self.next_positional,
             });
+            // TODO: Check matched tuple elements without inferring from excess arguments.
             return;
         }
 

@@ -1245,6 +1245,68 @@ exactly_zero()
 exactly_zero(1)  # error: [too-many-positional-arguments]
 ```
 
+### Unpacked variadic arity errors preserve element diagnostics
+
+Matched tuple elements should still be checked when a call has the wrong arity.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def exactly_two(*args: *tuple[int, str]) -> None: ...
+
+exactly_two(1, "valid")
+exactly_two("wrong", "valid")  # error: [invalid-argument-type]
+
+# TODO: error: [invalid-argument-type]
+# error: [missing-argument]
+exactly_two("wrong")
+
+# TODO: error: [invalid-argument-type]
+# error: [too-many-positional-arguments]
+exactly_two("wrong", "valid", 3)
+
+# TODO: error: [invalid-argument-type]
+# TODO: error: [invalid-argument-type]
+# error: [too-many-positional-arguments]
+exactly_two("wrong", 2, 3)
+```
+
+The same recovery should validate fixed prefixes when a required suffix is missing.
+
+```py
+def with_suffix(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
+
+# TODO: error: [invalid-argument-type]
+# error: [missing-argument]
+with_suffix("wrong")
+```
+
+Forwarding a fixed-length tuple should preserve the same element and arity diagnostics.
+
+```py
+def forward(values: tuple[str]) -> None:
+    # TODO: error: [invalid-argument-type]
+    # error: [missing-argument]
+    exactly_two(*values)
+```
+
+Callable protocols should use the same recovery as ordinary functions.
+
+```py
+from typing import Protocol
+
+class ExactlyTwo(Protocol):
+    def __call__(self, *args: *tuple[int, str]) -> None: ...
+
+def call(callback: ExactlyTwo) -> None:
+    # TODO: error: [invalid-argument-type]
+    # error: [missing-argument]
+    callback("wrong")
+```
+
 ### Unpacked variadic arguments preserve element positions
 
 Fixed prefixes, a homogeneous variadic segment, and fixed suffixes each retain their own argument
