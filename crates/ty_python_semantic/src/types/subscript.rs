@@ -24,7 +24,7 @@ use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
     ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypedDictType, UnionBuilder, UnionType, todo_type,
+    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -385,25 +385,27 @@ impl<'db> SubscriptErrorKind<'db> {
     }
 }
 
-fn map_union_subscript<'db, F>(
+/// Preserve a constrained type variable when each alternative's result matches that constraint.
+fn map_subscript_alternatives<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    union: UnionType<'db>,
-    mut map_fn: F,
-) -> Result<Type<'db>, SubscriptError<'db>>
-where
-    F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
-{
+    full_object_ty: Type<'db>,
+    alternatives: impl IntoIterator<Item = Type<'db>>,
+    mut map_fn: impl FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
+) -> Result<Type<'db>, SubscriptError<'db>> {
     let mut builder = UnionBuilder::new(db, env);
     let mut errors = Vec::new();
+    let mut preserves_typevar = matches!(full_object_ty, Type::TypeVar(_));
 
-    for element in union.elements(db) {
-        match map_fn(*element) {
+    for element in alternatives {
+        match map_fn(element) {
             Ok(result) => {
+                if preserves_typevar {
+                    preserves_typevar = result.is_equivalent_to(db, env, element);
+                }
                 builder = builder.add(result);
             }
             Err(error) => {
-                let full_object_ty = Type::Union(union);
                 builder = builder.add(error.result_type());
                 errors.extend(
                     error
@@ -415,12 +417,17 @@ where
         }
     }
 
-    builder = builder.recursively_defined(union.recursively_defined(db));
-    let result_ty = builder.build();
+    if let Type::Union(union) = full_object_ty {
+        builder = builder.recursively_defined(union.recursively_defined(db));
+    }
     if errors.is_empty() {
-        Ok(result_ty)
+        Ok(if preserves_typevar {
+            full_object_ty
+        } else {
+            builder.build()
+        })
     } else {
-        Err(SubscriptError::with_errors(result_ty, errors))
+        Err(SubscriptError::with_errors(builder.build(), errors))
     }
 }
 
@@ -581,13 +588,21 @@ impl<'db> Type<'db> {
                 Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
             }
 
-            (Type::Union(union), _) => Some(map_union_subscript(db, env, union, |element| {
-                element.subscript(db, env, slice_ty, expr_context)
-            })),
+            (Type::Union(union), _) => Some(map_subscript_alternatives(
+                db,
+                env,
+                value_ty,
+                union.elements(db).iter().copied(),
+                |element| element.subscript(db, env, slice_ty, expr_context),
+            )),
 
-            (_, Type::Union(union)) => Some(map_union_subscript(db, env, union, |element| {
-                value_ty.subscript(db, env, element, expr_context)
-            })),
+            (_, Type::Union(union)) => Some(map_subscript_alternatives(
+                db,
+                env,
+                slice_ty,
+                union.elements(db).iter().copied(),
+                |element| value_ty.subscript(db, env, element, expr_context),
+            )),
 
             (Type::EnumComplement(complement), _) => {
                 Some(complement.remaining_literal_union(db, env).subscript(
@@ -618,6 +633,19 @@ impl<'db> Type<'db> {
                 intersection,
                 |element| value_ty.subscript(db, env, element, expr_context),
             )),
+
+            (Type::TypeVar(typevar), _)
+                if let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                    typevar.typevar(db).bound_or_constraints(db, env) =>
+            {
+                Some(map_subscript_alternatives(
+                    db,
+                    env,
+                    value_ty,
+                    constraints.elements(db).iter().copied(),
+                    |constraint| constraint.subscript(db, env, slice_ty, expr_context),
+                ))
+            }
 
             // Ex) Given `person["name"]`, return `str`
             (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
@@ -849,7 +877,7 @@ impl<'db> Type<'db> {
                 Some(Ok(todo_type!("Inference of subscript on special form")))
             }
 
-            // TODO: more complex logic required for the `Type::TypeVar(_) branch!
+            // Upper-bounded and unconstrained type variables use ordinary method lookup.
             (
                 Type::FunctionLiteral(_)
                 | Type::WrapperDescriptor(_)
