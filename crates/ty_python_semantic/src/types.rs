@@ -4263,8 +4263,14 @@ impl<'db> Type<'db> {
         fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
-        let ty = key.ty(db);
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
+        // A bounded TypeVar retains its own class identity even when member lookup is delegated to
+        // its bound. Other lookup types remain necessary for intersections without precise meta-types.
+        let owner = if matches!(receiver, Type::TypeVar(_)) {
+            receiver.to_meta_type(db, env)
+        } else {
+            key.ty(db).to_meta_type(db, env)
+        };
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -4272,13 +4278,7 @@ impl<'db> Type<'db> {
             },
             meta_attr_kind,
             meta_attr_error,
-        ) = Self::try_call_dunder_get_on_attribute(
-            db,
-            env,
-            meta_attr_plain,
-            Some(receiver),
-            ty.to_meta_type(db, env),
-        );
+        ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
         let fallback_error = fallback.err().map(|error| error.kind(db));
@@ -4983,32 +4983,23 @@ impl<'db> Type<'db> {
                 }
                 Type::TypeVar(typevar) => {
                     let receiver = receiver.unwrap_or(this);
-                    let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
-                    if let Some(bound) = bound_or_constraints
-                        .map(|bound_or_constraints| bound_or_constraints.as_type(db, env))
-                        && (bound.to_instance(db, env).is_some()
-                            || matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                                && match bound {
-                                    Type::Union(union) => union
-                                        .elements(db)
-                                        .iter()
-                                        .any(|element| element.is_enum(db, env)),
-                                    _ => bound.is_enum(db, env),
-                                })
+                    if let Some(bound_or_constraints) =
+                        typevar.typevar(db).bound_or_constraints(db, env)
                     {
-                        // A TypeVar can be bounded by a class-object type such as `type[A]`, which
-                        // requires the full lookup path rather than instance-member lookup. Enum
-                        // bounds also need full lookup for their metadata-derived attributes.
-                        return bound.member_lookup_with_policy_and_receiver(
-                            db,
-                            env,
-                            name_str,
-                            policy,
-                            Some(receiver),
-                        );
+                        // Use the bound's complete lookup behavior, but retain the original
+                        // receiver so descriptors and `Self` remain correctly specialized.
+                        bound_or_constraints
+                            .as_type(db, env)
+                            .member_lookup_with_policy_and_receiver(
+                                db,
+                                env,
+                                name_str,
+                                policy,
+                                Some(receiver),
+                            )
+                    } else {
+                        instance_like_member_lookup(db, env, key, receiver)
                     }
-
-                    instance_like_member_lookup(db, env, key, receiver)
                 }
 
                 Type::NominalInstance(instance)
