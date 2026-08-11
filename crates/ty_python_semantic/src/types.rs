@@ -4263,8 +4263,21 @@ impl<'db> Type<'db> {
         fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
-        let ty = key.ty(db);
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
+        // A TypeVar retains its class identity when lookup is delegated to its bound, including
+        // after narrowing. Narrowing can also add an unrelated class to a mixin's `Self`, in which
+        // case the TypeVar alone is not a valid owner for descriptors from that class.
+        let owner = match receiver {
+            Type::TypeVar(_) => receiver,
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .copied()
+                .find(|element| element.is_type_var() && element.is_subtype_of(db, env, key.ty(db)))
+                .unwrap_or(key.ty(db)),
+            _ => key.ty(db),
+        }
+        .to_meta_type(db, env);
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -4272,13 +4285,7 @@ impl<'db> Type<'db> {
             },
             meta_attr_kind,
             meta_attr_error,
-        ) = Self::try_call_dunder_get_on_attribute(
-            db,
-            env,
-            meta_attr_plain,
-            Some(receiver),
-            ty.to_meta_type(db, env),
-        );
+        ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
         let fallback_error = fallback.err().map(|error| error.kind(db));
@@ -4983,23 +4990,23 @@ impl<'db> Type<'db> {
                 }
                 Type::TypeVar(typevar) => {
                     let receiver = receiver.unwrap_or(this);
-                    let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
-                    if let Some(bound) = bound_or_constraints
-                        .map(|bound_or_constraints| bound_or_constraints.as_type(db, env))
-                        && bound.to_instance(db, env).is_some()
+                    if let Some(bound_or_constraints) =
+                        typevar.typevar(db).bound_or_constraints(db, env)
                     {
-                        // A TypeVar can be bounded by a class-object type such as `type[A]`, which
-                        // requires the full lookup path rather than instance-member lookup.
-                        return bound.member_lookup_with_policy_and_receiver(
-                            db,
-                            env,
-                            name_str,
-                            policy,
-                            Some(receiver),
-                        );
+                        // Use the bound's complete lookup behavior, but retain the original
+                        // receiver so descriptors and `Self` remain correctly specialized.
+                        bound_or_constraints
+                            .as_type(db, env)
+                            .member_lookup_with_policy_and_receiver(
+                                db,
+                                env,
+                                name_str,
+                                policy,
+                                Some(receiver),
+                            )
+                    } else {
+                        instance_like_member_lookup(db, env, key, receiver)
                     }
-
-                    instance_like_member_lookup(db, env, key, receiver)
                 }
 
                 Type::NominalInstance(instance)
@@ -5094,8 +5101,11 @@ impl<'db> Type<'db> {
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     // A class-object lookup can originate from a TypeVar bound such as `type[A]`.
-                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`.
-                    let receiver = receiver.unwrap_or(this);
+                    // Retain that TypeVar as the receiver so `Self` binds to `T'instance`, not `A`,
+                    // unless its constraints also include non-class-object types.
+                    let receiver = receiver
+                        .filter(|receiver| receiver.to_instance_approximation(db, env).is_some())
+                        .unwrap_or(this);
                     let enum_class = match this {
                         Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of

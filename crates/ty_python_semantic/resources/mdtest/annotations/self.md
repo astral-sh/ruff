@@ -489,6 +489,36 @@ class Child(Parent):
         assert_type(self.create(), Self)
 ```
 
+Truthiness narrowing must also preserve `Self` when an instance accesses a class method.
+
+```py
+from typing import Self, assert_type
+
+class MaybeEmpty:
+    @classmethod
+    def create(cls, other: Self) -> Self:
+        return cls()
+
+    def copy_if_empty(self, other: Self) -> Self:
+        if not self:
+            assert_type(self.create(other), Self)
+            return self.create(other)
+        return self
+```
+
+A mixin narrowed to an unrelated class can also call that class's class methods.
+
+```py
+class Base:
+    @classmethod
+    def warn(cls) -> None: ...
+
+class Mixin:
+    def method(self) -> None:
+        assert isinstance(self, Base)
+        self.warn()
+```
+
 ## Attributes
 
 ```py
