@@ -1044,7 +1044,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
 
                 match (class, class.known(db)) {
                     (_, Some(KnownClass::NoneType)) => f.with_type(self.ty).write_str("None"),
-                    (_, Some(KnownClass::NoDefaultType)) => f.with_type(self.ty).write_str("NoDefault"),
+                    (_, Some(KnownClass::NoDefaultType)) => {
+                        f.with_type(self.ty).write_str("NoDefault")
+                    }
                     (_, Some(KnownClass::Float | KnownClass::Complex)) => {
                         f.set_invalid_type_annotation();
                         class
@@ -1056,13 +1058,18 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
                         .specialization(db)
                         .tuple(db)
-                        .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
+                        .expect(
+                            "Specialization::tuple() should always return `Some()` for \
+                            `KnownClass::Tuple`",
+                        )
                         .display_with(db, self.env, self.settings.clone())
                         .fmt_detailed(f),
-                    (ClassType::NonGeneric(class), _) => {
-                        class.display_with(db, self.settings.clone()).fmt_detailed(f)
-                    },
-                    (ClassType::Generic(alias), _) => alias.display_with(db, self.env, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::NonGeneric(class), _) => class
+                        .display_with(db, self.settings.clone())
+                        .fmt_detailed(f),
+                    (ClassType::Generic(alias), _) => alias
+                        .display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
@@ -1322,6 +1329,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         )),
                         Some(literal.value(db)),
                     ),
+                    KnownBoundMethodType::ConstraintSetLowerBound => {
+                        return f.write_str("bound method `ConstraintSet.lower_bound`");
+                    }
+                    KnownBoundMethodType::ConstraintSetUpperBound => {
+                        return f.write_str("bound method `ConstraintSet.upper_bound`");
+                    }
+                    KnownBoundMethodType::ConstraintSetEquality => {
+                        return f.write_str("bound method `ConstraintSet.equality`");
+                    }
                     KnownBoundMethodType::ConstraintSetRange => {
                         return f.write_str("bound method `ConstraintSet.range`");
                     }
@@ -1543,15 +1559,29 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 f.write_char('>')
             }
             Type::TypeAlias(alias) => {
+                let materialization_kind = alias.materialization_kind(db);
+                if let Some(kind) = materialization_kind {
+                    let (name, form) = match kind {
+                        MaterializationKind::Top => ("Top", SpecialFormType::Top),
+                        MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
+                    };
+                    f.with_type(Type::SpecialForm(form)).write_str(name)?;
+                    f.write_char('[')?;
+                }
+
                 alias
                     .display_with(db, self.settings.clone())
                     .fmt_detailed(f)?;
-                match alias.specialization(db) {
-                    None => Ok(()),
-                    Some(specialization) => specialization
+                if let Some(specialization) = alias.specialization(db) {
+                    specialization
                         .display_short(db, self.env, TupleSpecialization::No, self.settings.clone())
-                        .fmt_detailed(f),
+                        .fmt_detailed(f)?;
                 }
+
+                if materialization_kind.is_some() {
+                    f.write_char(']')?;
+                }
+                Ok(())
             }
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }

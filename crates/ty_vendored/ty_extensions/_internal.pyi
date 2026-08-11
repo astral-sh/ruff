@@ -100,6 +100,27 @@ class ConstraintSetSolution:
 
 class ConstraintSet:
     @staticmethod
+    def lower_bound(
+        lower_bound: TypeForm[object],
+        typevar: TypeForm[object],
+    ) -> ConstraintSet:
+        """Returns a constraint set requiring `typevar` to be a supertype of `lower_bound`."""
+
+    @staticmethod
+    def upper_bound(
+        typevar: TypeForm[object],
+        upper_bound: TypeForm[object],
+    ) -> ConstraintSet:
+        """Returns a constraint set requiring `typevar` to be a subtype of `upper_bound`."""
+
+    @staticmethod
+    def equality(
+        typevar: TypeForm[object],
+        value: TypeForm[object],
+    ) -> ConstraintSet:
+        """Returns a constraint set requiring `typevar` to specialize exactly to `value`."""
+
+    @staticmethod
     def range(
         lower_bound: TypeForm[object],
         typevar: TypeForm[object],

@@ -243,8 +243,12 @@ class C:
 c = C()
 c.attr = 1
 
-# TODO: An error should be emitted here.
-# See https://github.com/astral-sh/ruff/issues/16298 for more details.
+# error: [call-non-callable] "property has no getter"
+C.attr.__get__(c, C)
+# error: [call-non-callable] "property has no getter"
+type(C.attr).__get__(C.attr, c, C)
+
+# error: [invalid-attribute-access] "Cannot read property `attr` on object of type `C` because it has no getter"
 reveal_type(c.attr)  # revealed: Never
 ```
 

@@ -1121,6 +1121,11 @@ def _(
 `Top[T]` and `Bottom[T]` are always fully static types. Therefore, they have only one
 materialization (themselves) and applying `Top` or `Bottom` again does nothing.
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Any
 from ty_extensions import Top, Bottom, static_assert
@@ -1131,6 +1136,66 @@ static_assert(is_equivalent_to(Bottom[Top[list[Any]]], Top[list[Any]]))
 
 static_assert(is_equivalent_to(Bottom[Bottom[list[Any]]], Bottom[list[Any]]))
 static_assert(is_equivalent_to(Top[Bottom[list[Any]]], Bottom[list[Any]]))
+```
+
+The same is true when a covariant specialization contains a recursive alias with a gradual invariant
+branch. Materializing the recursive branch again must not unfold another layer.
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Invariant[T]:
+    value: T
+
+type Recursive = Covariant[Recursive] | Invariant[Any]
+
+static_assert(is_equivalent_to(Top[Covariant[Recursive]], Top[Top[Covariant[Recursive]]]))
+static_assert(is_equivalent_to(Bottom[Covariant[Recursive]], Bottom[Bottom[Covariant[Recursive]]]))
+static_assert(is_equivalent_to(Top[Covariant[Recursive]], Bottom[Top[Covariant[Recursive]]]))
+static_assert(is_equivalent_to(Bottom[Covariant[Recursive]], Top[Bottom[Covariant[Recursive]]]))
+```
+
+Both branches retain the requested materialization polarity.
+
+```py
+def recursive_materializations(top: Top[Recursive], bottom: Bottom[Recursive]) -> None:
+    reveal_type(top)  # revealed: Covariant[Top[Recursive]] | Top[Invariant[Any]]
+    reveal_type(bottom)  # revealed: Covariant[Bottom[Recursive]] | Bottom[Invariant[Any]]
+```
+
+Nested recursive aliases preserve their materialization polarity in displays and diagnostics.
+
+```py
+def nested_recursive_materializations(top: Top[Covariant[Recursive]], bottom: Bottom[Covariant[Recursive]]) -> None:
+    reveal_type(top)  # revealed: Covariant[Top[Recursive]]
+    reveal_type(bottom)  # revealed: Covariant[Bottom[Recursive]]
+
+    # error: [invalid-assignment] "Object of type `Covariant[Top[Recursive]]` is not assignable to `Covariant[Bottom[Recursive]]`"
+    bottom = top
+```
+
+Explicitly constructed recursive aliases preserve the same materialized identity.
+
+```py
+from typing_extensions import TypeAliasType
+
+ManualRecursive = TypeAliasType("ManualRecursive", "Covariant[ManualRecursive] | Invariant[Any]")
+
+static_assert(is_equivalent_to(Top[Covariant[ManualRecursive]], Top[Top[Covariant[ManualRecursive]]]))
+```
+
+Materialization also preserves the specialization of a recursive generic alias.
+
+```py
+type GenericRecursive[T] = Covariant[GenericRecursive[T]] | Invariant[Any] | T
+
+static_assert(is_equivalent_to(Top[GenericRecursive[int]], Top[Top[GenericRecursive[int]]]))
+static_assert(not is_equivalent_to(Top[GenericRecursive[int]], Top[GenericRecursive[str]]))
+
+def generic_recursive_materialization(value: Top[Covariant[GenericRecursive[int]]]) -> None:
+    reveal_type(value)  # revealed: Covariant[Top[GenericRecursive[int]]]
 ```
 
 ## Subtyping

@@ -50,9 +50,10 @@ pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagn
         match backtrace.status() {
             BacktraceStatus::Disabled => {
                 diagnostic.sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
-                        ));
+                    SubDiagnosticSeverity::Info,
+                    "run with `RUST_BACKTRACE=1` environment variable \
+                    to show the full backtrace information",
+                ));
             }
             BacktraceStatus::Captured => {
                 diagnostic.sub(SubDiagnostic::new(

@@ -32,3 +32,7 @@ f"{1:z}"  # [bad-format-character]
 ## False negatives
 
 print(("%" "z") % 1)
+
+## `%b` is only valid for bytes formatting.
+"%b" % b"25"
+b"%b" % b"25"

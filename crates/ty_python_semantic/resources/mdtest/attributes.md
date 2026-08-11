@@ -259,6 +259,9 @@ reveal_type(c_instance.b)  # revealed: int
 
 #### Augmented assignments
 
+An augmented assignment contributes its result to the inferred type of an unannotated instance
+attribute.
+
 ```py
 class Weird:
     def __iadd__(self, other: None) -> str:
@@ -269,9 +272,8 @@ class C:
         self.w = Weird()
         self.w += None
 
-# TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Weird
+# TODO: Infer only `str`, since the initial `Weird` value has been overwritten.
+reveal_type(C().w)  # revealed: Weird | str
 ```
 
 #### Nested augmented assignments after narrowing
@@ -2706,6 +2708,51 @@ accessed on the class itself:
 CustomGetAttr.whatever
 ```
 
+### Invalid `__getattr__` calls
+
+If `__getattr__` cannot accept the attribute name that Python passes to it, the access is invalid.
+The method's return type remains available for error recovery, while defined attributes do not
+invoke the fallback.
+
+```py
+class InvalidGetAttr:
+    defined: bool = True
+
+    def __getattr__(self) -> str:
+        return "fallback"
+
+InvalidGetAttr().missing  # snapshot: invalid-attribute-access
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidGetAttr`"
+reveal_type(InvalidGetAttr().missing)  # revealed: str
+reveal_type(InvalidGetAttr().defined)  # revealed: bool
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `InvalidGetAttr`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | InvalidGetAttr().missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttr.__getattr__`: expected 1, got 2
+info: This access implicitly calls `__getattr__`
+info: Method signature here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __getattr__(self) -> str:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+An incompatible type for the attribute name is also an invalid fallback call.
+
+```py
+class InvalidNameType:
+    def __getattr__(self, name: int) -> bytes:
+        return b"fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidNameType`"
+reveal_type(InvalidNameType().missing)  # revealed: bytes
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
@@ -2724,8 +2771,8 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
-reveal_type(date.century)  # revealed: Unknown
+# error: [invalid-attribute-access] "Invalid access to attribute `century` on type `Date`"
+reveal_type(date.century)  # revealed: int
 ```
 
 ### `argparse.Namespace`
@@ -2815,6 +2862,22 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Invalid `__getattr__` calls
+
+Invalid metaclass `__getattr__` calls are reported on class attribute access while preserving the
+method's return type for error recovery.
+
+```py
+class Meta(type):
+    def __getattr__(cls) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<class 'Foo'>`"
+reveal_type(Foo.missing)  # revealed: int
 ```
 
 ### Class attributes take precedence

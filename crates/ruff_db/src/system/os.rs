@@ -9,13 +9,13 @@ use super::walk_directory::{
 };
 use crate::max_parallelism;
 use crate::system::{
-    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
+    Command, CommandExecutor, DirectoryEntry, FileType, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use std::num::NonZeroUsize;
-use std::process::{Command, Output};
+use std::process::Output;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -130,16 +130,8 @@ impl System for OsSystem {
         }
     }
 
-    fn run_command(
-        &self,
-        program: &str,
-        args: &[&str],
-        current_directory: &SystemPath,
-    ) -> Result<Output> {
-        Command::new(program)
-            .args(args)
-            .current_dir(current_directory.as_std_path())
-            .output()
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        Some(self)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -232,6 +224,23 @@ impl System for OsSystem {
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
+
+impl CommandExecutor for OsSystem {
+    fn execute(&self, command: Command) -> Result<Output> {
+        let directory = command
+            .get_current_dir()
+            .unwrap_or_else(|| self.current_directory());
+
+        std::process::Command::new(command.get_executable())
+            .args(command.get_args())
+            .current_dir(directory.as_std_path())
+            .output()
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
         Box::new(self.clone())
     }
 }

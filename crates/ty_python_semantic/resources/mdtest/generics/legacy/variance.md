@@ -423,4 +423,57 @@ static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvaria
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
+## Inferred variance for writable subclass-type attributes
+
+A writable public `type[T]` attribute makes a legacy type variable with inferred variance invariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class ClassContainer(Generic[T]):
+    cls: type[T]
+
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_subtype_of(ClassContainer[object], ClassContainer[int]))
+
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_assignable_to(ClassContainer[object], ClassContainer[int]))
+```
+
+## Inferred variance for subclass-type method parameters
+
+A method parameter annotated as `type[T]` makes a legacy type variable with inferred variance
+contravariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class ClassContainer(Generic[T]):
+    def put(self, cls: type[T]) -> None: ...
+
+static_assert(is_subtype_of(ClassContainer[object], ClassContainer[int]))
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+
+static_assert(is_assignable_to(ClassContainer[object], ClassContainer[int]))
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
+```
+
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance

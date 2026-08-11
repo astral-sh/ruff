@@ -129,6 +129,8 @@ fn get_call_expr(
             | TokenKind::Complex
             | TokenKind::Float
             | TokenKind::Int => 1,
+            // Prefer the real token immediately before an empty recovery token at EOF.
+            TokenKind::Unknown => -1,
             _ => 0,
         })?;
 
@@ -1254,6 +1256,32 @@ def ab(a: int, *, c: int):
         // Should be on the second parameter (b: str) since we're after the inner call
         assert_eq!(signature.active_parameter, Some(1));
         assert_eq!(result.active_signature, Some(0));
+    }
+
+    #[test]
+    fn signature_help_after_opening_paren_at_end_of_file() {
+        let test = cursor_test(
+            r#"
+            def func(first: int, second: str) -> None: ...
+
+            func(<CURSOR>"#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures[0].active_parameter, Some(0));
+    }
+
+    #[test]
+    fn signature_help_after_comma_at_end_of_file() {
+        let test = cursor_test(
+            r#"
+            def func(first: int, second: str) -> None: ...
+
+            func(1,<CURSOR>"#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures[0].active_parameter, Some(1));
     }
 
     #[test]

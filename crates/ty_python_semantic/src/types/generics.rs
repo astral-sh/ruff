@@ -1755,24 +1755,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             TypeRelation::Subtyping
                 | TypeRelation::SubtypingAssuming
                 | TypeRelation::Redundancy { pure: false }
-        )
+        ) && (
             // Explicitly materialized sources are already static and cannot advance further.
-            && source.materialization_kind(db).is_none()
+            source.materialization_kind(db).is_none()
+        ) && (
             // Performance only: `source_top != source` below already handles unchanged
             // arguments. Without expanding aliases, treat them as potentially gradual.
-            && source.types(db).iter().any(|ty| {
+            source.types(db).iter().any(|ty| {
                 any_over_type(db, env, *ty, false, |ty| {
                     ty.is_dynamic() || matches!(ty, Type::TypeAlias(_))
                 })
             })
+        ) && (
             // Avoid the `self.always()` type-variable shortcut in
             // `check_subtyping_in_invariant_position`: it would incorrectly conclude
             // that `Top[Inv[Any]] <: Inv[T]` for an unresolved `T`.
             // TODO: remove this once that shortcut is removed.
-            && target
+            target
                 .types(db)
                 .iter()
                 .all(|ty| !ty.has_typevar_or_typevar_instance(db, env))
+        ) && (
             // Only non-pure redundancy needs a target already equal to its top.
             // Materializing the source otherwise loses the bottom needed to
             // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
@@ -1782,14 +1785,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `class C[T: tuple[int, int]]`, `C[tuple[Any, int]]` and `C[tuple[int, Any]]`
             // have the same top and bottom but expose `Any` in different tuple positions.
             // TODO: Try resolving the above issues so we can compare top/bottom subtyping here.
-            && (!matches!(self.relation, TypeRelation::Redundancy { pure: false })
+            !matches!(self.relation, TypeRelation::Redundancy { pure: false })
                 || target
                     == target.materialize_impl(
                         db,
                         MaterializationKind::Top,
                         self.materialization_visitor,
-                    ))
-        {
+                    )
+        ) {
             let source_top =
                 source.materialize_impl(db, MaterializationKind::Top, self.materialization_visitor);
             // Dynamic arguments can still be unchanged by top materialization; retrying
@@ -2003,10 +2006,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
                     && !ty.is_type_var()
-                    // Preserve union distribution before constructing constraints. Storing the
-                    // entire union as an exact bound makes solving common generic calls involving
-                    // large unions significantly more expensive.
-                    && !ty.is_union()
+                    && (
+                        // Preserve union distribution before constructing constraints. Storing the
+                        // entire union as an exact bound makes solving common generic calls involving
+                        // large unions significantly more expensive.
+                        !ty.is_union()
+                    )
                 {
                     let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
                     let env = self.env;

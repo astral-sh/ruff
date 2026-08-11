@@ -679,14 +679,13 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: Top[list[Unknown]]
+        reveal_type(y)  # revealed: list[Unknown]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: Unknown
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(x)  # revealed: list[int]
         for item in x:
-            # int & object simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
@@ -1541,12 +1540,10 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        reveal_type(x)  # revealed: T@f & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
-            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`.
+            # The `int` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1558,13 +1555,10 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        reveal_type(x)  # revealed: T@g & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
-            # `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`, NOT `int | str`.
+            # The `list[str]` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 

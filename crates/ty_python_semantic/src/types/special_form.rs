@@ -612,16 +612,16 @@ impl SpecialFormType {
     pub(super) const fn is_callable(self) -> bool {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
-            Self::TypedDict(_)
+            Self::TypedDict(_) => true,
 
             // Collection constructors are callable
             // TODO actually implement support for calling them
-            | Self::LegacyStdlibAlias(
+            Self::LegacyStdlibAlias(
                 LegacyStdlibAlias::ChainMap
                 | LegacyStdlibAlias::Counter
                 | LegacyStdlibAlias::DefaultDict
                 | LegacyStdlibAlias::Deque
-                | LegacyStdlibAlias::OrderedDict
+                | LegacyStdlibAlias::OrderedDict,
             )
             | Self::NamedTuple => true,
             Self::TypeForm => true,
@@ -632,7 +632,7 @@ impl SpecialFormType {
                 LegacyStdlibAlias::List
                 | LegacyStdlibAlias::Dict
                 | LegacyStdlibAlias::Set
-                | LegacyStdlibAlias::FrozenSet
+                | LegacyStdlibAlias::FrozenSet,
             )
             | Self::Tuple
             | Self::Type => false,
@@ -713,9 +713,11 @@ impl SpecialFormType {
             | Self::Divergent
             | Self::Todo
             | Self::TypeOf
-            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
-            | Self::Unpack => false,
-            Self::TypeForm => false,
+            | Self::Unpack
+            | Self::TypeForm => false,
+
+            // can be used in `issubclass()` but not `isinstance()`.
+            Self::Any => false,
         }
     }
 

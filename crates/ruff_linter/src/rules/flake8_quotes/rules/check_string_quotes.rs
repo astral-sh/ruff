@@ -376,8 +376,10 @@ fn strings(checker: &Checker, sequence: &[TextRange]) {
                 *range,
             )));
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
-            // If we're not using the preferred type, only allow use to avoid escapes.
-            && !relax_quote
+            && (
+                // If we're not using the preferred type, only allow use to avoid escapes.
+                !relax_quote
+            )
         {
             // If inline strings aren't enforced, ignore it.
             if !checker.is_rule_enabled(Rule::BadQuotesInlineString) {

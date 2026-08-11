@@ -1355,7 +1355,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
             if checker.is_rule_enabled(Rule::ContinueInFinally) {
-                if checker.target_version() <= PythonVersion::PY38 {
+                if checker.target_version() < PythonVersion::PY38 {
                     pylint::rules::continue_in_finally(checker, finalbody);
                 }
             }

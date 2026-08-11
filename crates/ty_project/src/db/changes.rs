@@ -203,7 +203,8 @@ impl ProjectDatabase {
 
                         if configuration_paths.may_contain_configuration(path, &project_root) {
                             tracing::debug!(
-                                "Reload project because a configuration file may have been deleted."
+                                "Reload project because a configuration file \
+                                may have been deleted."
                             );
                             reload_project = true;
                         }
@@ -240,7 +241,8 @@ impl ProjectDatabase {
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
                         let error = anyhow::Error::new(error);
                         tracing::error!(
-                            "Failed to apply configuration files, continuing without applying them: {error:#}"
+                            "Failed to apply configuration files, \
+                            continuing without applying them: {error:#}"
                         );
                     }
 
@@ -258,23 +260,24 @@ impl ProjectDatabase {
                         }
                         Err(error) => {
                             tracing::error!(
-                                "Failed to convert metadata to program settings, continuing without applying them: {error}"
+                                "Failed to convert metadata to program settings, \
+                                continuing without applying them: {error}"
                             );
                             Vec::new()
                         }
                     };
 
-                    let (settings, mut settings_diagnostics) = match merged_options
-                        .to_settings(self, &FallibleStrategy)
-                    {
-                        Ok((settings, diagnostics)) => (Some(settings), diagnostics),
-                        Err(error) => {
-                            tracing::warn!(
-                                "Keeping old project configuration because loading the new settings failed with: {error}"
-                            );
-                            (None, vec![error.into_diagnostic()])
-                        }
-                    };
+                    let (settings, mut settings_diagnostics) =
+                        match merged_options.to_settings(self, &FallibleStrategy) {
+                            Ok((settings, diagnostics)) => (Some(settings), diagnostics),
+                            Err(error) => {
+                                tracing::warn!(
+                                    "Keeping old project configuration because loading the new \
+                                     settings failed with: {error}"
+                                );
+                                (None, vec![error.into_diagnostic()])
+                            }
+                        };
                     settings_diagnostics.extend(
                         program_settings_diagnostics
                             .into_iter()

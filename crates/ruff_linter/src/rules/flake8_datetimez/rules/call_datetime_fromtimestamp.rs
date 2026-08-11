@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
+use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -99,5 +100,5 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCal
         None => DatetimeModuleAntipattern::NoTzArgumentPassed,
     };
 
-    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range);
+    checker.report_diagnostic(CallDatetimeFromtimestamp(antipattern), call.range());
 }
