@@ -29,7 +29,7 @@ f"{H:s} {W:z}"  # [bad-format-character]
 
 f"{1:z}"  # [bad-format-character]
 
-## False negatives
+## Supporting concatenated strings
 
 print(("%" "z") % 1)
 

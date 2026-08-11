@@ -67,6 +67,17 @@ PLE1300 Unsupported format character 'y'
 21 | "{0:.{foo}{bar}{foobar}y}".format(...)  # OK (cannot validate after nested placeholders)
    |
 
+PLE1300 Unsupported format character 'z'
+  --> bad_string_format_character.py:34:7
+   |
+32 | ## Supporting concatenated strings
+33 |
+34 | print(("%" "z") % 1)
+   |       ^^^^^^^^^^^^^
+35 |
+36 | ## `%b` is only valid for bytes formatting.
+   |
+
 PLE1300 Unsupported format character 'b'
   --> bad_string_format_character.py:37:1
    |
