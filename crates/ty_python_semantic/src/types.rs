@@ -7306,13 +7306,24 @@ impl<'db> Type<'db> {
                 } else {
                     // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
                     // still has meta-type `type[int]`. Pure negations are bounded by `object`.
-                    IntersectionType::from_elements(
-                        db,
-                        env,
-                        intersection
-                            .positive_elements_or_object(db)
-                            .map(|positive| positive.to_meta_type(db, env)),
-                    )
+                    let mut builder = IntersectionBuilder::new(db, env);
+                    for positive in intersection.positive_elements_or_object(db) {
+                        builder.add_positive_in_place(positive.to_meta_type(db, env));
+                    }
+
+                    // An exclusion can narrow a type variable's union bound to a definite class:
+                    // `(T: C | None) & ~None` has meta-type `type[T] & type[C]`.
+                    if !intersection.negative(db).is_empty()
+                        && intersection
+                            .iter_positive(db)
+                            .any(|positive| matches!(positive, Type::TypeVar(_)))
+                        && let Type::NominalInstance(narrowed_bound) =
+                            intersection.with_expanded_typevars_and_newtypes(db, env)
+                    {
+                        builder.add_positive_in_place(narrowed_bound.to_meta_type(db, env));
+                    }
+
+                    builder.build()
                 }
             }
             Type::EnumComplement(complement) => complement

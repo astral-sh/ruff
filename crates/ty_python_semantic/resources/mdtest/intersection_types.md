@@ -1432,6 +1432,21 @@ def preserve[T: Bound](value: T & Other) -> None:
     reveal_type(type(value)())  # revealed: T@preserve & Other
 ```
 
+### Excluded alternatives in type-variable bounds
+
+Excluding an alternative from a type variable's union bound can reveal a definite class. Preserve
+both that class constraint and the original type variable in the resulting class type.
+
+```py
+class Bound:
+    label = "bound"
+
+def exclude_none[T: Bound | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none] & type[Bound]
+        reveal_type(type(value).label)  # revealed: str
+```
+
 ### Truthiness refinements
 
 Whether an individual object is truthy or falsy does not constrain its runtime class. Both positive

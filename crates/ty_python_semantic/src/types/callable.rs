@@ -293,11 +293,68 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::FunctoolsPartialCall(partial),
             ) => Some(CallableTypes::one(partial.partial(db))),
 
-            Type::Intersection(intersection) => intersection
-                .finite_alternative_union(db, env)
-                .and_then(|alternatives| {
-                    alternatives.try_upcast_to_callable_with_policy(db, env, policy)
-                }),
+            Type::Intersection(intersection) => {
+                if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
+                    alternatives
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                } else {
+                    let mut intersection_callables: Option<CallableTypes<'db>> = None;
+
+                    for positive in intersection.iter_positive(db) {
+                        let Some(positive_callables) = positive
+                            .try_upcast_to_callable_with_policy_and_context(
+                                db, env, policy, context,
+                            )
+                        else {
+                            continue;
+                        };
+
+                        intersection_callables = Some(match intersection_callables {
+                            None => positive_callables,
+                            Some(previous_callables) => {
+                                // Each combination is one overloaded callable; separate
+                                // combinations remain separate union alternatives.
+                                let mut combined_callables = SmallVec::new();
+                                for previous in &previous_callables {
+                                    for positive in &positive_callables {
+                                        let kind = if previous.kind(db) == positive.kind(db) {
+                                            previous.kind(db)
+                                        } else if previous.is_function_like(db)
+                                            || positive.is_function_like(db)
+                                        {
+                                            CallableTypeKind::FunctionLike
+                                        } else {
+                                            CallableTypeKind::Regular
+                                        };
+                                        let provenance =
+                                            if previous.provenance(db) == positive.provenance(db) {
+                                                previous.provenance(db)
+                                            } else {
+                                                CallableFunctionProvenance::None
+                                            };
+
+                                        combined_callables.push(CallableType::new(
+                                            db,
+                                            CallableSignature::from_overloads(
+                                                previous
+                                                    .signatures(db)
+                                                    .iter()
+                                                    .chain(positive.signatures(db).iter())
+                                                    .cloned(),
+                                            ),
+                                            kind,
+                                            provenance,
+                                        ));
+                                    }
+                                }
+                                CallableTypes::new(combined_callables)
+                            }
+                        });
+                    }
+
+                    intersection_callables
+                }
+            }
 
             Type::EnumComplement(complement) => complement
                 .remaining_literal_union(db, env)

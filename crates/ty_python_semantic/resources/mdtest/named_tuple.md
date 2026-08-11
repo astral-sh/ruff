@@ -1464,6 +1464,20 @@ def _(y: type[typing.NamedTuple]):
 def _(z: typing.NamedTuple[int]): ...
 ```
 
+Class objects remain callable when their type variable is bounded by the intersection that
+represents `NamedTuple`:
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+NamedTupleT = TypeVar("NamedTupleT", bound=typing.NamedTuple)
+
+def accepts_callable(callback: Callable[..., object]) -> None: ...
+def named_tuple_class_is_callable(cls: type[NamedTupleT]) -> None:
+    accepts_callable(cls)
+```
+
 NamedTuples are assignable to `NamedTupleLike`. The `NamedTupleLike._replace` method is typed with
 `(*args, **kwargs)`, which type checkers treat as equivalent to `...` (per the typing spec), making
 all NamedTuple implementations automatically compatible:
