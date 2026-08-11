@@ -913,6 +913,8 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         let table = self.index.place_table(scope);
         let use_def = self.index.use_def_map(scope);
 
+        // Invalid names have entries in the place table but are not indexed as uses, so they must
+        // not fall through to either eager or deferred binding lookup.
         if let PlaceLoadMode::AtExpression(expression) | PlaceLoadMode::Deferred { expression, .. } =
             self.mode
             && expression
