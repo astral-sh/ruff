@@ -269,7 +269,8 @@ use crate::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState,
 };
 use crate::{
-    BoundnessAnalysis, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces, SemanticIndex,
+    BoundnessAnalysis, Db, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces,
+    SemanticIndex,
 };
 
 mod place_state;
@@ -952,6 +953,25 @@ impl<'db> UseDefMap<'db> {
 
     pub fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {
         self.all_definitions.get(id).state()
+    }
+
+    /// Returns the position of a binding or declaration within its containing scope.
+    pub fn definition_order(
+        &self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<ScopedDefinitionId> {
+        let place = definition.place(db);
+
+        self.reachable_bindings(place)
+            .map(|binding| (binding.binding, binding.binding_order))
+            .chain(
+                self.reachable_declarations(place)
+                    .map(|declaration| (declaration.declaration, declaration.declaration_order)),
+            )
+            .find_map(|(candidate, order)| {
+                (candidate.definition() == Some(definition)).then_some(order)
+            })
     }
 
     pub fn narrowing_evaluator(

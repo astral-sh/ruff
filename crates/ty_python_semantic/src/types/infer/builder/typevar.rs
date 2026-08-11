@@ -1528,9 +1528,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = definition.file_scope(db);
         let place = definition.place(db);
         let use_def = self.index.use_def_map(scope);
-        let definition_order = use_def.reachable_bindings(place).find_map(|binding| {
-            (binding.binding.definition() == Some(definition)).then_some(binding.binding_order)
-        });
+        let definition_order = use_def.definition_order(db, definition);
         debug_assert!(definition_order.is_some());
 
         let previous_definition = definition_order
