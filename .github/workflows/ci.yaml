@@ -31,6 +31,8 @@ jobs:
   pgo:
     name: "PGO"
     runs-on: depot-ubuntu-24.04-16
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.release_build == 'true' && !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,6 +73,8 @@ jobs:
       playground: ${{ steps.check_playground.outputs.changed }}
       # Flag that is set to "true" when code related to the benchmarks changes.
       benchmarks: ${{ steps.check_benchmarks.outputs.changed }}
+      # Flag that is set to "true" when release binaries would be built.
+      release_build: ${{ steps.check_release_build.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -87,6 +91,21 @@ jobs:
         run: |
           sha=$(git merge-base HEAD "origin/${BASE_REF}")
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release build inputs changed
+        id: check_release_build
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':pyproject.toml' \
+            ':.github/workflows/build-binaries.yml' \
+            ':scripts/build_ruff_pgo.py' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check if the parser code changed
         id: check_parser
@@ -1341,7 +1360,6 @@ jobs:
     name: "all required checks passed"
     if: always()
     needs:
-      - pgo
       - cargo-fmt
       - cargo-clippy
       - cargo-test-linux
