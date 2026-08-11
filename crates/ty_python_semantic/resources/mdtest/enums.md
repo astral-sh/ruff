@@ -2209,7 +2209,7 @@ def _(answer: Answer):
 ### Special attributes on method receivers
 
 Implicit receivers and receivers annotated with `Self` retain the special attributes of their enum
-bound. Their `Self` type must still preserve the particular member at call sites.
+bound. Their `Self` type preserves the particular member at call sites.
 
 ```toml
 [environment]
