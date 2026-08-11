@@ -276,6 +276,36 @@ class C:
 reveal_type(C().w)  # revealed: Weird | str
 ```
 
+#### Augmented assignments to narrowed optional attributes
+
+An optional attribute narrowed by an identity comparison remains narrowed while cyclic inference
+resolves augmented assignments in separate branches.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Counter:
+    def __init__(self, value: int | None) -> None:
+        self.value = value
+
+    def update(self, decrement: bool) -> None:
+        if self.value is None:
+            return
+
+        if decrement:
+            self.value -= 1
+        else:
+            self.value += 1
+
+    def current(self) -> int | None:
+        return self.value
+
+reveal_type(Counter(0).value)  # revealed: int | None
+```
+
 #### Nested augmented assignments after narrowing
 
 Augmented assignments to nested attributes (e.g., `self.inner.value += ...`) should work correctly

@@ -495,6 +495,60 @@ fn pep695_type_params() {
 }
 
 #[test]
+fn expression_cycle_initial_preserves_context_independent_literals() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        "if (value, None, True, 1, 1.5, 1j, ..., 'text', lambda: None): pass",
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
+    let file = program_file(&db, file);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let test = &module.syntax().body[0]
+        .as_if_stmt()
+        .expect("if statement")
+        .test;
+    let expression = semantic_index(&db, file).expression(test);
+    let inference = expression_cycle_initial(
+        &db,
+        expression.as_id(),
+        InferExpression::new(&db, expression, TypeContext::default()),
+    );
+    let values = &test.as_tuple_expr().expect("tuple expression").elts;
+    let env = ProgramEnvironment::from_file(file);
+
+    assert!(inference.expression_type(&values[0]).is_divergent());
+    assert_eq!(inference.expression_type(&values[1]), Type::none(&db, &env));
+    assert_eq!(
+        inference.expression_type(&values[2]),
+        Type::bool_literal(true)
+    );
+    assert_eq!(inference.expression_type(&values[3]), Type::int_literal(1));
+    assert_eq!(
+        inference.expression_type(&values[4]),
+        KnownClass::Float.to_instance(&db, &env)
+    );
+    assert_eq!(
+        inference.expression_type(&values[5]),
+        KnownClass::Complex.to_instance(&db, &env)
+    );
+    assert_eq!(
+        inference.expression_type(&values[6]),
+        KnownClass::EllipsisType.to_instance(&db, &env)
+    );
+    assert!(inference.expression_type(&values[7]).is_divergent());
+    assert!(
+        inference
+            .expression_type(&values[8].as_lambda_expr().expect("lambda expression").body)
+            .is_divergent()
+    );
+    assert!(inference.expression_type(test).is_divergent());
+
+    Ok(())
+}
+
+#[test]
 fn simple_assignment_does_not_enter_salsa_cycle() {
     let mut db = setup_db();
     db.write_dedented("src/a.py", "x = 1; y = x + 1").unwrap();

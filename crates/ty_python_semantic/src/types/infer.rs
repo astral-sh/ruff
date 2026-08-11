@@ -47,6 +47,7 @@ use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
@@ -456,8 +457,63 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
-    ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
+    let module = parsed_module(db, expression.python_file(db)).load(db);
+    let env = ProgramEnvironment::from_file(expression.program_file(db));
+    let mut literals = ContextIndependentLiteralCollector {
+        db,
+        env: &env,
+        expressions: Vec::new(),
+    };
+    literals.visit_expr(expression.node_ref(db).node(&module));
+
+    ExpressionInference::cycle_initial(
+        expression.scope(db),
+        Type::divergent(id),
+        literals.expressions.into_iter().collect(),
+    )
+}
+
+/// Collect literal types that do not depend on the expression currently being inferred.
+///
+/// In `value is None`, `value` may be cyclic, but `None` remains `None` from the first fixed-point
+/// iteration. Preserving these literals also keeps comparison narrowing stable during that cycle.
+struct ContextIndependentLiteralCollector<'db, 'env> {
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+    expressions: Vec<(ExpressionNodeKey, Type<'db>)>,
+}
+
+impl<'ast> Visitor<'ast> for ContextIndependentLiteralCollector<'_, '_> {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        let ty = match expression {
+            ast::Expr::NoneLiteral(_) => Some(Type::none(self.db, self.env)),
+            ast::Expr::BooleanLiteral(literal) => Some(Type::bool_literal(literal.value)),
+            ast::Expr::NumberLiteral(literal) => Some(match &literal.value {
+                ast::Number::Int(value) => value
+                    .as_i64()
+                    .map(Type::int_literal)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db, self.env)),
+                ast::Number::Float(_) => KnownClass::Float.to_instance(self.db, self.env),
+                ast::Number::Complex { .. } => KnownClass::Complex.to_instance(self.db, self.env),
+            }),
+            ast::Expr::EllipsisLiteral(_) => {
+                Some(KnownClass::EllipsisType.to_instance(self.db, self.env))
+            }
+            // Nested function and comprehension bodies belong to separate inference regions.
+            ast::Expr::Lambda(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::SetComp(_)
+            | ast::Expr::DictComp(_) => return,
+            _ => None,
+        };
+
+        if let Some(ty) = ty {
+            self.expressions.push((expression.into(), ty));
+        } else {
+            visitor::walk_expr(self, expression);
+        }
+    }
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -1681,14 +1737,18 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
+    fn cycle_initial(
+        scope: ScopeId<'db>,
+        cycle_recovery: Type<'db>,
+        expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    ) -> Self {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
-            expressions: FrozenMap::default(),
+            expressions,
             #[cfg(debug_assertions)]
             scope,
         }
