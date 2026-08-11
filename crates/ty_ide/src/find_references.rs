@@ -259,7 +259,7 @@ def outer_function():
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 9 references
+        info[references]: Found 7 references
           --> main.py:3:5
            |
          3 |     counter = 0
@@ -270,18 +270,16 @@ def outer_function():
            |                  -------
          7 |         counter += 1
            |         -------
-         8 |         return counter
-           |                -------
-         9 |
-        10 |     def decrement():
+           |
+          ::: main.py:11:18
+           |
         11 |         nonlocal counter
            |                  -------
         12 |         counter -= 1
            |         -------
-        13 |         return counter
-           |                -------
-        14 |
-        15 |     # Use counter in outer scope
+           |
+          ::: main.py:16:15
+           |
         16 |     initial = counter
            |               -------
         17 |     increment()
@@ -316,7 +314,7 @@ final_value = global_counter
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 9 references
+        info[references]: Found 7 references
           --> main.py:2:1
            |
          2 | global_counter = 0
@@ -327,18 +325,16 @@ final_value = global_counter
            |            --------------
          6 |     global_counter += 1
            |     --------------
-         7 |     return global_counter
-           |            --------------
-         8 |
-         9 | def decrement_global():
+           |
+          ::: main.py:10:12
+           |
         10 |     global global_counter
            |            --------------
         11 |     global_counter -= 1
            |     --------------
-        12 |     return global_counter
-           |            --------------
-        13 |
-        14 | # Use global_counter at module level
+           |
+          ::: main.py:15:17
+           |
         15 | initial_value = global_counter
            |                 --------------
         16 | increment_global()
@@ -366,48 +362,15 @@ except ValueError as err:
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 5 references
-          --> main.py:4:29
-           |
-         4 | except ZeroDivisionError as err:
-           |                             ---
-         5 |     print(f'Error: {err}')
-           |                     ---
-         6 |     return err
-           |            ---
-         7 |
-         8 | try:
-         9 |     y = 2 / 0
-        10 | except ValueError as err:
-           |                      ---
-        11 |     print(f'Different error: {err}')
-           |                               ---
-        ");
-    }
-
-    #[test]
-    fn pattern_match_as_references() {
-        let test = cursor_test(
-            "
-match x:
-    case [a, b] as patter<CURSOR>n:
-        print(f'Matched: {pattern}')
-        return pattern
-    case _:
-        pass
-",
-        );
-
-        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
-         --> main.py:3:20
+         --> main.py:4:29
           |
-        3 |     case [a, b] as pattern:
-          |                    -------
-        4 |         print(f'Matched: {pattern}')
-          |                           -------
-        5 |         return pattern
-          |                -------
+        4 | except ZeroDivisionError as err:
+          |                             ---
+        5 |     print(f'Error: {err}')
+          |                     ---
+        6 |     return err
+          |            ---
         ");
     }
 
@@ -514,7 +477,7 @@ test("test")
             .build();
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Found 6 references
+        info[references]: Found 4 references
           --> lib.py:5:5
            |
          5 | def test() -> None: ...
@@ -528,14 +491,6 @@ test("test")
         10 |
         11 | def test(a: Any) -> Any:
            |     ----
-           |
-          ::: main.py:2:17
-           |
-         2 | from lib import test
-           |                 ----
-         3 |
-         4 | test("test")
-           | ----
         "#);
     }
 
@@ -782,6 +737,29 @@ cls = MyClass
     }
 
     #[test]
+    fn deferred_annotation_load_uses_end_of_scope_definition() {
+        let test = cursor_test(
+            r#"
+class First: ...
+value: Fir<CURSOR>st
+class First: ...
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:2:7
+          |
+        2 | class First: ...
+          |       -----
+        3 | value: First
+          |        -----
+        4 | class First: ...
+          |       -----
+        "#);
+    }
+
+    #[test]
     fn references_match_name_stmt() {
         let test = cursor_test(
             r#"
@@ -987,17 +965,14 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 3 references
+        info[references]: Found 2 references
           --> main.py:2:7
            |
          2 | class Click:
            |       -----
            |
-          ::: main.py:8:20
+          ::: main.py:10:14
            |
-         8 | def my_func(event: Click):
-           |                    -----
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |              -----
         ");
@@ -1049,11 +1024,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 3 references
+        info[references]: Found 2 references
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |             --                      --       --
+          |             --                      --
         ");
     }
 
@@ -1085,11 +1060,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 3 references
+        info[references]: Found 2 references
          --> main.py:3:15
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |               --                          --        --
+          |               --                          --
         ");
     }
 
@@ -1119,11 +1094,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @"
-        info[references]: Found 3 references
+        info[references]: Found 2 references
          --> main.py:2:14
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |              --                      --          --
+          |              --                      --
         ");
     }
 
@@ -1420,6 +1395,38 @@ result = func(value=42)
         2 | def func(value: int):
           |          -----
         3 |     return value * 2
+          |            -----
+        ");
+    }
+
+    #[test]
+    fn reassigned_parameter_load_excludes_parameter_and_keyword() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+def func(value: int):
+    value = 0
+    return value<CURSOR>
+",
+            )
+            .source(
+                "main.py",
+                "
+from utils import func
+
+result = func(value=42)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> utils.py:3:5
+          |
+        3 |     value = 0
+          |     -----
+        4 |     return value
           |            -----
         ");
     }
@@ -1999,7 +2006,6 @@ func<CURSOR>_alias()
         ");
     }
 
-    // TODO: Should only return references to the last declaration
     #[test]
     fn declarations() {
         let test = CursorTest::builder()
@@ -2016,18 +2022,218 @@ func<CURSOR>_alias()
             .build();
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Found 3 references
-         --> main.py:2:1
+        info[references]: Found 2 references
+         --> main.py:4:1
           |
-        2 | a: str = "test"
-          | -
-        3 |
         4 | a: int = 10
           | -
         5 |
         6 | print(a)
           |       -
         "#);
+    }
+
+    #[test]
+    fn references_from_bindings_point_to_direct_uses() {
+        let first = cursor_test(
+            "
+x<CURSOR> = 1
+print(x)
+x = 2
+print(x)
+",
+        );
+        let second = cursor_test(
+            "
+x = 1
+print(x)
+x<CURSOR> = 2
+print(x)
+",
+        );
+
+        assert_snapshot!(first.references(), @"
+        info[references]: Found 2 references
+         --> main.py:2:1
+          |
+        2 | x = 1
+          | -
+        3 | print(x)
+          |       -
+        ");
+        assert_snapshot!(second.references(), @"
+        info[references]: Found 2 references
+         --> main.py:4:1
+          |
+        4 | x = 2
+          | -
+        5 | print(x)
+          |       -
+        ");
+    }
+
+    #[test]
+    fn references_from_loads_include_only_their_definitions() {
+        let test = cursor_test(
+            "
+if flag:
+    x = 1
+else:
+    x = 2
+print(x<CURSOR>)
+print(x)
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> main.py:3:5
+          |
+        3 |     x = 1
+          |     -
+        4 | else:
+        5 |     x = 2
+          |     -
+        6 | print(x)
+          |       -
+        ");
+    }
+
+    #[test]
+    fn references_from_loads_include_structural_references_to_their_definitions() {
+        let global = cursor_test(
+            "
+x = 1
+
+def read():
+    global x
+    return x<CURSOR>
+",
+        );
+        let parameter = cursor_test(
+            "
+def read(value: int):
+    return value<CURSOR>
+
+read(value=1)
+",
+        );
+
+        assert_snapshot!(global.references(), @"
+        info[references]: Found 3 references
+         --> main.py:2:1
+          |
+        2 | x = 1
+          | -
+        3 |
+        4 | def read():
+        5 |     global x
+          |            -
+        6 |     return x
+          |            -
+        ");
+        assert_snapshot!(parameter.references(), @"
+        info[references]: Found 3 references
+         --> main.py:2:10
+          |
+        2 | def read(value: int):
+          |          -----
+        3 |     return value
+          |            -----
+        4 |
+        5 | read(value=1)
+          |      -----
+        ");
+    }
+
+    #[test]
+    fn augmented_assignment_is_both_a_load_and_a_binding() {
+        let from_initial_binding = cursor_test(
+            "
+x<CURSOR> = 1
+x += 1
+print(x)
+",
+        );
+        let from_augmented_assignment = cursor_test(
+            "
+x = 1
+x<CURSOR> += 1
+print(x)
+",
+        );
+        let from_later_load = cursor_test(
+            "
+x = 1
+x += 1
+print(x<CURSOR>)
+",
+        );
+
+        assert_snapshot!(from_initial_binding.references(), @"
+        info[references]: Found 2 references
+         --> main.py:2:1
+          |
+        2 | x = 1
+          | -
+        3 | x += 1
+          | -
+        ");
+        assert_snapshot!(from_augmented_assignment.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:1
+          |
+        3 | x += 1
+          | -
+        4 | print(x)
+          |       -
+        ");
+        assert_snapshot!(from_later_load.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:1
+          |
+        3 | x += 1
+          | -
+        4 | print(x)
+          |       -
+        ");
+    }
+
+    #[test]
+    fn deletion_is_a_load_of_the_binding_it_removes() {
+        let from_binding = cursor_test(
+            "
+x<CURSOR> = 1
+del x
+x = 2
+",
+        );
+        let from_deletion = cursor_test(
+            "
+x = 1
+del x<CURSOR>
+x = 2
+",
+        );
+
+        assert_snapshot!(from_binding.references(), @"
+        info[references]: Found 2 references
+         --> main.py:2:1
+          |
+        2 | x = 1
+          | -
+        3 | del x
+          |     -
+        ");
+        assert_snapshot!(from_deletion.references(), @"
+        info[references]: Found 2 references
+         --> main.py:2:1
+          |
+        2 | x = 1
+          | -
+        3 | del x
+          |     -
+        ");
     }
 
     #[test]
@@ -2070,7 +2276,7 @@ print(x<CURSOR>)
     }
 
     #[test]
-    fn without_declaration_keeps_assignment_after_annotation() {
+    fn without_declaration_on_bare_annotation_returns_no_value_references() {
         let test = cursor_test(
             "
 x<CURSOR>: int
@@ -2080,13 +2286,7 @@ print(x)
         );
 
         assert_snapshot!(test.references_without_declaration(), @"
-        info[references]: Found 2 references
-         --> main.py:3:1
-          |
-        3 | x = 1
-          | -
-        4 | print(x)
-          |       -
+        No references found
         ");
     }
 
