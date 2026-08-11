@@ -955,7 +955,18 @@ impl<'db> UseDefMap<'db> {
         self.all_definitions.get(id).state()
     }
 
-    /// Returns the position of a binding or declaration within its containing scope.
+    /// Returns the scope-local insertion-order ID of a binding or declaration.
+    ///
+    /// [`ScopedDefinitionId`] indexes the append-only sequence of definition states for one scope.
+    /// Bindings, declarations, deletions, and synthesized definitions share this increasing
+    /// sequence, so comparing two IDs says which state the semantic index recorded first. This is
+    /// semantic-index visitation order, not necessarily source order or execution order: evaluation
+    /// order can differ from source order, mutually exclusive branches are visited consecutively,
+    /// and synthesized definitions are inserted where needed. IDs are meaningful only within the
+    /// same scope.
+    ///
+    /// The supplied definition must belong to this map's scope. Returns `None` if it is absent
+    /// from its place's reachable bindings and declarations.
     pub fn definition_order(
         &self,
         db: &'db dyn Db,
