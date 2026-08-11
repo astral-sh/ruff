@@ -4088,11 +4088,21 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
+        // Expression inference can temporarily substitute a cycle placeholder for every
+        // subexpression. `None` has a stable type regardless of that cycle, so preserve it when
+        // deriving comparison constraints for recursively inferred attributes.
+        let expression_type = |expr: &ast::Expr, env: &ProgramEnvironment<'db>| {
+            if expr.is_none_literal_expr() {
+                Type::none(db, env)
+            } else {
+                inference.expression_type(expr)
+            }
+        };
         let mut last_rhs_ty: Option<Type> = None;
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
-            let rhs_ty = inference.expression_type(right);
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| expression_type(left, &self.env));
+            let rhs_ty = expression_type(right, &self.env);
             let lhs_narrowing_rhs_ty = if matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn) {
                 self.inline_membership_rhs_type(right, inference)
                     .unwrap_or(rhs_ty)
