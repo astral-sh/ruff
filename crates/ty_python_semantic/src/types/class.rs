@@ -111,7 +111,7 @@ fn dynamic_class_header_range<'db>(
 }
 
 bitflags::bitflags! {
-    /// Properties that affect the representation of instances of a class.
+    /// Properties shared by all instances of a class.
     ///
     /// This combines properties derived from the MRO into the existing class-classification
     /// query, avoiding a separate cached query for each property.
@@ -121,6 +121,10 @@ bitflags::bitflags! {
         const TYPED_DICT = 1 << 0;
         /// The class directly or indirectly inherits from an explicit `Any` base.
         const INHERITS_FROM_EXPLICIT_ANY = 1 << 1;
+        /// The class may define or inherit a custom `__getattribute__` method.
+        const HAS_CUSTOM_GETATTRIBUTE = 1 << 2;
+        /// An unknown base may provide an attribute-interception method.
+        const HAS_DYNAMIC_GETATTRIBUTE = 1 << 3;
     }
 }
 
@@ -610,7 +614,7 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
-    /// Return the properties that affect how instances of this class are represented.
+    /// Return the properties shared by all instances of this class.
     fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         match self {
             Self::Static(literal) => literal.instance_flags(db),
@@ -636,6 +640,28 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
         self.instance_flags(db)
             .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
+    }
+
+    /// Return whether this class may override Python's default attribute lookup.
+    ///
+    /// Dynamically constructed classes are checked conservatively because their namespaces are
+    /// not represented by a static class-body scope.
+    pub(super) fn has_custom_getattribute(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Static(class) => class
+                .instance_flags(db)
+                .contains(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE),
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicTypedDict(_)
+            | Self::DynamicEnum(_) => true,
+        }
+    }
+
+    /// Return whether an unknown base might provide an attribute-interception method.
+    pub(super) fn has_dynamic_getattribute(self, db: &'db dyn Db) -> bool {
+        self.instance_flags(db)
+            .contains(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE)
     }
 
     /// Returns the metaclass of this class.

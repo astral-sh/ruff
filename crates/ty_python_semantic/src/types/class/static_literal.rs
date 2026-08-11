@@ -867,8 +867,42 @@ impl<'db> StaticClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    /// Return the properties that affect how instances of this class are represented.
+    /// Return the properties shared by all instances of this class.
     pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+        fn has_own_custom_getattribute<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> bool {
+            if matches!(class.known(db), Some(KnownClass::Object | KnownClass::Type)) {
+                return false;
+            }
+
+            if place_table(db, class.body_scope(db))
+                .symbol_id("__getattribute__")
+                .is_some()
+            {
+                return true;
+            }
+
+            if !class.has_explicit_metaclass(db) {
+                return false;
+            }
+
+            let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
+                return true;
+            };
+
+            metaclass.iter_mro(db).any(|base| match base {
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                ClassBase::Class(base) => base.static_class_literal(db).is_none_or(|(base, _)| {
+                    implicit_attribute_names(db, base.body_scope(db))
+                        .binary_search_by(|name| name.as_str().cmp("__getattribute__"))
+                        .is_ok()
+                }),
+                ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
+            })
+        }
+
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
@@ -886,20 +920,40 @@ impl<'db> StaticClassLiteral<'db> {
                 if base.is_explicit_any_base() {
                     flags.insert(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY);
                 }
+                if match base {
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                        flags.insert(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE);
+                        false
+                    }
+                    ClassBase::Class(class) => class
+                        .static_class_literal(db)
+                        .is_none_or(|(class, _)| has_own_custom_getattribute(db, class)),
+                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
+                } {
+                    flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
+                }
             }
             flags
         }
 
         if let Some(known) = self.known(db) {
-            return if known.is_typed_dict_subclass() {
+            let mut flags = if known.is_typed_dict_subclass() {
                 ClassInstanceFlags::TYPED_DICT
             } else {
                 ClassInstanceFlags::empty()
             };
+            if has_own_custom_getattribute(db, self) {
+                flags.insert(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE);
+            }
+            return flags;
         }
 
         if !self.has_explicit_bases(db) {
-            return ClassInstanceFlags::empty();
+            return if has_own_custom_getattribute(db, self) {
+                ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE
+            } else {
+                ClassInstanceFlags::empty()
+            };
         }
         instance_flags_inner(db, self)
     }

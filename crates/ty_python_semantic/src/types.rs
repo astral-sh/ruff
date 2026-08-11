@@ -6598,6 +6598,43 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return whether a custom `__getattribute__` could affect this lookup.
+    ///
+    /// Reusing the class's existing MRO classification avoids interning a member-lookup key just
+    /// to determine whether an override exists. An unknown base can still intercept a missing
+    /// attribute or bypass a failing descriptor, but cannot invalidate a definitely defined member.
+    fn custom_getattribute_may_affect_lookup(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        result: MemberLookupResult<'db>,
+    ) -> bool {
+        let Some(class) = self.nominal_class(db, env).or_else(|| {
+            self.to_meta_type(db, env)
+                .to_instance_approximation(db, env)
+                .and_then(|instance| instance.nominal_class(db, env))
+        }) else {
+            return true;
+        };
+
+        let class = class.class_literal(db);
+        if class.has_custom_getattribute(db) {
+            return true;
+        }
+
+        if !class.has_dynamic_getattribute(db) {
+            return false;
+        }
+
+        !matches!(
+            result,
+            Ok(PlaceAndQualifiers {
+                place: Place::Defined(place),
+                ..
+            }) if place.is_definitely_defined()
+        )
+    }
+
     /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
     ///
     /// A custom `__getattribute__` can intercept even an always-defined normal lookup result.
@@ -6639,14 +6676,13 @@ impl<'db> Type<'db> {
             }
         };
 
-        // This lookup is shared by every attribute on the receiver. Only create the requested
-        // name's literal type and check the call when an override actually exists.
         let getattribute_policy = MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
             | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK;
-        if self
-            .class_member_with_policy(db, env, "__getattribute__", getattribute_policy)
-            .place
-            .is_undefined()
+        if !self.custom_getattribute_may_affect_lookup(db, env, result)
+            || self
+                .class_member_with_policy(db, env, "__getattribute__", getattribute_policy)
+                .place
+                .is_undefined()
         {
             return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
         }
