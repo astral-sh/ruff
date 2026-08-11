@@ -4264,20 +4264,8 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain = Self::instance_lookup_class_member_with_policy(db, env, key);
-        // A TypeVar retains its class identity when lookup is delegated to its bound, including
-        // after narrowing. Narrowing can also add an unrelated class to a mixin's `Self`, in which
-        // case the TypeVar alone is not a valid owner for descriptors from that class.
-        let owner = match receiver {
-            Type::TypeVar(_) => receiver,
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .copied()
-                .find(|element| element.is_type_var() && element.is_subtype_of(db, env, key.ty(db)))
-                .unwrap_or(key.ty(db)),
-            _ => key.ty(db),
-        }
-        .to_meta_type(db, env);
+        // Preserve the receiver's type variables and all its narrowed class constraints.
+        let owner = receiver.to_meta_type(db, env);
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -7312,13 +7300,19 @@ impl<'db> Type<'db> {
                 SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
             }
             Type::Divergent(_) => self,
-            // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                     alternatives.to_meta_type(db, env)
                 } else {
-                    SubclassOfType::try_from_type(db, env, todo_type!("Intersection meta-type"))
-                        .expect("Type::Todo should be a valid `SubclassOfInner`")
+                    // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
+                    // still has meta-type `type[int]`. Pure negations are bounded by `object`.
+                    IntersectionType::from_elements(
+                        db,
+                        env,
+                        intersection
+                            .positive_elements_or_object(db)
+                            .map(|positive| positive.to_meta_type(db, env)),
+                    )
                 }
             }
             Type::EnumComplement(complement) => complement
