@@ -19,6 +19,8 @@ use crate::{
 };
 use ty_python_core::definition::Definition;
 
+const MAX_INTERSECTION_CALLABLE_ALTERNATIVES: usize = 64;
+
 impl<'db> Type<'db> {
     /// Create a callable type with a single non-overloaded signature.
     pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
@@ -312,6 +314,19 @@ impl<'db> Type<'db> {
                         intersection_callables = Some(match intersection_callables {
                             None => positive_callables,
                             Some(previous_callables) => {
+                                // Independent constructor alternatives can otherwise double for
+                                // every class in an intersection.
+                                if previous_callables
+                                    .as_slice()
+                                    .len()
+                                    .checked_mul(positive_callables.as_slice().len())
+                                    .is_none_or(|count| {
+                                        count > MAX_INTERSECTION_CALLABLE_ALTERNATIVES
+                                    })
+                                {
+                                    return None;
+                                }
+
                                 // Each combination is one overloaded callable; separate
                                 // combinations remain separate union alternatives.
                                 let mut combined_callables = SmallVec::new();

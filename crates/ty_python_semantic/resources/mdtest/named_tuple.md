@@ -1469,9 +1469,8 @@ represents `NamedTuple`:
 
 ```py
 from collections.abc import Callable
-from typing import TypeVar
 
-NamedTupleT = TypeVar("NamedTupleT", bound=typing.NamedTuple)
+NamedTupleT = typing.TypeVar("NamedTupleT", bound=typing.NamedTuple)
 
 def accepts_callable(callback: Callable[..., object]) -> None: ...
 def named_tuple_class_is_callable(cls: type[NamedTupleT]) -> None:
