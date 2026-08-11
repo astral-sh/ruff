@@ -427,8 +427,8 @@ x = MyBits()
 ~x  # error: [deprecated] "MyBits `~` support is broken"
 ```
 
-`bool.__invert__` is one such case in typeshed.
-This applies both to `bool` literals and to arbitrary values of type `bool`.
+`bool.__invert__` is one such case in typeshed. This applies both to `bool` literals and to
+arbitrary values of type `bool`.
 
 ```py
 ~True  # error: [deprecated]
