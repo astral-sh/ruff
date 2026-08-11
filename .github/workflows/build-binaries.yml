@@ -265,7 +265,7 @@ jobs:
 
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'depot-ubuntu-24.04-8' || 'depot-ubuntu-24.04-4' }}
     strategy:
       matrix:
         target:
@@ -335,7 +335,7 @@ jobs:
 
   linux-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: depot-ubuntu-24.04-arm-4
+    runs-on: depot-ubuntu-24.04-arm-8
     env:
       # see https://github.com/astral-sh/ruff/issues/3791
       # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
