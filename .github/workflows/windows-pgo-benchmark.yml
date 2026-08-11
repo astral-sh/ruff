@@ -1,0 +1,109 @@
+name: "Benchmark Windows PGO"
+
+on:
+  push:
+    branches:
+      - charlie/ruff-windows-pgo-benchmark
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  windows-pgo:
+    name: "Benchmark production Windows binaries"
+    runs-on: namespace-profile-windows-2022-x86-64-16x32
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: "Check out benchmark harness"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Set up Python"
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: "Download production baseline"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          run-id: 31400849675
+          name: artifacts-x86_64-pc-windows-msvc
+          path: ${{ runner.temp }}/ruff-pgo-bench/artifacts/baseline
+      - name: "Download production PGO binary"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          run-id: 31400850157
+          name: artifacts-x86_64-pc-windows-msvc
+          path: ${{ runner.temp }}/ruff-pgo-bench/artifacts/pgo
+      - name: "Verify production archive and executable hashes"
+        run: |
+          $expected = [ordered]@{
+            baseline = @{
+              archive = "7a83a402d64091e1440a28106c4fe91d336a46a66cbacc137738ceb6137d703c"
+              binary = "122b99dffbb9b305c523cd205096c61906c444292ea1ceca3c2b483e46c5d278"
+            }
+            pgo = @{
+              archive = "34ba39a0dde08a63f1a3ab64aec86fb8e51cd6c81b962502ac6662a97be6feb0"
+              binary = "ca0ad199c5bebf6b681a92025d161f87d578f060df98ce1f3bd7c401feabec2d"
+            }
+          }
+
+          foreach ($variant in $expected.Keys) {
+            $directory = Join-Path $env:RUNNER_TEMP "ruff-pgo-bench/artifacts/$variant"
+            $archive = Join-Path $directory "ruff-x86_64-pc-windows-msvc.zip"
+            $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($archiveHash -ne $expected[$variant].archive) {
+              throw "Unexpected $variant archive SHA-256: $archiveHash"
+            }
+
+            $destination = Join-Path $env:RUNNER_TEMP "ruff-pgo-bench/verified/$variant"
+            Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
+            $binary = Join-Path $destination "ruff.exe"
+            $binaryHash = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($binaryHash -ne $expected[$variant].binary) {
+              throw "Unexpected $variant executable SHA-256: $binaryHash"
+            }
+
+            Write-Output "$variant executable: $binaryHash"
+          }
+      - name: "Benchmark pinned held-out projects"
+        timeout-minutes: 30
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "ruff-pgo-bench"
+          $arguments = @(
+            "scripts/benchmark_windows_pgo.py"
+            "--baseline", (Join-Path $root "verified/baseline")
+            "--pgo", (Join-Path $root "verified/pgo")
+            "--workspace", (Join-Path $root "work")
+            "--json-output", (Join-Path $root "results.json")
+            "--markdown-output", (Join-Path $root "results.md")
+            "--pairs", "16"
+            "--warmups", "2"
+          )
+          python @arguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows PGO benchmark failed with exit code $LASTEXITCODE"
+          }
+      - name: "Publish benchmark summary"
+        if: ${{ always() }}
+        run: |
+          $summary = Join-Path $env:RUNNER_TEMP "ruff-pgo-bench/results.md"
+          if (Test-Path -LiteralPath $summary -PathType Leaf) {
+            Get-Content -LiteralPath $summary -Raw |
+              Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          }
+      - name: "Upload benchmark results"
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-pgo-benchmark-results
+          path: |
+            ${{ runner.temp }}/ruff-pgo-bench/results.json
+            ${{ runner.temp }}/ruff-pgo-bench/results.md
+          if-no-files-found: warn
+          retention-days: 7
