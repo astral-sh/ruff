@@ -10761,10 +10761,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .ignore_possibly_undefined()
                     {
                         self.check_deprecated(unary, dunder);
-                        Type::int_literal(!i64::from(value))
-                    } else {
-                        fallback_unary_expression_type()
                     }
+                    Type::int_literal(!i64::from(value))
                 }
                 _ => fallback_unary_expression_type(),
             },
