@@ -525,7 +525,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.cycle_recovery
     }
 
-    fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
+    /// Returns the definition whose expressions are currently being inferred.
+    ///
+    /// A type-variable binding context can identify a more specific active definition than the
+    /// surrounding inference region, so prefer it when one is available.
+    fn current_definition(&self) -> Option<Definition<'db>> {
         self.typevar_binding_context.or(match self.region {
             InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
                 Some(definition)
@@ -9786,7 +9790,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             PlaceLoadMode::Deferred {
                 expression: expr_ref,
                 definition_order: self
-                    .recursive_type_expression_definition()
+                    .current_definition()
                     .filter(|definition| definition.scope(db) == scope)
                     .and_then(|definition| use_def.definition_order(db, definition)),
             }
