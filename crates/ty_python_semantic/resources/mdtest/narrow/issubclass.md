@@ -280,6 +280,63 @@ def f(x: type[int | str | bytes | range]):
         reveal_type(x)  # revealed: <class 'range'>
 ```
 
+## Narrowing with generic classes
+
+### Strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+Without a known specialization, narrowing to a generic class uses the top materialization:
+
+```py
+def _(cls: type) -> None:
+    if issubclass(cls, list):
+        reveal_type(cls)  # revealed: type[Top[list[Unknown]]]
+        reveal_type(cls())  # revealed: Top[list[Unknown]]
+```
+
+When narrowing from a generic superclass to a generic subclass, we intersect with the top
+materialization of the subclass:
+
+```py
+from typing import Sequence
+
+def narrow_sequence_to_list(cls: type[Sequence[int]]) -> None:
+    if issubclass(cls, list):
+        reveal_type(cls)  # revealed: type[Sequence[int]] & type[Top[list[Unknown]]]
+        reveal_type(cls())  # revealed: Sequence[int] & Top[list[Unknown]]
+```
+
+### Gradual mode
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+Without a known specialization, narrowing to a generic class leaves its type argument unknown.
+
+```py
+def _(cls: type) -> None:
+    if issubclass(cls, list):
+        reveal_type(cls)  # revealed: type[list[Unknown]]
+        reveal_type(cls())  # revealed: list[Unknown]
+```
+
+Narrowing to a generic subclass preserves the specialized base class's type argument.
+
+```py
+from typing import Sequence
+
+def _(cls: type[Sequence[int]]) -> None:
+    if issubclass(cls, list):
+        reveal_type(cls)  # revealed: type[list[int]]
+        reveal_type(cls())  # revealed: list[int]
+```
+
 ## `classinfo` is a generic final class
 
 ```toml

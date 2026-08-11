@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_semantic"
-version = "0.0.7"
+version = "0.0.8"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }

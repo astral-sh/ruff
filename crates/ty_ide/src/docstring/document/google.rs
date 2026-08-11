@@ -686,12 +686,18 @@ impl<'a> ItemLine<'a> {
         item_indent: TextSize,
     ) -> bool {
         // More deeply indented lines are unambiguously part of the current item.
-        line_indent > item_indent
-            // Although the style guide suggests indenting continuation lines,
-            // aligned parameter prose is common in practice.
-            || (line_indent == item_indent && section_kind.is_parameter_section())
-            // Aligned URLs and paths are continuations despite resembling item headers.
-            || (line_indent == item_indent && self.is_item_like_continuation)
+        if line_indent > item_indent {
+            return true;
+        }
+
+        // Although the style guide suggests indenting continuation lines,
+        // aligned parameter prose is common in practice.
+        if line_indent == item_indent && section_kind.is_parameter_section() {
+            return true;
+        }
+
+        // Aligned URLs and paths are continuations despite resembling item headers.
+        line_indent == item_indent && self.is_item_like_continuation
     }
 
     fn classify(
@@ -848,14 +854,14 @@ fn split_once_at_field_delimiter(line: &str) -> Option<(&str, &str)> {
 /// :exc:`ValueError`
 /// ```
 fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
-    let Some(InlineMarkupToken::RestPrefixRole { span, .. }) =
+    let Some(InlineMarkupToken::RestPrefixRole(role)) =
         InlineMarkupScanner::new(cursor.as_str()).next()
     else {
         return false;
     };
 
     // Resume delimiter scanning after the closing backtick in e.g., `` :exc:`ValueError` ``.
-    cursor.skip_bytes(span.end().to_usize());
+    cursor.skip_bytes(role.span().end().to_usize());
     true
 }
 

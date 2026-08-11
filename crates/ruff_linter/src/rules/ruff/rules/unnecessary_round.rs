@@ -225,5 +225,5 @@ fn unwrap_round_call(
             rounded_expr.to_string()
         };
 
-    Edit::range_replacement(new_content, call.range)
+    Edit::range_replacement(new_content, call.range())
 }

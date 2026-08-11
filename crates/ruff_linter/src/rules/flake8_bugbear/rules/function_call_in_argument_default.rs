@@ -72,10 +72,15 @@ impl Violation for FunctionCallInDefaultArgument {
     fn message(&self) -> String {
         if let Some(name) = &self.name {
             format!(
-                "Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable"
+                "Do not perform function call `{name}` in argument defaults; \
+                instead, perform the call within the function, \
+                or read the default from a module-level singleton variable"
             )
         } else {
-            "Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable".to_string()
+            "Do not perform function call in argument defaults; \
+                instead, perform the call within the function, \
+                or read the default from a module-level singleton variable"
+                .to_string()
         }
     }
 }

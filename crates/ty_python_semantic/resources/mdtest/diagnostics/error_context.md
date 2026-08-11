@@ -819,6 +819,33 @@ help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types
 help: Consider using `Mapping[..]` instead of `dict[..]`.
 ```
 
+Assigning an open `TypedDict` to a specialized `Mapping`:
+
+```py
+from collections.abc import Mapping
+from typing import TypedDict
+
+class D(TypedDict):
+    a: int
+    b: int
+
+def f(d: D) -> Mapping[str, int]:
+    return d  # snapshot
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:40:12
+   |
+39 | def f(d: D) -> Mapping[str, int]:
+   |                ----------------- Expected `Mapping[str, int]` because of return type
+40 |     return d  # snapshot
+   |            ^ expected `Mapping[str, int]`, found `D`
+info: TypedDict `D` is not assignable to `Mapping[str, int]`
+help: `D` would be assignable to this `Mapping` type if it were declared with `closed=True`, but TypedDicts are open by default.
+help: A subclass of `D` could validly add a new field of an arbitrary type, violating subtyping with the `Mapping` type
+```
+
 ## Generic `TypedDict` field conflicts in overload diagnostics
 
 A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. The

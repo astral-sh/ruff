@@ -82,7 +82,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ISINSTANCE_AGAINST_TYPED_DICT);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
+    registry.register_lint(&UNSOUND_RETURN_STATEMENT);
     registry.register_lint(&INVALID_YIELD);
+    registry.register_lint(&UNSOUND_YIELD);
     registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
@@ -427,11 +429,30 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[expect(clippy::doc_link_with_quotes)]
+    #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
+    pub(crate) static UNSOUND_RETURN_STATEMENT = {
+        summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/invalid-yield.md")]
     pub(crate) static INVALID_YIELD = {
         summary: "detects yield expressions where the \"yield\" or \"send\" type is incompatible with the annotated return type",
         status: LintStatus::stable("0.0.25"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
+    pub(crate) static UNSOUND_YIELD = {
+        summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
+        status: LintStatus::stable("0.0.70"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1522,7 +1543,8 @@ fn covariant_supertype_hint<'db>(
             ),
             [1],
         ) => Some(
-            "Consider using the supertype `collections.abc.Mapping`, which is covariant in its value type",
+            "Consider using the supertype `collections.abc.Mapping`, \
+            which is covariant in its value type",
         ),
         _ => None,
     }
@@ -1658,13 +1680,15 @@ pub(super) fn report_invalid_assignment<'db>(
         match target_ty {
             Type::ClassLiteral(class) => {
                 diag.info(format_args!(
-                    "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
+                    "Implicit shadowing of class `{}`. \
+                    Add an annotation to make it explicit if this is intentional",
                     class.name(context.db()),
                 ));
             }
             Type::FunctionLiteral(function) => {
                 diag.info(format_args!(
-                    "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
+                    "Implicit shadowing of function `{}`. \
+                    Add an annotation to make it explicit if this is intentional",
                     function.name(context.db()),
                 ));
             }
@@ -1737,6 +1761,99 @@ pub(super) fn report_invalid_attribute_assignment(
 
     let error_context = source_ty.assignability_error_context(db, env, target_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+/// Reports an invalid implicit call to a descriptor's `__get__` method.
+pub(super) fn report_bad_dunder_get_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    descriptor_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+    if let Some(property) = failure.as_attempt_to_get_property_with_no_getter() {
+        let Some(builder) = context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) else {
+            return;
+        };
+        let object_type = object_type.display(db, env);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Cannot read property `{attribute}` \
+            on object of type `{object_type}` \
+            because it has no getter",
+        ));
+        if let Some(file_range) = property
+            .setter(db)
+            .and_then(|setter| setter.definition(db, env))
+            .or_else(|| {
+                property
+                    .deleter(db)
+                    .and_then(|deleter| deleter.definition(db, env))
+            })
+            .and_then(|definition| definition.focus_range(db))
+        {
+            diagnostic.annotate(Annotation::secondary(Span::from(file_range)).message(
+                format_args!("Property `{object_type}.{attribute}` defined here with no getter"),
+            ));
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Attempted access to `{object_type}.{attribute}` here"
+            ));
+        }
+    } else {
+        failure.report_diagnostics_with_override(
+            context,
+            target.into(),
+            &CallDiagnosticOverride {
+                lint: &INVALID_ATTRIBUTE_ACCESS,
+                message: format!(
+                    "Invalid access to descriptor attribute `{attribute}` on type `{}`",
+                    object_type.display(db, env),
+                ),
+                info: &format!(
+                    "This access implicitly calls `__get__` on a descriptor of type `{}`",
+                    descriptor_type.display(db, env),
+                ),
+                argument_ranges: &[target.range(), target.value.range(), target.value.range()],
+            },
+        );
+    }
+}
+
+/// Reports an invalid implicit `__getattr__` call at the original attribute access.
+///
+/// ```python
+/// class C:
+///     def __getattr__(self) -> int: ...
+///
+/// C().missing  # Invalid: Python passes the attribute name to __getattr__.
+/// ```
+///
+/// Preserves the underlying call diagnostic and explains why attribute access invoked the method.
+pub(super) fn report_bad_dunder_getattr_call<'db>(
+    context: &InferContext<'db, '_>,
+    failure: &CallError<'db>,
+    object_type: Type<'db>,
+    target: &ast::ExprAttribute,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let attribute = target.attr.as_str();
+
+    failure.report_diagnostics_with_override(
+        context,
+        target.into(),
+        &CallDiagnosticOverride {
+            lint: &INVALID_ATTRIBUTE_ACCESS,
+            message: format!(
+                "Invalid access to attribute `{attribute}` on type `{}`",
+                object_type.display(db, env),
+            ),
+            info: "This access implicitly calls `__getattr__`",
+            argument_ranges: &[target.range()],
+        },
+    );
 }
 
 pub(super) fn report_bad_dunder_set_call<'db>(
@@ -1857,7 +1974,8 @@ pub(super) fn report_bad_dunder_delattr_call(
     ));
     if binding_error {
         diagnostic.info(format_args!(
-            "Type `{}` has a `__delattr__` method, but it cannot be called with the expected arguments",
+            "Type `{}` has a `__delattr__` method, \
+            but it cannot be called with the expected arguments",
             object_type.display(db, env)
         ));
         diagnostic.info(
@@ -1899,6 +2017,53 @@ pub(super) fn report_invalid_return_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_return_statement(
+    context: &InferContext,
+    object_range: impl Ranged,
+    return_type_range: impl Ranged,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_RETURN_STATEMENT, object_range) else {
+        return;
+    };
+
+    let env = &context.program_environment();
+
+    // `TypeIs`-annotated functions are expected to return `bool`;
+    // this needs to be normalized before we figure out the error context
+    // and before we display the types.
+    let expected_ty = match expected_ty.resolve_type_alias(db) {
+        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
+        _ => expected_ty,
+    };
+
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+
+    let mut diag = builder.into_diagnostic("Unsound return statement");
+    let actual_ty_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_ty_display = expected_ty.display_with(db, env, settings);
+
+    diag.set_concise_message(format_args!(
+        "Unsound return statement: `{actual_ty_display}` is not a subtype \
+        of `{expected_ty_display}`"
+    ));
+    diag.set_primary_annotation_message(format_args!("Inferred as `{actual_ty_display}`"));
+    diag.annotate(context.secondary(return_type_range).message(format_args!(
+        "Expected a subtype of `{expected_ty_display}` because of the return type",
+    )));
+
+    diag.info(format_args!(
+        "`{actual_ty_display}` is assignable to `{expected_ty_display}`, \
+        but not a subtype of `{expected_ty_display}`",
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diag);
+    diag.help("Consider using an `assert` to narrow the type prior to the `return` statement");
 }
 
 pub(super) fn report_invalid_generator_function_return_type(
@@ -1968,14 +2133,16 @@ pub(super) fn report_invalid_generator_yield_type(
             "yield",
             "Yield expression type does not match annotation",
             format!(
-                "Yield type `{actual_display}` does not match annotated yield type `{expected_display}`"
+                "Yield type `{actual_display}` does not match annotated yield type \
+                `{expected_display}`"
             ),
         ),
         GeneratorMismatchKind::SendType => (
             "send",
             "Send type does not match annotation",
             format!(
-                "Send type `{actual_display}` does not match annotated send type `{expected_display}`"
+                "Send type `{actual_display}` does not match annotated send type \
+                `{expected_display}`"
             ),
         ),
     };
@@ -2000,6 +2167,78 @@ pub(super) fn report_invalid_generator_yield_type(
 
     let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
     error_context.attach_to(db, env, &mut diag);
+}
+
+pub(super) fn report_unsound_yield(
+    context: &InferContext,
+    yield_value: impl Ranged,
+    kind: YieldKind,
+    return_type_span: Option<Span>,
+    expected_ty: Type,
+    actual_ty: Type,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&UNSOUND_YIELD, yield_value) else {
+        return;
+    };
+
+    let env = context.program_environment();
+    let settings =
+        DisplaySettings::from_possibly_ambiguous_types(db, env, [expected_ty, actual_ty]);
+    let actual_display = actual_ty.display_with(db, env, settings.clone());
+    let expected_display = expected_ty.display_with(db, env, settings);
+
+    let mut diagnostic = builder.into_diagnostic(format_args!("Unsound `{kind}`"));
+    diagnostic.set_concise_message(format_args!(
+        "Unsound `{kind}`: `{actual_display}` is not a subtype of `{expected_display}`"
+    ));
+
+    match kind {
+        YieldKind::Yield => diagnostic
+            .set_primary_annotation_message(format_args!("Inferred as `{actual_display}`")),
+        YieldKind::YieldFrom => diagnostic.set_primary_annotation_message(format_args!(
+            "Yielded elements inferred as `{actual_display}`"
+        )),
+    }
+
+    if let Some(return_type_span) = return_type_span {
+        diagnostic.annotate(
+            Annotation::secondary(return_type_span).message(format_args!(
+                "Expected a subtype of `{expected_display}` because of the yield type"
+            )),
+        );
+    }
+
+    diagnostic.info(format_args!(
+        "`{actual_display}` is assignable to `{expected_display}`, \
+        but not a subtype of `{expected_display}`"
+    ));
+    let error_context = actual_ty.pure_redundancy_error_context(db, env, expected_ty);
+    error_context.attach_to(db, env, &mut diagnostic);
+
+    match kind {
+        YieldKind::Yield => {
+            diagnostic.help("Consider using an `assert` to narrow the type before yielding it");
+        }
+        YieldKind::YieldFrom => diagnostic.help(
+            "Consider using `assert`s to narrow the types of the elements before yielding them",
+        ),
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(super) enum YieldKind {
+    Yield,
+    YieldFrom,
+}
+
+impl std::fmt::Display for YieldKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            YieldKind::Yield => f.write_str("yield"),
+            YieldKind::YieldFrom => f.write_str("yield from"),
+        }
+    }
 }
 
 pub(super) fn report_implicit_return_type(
@@ -2027,7 +2266,8 @@ pub(super) fn report_implicit_return_type(
     // If no return statement is defined in the function, then the function always returns `None`
     let mut diagnostic = if no_return {
         let mut diag = builder.into_diagnostic(format_args!(
-            "Function always implicitly returns `None`, which is not assignable to return type `{}`",
+            "Function always implicitly returns `None`, \
+            which is not assignable to return type `{}`",
             expected_ty.display(db, env),
         ));
         diag.info(
@@ -2287,14 +2527,15 @@ pub(crate) fn report_instance_layout_conflict(
             match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => {
                     annotation = annotation.message(format_args!(
-                        "`{base}` instances have a distinct memory layout because `{base}` defines non-empty `__slots__`",
+                        "`{base}` instances have a distinct memory layout \
+                        because `{base}` defines non-empty `__slots__`",
                         base = originating_base.name(db)
                     ));
                 }
                 DisjointBaseKind::DisjointBaseDecorator => {
                     annotation = annotation.message(format_args!(
-                        "`{base}` instances have a distinct memory layout because of the way `{base}` \
-                        is implemented in a C extension",
+                        "`{base}` instances have a distinct memory layout \
+                        because of the way `{base}` is implemented in a C extension",
                         base = originating_base.name(db)
                     ));
                 }
@@ -2313,8 +2554,8 @@ pub(crate) fn report_instance_layout_conflict(
 
             additional_annotation = match disjoint_base.kind {
                 DisjointBaseKind::DefinesSlots => additional_annotation.message(format_args!(
-                    "`{disjoint_base}` instances have a distinct memory layout because `{disjoint_base}` \
-                        defines non-empty `__slots__`",
+                    "`{disjoint_base}` instances have a distinct memory layout \
+                    because `{disjoint_base}` defines non-empty `__slots__`",
                     disjoint_base = disjoint_base.class.name(db),
                 )),
 
@@ -2590,7 +2831,8 @@ pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
+        "Too many positional subpatterns for `{class_display}`: \
+        expected {positional_limit}, got {positional_count}"
     ));
 }
 
@@ -2640,8 +2882,9 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(format_args!(
-        "A protocol class can only be used in `{function_name}` checks if it is decorated \
-            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
+        "A protocol class can only be used in `{function_name}` checks \
+        if it is decorated with `@typing.runtime_checkable` \
+        or `@typing_extensions.runtime_checkable`"
     ));
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
 }
@@ -2718,7 +2961,8 @@ pub(crate) fn report_runtime_check_against_typed_dict(
     };
     let class_name = class.name(context.db());
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "`TypedDict` class `{class_name}` cannot be used as the second argument to `{function_name}`",
+        "`TypedDict` class `{class_name}` cannot be used as the second argument \
+        to `{function_name}`",
         function_name = function.name()
     ));
     diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
@@ -2740,8 +2984,9 @@ pub(crate) fn report_match_pattern_against_non_runtime_checkable_protocol<T: Ran
     diagnostic.set_primary_annotation_message("This will raise `TypeError` at runtime");
     add_non_runtime_checkable_protocol_context(db, &mut diagnostic, protocol);
     diagnostic.info(
-        "A protocol class can only be used in a match class pattern if it is decorated \
-            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`",
+        "A protocol class can only be used in a match class pattern \
+        if it is decorated with `@typing.runtime_checkable` \
+        or `@typing_extensions.runtime_checkable`",
     );
     diagnostic.info(format_args!("See {RUNTIME_CHECKABLE_DOCS_URL}"));
 }
@@ -3110,7 +3355,8 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 };
                 explain_mro_entries(&mut diagnostic);
                 diagnostic.info(format_args!(
-                    "Type `{}` has an `__mro_entries__` method, but it does not return a tuple of types",
+                    "Type `{}` has an `__mro_entries__` method, \
+                    but it does not return a tuple of types",
                     base_type.display(db, env)
                 ));
             }
@@ -3189,7 +3435,8 @@ pub(crate) fn report_unsupported_base(
         base_type.display(db, env)
     ));
     diagnostic.info(format_args!(
-        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
+        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` \
+        due to this base",
         class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
@@ -3275,14 +3522,16 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         ));
                     }
                     diagnostic.set_concise_message(format_args!(
-                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - did you mean \"{suggestion}\"?",
+                        "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` - \
+                        did you mean \"{suggestion}\"?",
                     ));
                 } else {
                     diagnostic
                         .set_primary_annotation_message(format_args!("Unknown key \"{key}\""));
                     if let Some(full_ty) = full_object_ty {
                         diagnostic.set_concise_message(format_args!(
-                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` (subscripted object has type `{full_ty}`)",
+                            "Unknown key \"{key}\" for TypedDict `{typed_dict_name}` \
+                            (subscripted object has type `{full_ty}`)",
                             full_ty = full_ty.display(db, env),
                         ));
                     } else {
@@ -3484,7 +3733,8 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
-            "Cannot delete read-only extra item \"{field_name}\" from TypedDict `{typed_dict_name}`"
+            "Cannot delete read-only extra item \"{field_name}\" \
+            from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
             "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
@@ -3526,7 +3776,8 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     // Add hint about how to allow deletion
     if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey) {
         diagnostic.info(
-            "Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted",
+            "Only keys marked as `NotRequired` \
+            (or in a TypedDict with `total=False`) can be deleted",
         );
     }
 }
@@ -3553,8 +3804,9 @@ pub(crate) fn report_invalid_type_param_order<'db>(
             )
         })
         .expect(
-            "It should not be possible for a class to have a legacy generic context \
-            if it does not inherit from `Protocol[]` or `Generic[]`",
+            "It should not be possible for a class to have \
+            a legacy generic context if it does \
+            not inherit from `Protocol[]` or `Generic[]`",
         );
 
     let base_node = &node.bases()[base_index];
@@ -3807,10 +4059,12 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` \
+        already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` \
+        already bound by an enclosing scope",
     ));
     diagnostic.set_primary_annotation_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
@@ -4668,7 +4922,9 @@ pub(super) fn report_invalid_total_ordering_call(
     };
 
     let mut diagnostic = builder.into_diagnostic(
-        "`@functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined",
+        "`@functools.total_ordering` requires at least one ordering method \
+        (`__lt__`, `__le__`, `__gt__`, or `__ge__`) \
+        to be defined",
     );
     diagnostic.set_primary_annotation_message(format_args!(
         "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",

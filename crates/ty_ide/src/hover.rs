@@ -12,7 +12,7 @@ use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
-use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
 pub fn hover<'db>(
     db: &'db dyn Db,
@@ -340,9 +340,7 @@ impl<'db> DisplayHoverContent<'_, 'db> {
         let db = self.db;
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
-        let ty_string = ty
-            .display_with(db, self.env, DisplaySettings::default().multiline())
-            .to_string();
+        let ty_string = ty.display(db, self.env).multiline().to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
         } else {
@@ -6067,13 +6065,13 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int | float
+        float
         ---------------------------------------------
         Convert a string or number to a floating-point number, if possible.
 
         ---------------------------------------------
         ```python
-        int | float
+        float
         ```
         ---
         Convert a string or number to a floating-point number, if possible.
@@ -6086,6 +6084,61 @@ def function():
           |    |
           |    source
         ");
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def f(x: builtins.float | float):
+                x<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_selected_signature() {
+        let test = hover_test(
+            r#"
+            import builtins
+            from typing import overload
+
+            class float: ...
+
+            @overload
+            def choose(value: builtins.float | float) -> None: ...
+            @overload
+            def choose(value: str) -> None: ...
+            def choose(value: object) -> None: ...
+
+            choose<CURSOR>(1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_keyword_parameter() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def choose(*, value: builtins.float | float) -> None: ...
+
+            choose(value<CURSOR>=1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
     }
 
     #[test]

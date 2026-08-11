@@ -202,7 +202,6 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::ExtensionsTypeVarTuple
             | Self::Sentinel
-            | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
             | Self::GeneratorType
@@ -210,8 +209,7 @@ impl KnownClass {
             | Self::MethodWrapperType
             | Self::CoroutineType
             | Self::BuiltinFunctionType
-            | Self::Template
-            | Self::Path => Some(Truthiness::AlwaysTrue),
+            | Self::Template => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -271,12 +269,9 @@ impl KnownClass {
             | Self::Mapping
             | Self::MutableMapping
             | Self::SupportsKeysAndGetItem
-            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
-            // and raises a `TypeError` in Python >=3.14
-            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
-            | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Super
             | Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -291,6 +286,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::Path
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel
@@ -298,6 +294,11 @@ impl KnownClass {
             | Self::PydanticConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict => Some(Truthiness::Ambiguous),
+
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            Self::NotImplementedType => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -1716,7 +1717,6 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
-            | Self::StdlibAlias  // no equivalent class exists in typing_extensions, nor ever will
             | Self::ModuleType
             | Self::VersionInfo
             | Self::BaseException
@@ -1783,7 +1783,12 @@ impl KnownClass {
             | Self::PydanticConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict => module == self.canonical_module(python_version),
+
+            // no equivalent class exists in typing_extensions, nor ever will
+            Self::StdlibAlias => module == self.canonical_module(python_version),
+
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
+
             Self::SpecialForm
             | Self::TypeAliasType
             | Self::NoDefaultType
@@ -1798,8 +1803,14 @@ impl KnownClass {
             | Self::Mapping
             | Self::MutableMapping
             | Self::ProtocolMeta
-            | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
-            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+            | Self::NewType => {
+                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
+            }
+
+            Self::Deprecated => matches!(
+                module,
+                KnownModule::Warnings | KnownModule::TypingExtensions
+            ),
         }
     }
 

@@ -622,19 +622,23 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         Expr::Tuple(expr_tuple) => expr_tuple.elts.iter().all(type_hint_is_excessive_for_expr),
 
         // Various Literal[...] types which are always excessive to hint
-        | Expr::BytesLiteral(_)
+        Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
-        | Expr::StringLiteral(_)
+        | Expr::StringLiteral(_) => true,
         // `None` isn't terribly verbose, but still redundant
-        | Expr::NoneLiteral(_)
+        Expr::NoneLiteral(_) => true,
         // This one expands to `str` which isn't verbose but is redundant
-        | Expr::FString(_)
+        Expr::FString(_) => true,
         // This one expands to `Template` which isn't verbose but is redundant
-        | Expr::TString(_)=> true,
+        Expr::TString(_) => true,
 
         // You too `+1 and `-1`, get back here
-        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+        Expr::UnaryOp(ExprUnaryOp {
+            op: UnaryOp::UAdd | UnaryOp::USub,
+            operand,
+            ..
+        }) => matches!(**operand, Expr::NumberLiteral(_)),
 
         // Everything else is reasonable
         _ => false,
@@ -2442,7 +2446,7 @@ Source with applied edits:
         assert_snapshot!(test.inlay_hints(), @r#"
 
         a[: list[int]] = [1, 2]
-        b[: list[int | float]] = [1.0, 2.0]
+        b[: list[float]] = [1.0, 2.0]
         c[: list[bool]] = [True, False]
         d[: list[None | Unknown]] = [None, None]
         e[: list[str]] = ["hel", "lo"]
@@ -2450,8 +2454,8 @@ Source with applied edits:
         g[: list[str]] = [f"{ft}", f"{ft}"]
         h[: list[Template]] = [t"wow %d", t"wow %d"]
         i[: list[bytes]] = [b'/x01', b'/x02']
-        j[: list[int | float]] = [+1, +2.0]
-        k[: list[int | float]] = [-1, -2.0]
+        j[: list[float]] = [+1, +2.0]
+        k[: list[float]] = [-1, -2.0]
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -2484,19 +2488,8 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | b[: list[int | float]] = [1.0, 2.0]
+        LL | b[: list[float]] = [1.0, 2.0]
            |     ^^^^
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ^^^
-        info: Source
-          --> main2.py:LL:10
-           |
-        LL | b[: list[int | float]] = [1.0, 2.0]
-           |          ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2504,10 +2497,10 @@ Source with applied edits:
         LL | class float:
            |       ^^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:10
            |
-        LL | b[: list[int | float]] = [1.0, 2.0]
-           |                ^^^^^
+        LL | b[: list[float]] = [1.0, 2.0]
+           |          ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2682,19 +2675,8 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | j[: list[int | float]] = [+1, +2.0]
+        LL | j[: list[float]] = [+1, +2.0]
            |     ^^^^
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ^^^
-        info: Source
-          --> main2.py:LL:10
-           |
-        LL | j[: list[int | float]] = [+1, +2.0]
-           |          ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2702,10 +2684,10 @@ Source with applied edits:
         LL | class float:
            |       ^^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:10
            |
-        LL | j[: list[int | float]] = [+1, +2.0]
-           |                ^^^^^
+        LL | j[: list[float]] = [+1, +2.0]
+           |          ^^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2715,19 +2697,8 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:5
            |
-        LL | k[: list[int | float]] = [-1, -2.0]
+        LL | k[: list[float]] = [-1, -2.0]
            |     ^^^^
-
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/builtins.pyi:LL:7
-           |
-        LL | class int:
-           |       ^^^
-        info: Source
-          --> main2.py:LL:10
-           |
-        LL | k[: list[int | float]] = [-1, -2.0]
-           |          ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -2735,10 +2706,10 @@ Source with applied edits:
         LL | class float:
            |       ^^^^^
         info: Source
-          --> main2.py:LL:16
+          --> main2.py:LL:10
            |
-        LL | k[: list[int | float]] = [-1, -2.0]
-           |                ^^^^^
+        LL | k[: list[float]] = [-1, -2.0]
+           |          ^^^^^
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
@@ -2759,7 +2730,7 @@ Source with applied edits:
            - j = [+1, +2.0]
            - k = [-1, -2.0]
         4  + a: list[int] = [1, 2]
-        5  + b: list[int | float] = [1.0, 2.0]
+        5  + b: list[float] = [1.0, 2.0]
         6  + c: list[bool] = [True, False]
         7  + d: list[None | Unknown] = [None, None]
         8  + e: list[str] = ["hel", "lo"]
@@ -2767,8 +2738,8 @@ Source with applied edits:
         10 + g: list[str] = [f"{ft}", f"{ft}"]
         11 + h: list[Template] = [t"wow %d", t"wow %d"]
         12 + i: list[bytes] = [b'/x01', b'/x02']
-        13 + j: list[int | float] = [+1, +2.0]
-        14 + k: list[int | float] = [-1, -2.0]
+        13 + j: list[float] = [+1, +2.0]
+        14 + k: list[float] = [-1, -2.0]
            |
         "#);
     }

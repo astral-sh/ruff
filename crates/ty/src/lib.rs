@@ -104,13 +104,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // The base path to which all CLI arguments are relative to.
     let cwd = {
         let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd)
-            .map_err(|path| {
-                anyhow!(
-                    "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
-                    path.display()
-                )
-            })?
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+            anyhow!(
+                "The current working directory `{}` contains non-Unicode characters. \
+                ty only supports Unicode paths.",
+                path.display()
+            )
+        })?
     };
 
     let project_path = args
@@ -226,7 +226,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Some("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
         Some(other) => {
             tracing::warn!(
-                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. \
+                Valid values are `short`, `full`, and `json`."
             );
         }
         None => {}
@@ -285,6 +286,10 @@ struct MainLoop {
     /// Receiver for the messages sent **to** the main loop.
     receiver: crossbeam_channel::Receiver<MainLoopMessage>,
 
+    /// Capacity-one channel used to coalesce pending workspace checks.
+    check_sender: crossbeam_channel::Sender<()>,
+    check_receiver: crossbeam_channel::Receiver<()>,
+
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
@@ -300,6 +305,7 @@ struct MainLoop {
 impl MainLoop {
     fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
+        let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
         let cancellation_token_source = CancellationTokenSource::new();
         let cancellation_token = cancellation_token_source.token();
@@ -309,6 +315,8 @@ impl MainLoop {
                 mode,
                 sender: sender.clone(),
                 receiver,
+                check_sender,
+                check_receiver,
                 watcher: None,
                 printer,
                 cancellation_token,
@@ -332,7 +340,7 @@ impl MainLoop {
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
+        self.request_check();
 
         let result = self.main_loop(db);
 
@@ -341,13 +349,22 @@ impl MainLoop {
         result
     }
 
+    fn request_check(&self) {
+        // A pending request already represents a check of the latest database revision.
+        let _ = self.check_sender.try_send(());
+    }
+
     fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        // Schedule the first check.
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
 
-        while let Ok(message) = self.receiver.recv() {
+        // Apply all queued changes before starting a pending check because every applied change
+        // cancels the running check.
+        while let Ok(message) = crossbeam_channel::select_biased! {
+            recv(self.receiver) -> message => message,
+            recv(self.check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
+        } {
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
@@ -384,7 +401,8 @@ impl MainLoop {
                 } => {
                     if check_revision != revision {
                         tracing::debug!(
-                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                            "Discarding check result for outdated revision: \
+                            current: {revision}, result revision: {check_revision}"
                         );
                         continue;
                     }
@@ -464,7 +482,9 @@ impl MainLoop {
 
                     if exit_status.is_internal_error() {
                         tracing::warn!(
-                            "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                            "A fatal error occurred while checking some files. \
+                            Not all project files were analyzed. \
+                            See the diagnostics list above for details."
                         );
                     }
 
@@ -485,7 +505,7 @@ impl MainLoop {
                         watcher.update(db);
                     }
 
-                    self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
+                    self.request_check();
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
@@ -545,7 +565,8 @@ impl MainLoop {
                         let total = fixed + diagnostics_count;
                         writeln!(
                             self.printer.stream_for_failure_summary(),
-                            "Found {total} diagnostic{} ({fixed} fixed, {diagnostics_count} remaining).",
+                            "Found {total} diagnostic{} \
+                            ({fixed} fixed, {diagnostics_count} remaining).",
                             if total == 1 { "" } else { "s" }
                         )?;
                     } else {

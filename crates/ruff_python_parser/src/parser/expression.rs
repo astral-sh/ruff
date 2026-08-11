@@ -417,11 +417,11 @@ impl<'src> Parser<'src> {
                     );
                 }
             } else {
+                // > The power operator `**` binds less tightly than an arithmetic
+                // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                //
+                // Reference: https://docs.python.org/3/reference/expressions.html#id21
                 if left_precedence > OperatorPrecedence::PosNegBitNot
-                    // > The power operator `**` binds less tightly than an arithmetic
-                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                    //
-                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
                     && left_precedence != OperatorPrecedence::Exponent
                 {
                     self.add_error(
@@ -788,11 +788,12 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
     fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
+        debug_assert_eq!(self.node_range(start).end(), arguments.end());
 
         ast::ExprCall {
             func: Box::new(func),
             arguments,
-            range: self.node_range(start),
+            range_start: start,
             node_index: AtomicNodeIndex::NONE,
         }
     }

@@ -220,6 +220,9 @@ pub enum KnownBoundMethodType<'db> {
     StrStartswith(StringLiteralType<'db>),
 
     // ConstraintSet methods
+    ConstraintSetLowerBound,
+    ConstraintSetUpperBound,
+    ConstraintSetEquality,
     ConstraintSetRange,
     ConstraintSetAlways,
     ConstraintSetNever,
@@ -260,7 +263,10 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 LiteralValueType::promotable(LiteralValueTypeKind::String(string_literal)).into(),
             );
         }
-        KnownBoundMethodType::ConstraintSetRange
+        KnownBoundMethodType::ConstraintSetLowerBound
+        | KnownBoundMethodType::ConstraintSetUpperBound
+        | KnownBoundMethodType::ConstraintSetEquality
+        | KnownBoundMethodType::ConstraintSetRange
         | KnownBoundMethodType::ConstraintSetAlways
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
@@ -309,6 +315,9 @@ impl<'db> KnownBoundMethodType<'db> {
                 ))
             }
             KnownBoundMethodType::StrStartswith(_)
+            | KnownBoundMethodType::ConstraintSetLowerBound
+            | KnownBoundMethodType::ConstraintSetUpperBound
+            | KnownBoundMethodType::ConstraintSetEquality
             | KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
@@ -332,7 +341,10 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderSet(_)
             | KnownBoundMethodType::PropertyDunderDelete(_) => KnownClass::MethodWrapperType,
             KnownBoundMethodType::StrStartswith(_) => KnownClass::BuiltinFunctionType,
-            KnownBoundMethodType::ConstraintSetRange
+            KnownBoundMethodType::ConstraintSetLowerBound
+            | KnownBoundMethodType::ConstraintSetUpperBound
+            | KnownBoundMethodType::ConstraintSetEquality
+            | KnownBoundMethodType::ConstraintSetRange
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
@@ -463,6 +475,42 @@ impl<'db> KnownBoundMethodType<'db> {
                             .with_default_type(Type::none(db, env)),
                     ]),
                     KnownClass::Bool.to_instance(db, env),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetLowerBound => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::standard([
+                        Parameter::positional_only(Some(Name::new_static("lower_bound")))
+                            .with_annotated_type(object_type_form()),
+                        Parameter::positional_only(Some(Name::new_static("typevar")))
+                            .with_annotated_type(object_type_form()),
+                    ]),
+                    KnownClass::ConstraintSet.to_instance(db, env),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetUpperBound => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::standard([
+                        Parameter::positional_only(Some(Name::new_static("typevar")))
+                            .with_annotated_type(object_type_form()),
+                        Parameter::positional_only(Some(Name::new_static("upper_bound")))
+                            .with_annotated_type(object_type_form()),
+                    ]),
+                    KnownClass::ConstraintSet.to_instance(db, env),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetEquality => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::standard([
+                        Parameter::positional_only(Some(Name::new_static("typevar")))
+                            .with_annotated_type(object_type_form()),
+                        Parameter::positional_only(Some(Name::new_static("value")))
+                            .with_annotated_type(object_type_form()),
+                    ]),
+                    KnownClass::ConstraintSet.to_instance(db, env),
                 )))
             }
 
@@ -632,6 +680,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             (
+                KnownBoundMethodType::ConstraintSetLowerBound,
+                KnownBoundMethodType::ConstraintSetLowerBound,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetUpperBound,
+                KnownBoundMethodType::ConstraintSetUpperBound,
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetEquality,
+                KnownBoundMethodType::ConstraintSetEquality,
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetRange,
                 KnownBoundMethodType::ConstraintSetRange,
             )
@@ -683,6 +743,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_)
                 | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetUpperBound
+                | KnownBoundMethodType::ConstraintSetEquality
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -700,6 +763,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_)
                 | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetUpperBound
+                | KnownBoundMethodType::ConstraintSetEquality
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever

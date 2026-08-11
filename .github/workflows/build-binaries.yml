@@ -18,6 +18,7 @@ on:
       - pyproject.toml
       # And when we change this workflow itself...
       - .github/workflows/build-binaries.yml
+      - scripts/build_ruff_pgo.py
 
 concurrency:
   group: build-binaries-${{ github.ref }}
@@ -115,6 +116,10 @@ jobs:
   macos-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-macos-15' || 'macos-15' }}
+    env:
+      # Use Rust's bundled Mach-O LLD, which supports ICF.
+      # ICF reduces the macOS aarch64 ruff binary size by ~0.8%.
+      RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -124,6 +129,14 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: arm64
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target aarch64-apple-darwin \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - aarch64"
@@ -133,9 +146,10 @@ jobs:
           target: aarch64
           args: --release --locked --out dist --compatibility pypi
         env:
-          # Use Rust's bundled Mach-O LLD, which supports ICF.
-          # ICF reduces the macOS aarch64 ruff binary size by ~0.8%.
-          RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
+          RUSTFLAGS: "${{ env.RUSTFLAGS }} -Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata"
+          # Apple Clang cannot consume profile data from rustc's LLVM version.
+          CFLAGS: "-fno-profile-generate -fno-profile-use"
+          CXXFLAGS: "-fno-profile-generate -fno-profile-use"
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
@@ -185,6 +199,21 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
+      - name: "Install LLVM profiling tools"
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
+        shell: bash
+        run: |
+          export RUSTFLAGS="${RUSTFLAGS:+${RUSTFLAGS} }-C target-feature=+crt-static"
+
+          python scripts/build_ruff_pgo.py \
+            --target "${{ matrix.platform.target }}" \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
@@ -196,6 +225,18 @@ jobs:
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
+      - name: "Verify static Windows runtime"
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
+        shell: bash
+        run: |
+          LLVM_READOBJ="$(rustc --print sysroot)/lib/rustlib/${{ matrix.platform.target }}/bin/llvm-readobj.exe"
+          IMPORTS_FILE="$RUNNER_TEMP/ruff-coff-imports.txt"
+          "$LLVM_READOBJ" --coff-imports "target/${{ matrix.platform.target }}/release/ruff.exe" > "$IMPORTS_FILE"
+
+          if grep -Eiq 'vcruntime[[:digit:]_]*\.dll|api-ms-win-crt-' "$IMPORTS_FILE"; then
+            echo "Ruff must not dynamically link the Visual C++ runtime" >&2
+            exit 1
+          fi
       - name: "Test wheel"
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
@@ -239,6 +280,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - name: "Install LLVM profiling tools"
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target "${{ matrix.target }}" \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
@@ -280,18 +333,78 @@ jobs:
             *.tar.gz
             *.sha256
 
+  linux-aarch64:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-24.04-arm
+    env:
+      # see https://github.com/astral-sh/ruff/issues/3791
+      # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
+      JEMALLOC_SYS_WITH_LG_PAGE: "16"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target aarch64-unknown-linux-gnu \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          maturin-version: v1.14.1
+          target: aarch64-unknown-linux-gnu
+          manylinux: 2_17
+          docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+          args: --release --locked --out dist --compatibility pypi
+      - name: "Test wheel"
+        run: |
+          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+          "${MODULE_NAME}" --help
+          python -m "${MODULE_NAME}" --help
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheels-aarch64-unknown-linux-gnu
+          path: dist
+      - name: "Archive binary"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET=aarch64-unknown-linux-gnu
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+      - name: "Upload binary"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-aarch64-unknown-linux-gnu
+          path: |
+            *.tar.gz
+            *.sha256
+
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         platform:
-          - target: aarch64-unknown-linux-gnu
-            arch: aarch64
-            manylinux: 2_17
-            # see https://github.com/astral-sh/ruff/issues/3791
-            # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
             manylinux: 2_17

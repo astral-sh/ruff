@@ -230,7 +230,11 @@ impl Session {
             .and_then(|request| {
                 if !self.request_queue.incoming().is_pending(&request.id) {
                     // Clear out the suspended request if the request has been cancelled.
-                    tracing::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
+                    tracing::debug!(
+                        "Skipping suspended workspace diagnostics request `{}` \
+                        because it was cancelled",
+                        request.id
+                    );
                     return None;
                 }
 
@@ -918,12 +922,14 @@ impl Session {
             match diagnostic_mode {
                 DiagnosticMode::Off => {
                     tracing::debug!(
-                        "Skipping registration of diagnostic capability because diagnostics are turned off"
+                        "Skipping registration of diagnostic capability \
+                        because diagnostics are turned off"
                     );
                 }
                 DiagnosticMode::OpenFilesOnly | DiagnosticMode::Workspace => {
                     tracing::debug!(
-                        "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+                        "Registering diagnostic capability \
+                        with {diagnostic_mode:?} diagnostic mode"
                     );
                     registrations.push(Registration {
                         id: DIAGNOSTIC_REGISTRATION_ID.into(),
@@ -1991,4 +1997,30 @@ pub(super) fn warn_about_unknown_options(
     };
     tracing::warn!("{message}");
     client.show_warning_message(message);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use ruff_db::system::{CommandExecutor, OsSystem, System as _};
+
+    use super::Index;
+    use crate::system::LSPSystem;
+
+    /// Mutating the document index requires exclusive ownership after Salsa cancels the current
+    /// database snapshots. A background command executor must not retain an `LSPSystem`, because
+    /// that would keep the index alive and prevent the server from applying document changes.
+    #[test]
+    fn detached_command_executor_does_not_retain_document_index() {
+        let index = Arc::new(Index::new());
+        let system = LSPSystem::new(index.clone(), Arc::new(OsSystem::default()));
+        let executor = system.command_executor().map(CommandExecutor::dyn_clone);
+        assert!(executor.is_some());
+        drop(system);
+
+        assert_eq!(Arc::strong_count(&index), 1);
+
+        drop(executor);
+    }
 }

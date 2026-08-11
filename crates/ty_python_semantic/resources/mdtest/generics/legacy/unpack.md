@@ -92,8 +92,9 @@ def f(
 
 ## Unsupported union unpacking
 
-Unpacking a type variable tuple into `Union` is currently not supported. Both the rejected union and
-runtime element access recover to `object`.
+Unpacking a type variable tuple into `Union` is currently not supported. The rejected union recovers
+to `object` both on its own and inside another generic specialization. Runtime element access also
+recovers to `object`.
 
 ```py
 from typing import TypeVarTuple, Union, Unpack
@@ -106,6 +107,10 @@ def reject_union(value: Union[Unpack[Ts]]) -> None:
     # TODO: should reveal `Union[*Ts]` representation
     reveal_type(value)  # revealed: object
 
+# error: [invalid-type-form] "Unpacking a `TypeVarTuple` in `Union` is not supported"
+def reject_nested_union(value: list[Union[Unpack[Ts], None]]) -> None:
+    reveal_type(value)  # revealed: list[object]
+
 def element_types(values: tuple[Unpack[Ts]]) -> None:
     # TODO: should reveal `Union[*Ts]` representation
     reveal_type(values[0])  # revealed: object
@@ -113,6 +118,35 @@ def element_types(values: tuple[Unpack[Ts]]) -> None:
     for value in values:
         # TODO: should reveal `Union[*Ts]` representation
         reveal_type(value)  # revealed: object
+```
+
+## Invalid unpack operand nested in a union
+
+Although `Unpack[int]` is valid Python syntax, its non-tuple operand should report an ordinary
+diagnostic when the union appears inside a generic specialization.
+
+```py
+from typing import Union, Unpack
+
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+def invalid_operand(value: list[Union[Unpack[int], None]]) -> None:
+    reveal_type(value)  # revealed: list[tuple[Unknown, ...] | None]
+```
+
+## Invalid unpack contexts still infer the operand
+
+An invalid unpack context should not suppress runtime errors from its operand. String annotations do
+not execute their contents, so unresolved names inside an invalid string annotation remain silent.
+
+```py
+from typing import Unpack
+
+# error: [invalid-type-form] "`Unpack` is not allowed in parameter annotations"
+# error: [unresolved-reference] "Name `Missing` used when not defined"
+def invalid_context(value: Unpack[Missing]) -> None: ...
+
+# error: [invalid-type-form] "`Unpack` is not allowed in parameter annotations"
+def invalid_stringified_context(value: "Unpack[Missing]") -> None: ...
 ```
 
 ## Concrete and nested tuple unpacking

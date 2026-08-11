@@ -1544,9 +1544,10 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             .map(move |index| {
                 self.type_at_nonnegative_index(db, env, index)
                     .unwrap_or_else(|| {
-                    unreachable!(
-                        "front-origin fixed slice positions are validated during plan construction"
-                    )
+                        unreachable!(
+                            "front-origin fixed slice positions are validated \
+                            during plan construction"
+                        )
                     })
             })
     }

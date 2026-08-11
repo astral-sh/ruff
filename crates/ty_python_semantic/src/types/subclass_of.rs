@@ -377,7 +377,8 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
         match self.subclass_of {
             SubclassOfInner::Class(class) => class.variance_of(db, env, typevar),
             SubclassOfInner::Protocol(protocol) => protocol.variance_of(db, env, typevar),
-            SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
+            SubclassOfInner::TypeVar(inner) => Type::TypeVar(inner).variance_of(db, env, typevar),
+            SubclassOfInner::Dynamic(_) => TypeVarVariance::Bivariant,
         }
     }
 }

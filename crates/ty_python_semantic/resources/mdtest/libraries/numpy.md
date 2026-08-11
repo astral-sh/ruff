@@ -71,5 +71,5 @@ _ScalarT = TypeVar("_ScalarT", bound=np.generic)
 def from_dtype_like(value: np._DTypeLike[_ScalarT]) -> np.dtype[_ScalarT]:
     raise NotImplementedError
 
-reveal_type(from_dtype_like(np.bool))  # revealed: dtype[bool[bool]]
+reveal_type(from_dtype_like(np.bool))  # revealed: dtype[mini_numpy.bool[builtins.bool]]
 ```

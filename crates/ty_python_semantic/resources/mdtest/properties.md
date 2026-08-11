@@ -243,9 +243,31 @@ class C:
 c = C()
 c.attr = 1
 
-# TODO: An error should be emitted here.
-# See https://github.com/astral-sh/ruff/issues/16298 for more details.
+# error: [call-non-callable] "property has no getter"
+C.attr.__get__(c, C)
+# error: [call-non-callable] "property has no getter"
+type(C.attr).__get__(C.attr, c, C)
+
+# error: [invalid-attribute-access] "Cannot read property `attr` on object of type `C` because it has no getter"
 reveal_type(c.attr)  # revealed: Never
+```
+
+### Attempting to call a getter with an incompatible instance
+
+Explicit bound and unbound `property.__get__` calls preserve the getter's receiver error and return
+type. For the unbound call, the reported argument is the instance rather than the property itself.
+
+```py
+class C:
+    @property
+    def attr(self) -> int:
+        return 1
+
+# error: [invalid-argument-type] "Argument to function `C.attr` is incorrect: Expected `C`"
+reveal_type(C.attr.__get__("wrong", C))  # revealed: int
+
+# error: [invalid-argument-type] "Argument to function `C.attr` is incorrect: Expected `C`"
+reveal_type(property.__get__(C.attr, "wrong", C))  # revealed: int
 ```
 
 ### Non-returning setter

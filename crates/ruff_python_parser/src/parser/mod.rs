@@ -393,16 +393,19 @@ impl<'src> Parser<'src> {
 
     /// Moves the parser to the next token.
     fn do_bump(&mut self, kind: TokenKind) {
-        if !matches!(
-            self.current_token_kind(),
+        if match self.current_token_kind() {
             // TODO explore including everything up to the dedent as part of the body.
-            TokenKind::Dedent
+            TokenKind::Dedent => false,
+
             // Don't include newlines in the body
-            | TokenKind::Newline
+            TokenKind::Newline => false,
+
             // TODO(micha): Including the semi feels more correct but it isn't compatible with lalrpop and breaks the
             // formatters semicolon detection. Exclude it for now
-            | TokenKind::Semi
-        ) {
+            TokenKind::Semi => false,
+
+            _ => true,
+        } {
             self.prev_token_end = self.current_token_range().end();
         }
 
@@ -1230,24 +1233,26 @@ enum RecoveryContextKind {
 impl RecoveryContextKind {
     /// Returns `true` if a trailing comma is allowed in the current context.
     const fn allow_trailing_comma(self) -> bool {
-        matches!(
-            self,
+        match self {
             RecoveryContextKind::Slices
-                | RecoveryContextKind::TupleElements(_)
-                | RecoveryContextKind::SetElements
-                | RecoveryContextKind::ListElements
-                | RecoveryContextKind::DictElements
-                | RecoveryContextKind::Arguments
-                | RecoveryContextKind::MatchPatternMapping
-                | RecoveryContextKind::SequenceMatchPattern(_)
-                | RecoveryContextKind::MatchPatternClassArguments
-                // Only allow a trailing comma if the with item itself is parenthesized
-                | RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
-                | RecoveryContextKind::Parameters(_)
-                | RecoveryContextKind::TypeParams
-                | RecoveryContextKind::DeleteTargets
-                | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
-        )
+            | RecoveryContextKind::TupleElements(_)
+            | RecoveryContextKind::SetElements
+            | RecoveryContextKind::ListElements
+            | RecoveryContextKind::DictElements
+            | RecoveryContextKind::Arguments
+            | RecoveryContextKind::MatchPatternMapping
+            | RecoveryContextKind::SequenceMatchPattern(_)
+            | RecoveryContextKind::MatchPatternClassArguments
+            | RecoveryContextKind::Parameters(_)
+            | RecoveryContextKind::TypeParams
+            | RecoveryContextKind::DeleteTargets
+            | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes) => true,
+
+            // Only allow a trailing comma if the with item itself is parenthesized
+            RecoveryContextKind::WithItems(WithItemKind::Parenthesized) => true,
+
+            _ => false,
+        }
     }
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context.

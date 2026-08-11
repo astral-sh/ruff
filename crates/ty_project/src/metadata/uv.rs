@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use pep440_rs::Version;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{Command, System, SystemPath, SystemPathBuf, WhichError};
 use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::Deserialize;
 use thiserror::Error;
@@ -21,18 +21,23 @@ impl UvWorkspace {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<Self, UvWorkspaceError> {
-        let uv = system
-            .env_var(EnvVars::UV)
-            .unwrap_or_else(|_| "uv".to_string());
+        let uv = match system.env_var(EnvVars::UV) {
+            Ok(uv) => uv,
+            Err(_) => system
+                .which("uv")
+                .map(SystemPathBuf::into_string)
+                .map_err(uv_executable_error)
+                .map_err(UvWorkspaceError::Invocation)?,
+        };
 
         // `uv check` has already selected and synchronized the environment. Keep this query
         // read-only so package selection and `--isolated` aren't overwritten by a second sync.
+        let mut command = Command::new(uv);
+        command
+            .args(["workspace", "metadata", "--frozen", "--active"])
+            .current_dir(path);
         let output = system
-            .run_command(
-                &uv,
-                &["workspace", "metadata", "--frozen", "--active"],
-                path,
-            )
+            .run_command(command)
             .map_err(UvWorkspaceError::Invocation)?;
 
         if !output.status.success() {
@@ -84,6 +89,13 @@ impl UvWorkspace {
     pub(super) fn python_version(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
         self.python_version.as_ref()
     }
+}
+
+fn uv_executable_error(error: WhichError) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("failed to resolve uv executable: {error}"),
+    )
 }
 
 fn resolve_python_version(
@@ -166,6 +178,7 @@ struct WorkspacePython {
 #[cfg(test)]
 mod tests {
     use ruff_db::system::{SystemPath, TestSystem};
+    use ty_static::EnvVars;
 
     use super::{UvWorkspace, UvWorkspaceError};
 
@@ -176,6 +189,18 @@ mod tests {
         assert!(matches!(
             UvWorkspace::from_metadata(b"{", &system),
             Err(UvWorkspaceError::InvalidMetadata(_))
+        ));
+    }
+
+    #[test]
+    fn explicit_uv_override_skips_path_lookup() {
+        let system = TestSystem::default();
+        system.set_env_var(EnvVars::UV, "/custom/uv");
+
+        assert!(matches!(
+            UvWorkspace::discover(SystemPath::new("/app"), &system),
+            Err(UvWorkspaceError::Invocation(error))
+                if error.kind() == std::io::ErrorKind::Unsupported
         ));
     }
 

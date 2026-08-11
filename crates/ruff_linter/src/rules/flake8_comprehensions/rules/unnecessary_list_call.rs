@@ -50,7 +50,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
     let ExprCall {
         func,
         arguments,
-        range: _,
+        range_start: _,
         node_index: _,
     } = call;
 

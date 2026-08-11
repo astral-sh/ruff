@@ -405,17 +405,17 @@ dunder methods. Perhaps we could have a special-case on the special-case, to exc
 return annotations from the widening, and preserve a bit more precision here?
 
 ```py
-reveal_type(3j + 3.14)  # revealed: int | float | complex
-reveal_type(4.2 + 42)  # revealed: int | float
-reveal_type(3j + 3)  # revealed: int | float | complex
-reveal_type(3.14 + 3j)  # revealed: int | float | complex
-reveal_type(42 + 4.2)  # revealed: int | float
-reveal_type(3 + 3j)  # revealed: int | float | complex
+reveal_type(3j + 3.14)  # revealed: complex
+reveal_type(4.2 + 42)  # revealed: float
+reveal_type(3j + 3)  # revealed: complex
+reveal_type(3.14 + 3j)  # revealed: complex
+reveal_type(42 + 4.2)  # revealed: float
+reveal_type(3 + 3j)  # revealed: complex
 
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
-    reveal_type(4.2 + x)  # revealed: int | float
-    reveal_type(y + 4.12)  # revealed: int | float
+    reveal_type(4.2 + x)  # revealed: float
+    reveal_type(y + 4.12)  # revealed: float
 ```
 
 ## With literal types
