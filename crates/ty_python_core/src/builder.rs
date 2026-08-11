@@ -4325,7 +4325,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
-                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                    if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
+                        && !symbol.is_parameter()
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
                                 name: name.to_string(),

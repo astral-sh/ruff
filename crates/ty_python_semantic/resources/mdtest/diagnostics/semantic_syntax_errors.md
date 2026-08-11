@@ -603,3 +603,87 @@ error[invalid-syntax]: name `a` cannot refer to a parameter and a global variabl
 27 |     global a  # snapshot: invalid-syntax
    |            ^
 ```
+
+## name cannot refer to a parameter and a nonlocal variable
+
+```py
+a = None
+
+def outer():
+    a = None
+    def f(a):
+        nonlocal a  # snapshot: invalid-syntax
+
+def outer():
+    a = None
+    def g(a):
+        if True:
+            nonlocal a  # snapshot: invalid-syntax
+
+def h(a):
+    def inner():
+        nonlocal a
+
+def outer():
+    a = None
+    def i(a):
+        try:
+            nonlocal a  # snapshot: invalid-syntax
+        except Exception:
+            pass
+
+def outer():
+    a = None
+    def f(a):
+        a = 1
+        a = 2
+        nonlocal a  # snapshot: invalid-syntax
+
+def f(a):
+    class Inner:
+        nonlocal a
+
+def f(a):
+    def inner(a):
+        nonlocal a  # snapshot: invalid-syntax
+
+def f(a=1):
+    def inner():
+        nonlocal a
+```
+
+```snapshot
+error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
+ --> src/mdtest_snippet.py:6:18
+  |
+6 |         nonlocal a # snapshot: invalid-syntax
+  |                  ^
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
+  --> src/mdtest_snippet.py:12:22
+   |
+12 |             nonlocal a # snapshot: invalid-syntax
+   |                      ^
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
+  --> src/mdtest_snippet.py:22:22
+   |
+22 |             nonlocal a # snapshot: invalid-syntax
+   |                      ^
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
+  --> src/mdtest_snippet.py:31:18
+   |
+31 |         nonlocal a # snapshot: invalid-syntax
+   |                  ^
+
+
+error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
+  --> src/mdtest_snippet.py:39:18
+   |
+39 |         nonlocal a # snapshot: invalid-syntax
+   |                  ^
+```
