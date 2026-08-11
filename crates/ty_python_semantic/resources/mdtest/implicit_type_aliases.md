@@ -1356,10 +1356,14 @@ def _(
 
 ### Subscripted generic alias inside `type[…]`
 
-A generic alias can also be specialized inside a `type[…]` annotation:
+A generic alias can also be specialized inside a `type[…]` annotation.
+
+#### Valid specializations
+
+The PEP 613 spelling and `typing.Type[…]` take the same path:
 
 ```py
-from typing import Generic, TypeAlias, TypeVar
+from typing import Generic, Type, TypeAlias, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -1367,18 +1371,59 @@ U = TypeVar("U")
 class Pair(Generic[T, U]): ...
 
 PairAlias = Pair[T, U]
+PairAliasExplicit: TypeAlias = Pair[T, U]
 
-def explicitly_specialized(x: type[PairAlias[int, str]]):
+def implicit(x: type[PairAlias[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def pep_613(x: type[PairAliasExplicit[int, str]]):
+    reveal_type(x)  # revealed: type[Pair[int, str]]
+
+def uppercase_type(x: Type[PairAlias[int, str]]):
     reveal_type(x)  # revealed: type[Pair[int, str]]
 
 def partially_specialized(x: type[PairAlias[int, T]]):
     reveal_type(x)  # revealed: type[Pair[int, T@partially_specialized]]
+```
 
-# The PEP 613 spelling of the same alias goes through the same path:
-PairAliasExplicit: TypeAlias = Pair[T, U]
+#### Invalid specializations
 
-def pep_613(x: type[PairAliasExplicit[int, str]]):
-    reveal_type(x)  # revealed: type[Pair[int, str]]
+Now that these annotations resolve to a concrete type rather than `@Todo`, an incorrect number of
+type arguments, a violated bound or constraint, and an invalid assignment are all diagnosed:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+Bounded = TypeVar("Bounded", bound=int)
+Constrained = TypeVar("Constrained", int, str)
+
+class Pair(Generic[T, U]): ...
+class BoundedBox(Generic[Bounded]): ...
+class ConstrainedBox(Generic[Constrained]): ...
+
+PairAlias = Pair[T, U]
+BoundedAlias = BoundedBox[Bounded]
+ConstrainedAlias = ConstrainedBox[Constrained]
+
+def _(
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    too_few: type[PairAlias[int]],
+    # error: [invalid-type-arguments] "Too many type arguments: expected 2, got 3"
+    too_many: type[PairAlias[int, str, bool]],
+    # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `Bounded@BoundedAlias`"
+    violated_bound: type[BoundedAlias[str]],
+    # error: [invalid-type-arguments] "Type `bytes` does not satisfy constraints `int`, `str` of type variable `Constrained@ConstrainedAlias`"
+    violated_constraint: type[ConstrainedAlias[bytes]],
+):
+    reveal_type(too_few)  # revealed: type[Pair[Unknown, Unknown]]
+    reveal_type(too_many)  # revealed: type[Pair[Unknown, Unknown]]
+    reveal_type(violated_bound)  # revealed: type[BoundedBox[Unknown]]
+    reveal_type(violated_constraint)  # revealed: type[ConstrainedBox[Unknown]]
+
+# error: [invalid-assignment] "Object of type `<class 'int'>` is not assignable to `type[Pair[int, str]]`"
+assigned: type[PairAlias[int, str]] = int
 ```
 
 ### `Type[…]`
