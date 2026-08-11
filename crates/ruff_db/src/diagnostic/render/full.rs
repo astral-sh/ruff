@@ -31,7 +31,7 @@ impl<'a> FullRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
+            DiagnosticStylesheet::styled().hyperlink(self.config.hyperlinks.is_enabled())
         } else {
             DiagnosticStylesheet::plain()
         };

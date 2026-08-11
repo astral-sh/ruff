@@ -1115,6 +1115,35 @@ def mvce(keys, values):
     ");
 }
 
+/// Rule codes in `--statistics` output link to the rule documentation, as they do in the concise
+/// and full output formats.
+#[test]
+fn show_statistics_hyperlinks() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("main.py");
+    fs::write(
+        &input,
+        "def mvce(keys, values):\n    return {key: value for key, value in zip(keys, values)}\n",
+    )?;
+
+    let mut cmd = RuffCheck::default()
+        .filename(input.to_str().unwrap())
+        .args(["--select", "C416", "--statistics", "--color", "always"])
+        .build();
+    // Force hyperlink support so that the test does not depend on the terminal it runs in.
+    let output = cmd.env("FORCE_HYPERLINK", "1").output()?;
+    let stdout = str::from_utf8(&output.stdout)?;
+
+    assert!(
+        stdout.contains(
+            "\u{1b}]8;;https://docs.astral.sh/ruff/rules/unnecessary-comprehension\u{1b}\\"
+        ),
+        "expected the `C416` code to be hyperlinked, got: {stdout:?}"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn show_statistics_unsafe_fixes() {
     let mut cmd = RuffCheck::default()

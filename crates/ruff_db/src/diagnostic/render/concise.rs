@@ -21,7 +21,7 @@ impl<'a> ConciseRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
+            DiagnosticStylesheet::styled().hyperlink(self.config.hyperlinks.is_enabled())
         } else {
             DiagnosticStylesheet::plain()
         };
@@ -74,7 +74,11 @@ impl<'a> ConciseRenderer<'a> {
                         f,
                         "{code} ",
                         code = fmt_styled(
-                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
+                            fmt_with_hyperlink(
+                                &code,
+                                diag.documentation_url(),
+                                stylesheet.hyperlink
+                            ),
                             stylesheet.secondary_code
                         )
                     )?;
@@ -86,7 +90,7 @@ impl<'a> ConciseRenderer<'a> {
                             fmt_with_hyperlink(
                                 &diag.inner.id,
                                 diag.documentation_url(),
-                                &stylesheet
+                                stylesheet.hyperlink
                             ),
                             stylesheet.secondary_code
                         )
@@ -109,7 +113,7 @@ impl<'a> ConciseRenderer<'a> {
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(id, diag.documentation_url(), &stylesheet),
+                        fmt_with_hyperlink(id, diag.documentation_url(), stylesheet.hyperlink),
                         stylesheet.emphasis
                     )
                 )?;

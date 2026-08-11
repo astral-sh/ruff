@@ -1,8 +1,6 @@
 use anstyle::{AnsiColor, Effects, Style};
 use std::fmt::Formatter;
 
-use crate::diagnostic::HyperlinkMode;
-
 pub(super) const fn fmt_styled<'a, T>(
     content: T,
     style: anstyle::Style,
@@ -33,15 +31,16 @@ where
     FmtStyled { content, style }
 }
 
-pub(super) fn fmt_with_hyperlink<'a, T>(
+/// Renders `content`, wrapped in an OSC 8 terminal hyperlink to `url` when `hyperlink` is enabled.
+pub fn fmt_with_hyperlink<'a, T>(
     content: T,
     url: Option<&'a str>,
-    stylesheet: &DiagnosticStylesheet,
+    hyperlink: bool,
 ) -> impl std::fmt::Display + 'a
 where
     T: std::fmt::Display + 'a,
 {
-    let url = if stylesheet.hyperlink { url } else { None };
+    let url = if hyperlink { url } else { None };
 
     std::fmt::from_fn(move |f| {
         if let Some(url) = url {
@@ -88,7 +87,6 @@ impl DiagnosticStylesheet {
     pub fn styled() -> Self {
         let bright_blue = AnsiColor::BrightBlue.on_default();
 
-        let hyperlink = supports_hyperlinks::supports_hyperlinks();
         Self {
             error: AnsiColor::BrightRed.on_default().effects(Effects::BOLD),
             warning: AnsiColor::Yellow.on_default().effects(Effects::BOLD),
@@ -104,16 +102,12 @@ impl DiagnosticStylesheet {
             deletion: AnsiColor::Red.on_default(),
             insertion_line_no: AnsiColor::Green.on_default().effects(Effects::BOLD),
             deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
-            hyperlink,
+            hyperlink: false,
         }
     }
 
-    pub(super) fn hyperlinks(mut self, mode: HyperlinkMode) -> Self {
-        match mode {
-            HyperlinkMode::Auto => {}
-            HyperlinkMode::Always => self.hyperlink = true,
-            HyperlinkMode::Never => self.hyperlink = false,
-        }
+    pub(super) fn hyperlink(mut self, yes: bool) -> Self {
+        self.hyperlink = yes;
         self
     }
 
