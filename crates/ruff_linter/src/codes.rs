@@ -2,6 +2,9 @@
 /// all rules categories. A rule category is something like pyflakes or flake8-todos. Each rule
 /// category contains all rules and their common prefixes, i.e. everything you can specify in
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
+///
+/// When [`crate::preview::is_rule_categories_enabled`] returns `true`, rules can also be selected by
+/// their semantic [`Category`].
 use std::fmt::Formatter;
 
 use ruff_db::diagnostic::SecondaryCode;
@@ -1259,4 +1262,21 @@ impl std::fmt::Display for Rule {
 pub enum FromNameError {
     #[error("unknown rule name")]
     Unknown,
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::{Category, Rule};
+
+    #[test]
+    fn category_names_do_not_conflict_with_rule_names() {
+        for category in Category::iter() {
+            assert!(
+                Rule::from_name(category.into_str()).is_err(),
+                "category {category} conflicts with a rule name"
+            );
+        }
+    }
 }

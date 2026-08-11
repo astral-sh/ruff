@@ -1238,6 +1238,40 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
 }
 
 #[test]
+fn rule_category_selector_cli_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid selector `restriction` in `select` from the CLI. Selecting rules by category requires preview mode
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_category_selector_cli_preview_enabled() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "assert True")?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction", "--preview"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:1: assert: Use of `assert` detected
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn rule_name_selector_config_preview_disabled() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
     fixture.write_file("ruff.toml", r#"lint = { select = ["unused-import"] }"#)?;
