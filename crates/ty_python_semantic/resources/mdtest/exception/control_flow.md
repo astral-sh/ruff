@@ -421,6 +421,55 @@ async def async_iteration(values: AsyncIterable[int]) -> None:
         reveal_type(state)  # revealed: Literal[1, 2]
 ```
 
+## Context-manager entry and exit can raise
+
+A context manager can raise before its body runs or after the body completes:
+
+```py
+def context_manager_entry_and_exit(manager) -> None:
+    state = 0
+    try:
+        with manager:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0, 1]
+```
+
+Asynchronous context managers have the same entry and exit behavior:
+
+```py
+async def async_context_manager_entry_and_exit(manager) -> None:
+    state = 0
+    try:
+        async with manager:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0, 1]
+```
+
+If entering the context manager fails, its `as` target has not yet been assigned:
+
+```py
+def context_manager_target_may_be_unbound(manager) -> None:
+    try:
+        with manager as value:
+            pass
+    except:
+        value  # error: [possibly-unresolved-reference]
+```
+
+Earlier context managers have already entered when a later manager raises:
+
+```py
+def multiple_context_managers(first, second) -> None:
+    state = 0
+    try:
+        with first as state, second:
+            state = 1
+    except:
+        reveal_type(state)  # revealed: Literal[0, 1] | Unknown
+```
+
 ## Unpacking can raise
 
 Unpacking can fail before the assignments following it run:

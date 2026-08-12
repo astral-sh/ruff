@@ -4000,6 +4000,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } in items
                 {
                     self.visit_expr(context_expr);
+                    self.record_exception_checkpoint();
 
                     if let Some(optional_vars) = optional_vars.as_deref() {
                         let context_manager = self.add_standalone_expression(context_expr);
@@ -4014,6 +4015,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
                 self.visit_body(body);
+                self.record_exception_checkpoint();
             }
 
             ast::Stmt::For(
