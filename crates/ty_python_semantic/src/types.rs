@@ -23,6 +23,7 @@ use smallvec::smallvec_inline;
 use ty_module_resolver::{ImportingFile, KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
+use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
@@ -6620,11 +6621,16 @@ impl<'db> Type<'db> {
         };
 
         let class = class.class_literal(db);
-        if class.has_custom_getattribute(db) {
+        if class.as_static().is_none() {
             return true;
         }
 
-        if !class.has_dynamic_getattribute(db) {
+        let flags = class.instance_flags(db);
+        if flags.contains(ClassInstanceFlags::HAS_CUSTOM_GETATTRIBUTE) {
+            return true;
+        }
+
+        if !flags.contains(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE) {
             return false;
         }
 
