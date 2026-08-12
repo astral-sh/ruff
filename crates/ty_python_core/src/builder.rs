@@ -246,6 +246,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
+    /// Number of enclosing `with` statements that can receive exception checkpoints.
+    active_with_depth: usize,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -317,6 +319,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
+            active_with_depth: 0,
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -2172,6 +2175,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::OrPatternAlternative(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
@@ -2242,9 +2246,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     reveal_type(state)  # Literal[1]
     /// ```
     ///
-    /// Skips snapshot construction entirely when no enclosing `try` suite has active handlers.
+    /// Skips snapshot construction entirely when no enclosing exception handler is active.
     fn record_exception_checkpoint(&mut self) {
-        if !self.in_try
+        if !(self.in_try || self.active_with_depth != 0)
             || !self
                 .try_node_context_stack_manager
                 .has_active_exception_handler(self)
@@ -2273,7 +2277,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && self.in_try
+            && (self.in_try || self.active_with_depth != 0)
             && self
                 .try_node_context_stack_manager
                 .has_active_exception_handler(self)
@@ -4011,6 +4015,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 is_async,
                 ..
             }) => {
+                self.active_with_depth += 1;
+                let mut context_managers =
+                    SmallVec::<[(&ast::Expr, Option<Expression<'db>>); 1]>::new();
+
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -4021,20 +4029,72 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_expr(context_expr);
                     self.record_exception_checkpoint();
 
-                    if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
+                    self.try_node_context_stack_manager.push_with_context();
+
+                    let expression = optional_vars.as_deref().map(|optional_vars| {
+                        let expression = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
                                 is_async: *is_async,
                             },
                             optional_vars,
-                            context_manager,
+                            expression,
                         );
-                    }
+                        expression
+                    });
+                    context_managers.push((context_expr, expression));
                 }
+
                 self.visit_body(body);
-                self.record_exception_checkpoint();
+
+                for (context_expr, expression) in context_managers.into_iter().rev() {
+                    let mut exceptional_entries = self
+                        .try_node_context_stack_manager
+                        .finish_with_context()
+                        .into_iter();
+
+                    if let Some(exceptional_entry) = exceptional_entries.next() {
+                        let normal_exit = self.flow_snapshot();
+                        let expression = expression
+                            .unwrap_or_else(|| self.add_standalone_expression(context_expr));
+                        let predicate = PredicateOrLiteral::Predicate(Predicate {
+                            node: PredicateNode::ContextManagerSuppresses {
+                                expression,
+                                is_async: *is_async,
+                            },
+                            is_positive: true,
+                        });
+                        let predicate_id = self.add_predicate(predicate);
+
+                        self.flow_restore(exceptional_entry);
+                        for exceptional_entry in exceptional_entries {
+                            self.flow_merge(exceptional_entry);
+                        }
+
+                        self.record_ambiguous_reachability();
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let narrowing_constraint = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                reachability_constraint,
+                                narrowing_constraint,
+                            );
+
+                        self.flow_merge(normal_exit);
+                    }
+
+                    // A manager cannot suppress an exception raised by its own exit method, but
+                    // an earlier manager or enclosing `try` statement can still receive it.
+                    self.record_exception_checkpoint();
+                }
+
+                self.active_with_depth -= 1;
             }
 
             ast::Stmt::For(

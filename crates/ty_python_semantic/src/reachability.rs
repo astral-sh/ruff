@@ -215,8 +215,8 @@ use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
-    ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
+    BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
+    FileScopeId, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
@@ -543,6 +543,7 @@ const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }
@@ -1134,7 +1135,11 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
 
-                    if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    if matches!(
+                        predicate.node,
+                        PredicateNode::IsNonTerminalCall(_)
+                            | PredicateNode::ContextManagerSuppresses { .. }
+                    ) {
                         actions.push(Action::AnalyzeNonTerminal(id));
                         actions.push(Action::Visit(node.if_uncertain));
                     } else {
@@ -1151,7 +1156,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
-                            unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
+                            unreachable!(
+                                "statically decidable predicates should never be Ambiguous"
+                            )
                         }
                     };
 
@@ -1523,6 +1530,14 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
                 .bool(db, env)
                 .negate_if(!predicate.is_positive)
         }
+        PredicateNode::ContextManagerSuppresses {
+            expression,
+            is_async,
+        } => Truthiness::from(
+            infer_same_file_expression_type(db, expression, TypeContext::default())
+                .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
+        )
+        .negate_if(!predicate.is_positive),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
             callable,
             call_expr,

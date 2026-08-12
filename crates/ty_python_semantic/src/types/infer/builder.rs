@@ -2183,8 +2183,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 // Call into the context expression inference to validate that it evaluates
                 // to a valid context manager.
-                let context_expression_ty =
-                    self.infer_expression(&item.context_expr, TypeContext::default());
+                let context_expression_ty = self
+                    .infer_maybe_standalone_expression(&item.context_expr, TypeContext::default());
                 self.infer_context_expression(&item.context_expr, context_expression_ty, *is_async);
                 self.infer_optional_expression(target, TypeContext::default());
             }

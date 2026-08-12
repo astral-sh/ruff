@@ -1,16 +1,82 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::{
-    FxOrderSet,
+    FxOrderSet, Program,
+    place::Place,
     types::{
-        Bindings, CallArguments, CallDunderError, Type, TypeContext, call::CallErrorKind,
-        context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
+        Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
+        TypeContext, UnionBuilder, call::CallErrorKind, context::InferContext,
+        diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
 use ruff_python_ast as ast;
 use ty_python_core::EvaluationMode;
 
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _, _| false,
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn context_manager_can_suppress<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    manager: Type<'db>,
+    is_async: bool,
+) -> bool {
+    if let Type::Union(union) = manager {
+        return union
+            .elements(db)
+            .iter()
+            .copied()
+            .any(|element| context_manager_can_suppress(db, program, element, is_async));
+    }
+
+    let env = ProgramEnvironment::from_program(program);
+    let method = if is_async { "__aexit__" } else { "__exit__" };
+    let Place::Defined(exit) = manager
+        .member_lookup_with_policy(db, &env, method, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+        .place
+    else {
+        return false;
+    };
+    let Some(callables) = exit.ty.try_upcast_to_callable(db, &env) else {
+        return false;
+    };
+
+    let mut return_types = UnionBuilder::new(db, &env);
+    for callable in &callables {
+        for signature in callable.signatures(db) {
+            let return_type = if is_async {
+                let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
+                    return false;
+                };
+                awaited
+            } else {
+                signature.return_ty
+            };
+            return_types.add_in_place(return_type);
+        }
+    }
+
+    let return_type = return_types.build();
+    return_type.is_equivalent_to(db, &env, KnownClass::Bool.to_instance(db, &env))
+        || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
+}
+
 impl<'db> Type<'db> {
+    /// Whether this context manager can suppress exceptions according to the typing specification.
+    ///
+    /// Only exit methods returning exactly `bool` or `Literal[True]` are considered suppressing.
+    /// Asynchronous context managers are classified by the awaited exit return type.
+    pub(crate) fn can_suppress_exceptions(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
+    ) -> bool {
+        context_manager_can_suppress(db, env.program(db), self, mode.is_async())
+    }
+
     /// Returns the type bound from a context manager with type `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.

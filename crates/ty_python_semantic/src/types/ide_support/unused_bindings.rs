@@ -269,6 +269,24 @@ mod tests {
     }
 
     #[test]
+    fn suppressed_exception_keeps_initial_binding_used() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            from contextlib import suppress
+
+            def f(values: list[int]) -> int | None:
+                value = None
+                with suppress(StopIteration):
+                    value = next(iter(values))
+                return value
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn captures_safe_local_binding_kinds() -> anyhow::Result<()> {
         let source = dedent(
             "

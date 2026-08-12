@@ -67,6 +67,24 @@ impl TryNodeContextStackManager {
             .push_context(exception_handlers);
     }
 
+    /// Push a context manager that can collect exceptions raised after it has been entered.
+    pub(super) fn push_with_context(&mut self) {
+        self.current_try_context_stack().0.push(TryNodeContext {
+            exception_handlers: ExceptionHandlers::propagating(),
+            kind: ExceptionContextKind::With,
+            ..TryNodeContext::default()
+        });
+    }
+
+    /// Take the exception checkpoints collected by the innermost context manager and remove it.
+    pub(super) fn finish_with_context(&mut self) -> Vec<FlowSnapshot> {
+        let stack = self.current_try_context_stack();
+        let snapshots = stack.end_try_suite();
+        let context = stack.pop_context();
+        debug_assert!(matches!(context.kind, ExceptionContextKind::With));
+        snapshots
+    }
+
     /// Pop a [`TryNodeContext`] off the [`TryNodeContextStack`] at the top of our stack of stacks.
     pub(super) fn pop_context(&mut self) -> TryNodeContext {
         self.current_try_context_stack().pop_context()
@@ -221,10 +239,23 @@ impl TryNodeContextStack {
     /// Push the snapshot onto the innermost `try` block's terminal-entry snapshots for its
     /// `finally` suite.
     fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
-        if let Some(context) = self.0.last_mut() {
+        if let Some(context) = self
+            .0
+            .iter_mut()
+            .rev()
+            .find(|context| matches!(context.kind, ExceptionContextKind::Try))
+        {
             context.record_terminal_finally_entry(builder.flow_snapshot());
         }
     }
+}
+
+/// Whether an exception-handling context also owns a `finally` suite.
+#[derive(Debug, Default)]
+enum ExceptionContextKind {
+    #[default]
+    Try,
+    With,
 }
 
 /// Context for tracking exception and `finally` entry states for a single
@@ -235,6 +266,7 @@ impl TryNodeContextStack {
 #[derive(Debug, Default)]
 pub(super) struct TryNodeContext {
     exception_handlers: ExceptionHandlers,
+    kind: ExceptionContextKind,
     last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,

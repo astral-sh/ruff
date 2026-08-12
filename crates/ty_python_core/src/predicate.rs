@@ -114,6 +114,11 @@ pub struct CallableAndCallExpr<'db> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    /// Whether a context manager's exit return type allows an exception to be suppressed.
+    ContextManagerSuppresses {
+        expression: Expression<'db>,
+        is_async: bool,
+    },
     /// These predicates are recorded for statements with call expressions. As part of
     /// reachability constraints, they are used to determine whether control flow can
     /// continue past this statement or not.

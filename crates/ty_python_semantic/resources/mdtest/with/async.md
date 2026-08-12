@@ -18,6 +18,81 @@ async def test():
         reveal_type(f)  # revealed: Target
 ```
 
+## Exception-suppressing async context managers
+
+An asynchronous context manager can suppress an exception when its awaited `__aexit__` result has
+type `bool`:
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+async def may_raise() -> str:
+    raise ValueError
+
+async def preserved_binding() -> None:
+    result = None
+    async with Suppresses():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+If an interrupted assignment has no earlier binding, the name may remain undefined:
+
+```py
+async def missing_binding() -> None:
+    async with Suppresses():
+        value = await may_raise()
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: str
+```
+
+An awaited `None` exit result cannot suppress exceptions:
+
+```py
+class Propagates:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
+
+async def propagating_exit() -> None:
+    result = None
+    async with Propagates():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+An earlier async context manager can suppress a later manager's entry failure, leaving its target
+undefined:
+
+```py
+class EnterFails:
+    async def __aenter__(self) -> str:
+        raise ValueError
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
+
+async def later_entry_fails() -> None:
+    async with Suppresses(), EnterFails() as target:
+        pass
+    # error: [possibly-unresolved-reference]
+    reveal_type(target)  # revealed: str
+```
+
+A return without a raising expression remains terminal, but an awaited return expression may raise
+and be suppressed:
+
+```py
+async def bare_return() -> str:
+    async with Suppresses():
+        return "finished"
+
+async def interrupted_return() -> str:  # error: [invalid-return-type]
+    async with Suppresses():
+        return await may_raise()
+```
+
 ## Multiple targets
 
 ```py

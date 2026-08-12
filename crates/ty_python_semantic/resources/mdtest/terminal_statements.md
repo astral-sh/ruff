@@ -578,6 +578,23 @@ def finally_assignment_runs_before_break():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Returning from a context manager inside `try`
+
+A context manager cannot suppress a return or prevent it from reaching an enclosing `finally` block.
+
+```py
+from contextlib import suppress
+
+def returns_through_finally() -> None:
+    value = "before"
+    try:
+        with suppress(ValueError):
+            value = "returned"
+            return
+    finally:
+        reveal_type(value)  # revealed: Literal["returned"]
+```
+
 ## Calls to functions returning `Never` / `NoReturn`
 
 These calls should be treated as terminal statements.

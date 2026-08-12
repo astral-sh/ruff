@@ -18,6 +18,231 @@ with Manager() as f:
     reveal_type(f)  # revealed: Target
 ```
 
+## Exception-suppressing context managers
+
+When a context manager suppresses an exception during an assignment, the previous binding remains
+visible after the `with` statement:
+
+```py
+from contextlib import suppress
+
+def may_raise() -> str:
+    raise ValueError
+
+result = None
+with suppress(ValueError):
+    result = may_raise()
+
+reveal_type(result)  # revealed: None | str
+```
+
+A binding introduced by an assignment that may fail is not guaranteed to exist:
+
+```py
+with suppress(ValueError):
+    value = may_raise()
+
+# error: [possibly-unresolved-reference]
+reveal_type(value)  # revealed: str
+```
+
+A deleted binding is not restored if a later exception is suppressed:
+
+```py
+deleted = 1
+with suppress(ValueError):
+    del deleted
+    may_raise()
+
+deleted  # error: [unresolved-reference]
+```
+
+An assignment that cannot raise remains definitely bound:
+
+```py
+with suppress(ValueError):
+    safe_value = 1
+
+reveal_type(safe_value)  # revealed: Literal[1]
+```
+
+## Assigning a context manager target can raise
+
+Unpacking the result of `__enter__` can raise after the context manager has entered. If its exit
+method suppresses that exception, earlier bindings remain visible and new targets may be undefined:
+
+```py
+from collections.abc import Iterable
+
+class EmptyIterableManager:
+    def __enter__(self) -> Iterable[int]:
+        return []
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+value = "before"
+with EmptyIterableManager() as (value, missing):
+    pass
+
+reveal_type(value)  # revealed: Literal["before"] | int
+# error: [possibly-unresolved-reference]
+reveal_type(missing)  # revealed: int
+```
+
+## Earlier context managers can suppress later entry failures
+
+If an earlier context manager suppresses an exception while a later manager enters, the later
+manager's target may never be assigned:
+
+```py
+from contextlib import suppress
+
+class EnterFails:
+    def __enter__(self) -> str:
+        raise ValueError
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+with suppress(ValueError), EnterFails() as target:
+    pass
+
+# error: [possibly-unresolved-reference]
+reveal_type(target)  # revealed: str
+```
+
+## Returning from an exception-suppressing context manager
+
+A context manager cannot suppress a return statement that does not raise:
+
+```py
+from contextlib import suppress
+
+def bare_return() -> int:
+    with suppress(ValueError):
+        return 1
+```
+
+It can suppress an exception raised while evaluating the return expression, allowing the function to
+continue without returning a value:
+
+```py
+def may_raise() -> int:
+    raise ValueError
+
+def interrupted_return() -> int:  # error: [invalid-return-type]
+    with suppress(ValueError):
+        return may_raise()
+```
+
+## Exception handlers inside a suppressing context manager
+
+A bare handler catches an exception before it can reach the surrounding context manager:
+
+```py
+from contextlib import suppress
+
+def caught_before_suppression() -> int:
+    with suppress(ValueError):
+        try:
+            raise ValueError
+        except:
+            return 1
+```
+
+## Eager and lazy expressions inside a suppressing context manager
+
+A list comprehension can raise immediately, but a generator expression does not evaluate its body
+until it is iterated:
+
+```py
+from contextlib import suppress
+
+def may_raise() -> int:
+    raise ValueError
+
+def eager_comprehension() -> int:  # error: [invalid-return-type]
+    with suppress(ValueError):
+        [may_raise() for _ in [0]]
+        return 1
+
+def lazy_generator() -> int:
+    with suppress(ValueError):
+        (may_raise() for _ in [0])
+        return 1
+```
+
+## Context manager exit return types
+
+The typing specification treats `bool` and `Literal[True]` exit return types as potentially
+exception-suppressing:
+
+```py
+from typing import Literal
+
+class Manager:
+    def __enter__(self) -> None: ...
+
+class Suppresses(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class AlwaysSuppresses(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
+        return True
+
+def may_raise() -> str:
+    raise ValueError
+
+for manager in [Suppresses(), AlwaysSuppresses()]:
+    result = 0
+    with manager:
+        result = may_raise()
+    reveal_type(result)  # revealed: Literal[0] | str
+```
+
+Other exit return types, including `Literal[False]`, `None`, and `bool | None`, do not suppress
+exceptions:
+
+```py
+class PropagatesFalse(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+class PropagatesNone(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class PropagatesOptionalBool(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return None
+
+for manager in [PropagatesFalse(), PropagatesNone(), PropagatesOptionalBool()]:
+    result = 0
+    with manager:
+        result = may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+A union can still suppress an exception when one of its context managers suppresses exceptions:
+
+```py
+def possibly_suppressing(manager: Suppresses | PropagatesOptionalBool) -> None:
+    result = 0
+    with manager:
+        result = may_raise()
+    reveal_type(result)  # revealed: Literal[0] | str
+```
+
+A non-suppressing manager does not restore a path that ends in an exception:
+
+```py
+def propagating_exception(value: int | str) -> None:
+    if isinstance(value, int):
+        with PropagatesNone():
+            raise ValueError
+    reveal_type(value)  # revealed: str
+```
+
 ## Union context manager
 
 ```py
