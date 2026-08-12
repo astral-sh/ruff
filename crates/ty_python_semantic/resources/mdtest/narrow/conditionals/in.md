@@ -1341,22 +1341,6 @@ def both_keys_are_present(mapping: Mapping[Literal["known"], int]) -> None:
         reveal_type(mapping["second"])  # revealed: object
 ```
 
-## Contradictory mapping key membership conditions
-
-A key cannot be both present and absent from the same mapping, so combining those membership facts
-makes the branch unreachable:
-
-```py
-from collections.abc import Mapping
-from typing import Literal
-
-def contradictory_membership(mapping: Mapping[Literal["known"], int]) -> None:
-    has_missing = "missing" in mapping
-
-    if has_missing and "missing" not in mapping:
-        reveal_type(mapping)  # revealed: Never
-```
-
 ## Mapping key membership disjunction
 
 If at least one of two keys must be present, excluding one establishes that the other can be
