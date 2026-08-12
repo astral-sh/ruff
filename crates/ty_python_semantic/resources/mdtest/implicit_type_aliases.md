@@ -1430,6 +1430,52 @@ def _(
 assigned: type[PairAlias[int, str]] = int
 ```
 
+#### Other alias representations
+
+An alias does not have to be backed by a class. Stringified, transparent, `Annotated` and
+union-valued aliases all specialize inside `type[…]` the same way they do outside it:
+
+```py
+from typing import Annotated, TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+StringAlias: TypeAlias = "list[T]"
+TransparentAlias: TypeAlias = T
+AnnotatedAlias = Annotated[list[T], "metadata"]
+UnionAlias = list[T] | set[T]
+
+def _(
+    string: type[StringAlias[int]],
+    transparent: type[TransparentAlias[int]],
+    annotated: type[AnnotatedAlias[int]],
+    union: type[UnionAlias[int]],
+):
+    reveal_type(string)  # revealed: type[list[int]]
+    reveal_type(transparent)  # revealed: type[int]
+    reveal_type(annotated)  # revealed: type[list[int]]
+    reveal_type(union)  # revealed: type[list[int] | set[int]]
+```
+
+#### Callable aliases
+
+A callable is not a class object, so specializing a `Callable` alias inside `type[…]` is rejected,
+just as a directly spelled callable is:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+CallableAlias = Callable[[T], T]
+
+def _(
+    # error: [invalid-type-form] "The argument to `type[]` must be a class object type"
+    callable_: type[CallableAlias[int]],
+):
+    reveal_type(callable_)  # revealed: type[Unknown]
+```
+
 ### `Type[…]`
 
 The same also works for `typing.Type[…]`:
