@@ -1297,6 +1297,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(slice, TypeContext::default());
                 KnownClass::NoneType.to_subclass_of(db, env)
             }
+            ast::Expr::Subscript(ast::ExprSubscript { value, .. }) if !is_dotted_name(value) => {
+                infer_type_argument(self, slice)
+            }
             ast::Expr::Subscript(
                 subscript @ ast::ExprSubscript {
                     value,
@@ -1380,7 +1383,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     value_ty @ (Type::SpecialForm(
                         SpecialFormType::Top | SpecialFormType::Bottom | SpecialFormType::Annotated,
                     )
-                    | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))) => {
+                    | Type::KnownInstance(_)
+                    | Type::GenericAlias(_)
+                    | Type::Callable(_)) => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
                         subclass_of_type_argument(self, slice, slice_ty)
                     }

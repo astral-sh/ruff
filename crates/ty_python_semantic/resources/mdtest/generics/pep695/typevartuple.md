@@ -1268,8 +1268,7 @@ def extract_middle[*Middle](
 
 accept_str_in_between(True, "phase", "status", b"ok")
 accept_str_in_between(True, b"ok")
-# error: [invalid-argument-type] "Argument to function `accept_str_in_between` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
-accept_str_in_between(True, 1, b"bad")
+accept_str_in_between(True, 1, b"bad")  # error: [invalid-argument-type]
 
 def f(i: int, s: str, b: bytes, mixed: tuple[int, *tuple[str, ...], bytes]) -> None:
     reveal_type(remove_bytes(i, s, b))  # revealed: tuple[int, str]

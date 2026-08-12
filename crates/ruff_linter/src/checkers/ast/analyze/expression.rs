@@ -1469,6 +1469,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::PercentFormatPositionalCountMismatch,
                     Rule::PercentFormatStarRequiresSequence,
                     Rule::PercentFormatUnsupportedFormatCharacter,
+                    Rule::BadStringFormatCharacter,
                 ]) {
                     let location = expr.range();
                     match pyflakes::cformat::CFormatSummary::try_from(value.to_str()) {
@@ -1481,6 +1482,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                 pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                     char: c,
                                 },
+                                location,
+                            );
+                            // PLE1300
+                            checker.report_diagnostic_if_enabled(
+                                pylint::rules::BadStringFormatCharacter { format_char: c },
                                 location,
                             );
                         }
@@ -1534,13 +1540,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::PrintfStringFormatting) {
                     pyupgrade::rules::printf_string_formatting(checker, bin_op, format_string);
-                }
-                if checker.is_rule_enabled(Rule::BadStringFormatCharacter) {
-                    pylint::rules::bad_string_format_character::percent(
-                        checker,
-                        expr,
-                        format_string,
-                    );
                 }
                 if checker.is_rule_enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, bin_op, format_string);
