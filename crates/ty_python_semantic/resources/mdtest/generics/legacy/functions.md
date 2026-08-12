@@ -121,6 +121,11 @@ def takes_in_type(x: type[T]) -> type[T]:
     return x
 
 reveal_type(takes_in_type(int))  # revealed: type[int]
+
+def takes_in_type_of_list(x: type[list[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(takes_in_type_of_list(list[int]))  # revealed: int
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
@@ -134,6 +139,9 @@ reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
+
+reveal_type(takes_in_type_of_list(Sub))  # revealed: int
+reveal_type(takes_in_type_of_list(GenericSub[str]))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub(ExplicitlyImplements[T]): ...
@@ -160,6 +168,63 @@ def pick(x: object) -> str | bool:
     raise NotImplementedError
 
 reveal_type(pick([1]))  # revealed: bool
+```
+
+## Inferring a class-object parameter through a generic factory
+
+```py
+from typing import Generic, TypeVar
+
+RequestT = TypeVar("RequestT")
+ResponseT = TypeVar("ResponseT")
+
+class BaseService(Generic[RequestT, ResponseT]):
+    Request: type[RequestT]
+    Response: type[ResponseT]
+
+class Future(Generic[ResponseT]):
+    def result(self) -> ResponseT | None:
+        raise NotImplementedError
+
+class Client(Generic[RequestT, ResponseT]):
+    def call_async(self, request: RequestT) -> Future[ResponseT]:
+        raise NotImplementedError
+
+def create_client(srv: type[BaseService[RequestT, ResponseT]]) -> Client[RequestT, ResponseT]:
+    raise NotImplementedError
+
+class MyRequest: ...
+class MyResponse: ...
+class MyService(BaseService[MyRequest, MyResponse]): ...
+
+def _() -> None:
+    client = create_client(MyService)
+    reveal_type(client)  # revealed: Client[MyRequest, MyResponse]
+    future = client.call_async(MyRequest())
+    reveal_type(future)  # revealed: Future[MyResponse]
+    reveal_type(future.result())  # revealed: MyResponse | None
+```
+
+The same shape as a method, where the specialization comes from the argument's bases:
+
+```py
+from collections.abc import Sequence
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Option(Generic[T]): ...
+class StringOptions(Option[Sequence[str]]): ...
+
+class Options:
+    def get_value_for(self, option: type[Option[T]]) -> T:
+        raise NotImplementedError
+
+def _(options: Options) -> None:
+    values = options.get_value_for(StringOptions)
+    reveal_type(values)  # revealed: Sequence[str]
+    # error: [unresolved-attribute] "Object of type `Sequence[str]` has no attribute `nonexistent`"
+    values.nonexistent()
 ```
 
 ## Inferring tuple parameter types

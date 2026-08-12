@@ -3727,6 +3727,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
+            (
+                Type::SubclassOf(formal_subclass),
+                Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::Union(_),
+            ) if matches!(formal_subclass.subclass_of(), SubclassOfInner::Class(_)) => {
+                let when = actual.when_constraint_set_assignable_to_owned(db, self.env, formal);
+                let when = self.constraints.load(db, self.env, &when);
+                self.infer_from_constraint_set(when)?;
+                return Ok(());
+            }
+
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
                     && let Some(actual_instance) = ty.to_instance_approximation(db, self.env) =>
