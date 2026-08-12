@@ -576,6 +576,36 @@ def class_decorator_raises(decorator) -> None:
         reveal_type(state)  # revealed: Literal[0, 1]
 ```
 
+A function decorator is applied after its parameter defaults have been evaluated:
+
+```py
+def function_decorator_raises(decorator) -> None:
+    state = 0
+    try:
+        @decorator
+        def inner(value=(state := 1)) -> None:
+            pass
+
+    except Exception:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+Decorator application can also raise when the function has no parameter defaults:
+
+```py
+def function_decorator_without_defaults(decorator) -> None:
+    caught = False
+    try:
+        @decorator
+        def inner() -> None:
+            pass
+
+    except Exception:
+        caught = True
+
+    reveal_type(caught)  # revealed: bool
+```
+
 A list comprehension also runs immediately:
 
 ```py

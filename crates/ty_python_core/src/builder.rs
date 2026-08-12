@@ -3264,6 +3264,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // and its `global` counterpart.
                 self.synthesize_nested_binding_definitions(nested_bindings);
 
+                // Decorator application can raise after defaults and annotations are evaluated.
+                self.record_exception_checkpoint_if(!decorator_list.is_empty());
+
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
