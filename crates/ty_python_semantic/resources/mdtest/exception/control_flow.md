@@ -246,6 +246,20 @@ def repeated_calls() -> None:
         reveal_type(state)  # revealed: Literal[0, "changed"]
 ```
 
+A branch that does not change any bindings preserves the state visible to the handler:
+
+```py
+def unchanged_branch(flag: bool) -> None:
+    state = 0
+    try:
+        may_raise()
+        if flag is True:
+            pass
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
 Branch narrowing changes the state visible to the handler even when neither branch introduces a new
 binding:
 
@@ -268,6 +282,20 @@ def restored_branches(value: int | None) -> None:
             may_raise()
         else:
             may_raise()
+    except:
+        reveal_type(value)  # revealed: int | None
+```
+
+Match guards also distinguish successful and failed branches without introducing a new binding:
+
+```py
+def guarded_match_branches(value: int | None) -> None:
+    try:
+        match value:
+            case _ if value is not None:
+                may_raise()
+            case _:
+                may_raise()
     except:
         reveal_type(value)  # revealed: int | None
 ```

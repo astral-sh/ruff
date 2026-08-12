@@ -1,5 +1,5 @@
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
-use crate::use_def::{ControlFlowRevision, FlowSnapshot, ScopedDefinitionId, UseDefMapBuilder};
+use crate::use_def::{FlowSnapshot, ScopedDefinitionId, UseDefMapBuilder};
 
 use super::SemanticIndexBuilder;
 
@@ -295,7 +295,9 @@ impl ExceptionContextStack {
                 ExceptionHandlers::None => context.has_escaping_exception = true,
                 ExceptionHandlers::Propagating(snapshots)
                 | ExceptionHandlers::CatchAll(snapshots) => {
-                    if context.last_checkpoint_key != Some(checkpoint_key) {
+                    if use_def_map.reachability_constraints.is_saturated()
+                        || context.last_checkpoint_key != Some(checkpoint_key)
+                    {
                         snapshots.push(use_def_map.snapshot());
                         context.last_checkpoint_key = Some(checkpoint_key);
                     }
@@ -347,7 +349,7 @@ enum ExceptionContextKind {
 pub(super) struct ExceptionContext {
     exception_handlers: ExceptionHandlers,
     kind: ExceptionContextKind,
-    last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
+    last_checkpoint_key: Option<(ScopedDefinitionId, ScopedReachabilityConstraintId)>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
     /// Whether apparently terminal control flow in a nested context-manager body, such as a
