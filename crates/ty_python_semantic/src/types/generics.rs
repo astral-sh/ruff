@@ -3727,6 +3727,36 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
+            (
+                formal @ (Type::SubclassOf(_) | Type::GenericAlias(_)),
+                Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::Union(_),
+            ) if formal.is_generic_alias()
+                || matches!(formal, Type::SubclassOf(subclass)
+                    if matches!(subclass.subclass_of(), SubclassOfInner::Class(_))) =>
+            {
+                let when = match polarity {
+                    TypeVarVariance::Covariant | TypeVarVariance::Invariant => {
+                        actual.when_constraint_set_assignable_to_owned(db, self.env, formal)
+                    }
+                    TypeVarVariance::Contravariant => {
+                        formal.when_constraint_set_assignable_to_owned(db, self.env, actual)
+                    }
+                    TypeVarVariance::Bivariant => return Ok(()),
+                };
+                let mut when = self.constraints.load(db, self.env, &when);
+                if matches!(polarity, TypeVarVariance::Invariant) {
+                    let reverse =
+                        formal.when_constraint_set_assignable_to_owned(db, self.env, actual);
+                    let reverse = self.constraints.load(db, self.env, &reverse);
+                    when.intersect(db, self.constraints, reverse);
+                }
+                self.infer_from_constraint_set(when)?;
+                return Ok(());
+            }
+
             (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
                     && let Some(actual_instance) = ty.to_instance_approximation(db, self.env) =>
