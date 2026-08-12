@@ -3,6 +3,10 @@
 Each shebang needs its own Markdown section. Python code blocks in the same section are concatenated,
 so only the first shebang would appear at the beginning of the file.
 
+Cases that should emit `EXE003` use Python fixtures instead. Assertion comments cannot precede a
+shebang without moving it from the beginning of the file, and an inline assertion becomes part of the
+shebang itself.
+
 ```toml
 lint.select = ["EXE003"]
 ```
@@ -76,21 +80,5 @@ print("hello world")
 
 ```py
 #!/usr/bin/env python3
-print("hello world")
-```
-
-## Invalid interpreter
-
-A shebang at the beginning of the file is still checked by `EXE003`, even when the interpreter name only resembles `uv run`.
-
-```py
-#!/usr/bin/env uv_not_really_run  # error: [shebang-missing-python]
-print("this should fail")
-```
-
-## Non-Python interpreter
-
-```py
-#!/usr/bin/bash  # error: [shebang-missing-python]
 print("hello world")
 ```

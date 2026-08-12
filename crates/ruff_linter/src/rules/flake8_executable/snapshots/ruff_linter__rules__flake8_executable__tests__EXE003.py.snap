@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
+---
+EXE003 Shebang should contain `python`, `pytest`, or `uv run`
+ --> EXE003.py:1:1
+  |
+1 | #!/usr/bin/bash
+  | ^^^^^^^^^^^^^^^
+2 | print("hello world")
+  |
