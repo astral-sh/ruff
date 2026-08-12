@@ -495,6 +495,15 @@ fn dynamic_content_impl<'db>(
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
 
+        fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            // Avoid walking the bounds/constraints/defaults of the generic context.
+            // Only the types the class was actually specialized with are relevant to whether
+            // the `GenericAlias` contains a dynamic type.
+            for ty in alias.specialization(db).types(db) {
+                self.visit_type(db, *ty);
+            }
+        }
+
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
             self.active_type_aliases.visit(
                 &alias.definition(db),

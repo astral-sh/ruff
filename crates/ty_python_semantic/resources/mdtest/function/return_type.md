@@ -836,6 +836,90 @@ def returns_list_containing_any() -> list[int]:
     return [returns_any()]
 ```
 
+## Regression test: `unsound-return-statement` with gradual generic declarations
+
+A specialized generic type is fully static if it has been specialized with fully static types, even
+if the type parameter(s) it is generic over have non-fully-static bounds, constraints, or defaults.
+A previous version of the rule incorrectly considered these specialized generic types as being
+non-fully-static, leading to false negatives in the below examples:
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Any, Generator, Generic, TypeVar
+
+class Bounded[T: Any]: ...
+class Constrained[T: (int, Any)]: ...
+class Defaulted[T = Any]: ...
+
+# `Bounded[int]`, `Constrained[int]` and `Defaulted[int]` are all fully static,
+# despite their bounds/constraints/defaults not being fully static
+def returns_bounded(value: Any) -> Bounded[int]:
+    return value  # error: [unsound-return-statement]
+
+def returns_constrained(value: Any) -> Constrained[int]:
+    return value  # error: [unsound-return-statement]
+
+def returns_defaulted(value: Any) -> Defaulted[int]:
+    return value  # error: [unsound-return-statement]
+```
+
+The same applies to classes declared with legacy type variables:
+
+```py
+BoundedT = TypeVar("BoundedT", bound=Any)
+ConstrainedT = TypeVar("ConstrainedT", int, Any)
+DefaultedT = TypeVar("DefaultedT", default=Any)
+
+class LegacyBounded(Generic[BoundedT]): ...
+class LegacyConstrained(Generic[ConstrainedT]): ...
+class LegacyDefaulted(Generic[DefaultedT]): ...
+
+def returns_legacy_bounded(value: Any) -> LegacyBounded[int]:
+    return value  # error: [unsound-return-statement]
+
+def returns_legacy_constrained(value: Any) -> LegacyConstrained[int]:
+    return value  # error: [unsound-return-statement]
+
+def returns_legacy_defaulted(value: Any) -> LegacyDefaulted[int]:
+    return value  # error: [unsound-return-statement]
+```
+
+and to `return` statements in generator functions:
+
+```py
+def generator_returns_bounded(value: Any) -> Generator[None, None, Bounded[int]]:
+    yield
+    return value  # error: [unsound-return-statement]
+```
+
+A specialized generic type is nonetheless considered to be non-fully-static if it is specialized
+with non-fully-static types:
+
+```py
+def returns_gradual_bounded(value: Any) -> Bounded[Any]:
+    # no error
+    return value
+
+def returns_gradual_constrained(value: Any) -> Constrained[Any]:
+    # no error
+    return value
+
+def returns_gradual_defaulted(value: Any) -> Defaulted[Any]:
+    # no error
+    return value
+
+def returns_nested_gradual_bounded(value: Any) -> Bounded[list[Any]]:
+    # no error
+    return value
+```
+
 ## Regression test: `unsound-return-statement` uses "pure redundancy"
 
 Internally, the rule uses "pure redundancy" rather than "impure redundancy". The following example
