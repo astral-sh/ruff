@@ -456,9 +456,8 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 Terminal control flow in a `try`, `except`, or `else` block passes through its `finally` clause
 before terminating the current scope or jumping to its final destination. A `finally` block with
-both normal and terminal entry paths sees the bindings from both, but only the normal path can
-continue after the block. Straight-line cleanup preserves that distinction; branching cleanup
-currently remains conservative.
+both normal and terminal entry paths continues only along the normal path. Straight-line cleanup
+sees the bindings from both entry paths; branching cleanup is analyzed on the continuing path.
 
 ```py
 def finally_runs_after_return():
@@ -572,6 +571,21 @@ def finally_cleanup_calls_preserve_narrowing(value: int | None, resource: Resour
     requires_int(value)
 ```
 
+A conditional cleanup call also preserves the continuing path's narrowing.
+
+```py
+def finally_conditional_cleanup_preserves_narrowing(value: int | None, resource: Resource, should_close: bool) -> None:
+    try:
+        if value is None:
+            return
+    finally:
+        if should_close:
+            resource.close()
+
+    reveal_type(value)  # revealed: int
+    requires_int(value)
+```
+
 A cleanup call that never returns also prevents any later code from being reached.
 
 ```py
@@ -605,12 +619,11 @@ def finally_assignment_overwrites_returning_path(cond: bool) -> None:
     reveal_type(value)  # revealed: Literal["cleanup"]
 ```
 
-Cleanup suites that branch are not analyzed separately for continuing and returning paths. Here,
-only `2` can reach the code after `finally`, but the conservative result also includes `1` from the
-returning path.
+A branching cleanup suite is analyzed on the continuing path, so assignments from returning paths do
+not reach subsequent code.
 
 ```py
-def finally_branching_cleanup_is_conservative(cond: bool) -> None:
+def finally_branching_cleanup_preserves_normal_path(cond: bool) -> None:
     try:
         if cond:
             return
@@ -620,8 +633,36 @@ def finally_branching_cleanup_is_conservative(cond: bool) -> None:
         else:
             value = 2
 
-    # TODO: Only `Literal[2]` should remain after the returning path exits.
-    reveal_type(value)  # revealed: Literal[1, 2]
+    reveal_type(value)  # revealed: Literal[2]
+```
+
+Operations in branching cleanup are not yet checked against values from returning paths.
+
+```py
+def finally_branching_cleanup_does_not_check_returning_path(cond: bool) -> None:
+    value = 1
+    try:
+        if cond:
+            value = "returned"
+            return
+    finally:
+        if cond:
+            # TODO: This should report an invalid argument from the returning path.
+            requires_int(value)
+```
+
+Complementary returns in the `try` and `finally` clauses leave no path to the following code.
+
+```py
+def finally_complementary_returns_remain_unreachable(cond: bool) -> None:
+    try:
+        if cond:
+            return
+    finally:
+        if not cond:
+            return
+
+    reveal_type(cond)  # revealed: Never
 ```
 
 A `break` likewise enters the cleanup suite, but its bindings do not reach the continuing path.

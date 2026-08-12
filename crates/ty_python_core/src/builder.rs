@@ -4487,11 +4487,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
-                    if !finalbody.is_empty() {
-                        for snapshot in terminal_finally_entry_snapshots {
-                            self.flow_merge(snapshot);
-                        }
-                    }
                     let linear_finally_entry = (has_terminal_finally_entries
                         && !finalbody.is_empty()
                         && self.in_function_scope()
@@ -4499,6 +4494,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             matches!(statement, ast::Stmt::Expr(_) | ast::Stmt::Pass(_))
                         }))
                     .then(|| {
+                        for snapshot in terminal_finally_entry_snapshots {
+                            self.flow_merge(snapshot);
+                        }
                         (
                             self.flow_snapshot(),
                             self.current_use_def_map().exception_checkpoint_key(),
@@ -4512,19 +4510,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     {
                         self.record_exception_checkpoint();
                     }
-                    if !finalbody.is_empty() && has_terminal_finally_entries {
-                        let restored_normal_flow = linear_finally_entry.is_some_and(
-                            |(mixed_finally_entry_state, mixed_finally_entry_key)| {
-                                self.current_use_def_map().exception_checkpoint_key()
-                                    == mixed_finally_entry_key
-                                    && self
-                                        .current_use_def_map_mut()
-                                        .restore_with_pending_constraints(
-                                            &normal_pre_finally_state,
-                                            &mixed_finally_entry_state,
-                                        )
-                            },
-                        );
+                    if let Some((mixed_finally_entry_state, mixed_finally_entry_key)) =
+                        linear_finally_entry
+                    {
+                        let restored_normal_flow =
+                            self.current_use_def_map().exception_checkpoint_key()
+                                == mixed_finally_entry_key
+                                && self
+                                    .current_use_def_map_mut()
+                                    .restore_with_pending_constraints(
+                                        &normal_pre_finally_state,
+                                        &mixed_finally_entry_state,
+                                    );
                         if !restored_normal_flow {
                             self.current_use_def_map_mut()
                                 .record_reachability_constraint(normal_pre_finally_reachability);
