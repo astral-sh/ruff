@@ -3308,6 +3308,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definitions behave lazily, while class bodies are actually evaluated eagerly.
                 self.synthesize_nested_binding_definitions(nested_bindings);
 
+                // Class construction and decorator application can raise after the body executes.
+                self.record_exception_checkpoint();
+
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
                 let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol.into(), class);

@@ -495,6 +495,87 @@ except:
 reveal_type(x)  # revealed: Literal[0, 1]
 ```
 
+A class-body assignment to a nonlocal variable is visible when the body raises:
+
+```py
+def class_nonlocal_assignment_raises() -> None:
+    state = "before"
+    try:
+        class C:
+            nonlocal state
+            state = 1
+            raise ValueError
+
+    except ValueError:
+        reveal_type(state)  # revealed: Literal["before", 1]
+```
+
+A nested class body also runs eagerly, so its nonlocal assignment reaches the surrounding handler:
+
+```py
+def nested_class_nonlocal_assignment_raises() -> None:
+    state = "before"
+    try:
+        class Outer:
+            class Inner:
+                nonlocal state
+                state = 1
+                raise ValueError
+
+    except ValueError:
+        reveal_type(state)  # revealed: Literal["before", 1]
+```
+
+A class can fail during construction even when its body contains only an assignment:
+
+```py
+def class_construction_can_raise() -> None:
+    state = "before"
+    caught = False
+    try:
+        class C:
+            nonlocal state
+            state = 1
+
+    except:
+        caught = True
+
+    reveal_type(caught)  # revealed: bool
+```
+
+A class-construction hook runs after the class body's nonlocal assignment:
+
+```py
+class RaisingBase:
+    def __init_subclass__(cls) -> None:
+        raise ValueError
+
+def class_construction_hook_raises() -> None:
+    state = 0
+    try:
+        class C(RaisingBase):
+            nonlocal state
+            state = 1
+
+    except ValueError:
+        reveal_type(state)  # revealed: Literal[0, 1]
+```
+
+A class decorator is applied after the class body has run:
+
+```py
+def class_decorator_raises(decorator) -> None:
+    state = 0
+    try:
+        @decorator
+        class C:
+            nonlocal state
+            state = 1
+
+    except ValueError:
+        reveal_type(state)  # revealed: Literal[0, 1]
+```
+
 A list comprehension also runs immediately:
 
 ```py
@@ -801,12 +882,10 @@ Code in an unreachable inner handler cannot make the outer handler reachable:
 ```py
 z = 0
 try:
-    class C:
-        try:
-            pass
-        except:
-            may_raise()
-
+    try:
+        pass
+    except:
+        may_raise()
 except:
     z = 1
 
