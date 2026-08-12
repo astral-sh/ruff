@@ -402,6 +402,28 @@ C.attribute = 1  # error: [invalid-assignment]
 C.attribute = Descriptor  # error: [invalid-assignment]
 ```
 
+A quoted type expression remains valid when both possible write targets accept the same runtime
+string:
+
+```py
+class StringC(metaclass=Meta):
+    attribute: str = ""
+
+StringC.attribute = "Descriptor"
+```
+
+The same contextual check applies when the metaclass attribute can also hold an ordinary string:
+
+```py
+class UnionMeta(type):
+    attribute: TypeForm[Descriptor] | str = Descriptor
+
+class UnionC(metaclass=UnionMeta):
+    attribute: int = 1
+
+UnionC.attribute = 1  # error: [invalid-assignment]
+```
+
 ### Bounded class-object metaclass attributes
 
 An inexact `type[Base]` attribute can hold a subclass whose custom metaclass makes the class object

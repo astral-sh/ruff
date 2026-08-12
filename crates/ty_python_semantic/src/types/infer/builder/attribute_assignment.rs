@@ -529,8 +529,36 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     return false;
                 }
                 let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
-                let member_valid =
-                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
+                let member_valid = match member {
+                    ExplicitAttributeWriteRequirement::AssignableTo { ty, .. }
+                        if fallback.is_some()
+                            && match ty.resolve_type_alias(db) {
+                                Type::TypeForm(_) => true,
+                                Type::Union(union) => union.elements(db).iter().any(|element| {
+                                    matches!(element.resolve_type_alias(db), Type::TypeForm(_))
+                                }),
+                                _ => false,
+                            } =>
+                    {
+                        // Both possible write targets must receive the same runtime value.
+                        // In particular, invalid type expressions must not silently become
+                        // `TypeForm[Unknown]` while checking the metaclass alternative.
+                        let mut speculative_builder = self.builder.speculate();
+                        let contextual_value_ty = (self.infer_value_ty.infer_expr)(
+                            &mut speculative_builder,
+                            TypeContext::new(Some(*ty)),
+                        );
+                        let checked_value_ty = if speculative_builder.context.has_diagnostics() {
+                            value_ty
+                        } else {
+                            contextual_value_ty
+                        };
+                        self.check_type_pair(checked_value_ty, *ty, emit_diagnostics)
+                    }
+                    _ => {
+                        self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics)
+                    }
+                };
                 if let Some(fallback) = fallback {
                     let fallback_valid = self.evaluate_class_fallback(
                         object_ty,
