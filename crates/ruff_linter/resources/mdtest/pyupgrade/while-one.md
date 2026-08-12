@@ -1,6 +1,7 @@
 # `while-one` (`UP048`)
 
 ```toml
+lint.preview = true
 lint.select = ["UP048"]
 ```
 
