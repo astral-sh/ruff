@@ -414,6 +414,30 @@ bounded_arguments(
     "ok",
     2,  # error: [invalid-argument-type] "upper bound `str`"
 )
+
+def check_splat_error(values: list[int]) -> None:
+    # TODO: Highlight the splatted argument instead of the whole call.
+    # snapshot: invalid-argument-type
+    bounded_arguments(
+        b"valid",
+        *values,
+    )
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `bounded_arguments` is incorrect
+  --> src/mdtest_snippet.py:83:5
+   |
+83 | /     bounded_arguments(
+84 | |         b"valid",
+85 | |         *values,
+86 | |     )
+   | |_____^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
+info: Type variable defined here
+  --> src/mdtest_snippet.py:71:33
+   |
+71 | def bounded_arguments[U: bytes, T: str, *Ts](first: U, *args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
+   |                                 ^^^^^^
 ```
 
 ### Fixed boundaries around variadic type variable tuples
