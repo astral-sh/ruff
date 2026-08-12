@@ -4365,9 +4365,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that may raise. Keep the context itself on the stack so that terminal statements
                 // in `except` and `else` suites can still be recorded as entries to the associated
                 // `finally` suite.
-                let try_block_snapshots = self
-                    .try_node_context_stack_manager
-                    .take_try_suite_snapshots();
+                let try_block_snapshots = self.try_node_context_stack_manager.end_try_suite();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block

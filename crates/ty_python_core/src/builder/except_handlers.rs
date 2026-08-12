@@ -23,6 +23,10 @@ impl ExceptionHandlers {
     pub(super) fn catch_all() -> Self {
         Self::CatchAll(Vec::new())
     }
+
+    fn is_active(&self) -> bool {
+        !matches!(self, Self::None)
+    }
 }
 
 /// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
@@ -68,8 +72,8 @@ impl TryNodeContextStackManager {
     /// snapshots recorded while visiting the `try` suite.
     ///
     /// Taking the snapshots deactivates the suite's handlers before their bodies are visited.
-    pub(super) fn take_try_suite_snapshots(&mut self) -> Vec<FlowSnapshot> {
-        self.current_try_context_stack().take_try_suite_snapshots()
+    pub(super) fn end_try_suite(&mut self) -> Vec<FlowSnapshot> {
+        self.current_try_context_stack().end_try_suite()
     }
 
     /// Record a checkpoint for every active `try` suite that could handle an exception raised at
@@ -148,12 +152,9 @@ struct TryNodeContextStack(Vec<TryNodeContext>);
 impl TryNodeContextStack {
     /// Returns whether a `try` suite in this scope is still collecting exception checkpoints.
     fn has_active_exception_handler(&self) -> bool {
-        self.0.iter().any(|context| {
-            matches!(
-                context.exception_handlers,
-                ExceptionHandlers::Propagating(_) | ExceptionHandlers::CatchAll(_)
-            )
-        })
+        self.0
+            .iter()
+            .any(|context| context.exception_handlers.is_active())
     }
 
     /// Returns whether an active handler has not yet observed the current flow state.
@@ -205,7 +206,7 @@ impl TryNodeContextStack {
     }
 
     /// Take all snapshots recorded while visiting the `try` suite and deactivate its handlers.
-    fn take_try_suite_snapshots(&mut self) -> Vec<FlowSnapshot> {
+    fn end_try_suite(&mut self) -> Vec<FlowSnapshot> {
         let context = self
             .0
             .last_mut()
