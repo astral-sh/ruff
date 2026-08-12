@@ -268,7 +268,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
+        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
         with:
           tool: |
             cargo-nextest
