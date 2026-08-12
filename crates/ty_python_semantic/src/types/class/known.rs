@@ -9,6 +9,7 @@ use crate::{
         constraints::{ConstraintSet, ConstraintSetBuilder},
         context::InferContext,
         diagnostic::SUPER_CALL_IN_NAMED_TUPLE_METHOD,
+        generics::InvalidSpecialization,
         infer::nearest_enclosing_class,
         known_instance::DeprecatedInstance,
     },
@@ -1129,8 +1130,11 @@ impl KnownClass {
                 return class_literal.default_specialization(db);
             }
 
-            class_literal
-                .apply_specialization(db, |_| generic_context.specialize(db, specialization))
+            class_literal.apply_specialization(db, |_| {
+                generic_context
+                    .specialize(db, specialization)
+                    .unwrap_or_else(InvalidSpecialization::into_fallback)
+            })
         }
 
         let class_literal = self

@@ -52,15 +52,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 37 | 
 38 | reveal_type(Constrained[int]())  # revealed: Constrained[int]
 39 | 
-40 | # TODO: error: [invalid-argument-type]
-41 | # TODO: revealed: Constrained[Unknown]
-42 | reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
+40 | # error: [invalid-type-arguments]
+41 | # revealed: Constrained[Unknown]
+42 | reveal_type(Constrained[IntSubclass]())
 43 | 
 44 | reveal_type(Constrained[str]())  # revealed: Constrained[str]
 45 | 
-46 | # TODO: error: [invalid-argument-type]
-47 | # TODO: revealed: Unknown
-48 | reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
+46 | # error: [invalid-type-arguments]
+47 | # revealed: Constrained[Unknown]
+48 | reveal_type(Constrained[int | str]())
 49 | 
 50 | # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
 51 | reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
@@ -137,6 +137,34 @@ error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound
 14 | BoundedT = TypeVar("BoundedT", bound=int)
    | -------- Type variable defined here
 info: element `str` of union `int | str` is not assignable to `int`
+
+```
+
+```
+error[invalid-type-arguments]: Type `IntSubclass` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`
+  --> src/mdtest_snippet.py:42:25
+   |
+42 | reveal_type(Constrained[IntSubclass]())
+   |                         ^^^^^^^^^^^
+   |
+  ::: src/mdtest_snippet.py:34:1
+   |
+34 | ConstrainedT = TypeVar("ConstrainedT", int, str)
+   | ------------ Type variable defined here
+
+```
+
+```
+error[invalid-type-arguments]: Type `int | str` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`
+  --> src/mdtest_snippet.py:48:25
+   |
+48 | reveal_type(Constrained[int | str]())
+   |                         ^^^^^^^^^
+   |
+  ::: src/mdtest_snippet.py:34:1
+   |
+34 | ConstrainedT = TypeVar("ConstrainedT", int, str)
+   | ------------ Type variable defined here
 
 ```
 

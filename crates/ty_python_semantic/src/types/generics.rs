@@ -27,7 +27,8 @@ use crate::types::tuple::{
 };
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet, walk_type_var_bounds,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+    walk_type_var_bounds,
 };
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
@@ -948,7 +949,9 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         known_class: Option<KnownClass>,
     ) -> Specialization<'db> {
-        let partial = self.specialize_partial(db, std::iter::repeat_n(None, self.len(db)));
+        let partial = self
+            .specialize_partial(db, std::iter::repeat_n(None, self.len(db)))
+            .unwrap_or_else(InvalidSpecialization::into_fallback);
         if known_class == Some(KnownClass::Tuple) {
             let env = ProgramEnvironment::from_program(self.program(db));
             Specialization::new(
@@ -958,6 +961,7 @@ impl<'db> GenericContext<'db> {
                 None,
                 Some(TupleType::homogeneous(db, &env, Type::unknown())),
             )
+            .expect("tuple default specialization must be valid")
         } else {
             partial
         }
@@ -967,6 +971,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types: Vec<Type> = self.variables(db).map(Type::TypeVar).collect();
         self.specialize(db, types)
+            .expect("identity specialization must be valid")
     }
 
     /// Returns a specialization of this generic context where each typevar is mapped to the same type.
@@ -977,6 +982,7 @@ impl<'db> GenericContext<'db> {
     ) -> Specialization<'db> {
         let types: Vec<Type> = self.variables(db).map(|_| ty).collect();
         self.specialize(db, types)
+            .expect("repeated specialization must be valid")
     }
 
     /// Specializes every type parameter to its unknown form.
@@ -1007,6 +1013,7 @@ impl<'db> GenericContext<'db> {
             (known_class == Some(KnownClass::Tuple))
                 .then(|| TupleType::homogeneous(db, &env, Type::unknown())),
         )
+        .expect("unknown specialization must be valid")
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
@@ -1045,7 +1052,14 @@ impl<'db> GenericContext<'db> {
     /// otherwise, you will be left with a partial specialization. (Use
     /// [`specialize_recursive`](Self::specialize_recursive) if your types might mention typevars
     /// in this generic context.)
-    pub(crate) fn specialize<'t, T>(self, db: &'db dyn Db, types: T) -> Specialization<'db>
+    ///
+    /// Returns an error containing a valid fallback specialization if any type assignment violates
+    /// its type variable's declared domain.
+    pub(crate) fn specialize<'t, T>(
+        self,
+        db: &'db dyn Db,
+        types: T,
+    ) -> Result<Specialization<'db>, InvalidSpecialization<'db>>
     where
         T: Into<Cow<'t, [Type<'db>]>>,
         'db: 't,
@@ -1061,21 +1075,28 @@ impl<'db> GenericContext<'db> {
     ///
     /// If any provided type is `None`, we will use the corresponding typevar's default type. You
     /// are allowed to provide types that mention the typevars in this generic context.
-    pub(crate) fn specialize_recursive<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    ///
+    /// Returns an error containing a valid fallback specialization if any recursively resolved
+    /// type assignment violates its type variable's declared domain.
+    pub(crate) fn specialize_recursive<I>(
+        self,
+        db: &'db dyn Db,
+        types: I,
+    ) -> Result<Specialization<'db>, InvalidSpecialization<'db>>
     where
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
         let types = self.fill_in_defaults(db, types);
-        self.specialize_from_types_recursive(db, types)
+        self.try_specialize_from_types_recursive(db, types)
     }
 
     /// Builds a specialization and recursively resolves references between the chosen types.
-    fn specialize_from_types_recursive(
+    fn try_specialize_from_types_recursive(
         self,
         db: &'db dyn Db,
         mut types: Box<[Type<'db>]>,
-    ) -> Specialization<'db> {
+    ) -> Result<Specialization<'db>, InvalidSpecialization<'db>> {
         let env = ProgramEnvironment::from_program(self.program(db));
         let len = types.len();
         let variables = self.variables(db).collect_vec();
@@ -1125,6 +1146,7 @@ impl<'db> GenericContext<'db> {
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
         Specialization::new(db, self, [element_type].as_slice(), None, Some(tuple))
+            .expect("tuple specialization must be valid")
     }
 
     fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
@@ -1191,7 +1213,14 @@ impl<'db> GenericContext<'db> {
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
     /// match the number of typevars in the generic context. If any provided type is `None`, we
     /// will use the corresponding typevar's default type.
-    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    ///
+    /// Returns an error containing a valid fallback specialization if any type assignment violates
+    /// its type variable's declared domain.
+    pub(crate) fn specialize_partial<I>(
+        self,
+        db: &'db dyn Db,
+        types: I,
+    ) -> Result<Specialization<'db>, InvalidSpecialization<'db>>
     where
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
@@ -1202,9 +1231,17 @@ impl<'db> GenericContext<'db> {
 
 /// An assignment of a specific type to each type variable in a generic scope.
 ///
+/// Every type assignment satisfies the corresponding type variable's declared upper bound or
+/// constraints. Construction replaces invalid assignments with `Unknown` in a separately returned
+/// fallback rather than interning an invalid specialization.
+///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(
+    debug,
+    constructor = new_internal,
+    heap_size = ruff_memory_usage::heap_size
+)]
 pub struct Specialization<'db> {
     #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
@@ -1243,7 +1280,163 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
+/// An invalid specialization attempt and its valid recovery specialization.
+#[derive(Debug)]
+pub(crate) struct InvalidSpecialization<'db> {
+    fallback: Specialization<'db>,
+    pub(crate) errors: Box<[SpecializationError<'db>]>,
+}
+
+impl<'db> InvalidSpecialization<'db> {
+    pub(crate) fn into_fallback(self) -> Specialization<'db> {
+        self.fallback
+    }
+
+    fn into_parts(self) -> (Specialization<'db>, Box<[SpecializationError<'db>]>) {
+        (self.fallback, self.errors)
+    }
+}
+
 impl<'db> Specialization<'db> {
+    /// Validates one type assignment against its type variable's declared domain.
+    pub(crate) fn validate_type_assignment(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        assignment: Type<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db, env)
+        else {
+            return Ok(());
+        };
+        Self::validate_type_assignment_with(
+            db,
+            env,
+            &ConstraintSetBuilder::new(),
+            bound_typevar,
+            assignment,
+            bound_or_constraints,
+        )
+    }
+
+    fn validate_type_assignment_with(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        assignment: Type<'db>,
+        bound_or_constraints: TypeVarBoundOrConstraints<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let when_assignable_to = |source: Type<'db>, target: Type<'db>| {
+            // Use the cached relation to preserve cycle recovery for recursive bounds.
+            let relation = source.when_constraint_set_assignable_to_owned(db, env, target);
+            constraints.load(db, env, &relation)
+        };
+        let valid = match bound_or_constraints {
+            TypeVarBoundOrConstraints::UpperBound(bound) => when_assignable_to(assignment, bound),
+            // We can't use `when_equivalent_to` here, because that checks full gradual
+            // equivalence, which requires the two types to have exactly the same set of
+            // materializations. That rejects `Any` or `Unknown` against a concrete declared
+            // constraint.
+            //
+            // Instead we use bi-assignability, which correctly rejects strict subtypes and unions
+            // while allowing gradual assignments.
+            TypeVarBoundOrConstraints::Constraints(declared_constraints) => declared_constraints
+                .elements(db)
+                .iter()
+                .copied()
+                .when_any(db, constraints, |declared_constraint| {
+                    when_assignable_to(assignment, declared_constraint).and(db, constraints, || {
+                        when_assignable_to(declared_constraint, assignment)
+                    })
+                }),
+        };
+        if !valid.is_never_satisfied(db, env) {
+            return Ok(());
+        }
+
+        Err(match bound_or_constraints {
+            TypeVarBoundOrConstraints::UpperBound(bound) => SpecializationError::MismatchedBound {
+                bound_typevar,
+                assignment,
+                bound,
+            },
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    assignment,
+                    constraints,
+                }
+            }
+        })
+    }
+
+    /// Creates a specialization, returning a valid recovery specialization if any type assignment
+    /// violates its type variable's declared domain.
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        types: impl AsRef<[Type<'db>]>,
+        materialization_kind: Option<MaterializationKind>,
+        tuple_inner: Option<TupleType<'db>>,
+    ) -> Result<Self, InvalidSpecialization<'db>> {
+        let types = types.as_ref();
+        assert_eq!(generic_context.len(db), types.len());
+
+        let env = ProgramEnvironment::from_program(generic_context.program(db));
+        let mut constraints = None;
+        let mut fallback_types: Option<Vec<_>> = None;
+        let mut errors = Vec::new();
+
+        for (index, (bound_typevar, assignment)) in generic_context
+            .variables(db)
+            .zip(types.iter().copied())
+            .enumerate()
+        {
+            let Some(bound_or_constraints) =
+                bound_typevar.typevar(db).bound_or_constraints(db, &env)
+            else {
+                continue;
+            };
+            let constraints = constraints.get_or_insert_with(ConstraintSetBuilder::new);
+            let Err(error) = Self::validate_type_assignment_with(
+                db,
+                &env,
+                constraints,
+                bound_typevar,
+                assignment,
+                bound_or_constraints,
+            ) else {
+                continue;
+            };
+
+            let fallback_types = fallback_types.get_or_insert_with(|| types.to_vec());
+            fallback_types[index] = Type::unknown();
+            errors.push(error);
+        }
+
+        let Some(fallback_types) = fallback_types else {
+            return Ok(Self::new_internal(
+                db,
+                generic_context,
+                types,
+                materialization_kind,
+                tuple_inner,
+            ));
+        };
+
+        Err(InvalidSpecialization {
+            fallback: Self::new_internal(
+                db,
+                generic_context,
+                fallback_types.into_boxed_slice(),
+                materialization_kind,
+                tuple_inner,
+            ),
+            errors: errors.into_boxed_slice(),
+        })
+    }
+
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
     /// Known argument mismatches are not merged because doing so would be unsound for invariant
@@ -1271,13 +1464,16 @@ impl<'db> Specialization<'db> {
             })
             .collect::<Option<Box<[_]>>>()?;
 
-        Some(Self::new(
-            db,
-            self.generic_context(db),
-            types,
-            self.materialization_kind(db),
-            self.tuple_inner(db),
-        ))
+        Some(
+            Self::new(
+                db,
+                self.generic_context(db),
+                types,
+                self.materialization_kind(db),
+                self.tuple_inner(db),
+            )
+            .expect("cycle recovery must preserve valid specializations"),
+        )
     }
 
     /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
@@ -1326,13 +1522,16 @@ impl<'db> Specialization<'db> {
                 self_types.get(index).copied()
             })
             .collect();
-        Some(Self::new(
-            db,
-            generic_context,
-            restricted_types?,
-            self.materialization_kind(db),
-            None,
-        ))
+        Some(
+            Self::new(
+                db,
+                generic_context,
+                restricted_types?,
+                self.materialization_kind(db),
+                None,
+            )
+            .expect("specialization restriction must preserve validity"),
+        )
     }
 
     /// Returns the tuple spec for a specialization of the `tuple` class.
@@ -1370,6 +1569,7 @@ impl<'db> Specialization<'db> {
             self.materialization_kind(db),
             None,
         )
+        .expect("tuple element projection must preserve validity")
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -1428,6 +1628,7 @@ impl<'db> Specialization<'db> {
             materialization_kind,
             self.tuple_inner(db),
         )
+        .expect("updating the specialization materialization marker must preserve validity")
     }
 
     fn apply_type_mapping<'a>(
@@ -1514,6 +1715,7 @@ impl<'db> Specialization<'db> {
                 new_materialization_kind,
                 tuple_inner,
             )
+            .expect("mapping specialization types must preserve validity")
         }
     }
 
@@ -1535,7 +1737,11 @@ impl<'db> Specialization<'db> {
     /// typevar to a known type, those types are unioned together.
     ///
     /// Panics if the two specializations are not for the same generic context.
-    pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
+    pub(crate) fn combine(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+    ) -> Result<Self, InvalidSpecialization<'db>> {
         let generic_context = self.generic_context(db);
         assert_eq!(other.generic_context(db), generic_context);
         let env = ProgramEnvironment::from_program(generic_context.program(db));
@@ -1584,13 +1790,16 @@ impl<'db> Specialization<'db> {
             None => None,
         };
         let context = self.generic_context(db);
-        Some(Self::new(
-            db,
-            context,
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        ))
+        Some(
+            Self::new(
+                db,
+                context,
+                types,
+                self.materialization_kind(db),
+                tuple_inner,
+            )
+            .expect("recursive type normalization must preserve validity"),
+        )
     }
 
     pub(super) fn materialize_impl(
@@ -1678,6 +1887,7 @@ impl<'db> Specialization<'db> {
                 new_materialization_kind,
                 tuple_inner,
             )
+            .unwrap_or_else(InvalidSpecialization::into_fallback)
         }
     }
 
@@ -2312,23 +2522,25 @@ impl<'db> ApplySpecialization<'_, 'db> {
                 types,
                 skip,
             } => Some(
-                generic_context.specialize(
-                    db,
-                    generic_context
-                        .variables(db)
-                        .enumerate()
-                        .map(|(index, bound_typevar)| {
-                            if skip.is_some_and(|skip| skip == index) {
-                                Type::TypeVar(bound_typevar)
-                            } else {
-                                types
-                                    .get(index)
-                                    .copied()
-                                    .unwrap_or(Type::TypeVar(bound_typevar))
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                ),
+                generic_context
+                    .specialize(
+                        db,
+                        generic_context
+                            .variables(db)
+                            .enumerate()
+                            .map(|(index, bound_typevar)| {
+                                if skip.is_some_and(|skip| skip == index) {
+                                    Type::TypeVar(bound_typevar)
+                                } else {
+                                    types
+                                        .get(index)
+                                        .copied()
+                                        .unwrap_or(Type::TypeVar(bound_typevar))
+                                }
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .unwrap_or_else(InvalidSpecialization::into_fallback),
             ),
             ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
         }
@@ -2382,32 +2594,76 @@ pub(crate) struct TypeVarInference<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct TypeVarSpecializationResult<'db> {
+    specialization: Specialization<'db>,
+    errors: Box<[SpecializationError<'db>]>,
+}
+
+impl<'db> TypeVarSpecializationResult<'db> {
+    fn valid(specialization: Specialization<'db>) -> Self {
+        Self {
+            specialization,
+            errors: Box::default(),
+        }
+    }
+
+    fn from_result(result: Result<Specialization<'db>, InvalidSpecialization<'db>>) -> Self {
+        match result {
+            Ok(specialization) => Self::valid(specialization),
+            Err(invalid) => {
+                let (specialization, errors) = invalid.into_parts();
+                Self {
+                    specialization,
+                    errors,
+                }
+            }
+        }
+    }
+}
+
 impl<'db> TypeVarInference<'db> {
-    /// Project this inference result into a closed specialization.
-    pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+    fn specialization_result(self, db: &'db dyn Db) -> &'db TypeVarSpecializationResult<'db> {
         #[salsa::tracked(
-            returns(copy),
+            returns(ref),
             cycle_initial=|db, _, inference: TypeVarInference<'db>| {
-                inference.generic_context(db).unknown_specialization(db, None)
+                TypeVarSpecializationResult::valid(
+                    inference.generic_context(db).unknown_specialization(db, None),
+                )
             },
-            cycle_fn=|db, cycle: &salsa::Cycle, previous: &Specialization<'db>, current: Specialization<'db>, inference: TypeVarInference<'db>| {
+            cycle_fn=|db, cycle: &salsa::Cycle, previous: &TypeVarSpecializationResult<'db>, current: TypeVarSpecializationResult<'db>, inference: TypeVarInference<'db>| {
                 if cycle.iteration() <= crate::TAINTED_CYCLES {
                     current
                 } else {
-                    current
-                        .merge_cycle_recovery(db, *previous)
-                        .unwrap_or_else(|| inference.generic_context(db).unknown_specialization(db, None))
+                    TypeVarSpecializationResult {
+                        specialization: current
+                            .specialization
+                            .merge_cycle_recovery(db, previous.specialization)
+                            .unwrap_or_else(|| inference.generic_context(db).unknown_specialization(db, None)),
+                        errors: current.errors,
+                    }
                 }
             }
         )]
-        fn specialization_inner<'db>(
+        fn specialization_result_inner<'db>(
             db: &'db dyn Db,
             inference: TypeVarInference<'db>,
-        ) -> Specialization<'db> {
-            inference.specialization_with(db, |_, _| None)
+        ) -> TypeVarSpecializationResult<'db> {
+            TypeVarSpecializationResult::from_result(
+                inference.try_specialization_with(db, |_, _| None),
+            )
         }
 
-        specialization_inner(db, self)
+        specialization_result_inner(db, self)
+    }
+
+    /// Project this inference result into a closed specialization.
+    pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        self.specialization_result(db).specialization
+    }
+
+    pub(crate) fn specialization_errors(self, db: &'db dyn Db) -> &'db [SpecializationError<'db>] {
+        &self.specialization_result(db).errors
     }
 
     /// Project this inference result into a specialization with explicit handling for each
@@ -2416,11 +2672,11 @@ impl<'db> TypeVarInference<'db> {
     /// The hook receives the type variable and its inferred type, if any. Returning `Some` overrides
     /// the projection for that variable. Returning `None` uses the inferred type if present,
     /// otherwise the type variable's default.
-    pub(crate) fn specialization_with(
+    fn try_specialization_with(
         self,
         db: &'db dyn Db,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<Type<'db>>) -> Option<Type<'db>>,
-    ) -> Specialization<'db> {
+    ) -> Result<Specialization<'db>, InvalidSpecialization<'db>> {
         let types = self
             .generic_context(db)
             .variables(db)
@@ -2428,6 +2684,15 @@ impl<'db> TypeVarInference<'db> {
             .map(|(typevar, inferred)| choose(typevar, inferred).or(inferred));
 
         self.generic_context(db).specialize_recursive(db, types)
+    }
+
+    pub(crate) fn specialization_with(
+        self,
+        db: &'db dyn Db,
+        choose: impl FnMut(BoundTypeVarInstance<'db>, Option<Type<'db>>) -> Option<Type<'db>>,
+    ) -> Specialization<'db> {
+        self.try_specialization_with(db, choose)
+            .unwrap_or_else(InvalidSpecialization::into_fallback)
     }
 }
 
@@ -2482,7 +2747,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         generic_context: GenericContext<'db>,
         mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
-    ) -> Specialization<'db> {
+    ) -> Result<Specialization<'db>, InvalidSpecialization<'db>> {
         let db = self.db;
         let types = self
             .solve_pending_with(generic_context, &mut choose)
@@ -2981,24 +3246,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<SpecializationError<'db>> {
         let db = self.db;
         let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.lower?;
+        let assignment = path_bound.lower?;
         match bound_typevar
             .typevar(db)
             .bound_or_constraints(db, self.env)?
         {
-            TypeVarBoundOrConstraints::UpperBound(bound) => (!argument
+            TypeVarBoundOrConstraints::UpperBound(bound) => (!assignment
                 .when_assignable_to(db, self.env, bound, self.constraints, self.inferable)
                 .is_always_satisfied(db, self.env))
             .then_some(SpecializationError::MismatchedBound {
                 bound_typevar,
-                argument,
+                assignment,
+                bound,
             }),
-            TypeVarBoundOrConstraints::Constraints(_) => {
-                (!path_bound.has_upper()).then_some(SpecializationError::MismatchedConstraint {
+            TypeVarBoundOrConstraints::Constraints(constraints) => (!path_bound.has_upper())
+                .then_some(SpecializationError::MismatchedConstraint {
                     bound_typevar,
-                    argument,
-                })
-            }
+                    assignment,
+                    constraints,
+                }),
         }
     }
 
@@ -3551,7 +3817,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
-                                argument: ty,
+                                assignment: ty,
+                                bound,
                             });
                         }
                         self.add_type_mapping(bound_typevar, ty, polarity);
@@ -3636,7 +3903,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,
-                            argument: ty,
+                            assignment: ty,
+                            constraints: typevar_constraints,
                         });
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),
@@ -4052,15 +4320,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SpecializationError<'db> {
     MismatchedBound {
         bound_typevar: BoundTypeVarInstance<'db>,
-        argument: Type<'db>,
+        assignment: Type<'db>,
+        bound: Type<'db>,
     },
     MismatchedConstraint {
         bound_typevar: BoundTypeVarInstance<'db>,
-        argument: Type<'db>,
+        assignment: Type<'db>,
+        constraints: TypeVarConstraints<'db>,
     },
 }
 
@@ -4072,10 +4342,10 @@ impl<'db> SpecializationError<'db> {
         }
     }
 
-    pub(crate) fn argument_type(&self) -> Type<'db> {
+    pub(crate) fn assignment(&self) -> Type<'db> {
         match self {
-            Self::MismatchedBound { argument, .. } => *argument,
-            Self::MismatchedConstraint { argument, .. } => *argument,
+            Self::MismatchedBound { assignment, .. } => *assignment,
+            Self::MismatchedConstraint { assignment, .. } => *assignment,
         }
     }
 }

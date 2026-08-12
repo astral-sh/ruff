@@ -88,7 +88,8 @@ use crate::types::function::{
     same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
+    GenericContext, InvalidSpecialization, Specialization, SpecializationBuilder, bind_typevar,
+    enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -6563,12 +6564,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|(identity, accumulator)| (identity, accumulator.into_type(db, env)))
                 .collect();
         let specialized = Type::from(class.apply_specialization(db, |generic_context| {
-            generic_context.specialize_recursive(
-                db,
-                generic_context
-                    .variables(db)
-                    .map(|typevar| type_context_mappings.get(&typevar.identity(db)).copied()),
-            )
+            generic_context
+                .specialize_recursive(
+                    db,
+                    generic_context
+                        .variables(db)
+                        .map(|typevar| type_context_mappings.get(&typevar.identity(db)).copied()),
+                )
+                .unwrap_or_else(InvalidSpecialization::into_fallback)
         }));
         if specialized.is_assignable_to(db, env, Type::Callable(target_callable)) {
             specialized
@@ -7475,6 +7478,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     |generic_context| {
                         generic_context
                             .specialize_recursive(db, specialization.into_iter().map(Some))
+                            .unwrap_or_else(InvalidSpecialization::into_fallback)
                     },
                 );
                 return Type::from(class_type).to_instance_approximation(db, env);
@@ -7694,41 +7698,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let specialization = builder
+            .build_with(generic_context, |current_typevar, bounds| {
+                let lower = bounds?.lower?;
+
+                let lower = if is_empty_collection_type_context(tcx) {
+                    // Constraints learned from later collection uses follow the same promotion
+                    // policy as literal elements: promote element literal types in invariant
+                    // position unless an explicit annotation made them unpromotable.
+                    lower.promote(db, env)
+                } else {
+                    lower
+                };
+
+                let lower = if tuple_size_promotion_constraints
+                    .allow(current_typevar.identity(self.db()))
+                {
+                    lower.promote_tuple_size_in_union(db, env)
+                } else {
+                    lower
+                };
+
+                let lower = if is_empty_collection_type_context(tcx) {
+                    lower
+                        // Promote singleton types to `T | Unknown` in inferred type parameters,
+                        // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
+                        .promote_singletons_recursively(db, env)
+                } else {
+                    lower
+                };
+
+                Some(lower)
+            })
+            .ok()?;
         let class_type = collection_alias
             .origin(self.db())
-            .apply_specialization(db, |_| {
-                builder.build_with(generic_context, |current_typevar, bounds| {
-                    let lower = bounds?.lower?;
-
-                    let lower = if is_empty_collection_type_context(tcx) {
-                        // Constraints learned from later collection uses follow the same promotion
-                        // policy as literal elements: promote element literal types in invariant
-                        // position unless an explicit annotation made them unpromotable.
-                        lower.promote(db, env)
-                    } else {
-                        lower
-                    };
-
-                    let lower = if tuple_size_promotion_constraints
-                        .allow(current_typevar.identity(self.db()))
-                    {
-                        lower.promote_tuple_size_in_union(db, env)
-                    } else {
-                        lower
-                    };
-
-                    let lower = if is_empty_collection_type_context(tcx) {
-                        lower
-                            // Promote singleton types to `T | Unknown` in inferred type parameters,
-                            // so that e.g. `[None]` is inferred as `list[None | Unknown]`.
-                            .promote_singletons_recursively(db, env)
-                    } else {
-                        lower
-                    };
-
-                    Some(lower)
-                })
-            });
+            .apply_specialization(db, |_| specialization);
 
         Type::from(class_type).to_instance_approximation(db, env)
     }

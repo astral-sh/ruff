@@ -41,6 +41,7 @@ use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
 };
+use super::generics::InvalidSpecialization;
 use super::match_pattern::is_typed_dict_runtime_domain;
 use super::variance::TypeVarVariance;
 use itertools::Itertools;
@@ -1030,7 +1031,9 @@ fn specialize_generic_class_from_solutions<'db>(
     {
         generic_context.specialize_tuple(db, *element, TupleType::homogeneous(db, env, *element))
     } else {
-        generic_context.specialize(db, types)
+        generic_context
+            .specialize(db, types)
+            .unwrap_or_else(InvalidSpecialization::into_fallback)
     };
 
     Some(target_class.apply_specialization(db, |_| specialization))
@@ -2401,7 +2404,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }) {
             return None;
         }
-        Some(pattern_class.apply_specialization(db, |_| generic_context.specialize(db, types)))
+        Some(pattern_class.apply_specialization(db, |_| {
+            generic_context
+                .specialize(db, types)
+                .unwrap_or_else(InvalidSpecialization::into_fallback)
+        }))
     }
 
     fn class_pattern_contexts(

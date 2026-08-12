@@ -50,7 +50,8 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    GenericContext, InvalidSpecialization, Specialization, SpecializationBuilder,
+    SpecializationError, TypeVarInference,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
@@ -5836,8 +5837,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // If we failed to prefer the declared type, attempt inference again, ignoring
         // the declared type.
         //
-        // Note that this will still lead to an invalid specialization, but may
-        // produce more precise diagnostics.
+        // This can still infer candidates outside a TypeVar's declared domain, but final
+        // specialization construction reports them and recovers invalid assignments to `Unknown`.
         if !assignable_to_declared_type {
             builder =
                 SpecializationBuilder::new(db, self.env, constraints, self.inferable_typevars);
@@ -5939,6 +5940,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         };
         let specialization = inference.specialization(db);
+        self.errors.extend(
+            inference
+                .specialization_errors(db)
+                .iter()
+                .cloned()
+                .map(|error| BindingError::SpecializationError {
+                    error,
+                    argument_index: None,
+                }),
+        );
 
         self.return_ty = self.return_ty.apply_specialization(db, specialization);
         self.inference = Some(inference);
@@ -7270,31 +7281,36 @@ impl<'db> Binding<'db> {
         // approach would be to propagate constraint sets as type context, making bidirectional
         // inference constraint-set-aware, or to infer constraint sets directly for argument types,
         // and avoid the need to construct type context before call inference has completed.
-        Some(generic_context.specialize_recursive(
-            db,
-            generic_context.variables(db).map(|typevar| {
-                let identity = typevar.identity(db);
+        Some(
+            generic_context
+                .specialize_recursive(
+                    db,
+                    generic_context.variables(db).map(|typevar| {
+                        let identity = typevar.identity(db);
 
-                let call_expression_constraints = return_type_solutions.get(&identity).copied();
-                let argument_constraints = self
-                    .specialization(db)
-                    .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_dynamic(db, env))
-                    .map(|ty| ty.promote(db, env));
+                        let call_expression_constraints =
+                            return_type_solutions.get(&identity).copied();
+                        let argument_constraints = self
+                            .specialization(db)
+                            .and_then(|specialization| specialization.get(db, typevar))
+                            .filter(|ty| !ty.has_dynamic(db, env))
+                            .map(|ty| ty.promote(db, env));
 
-                // TODO: We should similarly combine both the call expression and argument constraints
-                // here. We currently only rely on argument constraints when there is no explicit declared
-                // type for the call expression.
-                Some(
-                    call_expression_constraints
-                        .or(argument_constraints)
-                        // Default specialize any type variables to a marker type, which will be ignored
-                        // during argument inference, allowing the concrete subset of the parameter
-                        // type to still affect argument inference.
-                        .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+                        // TODO: We should similarly combine both the call expression and argument constraints
+                        // here. We currently only rely on argument constraints when there is no explicit declared
+                        // type for the call expression.
+                        Some(
+                            call_expression_constraints
+                                .or(argument_constraints)
+                                // Default specialize any type variables to a marker type, which will be ignored
+                                // during argument inference, allowing the concrete subset of the parameter
+                                // type to still affect argument inference.
+                                .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
+                        )
+                    }),
                 )
-            }),
-        ))
+                .unwrap_or_else(InvalidSpecialization::into_fallback),
+        )
     }
 
     /// Records the overload's source definition index for later diagnostics.
@@ -8743,7 +8759,7 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let argument_type = error.argument_type();
+                let argument_type = error.assignment();
                 let argument_ty_display = argument_type.display(db, env);
 
                 let mut diag = builder.into_diagnostic(format_args!(
@@ -8754,36 +8770,30 @@ impl<'db> BindingError<'db> {
                 ));
 
                 match error {
-                    SpecializationError::MismatchedBound { bound_typevar, .. } => {
-                        let typevar = bound_typevar.typevar(context.db());
-                        let typevar_name = typevar.name(context.db());
+                    SpecializationError::MismatchedBound {
+                        bound_typevar,
+                        bound,
+                        ..
+                    } => {
+                        let typevar_name = bound_typevar.typevar(context.db()).name(context.db());
                         diag.set_primary_annotation_message(format_args!(
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy upper bound `{}` of type variable `{typevar_name}`",
-                            typevar
-                                .upper_bound(db, env)
-                                .expect(
-                                    "type variable should have an upper bound if this error occurs"
-                                )
-                                .display(db, env)
+                            bound.display(db, env)
                         ));
                     }
-                    SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
-                        let typevar = bound_typevar.typevar(context.db());
-                        let typevar_name = typevar.name(context.db());
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        constraints,
+                        ..
+                    } => {
+                        let typevar_name = bound_typevar.typevar(context.db()).name(context.db());
                         diag.set_primary_annotation_message(format_args!(
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy constraints ({}) of type variable `{typevar_name}`",
-                            typevar
-                                .constraints(db, env)
-                                .expect(
-                                    "type variable should have constraints if this error occurs"
-                                )
-                                .iter()
-                                .format_with(", ", |ty, f| f(&format_args!(
-                                    "`{}`",
-                                    ty.display(db, env)
-                                )))
+                            constraints.elements(db).iter().format_with(", ", |ty, f| f(
+                                &format_args!("`{}`", ty.display(db, env))
+                            ))
                         ));
                     }
                 }

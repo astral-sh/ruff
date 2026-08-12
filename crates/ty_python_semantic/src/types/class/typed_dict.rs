@@ -12,7 +12,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{DynamicClassHeaderAnchor, dynamic_class_header_range};
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, InvalidSpecialization};
 use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
@@ -735,10 +735,12 @@ fn synthesize_typed_dict_view_method<'db>(
         .and_then(Type::as_class_literal)
         .map(|class| {
             class.apply_specialization(db, |generic_context| {
-                generic_context.specialize(
-                    db,
-                    &[typed_dict.key_type(db, env), typed_dict.value_type(db, env)],
-                )
+                generic_context
+                    .specialize(
+                        db,
+                        &[typed_dict.key_type(db, env), typed_dict.value_type(db, env)],
+                    )
+                    .unwrap_or_else(InvalidSpecialization::into_fallback)
             })
         })
         .and_then(|class| Type::from(class).to_instance_approximation(db, env))
