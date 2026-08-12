@@ -1,22 +1,38 @@
-<!-- Replace every placeholder and remove all HTML comments before presenting the report. Keep each prose paragraph and list item on one source line. Omit project-specific reproduction details when there are no affected projects. Do not add change-count tables, bot-update timestamps, reproduction-completeness bookkeeping, import-audit details, exhaustive traceability appendices, raw URLs, or artifact hashes. -->
+<!-- Replace every placeholder and remove all HTML comments before presenting the report. Keep each prose paragraph and list item on one source line. Number retained change subsections consecutively within each section, restarting at 1 for each section. Do not mention the absence of new panics, overflows, or timeouts. Do not add change-count tables, bot-update timestamps, reproduction-completeness bookkeeping, import-audit details, exhaustive traceability appendices, raw URLs, or artifact hashes. -->
 
 # [PR #<number>](https://github.com/astral-sh/ruff/pull/<number>) ecosystem summary
 
-<Summarize the distinct failure, flakiness, and diagnostic behavior changes and their significance. Lead with the analysis readers need; do not describe how the report was generated.>
+<Summarize meaningful changes to project failures and diagnostic behavior, including changes involving intermittent severe failures, along with their significance. Lead with the analysis readers need; do not describe how the report was generated.>
 
-<!-- Omit this entire section if no project failures or meaningful flaky outcomes changed. -->
+<!-- Omit this entire section if no stable project failures changed. Repeat its numbered subsection for each distinct failure. -->
 
-## <New, fixed, or changed project failure or flaky outcome>
+## Project failures
+
+### 1. <New, fixed, or changed project failure>
 
 **Affected projects:**
 
 - [<project>](<project-url>): merge base: `<base outcome>`; PR: `<PR outcome>`.
 
-<Explain the crash, panic, timeout, abnormal exit, or flaky change, including relevant stderr and observed base/PR run frequencies where applicable.>
+<Explain the crash, panic, overflow, timeout, or abnormal exit, including relevant stderr where applicable.>
 
-<!-- Omit this entire section if no diagnostic behavior changed. -->
+<!-- Omit this entire section if no severe failure involving intermittent outcomes changed. Repeat its numbered subsection for each distinct change. -->
 
-## <Distinct behavior change>
+## Intermittent severe failures
+
+### 1. <New or changed intermittent panic, crash, overflow, or timeout>
+
+**Affected projects:**
+
+- [<project>](<project-url>): merge base: `<base outcome and count/runs, or not present>`; PR: `<PR outcome and count/runs, or not present>`.
+
+<Explain the change in failure behavior and relevant stderr. Do not include unchanged failures or frequency-only fluctuations.>
+
+<!-- Omit this entire section if no stable diagnostic behavior changed. Repeat its numbered subsection for each distinct behavior change. -->
+
+## Affected projects
+
+### 1. <Distinct behavior change>
 
 **Report entries:**
 
@@ -25,6 +41,10 @@
 - [<project2 file1.py:line>](<permalink>)
 
 <Explain the exact behavior on the merge base and PR. Group additional entries here only when the same explanation and minimized reproducer account for all of them.>
+
+<!-- If this diagnostic change exposes an existing ty shortcoming, search astral-sh/ty for issues covering that exact shortcoming. Include the following paragraph only when a matching issue exists. -->
+
+**Existing ty issues:** [ty#<issue-number>](https://github.com/astral-sh/ty/issues/<issue-number>)
 
 <!--
 A minimal reproducer should annotate every line with a new, changed, or removed diagnostic using comments immediately above that line. Include the full error messages and error codes from both revisions, including duplicates.
