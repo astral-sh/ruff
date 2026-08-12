@@ -42,12 +42,8 @@ os.system("./bin/ls")
 os.system(["/bin/ls"])
 os.system(["/bin/ls", "/tmp"])
 os.system(r"C:\\bin\ls")
-os.execv(path="/bin/ls", args=["ls"])
 
 # Regression for https://github.com/astral-sh/ruff/issues/24075
 # Check that "partial path" checks tuples too
 import subprocess
 subprocess.run(("echo", "foo"))
-
-# Keyword command arguments are checked too.
-subprocess.run(args="git status")

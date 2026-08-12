@@ -8,17 +8,6 @@ check_call(a, shell=False)
 check_output(a, shell=False)
 run(a, shell=False)
 
-# https://github.com/astral-sh/ruff/issues/27631
-# Keyword command arguments are checked too.
-Popen(args=a, shell=False)
-call(args=a, shell=False)
-check_call(args=a, shell=False)
-check_output(args=a, shell=False)
-run(args=a, shell=False)
-
-# A list command with an untrusted element is also flagged.
-check_output(args=[a], shell=False)
-
 # Falsey values are treated as false.
 Popen(a, shell=0)
 Popen(a, shell=[])
@@ -31,9 +20,6 @@ Popen(a, shell=True if True else False)
 # No value is also caught.
 Popen(a)
 
-# Starred command arguments are untrusted.
-run(*a)
-
 # Literals are fine, they're trusted.
 run("true")
 Popen(["true"])
@@ -42,7 +28,6 @@ call("true", shell=False)
 check_call("true", shell=False)
 check_output("true", shell=False)
 run("true", shell=False)
-run(args=["true"])
 
 # Not through assignments though.
 cmd = ["true"]

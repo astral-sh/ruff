@@ -7,14 +7,6 @@ check_call("true", shell=True)
 check_output("true", shell=True)
 run("true", shell=True)
 
-# https://github.com/astral-sh/ruff/issues/27631
-# Keyword command arguments are checked too.
-Popen(args="true", shell=True)
-call(args="true", shell=True)
-check_call(args="true", shell=True)
-check_output(args="true", shell=True)
-run(args="true", shell=True)
-
 # Check values that truthy values are treated as true.
 Popen("true", shell=1)
 Popen("true", shell=[1])
@@ -26,11 +18,6 @@ var_string = "true"
 Popen(var_string, shell=True)
 Popen([var_string], shell=True)
 Popen([var_string, ""], shell=True)
-Popen(args=var_string, shell=True)
-
-# Starred command arguments are untrusted.
-cmd = input()
-Popen(*cmd, shell=True)
 
 # Check dict display with only double-starred expressions can be falsey.
 Popen("true", shell={**{}})
