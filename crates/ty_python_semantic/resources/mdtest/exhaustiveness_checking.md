@@ -283,8 +283,11 @@ def match_non_exhaustive(x: Color):
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
-Matching every named member is not exhaustive for `Flag` classes. Custom `_missing_` methods do not
-change the static member set of other enums, even when they create unnamed members at runtime.
+Matching every named member is not exhaustive for `Flag` classes.
+
+Custom `_missing_` methods technically could create a new undeclared member via `object.__new__`,
+but this is also possible outside a `_missing_` method. We choose to in general ignore this
+possibility; we don't assume that a `_missing_` method will do this.
 
 ```py
 from enum import Enum, Flag
@@ -297,7 +300,7 @@ class MissingValueEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "MissingValueEnum":
-        return object.__new__(cls)
+        return cls.ONLY
 
 def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
     match value:
@@ -325,9 +328,6 @@ class FallbackColor(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "FallbackColor":
-        for member in cls:
-            if member.value == value:
-                return member
         return FallbackColor.RED
 
 def get_color() -> FallbackColor:

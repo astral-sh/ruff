@@ -323,7 +323,7 @@ class MissingValueEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "MissingValueEnum":
-        return object.__new__(cls)
+        return cls.ONLY
 
 def compare_custom_missing_enums(left: MissingValueEnum, right: MissingValueEnum):
     reveal_type(left == right)  # revealed: Literal[True]
@@ -688,6 +688,22 @@ def compare_custom_missing_identity(
         reveal_type(left)  # revealed: CustomMissingIdentity
 ```
 
+A metaclass can inject undeclared members, leaving an identity-comparing enum genuinely open.
+Comparing against its declared members can still exclude those undeclared members.
+
+```py
+class OpenIdentity(Enum, metaclass=InjectingEnumMeta):
+    A = "a"
+    B = "b"
+
+def compare_open_identity(
+    left: OpenIdentity | OtherIdentity,
+    right: Literal[OpenIdentity.A, OpenIdentity.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[OpenIdentity.A, OpenIdentity.B]
+```
+
 Integer comparison keys normalize booleans in the same way as Python equality:
 
 ```py
@@ -759,6 +775,18 @@ def compare_custom_missing(left: CustomMissingLeft, right: CustomRight):
         reveal_type(left)  # revealed: CustomMissingLeft
 ```
 
+A metaclass can add undeclared scalar members, so cross-enum comparison must retain the full open
+enum:
+
+```py
+class OpenLeft(StrEnum, metaclass=InjectingEnumMeta):
+    MEMBER = "shared"
+
+def compare_open(left: OpenLeft, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: OpenLeft
+```
+
 A custom equality method must still determine the result when the enum is combined with `None`:
 
 ```py
@@ -774,6 +802,15 @@ combined with `None`:
 def compare_optional_custom_missing(left: CustomMissingLeft | None, right: CustomRight):
     if left == right:
         reveal_type(left)  # revealed: CustomMissingLeft
+```
+
+Undeclared members of a genuinely open scalar enum must survive cross-enum comparison even when the
+enum is combined with `None`:
+
+```py
+def compare_optional_open(left: OpenLeft | None, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: OpenLeft
 ```
 
 The same narrowing applies when comparing enum members directly with their inherited integer or
