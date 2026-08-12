@@ -111,7 +111,7 @@ fn dynamic_class_header_range<'db>(
 }
 
 bitflags::bitflags! {
-    /// Properties that affect the representation of instances of a class.
+    /// Properties shared by all instances of a class.
     ///
     /// This combines properties derived from the MRO into the existing class-classification
     /// query, avoiding a separate cached query for each property.
@@ -121,6 +121,10 @@ bitflags::bitflags! {
         const TYPED_DICT = 1 << 0;
         /// The class directly or indirectly inherits from an explicit `Any` base.
         const INHERITS_FROM_EXPLICIT_ANY = 1 << 1;
+        /// The class may define or inherit a custom `__getattribute__` method.
+        const HAS_CUSTOM_GETATTRIBUTE = 1 << 2;
+        /// An unknown base may provide an attribute-interception method.
+        const HAS_DYNAMIC_GETATTRIBUTE = 1 << 3;
     }
 }
 
@@ -610,8 +614,8 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
-    /// Return the properties that affect how instances of this class are represented.
-    fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+    /// Return the properties shared by all instances of this class.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         match self {
             Self::Static(literal) => literal.instance_flags(db),
             Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
@@ -634,6 +638,12 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
     pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        if let Some(class) = self.as_static()
+            && (class.known(db).is_some() || !class.has_explicit_bases(db))
+        {
+            return false;
+        }
+
         self.instance_flags(db)
             .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }

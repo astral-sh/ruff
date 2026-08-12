@@ -1287,6 +1287,24 @@ class C:
 reveal_type(C().value)  # revealed: int
 ```
 
+### An unknown `__getattribute__` can bypass descriptors
+
+A dynamic base may provide an attribute interceptor that avoids a malformed descriptor, so the
+descriptor access cannot be guaranteed to fail.
+
+```py
+from typing import Any
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C(Any):
+    value = Descriptor()
+
+reveal_type(C().value)  # revealed: int
+```
+
 ### An instance `__getattribute__` may delegate to descriptor lookup
 
 The return annotation of an override does not establish whether it delegates to the default
@@ -1305,6 +1323,27 @@ class C:
         return super().__getattribute__(name)
 
 C().value
+```
+
+### An invalid `__getattribute__` runs before descriptors
+
+A malformed `__getattribute__` fails before it can invoke a malformed descriptor. The diagnostic
+therefore describes the `__getattribute__` call while preserving the descriptor's return type.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> str:
+        return "fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: int
 ```
 
 ### An assigned instance attribute shadows a non-data descriptor
