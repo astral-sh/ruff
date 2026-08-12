@@ -656,6 +656,91 @@ def _[T]() -> None:
     ~ConstraintSet.range(SubSub, T, Base) & ~ConstraintSet.range(Sub, T, Super)
 ```
 
+### Type alias arguments in constraints
+
+`T ≤ Alias[U]` has the same dependency on `U` as `T ≤ U` when the alias preserves its argument:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Alias[V] = V
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Alias[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=U@_, U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+An alias that ignores its argument leaves the concrete bound `int`, which does not depend on `U`:
+
+```py
+type Ignored[V] = int
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Ignored[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=int, U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Recursive type alias arguments in constraints
+
+A recursive alias retains the dependency on its argument, even when each level of recursion changes
+the specialization:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Recursive[V] = list[Recursive[list[V]]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Recursive[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=list[Recursive[list[U@_]]], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+An unused argument still introduces no dependency, even when the alias's value is recursive:
+
+```py
+type Ignored[V] = Recursive[int]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Ignored[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=list[Recursive[list[int]]], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Concrete structural bounds
+
+`U ≤ list[T]` relates two type variables. `T ≤ Recursive[int]` instead gives `T` a concrete bound;
+the protocol's recursive members do not introduce another dependency:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+from ty_extensions._internal import ConstraintSet
+
+class Recursive[V](Protocol):
+    next: Recursive[list[V]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Recursive[int]) & ConstraintSet.upper_bound(U, list[T])
+    # revealed: tuple[Solution[T=Recursive[int], U=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+Recursive `TypedDict` fields do not introduce a dependency either:
+
+```py
+class Payload[V](TypedDict):
+    child: Payload[list[V]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Payload[int]) & ConstraintSet.upper_bound(U, list[T])
+    # revealed: tuple[Solution[T=Payload[int], U=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
 ## Union
 
 The union of two constraint sets requires that the constraints in either set hold. In many cases, we

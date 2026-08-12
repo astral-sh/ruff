@@ -466,24 +466,12 @@ impl<'db> StaticClassLiteral<'db> {
                 self.env
             }
 
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
             fn visit_bound_type_var_type(
                 &self,
                 _db: &'db dyn Db,
                 bound_typevar: BoundTypeVarInstance<'db>,
             ) {
                 self.typevars.borrow_mut().insert(bound_typevar);
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                // The generic context contains the base class's formal type parameters, not type
-                // variables referenced by this class's base expression.
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {

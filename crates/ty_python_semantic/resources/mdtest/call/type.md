@@ -133,8 +133,8 @@ def materialized_classes(top: Top[Gradual], bottom: Bottom[Gradual], plain: Grad
 
 ### Classes with an aliased recursive type-variable bound
 
-A type variable cannot appear in its own bound, but this is not yet diagnosed when an alias hides
-the type variable. Computing a parameter's class still terminates in this case.
+A type variable cannot appear in its own bound, even through an alias. Calling `type` on a parameter
+with this invalid bound still terminates.
 
 ```toml
 [environment]
@@ -144,14 +144,15 @@ python-version = "3.12"
 ```py
 type Meta[T] = type[T]
 
-def recursive_bound[T: Meta[T]](value: type[T]):
+# error: [invalid-type-variable-bound]
+def _[T: Meta[T]](value: type[T]):
     type(value)
 ```
 
 ### Classes with an identity alias in a recursive type-variable bound
 
-An identity alias can also hide an invalid bound that refers back to the same type variable.
-Computing a parameter's class terminates after the alias has been expanded.
+An identity alias also cannot refer to the variable being bounded. Calling `type` on a parameter
+with this invalid bound still terminates.
 
 ```toml
 [environment]
@@ -161,14 +162,15 @@ python-version = "3.12"
 ```py
 type Identity[T] = T
 
-def recursive_bound[T: Identity[T]](value: type[T]):
+# error: [invalid-type-variable-bound]
+def _[T: Identity[T]](value: type[T]):
     type(value)
 ```
 
 ### Classes with aliased recursive type-variable constraints
 
-An alias for `type[T]` can hide an invalid recursive constraint. Although this is not yet diagnosed,
-computing a `type[T]` parameter's class still terminates.
+An alias for `type[T]` does not allow `T` in its own constraints. Calling `type` on a parameter with
+these invalid constraints still terminates.
 
 ```toml
 [environment]
@@ -178,7 +180,8 @@ python-version = "3.12"
 ```py
 type Meta[T] = type[T]
 
-def recursive_constraints[T: (Meta[T], int)](value: type[T]):
+# error: [invalid-type-variable-constraints]
+def _[T: (Meta[T], int)](value: type[T]):
     type(value)
 ```
 

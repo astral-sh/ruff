@@ -1,6 +1,6 @@
 use crate::types::generics::specialization_variance;
 use crate::types::tuple::TupleSpec;
-use crate::types::visitor::contains_growing_type;
+use crate::types::visitor::materialization_is_noop;
 use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
@@ -52,7 +52,7 @@ pub(super) fn generic_gradual_intersection<'db>(
         .or_else(|| nominal_top_intersection(db, env, right, left))
 }
 
-/// Intersect a fully static nominal base with a generic subclass.
+/// Intersect a nominal base with a generic subclass when materializing the base has no effect.
 ///
 /// The subclass's identity MRO determines which subclass type variables specialize the base.
 /// Restricting those variables by the base's variance preserves invariant subclass
@@ -89,12 +89,12 @@ fn nominal_top_intersection<'db>(
     // Inspect lazy attributes only after establishing that the classes are related. Expanding a
     // recursive generic alias or member can re-enter intersection simplification with ever-growing
     // type arguments. Exact recursive specializations can still be checked.
-    if contains_growing_type(db, env, base) {
+    if base.contains_growing_type(db, env) {
         return Some(GenericIntersection::Recursive);
     }
     if base_specialization.materialization_kind(db).is_some()
         || subclass_specialization.materialization_kind(db) == Some(MaterializationKind::Bottom)
-        || !base.is_fully_static(db, env)
+        || !materialization_is_noop(db, env, base)
     {
         return None;
     }

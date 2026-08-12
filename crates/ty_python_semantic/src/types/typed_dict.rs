@@ -1351,13 +1351,19 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 ) {
     if let TypedDictType::Class(defining_class) = typed_dict {
         visitor.visit_type(db, defining_class.into());
-
-        if !visitor.should_visit_lazy_type_attributes() {
-            visitor.notify_skipped_lazy_type_attributes();
-            return;
-        }
+        visitor.notify_skipped_lazy_type_attributes();
+        return;
     }
 
+    walk_typed_dict_fields(db, typed_dict, visitor);
+}
+
+/// Visit the declared field and extra-item types of a `TypedDict`.
+pub(super) fn walk_typed_dict_fields<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    visitor: &V,
+) {
     for field in typed_dict.items(db).values() {
         visitor.visit_type(db, field.declared_ty);
     }

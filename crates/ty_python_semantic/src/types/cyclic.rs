@@ -33,11 +33,16 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::newtype::{NewType, walk_newtype_instance_type};
+use crate::types::protocol_class::walk_protocol_instance_interface;
+use crate::types::type_alias::walk_type_alias_value;
+use crate::types::typed_dict::walk_typed_dict_fields;
+use crate::types::typevar::{TypeVarInstance, walk_type_var_bounds};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, StaticClassLiteral, Type,
-    TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, ProtocolInstanceType,
+    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -53,6 +58,26 @@ pub enum TypeIdentity<'db> {
 }
 
 impl<'db> Type<'db> {
+    /// Return whether inspecting this type can encounter recursive types with changing specializations.
+    ///
+    /// Protocol method signatures are not included in specialization-flow analysis, so a new
+    /// specialization of an active protocol definition is conservatively considered growing.
+    pub(super) fn contains_growing_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let visitor = GrowingTypeVisitor {
+            env,
+            visited_types: TypeCollector::default(),
+            active_types: ActiveRecursionDetector::default(),
+            active_class_protocols: ActiveRecursionDetector::default(),
+            found: Cell::new(false),
+        };
+        visitor.visit_type(db, self);
+        visitor.found.get()
+    }
+
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
         self.recursive_identity(db)
             .unwrap_or(TypeIdentity::Other(self))
@@ -112,6 +137,113 @@ impl<'db> Type<'db> {
             }
             _ => None,
         }
+    }
+}
+
+struct GrowingTypeVisitor<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    visited_types: TypeCollector<'db>,
+    active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
+    active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+    found: Cell<bool>,
+}
+
+impl<'db> GrowingTypeVisitor<'_, 'db> {
+    fn visit_lazy_type(&self, db: &'db dyn Db, ty: Type<'db>, visit: impl FnOnce()) {
+        if self.found.get() {
+            return;
+        }
+
+        let identity = ty.to_type_identity(db);
+        if matches!(
+            identity,
+            TypeIdentity::GrowingTypeAlias(_)
+                | TypeIdentity::GrowingProtocol(_)
+                | TypeIdentity::GrowingTypedDict(_)
+        ) && RecursiveDefinition::from_type(db, ty)
+            .is_some_and(|reference| reference.target.generic_context(db).is_some())
+        {
+            self.found.set(true);
+            return;
+        }
+
+        self.active_types.visit(&identity, || {}, visit);
+    }
+}
+
+impl<'db> TypeVisitor<'db> for GrowingTypeVisitor<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if !self.found.get() {
+            walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        }
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        self.visit_lazy_type(db, Type::TypeAlias(alias), || {
+            walk_type_alias_value(db, alias, self);
+        });
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        let ty = Type::ProtocolInstance(protocol);
+        self.visit_lazy_type(db, ty, || {
+            let visit_members = || {
+                // Bind implicit receivers so they do not introduce recursive edges of their
+                // own. Explicitly recursive method signatures still need to be inspected.
+                walk_protocol_instance_interface(db, protocol.interface(db), ty, self);
+            };
+
+            let Some((origin, specialization)) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            else {
+                visit_members();
+                return;
+            };
+
+            if let Some(specialization) = specialization {
+                // Inspect arguments before activating the definition so finite nesting such as
+                // `P[P[int]]` does not look like an expanding recursive declaration.
+                walk_specialization(db, specialization, self);
+                if self.found.get() {
+                    return;
+                }
+            }
+
+            self.active_class_protocols
+                .visit(&origin, || self.found.set(true), visit_members);
+        });
+    }
+
+    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+        self.visit_lazy_type(db, Type::TypedDict(typed_dict), || {
+            if let Some(class) = typed_dict.defining_class() {
+                self.visit_type(db, class.into());
+            }
+            walk_typed_dict_fields(db, typed_dict, self);
+        });
+    }
+
+    fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+        self.visit_lazy_type(
+            db,
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)),
+            || {
+                if let Some(bounds) = typevar.bound_or_constraints(db, self.env) {
+                    walk_type_var_bounds(db, bounds, self);
+                }
+            },
+        );
+    }
+
+    fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+        self.visit_lazy_type(db, Type::NewTypeInstance(newtype), || {
+            walk_newtype_instance_type(db, newtype, self);
+        });
     }
 }
 
@@ -625,10 +757,6 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
         &self.env
     }
 
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
@@ -692,10 +820,6 @@ impl<'a, 'db> SourceParameterCollector<'a, 'db> {
 impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
     fn program_environment(&self) -> &ProgramEnvironment<'db> {
         self.env
-    }
-
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
     }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {

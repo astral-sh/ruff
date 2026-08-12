@@ -14,7 +14,7 @@ use crate::{
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
-        visitor, walk_signature,
+        visitor,
     },
 };
 use ty_python_core::definition::Definition;
@@ -415,7 +415,7 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     for signature in &ty.signatures(db).overloads {
-        walk_signature(db, signature, visitor);
+        visitor.visit_signature(db, signature);
     }
 }
 

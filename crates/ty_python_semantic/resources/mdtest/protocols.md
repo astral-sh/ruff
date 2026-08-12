@@ -3447,6 +3447,157 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Local setter types independent of method parameters
+
+A local protocol with only concrete members does not depend on the setter's type parameter. A
+property setter accepting the same protocol satisfies the descriptor's writable member.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def _() -> None:
+    class Local(Protocol):
+        member: int
+
+    class Descriptor:
+        def __init__(self, getter: object) -> None: ...
+        def __get__(self, instance: object, owner: type | None = None) -> int:
+            return 1
+
+        def __set__[U](self, instance: object, value: Local) -> None: ...
+
+    class HasValue(Protocol):
+        @Descriptor
+        def value(self) -> int: ...
+
+    class Implementation:
+        @property
+        def value(self) -> int:
+            return 1
+
+        @value.setter
+        def value(self, value: Local) -> None: ...
+
+    static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+### Recursive setter types independent of method parameters
+
+A recursively specialized protocol can still be independent of `__set__`'s type parameter. The
+accepted value type is always `Recursive[int]`, so assignments are checked against that
+specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: Recursive[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue, value: Recursive[int]) -> None:
+    x.value = value
+    x.value = 1  # error: [invalid-assignment]
+```
+
+A `TypedDict` can likewise recur without referring to the setter's `U`:
+
+```py
+from typing import TypedDict
+
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+class PayloadDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: Payload[int]) -> None: ...
+
+class HasPayload(Protocol):
+    @PayloadDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasPayload, value: Payload[int]) -> None:
+    x.value = value
+    x.value = 1  # error: [invalid-assignment]
+```
+
+A recursive alias that does not refer to the setter's `U` behaves the same way:
+
+```py
+type RecursiveAlias[T] = list[RecursiveAlias[list[T]]]
+
+class AliasDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: RecursiveAlias[int]) -> None: ...
+
+class HasAlias(Protocol):
+    @AliasDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasAlias, value: RecursiveAlias[int]) -> None:
+    x.value = value
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Setter type parameters inside recursive aliases
+
+The value of `Recursive[T]` is always a `list`, so an `int` assignment is invalid. This still holds
+when each recursive reference nests `T` more deeply.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Recursive[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1  # error: [invalid-assignment]
+```
+
 ### Type variables from the surrounding function
 
 A type variable supplied by the surrounding function is still the descriptor's value type. Assigning
@@ -3522,6 +3673,37 @@ Assignments through the protocol accept `int` but reject `str`:
 def update_aliased_receiver(value: HasAliasedReceiver) -> None:
     value.value = 1
     value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Unused alias arguments do not constrain setters
+
+`Ignored[T]` always denotes `int`, so the setter accepts `int` independently of its type parameter
+and rejects `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Ignored[T] = int
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Ignored[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1
+    x.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Constrained generic setters
@@ -6421,6 +6603,32 @@ class NestedRightProtocol[T](Protocol):
 
 # TODO: These structurally equivalent protocols should be recognized as subtypes.
 static_assert(not is_subtype_of(NestedLeftProtocol[int], NestedRightProtocol[int]))
+```
+
+### Generic calls with independent recursive members
+
+`Recursive[int]` can be passed to `f` even when two of its members recurse through different
+definitions. The alias in `payload` does not refer back to `Recursive`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+type Alias[T] = list[Alias[list[T]]]
+
+class Recursive[T](Protocol):
+    child: Recursive[list[T]]
+    payload: Alias[int]
+
+def f[T](x: Recursive[T]) -> None: ...
+def _(x: Recursive[int]) -> None:
+    f(x)
 ```
 
 ### Disjointness of recursive protocol and recursive final type

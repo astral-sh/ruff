@@ -643,6 +643,25 @@ def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
     a: X.GenAlias[int] = y
 ```
 
+## Qualified names in type alias arguments
+
+Diagnostics qualify class names inside alias arguments when the same name refers to different
+classes.
+
+```py
+class Left:
+    class Item: ...
+
+class Right:
+    class Item: ...
+
+type Alias[T] = T
+
+def _(value: Alias[Left.Item]) -> None:
+    # error: [invalid-assignment] "Object of type `Alias[mdtest_snippet.Left.Item]` is not assignable to `Alias[mdtest_snippet.Right.Item]`"
+    x: Alias[Right.Item] = value
+```
+
 ## Different specializations of the same generic type alias
 
 Different specializations of the same generic type alias refer to the same definition, so they

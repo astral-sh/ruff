@@ -484,6 +484,30 @@ def bad_return(x: T) -> T:
     return x + 1
 ```
 
+## `Self` satisfies variadic constraints
+
+An instance of a variadic generic class satisfies a constraint accepting any tuple of type
+arguments. This also applies to `self`, whose implicit `Self` bound is the enclosing class:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any, Generic, TypeVar, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+class Box(Generic[Unpack[Ts]]):
+    def _(self) -> None:
+        accept(self)
+
+T = TypeVar("T", Box[Unpack[tuple[Any, ...]]], str)
+
+def accept(value: T) -> None: ...
+```
+
 ## All occurrences of the same typevar have the same type
 
 If a typevar appears multiple times in a function signature, all occurrences have the same type.
@@ -602,6 +626,29 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
     raise NotImplementedError
 
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
+```
+
+## Constrained type variables as callback context
+
+`Any` in a type variable's constraints does not make the variable itself gradual. The callback
+parameter retains that type variable, so its body must accept every constraint:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+Constrained = TypeVar("Constrained", float, list[Any])
+
+def accept_float(value: float) -> None: ...
+
+class Box(Generic[T_co]):
+    def apply(self: "Box[T]", callback: Callable[[T], object]) -> None: ...
+    def _(self: "Box[Constrained]") -> None:
+        self.apply(lambda value: reveal_type(value))  # revealed: Constrained@_
+
+        # error: [invalid-argument-type] "Expected `float`, found `Constrained@_`"
+        self.apply(lambda value: accept_float(value))
 ```
 
 ## Gradual invariant protocol members

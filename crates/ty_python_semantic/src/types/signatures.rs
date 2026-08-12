@@ -29,7 +29,6 @@ use crate::types::constraints::{
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
     ApplySpecialization, GenericContext, Specialization, SpecializationBuilder, TypeVarInference,
-    walk_generic_context,
 };
 use crate::types::infer::{
     TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
@@ -42,6 +41,7 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annot
 use crate::types::typevar::{
     TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
 };
+use crate::types::visitor::contains_typevar_dependency;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
@@ -676,9 +676,6 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     signature: &Signature<'db>,
     visitor: &V,
 ) {
-    if let Some(generic_context) = &signature.generic_context {
-        walk_generic_context(db, *generic_context, visitor);
-    }
     for ty in signature.receiver_constraint_types() {
         visitor.visit_type(db, ty);
     }
@@ -1504,14 +1501,12 @@ impl<'db> Signature<'db> {
 
             typevar.binding_context(db).definition() == Some(definition)
                 && !variable.is_self(db)
-                && annotation.references_typevar_through_aliases(db, env, identity)
-                && (self
-                    .return_ty
-                    .references_typevar_through_aliases(db, env, identity)
+                && annotation.references_typevar(db, env, identity)
+                && (self.return_ty.references_typevar(db, env, identity)
                     || self.parameters.iter().skip(1).any(|parameter| {
                         parameter
                             .annotated_type()
-                            .references_typevar_through_aliases(db, env, identity)
+                            .references_typevar(db, env, identity)
                     }))
         })
     }
@@ -1743,8 +1738,8 @@ impl<'db> Signature<'db> {
 
     /// Returns the specialization used for the callable signature exposed by a partial object.
     ///
-    /// Surviving type variables that still appear in the reduced parameter list may need a more
-    /// specific specialization than the plain return-type view.
+    /// Inferred types for variables used by remaining parameters are promoted to accommodate later
+    /// arguments. Unused type-alias arguments do not constrain those parameters.
     fn partial_application_specialization(
         &self,
         db: &'db dyn Db,
@@ -1760,15 +1755,17 @@ impl<'db> Signature<'db> {
         let promoted_typevars: FxHashSet<BoundTypeVarIdentity<'db>> = generic_context
             .variables(db)
             .filter(|typevar| {
+                let identity = typevar.typevar(db).identity(db);
                 self.parameters
                     .iter()
                     .enumerate()
                     .filter(|(index, _)| !partial_application.is_positionally_bound(*index))
                     .any(|(_, parameter)| {
-                        parameter.annotated_type().references_typevar(
+                        contains_typevar_dependency(
                             db,
                             env,
-                            typevar.typevar(db).identity(db),
+                            parameter.annotated_type(),
+                            |typevar| typevar.typevar(db).identity(db) == identity,
                         )
                     })
             })
@@ -2095,7 +2092,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let is_unary_overload_aggregate_candidate_type = |ty: Type<'db>| {
             // Keep aggregate probing away from inference-sensitive shapes and defer them to the
             // legacy path, which already handles dynamic/typevar interactions.
-            !ty.has_dynamic(db, env) && !ty.has_typevar_or_typevar_instance(db, env)
+            ty.is_fully_static(db, env) && !ty.has_typevar_or_typevar_instance(db, env)
         };
 
         if !is_unary_overload_aggregate_candidate_type(other_parameter_type)

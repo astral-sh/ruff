@@ -2,6 +2,7 @@
 
 use std::cell::Cell;
 use std::fmt::{Debug, Display};
+use std::iter;
 
 use smallvec::SmallVec;
 
@@ -12,7 +13,7 @@ use crate::types::constraints::{
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, contains_typevar_dependency, walk_type_with_recursion_guard,
 };
 use crate::types::{BoundTypeVarInstance, Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
@@ -675,15 +676,11 @@ impl SequentMap {
         left_constraint: ConstraintId,
         right_constraint: ConstraintId,
     ) {
-        // Keep this precheck aligned with `variance_of`, which visits lazy types.
         let has_typevar_bound = |bounds: ConstraintBounds<'db>| {
-            bounds
-                .lower
-                .is_some_and(|lower| any_over_type(db, env, lower.ty(), true, Type::is_type_var))
-                || bounds.upper.is_some_and(|upper| {
-                    any_over_type(db, env, upper.ty(), true, Type::is_type_var)
-                })
+            iter::chain(bounds.lower, bounds.upper)
+                .any(|bound| contains_typevar_dependency(db, env, bound.ty(), |_| true))
         };
+
         if !has_typevar_bound(storage.constraint_data(left_constraint).bounds)
             && !has_typevar_bound(storage.constraint_data(right_constraint).bounds)
         {
@@ -1326,10 +1323,8 @@ impl<'db> Type<'db> {
     /// Returns whether this type can participate in a transitive sequent proof.
     ///
     /// Gradual assignability is not transitive, so constraints with dynamic bounds are ineligible.
-    /// Note that we can't use [`is_fully_static`][Type::is_fully_static] here, since that
-    /// considers the declared bounds/constraints of typevars. In the context of a sequent map,
-    /// typevars are opaque symbolic atoms: considering their bounds or defaults could incorrectly
-    /// make their eligibility depend on a specialization that the sequent is meant to constrain.
+    /// We inspect stored types without expanding lazy attributes. Type variables are opaque
+    /// symbolic atoms: their bounds and defaults do not affect eligibility.
     pub(super) fn is_static_sequent_eligible(
         self,
         db: &'db dyn Db,
@@ -1344,10 +1339,6 @@ impl<'db> Type<'db> {
         impl<'db> TypeVisitor<'db> for EligibilityVisitor<'_, 'db> {
             fn program_environment(&self) -> &ProgramEnvironment<'db> {
                 self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
