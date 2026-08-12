@@ -4426,12 +4426,6 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
 /// and full output formats.
 #[test]
 fn statistics_hyperlinks() -> Result<()> {
-    const CONTENT: &str = "\
-import os as os  # PLC0414
-def mvce(keys, values):
-    return {key: value for key, value in zip(keys, values)}  # C416
-";
-
     let fixture = CliTest::with_settings(|_project_dir, mut settings| {
         // Spell out the hyperlink escapes to keep the snapshot readable, filtering them before
         // the fixture rewrites the backslash in their `ESC \` terminators. The colors are absent
@@ -4442,7 +4436,7 @@ def mvce(keys, values):
         settings.add_filter(r"\x1b", "<ESC>");
         settings
     })?;
-    fixture.write_file("input.py", CONTENT)?;
+    fixture.write_file("input.py", "import os as os, math")?;
 
     assert_cmd_snapshot!(
         fixture
@@ -4451,7 +4445,7 @@ def mvce(keys, values):
                 "check",
                 "--no-cache",
                 "--select",
-                "C416,PLC0414",
+                "F401,PLC0414",
                 "--statistics",
                 "--color",
                 "always",
@@ -4459,7 +4453,18 @@ def mvce(keys, values):
             ])
             // Hyperlink support is otherwise detected from the terminal, which varies between
             // local runs and CI.
-            .env("FORCE_HYPERLINK", "1")
+            .env("FORCE_HYPERLINK", "1"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	<link https://docs.astral.sh/ruff/rules/unused-import>F401   </link>	[*] unused-import
+    1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    ",
     );
 
     Ok(())
