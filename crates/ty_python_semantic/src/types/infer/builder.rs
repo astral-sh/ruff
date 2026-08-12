@@ -10815,7 +10815,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             operand_type,
                             constraints,
                             |constraint| {
-                                constraint
+                                let outcome = constraint
                                     .try_call_dunder(
                                         db,
                                         env,
@@ -10823,8 +10823,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         CallArguments::none(),
                                         TypeContext::default(),
                                     )
-                                    .map(|outcome| outcome.return_type(db, env))
-                                    .ok()
+                                    .ok()?;
+                                for callable in outcome.iter_flat() {
+                                    self.check_deprecated(unary, callable.callable_type);
+                                }
+                                Some(outcome.return_type(db, env))
                             },
                         ) {
                             Some(ty) => ty,

@@ -441,6 +441,31 @@ def f(x: bool):
     ~x  # error: [deprecated]
 ```
 
+Type variables constraints also should be checked.
+
+```py
+from typing import TypeVar
+from typing_extensions import deprecated
+
+class First:
+    @deprecated("first")
+    def __invert__(self) -> int:
+        return 42
+
+class Second:
+    @deprecated("second")
+    def __invert__(self) -> int:
+        return 42
+
+T = TypeVar("T", First, Second)
+
+def f(value: T) -> None:
+    # error: [deprecated] "first"
+    # error: [deprecated] "second"
+    ~value
+```
+
+
 ## Overloads
 
 Overloads can be deprecated, but only trigger warnings when invoked.
