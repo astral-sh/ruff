@@ -351,20 +351,18 @@ impl Printer {
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
+                    let code = statistic
+                        .code
+                        .map(SecondaryCode::as_str)
+                        .unwrap_or_default();
+                    let padding_width = code_width - code.len();
+
                     writeln!(
                         writer,
-                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        "{:>count_width$}\t{}{:padding_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        fmt_with_hyperlink(
-                            statistic
-                                .code
-                                .map(SecondaryCode::as_str)
-                                .unwrap_or_default()
-                                .red()
-                                .bold(),
-                            statistic.url,
-                            &stylesheet,
-                        ),
+                        fmt_with_hyperlink(code.red().bold(), statistic.url, &stylesheet),
+                        "",
                         if any_fixable {
                             if statistic.all_fixable {
                                 &all_fixable

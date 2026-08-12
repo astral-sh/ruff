@@ -4458,7 +4458,7 @@ fn statistics_hyperlinks() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    1	<link https://docs.astral.sh/ruff/rules/unused-import>F401   </link>	[*] unused-import
+    1	<link https://docs.astral.sh/ruff/rules/unused-import>F401</link>   	[*] unused-import
     1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
