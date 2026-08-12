@@ -29,8 +29,8 @@ use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 pub use self::dedicated::pytest::{
-    FixtureBinding, SyntheticFixture, fixture_bindings_for_parameter, pytest_global_plugin_files,
-    synthetic_fixture_for_parameter,
+    FixtureBinding, SyntheticFixture, fixture_bindings_for_parameter, fixture_reference_candidates,
+    fixture_reference_targets, pytest_global_plugin_files, synthetic_fixture_for_parameter,
 };
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;

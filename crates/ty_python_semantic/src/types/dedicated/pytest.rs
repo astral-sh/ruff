@@ -47,7 +47,7 @@ use ty_module_resolver::{
     resolve_real_module, stub_file_to_real_module,
 };
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
-use ty_python_core::scope::{FileScopeId, ScopeId, ScopeKind};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
 
 use crate::definition_resolution::{DefinitionResolution, definitions_for_module_global};
@@ -277,6 +277,90 @@ pub fn pytest_global_plugin_files<'db>(
     plugins.into_boxed_slice()
 }
 
+/// Returns the definitions in `file` that can participate in pytest fixture references.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub fn fixture_reference_candidates<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+) -> Box<[Definition<'db>]> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let index = semantic_index(db, file);
+    let mut seen = FxHashSet::default();
+    let mut candidates = Vec::new();
+
+    for scope_id in index.scope_ids() {
+        let file_scope = scope_id.file_scope_id(db);
+        let scope = index.scope(file_scope);
+
+        if is_fixture_provider_scope(index, file_scope) {
+            let table = index.place_table(file_scope);
+            let use_def = index.use_def_map(file_scope);
+            for (symbol_id, definitions) in use_def.all_end_of_scope_symbol_bindings() {
+                let symbol_name = table.symbol(symbol_id).name();
+                for definition in definitions.filter_map(|binding| binding.binding.definition()) {
+                    if definition.program_file(db) == file
+                        && fixture_definitions_for_definition(db, definition, symbol_name.clone())
+                            .iter()
+                            .any(|fixture| fixture_definition_is_available(db, *fixture))
+                    {
+                        push_unique_candidate(&mut candidates, &mut seen, definition);
+                    }
+                }
+            }
+        }
+
+        let NodeWithScopeKind::Function(function_ref) = scope.node() else {
+            continue;
+        };
+        let function = function_ref.node(&module);
+        let owner = index.expect_single_definition(function_ref);
+        if fixture_definition_is_available(db, owner) {
+            push_unique_candidate(&mut candidates, &mut seen, owner);
+        }
+        for parameter in &function.parameters {
+            let definition = match parameter {
+                ast::AnyParameterRef::Variadic(parameter) => {
+                    index.expect_single_definition(parameter)
+                }
+                ast::AnyParameterRef::NonVariadic(parameter) => {
+                    index.expect_single_definition(parameter)
+                }
+            };
+            if FixtureRequest::from_parameter(db, definition).is_some() {
+                push_unique_candidate(&mut candidates, &mut seen, definition);
+            }
+        }
+    }
+
+    candidates.into_boxed_slice()
+}
+
+/// Returns the canonical fixture declarations associated with `definition`.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub fn fixture_reference_targets<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Box<[Definition<'db>]> {
+    if matches!(definition.kind(db), DefinitionKind::Parameter(_)) {
+        return fixture_bindings_for_parameter(db, definition)
+            .iter()
+            .map(|binding| binding.fixture())
+            .collect();
+    }
+
+    let Some(symbol) = definition.place(db).as_symbol() else {
+        return Box::default();
+    };
+    let name = place_table(db, definition.scope(db)).symbol(symbol).name();
+    let mut seen = FxHashSet::default();
+    fixture_definitions_for_definition(db, definition, name.clone())
+        .iter()
+        .copied()
+        .filter(|target| fixture_definition_is_available(db, *target))
+        .filter(|target| seen.insert(*target))
+        .collect()
+}
+
 /// An eligible fixture parameter and the context needed to resolve its request.
 #[derive(Debug)]
 struct FixtureRequest<'db> {
@@ -496,6 +580,45 @@ enum FixtureName {
     /// Represents a public name that ty cannot determine statically, such as a
     /// dynamically-typed expression or a non-literal `str`.
     Unknown,
+}
+
+/// Adds a uniquely identified, named definition to the reference candidates.
+fn push_unique_candidate<'db>(
+    candidates: &mut Vec<Definition<'db>>,
+    seen: &mut FxHashSet<Definition<'db>>,
+    definition: Definition<'db>,
+) {
+    if seen.insert(definition) {
+        candidates.push(definition);
+    }
+}
+
+/// Returns whether a fixture definition belongs to a supported provider scope.
+fn fixture_definition_is_available(db: &dyn Db, definition: Definition<'_>) -> bool {
+    fixture_declaration(db, definition).is_some()
+        && is_fixture_provider_scope(
+            semantic_index(db, definition.program_file(db)),
+            definition.file_scope(db),
+        )
+}
+
+/// Returns whether a scope can expose fixtures to pytest.
+fn is_fixture_provider_scope(
+    index: &ty_python_core::SemanticIndex<'_>,
+    mut scope: FileScopeId,
+) -> bool {
+    loop {
+        match index.scope(scope).kind() {
+            ScopeKind::Module => return true,
+            ScopeKind::Class => {
+                let Some(parent) = non_type_parameter_parent(index, scope) else {
+                    return false;
+                };
+                scope = parent;
+            }
+            _ => return false,
+        }
+    }
 }
 
 /// A fixture provider layer in which to resolve a request.
@@ -1213,7 +1336,8 @@ mod tests {
     use ty_python_core::semantic_index;
 
     use super::{
-        SyntheticFixture, fixture_bindings_for_parameter, pytest_global_plugin_files,
+        SyntheticFixture, end_of_scope_definition, fixture_bindings_for_parameter,
+        fixture_reference_candidates, fixture_reference_targets, pytest_global_plugin_files,
         synthetic_fixture_for_parameter,
     };
     use crate::Db as _;
@@ -2481,6 +2605,186 @@ default_plugins = plugins()
         assert_snapshot!(test_use.fixture_resolution("core_value"), @"No fixture resolved for parameter `core_value`");
     }
 
+    #[test]
+    fn connects_fixture_declarations_exposures_and_requests() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture(name="public_name")
+def implementation(): ...
+"#,
+                ),
+                (
+                    "/src/fixtures.pyi",
+                    r#"
+def implementation() -> object: ...
+"#,
+                ),
+                (
+                    "/src/reexports.py",
+                    r#"
+from fixtures import implementation as middle
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+from reexports import middle
+
+def test_use(public_name):
+    print(public_name)
+"#,
+                ),
+            ],
+        );
+
+        let declaration = test.function_definition("/src/fixtures.py", "implementation");
+        let exposure = test.global_definition("/src/reexports.py", "middle");
+        let test_use = test.function("test_use");
+        let request = test_use.parameter_definition("public_name");
+
+        assert_eq!(test.fixture_reference_targets(declaration), [declaration]);
+        assert_eq!(test.fixture_reference_targets(exposure), [declaration]);
+        assert_eq!(test.fixture_reference_targets(request), [declaration]);
+        assert!(
+            test.fixture_candidates("/src/fixtures.py")
+                .contains(&declaration)
+        );
+        assert!(
+            test.fixture_candidates("/src/reexports.py")
+                .contains(&exposure)
+        );
+        assert!(
+            test.fixture_candidates("/src/test_example.py")
+                .contains(&request)
+        );
+    }
+
+    #[test]
+    fn connects_nested_class_fixture_references() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            r#"
+import pytest
+
+class TestOuter:
+    class TestInner:
+        @pytest.fixture
+        def resource(self): ...
+
+        def test_use(self, resource): ...
+"#,
+        );
+
+        let fixture =
+            test.function_definition("/src/test_example.py", "TestOuter.TestInner.resource");
+        let test_use = test.function("TestOuter.TestInner.test_use");
+        let request = test_use.parameter_definition("resource");
+
+        assert_eq!(test.fixture_reference_targets(fixture), [fixture]);
+        assert_eq!(test.fixture_reference_targets(request), [fixture]);
+        assert!(
+            test.fixture_candidates("/src/test_example.py")
+                .contains(&fixture)
+        );
+        assert!(
+            test.fixture_candidates("/src/test_example.py")
+                .contains(&request)
+        );
+    }
+
+    #[test]
+    fn excludes_function_local_class_fixtures_from_reference_candidates() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            r#"
+import pytest
+
+def factory():
+    class TestLocal:
+        @pytest.fixture
+        def resource(self): ...
+"#,
+        );
+
+        assert!(test.fixture_candidates("/src/test_example.py").is_empty());
+    }
+
+    #[test]
+    fn keeps_ambiguous_reference_targets_anchored() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/first.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def first(): ...
+"#,
+                ),
+                (
+                    "/src/second.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def second(): ...
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+flag: bool
+
+if flag:
+    from first import first as resource
+else:
+    from second import second as resource
+
+def test_use(resource): ...
+"#,
+                ),
+            ],
+        );
+
+        let first = test.function_definition("/src/first.py", "first");
+        let second = test.function_definition("/src/second.py", "second");
+        let test_use = test.function("test_use");
+        let request = test_use.parameter_definition("resource");
+        let mut request_targets = test.fixture_reference_targets(request);
+        test.sort_definitions_by_name(&mut request_targets);
+
+        assert_eq!(request_targets, [first, second]);
+        assert_eq!(test.fixture_reference_targets(first), [first]);
+        assert_eq!(test.fixture_reference_targets(second), [second]);
+    }
+
+    #[test]
+    fn retains_unresolved_and_synthetic_requests_as_candidates() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            r#"
+def test_use(missing, request): ...
+"#,
+        );
+        let function = test.function("test_use");
+        let missing = function.parameter_definition("missing");
+        let request = function.parameter_definition("request");
+        let candidates = test.fixture_candidates("/src/test_example.py");
+
+        assert!(candidates.contains(&missing));
+        assert!(candidates.contains(&request));
+        assert!(test.fixture_reference_targets(missing).is_empty());
+        assert!(test.fixture_reference_targets(request).is_empty());
+    }
+
     struct PytestTestCase {
         db: TestDb,
         path: &'static str,
@@ -2532,6 +2836,29 @@ default_plugins = plugins()
                 .iter()
                 .map(|file| file.file(&self.db).path(&self.db).to_string())
                 .collect()
+        }
+
+        fn function_definition<'db>(&'db self, path: &str, name: &str) -> Definition<'db> {
+            function_definition(&self.db, path, name)
+        }
+
+        fn global_definition<'db>(&'db self, path: &str, name: &str) -> Definition<'db> {
+            global_definition(&self.db, path, name)
+        }
+
+        fn fixture_reference_targets<'db>(
+            &'db self,
+            definition: Definition<'db>,
+        ) -> Vec<Definition<'db>> {
+            fixture_reference_targets(&self.db, definition).to_vec()
+        }
+
+        fn fixture_candidates<'db>(&'db self, path: &str) -> Vec<Definition<'db>> {
+            fixture_candidates(&self.db, path)
+        }
+
+        fn sort_definitions_by_name<'db>(&'db self, definitions: &mut [Definition<'db>]) {
+            definitions.sort_by_key(|definition| definition.name(&self.db));
         }
     }
 
@@ -2615,6 +2942,25 @@ default_plugins = plugins()
                 }
             }
         }
+    }
+
+    fn function_definition<'db>(db: &'db TestDb, path: &str, function: &str) -> Definition<'db> {
+        let file = system_path_to_file(db, path).expect("test file exists");
+        let file = db.program_file(file);
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let function = find_function(module.suite(), function).expect("function exists");
+        semantic_index(db, file).expect_single_definition(function)
+    }
+
+    fn global_definition<'db>(db: &'db TestDb, path: &str, name: &str) -> Definition<'db> {
+        let file = system_path_to_file(db, path).expect("test file exists");
+        let file = db.program_file(file);
+        end_of_scope_definition(db, file, name).expect("global definition exists")
+    }
+
+    fn fixture_candidates<'db>(db: &'db TestDb, path: &str) -> Vec<Definition<'db>> {
+        let file = system_path_to_file(db, path).expect("test file exists");
+        fixture_reference_candidates(db, db.program_file(file)).to_vec()
     }
 
     fn find_function<'ast>(
