@@ -243,9 +243,19 @@ S607 Starting a process with a partial executable path
    |
 
 S607 Starting a process with a partial executable path
-  --> S607.py:49:16
+  --> S607.py:50:16
    |
-47 | # Check that "partial path" checks tuples too
-48 | import subprocess
-49 | subprocess.run(("echo", "foo"))
+48 | # Check that "partial path" checks tuples too
+49 | import subprocess
+50 | subprocess.run(("echo", "foo"))
    |                ^^^^^^^^^^^^^^^
+51 |
+52 | # Keyword command arguments are checked too.
+   |
+
+S607 Starting a process with a partial executable path
+  --> S607.py:53:21
+   |
+52 | # Keyword command arguments are checked too.
+53 | subprocess.run(args="git status")
+   |                     ^^^^^^^^^^^^
