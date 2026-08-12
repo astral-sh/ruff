@@ -1056,6 +1056,27 @@ def _(x: int):
     reveal_type(C().implicit_self(x))  # revealed: tuple[C, int]
 ```
 
+## Generic method errors account for the implicit receiver
+
+An implicit `self` participates in generic inference but is absent from the call-site argument list.
+Bound violations must still identify the correct positional or keyword argument.
+
+```py
+class Box:
+    def accept[T: int](self, value: T, *, other: T) -> T:
+        return value
+
+box = Box()
+
+reveal_type(box.accept(1, other=2))  # revealed: Literal[1, 2]
+
+# error: 12 [invalid-argument-type] "does not satisfy upper bound `int`"
+box.accept("invalid", other=1)
+
+# error: 15 [invalid-argument-type] "does not satisfy upper bound `int`"
+box.accept(1, other="invalid")
+```
+
 ## `~T` is never assignable to `T`
 
 ```py
