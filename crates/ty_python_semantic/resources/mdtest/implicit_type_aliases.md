@@ -1406,6 +1406,7 @@ class ConstrainedBox(Generic[Constrained]): ...
 PairAlias = Pair[T, U]
 BoundedAlias = BoundedBox[Bounded]
 ConstrainedAlias = ConstrainedBox[Constrained]
+BoundedUnionAlias = list[Bounded] | set[Bounded]
 
 def _(
     # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
@@ -1416,6 +1417,9 @@ def _(
     violated_bound: type[BoundedAlias[str]],
     # error: [invalid-type-arguments] "Type `bytes` does not satisfy constraints `int`, `str` of type variable `Constrained@ConstrainedAlias`"
     violated_constraint: type[ConstrainedAlias[bytes]],
+    # Bounds are checked through a union-valued alias too:
+    # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `Bounded@BoundedUnionAlias`"
+    union_violated_bound: type[BoundedUnionAlias[str]],
     # Subscripting an already-subscripted alias is invalid, just as it is outside of `type[…]`:
     # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
     double_subscript: type[PairAlias[T, U][int, str]],
@@ -1424,10 +1428,13 @@ def _(
     reveal_type(too_many)  # revealed: type[Pair[Unknown, Unknown]]
     reveal_type(violated_bound)  # revealed: type[BoundedBox[Unknown]]
     reveal_type(violated_constraint)  # revealed: type[ConstrainedBox[Unknown]]
+    reveal_type(union_violated_bound)  # revealed: type[list[Unknown] | set[Unknown]]
     reveal_type(double_subscript)  # revealed: type[Unknown]
 
 # error: [invalid-assignment] "Object of type `<class 'int'>` is not assignable to `type[Pair[int, str]]`"
 assigned: type[PairAlias[int, str]] = int
+# error: [invalid-assignment] "Object of type `<class 'str'>` is not assignable to `type[list[int] | set[int]]`"
+assigned_union: type[BoundedUnionAlias[int]] = str
 ```
 
 #### Other alias representations
