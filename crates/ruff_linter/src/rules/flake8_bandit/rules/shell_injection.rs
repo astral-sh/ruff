@@ -47,10 +47,18 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         match (self.safety, self.is_exact) {
-            (Safety::SeemsSafe, true) => "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
-            (Safety::Unknown, true) => "`subprocess` call with `shell=True` identified, security issue".to_string(),
-            (Safety::SeemsSafe, false) => "`subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
-            (Safety::Unknown, false) => "`subprocess` call with truthy `shell` identified, security issue".to_string(),
+            (Safety::SeemsSafe, true) => "`subprocess` call with `shell=True` seems safe, \
+                but may be changed in the future; consider rewriting without `shell`"
+                .to_string(),
+            (Safety::Unknown, true) => {
+                "`subprocess` call with `shell=True` identified, security issue".to_string()
+            }
+            (Safety::SeemsSafe, false) => "`subprocess` call with truthy `shell` seems safe, \
+                but may be changed in the future; consider rewriting without `shell`"
+                .to_string(),
+            (Safety::Unknown, false) => {
+                "`subprocess` call with truthy `shell` identified, security issue".to_string()
+            }
         }
     }
 }
@@ -181,8 +189,12 @@ impl Violation for StartProcessWithAShell {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.safety {
-            Safety::SeemsSafe => "Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`".to_string(),
-            Safety::Unknown => "Starting a process with a shell, possible injection detected".to_string(),
+            Safety::SeemsSafe => "Starting a process with a shell: seems safe, \
+                but may be changed in the future; consider rewriting without `shell`"
+                .to_string(),
+            Safety::Unknown => {
+                "Starting a process with a shell, possible injection detected".to_string()
+            }
         }
     }
 }

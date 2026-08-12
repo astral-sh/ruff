@@ -2,8 +2,8 @@ use crate::Db;
 use crate::reachability::is_reachable;
 use get_size2::GetSize;
 use itertools::Itertools;
-use ruff_db::files::File;
 use ruff_text_size::TextRange;
+use ty_python_core::ProgramFile;
 use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::semantic_index;
 
@@ -45,10 +45,9 @@ pub enum UnreachableKind {
 /// `ALWAYS_FALSE` constraints are classified as unconditional; all others are
 /// unreachable only under the current analysis.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unreachable_ranges(db: &dyn Db, file: File) -> Box<[UnreachableRange]> {
+pub fn unreachable_ranges(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
-
     for scope_id in index.scope_ids() {
         let use_def = index.use_def_map(scope_id.file_scope_id(db));
         unreachable.extend(
@@ -93,7 +92,7 @@ fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Box<[Unreachab
 #[cfg(test)]
 mod tests {
     use super::{UnreachableKind, unreachable_ranges};
-    use crate::db::tests::TestDbBuilder;
+    use crate::db::tests::{TestDb, TestDbBuilder};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
@@ -101,6 +100,7 @@ mod tests {
     use ruff_db::files::{FileRange, system_path_to_file};
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+    use ty_python_core::ProgramFile;
     use ty_python_core::platform::PythonPlatform;
 
     const TEST_PATH: &str = "/src/main.py";
@@ -145,25 +145,28 @@ mod tests {
         }
     }
 
-    fn render_unreachable_diagnostics(db: &crate::db::tests::TestDb, path: &str) -> String {
+    fn render_unreachable_diagnostics(db: &TestDb, path: &str) -> String {
         let file = system_path_to_file(db, path).unwrap();
-        let diagnostics = unreachable_ranges(db, file)
-            .iter()
-            .map(|range| {
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::lint("unreachable-code"),
-                    Severity::Info,
-                    match range.kind {
-                        UnreachableKind::Unconditional => "Code is always unreachable",
-                        UnreachableKind::CurrentAnalysis => "Code is unreachable",
-                    },
-                );
-                diagnostic.annotate(Annotation::primary(
-                    FileRange::new(file, range.range).into(),
-                ));
-                diagnostic
-            })
-            .collect::<Vec<_>>();
+        let diagnostics = unreachable_ranges(
+            db,
+            ProgramFile::new(db, file, db.program_environment().program(db)),
+        )
+        .iter()
+        .map(|range| {
+            let mut diagnostic = Diagnostic::new(
+                DiagnosticId::lint("unreachable-code"),
+                Severity::Info,
+                match range.kind {
+                    UnreachableKind::Unconditional => "Code is always unreachable",
+                    UnreachableKind::CurrentAnalysis => "Code is unreachable",
+                },
+            );
+            diagnostic.annotate(Annotation::primary(
+                FileRange::new(file, range.range).into(),
+            ));
+            diagnostic
+        })
+        .collect::<Vec<_>>();
 
         DisplayDiagnostics::new(
             db,
@@ -383,6 +386,28 @@ mod tests {
         3 |     print("dead")
           |     ^^^^^^^^^^^^^
         "#);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_impossible_typed_dict_key_membership() -> anyhow::Result<()> {
+        let source = r#"
+            from typing_extensions import TypedDict
+
+            class Items(TypedDict, closed=True):
+                present: int
+
+            def f(items: Items) -> None:
+                if "missing" in items:
+                    print("missing")
+                if "present" not in items:
+                    print("present")
+            "#;
+
+        let diagnostics = UnreachableTest::new().render(source)?;
+        assert_eq!(diagnostics.matches("Code is unreachable").count(), 2);
+        assert!(diagnostics.contains("print(\"missing\")"));
+        assert!(diagnostics.contains("print(\"present\")"));
         Ok(())
     }
 

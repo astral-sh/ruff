@@ -299,6 +299,30 @@ def factory():
         reveal_type(x)  # revealed: Literal[1]
 ```
 
+If the rebinding is conditional, an unbound enclosing snapshot continues to the implicit global:
+
+```py
+def conditional_factory(flag: bool):
+    global __file__
+    if flag:
+        __file__ = "shadow"
+
+    class C:
+        reveal_type(__file__)  # revealed: str
+```
+
+An unbound snapshot can also continue through the module scope to a builtin.
+
+```py
+def conditional_builtin_factory(flag: bool):
+    global len  # error: [unresolved-global] "Invalid global declaration of `len`: `len` has no declarations or bindings in the global scope"
+    if flag:
+        len = 1
+
+    class C:
+        reveal_type(len)  # revealed: Literal[1] | (def len(obj: Sized, /) -> int)
+```
+
 ## References to variables before they are defined within a class scope are considered global
 
 If we try to access a variable in a class before it has been defined, the lookup will fall back to

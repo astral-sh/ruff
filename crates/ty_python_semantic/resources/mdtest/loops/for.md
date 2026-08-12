@@ -679,14 +679,13 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: Top[list[Unknown]]
+        reveal_type(y)  # revealed: list[Unknown]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: Unknown
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(x)  # revealed: list[int]
         for item in x:
-            # int & object simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
@@ -892,6 +891,7 @@ info: Its `__iter__` method has an invalid signature
 info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -970,6 +970,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1233,6 +1234,7 @@ info: Its `__iter__` method may have an invalid signature
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1308,6 +1310,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1486,8 +1489,8 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import TypeOf, is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to, reveal_mro
 
 class Foo(SomethingUnknown): ...
 
@@ -1537,12 +1540,10 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        reveal_type(x)  # revealed: T@f & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
-            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`.
+            # The `int` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1554,13 +1555,10 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        reveal_type(x)  # revealed: T@g & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
-            # `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`, NOT `int | str`.
+            # The `list[str]` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 

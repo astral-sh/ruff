@@ -7,7 +7,6 @@ use ruff_db::Db as SourceDb;
 use ruff_db::files::Files;
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
@@ -23,48 +22,42 @@ pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
-    search_paths: Arc<SearchPaths>,
-    python_version: PythonVersion,
 }
 
 impl ModuleDb {
-    /// Initialize a [`ModuleDb`] from the given source root.
-    pub fn from_src_roots<S>(
-        system: S,
-        src_roots: Vec<SystemPathBuf>,
-        python_version: PythonVersion,
-        venv_path: Option<SystemPathBuf>,
-    ) -> Result<Self>
+    /// Initialize a [`ModuleDb`] for the given system.
+    pub fn new<S>(system: S) -> Self
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let mut search_path_settings = SearchPathSettings::new(src_roots);
-        // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
-        if let Some(venv_path) = venv_path {
-            let environment =
-                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, &system)?;
-            search_path_settings.site_packages_paths = environment
-                .site_packages_paths(&system)
-                .context("Failed to discover the site-packages directory")?
-                .into_vec();
-        }
-        let search_paths = search_path_settings
-            .to_search_paths(&system, &EMPTY_VENDORED, &FallibleStrategy)
-            .context("Invalid search path settings")?;
-
-        let db = Self {
+        Self {
             storage: salsa::Storage::new(None),
             files: Files::default(),
             system: Arc::new(system),
-            search_paths: Arc::new(search_paths),
-            python_version,
-        };
-
-        // Register the static roots for salsa durability
-        db.search_paths.try_register_static_roots(&db);
-
-        Ok(db)
+        }
     }
+}
+
+/// Resolve module search paths for the given source roots and Python environment.
+pub fn resolve_search_paths(
+    system: &dyn System,
+    src_roots: Vec<SystemPathBuf>,
+    venv_path: Option<SystemPathBuf>,
+) -> Result<SearchPaths> {
+    let mut search_path_settings = SearchPathSettings::new(src_roots);
+    // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
+    if let Some(venv_path) = venv_path {
+        let environment =
+            PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, system)?;
+        search_path_settings.site_packages_paths = environment
+            .site_packages_paths(system)
+            .context("Failed to discover the site-packages directory")?
+            .into_vec();
+    }
+
+    search_path_settings
+        .to_search_paths(system, &EMPTY_VENDORED, &FallibleStrategy)
+        .context("Invalid search path settings")
 }
 
 #[salsa::db]
@@ -80,18 +73,10 @@ impl SourceDb for ModuleDb {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> PythonVersion {
-        self.python_version
-    }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for ModuleDb {
-    fn search_paths(&self) -> &SearchPaths {
-        &self.search_paths
-    }
-}
+impl ty_module_resolver::Db for ModuleDb {}
 
 #[salsa::db]
 impl salsa::Database for ModuleDb {}

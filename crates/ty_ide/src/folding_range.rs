@@ -1,4 +1,4 @@
-use ruff_db::files::File;
+use ruff_db::PythonFile;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::token::{TokenKind, Tokens, parenthesized_range};
@@ -56,10 +56,11 @@ impl From<TextRange> for FoldingRange {
 /// Returns a list of folding ranges for the given file.
 pub fn folding_ranges(
     db: &dyn Db,
-    file: File,
+    file: PythonFile<'_>,
     range_filter: Option<TextRange>,
 ) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
+    let file = file.file(db);
     let source = source_text(db, file);
 
     let mut visitor = FoldingRangeVisitor {
@@ -699,11 +700,10 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             AnyNodeRef::ExprList(_) | AnyNodeRef::ExprListComp(_) | AnyNodeRef::TypeParams(_) => {
                 self.add_delimited_expression_range(node.range(), BRACKETS);
             }
-            AnyNodeRef::ExprTuple(tuple)
-                // Only fold parenthesized tuples.
-                if tuple.parenthesized => {
-                    self.add_delimited_expression_range(node.range(), PARENTHESES);
-                }
+            // Only fold parenthesized tuples.
+            AnyNodeRef::ExprTuple(tuple) if tuple.parenthesized => {
+                self.add_delimited_expression_range(node.range(), PARENTHESES);
+            }
             AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprSetComp(_)
@@ -762,6 +762,7 @@ mod tests {
     use crate::tests::CursorTest;
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_db::files::File;
 
     #[test]
     fn test_folding_range_class() {
@@ -2577,7 +2578,11 @@ with open("file.txt") as f:
 
     impl CursorTest {
         fn folding_ranges(&self) -> String {
-            let ranges = folding_ranges(&self.db, self.cursor.file, None);
+            let ranges = folding_ranges(
+                &self.db,
+                self.program_file(self.cursor.file).python_file(&self.db),
+                None,
+            );
 
             if ranges.is_empty() {
                 return "No folding ranges found".to_string();

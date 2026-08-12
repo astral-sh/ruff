@@ -99,8 +99,12 @@ impl NotebookDocument {
             nbformat_minor: 5,
         };
 
-        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false)
-            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to Ruff's notebook document format: {err}"))
+        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false).unwrap_or_else(|err| {
+            panic!(
+                "Server notebook document could not be converted to Ruff's \
+                notebook document format: {err}"
+            )
+        })
     }
 
     pub(crate) fn update(
@@ -239,11 +243,7 @@ impl NotebookDocument {
 }
 
 impl NotebookCell {
-    pub(crate) fn new(
-        cell: lsp_types::NotebookCell,
-        contents: String,
-        version: DocumentVersion,
-    ) -> Self {
+    fn new(cell: lsp_types::NotebookCell, contents: String, version: DocumentVersion) -> Self {
         Self {
             uri: cell.document,
             kind: cell.kind,

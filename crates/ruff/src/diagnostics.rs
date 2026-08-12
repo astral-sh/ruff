@@ -54,7 +54,7 @@ impl Diagnostics {
     }
 
     /// Generate [`Diagnostics`] based on a [`SourceError`].
-    pub(crate) fn from_source_error(
+    fn from_source_error(
         err: &SourceError,
         path: Option<&Path>,
         settings: &LinterSettings,

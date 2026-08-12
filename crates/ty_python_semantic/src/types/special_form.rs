@@ -2,6 +2,7 @@
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
 use super::{ClassType, Type, TypeFormType, class::KnownClass};
+use crate::ProgramEnvironment;
 use crate::db::Db;
 use crate::types::IntersectionType;
 use crate::types::infer::InferenceFlags;
@@ -10,11 +11,10 @@ use crate::types::{
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use ruff_db::files::File;
 use strum_macros::EnumString;
-use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_module_confident};
 use ty_python_core::{
-    FileScopeId,
+    FileScopeId, ProgramFile,
     definition::{Definition, DefinitionKind},
     place::ScopedPlaceId,
     place_table,
@@ -75,7 +75,7 @@ pub enum SpecialFormType {
     NoReturn,
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
-    /// The symbol `ty_extensions.Unknown`
+    /// The symbol `ty_extensions._internal.Unknown`
     Unknown,
     /// The symbol `ty_extensions._internal.Divergent`
     Divergent,
@@ -228,10 +228,14 @@ impl SpecialFormType {
     /// Return the instance type which this type is a subtype of.
     ///
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
-    /// so `SpecialFormType::Literal.instance_fallback(db)`
+    /// so `SpecialFormType::Literal.instance_fallback(db, python_version)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
-        self.class().to_instance(db)
+    pub(super) fn instance_fallback<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.class().to_instance(db, env)
     }
 
     /// Return `true` if this special form is guaranteed to be a singleton at runtime.
@@ -248,7 +252,11 @@ impl SpecialFormType {
 
     /// Return the type denoted by this retained special-form value when it is valid without
     /// parameters or a surrounding inference scope.
-    pub(crate) fn type_form_argument(self, db: &dyn Db) -> Option<Type<'_>> {
+    pub(crate) fn type_form_argument<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
         match self {
             Self::Never | Self::NoReturn => Some(Type::Never),
             Self::LiteralString => Some(Type::literal_string()),
@@ -258,37 +266,45 @@ impl SpecialFormType {
             Self::AlwaysFalsy => Some(Type::AlwaysFalsy),
             Self::NamedTuple => Some(IntersectionType::from_two_elements(
                 db,
-                Type::homogeneous_tuple(db, Type::object()),
-                KnownClass::NamedTupleLike.to_instance(db),
+                env,
+                Type::homogeneous_tuple(db, env, Type::object()),
+                KnownClass::NamedTupleLike.to_instance(db, env),
             )),
-            Self::Type => Some(KnownClass::Type.to_instance(db)),
+            Self::Type => Some(KnownClass::Type.to_instance(db, env)),
             Self::TypeForm => Some(TypeFormType::from_type_expression(db, Type::any())),
-            Self::Tuple => Some(Type::homogeneous_tuple(db, Type::unknown())),
+            Self::Tuple => Some(Type::homogeneous_tuple(db, env, Type::unknown())),
             Self::TypingCallable | Self::CollectionsAbcCallable => {
                 Some(Type::Callable(CallableType::unknown(db)))
             }
-            Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(db)),
+            Self::LegacyStdlibAlias(alias) => Some(alias.aliased_class().to_instance(db, env)),
             _ => None,
         }
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
-        self.class().is_subclass_of(db, class)
+    pub(super) fn is_instance_of(
+        self,
+        db: &dyn Db,
+        env: &ProgramEnvironment<'_>,
+        class: ClassType,
+    ) -> bool {
+        self.class().is_subclass_of(db, env, class)
     }
 
     pub(super) fn try_from_file_and_name(
         db: &dyn Db,
-        file: File,
+        file: ImportingFile<'_>,
         symbol_name: &str,
     ) -> Option<Self> {
-        Self::candidates_from_name(symbol_name)
+        let candidates = Self::candidates_from_name(symbol_name);
+        if candidates.is_empty() {
+            return None;
+        }
+
+        let known_module = file_to_module(db, file.resolver_file(db))?.known(db)?;
+        candidates
             .iter()
-            .find(|candidate| {
-                file_to_module(db, file)
-                    .and_then(|module| module.known(db))
-                    .is_some_and(|known_module| candidate.check_module(known_module))
-            })
+            .find(|candidate| candidate.check_module(known_module))
             .copied()
     }
 
@@ -529,7 +545,7 @@ impl SpecialFormType {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module(db)`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(super) const fn check_module(self, module: KnownModule) -> bool {
+    const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
             Self::LegacyStdlibAlias(_)
@@ -559,15 +575,15 @@ impl SpecialFormType {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
 
-            Self::Unknown
-            | Self::AlwaysTruthy
+            Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Top
             | Self::Bottom
             | Self::Intersection => module.is_ty_extensions(),
 
-            Self::Divergent
+            Self::Unknown
+            | Self::Divergent
             | Self::Todo
             | Self::TypeOf
             | Self::CallableTypeOf
@@ -582,8 +598,12 @@ impl SpecialFormType {
         }
     }
 
-    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type<'_> {
-        self.class().to_class_literal(db)
+    pub(super) fn to_meta_type<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.class().to_class_literal(db, env)
     }
 
     /// Return true if this special form is callable at runtime.
@@ -592,16 +612,16 @@ impl SpecialFormType {
     pub(super) const fn is_callable(self) -> bool {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
-            Self::TypedDict(_)
+            Self::TypedDict(_) => true,
 
             // Collection constructors are callable
             // TODO actually implement support for calling them
-            | Self::LegacyStdlibAlias(
+            Self::LegacyStdlibAlias(
                 LegacyStdlibAlias::ChainMap
                 | LegacyStdlibAlias::Counter
                 | LegacyStdlibAlias::DefaultDict
                 | LegacyStdlibAlias::Deque
-                | LegacyStdlibAlias::OrderedDict
+                | LegacyStdlibAlias::OrderedDict,
             )
             | Self::NamedTuple => true,
             Self::TypeForm => true,
@@ -612,7 +632,7 @@ impl SpecialFormType {
                 LegacyStdlibAlias::List
                 | LegacyStdlibAlias::Dict
                 | LegacyStdlibAlias::Set
-                | LegacyStdlibAlias::FrozenSet
+                | LegacyStdlibAlias::FrozenSet,
             )
             | Self::Tuple
             | Self::Type => false,
@@ -693,9 +713,11 @@ impl SpecialFormType {
             | Self::Divergent
             | Self::Todo
             | Self::TypeOf
-            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
-            | Self::Unpack => false,
-            Self::TypeForm => false,
+            | Self::Unpack
+            | Self::TypeForm => false,
+
+            // can be used in `issubclass()` but not `isinstance()`.
+            Self::Any => false,
         }
     }
 
@@ -786,15 +808,15 @@ impl SpecialFormType {
 
             SpecialFormType::CollectionsAbcCallable => &[KnownModule::CollectionsAbc],
 
-            SpecialFormType::Unknown
-            | SpecialFormType::AlwaysTruthy
+            SpecialFormType::AlwaysTruthy
             | SpecialFormType::AlwaysFalsy
             | SpecialFormType::Not
             | SpecialFormType::Intersection
             | SpecialFormType::Top
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
 
-            SpecialFormType::Divergent
+            SpecialFormType::Unknown
+            | SpecialFormType::Divergent
             | SpecialFormType::Todo
             | SpecialFormType::TypeOf
             | SpecialFormType::CallableTypeOf
@@ -802,11 +824,17 @@ impl SpecialFormType {
         }
     }
 
-    pub(super) fn definition(self, db: &dyn Db) -> Option<TypeDefinition<'_>> {
+    pub(super) fn definition<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<TypeDefinition<'db>> {
         self.definition_modules()
             .iter()
             .find_map(|module| {
-                let file = resolve_module_confident(db, &module.name())?.file(db)?;
+                let module =
+                    resolve_module_confident(db, env.resolver_environment(db), &module.name())?;
+                let file = ProgramFile::new(db, module.file(db)?, env.program(db));
                 let scope = FileScopeId::global().to_scope_id(db, file);
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
@@ -830,6 +858,8 @@ impl SpecialFormType {
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
+        let env = ProgramEnvironment::from_scope(scope_id);
+        let env = &env;
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
             Self::LiteralString => Ok(Type::literal_string()),
@@ -850,8 +880,9 @@ impl SpecialFormType {
             // See conversation in https://github.com/astral-sh/ruff/pull/19915.
             Self::NamedTuple => Ok(IntersectionType::from_two_elements(
                 db,
-                Type::homogeneous_tuple(db, Type::object()),
-                KnownClass::NamedTupleLike.to_instance(db),
+                env,
+                Type::homogeneous_tuple(db, env, Type::object()),
+                KnownClass::NamedTupleLike.to_instance(db, env),
             )),
 
             Self::TypingSelf => {
@@ -859,7 +890,8 @@ impl SpecialFormType {
                     return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
                 }
 
-                let index = semantic_index(db, scope_id.file(db));
+                let program_file = scope_id.program_file(db);
+                let index = semantic_index(db, program_file);
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(
                         Type::SpecialForm(self),
@@ -888,15 +920,26 @@ impl SpecialFormType {
                 }
 
                 let is_in_metaclass = KnownClass::Type
-                    .to_class_literal(db)
+                    .to_class_literal(db, env)
                     .to_class_type(db)
                     .is_some_and(|type_class| {
                         class
                             .default_specialization(db)
-                            .is_subclass_of(db, type_class)
+                            .is_subclass_of(db, env, type_class)
                     });
                 if is_in_metaclass {
                     return Err(InvalidTypeExpression::TypingSelfInMetaclass);
+                }
+
+                if inference_flags.contains(InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER)
+                    && inference_flags.intersects(
+                        InferenceFlags::IN_RETURN_TYPE | InferenceFlags::IN_PARAMETER_ANNOTATION,
+                    )
+                    && let Some(typing_self) = typing_self
+                {
+                    return Err(InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(
+                        typing_self,
+                    ));
                 }
 
                 Ok(typing_self
@@ -939,13 +982,15 @@ impl SpecialFormType {
             | Self::RegularCallableTypeOf => Err(InvalidTypeExpression::RequiresOneArgument(self)),
 
             // We treat `typing.Type` exactly the same as `builtins.type`:
-            SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
+            SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db, env)),
             SpecialFormType::TypeForm => Ok(TypeFormType::from_type_expression(db, Type::any())),
-            SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
+            SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, env, Type::unknown())),
             SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                 Ok(Type::Callable(CallableType::unknown(db)))
             }
-            SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
+            SpecialFormType::LegacyStdlibAlias(alias) => {
+                Ok(alias.aliased_class().to_instance(db, env))
+            }
             SpecialFormType::TypeQualifier(qualifier) => {
                 Err(InvalidTypeExpression::TypeQualifier(qualifier))
             }

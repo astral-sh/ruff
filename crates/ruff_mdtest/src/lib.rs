@@ -148,9 +148,20 @@ fn run_test(
             };
             normalize_diagnostics(test_file.file, &mut diagnostics);
 
+            let path = test_file
+                .file
+                .path(db)
+                .as_system_path()
+                .expect("mdtest files are on the system");
+            let python_version = settings
+                .linter
+                .resolve_target_version(path.as_std_path())
+                .parser_version();
+
             let failure = match matcher::match_file(
                 db,
                 test_file.file,
+                python_version,
                 &diagnostics,
                 mdtest::RunOptions::default(),
             )

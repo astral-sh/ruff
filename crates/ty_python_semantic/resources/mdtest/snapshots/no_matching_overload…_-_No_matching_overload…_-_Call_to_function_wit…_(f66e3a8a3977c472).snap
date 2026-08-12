@@ -167,19 +167,19 @@ info:   (a: str, b: str, c: int) -> Unknown
 info:   (a: int, b: str, c: str) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
 info:   (a: int, b: int, c: int) -> Unknown
-info:   (a: int | float, b: int, c: int) -> Unknown
-info:   (a: int, b: int | float, c: int) -> Unknown
-info:   (a: int, b: int, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int) -> Unknown
-info:   (a: int, b: int | float, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: float, b: int, c: int) -> Unknown
+info:   (a: int, b: float, c: int) -> Unknown
+info:   (a: int, b: int, c: float) -> Unknown
+info:   (a: float, b: float, c: int) -> Unknown
+info:   (a: int, b: float, c: float) -> Unknown
+info:   (a: float, b: float, c: float) -> Unknown
 info:   (a: str, b: str, c: str) -> Unknown
-info:   (a: int | float, b: str, c: str) -> Unknown
-info:   (a: str, b: int | float, c: str) -> Unknown
-info:   (a: str, b: str, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: str) -> Unknown
-info:   (a: str, b: int | float, c: int | float) -> Unknown
-info:   (a: int | float, b: int | float, c: int | float) -> Unknown
+info:   (a: float, b: str, c: str) -> Unknown
+info:   (a: str, b: float, c: str) -> Unknown
+info:   (a: str, b: str, c: float) -> Unknown
+info:   (a: float, b: float, c: str) -> Unknown
+info:   (a: str, b: float, c: float) -> Unknown
+info:   (a: float, b: float, c: float) -> Unknown
 info:   (a: list[int], b: list[int], c: list[int]) -> Unknown
 info:   (a: list[str], b: list[int], c: list[int]) -> Unknown
 info:   (a: list[int], b: list[str], c: list[int]) -> Unknown
@@ -188,19 +188,19 @@ info:   (a: list[str], b: list[str], c: list[int]) -> Unknown
 info:   (a: list[int], b: list[str], c: list[str]) -> Unknown
 info:   (a: list[str], b: list[str], c: list[str]) -> Unknown
 info:   (a: list[int], b: list[int], c: list[int]) -> Unknown
-info:   (a: list[int | float], b: list[int], c: list[int]) -> Unknown
-info:   (a: list[int], b: list[int | float], c: list[int]) -> Unknown
-info:   (a: list[int], b: list[int], c: list[int | float]) -> Unknown
-info:   (a: list[int | float], b: list[int | float], c: list[int]) -> Unknown
-info:   (a: list[int], b: list[int | float], c: list[int | float]) -> Unknown
-info:   (a: list[int | float], b: list[int | float], c: list[int | float]) -> Unknown
+info:   (a: list[float], b: list[int], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[float], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[int], c: list[float]) -> Unknown
+info:   (a: list[float], b: list[float], c: list[int]) -> Unknown
+info:   (a: list[int], b: list[float], c: list[float]) -> Unknown
+info:   (a: list[float], b: list[float], c: list[float]) -> Unknown
 info:   (a: list[str], b: list[str], c: list[str]) -> Unknown
-info:   (a: list[int | float], b: list[str], c: list[str]) -> Unknown
-info:   (a: list[str], b: list[int | float], c: list[str]) -> Unknown
-info:   (a: list[str], b: list[str], c: list[int | float]) -> Unknown
-info:   (a: list[int | float], b: list[int | float], c: list[str]) -> Unknown
-info:   (a: list[str], b: list[int | float], c: list[int | float]) -> Unknown
-info:   (a: list[int | float], b: list[int | float], c: list[int | float]) -> Unknown
+info:   (a: list[float], b: list[str], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[float], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[str], c: list[float]) -> Unknown
+info:   (a: list[float], b: list[float], c: list[str]) -> Unknown
+info:   (a: list[str], b: list[float], c: list[float]) -> Unknown
+info:   (a: list[float], b: list[float], c: list[float]) -> Unknown
 info:   (a: bool, b: bool, c: bool) -> Unknown
 info:   (a: str, b: bool, c: bool) -> Unknown
 info:   (a: bool, b: str, c: bool) -> Unknown

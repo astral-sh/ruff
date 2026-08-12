@@ -12,7 +12,9 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_module_resolver::ResolverFile;
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
+use ty_python_core::ProgramFile;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
@@ -28,8 +30,9 @@ const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
 /// Find every place in the project that calls the symbol at `offset`, grouped
 /// by enclosing function/method/class/module.
-pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<IncomingCall> {
-    let module = parsed_module(db, file).load(db);
+pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> Vec<IncomingCall> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let source_file = file.file(db);
     let model = SemanticModel::new(db, file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
@@ -73,11 +76,12 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
     let mut raw = call_sites_for_file(db, file, &target_definitions, target_role, needle);
 
     if is_externally_visible {
+        let program = model.program();
         let files = db.project().files(db);
         let files: Vec<_> = files
             .iter()
             .copied()
-            .filter(|other| *other != file)
+            .filter(|other| *other != source_file)
             .collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
         // The byte-level text prefilter still pays off as a coarse gate:
@@ -98,7 +102,13 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
                     return Vec::new();
                 }
 
-                call_sites_for_file(db, other_file, &target_definitions, target_role, needle)
+                call_sites_for_file(
+                    db,
+                    ProgramFile::new(db, other_file, program),
+                    &target_definitions,
+                    target_role,
+                    needle,
+                )
             })
             .flat_map_iter(|sites| sites)
             .collect::<Vec<_>>();
@@ -161,12 +171,12 @@ struct EnclosingKey {
 /// `target_definitions`.
 fn call_sites_for_file(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     target_definitions: &Definitions<'_>,
     target_role: Option<PropertyAccessorRole>,
     needle: Option<&str>,
 ) -> Vec<RawCallSite> {
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
     let mut sites = Vec::new();
@@ -303,6 +313,7 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// accessor: a read calls the getter, a write calls the setter, and a
     /// `del` calls the deleter.
     fn check_property_access(&mut self, attribute: &'a ast::ExprAttribute) {
+        let db = self.db;
         let Some(Type::PropertyInstance(property)) =
             static_member_type_for_attribute(self.model, attribute)
         else {
@@ -335,7 +346,7 @@ impl<'a> CallSitesFinder<'a, '_> {
         let intersects = current_definitions.iter().any(|resolved| {
             let role = resolved
                 .definition()
-                .and_then(|def| property.accessor_role(self.db, def));
+                .and_then(|def| property.accessor_role(db, def));
             let matches_site_kind = match attribute.ctx {
                 ast::ExprContext::Load => {
                     matches!(role, Some(PropertyAccessorRole::Getter) | None)
@@ -380,7 +391,9 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// method's AST node. Comprehension and annotation scopes have no callable
     /// hierarchy item of their own, so walk outward until reaching one that does.
     fn enclosing_scope_item(&self, scope_node: AnyNodeRef<'_>) -> CallHierarchyItem {
-        let file = self.model.file();
+        let program_file = self.model.program_file();
+        let resolver_file = program_file.resolver_file(self.db);
+        let file = program_file.file(self.db);
         let mut ancestors = self.model.ancestor_scopes(scope_node);
         let Some((_, enclosing)) = ancestors.find(|(_, ancestor)| {
             matches!(
@@ -388,11 +401,11 @@ impl<'a> CallSitesFinder<'a, '_> {
                 ScopeKind::Module | ScopeKind::Function | ScopeKind::Class | ScopeKind::Lambda
             )
         }) else {
-            return module_item(self.db, file);
+            return module_item(self.db, resolver_file);
         };
 
         match enclosing.node() {
-            NodeWithScopeKind::Module => module_item(self.db, file),
+            NodeWithScopeKind::Module => module_item(self.db, resolver_file),
             NodeWithScopeKind::Function(func) => {
                 let func = func.node(self.module);
                 let is_method = ancestors
@@ -411,7 +424,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     } else {
                         SymbolKind::Function
                     },
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: func.range(),
                     selection_range: func.name.range(),
@@ -422,7 +435,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: class.name.id.clone(),
                     kind: SymbolKind::Class,
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: class.range(),
                     selection_range: class.name.range(),
@@ -439,13 +452,13 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new_static("(lambda)"),
                     kind: SymbolKind::Function,
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, resolver_file),
                     file,
                     full_range: lambda.range(),
                     selection_range: TextRange::new(lambda.start(), end),
                 }
             }
-            _ => module_item(self.db, file),
+            _ => module_item(self.db, resolver_file),
         }
     }
 }
@@ -456,7 +469,7 @@ struct RawCallSite {
 }
 
 /// Build an item for the module-level enclosing scope (no enclosing function).
-fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
+fn module_item(db: &dyn Db, file: ResolverFile<'_>) -> CallHierarchyItem {
     let name = ty_module_resolver::file_to_module(db, file)
         .map(|module| Name::new(module.name(db).last_component()))
         .unwrap_or_else(|| Name::new_static("<module>"));
@@ -464,7 +477,7 @@ fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
         name,
         kind: SymbolKind::Module,
         detail: None,
-        file,
+        file: file.file(db),
         full_range: TextRange::default(),
         selection_range: TextRange::default(),
     }
@@ -514,7 +527,11 @@ mod tests {
             else {
                 return "No incoming calls found".to_string();
             };
-            let calls = incoming_calls(&self.db, target.file, target.selection_range.start());
+            let calls = incoming_calls(
+                &self.db,
+                self.program_file(target.file),
+                target.selection_range.start(),
+            );
             if calls.is_empty() {
                 return "No incoming calls found".to_string();
             }
@@ -1130,7 +1147,11 @@ def make() -> C:
         else {
             panic!("expected a call hierarchy target");
         };
-        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
+        let incoming = incoming_calls(
+            &test.db,
+            test.program_file(target.file),
+            target.selection_range.start(),
+        );
         // The selection identifies the anonymous callable header.
         let sel = incoming[0].from.selection_range;
         let source = test.cursor.source.as_str();
@@ -1259,14 +1280,18 @@ def make() -> C:
         else {
             panic!("expected a call hierarchy target");
         };
-        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
+        let incoming = incoming_calls(
+            &test.db,
+            test.program_file(target.file),
+            target.selection_range.start(),
+        );
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         let lambda_item = &incoming[0].from;
         assert_eq!(lambda_item.name.as_str(), "(lambda)");
 
         let follow_up_incoming = incoming_calls(
             &test.db,
-            lambda_item.file,
+            test.program_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(
@@ -1276,7 +1301,7 @@ def make() -> C:
 
         let follow_up_outgoing = outgoing_calls(
             &test.db,
-            lambda_item.file,
+            test.program_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(

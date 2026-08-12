@@ -10,7 +10,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 
 /// The source of the Python version.
-#[derive(Clone, Debug, Eq, PartialEq, Default, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Default, get_size2::GetSize)]
 pub enum PythonVersionSource {
     /// Value loaded from a project's configuration file.
     ConfigFile(PythonVersionFileSource),
@@ -49,7 +49,7 @@ pub enum PythonVersionSource {
 
 /// Information regarding the file and [`TextRange`] of the configuration
 /// from which we inferred the Python version.
-#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, get_size2::GetSize)]
 pub struct PythonVersionFileSource {
     path: Arc<SystemPathBuf>,
     range: Option<TextRange>,
@@ -58,16 +58,6 @@ pub struct PythonVersionFileSource {
 impl PythonVersionFileSource {
     pub fn new(path: Arc<SystemPathBuf>, range: Option<TextRange>) -> Self {
         Self { path, range }
-    }
-
-    /// Returns the path to the configuration file.
-    pub fn path(&self) -> &SystemPathBuf {
-        &self.path
-    }
-
-    /// Returns the range of the configuration setting.
-    pub fn range(&self) -> Option<TextRange> {
-        self.range
     }
 
     /// Attempt to resolve a [`Span`] that corresponds to the location of
@@ -82,7 +72,7 @@ impl PythonVersionFileSource {
 }
 
 /// A Python version with its source.
-#[derive(Eq, PartialEq, Debug, Clone, get_size2::GetSize)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone, get_size2::GetSize)]
 pub struct PythonVersionWithSource {
     pub version: PythonVersion,
     pub source: PythonVersionSource,

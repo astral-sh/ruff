@@ -518,7 +518,7 @@ them:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(a: type[Any], b: type[Unknown]):
     reveal_type(a.__mro__)  # revealed: tuple[type, ...] & Any

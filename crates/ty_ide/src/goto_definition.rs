@@ -1,8 +1,9 @@
 use crate::goto::find_goto_target;
 use crate::{Db, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Navigate to the definition of a symbol.
@@ -13,10 +14,10 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// source file implementations using the `StubMapper`.
 pub fn goto_definition(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
@@ -25,7 +26,7 @@ pub fn goto_definition(
         .into_navigation_targets(model.db());
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(file.file(db), goto_target.range()),
         value: definition_targets,
     })
 }
@@ -2648,7 +2649,11 @@ class GenericFoo[T](Base):
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
-                goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+                goto_definition(
+                    &self.db,
+                    self.program_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "No goto target found".to_string();
             };

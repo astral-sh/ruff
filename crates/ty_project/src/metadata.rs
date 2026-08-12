@@ -44,7 +44,7 @@ pub struct ProjectMetadata {
     /// When [`Self::config_file_override`] is `None`, then these are the options from the
     /// project's `ty.toml` or `pyproject.toml`. The options come from
     /// the file specified by [`Self::config_file_override`] if it is `Some` (e.g. when using `--config-file <path>`).
-    pub(super) options: Options,
+    options: Options,
 
     /// The Python version and interpreter path derived from uv workspace metadata.
     ///
@@ -120,7 +120,7 @@ impl ProjectMetadata {
     }
 
     /// Loads a project from a `pyproject.toml` file.
-    pub(crate) fn from_pyproject(
+    fn from_pyproject(
         pyproject: PyProject,
         root: SystemPathBuf,
     ) -> Result<Self, ResolveRequiresPythonError> {
@@ -405,15 +405,15 @@ impl ProjectMetadata {
         Ok(metadata)
     }
 
-    pub fn root(&self) -> &SystemPath {
+    pub(crate) fn root(&self) -> &SystemPath {
         &self.root
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         self.name.as_str()
     }
 
-    pub fn options(&self) -> &Options {
+    fn options(&self) -> &Options {
         &self.options
     }
 
@@ -423,7 +423,7 @@ impl ProjectMetadata {
     }
 
     /// Returns configuration paths outside normal project discovery that should be watched.
-    pub fn extra_configuration_paths(&self) -> impl Iterator<Item = &SystemPath> {
+    pub(crate) fn extra_configuration_paths(&self) -> impl Iterator<Item = &SystemPath> {
         self.config_file_override().into_iter().chain(
             self.user_configuration
                 .as_deref()
@@ -480,7 +480,7 @@ impl ProjectMetadata {
     ///     merged.combine_with(layer.clone());
     /// }
     /// ```
-    pub(crate) fn options_in_precedence_order<'a>(
+    fn options_in_precedence_order<'a>(
         &'a self,
         options: &'a Options,
     ) -> impl Iterator<Item = &'a Options> {
@@ -769,8 +769,8 @@ unclosed table, expected `]`
                     [project]
                     name = "project-root"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
                 (
@@ -779,8 +779,8 @@ unclosed table, expected `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
             ])
@@ -794,8 +794,10 @@ unclosed table, expected `]`
               name: ProjectName("nested-project"),
               root: "/app/packages/a",
               options: Options(
-                src: Some(SrcOptions(
-                  root: Some("src"),
+                environment: Some(EnvironmentOptions(
+                  root: Some([
+                    "src",
+                  ]),
                 )),
               ),
             )
@@ -819,8 +821,8 @@ unclosed table, expected `]`
                     [project]
                     name = "project-root"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
                 (
@@ -829,8 +831,8 @@ unclosed table, expected `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.ty.src]
-                    root = "src"
+                    [tool.ty.environment]
+                    root = ["src"]
                     "#,
                 ),
             ])
@@ -844,8 +846,10 @@ unclosed table, expected `]`
               name: ProjectName("project-root"),
               root: "/app",
               options: Options(
-                src: Some(SrcOptions(
-                  root: Some("src"),
+                environment: Some(EnvironmentOptions(
+                  root: Some([
+                    "src",
+                  ]),
                 )),
               ),
             )
@@ -1221,15 +1225,15 @@ unclosed table, expected `]`
                     name = "super-app"
                     requires-python = ">=3.12"
 
-                    [tool.ty.src]
-                    root = "this_option_is_ignored"
+                    [tool.ty.environment]
+                    root = ["this_option_is_ignored"]
                     "#,
                 ),
                 (
                     root.join("ty.toml"),
                     r#"
-                    [src]
-                    root = "src"
+                    [environment]
+                    root = ["src"]
                     "#,
                 ),
             ])
@@ -1244,10 +1248,10 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
+                  root: Some([
+                    "src",
+                  ]),
                   r#python-version: Some(r#3.12),
-                )),
-                src: Some(SrcOptions(
-                  root: Some("src"),
                 )),
               ),
             )

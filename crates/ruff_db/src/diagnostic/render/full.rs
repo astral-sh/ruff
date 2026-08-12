@@ -3,7 +3,9 @@ use std::num::NonZeroUsize;
 
 use similar::{ChangeTag, DiffOp, TextDiff};
 
-use annotate_snippets::Renderer as AnnotateRenderer;
+use annotate_snippets::{
+    Group as AnnotateGroup, Level as AnnotateLevel, Renderer as AnnotateRenderer,
+};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
@@ -69,6 +71,9 @@ impl<'a> FullRenderer<'a> {
                     Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
+                if let Some(applicability) = to_applicability_annotate(diff.fix) {
+                    writeln!(f, "{}", renderer.render(&[applicability]))?;
+                }
             }
 
             writeln!(f)?;
@@ -113,50 +118,15 @@ impl<'a> Diff<'a> {
         })
     }
 
-    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{line} {separator}",
-            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
-            separator = fmt_styled("|", self.stylesheet.line_no),
-        )
-    }
-}
-
-/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
-const DIFF_CONTEXT_WINDOW: usize = 3;
-
-impl std::fmt::Display for Diff<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn write(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        // Partition the source code into end offsets for each cell. If `self.notebook_index` is
-        // `None`, indicating a regular script file, all the lines will be in one "cell" under the
-        // `None` key.
-        let cells = if let Some(notebook_index) = &self.notebook_index {
-            let mut last_cell_index = OneIndexed::MIN;
-            let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
-            for cell in notebook_index.iter() {
-                if cell.cell_index() != last_cell_index {
-                    let offset = source_code.line_start(cell.start_row());
-                    cells.push((Some(last_cell_index), offset));
-                    last_cell_index = cell.cell_index();
-                }
-            }
-            cells.push((Some(last_cell_index), source_text.text_len()));
-            cells
-        } else {
-            vec![(None, source_text.text_len())]
-        };
+        let cell_ranges = self.cell_ranges();
 
-        let mut last_end = TextSize::ZERO;
-        for (cell, offset) in cells {
-            let range = TextRange::new(last_end, offset);
-            last_end = offset;
-
+        for (cell_index, range) in cell_ranges {
             // For non-notebooks, construct and diff only the source surrounding the edits.
-            let (range, line_offset) = if cell.is_none()
+            let (range, line_offset) = if cell_index.is_none()
                 && let Some(first) = self.fix.edits().first()
                 && let Some(last) = self.fix.edits().last()
             {
@@ -180,24 +150,26 @@ impl std::fmt::Display for Diff<'_> {
                 (range, 0)
             };
 
+            let edits = self
+                .fix
+                .edits()
+                .iter()
+                .filter(|edit| range.contains_range(edit.range()))
+                .collect::<Vec<_>>();
+            // No edits were applied, so there's no need to diff.
+            if edits.is_empty() {
+                continue;
+            }
+
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
             let mut last_end = range.start();
 
-            let mut applied = 0;
-            for edit in self.fix.edits() {
-                if range.contains_range(edit.range()) {
-                    output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
-                    output.push_str(edit.content().unwrap_or_default());
-                    last_end = edit.end();
-                    applied += 1;
-                }
-            }
-
-            // No edits were applied, so there's no need to diff.
-            if applied == 0 {
-                continue;
+            for edit in edits {
+                output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
+                output.push_str(edit.content().unwrap_or_default());
+                last_end = edit.end();
             }
 
             output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
@@ -235,10 +207,10 @@ impl std::fmt::Display for Diff<'_> {
 
             let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 
-            if let Some(cell) = cell {
+            if let Some(cell_index) = cell_index {
                 // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
                 // three colons on the pipe.
-                writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
+                writeln!(f, "{:>1$} cell {cell_index}", ":::", digit_with.get() + 3)?;
             }
 
             self.write_gutter(f, digit_with)?;
@@ -309,35 +281,55 @@ impl std::fmt::Display for Diff<'_> {
             self.write_gutter(f, digit_with)?;
         }
 
-        match self.fix.applicability() {
-            Applicability::Safe => {}
-            Applicability::Unsafe => {
-                writeln!(
-                    f,
-                    "{note}: {msg}",
-                    note = fmt_styled("note", self.stylesheet.warning),
-                    msg = fmt_styled(
-                        "This is an unsafe fix and may change runtime behavior",
-                        self.stylesheet.emphasis
-                    )
-                )?;
-            }
-            Applicability::DisplayOnly => {
-                // Note that this is still only used in tests. There's no `--display-only-fixes`
-                // analog to `--unsafe-fixes` for users to activate this or see the styling.
-                writeln!(
-                    f,
-                    "{note}: {msg}",
-                    note = fmt_styled("note", self.stylesheet.error),
-                    msg = fmt_styled(
-                        "This is a display-only fix and is likely to be incorrect",
-                        self.stylesheet.emphasis
-                    )
-                )?;
+        Ok(())
+    }
+
+    fn cell_ranges(&self) -> Vec<(Option<usize>, TextRange)> {
+        let source_code = self.diagnostic_source.as_source_code();
+        let source_text = source_code.text();
+
+        let mut last_end = TextSize::ZERO;
+        let Some(notebook_index) = self.notebook_index.as_ref() else {
+            // a regular script file, all the lines will be in one "cell" under the `None` key
+            let offset = source_text.text_len();
+            let range = TextRange::new(last_end, offset);
+            return vec![(None, range)];
+        };
+
+        // Partition the source code into end offsets for each cell.
+        let mut last_cell_index = OneIndexed::MIN;
+        let mut cells: Vec<(Option<usize>, TextRange)> = Vec::new();
+        for cell in notebook_index.iter() {
+            if cell.cell_index() != last_cell_index {
+                let offset = source_code.line_start(cell.start_row());
+                let range = TextRange::new(last_end, offset);
+                cells.push((Some(last_cell_index.get()), range));
+                last_end = offset;
+                last_cell_index = cell.cell_index();
             }
         }
+        let offset = source_text.text_len();
+        let range = TextRange::new(last_end, offset);
+        cells.push((Some(last_cell_index.get()), range));
+        cells
+    }
 
-        Ok(())
+    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{line} {separator}",
+            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
+            separator = fmt_styled("|", self.stylesheet.line_no),
+        )
+    }
+}
+
+/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
+const DIFF_CONTEXT_WINDOW: usize = 3;
+
+impl std::fmt::Display for Diff<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.write(f)
     }
 }
 
@@ -371,6 +363,25 @@ fn show_nonprinting(s: &str) -> Cow<'_, str> {
     } else {
         Cow::Borrowed(s)
     }
+}
+
+fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
+    let (level, message) = match fix.applicability() {
+        Applicability::Safe => return None,
+        Applicability::Unsafe => (
+            AnnotateLevel::WARNING,
+            "This is an unsafe fix and may change runtime behavior",
+        ),
+        Applicability::DisplayOnly => (
+            // Note that this is still only used in tests. There's no `--display-only-fixes`
+            // analog to `--unsafe-fixes` for users to activate this or see the styling.
+            AnnotateLevel::ERROR,
+            "This is a display-only fix and is likely to be incorrect",
+        ),
+    };
+    let level = level.with_name("note");
+
+    Some(AnnotateGroup::with_title(level.primary_title(message)))
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
-use ty_python_core::{SemanticIndex, semantic_index};
+use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
 /// unused-binding diagnostics.
@@ -102,9 +102,10 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
-    let parsed = parsed_module(db, file).load(db);
-    let is_stub_file = file.is_stub(db);
+pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding]> {
+    let source_file = file.file(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let is_stub_file = source_file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
     // A used synthetic definition counts as a use of the user-visible definitions it represents.
@@ -236,6 +237,7 @@ mod tests {
     use ruff_python_ast::name::Name;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
+    use ty_python_core::ProgramFile;
 
     fn collect_unused_bindings_in_file(
         path: &str,
@@ -243,7 +245,8 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).to_vec();
+        let program = db.program_environment().program(&db);
+        let mut bindings = unused_bindings(&db, ProgramFile::new(&db, file, program)).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }
@@ -313,6 +316,57 @@ mod tests {
                 "dead_walrus",
                 "dead_with",
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn or_pattern_captures_used_in_body_are_not_reported() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                match subject:
+                    case [first, second] | {\"first\": first, \"second\": second} | (first, second):
+                        print(first, second)
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn nested_or_pattern_capture_used_in_guard_is_not_reported() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                match subject:
+                    case [[value] | {\"item\": value}] if value:
+                        pass
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn or_pattern_captures_do_not_hide_other_unused_bindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(subject):
+                value = 0
+                match subject:
+                    case [value] | {\"used\": value}:
+                        print(value)
+                    case {\"unused\": value} | {\"also_unused\": value}:
+                        pass
+            ",
+        );
+
+        assert_eq!(
+            collect_unused_names(&source)?,
+            vec!["value", "value", "value"]
         );
         Ok(())
     }

@@ -40,7 +40,7 @@ struct NotebookCell {
 }
 
 impl NotebookDocument {
-    pub fn new(
+    pub(crate) fn new(
         uri: lsp_types::Uri,
         notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
@@ -124,8 +124,12 @@ impl NotebookDocument {
             nbformat_minor: 5,
         };
 
-        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false)
-            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to ty's notebook document format: {err}"))
+        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false).unwrap_or_else(|err| {
+            panic!(
+                "Server notebook document could not be converted to ty's \
+                notebook document format: {err}"
+            )
+        })
     }
 
     pub(crate) fn update(
@@ -197,7 +201,7 @@ impl NotebookDocument {
 }
 
 impl NotebookCell {
-    pub(crate) fn new(cell: lsp_types::NotebookCell) -> Self {
+    fn new(cell: lsp_types::NotebookCell) -> Self {
         Self {
             uri: cell.document,
             kind: cell.kind,

@@ -187,7 +187,7 @@ impl Session {
         &mut self.request_queue
     }
 
-    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
+    fn initialization_options(&self) -> &InitializationOptions {
         &self.initialization_options
     }
 
@@ -230,7 +230,11 @@ impl Session {
             .and_then(|request| {
                 if !self.request_queue.incoming().is_pending(&request.id) {
                     // Clear out the suspended request if the request has been cancelled.
-                    tracing::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
+                    tracing::debug!(
+                        "Skipping suspended workspace diagnostics request `{}` \
+                        because it was cancelled",
+                        request.id
+                    );
                     return None;
                 }
 
@@ -325,7 +329,7 @@ impl Session {
     /// Refer to [`project_db`] for more details on how the project is selected.
     ///
     /// [`project_db`]: Session::project_db
-    pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
+    fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
         &mut self.project_state_mut(path).db
     }
 
@@ -335,7 +339,7 @@ impl Session {
     /// given path, or the first project if no project is found for the path.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
-    pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
+    fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         match path {
             AnySystemPath::System(system_path) => self
                 .project_state_for_path(system_path)
@@ -382,10 +386,7 @@ impl Session {
 
     /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
     /// any.
-    pub(crate) fn project_state_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&ProjectState> {
+    fn project_state_for_path(&self, path: impl AsRef<SystemPath>) -> Option<&ProjectState> {
         let path = path.as_ref();
         self.projects
             .range(..=path.to_path_buf())
@@ -424,7 +425,7 @@ impl Session {
     }
 
     /// Returns a mutable iterator over all projects.
-    pub(crate) fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
+    fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
         self.projects.values_mut()
     }
 
@@ -531,7 +532,7 @@ impl Session {
     ///
     /// The client provided is used to show error messages and publish
     /// diagnostics related to configuration.
-    pub(crate) fn initialize_workspace_folder(
+    fn initialize_workspace_folder(
         &mut self,
         client: &Client,
         uri: &Uri,
@@ -863,7 +864,7 @@ impl Session {
     /// This is done by notifying the client with an empty list of diagnostics for the document.
     /// For notebook cells, this clears diagnostics for the specific cell.
     /// For other document types, this clears diagnostics for the main document.
-    pub(crate) fn clear_diagnostics(&self, client: &Client, uri: &Uri) {
+    fn clear_diagnostics(&self, client: &Client, uri: &Uri) {
         if self.global_settings().diagnostic_mode().is_off() {
             return;
         }
@@ -921,12 +922,14 @@ impl Session {
             match diagnostic_mode {
                 DiagnosticMode::Off => {
                     tracing::debug!(
-                        "Skipping registration of diagnostic capability because diagnostics are turned off"
+                        "Skipping registration of diagnostic capability \
+                        because diagnostics are turned off"
                     );
                 }
                 DiagnosticMode::OpenFilesOnly | DiagnosticMode::Workspace => {
                     tracing::debug!(
-                        "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+                        "Registering diagnostic capability \
+                        with {diagnostic_mode:?} diagnostic mode"
                     );
                     registrations.push(Registration {
                         id: DIAGNOSTIC_REGISTRATION_ID.into(),
@@ -1090,7 +1093,11 @@ impl Session {
             let paths = self
                 .project_dbs()
                 .flat_map(|db| {
-                    ty_module_resolver::system_module_search_paths(db).map(move |path| (db, path))
+                    ty_module_resolver::system_module_search_paths(
+                        db,
+                        db.project().program(db).resolver_environment(db),
+                    )
+                    .map(move |path| (db, path))
                 })
                 .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
                 .map(|(_, path)| path)
@@ -1622,15 +1629,15 @@ impl Workspace {
         &self.settings
     }
 
-    pub(crate) fn settings_arc(&self) -> Arc<WorkspaceSettings> {
+    fn settings_arc(&self) -> Arc<WorkspaceSettings> {
         self.settings.clone()
     }
 
-    pub(crate) fn is_initialized(&self) -> bool {
+    fn is_initialized(&self) -> bool {
         self.initialized
     }
 
-    pub(crate) fn initialize(&mut self, settings: WorkspaceSettings) {
+    fn initialize(&mut self, settings: WorkspaceSettings) {
         self.settings = Arc::new(settings);
         self.initialized = true;
     }
@@ -1763,7 +1770,7 @@ impl DocumentHandle {
     }
 
     #[expect(unused)]
-    pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
+    fn file_path(&self) -> Option<&AnySystemPath> {
         match self {
             Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
             Self::Cell { .. } => None,
@@ -1771,7 +1778,7 @@ impl DocumentHandle {
     }
 
     #[expect(unused)]
-    pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
+    fn notebook_path(&self) -> Option<&AnySystemPath> {
         match self {
             DocumentHandle::Notebook { path, .. } => Some(path),
             DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
@@ -1990,4 +1997,30 @@ pub(super) fn warn_about_unknown_options(
     };
     tracing::warn!("{message}");
     client.show_warning_message(message);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use ruff_db::system::{CommandExecutor, OsSystem, System as _};
+
+    use super::Index;
+    use crate::system::LSPSystem;
+
+    /// Mutating the document index requires exclusive ownership after Salsa cancels the current
+    /// database snapshots. A background command executor must not retain an `LSPSystem`, because
+    /// that would keep the index alive and prevent the server from applying document changes.
+    #[test]
+    fn detached_command_executor_does_not_retain_document_index() {
+        let index = Arc::new(Index::new());
+        let system = LSPSystem::new(index.clone(), Arc::new(OsSystem::default()));
+        let executor = system.command_executor().map(CommandExecutor::dyn_clone);
+        assert!(executor.is_some());
+        drop(system);
+
+        assert_eq!(Arc::strong_count(&index), 1);
+
+        drop(executor);
+    }
 }

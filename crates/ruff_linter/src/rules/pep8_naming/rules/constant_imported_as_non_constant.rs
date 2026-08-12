@@ -72,24 +72,32 @@ pub(crate) fn constant_imported_as_non_constant(
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
 ) {
-    if str::is_cased_uppercase(name)
-        && !(str::is_cased_uppercase(asname)
-            // Single-character names are ambiguous.
-            // It could be a class or a constant, so allow it to be imported
-            // as `SCREAMING_SNAKE_CASE` *or* `CamelCase`.
-            || (name.chars().nth(1).is_none() && helpers::is_camelcase(asname)))
-    {
-        // Ignore any explicitly-allowed names.
-        if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return;
-        }
-        let mut diagnostic = checker.report_diagnostic(
-            ConstantImportedAsNonConstant {
-                name: name.to_string(),
-                asname: asname.to_string(),
-            },
-            alias.range(),
-        );
-        diagnostic.set_parent(stmt.start());
+    if !str::is_cased_uppercase(name) {
+        return;
     }
+
+    if str::is_cased_uppercase(asname) {
+        return;
+    }
+
+    // Single-character names are ambiguous.
+    // It could be a class or a constant, so allow it to be imported
+    // as `SCREAMING_SNAKE_CASE` *or* `CamelCase`.
+    if name.chars().nth(1).is_none() && helpers::is_camelcase(asname) {
+        return;
+    }
+
+    // Ignore any explicitly-allowed names.
+    if ignore_names.matches(name) || ignore_names.matches(asname) {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
+        ConstantImportedAsNonConstant {
+            name: name.to_string(),
+            asname: asname.to_string(),
+        },
+        alias.range(),
+    );
+    diagnostic.set_parent(stmt.start());
 }

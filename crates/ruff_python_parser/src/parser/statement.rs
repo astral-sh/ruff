@@ -1150,8 +1150,9 @@ impl<'src> Parser<'src> {
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
-                                "Only integer literals are allowed in subscript expressions in help end escape command"
-                                    .to_string()
+                                "Only integer literals are allowed in subscript expressions \
+                                    in help end escape command"
+                                    .to_string(),
                             ),
                             slice.range(),
                         );
@@ -1168,8 +1169,9 @@ impl<'src> Parser<'src> {
                 _ => {
                     parser.add_error(
                         ParseErrorType::OtherError(
-                            "Expected name, subscript or attribute expression in help end escape command"
-                                .to_string()
+                            "Expected name, subscript or attribute expression \
+                                in help end escape command"
+                                .to_string(),
                         ),
                         expr,
                     );
@@ -2396,11 +2398,13 @@ impl<'src> Parser<'src> {
                 self.add_error(error, &parsed_with_item.item.context_expr);
             }
         } else if self.at(TokenKind::Rpar)
-            // test_err with_items_parenthesized_missing_colon
-            // # `)` followed by a newline
-            // with (item1, item2)
-            //     pass
-            && matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+            && (
+                // test_err with_items_parenthesized_missing_colon
+                // # `)` followed by a newline
+                // with (item1, item2)
+                //     pass
+                matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+            )
         {
             if parsed_with_items.is_empty() {
                 // No with items, treat it as a parenthesized expression to create an empty
@@ -3050,7 +3054,9 @@ impl<'src> Parser<'src> {
                 // x = 1
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "Expected class, function definition or async function definition after decorator".to_string(),
+                        "Expected class, function definition or async function definition \
+                            after decorator"
+                            .to_string(),
                     ),
                     self.current_token_range(),
                 );
@@ -3349,11 +3355,14 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
-                    kwonlyargs_snapshot
-                        .get_or_insert_with(|| parser.parameter_scratch.snapshot());
+                    kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
 
                     if parser.at_name_or_soft_keyword() {
-                        let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
+                        let param = parser.parse_parameter(
+                            param_start,
+                            function_kind,
+                            AllowStarAnnotation::Yes,
+                        );
                         let param_star_range = parser.node_range(star_range.start());
 
                         if parser.at(TokenKind::Equal) {
@@ -3405,7 +3414,8 @@ impl<'src> Parser<'src> {
                             // def foo(a, *args, b, c, *): ...
                             parser.add_error(
                                 ParseErrorType::OtherError(
-                                    "Keyword-only parameter separator not allowed after '*' parameter"
+                                    "Keyword-only parameter separator not allowed \
+                                        after '*' parameter"
                                         .to_string(),
                                 ),
                                 star_range,
@@ -3420,7 +3430,8 @@ impl<'src> Parser<'src> {
                     let double_star_range = parser.current_token_range();
                     parser.bump(TokenKind::DoubleStar);
 
-                    let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
+                    let param =
+                        parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
                     if parameters.kwarg.is_some() {
@@ -3547,8 +3558,7 @@ impl<'src> Parser<'src> {
 
                         // test_err params_non_default_after_default
                         // def foo(a=10, b, c: int): ...
-                        parser
-                            .add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
+                        parser.add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
                     }
 
                     seen_default_param |= param.default.is_some();

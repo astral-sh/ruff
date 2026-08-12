@@ -1,8 +1,9 @@
+use crate::Db;
+use crate::ProgramEnvironment;
 use rustc_hash::FxHashSet;
 
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 
-use crate::Db;
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::any_over_type;
@@ -24,12 +25,13 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     pub(crate) fn record_inferred_expression_type(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::is_promotable_tuple_literal(db, expression, ty) {
-            self.record_unpromotable_type(db, typevar_identity, ty);
+        if !Self::is_promotable_tuple_literal(db, env, expression, ty) {
+            self.record_unpromotable_type(db, env, typevar_identity, ty);
         }
     }
 
@@ -38,10 +40,13 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     pub(crate) fn record_unpromotable_type(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if any_over_type(db, ty, true, |ty| ty.tuple_instance_spec(db).is_some()) {
+        if any_over_type(db, env, ty, true, |ty| {
+            ty.tuple_instance_spec(db, env).is_some()
+        }) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -54,9 +59,14 @@ impl<'db> TupleSizePromotionConstraints<'db> {
 
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the
     /// empty tuple (and hence is eligible for tuple size promotion).
-    fn is_promotable_tuple_literal(db: &'db dyn Db, expression: &ast::Expr, ty: Type<'db>) -> bool {
+    fn is_promotable_tuple_literal(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+    ) -> bool {
         matches!(expression, ast::Expr::Tuple(tuple) if !tuple.iter().any(ast::Expr::is_starred_expr))
-            && TupleSizePromotionCandidate::from_type(db, ty).is_some()
+            && TupleSizePromotionCandidate::from_type(db, env, ty).is_some()
     }
 }
 
@@ -72,7 +82,7 @@ enum TupleSizePromotionCandidate<'db> {
 impl<'db> TupleSizePromotionCandidate<'db> {
     /// Returns an eligible candidate if the given type represents one (i.e., it is a
     /// fixed-length homogeneous tuple or the empty tuple).
-    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
         let tuple_spec = ty.exact_tuple_instance_spec(db)?;
         let TupleSpec::Fixed(tuple) = tuple_spec.as_ref() else {
             return None;
@@ -84,7 +94,7 @@ impl<'db> TupleSizePromotionCandidate<'db> {
         };
 
         elements
-            .all(|element| element.is_equivalent_to(db, element_type))
+            .all(|element| element.is_equivalent_to(db, env, element_type))
             .then_some(Self::Homogeneous {
                 element_type,
                 length: tuple.len(),
@@ -122,20 +132,21 @@ impl<'db> HomogeneousTupleUnionGroup<'db> {
 /// candidates for tuple size promotion, and another for groups of homogeneous tuple elements that are.
 fn partition_tuple_union_elements<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     elements: impl IntoIterator<Item = Type<'db>>,
 ) -> (Vec<Type<'db>>, Vec<HomogeneousTupleUnionGroup<'db>>) {
     let mut other_union_elements = Vec::new();
     let mut tuple_groups: Vec<HomogeneousTupleUnionGroup<'db>> = Vec::new();
 
     for element in elements {
-        match TupleSizePromotionCandidate::from_type(db, element) {
+        match TupleSizePromotionCandidate::from_type(db, env, element) {
             Some(TupleSizePromotionCandidate::Homogeneous {
                 element_type,
                 length,
             }) => {
                 if let Some(group) = tuple_groups
                     .iter_mut()
-                    .find(|group| group.element_type.is_equivalent_to(db, element_type))
+                    .find(|group| group.element_type.is_equivalent_to(db, env, element_type))
                 {
                     group.add(element, length);
                 } else {
@@ -175,19 +186,23 @@ impl<'db> Type<'db> {
     /// reveal_type(languages)  # revealed: dict[str, tuple[str, ...]]
     /// ```
     ///
-    pub(crate) fn promote_tuple_size_in_union(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn promote_tuple_size_in_union(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         let Type::Union(union) = self else {
             return self;
         };
 
         let (other_union_elements, tuple_groups) =
-            partition_tuple_union_elements(db, union.elements(db).iter().copied());
+            partition_tuple_union_elements(db, env, union.elements(db).iter().copied());
 
         if !tuple_groups.iter().any(|group| group.has_multiple_lengths) {
             return self;
         }
 
-        let mut builder = UnionBuilder::new(db)
+        let mut builder = UnionBuilder::new(db, env)
             .unpack_aliases(false)
             .recursively_defined(union.recursively_defined(db));
 
@@ -197,7 +212,7 @@ impl<'db> Type<'db> {
 
         for group in tuple_groups {
             if group.has_multiple_lengths {
-                builder = builder.add(Type::homogeneous_tuple(db, group.element_type));
+                builder = builder.add(Type::homogeneous_tuple(db, env, group.element_type));
             } else {
                 for element in group.original_tuple_types {
                     builder = builder.add(element);

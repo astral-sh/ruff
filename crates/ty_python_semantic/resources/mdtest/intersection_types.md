@@ -449,6 +449,27 @@ def example_type_bool_type_str(
     reveal_type(i)  # revealed: Never
 ```
 
+Ordinary types accept values with any `NewType` tag, so an integer-based `NewType` can overlap
+`bool`. Distinct `NewType` tags are mutually exclusive even when their runtime values overlap;
+nested `NewType`s retain their relationship with their parent.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+OtherUserId = NewType("OtherUserId", int)
+NestedUserId = NewType("NestedUserId", UserId)
+
+def newtype_intersections(
+    user_bool: UserId & bool,
+    user_nested: UserId & NestedUserId,
+    user_other: UserId & OtherUserId,
+) -> None:
+    reveal_type(user_bool)  # revealed: UserId & bool
+    reveal_type(user_nested)  # revealed: NestedUserId
+    reveal_type(user_other)  # revealed: Never
+```
+
 #### Positive and negative contributions
 
 If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can remove the negative
@@ -727,7 +748,8 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -820,13 +842,60 @@ def _(e: (Single | int) & ~Single) -> None:
     reveal_type(e)  # revealed: int
 ```
 
+A `NewType` is preserved when all but one member of its underlying enum are excluded. The resulting
+intersection is also assignable to the remaining member.
+
+```pyi
+from typing import NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
+
+ColorId = NewType("ColorId", Color)
+NestedColorId = NewType("NestedColorId", ColorId)
+type NestedAlias = NestedColorId
+
+def enum_newtype(value: ColorId & ~(Red | Green), nested: NestedAlias & ~Red & ~Green) -> None:
+    reveal_type(value)  # revealed: ColorId & Literal[Color.BLUE]
+    reveal_type(nested)  # revealed: NestedColorId & Literal[Color.BLUE]
+
+static_assert(is_assignable_to(ColorId & ~(Red | Green), ColorId))
+static_assert(is_assignable_to(ColorId & ~(Red | Green), Blue))
+static_assert(is_equivalent_to(ColorId & ~(Red | Green), ColorId & Blue))
+```
+
+Aliases name the same enum member, while `Flag` members are not exhaustive.
+
+```pyi
+from enum import Flag
+
+class Aliased(Enum):
+    FIRST = 1
+    FIRST_ALIAS = 1
+    LAST = 2
+
+AliasedId = NewType("AliasedId", Aliased)
+
+def aliased_member(value: AliasedId & ~Literal[Aliased.FIRST_ALIAS]) -> None:
+    reveal_type(value)  # revealed: AliasedId & Literal[Aliased.LAST]
+
+class Permission(Flag):
+    READ = 1
+    WRITE = 2
+
+PermissionId = NewType("PermissionId", Permission)
+
+def non_exhaustive(value: PermissionId & ~Literal[Permission.READ]) -> None:
+    reveal_type(value)  # revealed: PermissionId & ~Literal[Permission.READ]
+```
+
 ## Addition of a type to an intersection with many non-disjoint types
 
 This slightly strange-looking test is a regression test for a mistake that was nearly made in a PR:
 <https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
 
 ```py
-from ty_extensions import AlwaysFalsy, Unknown
+from ty_extensions import AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import Literal
 
 def _(x: str & Unknown & AlwaysFalsy & Literal[""]):
@@ -842,7 +911,7 @@ is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We 
 simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any, Never
 
 class P: ...
@@ -872,7 +941,7 @@ The intersection of an unknown set of runtime values with (another) unknown set 
 still an unknown set of runtime values:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any
 
 class P: ...
@@ -907,7 +976,7 @@ of another unknown set of values is not necessarily empty, so we keep the positi
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def any(
     i1: Any & ~Any,
@@ -930,7 +999,7 @@ Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def mixed(
     i1: Any & Unknown,
@@ -1003,6 +1072,45 @@ def _(
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     x(1.0)
+```
+
+### Constructor intersection diagnostics retain the called class types
+
+When an intersection of class objects rejects a constructor call, the diagnostic should describe the
+original class types instead of reconstructing an intersection from their `__init__` and `__new__`
+methods.
+
+```py
+from typing import Self
+
+class UsesInit:
+    def __init__(self, value: int) -> None: ...
+
+class UsesNew:
+    def __new__(cls, value: str) -> Self:
+        return object.__new__(cls)
+
+def _(cls: type[UsesInit]) -> None:
+    if issubclass(cls, UsesNew):
+        reveal_type(cls)  # revealed: type[UsesInit] & type[UsesNew]
+        # error: [invalid-argument-type] "UsesNew.__new__"
+        # snapshot: invalid-argument-type
+        cls(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
+  --> src/mdtest_snippet.py:15:13
+   |
+15 |         cls(None)
+   |             ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
+info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
 ```
 
 ### Error priority: binding error over top-callable
@@ -1349,7 +1457,7 @@ For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class P: ...
 class Q: ...

@@ -14,8 +14,8 @@ materializations of `B`, and all materializations of `B` are also materializatio
 
 ```py
 from typing_extensions import Literal, LiteralString, Protocol, Never
-from ty_extensions import Unknown, static_assert, AlwaysTruthy, AlwaysFalsy
-from ty_extensions._internal import TypeOf, is_equivalent_to
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown, TypeOf, is_equivalent_to
 from enum import Enum
 
 class Answer(Enum):
@@ -72,8 +72,8 @@ static_assert(is_equivalent_to(type, type[object]))
 ```py
 from typing import Any
 from typing_extensions import Literal, LiteralString, Never
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Any, Any))
 static_assert(is_equivalent_to(Unknown, Unknown))
@@ -100,8 +100,8 @@ For a covariant bounded type parameter, this applies to aliases containing eithe
 ```py
 from typing import Any
 
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 type AnyTuple = tuple[Any, ...]
 type UnknownTuple = tuple[Unknown, ...]
@@ -178,8 +178,8 @@ static_assert(not is_equivalent_to(BoundedInvariant[tuple[Any, ...]], BoundedInv
 
 ```pyi
 from typing import Any, Literal, TypeAlias
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
@@ -242,8 +242,8 @@ static_assert(is_equivalent_to(Any, ~None & Unknown | Unknown))
 ## Tuples
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
@@ -461,8 +461,8 @@ Two unions containing different `Callable` types are equivalent even if the unio
 ordered:
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, RegularCallableTypeOf, is_equivalent_to
 
 def f(x): ...
 def g(x: Unknown): ...
@@ -579,8 +579,8 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))

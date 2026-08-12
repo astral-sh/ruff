@@ -117,7 +117,7 @@ pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &a
         UnnecessaryEmptyIterableWithinDequeCall {
             has_maxlen: maxlen.is_some(),
         },
-        deque.range,
+        deque.range(),
     );
 
     // Return without a fix in the presence of a starred argument because we can't accurately
@@ -145,7 +145,7 @@ fn fix_unnecessary_literal_in_deque(
         );
         let len_str = checker.locator().slice(maxlen);
         let deque_str = format!("{deque_name}(maxlen={len_str})");
-        Edit::range_replacement(deque_str, deque.range)
+        Edit::range_replacement(deque_str, deque.range())
     } else {
         remove_argument(
             &iterable,

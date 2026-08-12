@@ -1172,7 +1172,7 @@ def no_type_check(arg: _F) -> _F:
     """
 
 if sys.version_info < (3, 15):
-    @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
+    @deprecated("Deprecated; removed in Python 3.15.")
     def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
         """Decorator to give another decorator the @no_type_check effect.
 
@@ -2281,7 +2281,6 @@ if sys.version_info >= (3, 11):
         kw_only_default: bool = False,
         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
-        **kwargs: Any,
     ) -> IdentityFunction:
         """Decorator to mark an object as providing dataclass-like behavior.
 
@@ -2386,13 +2385,13 @@ class NamedTuple(tuple[Any, ...]):
 
     @final
     @classmethod
-    def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
+    def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...  # ty:ignore[invalid-type-form]
     @final
     def _asdict(self) -> dict[str, Any]: ...
     @final
-    def _replace(self, **kwargs: Any) -> typing_extensions.Self: ...
+    def _replace(self, **kwargs: Any) -> typing_extensions.Self: ...  # ty:ignore[invalid-type-form]
     if sys.version_info >= (3, 13):
-        def __replace__(self, **kwargs: Any) -> typing_extensions.Self: ...
+        def __replace__(self, **kwargs: Any) -> typing_extensions.Self: ...  # ty:ignore[invalid-type-form]
 
 # Internal mypy fallback type for all typed dicts (does not exist at runtime)
 # N.B. Keep this mostly in sync with typing_extensions._TypedDict/mypy_extensions._TypedDict

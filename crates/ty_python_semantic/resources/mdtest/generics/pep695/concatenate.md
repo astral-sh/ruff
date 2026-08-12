@@ -450,7 +450,7 @@ def my_handler(env: str, x: int, y: float) -> bool:
     return True
 
 m = Middleware(my_handler)
-reveal_type(m)  # revealed: Middleware[(x: int, y: int | float), bool]
+reveal_type(m)  # revealed: Middleware[(x: int, y: float), bool]
 ```
 
 ### Specializing `ParamSpec` with `Concatenate`

@@ -1,6 +1,15 @@
-use crate::types::{ParamSpecAttrKind, Type, context::InferContext, diagnostic::INVALID_PARAMSPEC};
+use crate::{
+    FxOrderSet,
+    types::{
+        ParamSpecAttrKind, Type,
+        context::InferContext,
+        diagnostic::{INVALID_PARAMSPEC, UNBOUND_TYPE_VARIABLE},
+        generics::resolve_typevar_reference,
+    },
+};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
+use ty_python_core::SemanticIndex;
 
 /// Validate the usage of `ParamSpec` components (`P.args` and `P.kwargs`) across all
 /// parameters of a function.
@@ -8,13 +17,16 @@ use ruff_text_size::Ranged;
 /// This enforces several rules from the typing spec:
 /// - `P.args` and `P.kwargs` must always be used together
 /// - When `*args: P.args` is present, `**kwargs: P.kwargs` must also be present (same P)
+/// - `P` must already be in scope
 /// - No keyword-only parameters are allowed between `*args: P.args` and `**kwargs: P.kwargs`
 pub(super) fn validate_paramspec_components<'db>(
     context: &'db InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
     parameters: &ast::Parameters,
     infer_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
+    let env = context.program_environment();
 
     // Extract ParamSpec info from *args annotation
     let args_paramspec = parameters.vararg.as_deref().and_then(|vararg| {
@@ -49,7 +61,7 @@ pub(super) fn validate_paramspec_components<'db>(
 
     match (args_paramspec, kwargs_paramspec) {
         // Both *args: P.args and **kwargs: P.kwargs present
-        (Some((args_tv, _args_annotation)), Some((kwargs_tv, kwargs_annotation))) => {
+        (Some((args_tv, args_annotation)), Some((kwargs_tv, kwargs_annotation))) => {
             // Check they refer to the same ParamSpec
             if !args_tv.is_same_typevar_as(db, kwargs_tv) {
                 let args_name = args_tv.name(db);
@@ -62,6 +74,48 @@ pub(super) fn validate_paramspec_components<'db>(
                     ));
                 }
             } else {
+                let paramspec_is_bound_by_parameter = parameters
+                    .iter()
+                    .filter_map(ast::AnyParameterRef::annotation)
+                    .map(&infer_type)
+                    .filter(|ty| {
+                        !matches!(
+                            ty,
+                            Type::TypeVar(typevar)
+                                if typevar.is_paramspec(db)
+                                    && typevar.paramspec_attr(db).is_some()
+                        )
+                    })
+                    .any(|ty| {
+                        let mut typevars = FxOrderSet::default();
+                        ty.find_legacy_typevars(db, env, None, &mut typevars);
+                        typevars
+                            .iter()
+                            .any(|typevar| typevar.is_same_typevar_as(db, args_tv))
+                    });
+                let paramspec_is_in_scope = paramspec_is_bound_by_parameter
+                    || index
+                        .scope(context.scope().file_scope_id(db))
+                        .parent()
+                        .is_some_and(|parent_scope| {
+                            resolve_typevar_reference(db, index, parent_scope, args_tv.typevar(db))
+                                .is_some()
+                        });
+                if !paramspec_is_in_scope
+                    && let Some(builder) =
+                        context.report_lint(&UNBOUND_TYPE_VARIABLE, args_annotation)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "ParamSpec `{}` is not in scope",
+                        args_tv.name(db),
+                    ));
+                    diagnostic.annotate(
+                        context
+                            .secondary(kwargs_annotation)
+                            .message("This component uses the same out-of-scope ParamSpec"),
+                    );
+                }
+
                 // Same ParamSpec - check no keyword-only params between them
                 if !parameters.kwonlyargs.is_empty() {
                     let name = args_tv.name(db);

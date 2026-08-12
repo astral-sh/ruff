@@ -275,14 +275,8 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }
@@ -295,6 +289,17 @@ mod tests {
                 .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn continue_in_finally_python_38() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/continue_in_finally.py"),
+            &LinterSettings::for_rule(Rule::ContinueInFinally)
+                .with_target_version(PythonVersion::PY38),
+        )?;
+        assert!(diagnostics.is_empty());
         Ok(())
     }
 

@@ -7,7 +7,6 @@ use ruff_macros::Combine;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ruff_text_size::TextRange;
 
-use crate::Db;
 use crate::glob::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
@@ -37,7 +36,7 @@ use crate::glob::{
 pub struct RelativePathBuf(RangedValue<SystemPathBuf>);
 
 impl RelativePathBuf {
-    pub fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
+    pub(crate) fn new(path: impl AsRef<SystemPath>, source: ValueSource) -> Self {
         Self(RangedValue::new(path.as_ref().to_path_buf(), source))
     }
 
@@ -54,22 +53,12 @@ impl RelativePathBuf {
         &self.0
     }
 
-    pub fn source(&self) -> &ValueSource {
+    pub(crate) fn source(&self) -> &ValueSource {
         self.0.source()
     }
 
-    pub fn range(&self) -> Option<TextRange> {
+    pub(crate) fn range(&self) -> Option<TextRange> {
         self.0.range()
-    }
-
-    /// Returns the owned relative path.
-    pub fn into_path_buf(self) -> SystemPathBuf {
-        self.0.into_inner()
-    }
-
-    /// Resolves the absolute path for `self` based on its origin.
-    pub fn absolute_with_db(&self, db: &dyn Db) -> SystemPathBuf {
-        self.absolute(db.project().root(db), db.system())
     }
 
     /// Resolves the absolute path for `self` based on its origin.
@@ -131,7 +120,7 @@ impl fmt::Display for RelativePathBuf {
 pub struct RelativeGlobPattern(RangedValue<String>);
 
 impl RelativeGlobPattern {
-    pub fn new(pattern: impl AsRef<str>, source: ValueSource) -> Self {
+    fn new(pattern: impl AsRef<str>, source: ValueSource) -> Self {
         Self(RangedValue::new(pattern.as_ref().to_string(), source))
     }
 

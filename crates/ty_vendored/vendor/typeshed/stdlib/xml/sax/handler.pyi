@@ -9,15 +9,16 @@ of the interfaces.
 $Id$
 """
 
-from typing import Final, NoReturn, Protocol, type_check_only
+from typing import Final, Protocol, type_check_only
+from typing_extensions import Never
 from xml.sax import xmlreader
 
 version: Final[str]
 
 @type_check_only
 class _ErrorHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
-    def error(self, exception: BaseException) -> NoReturn: ...
-    def fatalError(self, exception: BaseException) -> NoReturn: ...
+    def error(self, exception: BaseException) -> Never: ...
+    def fatalError(self, exception: BaseException) -> Never: ...
     def warning(self, exception: BaseException) -> None: ...
 
 class ErrorHandler:
@@ -31,10 +32,10 @@ class ErrorHandler:
     SAXParseException as the only parameter.
     """
 
-    def error(self, exception: BaseException) -> NoReturn:
+    def error(self, exception: BaseException) -> Never:
         """Handle a recoverable error."""
 
-    def fatalError(self, exception: BaseException) -> NoReturn:
+    def fatalError(self, exception: BaseException) -> Never:
         """Handle a non-recoverable error."""
 
     def warning(self, exception: BaseException) -> None:

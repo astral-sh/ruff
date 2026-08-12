@@ -6,8 +6,8 @@ use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
@@ -19,9 +19,10 @@ use ruff_python_parser::semantic_errors::{
 };
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, ResolverEnvironment, resolve_module};
 
 use crate::HasTrackedScope;
+use crate::ProgramFile;
 use crate::ast_ids::node_key::ExpressionNodeKey;
 use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
@@ -48,7 +49,6 @@ use crate::predicate::{
     PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
     SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
-use crate::program::Program;
 use crate::re_exports::exported_names;
 use crate::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
@@ -81,16 +81,6 @@ struct Loop {
     break_states: Vec<FlowSnapshot>,
     /// Flow states at each `continue` in the current loop.
     continue_states: Vec<FlowSnapshot>,
-}
-
-impl Loop {
-    fn push_break(&mut self, state: FlowSnapshot) {
-        self.break_states.push(state);
-    }
-
-    fn push_continue(&mut self, state: FlowSnapshot) {
-        self.continue_states.push(state);
-    }
 }
 
 /// A narrowing alias: a variable whose RHS is a narrowing expression
@@ -239,7 +229,7 @@ impl ConditionFlowSnapshot {
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
-    file: File,
+    file: ProgramFile<'db>,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
     scope_stack: Vec<ScopeInfo<'ast>>,
@@ -263,6 +253,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors
+    resolver_environment: ResolverEnvironment<'db>,
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
     semantic_checker: SemanticSyntaxChecker,
@@ -310,11 +301,15 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
-    pub(super) fn new(db: &'db dyn Db, file: File, module_ref: &'ast ParsedModuleRef) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        file: ProgramFile<'db>,
+        module_ref: &'ast ParsedModuleRef,
+    ) -> Self {
         let mut builder = Self {
             db,
             file,
-            source_type: file.source_type(db),
+            source_type: file.file(db).source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
@@ -350,7 +345,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             enclosing_snapshots: FxHashMap::default(),
 
-            python_version: Program::get(db).python_version(db),
+            resolver_environment: file.resolver_environment(db),
+            python_version: file.python_version(db),
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
@@ -390,7 +386,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    pub(crate) fn expect_single_definition(
+    fn expect_single_definition(
         &self,
         definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
@@ -983,7 +979,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                     symbol.name().to_string(),
                                 ),
                                 range: declaration.range,
-                                python_version: self.python_version,
+                                python_version: self.python_version(),
                             });
                         }
                         // This `nonlocal` is resolved.
@@ -1046,7 +1042,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
                             range: declaration.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                 }
@@ -1199,14 +1195,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.narrowing_aliases.retain(|name, alias| {
             // Drop aliases that narrow the reassigned place or any of its members.
             //  e.g. `is_none = x is None and ...; x = 1`
-            !alias.narrowed_places.contains(&place)
-                //  e.g. `is_none = a.x is None; a = A()`
-                && !associated_members
-                    .iter()
-                    .any(|m| alias.narrowed_places.contains(&(*m).into()))
-                // Drop the alias whose own variable is the reassigned place.
-                // e.g. `is_none = x is None; is_none = False`
-                && reassigned_alias_name != Some(name)
+            if alias.narrowed_places.contains(&place) {
+                return false;
+            }
+
+            //  e.g. `is_none = a.x is None; a = A()`
+            if associated_members
+                .iter()
+                .any(|m| alias.narrowed_places.contains(&(*m).into()))
+            {
+                return false;
+            }
+
+            // Drop the alias whose own variable is the reassigned place.
+            // e.g. `is_none = x is None; is_none = False`
+            reassigned_alias_name != Some(name)
         });
     }
 
@@ -2172,6 +2175,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::IsNonEmptyIterable(_)
+                    | PredicateNode::OrPatternAlternative(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -2281,6 +2285,40 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast, 'db>> {
         self.current_statements.last_mut()
+    }
+
+    /// Return whether a pattern contains any capture that changes the current flow state.
+    fn pattern_has_bindings(pattern: &ast::Pattern) -> bool {
+        match pattern {
+            ast::Pattern::MatchValue(_) | ast::Pattern::MatchSingleton(_) => false,
+            ast::Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. })
+            | ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
+                patterns.iter().any(Self::pattern_has_bindings)
+            }
+            ast::Pattern::MatchMapping(pattern) => {
+                pattern.rest.is_some() || pattern.patterns.iter().any(Self::pattern_has_bindings)
+            }
+            ast::Pattern::MatchClass(pattern) => pattern
+                .arguments
+                .patterns
+                .iter()
+                .chain(
+                    pattern
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| &keyword.pattern),
+                )
+                .any(Self::pattern_has_bindings),
+            ast::Pattern::MatchStar(pattern) => pattern.name.is_some(),
+            ast::Pattern::MatchAs(pattern) => {
+                pattern.name.is_some()
+                    || pattern
+                        .pattern
+                        .as_deref()
+                        .is_some_and(Self::pattern_has_bindings)
+            }
+        }
     }
 
     fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
@@ -2947,7 +2985,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn source_text(&self) -> &SourceText {
         self.source_text
-            .get_or_init(|| source_text(self.db, self.file))
+            .get_or_init(|| source_text(self.db, self.file.file(self.db)))
     }
 
     fn visit_stmt_impl(&mut self, stmt: &'ast ast::Stmt) {
@@ -3171,14 +3209,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
                 let mut is_self_import = false;
-                if self.file.is_package(self.db)
+                let source_file = self.file.file(self.db);
+                let resolver_environment = self.resolver_environment;
+                if source_file.is_package(self.db)
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
-                        self.file,
+                        ImportingFile::File(source_file, resolver_environment),
                         node.module.as_deref(),
                         node.level,
                     )
-                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                    && let Ok(thispackage) = ModuleName::package_for_file(
+                        self.db,
+                        ImportingFile::File(source_file, resolver_environment),
+                    )
                 {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
@@ -3251,20 +3294,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let Ok(module_name) =
-                            ModuleName::from_import_statement(self.db, self.file, node)
-                        else {
+                        let Ok(module_name) = ModuleName::from_import_statement(
+                            self.db,
+                            ImportingFile::File(source_file, resolver_environment),
+                            node,
+                        ) else {
                             continue;
                         };
 
-                        let Some(module) = resolve_module(self.db, self.file, &module_name) else {
+                        let Some(module) = resolve_module(
+                            self.db,
+                            ImportingFile::File(source_file, resolver_environment),
+                            &module_name,
+                        ) else {
                             continue;
                         };
 
-                        let Some(referenced_module) = module.file(self.db) else {
+                        let Some(referenced_file) = module.file(self.db) else {
                             continue;
                         };
-
+                        let referenced_program_file =
+                            ProgramFile::new(self.db, referenced_file, self.file.program(self.db));
                         // In order to understand the reachability of definitions created by a `*` import,
                         // we need to know the reachability of the global-scope definitions in the
                         // `referenced_module` the symbols imported from. Much like predicates for `if`
@@ -3279,14 +3329,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // ```
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
-                        for export in exported_names(self.db, referenced_module) {
+                        for export in exported_names(self.db, referenced_program_file) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
                                 self.file,
                                 symbol_id,
-                                referenced_module,
+                                referenced_program_file,
                             );
 
                             let star_import_predicate = self.add_predicate(star_import.into());
@@ -3467,7 +3517,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                     // Check whether the variable has been declared nonlocal.
@@ -3477,7 +3527,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 name.id.as_str().into(),
                             ),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                 }
@@ -3487,7 +3537,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     *node.target,
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::AnnAssign(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
 
@@ -3520,12 +3570,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
                         }
 
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        self.push_assignment(aug_assign.into());
+                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                         self.visit_expr(target);
                         self.pop_assignment();
                     }
@@ -4203,20 +4253,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.mark_unreachable();
             }
 
-            ast::Stmt::Continue(_) => {
+            ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
                 let snapshot = self.flow_snapshot();
                 if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_continue(snapshot);
-                }
-                self.record_terminal_finally_entry();
-                // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
-            }
-
-            ast::Stmt::Break(_) => {
-                let snapshot = self.flow_snapshot();
-                if let Some(current_loop) = self.current_loop_mut() {
-                    current_loop.push_break(snapshot);
+                    if stmt.is_continue_stmt() {
+                        current_loop.continue_states.push(snapshot);
+                    } else {
+                        current_loop.break_states.push(snapshot);
+                    }
                 }
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
@@ -4242,7 +4286,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 start: name.range.start(),
                             },
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                     // Check whether the variable has also been declared nonlocal.
@@ -4250,7 +4294,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                         // Never mark a symbol both global and nonlocal, even in this error case.
                         continue;
@@ -4295,7 +4339,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 start: name.range.start(),
                             },
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                     }
                     // Check whether the variable has also been declared global.
@@ -4303,7 +4347,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,
-                            python_version: self.python_version,
+                            python_version: self.python_version(),
                         });
                         // Never mark a symbol both global and nonlocal, even in this error case.
                         continue;
@@ -4687,7 +4731,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
-                    self.push_assignment(node.into());
+                    self.push_assignment(CurrentAssignment::Named(node));
                     self.visit_expr(&node.target);
                     self.pop_assignment();
                 } else {
@@ -4947,6 +4991,40 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
+        if let ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) = pattern
+            && let Some((last, alternatives)) = patterns.split_last()
+            && (
+                // Capture-free alternatives do not affect bindings and need no flow merge.
+                patterns.iter().any(Self::pattern_has_bindings)
+            )
+        {
+            // Start each alternative without earlier captures so repeated names do not shadow one
+            // another. Complementary predicates preserve possible missing captures while all
+            // alternatives together recover the incoming reachability.
+            let mut successful_alternatives = None;
+            for alternative in alternatives {
+                let remaining_alternatives = self.flow_snapshot();
+                let selected_alternative =
+                    self.record_reachability_constraint(PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::OrPatternAlternative(self.current_scope_id()),
+                        is_positive: true,
+                    }));
+                self.visit_pattern(alternative);
+                if let Some(previous_alternatives) = successful_alternatives.take() {
+                    self.flow_merge(previous_alternatives);
+                }
+                successful_alternatives = Some(self.flow_snapshot());
+                self.flow_restore(remaining_alternatives);
+                self.record_negated_reachability_constraint(selected_alternative);
+            }
+
+            self.visit_pattern(last);
+            if let Some(successful_alternative) = successful_alternatives {
+                self.flow_merge(successful_alternative);
+            }
+            return;
+        }
+
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
@@ -5152,7 +5230,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             return;
         }
 
-        if self.db.should_check_file(self.file) {
+        if self.db.should_check_file(self.file.file(self.db)) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }
@@ -5202,24 +5280,6 @@ impl CurrentAssignment<'_, '_> {
             | Self::Comprehension { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
             Self::Assign { .. } | Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
         }
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAnnAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAnnAssign) -> Self {
-        Self::AnnAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAugAssign> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::StmtAugAssign) -> Self {
-        Self::AugAssign(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
-    fn from(value: &'ast ast::ExprNamed) -> Self {
-        Self::Named(value)
     }
 }
 
@@ -5471,6 +5531,6 @@ fn is_collection_initializer(expr: &ast::Expr) -> bool {
     is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
 }
 
-pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {
+fn is_collection_literal(expr: &ast::Expr) -> bool {
     expr.is_list_expr() || expr.is_set_expr() || expr.is_dict_expr()
 }

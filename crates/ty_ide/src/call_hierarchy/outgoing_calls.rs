@@ -15,6 +15,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
@@ -29,8 +30,8 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// are reported when the nested callable is expanded separately. Declaration
 /// expressions attached to a nested callable are still included while
 /// traversing the containing item's body.
-pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<OutgoingCall> {
-    let module = parsed_module(db, file).load(db);
+pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> Vec<OutgoingCall> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
@@ -51,10 +52,9 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
         let Some(def) = resolved.definition() else {
             continue;
         };
-        let def_file = def.file(db);
-        let parsed = parsed_module(db, def_file).load(db);
+        let parsed = parsed_module(db, def.python_file(db)).load(db);
 
-        let model = SemanticModel::new(db, def_file);
+        let model = SemanticModel::new(db, def.program_file(db));
         let mut finder = OutgoingCallsFinder {
             db,
             model: &model,
@@ -152,7 +152,7 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
                 _ => continue,
             }
             let def_file = def.file(self.db);
-            let module_ref = parsed_module(self.db, def_file).load(self.db);
+            let module_ref = parsed_module(self.db, def.python_file(self.db)).load(self.db);
             let selection_range = def.focus_range(self.db, &module_ref).range();
 
             let key = CalleeKey {
@@ -304,7 +304,11 @@ mod tests {
             else {
                 return "No outgoing calls found".to_string();
             };
-            let calls = outgoing_calls(&self.db, target.file, target.selection_range.start());
+            let calls = outgoing_calls(
+                &self.db,
+                self.program_file(target.file),
+                target.selection_range.start(),
+            );
             if calls.is_empty() {
                 return "No outgoing calls found".to_string();
             }

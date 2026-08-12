@@ -56,10 +56,14 @@ impl AlwaysFixableViolation for AvoidableEscapedQuote {
 pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike) {
     if checker.semantic().in_pep_257_docstring()
         || checker.semantic().in_string_type_definition()
-        // This rule has support for strings nested inside another f-strings but they're checked
-        // via the outermost f-string. This means that we shouldn't be checking any nested string
-        // or f-string.
-        || checker.semantic().in_interpolated_string_replacement_field()
+        || (
+            // This rule has support for strings nested inside another f-strings but they're checked
+            // via the outermost f-string. This means that we shouldn't be checking any nested string
+            // or f-string.
+            checker
+                .semantic()
+                .in_interpolated_string_replacement_field()
+        )
     {
         return;
     }

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::{ImplementationParams, ImplementationRequest, ImplementationResponse, Uri};
 use ty_ide::goto_implementation;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -48,7 +48,7 @@ impl BackgroundDocumentRequestHandler for GotoImplementationRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_implementation(db, file, offset) else {
+        let Some(ranged) = goto_implementation(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

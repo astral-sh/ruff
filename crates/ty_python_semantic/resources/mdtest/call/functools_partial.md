@@ -57,7 +57,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, 1, c=3.14)
-reveal_type(p)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### All args bound
@@ -539,68 +539,6 @@ reveal_type(p)  # revealed: partial[(path: str, *, start: str | None = ".") -> s
 reveal_type(list(map(p, paths)))  # revealed: list[str]
 ```
 
-### Unbound `TypeVarTuple` callable bound with `partial`
-
-Binding fixed wrapper parameters must not specialize an untouched variadic tuple to the empty tuple.
-The returned partial must remain callable with the same arguments as its callbacks.
-
-```py
-from collections.abc import Callable
-from functools import partial
-from typing_extensions import TypeVarTuple, Unpack
-
-Ts = TypeVarTuple("Ts")
-
-def wrapper(
-    callback: Callable[[Unpack[Ts]], None],
-    *args: Unpack[Ts],
-) -> None: ...
-def decorate(callback: Callable[[Unpack[Ts]], None]) -> Callable[[Unpack[Ts]], None]:
-    # TODO: An untouched TypeVarTuple should remain generic in a partial application.
-    # error: [invalid-return-type]
-    # error: [invalid-argument-type]
-    return partial(wrapper, callback)
-
-def accept(value: int) -> None: ...
-
-bound = decorate(accept)
-reveal_type(bound)  # revealed: (int, /) -> None
-bound(1)
-# error: [invalid-argument-type]
-bound("wrong")
-```
-
-### Bound `TypeVarTuple` callable with `partial`
-
-Binding the arguments of a TypeVarTuple-backed callback leaves a zero-argument partial, not a
-partial that still requires the already-bound arguments.
-
-```py
-from collections.abc import Awaitable, Callable
-from functools import partial
-from typing import TypeVar
-from typing_extensions import TypeVarTuple, Unpack
-
-Ts = TypeVarTuple("Ts")
-R = TypeVar("R")
-
-def from_thread(
-    callback: Callable[[Unpack[Ts]], Awaitable[R]],
-    *args: Unpack[Ts],
-    token: object | None = None,
-) -> R:
-    raise NotImplementedError
-
-async def sleep(seconds: float) -> None: ...
-async def check(token: object | None) -> None:
-    bound = partial(from_thread, sleep, 0, token=token)
-    # TODO: A fully bound TypeVarTuple should leave a zero-argument partial.
-    reveal_type(bound)  # revealed: partial[(int | float, /, *, token: object = ...) -> None]
-    bound()  # error: [missing-argument]
-    # TODO: This should reject the extra argument once the bound pack is removed.
-    bound(1)
-```
-
 ### ParamSpec callable bound with `partial`
 
 ```py
@@ -765,7 +703,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int, str] = (1, "hello")
 p = partial(f, *args)
-reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(c: float) -> bool]
 ```
 
 ### Mixed positional and starred args
@@ -778,7 +716,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[str] = ("hello",)
 p = partial(f, 1, *args)
-reveal_type(p)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(c: float) -> bool]
 ```
 
 ### Fallback for starred args with variable-length tuple
@@ -984,10 +922,10 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p1 = partial(f, 1)
-reveal_type(p1)  # revealed: partial[(b: str, c: int | float) -> bool]
+reveal_type(p1)  # revealed: partial[(b: str, c: float) -> bool]
 
 p2 = partial(p1, "hello")
-reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
+reveal_type(p2)  # revealed: partial[(c: float) -> bool]
 ```
 
 ## Constructors and advanced signatures
@@ -1254,7 +1192,7 @@ def f(a: int, b: str = "default", c: float = 0.0) -> bool:
     return True
 
 p = partial(f, 1, "hello")
-reveal_type(p)  # revealed: partial[(c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(c: float = ...) -> bool]
 ```
 
 ### Multiple keyword bindings
@@ -1266,7 +1204,7 @@ def f(a: int, b: str, c: float, d: bool) -> int:
     return 0
 
 p = partial(f, b="hello", d=True)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float, d: bool = True) -> int]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float, d: bool = True) -> int]
 ```
 
 ### Mixed positional-only, regular, and keyword-only
@@ -1279,15 +1217,15 @@ def f(a: int, /, b: str, *, c: float) -> bool:
 
 # Bind the positional-only param
 p1 = partial(f, 1)
-reveal_type(p1)  # revealed: partial[(b: str, *, c: int | float) -> bool]
+reveal_type(p1)  # revealed: partial[(b: str, *, c: float) -> bool]
 
 # Bind a keyword-only param by keyword
 p2 = partial(f, c=3.14)
-reveal_type(p2)  # revealed: partial[(a: int, /, b: str, *, c: int | float = ...) -> bool]
+reveal_type(p2)  # revealed: partial[(a: int, /, b: str, *, c: float = ...) -> bool]
 
 # Bind both positional-only and keyword-only
 p3 = partial(f, 1, c=3.14)
-reveal_type(p3)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p3)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### Starred args combined with keyword args
@@ -1300,7 +1238,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 args: tuple[int] = (1,)
 p = partial(f, *args, c=3.14)
-reveal_type(p)  # revealed: partial[(b: str, *, c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(b: str, *, c: float = ...) -> bool]
 ```
 
 ### Starred args with empty tuple
@@ -1393,7 +1331,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: float) -> bool]
 
 # Override b at call time
 reveal_type(p(1, b="world", c=3.14))  # revealed: bool

@@ -329,12 +329,12 @@ struct ClassCellReferenceFinder {
 }
 
 impl ClassCellReferenceFinder {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         ClassCellReferenceFinder {
             has_class_cell: false,
         }
     }
-    pub(crate) fn found(&self) -> bool {
+    fn found(&self) -> bool {
         self.has_class_cell
     }
 }

@@ -5,11 +5,12 @@ use std::ops::Deref;
 use compact_str::{CompactString, ToCompactString};
 
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::db::Db;
 use crate::resolve::file_to_module;
+use crate::{ResolverEnvironment, ResolverFile};
 
 /// A module name, e.g. `foo.bar`.
 ///
@@ -305,13 +306,12 @@ impl ModuleName {
     /// Extracts a module name from the AST of a `from <module> import ...`
     /// statement.
     ///
-    /// `importing_file` must be the [`File`] that contains the import
-    /// statement.
+    /// `importing_file` must be the file that contains the import statement.
     ///
     /// This handles relative import statements.
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,
-        importing_file: File,
+        importing_file: ImportingFile<'db>,
         node: &'db ast::StmtImportFrom,
     ) -> Result<Self, ModuleNameResolutionError> {
         let ast::StmtImportFrom {
@@ -326,14 +326,14 @@ impl ModuleName {
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`
-    pub fn from_identifier_parts(
-        db: &dyn Db,
-        importing_file: File,
+    pub fn from_identifier_parts<'db>(
+        db: &'db dyn Db,
+        importing_file: ImportingFile<'db>,
         module: Option<&str>,
         level: u32,
     ) -> Result<Self, ModuleNameResolutionError> {
         if let Some(level) = NonZeroU32::new(level) {
-            relative_module_name(db, importing_file, module, level)
+            relative_module_name(db, importing_file.resolver_file(db), module, level)
         } else {
             module
                 .and_then(Self::new)
@@ -344,9 +344,9 @@ impl ModuleName {
     /// Computes the absolute module name for the package this file belongs to.
     ///
     /// i.e. this resolves `.`
-    pub fn package_for_file(
-        db: &dyn Db,
-        importing_file: File,
+    pub fn package_for_file<'db>(
+        db: &'db dyn Db,
+        importing_file: ImportingFile<'db>,
     ) -> Result<Self, ModuleNameResolutionError> {
         Self::from_identifier_parts(db, importing_file, None, 1)
     }
@@ -468,6 +468,67 @@ impl std::fmt::Display for ModuleName {
     }
 }
 
+/// The file from which an import is resolved.
+///
+/// Most absolute imports only need the resolver environment. Creating a [`ResolverFile`] for each
+/// such import would unnecessarily intern the file and environment together, even though that
+/// combined identity is never used:
+///
+/// ```text
+/// resolve_module(ImportingFile::File(shared.py, environment), "dependency")
+///     -> resolve using environment; no ResolverFile needed
+/// ```
+///
+/// Relative imports, on the other hand, need the importing file's module identity and therefore
+/// require a [`ResolverFile`]:
+///
+/// ```text
+/// from .dependency import value
+///     -> importing_file.resolver_file(db)
+///     -> ResolverFile(shared.py, environment)
+/// ```
+///
+/// [`ImportingFile::File`] defers interning until such a code path actually calls
+/// [`ImportingFile::resolver_file`]. Callers that already have an interned resolver file can pass
+/// [`ImportingFile::ResolverFile`] to reuse it directly.
+#[derive(Clone, Copy)]
+pub enum ImportingFile<'db> {
+    /// An already-interned resolver key that can be reused without materialization.
+    ResolverFile(ResolverFile<'db>),
+    /// An importing file and resolver environment whose combined key is materialized lazily.
+    File(File, ResolverEnvironment<'db>),
+}
+
+impl<'db> ImportingFile<'db> {
+    pub fn file(self, db: &dyn Db) -> File {
+        match self {
+            Self::ResolverFile(file) => file.file(db),
+            Self::File(file, _) => file,
+        }
+    }
+
+    pub fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+        match self {
+            Self::ResolverFile(file) => file.environment(db),
+            Self::File(_, resolver_environment) => resolver_environment,
+        }
+    }
+
+    pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {
+        self.resolver_environment(db).python_version(db)
+    }
+
+    /// Returns the existing resolver key or materializes one when required.
+    pub fn resolver_file(self, db: &'db dyn Db) -> ResolverFile<'db> {
+        match self {
+            Self::ResolverFile(file) => file,
+            Self::File(file, resolver_environment) => {
+                ResolverFile::new(db, file, resolver_environment)
+            }
+        }
+    }
+}
+
 /// Given a `from .foo import bar` relative import, resolve the relative module
 /// we're importing `bar` from into an absolute [`ModuleName`]
 /// using the name of the module we're currently analyzing.
@@ -478,9 +539,9 @@ impl std::fmt::Display for ModuleName {
 /// - `tail` is the relative module name stripped of all leading dots:
 ///   - `from .foo import bar` => `tail == "foo"`
 ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-fn relative_module_name(
-    db: &dyn Db,
-    importing_file: File,
+fn relative_module_name<'db>(
+    db: &'db dyn Db,
+    importing_file: ResolverFile<'db>,
     tail: Option<&str>,
     level: NonZeroU32,
 ) -> Result<ModuleName, ModuleNameResolutionError> {

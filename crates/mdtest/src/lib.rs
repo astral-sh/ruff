@@ -190,7 +190,7 @@ impl OutputFormat {
     /// Actions can detect them as workflow commands. Workflow commands must
     /// appear at the beginning of a line in stdout to be parsed by GitHub.
     #[expect(clippy::print_stdout)]
-    pub fn write_error(
+    fn write_error(
         self,
         assertion_buf: &mut String,
         file: &str,
@@ -220,7 +220,7 @@ impl OutputFormat {
 
     /// Write a module-resolution inconsistency in the appropriate format.
     ///
-    /// See [`write_error`](Self::write_error) for details on why GitHub-format
+    /// See `write_error` for details on why GitHub-format
     /// messages must be printed directly to stdout.
     #[expect(clippy::print_stdout)]
     pub fn write_inconsistency(
@@ -314,7 +314,7 @@ impl TestFile<'_> {
     }
 }
 
-pub(crate) fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
+fn diagnostic_display_config(tool_name: &'static str) -> DisplayDiagnosticConfig {
     DisplayDiagnosticConfig::new(tool_name)
         .color(false)
         .with_fix_applicability(Applicability::DisplayOnly)
@@ -332,11 +332,7 @@ pub fn render_diagnostic(db: &dyn Db, tool_name: &'static str, diagnostic: &Diag
         .to_string()
 }
 
-pub(crate) fn render_diagnostics(
-    db: &dyn Db,
-    tool_name: &'static str,
-    diagnostics: &[Diagnostic],
-) -> String {
+fn render_diagnostics(db: &dyn Db, tool_name: &'static str, diagnostics: &[Diagnostic]) -> String {
     let mut rendered = String::new();
     for diag in diagnostics {
         writeln!(rendered, "{}", render_diagnostic(db, tool_name, diag)).unwrap();
@@ -345,14 +341,14 @@ pub(crate) fn render_diagnostics(
     rendered.trim_end_matches('\n').to_string()
 }
 
-pub(crate) fn is_update_inline_snapshots_enabled() -> bool {
+fn is_update_inline_snapshots_enabled() -> bool {
     let is_enabled: std::sync::LazyLock<_> = std::sync::LazyLock::new(|| {
         std::env::var_os(MDTEST_UPDATE_SNAPSHOTS).is_some_and(|v| v != "0")
     });
     *is_enabled
 }
 
-pub(crate) fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
+fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
     static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
         std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
 
@@ -412,7 +408,9 @@ pub fn validate_inline_snapshot(
                     failures.push(
                         failure_line,
                         vec![Failure::new(
-                            "This code block has a `snapshot` code block but no `# snapshot` assertions. Remove the `snapshot` code block or add a `# snapshot:` assertion.",
+                            "This code block has a `snapshot` code block but no `# snapshot` \
+                            assertions. Remove the `snapshot` code block or add a `# snapshot:` \
+                            assertion.",
                         )],
                     );
                 }
@@ -436,7 +434,8 @@ pub fn validate_inline_snapshot(
                 failures.push(
                     line,
                     vec![Failure::new(format!(
-                        "Add a `snapshot` block for this `# snapshot` assertion, or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
+                        "Add a `snapshot` block for this `# snapshot` assertion, \
+                        or set `{MDTEST_UPDATE_SNAPSHOTS}=1` to insert one automatically",
                     ))],
                 );
             }
@@ -455,10 +454,14 @@ pub fn validate_inline_snapshot(
         } else {
             failures.push(
                 failure_line,
-                vec![Failure::new(format_args!(
-                        "inline diagnostics snapshot are out of date; set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
-                    )).with_diff(snapshot_code_block.expected.to_string(), actual)],
-                );
+                vec![
+                    Failure::new(format_args!(
+                        "inline diagnostics snapshot are out of date; \
+                        set `{MDTEST_UPDATE_SNAPSHOTS}=1` to update the `snapshot` block",
+                    ))
+                    .with_diff(snapshot_code_block.expected.to_string(), actual),
+                ],
+            );
         }
     }
 
@@ -522,7 +525,7 @@ fn try_apply_markdown_edits(
     }
 }
 
-pub fn create_diagnostic_snapshot<'d, C>(
+fn create_diagnostic_snapshot<'d, C>(
     db: &dyn Db,
     tool_name: &'static str,
     relative_fixture_path: &Utf8Path,
@@ -581,8 +584,8 @@ pub fn create_diagnostic_snapshot<'d, C>(
 
 #[derive(Debug, Clone)]
 pub struct MarkdownEdit {
-    pub(crate) range: TextRange,
-    pub(crate) replacement: String,
+    range: TextRange,
+    replacement: String,
 }
 
 /// Run a function over an embedded test file, catching any panics that occur in the process.
@@ -678,7 +681,8 @@ pub fn check_panic<C>(test: &MarkdownTest<'_, '_, C>, panic_info: Option<PanicEr
                 let message = panic_info.payload.to_string();
                 assert!(
                     message.contains(expected_message),
-                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    "Test `{}` is expected to panic with `{expected_message}`, \
+                    but panicked with `{message}` instead.",
                     test.name(),
                 );
             }
@@ -774,10 +778,6 @@ pub(crate) mod tests {
 
         fn files(&self) -> &Files {
             &self.files
-        }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest_ty()
         }
     }
 

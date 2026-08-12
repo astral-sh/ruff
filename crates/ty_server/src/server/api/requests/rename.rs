@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use lsp_types::RenameRequest;
 use lsp_types::{RenameParams, TextEdit, Uri, WorkspaceEdit};
 use ty_ide::rename;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -50,7 +50,8 @@ impl BackgroundDocumentRequestHandler for RenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(rename_results) = rename(db, file, offset, &params.new_name) else {
+        let Some(rename_results) = rename(db, db.program_file(file), offset, &params.new_name)
+        else {
             return Ok(None);
         };
 

@@ -22,8 +22,8 @@ Types that "produce" data on demand are covariant in their typevar. If you expec
 get from the sequence is a valid `int`.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -104,8 +104,8 @@ Types that "consume" data are contravariant in their typevar. If you expect a co
 that you pass into the consumer is a valid `int`.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -217,8 +217,8 @@ In the end, if you expect a mutable list, you must always be given a list of exa
 since we can't know in advance which of the allowed methods you'll want to use.
 
 ```py
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -421,6 +421,59 @@ class GoodInferredCovariant(Covariant[T_infer]): ...
 
 static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvariant[A]))
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
+```
+
+## Inferred variance for writable subclass-type attributes
+
+A writable public `type[T]` attribute makes a legacy type variable with inferred variance invariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class ClassContainer(Generic[T]):
+    cls: type[T]
+
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_subtype_of(ClassContainer[object], ClassContainer[int]))
+
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
+static_assert(not is_assignable_to(ClassContainer[object], ClassContainer[int]))
+```
+
+## Inferred variance for subclass-type method parameters
+
+A method parameter annotated as `type[T]` makes a legacy type variable with inferred variance
+contravariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class ClassContainer(Generic[T]):
+    def put(self, cls: type[T]) -> None: ...
+
+static_assert(is_subtype_of(ClassContainer[object], ClassContainer[int]))
+static_assert(not is_subtype_of(ClassContainer[int], ClassContainer[object]))
+
+static_assert(is_assignable_to(ClassContainer[object], ClassContainer[int]))
+static_assert(not is_assignable_to(ClassContainer[int], ClassContainer[object]))
 ```
 
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance

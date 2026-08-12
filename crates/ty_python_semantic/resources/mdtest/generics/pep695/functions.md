@@ -77,7 +77,7 @@ def f[T](x: T) -> T:
     return x
 
 reveal_type(f(1))  # revealed: Literal[1]
-reveal_type(f(1.0))  # revealed: float
+reveal_type(f(1.0))  # revealed: float*
 reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
@@ -740,6 +740,35 @@ reveal_type(invoke(head_invariant, Invariant[int]()))
 reveal_type(invoke(lift_invariant, 1))
 ```
 
+## Passing unbound generic methods to generic functions
+
+An unbound method of a generic class can be passed to a generic higher-order function. The class
+type parameter must still be inferred from the concrete receiver expected by that function.
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+
+class Box[T]:
+    def merge(self, other: Box[T]) -> Box[T]:
+        return self
+
+def fold[T](function: Callable[[T, T], T], values: list[T]) -> T:
+    return values[0]
+
+def merge_boxes(values: list[Box[str]]) -> Box[str]:
+    return fold(Box.merge, values)
+```
+
+The same applies to the standard-library `set.union` method passed to `functools.reduce`.
+
+```py
+from functools import reduce
+
+reveal_type(reduce(set.union, [set[str]()]))  # revealed: set[str]
+```
+
 ## Protocols as TypeVar bounds
 
 Protocol types can be used as TypeVar bounds, just like nominal types.
@@ -1039,6 +1068,63 @@ def f[T](x: T, y: Not[T]) -> T:
 ```
 
 ## `Callable` parameters
+
+### Return type inference from object-variadic callbacks
+
+Object-variadic callbacks must preserve `Callable[..., T]` return constraints.
+
+```py
+from collections.abc import Callable
+
+def call[T](callback: Callable[..., T]) -> T:
+    return callback()
+
+def bounded[T: int](callback: Callable[..., T]) -> T:
+    return callback()
+
+def callback(*args: object, **kwargs: object) -> int:
+    return 1
+
+reveal_type(call(callback))  # revealed: int
+reveal_type(bounded(callback))  # revealed: int
+```
+
+### Return type inference from top callables
+
+Top callable parameters must preserve return-type constraints.
+
+```py
+from collections.abc import Callable
+from ty_extensions import Top
+
+def accept_top[T](callback: Top[Callable[..., T]]) -> T:
+    raise NotImplementedError
+
+def ordinary() -> int:
+    return 1
+
+reveal_type(accept_top(ordinary))  # revealed: int
+```
+
+### Gradual callable parameters with a required prefix
+
+```py
+from collections.abc import Callable
+from typing import Concatenate
+
+def invoke[T](callback: Callable[Concatenate[int, ...], T]) -> T:
+    return callback(1)
+
+def accepts_int(value: int, *args: object, **kwargs: object) -> int:
+    return value
+
+def needs_str(value: str, *args: object, **kwargs: object) -> int:
+    return len(value)
+
+reveal_type(invoke(accepts_int))  # revealed: int
+# error: [invalid-argument-type]
+reveal_type(invoke(needs_str))  # revealed: int
+```
 
 ### Class constructors
 

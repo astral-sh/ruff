@@ -58,7 +58,7 @@ def f(x: T) -> T:
     return x
 
 reveal_type(f(1))  # revealed: Literal[1]
-reveal_type(f(1.0))  # revealed: float
+reveal_type(f(1.0))  # revealed: float*
 reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
@@ -434,6 +434,33 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
     raise NotImplementedError
 
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
+```
+
+## Incompatible invariant protocol members
+
+When the same inferred type variable appears in multiple invariant protocol members, those members
+must agree on one exact specialization. Gradual consistency between their types is not sufficient.
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Protocol[T]):
+    first: T
+    second: T
+
+class GradualPair(Generic[U]):
+    first: tuple[U, Any]
+    second: tuple[U, int]
+
+def infer_pair(value: Pair[T]) -> T:
+    raise NotImplementedError
+
+def check_pair(value: GradualPair[U]) -> None:
+    # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
+    reveal_type(infer_pair(value))  # revealed: Unknown
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
@@ -904,6 +931,30 @@ U = TypeVar("U", bound=type[A] | type[B])
 
 def union_bound(cls: U) -> None:
     reveal_type(cls.attr)  # revealed: str | int
+```
+
+## Attribute access on TypeVars constrained to instances and class objects
+
+A constrained type variable can contain both ordinary instances and class objects. Accessing a
+shared attribute must inspect each constraint without treating the entire type variable as a class.
+
+```py
+from typing import TypeVar
+
+class Instance:
+    @staticmethod
+    def keys() -> list[str]:
+        return []
+
+class ClassObject:
+    @staticmethod
+    def keys() -> list[str]:
+        return []
+
+T = TypeVar("T", Instance, type[ClassObject])
+
+def read(value: T) -> list[str]:
+    return value.keys()
 ```
 
 ## Solving TypeVars with upper bounds in unions
