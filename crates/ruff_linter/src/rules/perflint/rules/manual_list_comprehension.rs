@@ -1,13 +1,16 @@
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, PythonVersion};
 
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
-    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
-    rules::perflint::helpers::statement_deletion_range,
+    checkers::ast::Checker,
+    preview::is_fix_manual_list_comprehension_enabled,
+    rules::perflint::helpers::{
+        comment_strings_in_range, contains_potentially_zero_argument_super_call,
+        statement_deletion_range,
+    },
 };
 use anyhow::{Result, anyhow};
 
-use crate::rules::perflint::helpers::comment_strings_in_range;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::{Binding, analyze::typing::is_list};
@@ -27,6 +30,10 @@ use ruff_text_size::{Ranged, TextRange};
 /// Note that, as with all `perflint` rules, this is only intended as a
 /// micro-optimization, and will have a negligible impact on performance in
 /// most cases.
+///
+/// ## Known problems
+/// For targets before Python 3.12, this rule ignores loops whose rewrite would
+/// move a potentially zero-argument `super` call into a comprehension.
 ///
 /// ## Example
 /// ```python
@@ -94,7 +101,7 @@ impl Violation for ManualListComprehension {
 }
 
 /// PERF401
-pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_list_comprehension<'a>(checker: &Checker<'a>, for_stmt: &'a ast::StmtFor) {
     let Expr::Name(ast::ExprName {
         id: for_stmt_target_id,
         ..
@@ -335,6 +342,27 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         ComprehensionType::Extend
     };
 
+    let contains_potentially_zero_argument_super_call =
+        contains_potentially_zero_argument_super_call(checker, arg)
+            || if_test
+                .is_some_and(|test| contains_potentially_zero_argument_super_call(checker, test));
+
+    // Before Python 3.12, comprehensions ran in a nested function. A potentially zero-argument
+    // `super` call would then use the comprehension's implicit `.0` iterator argument and raise a
+    // `TypeError` at runtime.
+    if checker.target_version() < PythonVersion::PY312
+        && contains_potentially_zero_argument_super_call
+    {
+        return;
+    }
+
+    // Synchronous `list.extend` normally receives a generator expression, which always introduces
+    // a nested scope. When a potentially zero-argument `super` call is present, use a list
+    // comprehension instead. Python 3.12 inlines it, just as it does for the other fixes here.
+    let list_extend_uses_list_comprehension = contains_potentially_zero_argument_super_call
+        && comprehension_type == ComprehensionType::Extend
+        && !for_stmt.is_async;
+
     let mut diagnostic = checker.report_diagnostic(
         ManualListComprehension {
             is_async: for_stmt.is_async,
@@ -352,6 +380,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 for_stmt,
                 if_test.map(std::convert::AsRef::as_ref),
                 arg,
+                list_extend_uses_list_comprehension,
                 checker,
             )
         });
@@ -364,6 +393,7 @@ fn convert_to_list_extend(
     for_stmt: &ast::StmtFor,
     if_test: Option<&Expr>,
     to_append: &Expr,
+    list_extend_uses_list_comprehension: bool,
     checker: &Checker,
 ) -> Result<Fix> {
     let semantic = checker.semantic();
@@ -443,8 +473,10 @@ fn convert_to_list_extend(
 
     match fix_type {
         ComprehensionType::Extend => {
-            let generator_str = if for_stmt.is_async {
-                // generators do not implement __iter__, so `async for` requires the generator to be a list
+            let generator_str = if for_stmt.is_async || list_extend_uses_list_comprehension {
+                // Async generators do not implement `__iter__`, so `async for` requires a list.
+                // A synchronous loop uses a list too when `super` must remain in an inlined
+                // comprehension on Python 3.12+.
                 format!("[{generator_str}]")
             } else {
                 generator_str

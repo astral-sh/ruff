@@ -8,3 +8,11 @@ PERF402 Use `list` or `list.copy` to create a copy of a list
 4 |     for i in items:
 5 |         result.append(i)  # PERF402
   |         ^^^^^^^^^^^^^^^^
+
+PERF402 Use `list` or `list.copy` to create a copy of a list
+  --> PERF402.py:65:13
+   |
+63 |         # PERF402 remains valid because `list(super().items())` evaluates `super()` in this method.
+64 |         for item in super().items():
+65 |             result.append(item)  # PERF402
+   |             ^^^^^^^^^^^^^^^^^^^

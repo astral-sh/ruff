@@ -9,17 +9,19 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
-    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Rule::UnnecessaryListCast, Path::new("PERF101.py"))]
     #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
     #[test_case(Rule::TryExceptInLoop, Path::new("PERF203.py"))]
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
+    #[test_case(Rule::ManualListComprehension, Path::new("PERF401_super.py"))]
     #[test_case(Rule::ManualListCopy, Path::new("PERF402.py"))]
     #[test_case(Rule::ManualDictComprehension, Path::new("PERF403.py"))]
+    #[test_case(Rule::ManualDictComprehension, Path::new("PERF403_super.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -33,7 +35,9 @@ mod tests {
     #[test_case(Rule::IncorrectDictIterator, Path::new("PERF102.py"))]
     // TODO: remove this test case when the fixes for `perf401` and `perf403` are stabilized
     #[test_case(Rule::ManualDictComprehension, Path::new("PERF403.py"))]
+    #[test_case(Rule::ManualDictComprehension, Path::new("PERF403_super.py"))]
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
+    #[test_case(Rule::ManualListComprehension, Path::new("PERF401_super.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -47,6 +51,23 @@ mod tests {
                 .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::ManualListComprehension, Path::new("PERF401_super.py"))]
+    #[test_case(Rule::ManualDictComprehension, Path::new("PERF403_super.py"))]
+    fn super_calls_python_version_diff(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("diff_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("perflint").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY311),
+            &LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY312),
+        );
         Ok(())
     }
 }

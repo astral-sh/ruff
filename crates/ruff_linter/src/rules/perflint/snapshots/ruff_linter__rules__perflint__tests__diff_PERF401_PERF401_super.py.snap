@@ -1,0 +1,224 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.11
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 0
+Added: 10
+
+--- Added ---
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:13:13
+   |
+11 |         result = []
+12 |         for _ in range(1):
+13 |             result.append(super().value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 |     def condition(self):
+   |
+help: Replace for loop with list comprehension
+   |
+10 |     def element(self):
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(super().value())
+11 +         result = [super().value() for _ in range(1)]
+12 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:19:17
+   |
+17 |         for value in range(1):
+18 |             if super().value():
+19 |                 result.append(value)
+   |                 ^^^^^^^^^^^^^^^^^^^^
+20 |
+21 |     def extend(self):
+   |
+help: Replace for loop with list comprehension
+   |
+15 |     def condition(self):
+   -         result = []
+   -         for value in range(1):
+   -             if super().value():
+   -                 result.append(value)
+16 +         result = [value for value in range(1) if super().value()]
+17 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use `list.extend` to create a transformed list
+  --> PERF401_super.py:24:13
+   |
+22 |         result = [0]
+23 |         for _ in range(1):
+24 |             result.append(super().value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 |     def extend_condition(self):
+   |
+help: Replace for loop with list.extend
+   |
+22 |         result = [0]
+   -         for _ in range(1):
+   -             result.append(super().value())
+23 +         result.extend([super().value() for _ in range(1)])
+24 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use `list.extend` to create a transformed list
+  --> PERF401_super.py:30:17
+   |
+28 |         for value in range(1):
+29 |             if super().value():
+30 |                 result.append(value)
+   |                 ^^^^^^^^^^^^^^^^^^^^
+31 |
+32 |     async def async_list_comprehension(self, values):
+   |
+help: Replace for loop with list.extend
+   |
+27 |         result = [0]
+   -         for value in range(1):
+   -             if super().value():
+   -                 result.append(value)
+28 +         result.extend([value for value in range(1) if super().value()])
+29 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use an async list comprehension to create a transformed list
+  --> PERF401_super.py:35:13
+   |
+33 |         result = []
+34 |         async for _ in values:
+35 |             result.append(super().value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 |
+37 |     async def async_extend(self, values):
+   |
+help: Replace for loop with list comprehension
+   |
+32 |     async def async_list_comprehension(self, values):
+   -         result = []
+   -         async for _ in values:
+   -             result.append(super().value())
+33 +         result = [super().value() async for _ in values]
+34 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use `list.extend` with an async comprehension to create a transformed list
+  --> PERF401_super.py:40:13
+   |
+38 |         result = [0]
+39 |         async for _ in values:
+40 |             result.append(super().value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+41 |
+42 |     def iterable(self):
+   |
+help: Replace for loop with list.extend
+   |
+38 |         result = [0]
+   -         async for _ in values:
+   -             result.append(super().value())
+39 +         result.extend([super().value() async for _ in values])
+40 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:66:13
+   |
+64 |         result = []
+65 |         for _ in range(1):
+66 |             result.append(super(*()).value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 |
+68 |     def extend_starred(self):
+   |
+help: Replace for loop with list comprehension
+   |
+63 |     def starred(self):
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(super(*()).value())
+64 +         result = [super(*()).value() for _ in range(1)]
+65 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use `list.extend` to create a transformed list
+  --> PERF401_super.py:71:13
+   |
+69 |         result = [0]
+70 |         for _ in range(1):
+71 |             result.append(super(*()).value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+72 |
+73 |     def lambda_body(self):
+   |
+help: Replace for loop with list.extend
+   |
+69 |         result = [0]
+   -         for _ in range(1):
+   -             result.append(super(*()).value())
+70 +         result.extend([super(*()).value() for _ in range(1)])
+71 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:81:13
+   |
+79 |         result = []
+80 |         for _ in range(1):
+81 |             result.append(lambda value=super().value(): value)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+82 |
+83 |     def nested_generator_iterable(self):
+   |
+help: Replace for loop with list comprehension
+   |
+78 |     def lambda_default(self):
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(lambda value=super().value(): value)
+79 +         result = [lambda value=super().value(): value for _ in range(1)]
+80 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:86:13
+   |
+84 |         result = []
+85 |         for _ in range(1):
+86 |             result.append(value for value in super().values())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace for loop with list comprehension
+   |
+83 |     def nested_generator_iterable(self):
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(value for value in super().values())
+84 +         result = [(value for value in super().values()) for _ in range(1)]
+   |
+note: This is an unsafe fix and may change runtime behavior

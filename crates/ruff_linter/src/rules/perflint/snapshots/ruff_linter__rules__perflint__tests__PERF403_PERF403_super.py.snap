@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super.py:25:13
+   |
+23 |         result = {}
+24 |         for key, value in super().pairs():
+25 |             result[key] = value
+   |             ^^^^^^^^^^^^^^^^^^^
+26 |
+27 |     def explicit(self, pairs):
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super.py:31:17
+   |
+29 |         for key, value in pairs:
+30 |             if super(Child, self).condition():
+31 |                 result[key] = value
+   |                 ^^^^^^^^^^^^^^^^^^^
+32 |
+33 |     def shadowed(self, pairs):
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super.py:38:17
+   |
+36 |         for key, value in pairs:
+37 |             if super().condition():
+38 |                 result[key] = value
+   |                 ^^^^^^^^^^^^^^^^^^^
+help: Replace for loop with dict comprehension

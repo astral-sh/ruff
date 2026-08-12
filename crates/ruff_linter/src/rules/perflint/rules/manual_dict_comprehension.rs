@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
+    self as ast, Expr, PythonVersion, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
@@ -8,7 +8,10 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
-use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::perflint::helpers::{
+    comment_strings_in_range, contains_potentially_zero_argument_super_call,
+    statement_deletion_range,
+};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -24,6 +27,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Note that, as with all `perflint` rules, this is only intended as a
 /// micro-optimization, and will have a negligible impact on performance in
 /// most cases.
+///
+/// ## Known problems
+/// For targets before Python 3.12, this rule ignores loops whose rewrite would
+/// move a potentially zero-argument `super` call into a dictionary comprehension.
 ///
 /// ## Example
 /// ```python
@@ -82,7 +89,7 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_dict_comprehension<'a>(checker: &Checker<'a>, for_stmt: &'a ast::StmtFor) {
     let ast::StmtFor { body, target, .. } = for_stmt;
     let body = body.as_slice();
     let target = target.as_ref();
@@ -138,6 +145,15 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     else {
         return;
     };
+
+    // Before Python 3.12, dictionary comprehensions ran in a nested function. Moving a condition
+    // containing a potentially zero-argument `super` call into one would make it use the
+    // comprehension's implicit `.0` iterator argument and raise a `TypeError` at runtime.
+    if checker.target_version() < PythonVersion::PY312
+        && if_test.is_some_and(|test| contains_potentially_zero_argument_super_call(checker, test))
+    {
+        return;
+    }
 
     // If any references to a target variable are after the loop,
     // then removing the loop would cause a NameError. Make sure none

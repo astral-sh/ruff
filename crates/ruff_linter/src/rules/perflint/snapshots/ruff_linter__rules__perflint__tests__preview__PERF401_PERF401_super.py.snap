@@ -1,0 +1,106 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:45:13
+   |
+43 |         result = []
+44 |         for value in super().values():
+45 |             result.append(value + 1)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+46 |
+47 |     def extend_iterable(self):
+   |
+help: Replace for loop with list comprehension
+   |
+42 |     def iterable(self):
+   -         result = []
+   -         for value in super().values():
+   -             result.append(value + 1)
+43 +         result = [value + 1 for value in super().values()]
+44 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use `list.extend` to create a transformed list
+  --> PERF401_super.py:50:13
+   |
+48 |         result = [0]
+49 |         for value in super().values():
+50 |             result.append(value + 1)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+51 |
+52 |     def explicit(self):
+   |
+help: Replace for loop with list.extend
+   |
+48 |         result = [0]
+   -         for value in super().values():
+   -             result.append(value + 1)
+49 +         result.extend(value + 1 for value in super().values())
+50 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:55:13
+   |
+53 |         result = []
+54 |         for _ in range(1):
+55 |             result.append(super(Child, self).value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |
+57 |     def shadowed(self):
+   |
+help: Replace for loop with list comprehension
+   |
+52 |     def explicit(self):
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(super(Child, self).value())
+53 +         result = [super(Child, self).value() for _ in range(1)]
+54 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:61:13
+   |
+59 |         result = []
+60 |         for _ in range(1):
+61 |             result.append(super())
+   |             ^^^^^^^^^^^^^^^^^^^^^^
+62 |
+63 |     def starred(self):
+   |
+help: Replace for loop with list comprehension
+   |
+58 |         super = lambda: 1
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(super())
+59 +         result = [super() for _ in range(1)]
+60 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+  --> PERF401_super.py:76:13
+   |
+74 |         result = []
+75 |         for _ in range(1):
+76 |             result.append(lambda instance: super().value())
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+77 |
+78 |     def lambda_default(self):
+   |
+help: Replace for loop with list comprehension
+   |
+73 |     def lambda_body(self):
+   -         result = []
+   -         for _ in range(1):
+   -             result.append(lambda instance: super().value())
+74 +         result = [lambda instance: super().value() for _ in range(1)]
+75 |
+   |
+note: This is an unsafe fix and may change runtime behavior

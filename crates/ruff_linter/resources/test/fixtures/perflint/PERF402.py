@@ -50,3 +50,16 @@ def f():
     result = []
     async for i in items:
         result.append(i)  # PERF402
+
+
+class Parent:
+    def items(self):
+        return [1, 2, 3, 4]
+
+
+class Child(Parent):
+    def f(self):
+        result = []
+        # PERF402 remains valid because `list(super().items())` evaluates `super()` in this method.
+        for item in super().items():
+            result.append(item)  # PERF402

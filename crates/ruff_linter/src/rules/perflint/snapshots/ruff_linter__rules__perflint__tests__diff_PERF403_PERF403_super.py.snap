@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.11
++linter.unresolved_target_version = 3.12
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super.py:14:17
+   |
+12 |         for key, value in pairs:
+13 |             if super().condition():
+14 |                 result[key] = value
+   |                 ^^^^^^^^^^^^^^^^^^^
+15 |
+16 |     def update(self, pairs):
+   |
+help: Replace for loop with dict comprehension
+   |
+10 |     def condition_in_comprehension(self, pairs):
+   -         result = {}
+   -         for key, value in pairs:
+   -             if super().condition():
+   -                 result[key] = value
+11 +         result = {key: value for key, value in pairs if super().condition()}
+12 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+PERF403 [*] Use `dict.update` instead of a for-loop
+  --> PERF403_super.py:20:17
+   |
+18 |         for key, value in pairs:
+19 |             if super().condition():
+20 |                 result[key] = value
+   |                 ^^^^^^^^^^^^^^^^^^^
+21 |
+22 |     def iterable(self):
+   |
+help: Replace for loop with `dict.update`
+   |
+17 |         result = {"existing": 0}
+   -         for key, value in pairs:
+   -             if super().condition():
+   -                 result[key] = value
+18 +         result.update({key: value for key, value in pairs if super().condition()})
+19 |
+   |
+note: This is an unsafe fix and may change runtime behavior
