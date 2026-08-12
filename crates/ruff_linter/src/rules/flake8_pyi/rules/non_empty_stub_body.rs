@@ -40,11 +40,11 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ```
 ///
 /// ## See also
-/// Statements that are already empty are left to the rules that own them: `pass` to
-/// [`pass-statement-stub-body` (`PYI009`)][PYI009] and docstrings to
-/// [`docstring-in-stub` (`PYI021`)][PYI021]. A body holding several such empty statements
-/// is left to [`stub-body-multiple-statements` (`PYI048`)][PYI048] and
-/// [`unnecessary-placeholder` (`PIE790`)][PIE790].
+/// Statements that are already empty are left to the rules that handle them:
+/// - `pass` vs `...`: [`pass-statement-stub-body` (`PYI009`)][PYI009]
+/// - Docstrings in stubs: [`docstring-in-stub` (`PYI021`)][PYI021]
+/// - Multiple empty statements: [`stub-body-multiple-statements` (`PYI048`)][PYI048]
+///   and [`unnecessary-placeholder` (`PIE790`)][PIE790]
 ///
 /// ## Fix safety
 /// The fix removes each offending statement whole, including any comment nested inside it,
@@ -165,7 +165,7 @@ pub(crate) fn non_empty_stub_body(checker: &Checker, body: &[Stmt]) {
 }
 
 /// Returns `true` if the statement is one that a stub body may keep: `...`, `pass`, or a
-/// docstring. See the "See also" section of [`NonEmptyStubBody`] for the rules that own the
+/// docstring. See the "See also" section of [`NonEmptyStubBody`] for the rules that handle the
 /// latter two.
 ///
 /// Only the first statement can be a docstring, hence `is_first`; a later string is dead
