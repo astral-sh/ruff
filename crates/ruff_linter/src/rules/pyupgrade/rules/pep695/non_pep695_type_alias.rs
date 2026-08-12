@@ -14,6 +14,7 @@ use ruff_python_ast::PythonVersion;
 
 use super::{
     DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
+    non_default_follows_default,
 };
 
 /// ## What it does
@@ -263,6 +264,10 @@ fn create_diagnostic(
         || !is_type_var_default_enabled(checker.settings()))
         && type_vars.iter().any(|type_var| type_var.default.is_some())
     {
+        return;
+    }
+
+    if non_default_follows_default(type_vars) {
         return;
     }
 

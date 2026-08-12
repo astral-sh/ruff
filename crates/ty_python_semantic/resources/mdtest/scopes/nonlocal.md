@@ -495,7 +495,7 @@ def _(maybe_float: float | None, certain_int: int, flag: bool) -> None:
         if flag:
             x = certain_int
         assert x is not None
-        reveal_type(x)  # revealed: int | float
+        reveal_type(x)  # revealed: float
         +x
 ```
 

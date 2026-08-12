@@ -392,14 +392,18 @@ where
             Expr::Call(ast::ExprCall {
                 func: call_func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
+                // Note that this is the evaluation order but not necessarily the declaration order
+                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
                 any_over_expr(call_func, &mut *func)
-                    // Note that this is the evaluation order but not necessarily the declaration order
-                    // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                    || arguments.args.iter().any(|expr| any_over_expr(expr, &mut *func))
-                    || arguments.keywords
+                    || arguments
+                        .args
+                        .iter()
+                        .any(|expr| any_over_expr(expr, &mut *func))
+                    || arguments
+                        .keywords
                         .iter()
                         .any(|keyword| any_over_expr(&keyword.value, &mut *func))
             }
@@ -806,7 +810,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 
 /// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
-pub const fn is_singleton(expr: &Expr) -> bool {
+const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)

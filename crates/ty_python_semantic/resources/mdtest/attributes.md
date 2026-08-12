@@ -259,6 +259,9 @@ reveal_type(c_instance.b)  # revealed: int
 
 #### Augmented assignments
 
+An augmented assignment contributes its result to the inferred type of an unannotated instance
+attribute.
+
 ```py
 class Weird:
     def __iadd__(self, other: None) -> str:
@@ -269,9 +272,8 @@ class C:
         self.w = Weird()
         self.w += None
 
-# TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Weird
+# TODO: Infer only `str`, since the initial `Weird` value has been overwritten.
+reveal_type(C().w)  # revealed: Weird | str
 ```
 
 #### Nested augmented assignments after narrowing
@@ -1898,7 +1900,6 @@ error[unresolved-reference]: Name `x` used when not defined
   |
 5 |         y = x  # snapshot
   |             ^
-  |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -1916,7 +1917,6 @@ error[unresolved-reference]: Name `x` used when not defined
    |
 10 |         y = x  # snapshot
    |             ^
-   |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -2708,6 +2708,51 @@ accessed on the class itself:
 CustomGetAttr.whatever
 ```
 
+### Invalid `__getattr__` calls
+
+If `__getattr__` cannot accept the attribute name that Python passes to it, the access is invalid.
+The method's return type remains available for error recovery, while defined attributes do not
+invoke the fallback.
+
+```py
+class InvalidGetAttr:
+    defined: bool = True
+
+    def __getattr__(self) -> str:
+        return "fallback"
+
+InvalidGetAttr().missing  # snapshot: invalid-attribute-access
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidGetAttr`"
+reveal_type(InvalidGetAttr().missing)  # revealed: str
+reveal_type(InvalidGetAttr().defined)  # revealed: bool
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `InvalidGetAttr`
+ --> src/mdtest_snippet.py:7:1
+  |
+7 | InvalidGetAttr().missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttr.__getattr__`: expected 1, got 2
+info: This access implicitly calls `__getattr__`
+info: Method signature here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __getattr__(self) -> str:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+An incompatible type for the attribute name is also an invalid fallback call.
+
+```py
+class InvalidNameType:
+    def __getattr__(self, name: int) -> bytes:
+        return b"fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidNameType`"
+reveal_type(InvalidNameType().missing)  # revealed: bytes
+```
+
 ### Type of the `name` parameter
 
 If the `name` parameter of the `__getattr__` method is annotated with a (union of) literal type(s),
@@ -2726,8 +2771,8 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
-reveal_type(date.century)  # revealed: Unknown
+# error: [invalid-attribute-access] "Invalid access to attribute `century` on type `Date`"
+reveal_type(date.century)  # revealed: int
 ```
 
 ### `argparse.Namespace`
@@ -2742,6 +2787,8 @@ def _(ns: argparse.Namespace):
 ```
 
 ## Classes with custom `__getattribute__` methods
+
+### Basic
 
 If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
 attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
@@ -2801,6 +2848,113 @@ class ThisFails:
 ThisFails().x
 ```
 
+### Invalid `__getattribute__` calls
+
+An invalid `__getattribute__` call fails before Python can look up either a defined or missing
+attribute. A defined member retains its declared type, while a missing member uses the method's
+return type for error recovery.
+
+```py
+class InvalidGetAttribute:
+    defined: bool = True
+
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> str:
+        return "fallback"
+
+InvalidGetAttribute().missing  # snapshot: invalid-attribute-access
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidGetAttribute`"
+reveal_type(InvalidGetAttribute().missing)  # revealed: str
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `InvalidGetAttribute`"
+reveal_type(InvalidGetAttribute().defined)  # revealed: bool
+
+# error: [invalid-attribute-access] "Invalid access to attribute `__getattribute__` on type `InvalidGetAttribute`"
+InvalidGetAttribute().__getattribute__
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `InvalidGetAttribute`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | InvalidGetAttribute().missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttribute.__getattribute__`: expected 1, got 2
+info: This access implicitly calls `__getattribute__`
+info: Method signature here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __getattribute__(self) -> str:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+An incompatible type for the attribute name also makes the implicit call invalid.
+
+```py
+class InvalidNameType:
+    # error: [invalid-method-override]
+    def __getattribute__(self, name: int) -> bytes:
+        return b"fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidNameType`"
+reveal_type(InvalidNameType().missing)  # revealed: bytes
+```
+
+### Inherited invalid `__getattribute__` calls
+
+An invalid interceptor inherited from a base class also prevents access to attributes declared on
+the subclass.
+
+```py
+class InvalidBase:
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> int:
+        return 1
+
+class Child(InvalidBase):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `Child`"
+reveal_type(Child().defined)  # revealed: str
+```
+
+### Invalid `__getattribute__` installed by a metaclass
+
+A metaclass can install an invalid interceptor in the namespace of each class it creates.
+
+```py
+def invalid_getattribute(self) -> int:
+    return 1
+
+class Meta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        # error: [invalid-assignment]
+        cls.__getattribute__ = invalid_getattribute
+
+class Example(metaclass=Meta):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `Example`"
+reveal_type(Example().defined)  # revealed: str
+```
+
+### Invalid `__getattribute__` takes precedence over `__getattr__`
+
+An invalid `__getattribute__` raises before Python can call an otherwise valid `__getattr__` method.
+
+```py
+class CustomAccess:
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> int:
+        return 1
+
+    def __getattr__(self, name: str) -> str:
+        return "fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `CustomAccess`"
+reveal_type(CustomAccess().missing)  # revealed: int
+```
+
 ## Metaclasses with custom `__getattr__` methods
 
 A class is an instance of its metaclass. When attribute lookup on a class fails, Python falls back
@@ -2817,6 +2971,22 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Invalid `__getattr__` calls
+
+Invalid metaclass `__getattr__` calls are reported on class attribute access while preserving the
+method's return type for error recovery.
+
+```py
+class Meta(type):
+    def __getattr__(cls) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<class 'Foo'>`"
+reveal_type(Foo.missing)  # revealed: int
 ```
 
 ### Class attributes take precedence
@@ -2909,6 +3079,50 @@ class Foo(metaclass=Meta): ...
 reveal_type(Foo.whatever)  # revealed: int
 ```
 
+### Invalid `__getattribute__` calls
+
+A malformed metaclass `__getattribute__` prevents access to both defined and missing class
+attributes. Their original types remain available for error recovery.
+
+```py
+class Meta(type):
+    # error: [invalid-method-override]
+    def __getattribute__(cls) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<class 'Foo'>`"
+reveal_type(Foo.missing)  # revealed: int
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `<class 'Foo'>`"
+reveal_type(Foo.defined)  # revealed: str
+
+# error: [invalid-attribute-access] "Invalid access to attribute `__getattribute__` on type `<class 'Foo'>`"
+Foo.__getattribute__
+```
+
+### Inherited invalid `__getattribute__` calls
+
+A malformed interceptor inherited by a metaclass still runs before looking up attributes declared on
+the class object.
+
+```py
+class InvalidBaseMeta(type):
+    # error: [invalid-method-override]
+    def __getattribute__(cls) -> int:
+        return 1
+
+class Meta(InvalidBaseMeta): ...
+
+class Foo(metaclass=Meta):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `<class 'Foo'>`"
+reveal_type(Foo.defined)  # revealed: str
+```
+
 ### Class attributes take precedence
 
 ```py
@@ -2996,7 +3210,7 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
   |
 5 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
-  |
+info: Argument to bound method `C.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
 info: Method defined here
@@ -3004,7 +3218,6 @@ info: Method defined here
   |
 2 |     def __setattr__(self, name: str, value: tuple[int, str]): ...
   |         ^^^^^^^^^^^                  ---------------------- Parameter declared here
-  |
 ```
 
 ### Overloaded `__setattr__`
@@ -3029,7 +3242,6 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
    |
 11 | d.x = (1, b"")  # snapshot: invalid-assignment
    | ^^^ No overload of bound method `D.__setattr__` matches arguments
-   |
 info: This assignment implicitly calls a custom `__setattr__` method
 info: First overload defined here
  --> src/mdtest_snippet.py:4:5
@@ -3037,7 +3249,6 @@ info: First overload defined here
 4 | /     @overload
 5 | |     def __setattr__(self, name: str, value: tuple[int, str]): ...
   | |_________________________________________________________________^ First overload defined here
-  |
 info: Possible overloads for bound method `__setattr__`:
 info:   (self, name: str, value: tuple[int, str]) -> Unknown
 info:   (self, name: str, value: int) -> Unknown
@@ -3046,7 +3257,6 @@ info: Overload implementation defined here
   |
 8 |     def __setattr__(self, name: str, value: tuple[int, str] | int): ...
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ### Type of the `name` parameter
@@ -3079,14 +3289,13 @@ error[invalid-assignment]: Cannot assign object of type `Literal["May"]` to attr
    |
 13 | date.month = "May"  # snapshot: invalid-assignment
    |              ^^^^^ Expected `int`, found `Literal["May"]`
-   |
+info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
   |         ^^^^^^^^^^^                                              ---------- Parameter declared here
-  |
 
 
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
@@ -3094,14 +3303,13 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
    |
 16 | date.tz = "UTC"
    | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
-   |
+info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
   |         ^^^^^^^^^^^       ------------------------------------- Parameter declared here
-  |
 
 
 error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date`
@@ -3109,14 +3317,13 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
    |
 16 | date.tz = "UTC"
    |           ^^^^^ Expected `int`, found `Literal["UTC"]`
-   |
+info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
   |         ^^^^^^^^^^^                                              ---------- Parameter declared here
-  |
 ```
 
 ### Return type of `__setattr__`
@@ -4030,8 +4237,8 @@ reveal_type(C.a_int)  # revealed: int
 reveal_type(C.a_str)  # revealed: str
 reveal_type(C.a_bytes)  # revealed: bytes
 reveal_type(C.a_bool)  # revealed: bool
-reveal_type(C.a_float)  # revealed: int | float
-reveal_type(C.a_complex)  # revealed: int | float | complex
+reveal_type(C.a_float)  # revealed: float
+reveal_type(C.a_complex)  # revealed: complex
 reveal_type(C.a_tuple)  # revealed: tuple[int]
 reveal_type(C.a_range)  # revealed: range
 # TODO: revealed: slice[Any, Literal[1], Any]
@@ -4230,7 +4437,6 @@ error[unresolved-attribute]: Module `datetime` has no member `UTC`
   |
 4 | reveal_type(datetime.UTC)  # revealed: Unknown
   |             ^^^^^^^^^^^^
-  |
 info: The member may be available on other Python versions or platforms
 info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 ```
@@ -4252,7 +4458,6 @@ error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
   |
 4 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
   |             ^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## Unimported submodule incorrectly accessed as attribute
@@ -4289,7 +4494,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(foo.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `foo.bar`
 ```
 
@@ -4308,7 +4512,6 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(baz.bar)  # revealed: Unknown
   |             ^^^^^^^
-  |
 help: Consider explicitly importing `baz.bar`
 ```
 
@@ -4334,7 +4537,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__n
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^
-  |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
@@ -4350,7 +4552,6 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__a
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^^^^^
-  |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```

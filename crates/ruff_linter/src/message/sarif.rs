@@ -21,12 +21,12 @@ use crate::registry::{Linter, RuleNamespace};
 /// Static Analysis Results Interchange Format (SARIF) is a standard format
 /// for static analysis results. For full specification, see:
 /// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
-pub struct SarifEmitter<'a> {
+pub(crate) struct SarifEmitter<'a> {
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> SarifEmitter<'a> {
-    pub fn new(config: &'a DisplayDiagnosticConfig) -> Self {
+    pub(crate) fn new(config: &'a DisplayDiagnosticConfig) -> Self {
         Self { config }
     }
 }
@@ -194,7 +194,11 @@ impl Serialize for RuleCode<'_> {
 impl<'a> RuleCode<'a> {
     fn from_diagnostic(code: &'a Diagnostic, config: &'a DisplayDiagnosticConfig) -> Self {
         match code.secondary_code() {
-            Some(diagnostic) if !config.preview_enabled() => Self::SecondaryCode(diagnostic),
+            Some(diagnostic)
+                if !config.preview_enabled() || config.is_prefer_rule_codes_enabled() =>
+            {
+                Self::SecondaryCode(diagnostic)
+            }
             _ => Self::LintId(code.id().as_str()),
         }
     }

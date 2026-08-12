@@ -67,6 +67,117 @@ def f() -> list[Literal[1]]:
     return [1]
 ```
 
+## Loop-carried assignment context
+
+A declaration inside a loop provides context to assignments that reach it from an earlier iteration.
+
+### While loops
+
+A declaration inside a `while` loop applies to list literals assigned in each iteration.
+
+```py
+while True:
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### For loops
+
+The same declaration context applies to assignments in a `for` loop.
+
+```py
+for _ in range(2):
+    values: list[object]
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### Nested dictionary values
+
+A declaration inside a loop also provides context for values nested within a dictionary literal.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    values: list[float]
+
+while True:
+    record: Record
+    record = {"values": [1]}
+    reveal_type(record)  # revealed: Record
+```
+
+### Invalid dictionary values
+
+An incompatible dictionary item is reported at the assignment, not at the declaration.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    value: int
+
+while True:
+    record: Record
+    record = {"value": "invalid"}  # error: [invalid-argument-type]
+    reveal_type(record)  # revealed: Record
+```
+
+### Stringified annotations
+
+String annotations provide their resolved type when a loop-carried assignment needs context.
+
+```py
+while True:
+    values: "list[object]"
+    values = [1]
+    reveal_type(values)  # revealed: list[object]
+```
+
+### Deferred forward references
+
+Deferred annotations resolve a `TypedDict` defined after the loop before inferring its dictionary
+assignments.
+
+```py
+from __future__ import annotations
+from typing import TypedDict
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    reveal_type(record)  # revealed: Record
+
+    invalid: Record
+    invalid = {"value": "invalid"}  # error: [invalid-argument-type]
+
+class Record(TypedDict):
+    value: int
+```
+
+### Deferred forward references on Python 3.14
+
+Annotations are deferred by default in Python 3.14 and later.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypedDict
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    reveal_type(record)  # revealed: Record
+
+class Record(TypedDict):
+    value: int
+```
+
 ## Collection literals
 
 ### Basic
@@ -135,6 +246,95 @@ s = {1: 1, 2: 2, 3: 3}
 reveal_type(s)  # revealed: dict[int | str, int | str]
 (s := {1: 1, 2: 2, 3: 3})
 reveal_type(s)  # revealed: dict[int | str, int | str]
+```
+
+### Exact float types in covariant contexts
+
+A covariant collection context must preserve an exact float when numeric promotion would introduce
+an `int` that the expected element type rejects.
+
+```py
+from collections.abc import Iterable, Sequence
+from ty_extensions import JustFloat
+
+def takes_exact_sequence(values: Sequence[JustFloat]) -> None: ...
+def takes_exact_iterable(values: Iterable[JustFloat]) -> None: ...
+def takes_exact_list(values: list[JustFloat]) -> None: ...
+
+takes_exact_sequence([1.0])
+takes_exact_sequence((1.0,))
+takes_exact_sequence([1])  # error: [invalid-argument-type]
+
+takes_exact_iterable([1.0])
+takes_exact_iterable((1.0,))
+takes_exact_iterable([1])  # error: [invalid-argument-type]
+
+takes_exact_list([1.0])
+
+annotated: list[JustFloat] = [1.0]
+takes_exact_sequence(annotated)
+```
+
+Ordinary `float` contexts and unannotated mutable lists must retain numeric promotion.
+
+```py
+def takes_float_sequence(values: Sequence[float]) -> None: ...
+
+takes_float_sequence([1.0])
+takes_float_sequence([1])
+
+mutable_floats = [1.0]
+mutable_floats.append(1)
+reveal_type(mutable_floats)  # revealed: list[float]
+```
+
+### Exact complex types in covariant contexts
+
+The same contextual restriction applies when promoting an exact complex number would introduce `int`
+and `float`.
+
+```py
+from collections.abc import Sequence
+from ty_extensions import JustComplex
+
+def takes_exact_complexes(values: Sequence[JustComplex]) -> None: ...
+
+takes_exact_complexes([1j])
+takes_exact_complexes((1j,))
+takes_exact_complexes([1])  # error: [invalid-argument-type]
+takes_exact_complexes([1.0])  # error: [invalid-argument-type]
+```
+
+### Exact-type protocols in covariant contexts
+
+A writable `__class__` property allows an invariant protocol to distinguish a runtime float from an
+integer. A covariant sequence of a union containing this protocol must preserve that distinction.
+
+```py
+from collections.abc import Sequence
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Just(Protocol, Generic[T]):
+    @property
+    def __class__(self, /) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T], /) -> None: ...
+
+def takes_exact_float(value: Just[float]) -> None: ...
+def takes_exact_values(values: Sequence[str | Just[float]]) -> None: ...
+
+takes_exact_float(1.0)
+takes_exact_float(1)  # error: [invalid-argument-type]
+
+takes_exact_values(["1", 1.0])
+takes_exact_values(["1", float("nan")])
+takes_exact_values(("1", 1.0))
+takes_exact_values(["1", 1])  # error: [invalid-argument-type]
+
+annotated: list[str | Just[float]] = ["1", 1.0]
+takes_exact_values(annotated)
 ```
 
 ### Optional unions
@@ -1582,11 +1782,10 @@ reveal_type(f7)  # revealed: (*args) -> None
 f8: Callable[[int], None] = lambda *, x=1: None
 reveal_type(f8)  # revealed: (int, /) -> None
 
-# `Callable` annotations only describe positional parameters, so the keyword-only `x` is not
-# compatible with the positional suffix in the annotation.
-# error: [invalid-assignment]
+# An optional keyword-only parameter does not prevent `*args` from accepting the positional
+# suffix in a `Callable` annotation.
 f9: Callable[[*tuple[int, ...], int], None] = lambda *args, x=1: None
-reveal_type(f9)  # revealed: (*tuple[int, ...], int) -> None
+reveal_type(f9)  # revealed: (*args, *, x=1) -> None
 
 f10: Callable[[str, int, str], tuple[str, int, str]] = lambda x, y, z: reveal_type((x, y, z))  # revealed: tuple[str, int, str]
 reveal_type(f10)  # revealed: (x: str, y: int, z: str) -> tuple[str, int, str]
@@ -1818,7 +2017,7 @@ def overloaded_call(data: object, dtype: object) -> object:
 
 def _(dtype: FloatDtype):
     x = overloaded_call([1.0], dtype)
-    reveal_type(x)  # revealed: int | float
+    reveal_type(x)  # revealed: float
 ```
 
 ```py
@@ -2190,7 +2389,7 @@ def _() -> int:
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]
-reveal_type(x7)  # revealed: list[int | str | float]
+reveal_type(x7)  # revealed: list[float | str]
 ```
 
 ```py
@@ -2327,7 +2526,7 @@ x23 = [None, None, None]
 x23[0] = 1
 x23[1] = "2"
 x23[2] = 3.0
-reveal_type(x23)  # revealed: list[int | str | float | None]
+reveal_type(x23)  # revealed: list[float | str | None]
 ```
 
 ```py

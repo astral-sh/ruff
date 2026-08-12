@@ -346,7 +346,6 @@ F541 [*] f-string without any placeholders
 43 | f"{v:{f"0.2f"}}"
 44 | f"\{{x}}"
    | ^^^^^^^^^
-   |
 help: Remove extraneous `f` prefix
    |
 43 | f"{v:{f"0.2f"}}"

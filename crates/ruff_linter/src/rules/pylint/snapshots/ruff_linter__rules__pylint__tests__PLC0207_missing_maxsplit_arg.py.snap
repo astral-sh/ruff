@@ -621,7 +621,6 @@ PLC0207 [*] String is split more times than necessary
 62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
 63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
    | ^^^^^^^^^^^^^^^^^
-   |
 help: Pass `maxsplit=1` into `str.split()`
    |
 62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
@@ -637,7 +636,6 @@ PLC0207 [*] String is split more times than necessary
 62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
 63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Pass `maxsplit=1` into `str.split()`
    |
 62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
@@ -653,7 +651,6 @@ PLC0207 [*] String is split more times than necessary
 62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
 63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `str.rsplit()` and pass `maxsplit=1`
    |
 62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
@@ -707,7 +704,6 @@ PLC0207 [*] String is split more times than necessary
 188 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 189 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Pass `maxsplit=1` into `str.split()`
     |
 188 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
@@ -743,7 +739,6 @@ PLC0207 [*] String is split more times than necessary
 198 | args_list = [-1]
 199 | "1,2,3".split(",", *args_list)[0]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Pass `maxsplit=1` into `str.split()`
     |
 198 | args_list = [-1]

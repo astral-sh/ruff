@@ -168,7 +168,6 @@ C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16 | saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Rewrite as a dict comprehension
    |
 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087

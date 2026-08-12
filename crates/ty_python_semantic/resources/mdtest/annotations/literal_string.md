@@ -46,7 +46,6 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |
 4 | a: LiteralString[str]
   |    ^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ```py
@@ -62,7 +61,6 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |    -------------^^^^^^^
   |    |
   |    Did you mean `Literal`?
-  |
 ```
 
 ### As a base class

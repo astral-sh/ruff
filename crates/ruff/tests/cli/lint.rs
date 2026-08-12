@@ -4273,6 +4273,31 @@ class Foo:
     );
 }
 
+#[test]
+fn prefer_rule_codes_in_output() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args([
+                "--preview",
+                "--config",
+                "output-prefer-rule-codes = true",
+                "--select=A001",
+                "-",
+            ])
+            .pass_stdin("print = 1\n"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: A001 Variable `print` is shadowing a Python builtin
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
+}
+
 #[test_case::test_case("concise")]
 #[test_case::test_case("full")]
 #[test_case::test_case("json")]
@@ -4397,6 +4422,54 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
     Ok(())
 }
 
+/// Rule codes in `--statistics` output link to the rule documentation, as they do in the concise
+/// and full output formats.
+#[test]
+fn statistics_hyperlinks() -> Result<()> {
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // Spell out the hyperlink escapes to keep the snapshot readable, filtering them before
+        // the fixture rewrites the backslash in their `ESC \` terminators. The colors are absent
+        // because test builds enable `colored`'s `no-color` feature; the last filter only keeps
+        // stray escapes out of the snapshot if that ever changes.
+        settings.add_filter(r"\x1b\]8;;(.+?)\x1b\\", "<link ${1}>");
+        settings.add_filter(r"\x1b\]8;;\x1b\\", "</link>");
+        settings.add_filter(r"\x1b", "<ESC>");
+        settings
+    })?;
+    fixture.write_file("input.py", "import os as os, math")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .command()
+            .args([
+                "check",
+                "--no-cache",
+                "--select",
+                "F401,PLC0414",
+                "--statistics",
+                "--color",
+                "always",
+                "input.py",
+            ])
+            // Hyperlink support is otherwise detected from the terminal, which varies between
+            // local runs and CI.
+            .env("FORCE_HYPERLINK", "1"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	<link https://docs.astral.sh/ruff/rules/unused-import>F401</link>   	[*] unused-import
+    1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    ",
+    );
+
+    Ok(())
+}
+
 #[test]
 fn show_fixes_preview() -> Result<()> {
     let fixture = CliTest::with_file("input.py", "import os  # F401")?;
@@ -4475,7 +4548,6 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |
     1 | import math
       |        ^^^^
-      |
     help: Remove unused import: `math`
       |
       - import math
@@ -5195,7 +5267,6 @@ fn ruff_toml_is_linted() -> Result<()> {
       |
     1 | lint.select = ["F401"]
       |                 ^^^^
-      |
     help: Replace rule code with `unused-import`
       |
       - lint.select = ["F401"]

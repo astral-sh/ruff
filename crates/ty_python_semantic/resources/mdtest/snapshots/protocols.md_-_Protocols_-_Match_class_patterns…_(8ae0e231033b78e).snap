@@ -52,13 +52,11 @@ error[isinstance-against-protocol]: Class `HasX` cannot be used in a class patte
    |
 12 |         case HasX():  # error: [isinstance-against-protocol]
    |              ^^^^ This will raise `TypeError` at runtime
-   |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
  --> src/mdtest_snippet.py:3:7
   |
 3 | class HasX(Protocol):
   |       ^^^^^^^^^^^^^^ `HasX` declared here
-  |
 info: A protocol class can only be used in a match class pattern if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
 
@@ -70,13 +68,11 @@ error[isinstance-against-protocol]: Class `HasX` cannot be used in a class patte
    |
 28 |         case Wrapper(inner=HasX()):  # error: [isinstance-against-protocol]
    |                            ^^^^ This will raise `TypeError` at runtime
-   |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
  --> src/mdtest_snippet.py:3:7
   |
 3 | class HasX(Protocol):
   |       ^^^^^^^^^^^^^^ `HasX` declared here
-  |
 info: A protocol class can only be used in a match class pattern if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
 

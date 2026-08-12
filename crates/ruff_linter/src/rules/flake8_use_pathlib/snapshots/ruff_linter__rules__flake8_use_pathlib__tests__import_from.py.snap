@@ -314,7 +314,6 @@ PTH123 `open()` should be replaced by `Path.open()`
 35 |     fp.read()
 36 | open(p).close()
    | ^^^^
-   |
 help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
@@ -324,7 +323,6 @@ PTH123 `open()` should be replaced by `Path.open()`
 42 |
 43 |     with open(p) as _: ...  # Error
    |          ^^^^
-   |
 help: Replace with `Path.open()`
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`

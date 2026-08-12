@@ -8,7 +8,6 @@ C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
 6 |     list = ...
 7 |     list(map(lambda x: x, []))
   |          ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace `map()` with a generator expression
   |
 6 |     list = ...

@@ -87,7 +87,7 @@ def main() -> None:
 
     args = parser.parse_args()
     logging.basicConfig(
-        level=logging.INFO if args.verbose else logging.WARN,
+        level=logging.INFO if args.verbose else logging.WARNING,
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
@@ -165,15 +165,15 @@ def main() -> None:
                 continue
 
             if not first:
-                print("")
+                print()
                 print(
                     "-------------------------------------------------------------------------------"
                 )
-                print("")
+                print()
 
             print(f"{project.name}")
             print("-" * len(project.name))
-            print("")
+            print()
 
             if args.snapshot:
                 # Get the directory where run.py is located to find snapshots directory.

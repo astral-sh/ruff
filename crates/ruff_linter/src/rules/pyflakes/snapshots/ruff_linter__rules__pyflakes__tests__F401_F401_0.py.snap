@@ -107,7 +107,6 @@ F401 [*] `pickle` imported but unused
 51 |     def b(self) -> None:
 52 |         import pickle
    |                ^^^^^^
-   |
 help: Remove unused import: `pickle`
    |
 51 |     def b(self) -> None:
@@ -139,7 +138,6 @@ F401 [*] `y` imported but unused
 93 |         import x
 94 |         import y
    |                ^
-   |
 help: Remove unused import: `y`
    |
 93 |         import x
@@ -188,7 +186,6 @@ F401 [*] `a2` imported but unused
 106 |
 107 |     import a2
     |            ^^
-    |
 help: Remove unused import: `a2`
     |
 106 |
@@ -220,7 +217,6 @@ F401 [*] `b2` imported but unused
 113 |
 114 |         import b2
     |                ^^
-    |
 help: Remove unused import: `b2`
     |
 113 |
@@ -234,7 +230,6 @@ F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused
 121 | from datameta_client_lib.model_helpers import (
 122 | noqa )
     | ^^^^
-    |
 help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
     |
 120 |

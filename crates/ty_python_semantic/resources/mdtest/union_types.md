@@ -153,7 +153,7 @@ def _(
 ## Do not erase `Unknown`
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -166,7 +166,7 @@ Since `Unknown` is a gradual type, it is not a subtype of anything, but multiple
 union are still redundant:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknown | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -179,7 +179,7 @@ def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknow
 Simplifications still apply when `Unknown` is present.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: int | Unknown | bool) -> None:
     reveal_type(u1)  # revealed: int | Unknown
@@ -372,4 +372,44 @@ def _(
     reveal_type(f)  # revealed: Contravariant[Any]
     reveal_type(g)  # revealed: Invariant[Any] | Invariant[Any | str]
     reveal_type(h)  # revealed: Invariant[Any | str] | Invariant[Any]
+```
+
+A type alias does not make a gradual type argument static. Covariant unions simplify the same way
+whether the gradual argument is written directly or hidden behind one or more aliases.
+
+```py
+type GradualAlias = Any | str
+type NestedGradualAlias = GradualAlias
+
+def gradual_aliases(
+    direct_first: Covariant[Any] | Covariant[GradualAlias],
+    direct_last: Covariant[GradualAlias] | Covariant[Any],
+    nested_first: Covariant[Any] | Covariant[NestedGradualAlias],
+    nested_last: Covariant[NestedGradualAlias] | Covariant[Any],
+) -> None:
+    reveal_type(direct_first)  # revealed: Covariant[GradualAlias]
+    reveal_type(direct_last)  # revealed: Covariant[GradualAlias]
+    reveal_type(nested_first)  # revealed: Covariant[NestedGradualAlias]
+    reveal_type(nested_last)  # revealed: Covariant[NestedGradualAlias]
+```
+
+Matching materialization endpoints do not establish that gradual tuple arguments have the same
+shape. A bounded generic must preserve which tuple position contains the gradual element.
+
+```py
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type L = tuple[Any, int]
+type R = tuple[int, Any]
+
+class C[T: tuple[int, int]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Top[C[L]], Top[C[R]]))
+static_assert(is_equivalent_to(Bottom[C[L]], Bottom[C[R]]))
+static_assert(not is_equivalent_to(C[L], C[R]))
+static_assert(not is_equivalent_to(C[L] | C[R], C[L]))
+static_assert(not is_equivalent_to(C[R] | C[L], C[R]))
 ```

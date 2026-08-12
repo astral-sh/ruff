@@ -562,6 +562,13 @@
         }
       ]
     },
+    "output-prefer-rule-codes": {
+      "description": "Whether to prefer rule codes over human-readable rule names in diagnostic output, even\nwhen preview mode is enabled.\n\nDiagnostics without rule codes, such as syntax errors and formatting diagnostics, will\ncontinue to use the human-readable name, but those corresponding to lint rules will use the\nrule's code. For example, the concise diagnostic for an unused import will use the code\n`F401` instead of the name `unused-import`:\n\n```console\n$ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py\nexample.py:1:8: F401 [*] `math` imported but unused\n$ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py\nexample.py:1:8: unused-import: [*] `math` imported but unused\n```",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "pep8-naming": {
       "description": "Options for the `pep8-naming` plugin.",
       "anyOf": [
@@ -1254,7 +1261,7 @@
           "uniqueItems": true
         },
         "extend-aliases": {
-          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping\nand will override any existing `aliases` if the two settings overlap.",
           "type": [
             "object",
             "null"

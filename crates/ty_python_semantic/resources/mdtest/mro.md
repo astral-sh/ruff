@@ -227,8 +227,8 @@ guarantee:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown, Intersection
-from ty_extensions._internal import reveal_mro
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown, reveal_mro
 
 def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
     class Foo(x): ...

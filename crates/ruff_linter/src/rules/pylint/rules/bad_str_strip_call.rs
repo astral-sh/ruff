@@ -104,7 +104,7 @@ pub(crate) enum StripKind {
 }
 
 impl StripKind {
-    pub(crate) fn from_str(s: &str) -> Option<Self> {
+    fn from_str(s: &str) -> Option<Self> {
         match s {
             "strip" => Some(Self::Strip),
             "lstrip" => Some(Self::LStrip),
@@ -132,7 +132,7 @@ pub(crate) enum RemovalKind {
 }
 
 impl RemovalKind {
-    pub(crate) fn for_strip(s: StripKind) -> Option<Self> {
+    fn for_strip(s: StripKind) -> Option<Self> {
         match s {
             StripKind::Strip => None,
             StripKind::LStrip => Some(Self::RemovePrefix),

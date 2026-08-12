@@ -1,5 +1,5 @@
 use lsp_types::{SymbolKind, TypeHierarchyItem};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
 use crate::document::{ToRangeExt, resolve_file_uri_range};
@@ -33,6 +33,7 @@ pub(crate) fn hierarchy_handler(
         ) else {
             continue;
         };
+        let file = db.program_file(file);
         let hierarchy_types = match hierarchy_kind {
             TypeHierarchyKind::Subtypes => ty_ide::type_hierarchy_subtypes(db, file, offset),
             TypeHierarchyKind::Supertypes => ty_ide::type_hierarchy_supertypes(db, file, offset),

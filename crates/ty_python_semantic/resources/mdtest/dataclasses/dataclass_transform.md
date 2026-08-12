@@ -847,6 +847,30 @@ class NotOrderedWithOverrides:
         return False
 ```
 
+### Unrecognized parameters
+
+`dataclass_transform` rejects unrecognized parameters:
+
+```py
+from typing import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
+This also works for the variant from `typing_extensions`:
+
+```py
+from typing_extensions import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
 ## Other `dataclass` parameters
 
 Other parameters from normal dataclasses can also be set on models created using
@@ -1418,6 +1442,10 @@ class InvalidModel:
     x: int = 1
     y: str  # error: [dataclass-field-order]
 
+@create_model
+class InvalidInheritedModel(ValidModel):
+    z: bytes  # error: [dataclass-field-order]
+
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
     ...
@@ -1438,6 +1466,48 @@ class InvalidKWOnlyDefaultModel:
     x: int
     y: str = field(kw_only=False, default="default")
     z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+```
+
+### Keyword-only field specifiers before Python 3.10
+
+Although `dataclasses.field` does not support `kw_only` before Python 3.10, third-party field
+specifiers can support it on earlier Python versions. Inherited keyword-only fields must retain that
+setting so they do not participate in positional field ordering.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import Any, TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+
+def custom_field(*, default: Any = ..., kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(custom_field,))
+def custom_dataclass(cls: type[T]) -> type[T]:
+    return cls
+
+@custom_dataclass
+class Base:
+    optional: float = custom_field(default=1.0, kw_only=True)
+
+@custom_dataclass
+class Child(Base):
+    required: str
+
+reveal_type(Child.__init__)  # revealed: (self: Child, required: str, *, optional: float = ...) -> None
+
+Child("value")
+Child("value", optional=2.0)
+Child("value", 2.0)  # error: [too-many-positional-arguments]
+
+@custom_dataclass
+class InvalidChild(Base):
+    positional_default: str = custom_field(default="default", kw_only=False)
+    required: int  # error: [dataclass-field-order]
 ```
 
 ### For metaclass-based transformers
@@ -1562,6 +1632,28 @@ class TemperatureSensor(Sensor):
 t = TemperatureSensor(key=1, name="Temperature Sensor")
 reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
+```
+
+Dataclass-transform defaults remain attached to inherited fields even when a subclass is explicitly
+decorated with `@dataclass`.
+
+```py
+@dataclass_transform(kw_only_default=True)
+class KeywordOnlyModelMeta(type):
+    pass
+
+class RequiredModel(metaclass=KeywordOnlyModelMeta):
+    required: int
+
+class OptionalModel(metaclass=KeywordOnlyModelMeta):
+    optional: int = 1
+
+@dataclass(kw_only=True)
+class Child(RequiredModel, OptionalModel):
+    pass
+
+reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = 1, required: int) -> None
+Child(required=1)
 ```
 
 ## `__dataclass_fields__` and `DataclassInstance` protocol
@@ -2022,7 +2114,7 @@ WithClassConverter("1", "2.5")
 
 with_class_converter = WithClassConverter("1", "2.5")
 reveal_type(with_class_converter.a)  # revealed: PermissiveNumber
-reveal_type(with_class_converter.b)  # revealed: int | float
+reveal_type(with_class_converter.b)  # revealed: float
 
 with_class_converter.a = "2"
 with_class_converter.a = 1.5  # error: [invalid-assignment]

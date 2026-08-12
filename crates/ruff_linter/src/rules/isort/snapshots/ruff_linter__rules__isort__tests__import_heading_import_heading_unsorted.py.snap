@@ -12,7 +12,6 @@ I001 [*] Import block is un-sorted or un-formatted
 6 | | from my_first_party import my_first_party_object
 7 | | from . import my_local_folder_object
   | |____________________________________^
-  |
 help: Organize imports
    |
    - import pandas

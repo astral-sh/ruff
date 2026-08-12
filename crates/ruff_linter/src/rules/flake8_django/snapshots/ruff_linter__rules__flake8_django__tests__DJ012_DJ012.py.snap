@@ -8,7 +8,6 @@ DJ012 Order of model's inner classes, methods, and fields does not follow the Dj
 27 |
 28 |     first_name = models.CharField(max_length=32)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
   --> DJ012.py:43:5
@@ -17,7 +16,6 @@ DJ012 Order of model's inner classes, methods, and fields does not follow the Dj
 42 |
 43 |     first_name = models.CharField(max_length=32)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: Magic method should come before custom method
   --> DJ012.py:56:5
@@ -27,7 +25,6 @@ DJ012 Order of model's inner classes, methods, and fields does not follow the Dj
 56 | /     def __str__(self):
 57 | |         return "foobar"
    | |_______________________^
-   |
 
 DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
   --> DJ012.py:69:5
@@ -37,7 +34,6 @@ DJ012 Order of model's inner classes, methods, and fields does not follow the Dj
 69 | /     def save(self):
 70 | |         pass
    | |____________^
-   |
 
 DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
    --> DJ012.py:123:5
@@ -56,7 +52,6 @@ DJ012 Order of model's inner classes, methods, and fields does not follow the Dj
 128 |
 129 |     middle_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
    --> DJ012.py:146:5
@@ -65,4 +60,3 @@ DJ012 Order of model's inner classes, methods, and fields does not follow the Dj
 145 |
 146 |     first_name = models.CharField(max_length=32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |

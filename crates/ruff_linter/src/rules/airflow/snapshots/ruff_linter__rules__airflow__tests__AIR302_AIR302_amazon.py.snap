@@ -211,7 +211,6 @@ AIR302 [*] `airflow.operators.s3_to_redshift_operator.S3ToRedshiftTransfer` is m
 33 |
 34 | S3ToRedshiftTransfer()
    | ^^^^^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-amazon>=1.0.0` and use `S3ToRedshiftOperator` from `airflow.providers.amazon.aws.transfers.s3_to_redshift` instead.
    |
 32 | from airflow.operators.s3_to_redshift_operator import S3ToRedshiftTransfer

@@ -38,11 +38,11 @@ mod types;
 
 #[derive(Debug)]
 pub(crate) struct AnnotatedAliasData<'a> {
-    pub(crate) name: &'a str,
-    pub(crate) asname: Option<&'a str>,
-    pub(crate) atop: Vec<Comment<'a>>,
-    pub(crate) inline: Vec<Comment<'a>>,
-    pub(crate) trailing: Vec<Comment<'a>>,
+    name: &'a str,
+    asname: Option<&'a str>,
+    atop: Vec<Comment<'a>>,
+    inline: Vec<Comment<'a>>,
+    trailing: Vec<Comment<'a>>,
 }
 
 #[derive(Debug)]

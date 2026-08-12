@@ -150,4 +150,3 @@ PYI052 Need type annotation for `WIZ`
 113 | class Bop:
 114 |     WIZ = 4
     |           ^
-    |

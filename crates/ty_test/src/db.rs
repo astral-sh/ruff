@@ -14,12 +14,13 @@ use salsa::Setter as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
-use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
-use ty_python_core::Db as _;
-use ty_python_core::program::Program;
+use ty_module_resolver::ModuleGlobSetBuilder;
+use ty_python_core::program::ProgramSettings;
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
+    default_lint_registry,
 };
 
 #[salsa::db]
@@ -34,6 +35,8 @@ pub(crate) struct Db {
 
 impl Db {
     pub(crate) fn setup() -> Self {
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -41,17 +44,25 @@ impl Db {
                     tracing::trace!("event: {:?}", event);
                 }
             }))),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             files: Files::default(),
             settings: None,
         };
 
-        db.settings = Some(Settings::new(&db));
+        db.settings = Some(Settings::new(&db, program_settings));
         db
     }
 
     fn settings(&self) -> Settings {
         self.settings.unwrap()
+    }
+
+    pub(crate) fn update_program(&mut self, settings: ProgramSettings) {
+        let db_settings = self.settings();
+        if db_settings.program(self) != &settings {
+            settings.search_paths.try_register_static_roots(self);
+            db_settings.set_program(self).to(settings);
+        }
     }
 
     pub(crate) fn set_verbosity(&mut self, verbose: bool) {
@@ -110,18 +121,10 @@ impl SourceDb for Db {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for Db {
-    fn search_paths(&self) -> &SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for Db {}
 
 #[salsa::db]
 impl ty_python_core::Db for Db {
@@ -137,7 +140,15 @@ impl SemanticDb for Db {
             return Vec::new();
         }
 
-        check_file_unwrap(self, file)
+        check_file_unwrap(self, self.program_file(file))
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        self.program().program_file(self, file)
+    }
+
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.settings().program(self).python_version
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -162,6 +173,13 @@ impl SemanticDb for Db {
 
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
+    }
+}
+
+#[salsa::db]
+impl TestProgramDb for Db {
+    fn program_settings(&self) -> &ProgramSettings {
+        self.settings().program(self)
     }
 }
 
@@ -218,6 +236,8 @@ impl FileSettings {
 
 #[salsa::input(debug)]
 struct Settings {
+    #[returns(ref)]
+    program: ProgramSettings,
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
@@ -252,6 +272,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
     };
 
     let AnalysisSettings {
+        strict_generic_narrowing: strict_generic_narrowing_default,
         strict_equality_semantics: strict_equality_semantics_default,
         respect_type_ignore_comments: respect_type_ignore_comments_default,
         allowed_unresolved_imports: allowed_unresolved_imports_default,
@@ -285,6 +306,9 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         };
 
     AnalysisSettings {
+        strict_generic_narrowing: options
+            .strict_generic_narrowing
+            .unwrap_or(strict_generic_narrowing_default),
         strict_equality_semantics: options
             .strict_equality_semantics
             .unwrap_or(strict_equality_semantics_default),
@@ -297,26 +321,32 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
 }
 
 fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
+    // In general (as shown by the initialization of `selection` below), we enable even rules that
+    // are ignored by default in mdtests so that their behaviour is covered alongside the default
+    // rules. There are a few small exceptions to this, however:
+    static DISABLED_IN_MDTESTS: &[&str] = &[
+        // `missing-override-decorator` is an exception: because it is extremely pedantic we have
+        // chosen to keep it opt-in to minimize churn in unrelated tests.
+        "missing-override-decorator",
+        // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+        // negation types in our tests for better readability.
+        "experimental-syntax",
+        // The `unsound-*` rules are also exceptions because they are very strict, would
+        // result in lots of additional diagnostics in mdtests, and are not the default behaviour
+        // we'll show to our users.
+        "unsound-return-statement",
+        "unsound-yield",
+    ];
+
     let registry = default_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
-    // In general (as shown by the initialization of `selection` above), we enable even rules that
-    // are ignored by default in mdtests so that their behaviour is covered alongside the default
-    // rules.
-    //
-    // `missing-override-decorator` is an exception: because it is extremely pedantic we have
-    // chosen to keep it opt-in to minimize churn in unrelated tests.
-    let missing_override_decorator = registry
-        .get("missing-override-decorator")
-        .expect("missing-override-decorator is a known lint rule");
-    selection.disable(missing_override_decorator);
-
-    // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
-    // negation types in our tests for better readability.
-    let experimental_syntax = registry
-        .get("experimental-syntax")
-        .expect("experimental-syntax is a known lint rule");
-    selection.disable(experimental_syntax);
+    for rule in DISABLED_IN_MDTESTS {
+        let lint = registry
+            .get(rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{rule}`: {error}"));
+        selection.disable(lint);
+    }
 
     if let Some(rules) = rules {
         let set_lint_level =

@@ -506,8 +506,8 @@ An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ..
 
 ```py
 from typing_extensions import Any, assert_type
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
 

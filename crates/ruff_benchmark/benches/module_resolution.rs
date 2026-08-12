@@ -8,11 +8,11 @@ use divan::{Bencher, bench};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{Db as _, ProjectDatabase, ProjectMetadata};
 
 const SEEDED_TARGETS: &[&str] = &["target_0", "target_1", "target_2", "target_3", "target_4"];
 // Exercise stub-overlay discovery followed by normal fallback.
@@ -72,6 +72,10 @@ fn setup_case(n: usize) -> Case {
     });
 
     let db = ProjectDatabase::fallible(metadata, system).unwrap();
+
+    // Keep lazy program and resolver initialization out of the measured module-resolution queries.
+    let _ = db.project().program(&db).resolver_environment(&db);
+
     let importing_file = system_path_to_file(&db, &importing_path).unwrap();
 
     let resolves = SEEDED_TARGETS
@@ -93,8 +97,17 @@ fn ty_module_resolver<const PATHS: usize>(bencher: Bencher) {
     bencher
         .with_inputs(|| setup_case(PATHS))
         .bench_local_refs(|case| {
+            let environment = case
+                .db
+                .project()
+                .program(&case.db)
+                .resolver_environment(&case.db);
             for name in &case.resolves {
-                black_box(resolve_module(&case.db, case.importing_file, name));
+                black_box(resolve_module(
+                    &case.db,
+                    ImportingFile::File(case.importing_file, environment),
+                    name,
+                ));
             }
         });
 }

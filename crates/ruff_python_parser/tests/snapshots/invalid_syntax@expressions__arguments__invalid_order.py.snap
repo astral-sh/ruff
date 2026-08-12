@@ -343,4 +343,3 @@ Module(
 4 | call(**kwargs, *args)
 5 | call(**kwargs, (*args))
   |                 ^^^^^ Syntax Error: Starred expression cannot be used here
-  |

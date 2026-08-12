@@ -261,7 +261,6 @@ error[RUF100]: Unused suppression (unused: `F401`)
    |
 21 | import sys  # start # ruff:ignore[F401] # end
    |                     ^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unused suppression
    |
 20 | # snapshot: unused-noqa
@@ -337,7 +336,6 @@ error[RUF102]: Invalid rule code in suppression: unused-import
 4 | import math
 5 | # ruff:enable[unused-import]
   |               -------------
-  |
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
   |
@@ -370,7 +368,6 @@ error[RUF102]: Invalid rule code in suppression: unknown-rule, unused-import
  9 | import sys
 10 | # ruff:enable[unused-import, unknown-rule]
    | ------------------------------------------
-   |
 help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
@@ -445,7 +442,6 @@ error[RUF103]: Invalid suppression comment: no matching 'disable' comment
    |
 12 | # ruff:enable[F401]
    | ^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove suppression comment
    |
 11 | # snapshot: invalid-suppression-comment
@@ -485,7 +481,6 @@ error[RUF102]: Invalid rule code in suppression: not-a-rule
   |
 2 | # ruff:ignore[unused-import, not-a-rule]
   |                              ^^^^^^^^^^
-  |
 help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `not-a-rule`
   |
@@ -519,7 +514,6 @@ error[RUF100]: Unused suppression (unused: `unused-import`)
   |
 8 | import math  # ruff:ignore[unused-import]
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 7 | # snapshot: unused-noqa
@@ -544,7 +538,6 @@ error[RUF100]: Unused suppression (unused: `unused-import`)
    |
 12 | # ruff:ignore[F401, unused-import]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unused suppression
    |
 11 | # snapshot: unused-noqa
@@ -581,7 +574,6 @@ error[RUF103]: Invalid suppression comment: missing suppression codes like `[E50
   |
 4 | import sys  # explanation # ruff:ignore # another
   |                           ^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 3 | # error: [unused-import]
@@ -631,7 +623,6 @@ error[RUF103]: Invalid suppression comment: trailing comments are only supported
   |
 2 | # explanation # ruff:disable[F401]
   |               ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 1 | # snapshot: invalid-suppression-comment
@@ -708,7 +699,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
   |
 3 | # ruff:ignore[E501] # ruff:file-ignore[F821]
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 2 | # error: [invalid-suppression-comment]
@@ -743,7 +733,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
 10 | undefined_name
 11 | # ruff:enable[E501]
    | -------------------
-   |
 help: Remove unused suppression
    |
 7  | # error: [unused-noqa] "F821"
@@ -781,7 +770,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
 3 | value = 1
 4 | # ruff:enable[E501] # TODO # ruff:ignore[FIX002]
   | --------------------
-  |
 help: Remove unused suppression
   |
 1 | # snapshot: unused-noqa
@@ -816,7 +804,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
   |
 3 | # ruff:ignore[E501, F821] # ruff:file-ignore[F401]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 2 | # error: [invalid-suppression-comment]
@@ -849,7 +836,6 @@ error[RUF102]: Invalid rule code in suppression: XYZ
   |
 3 | # ruff:ignore[XYZ] # ruff:file-ignore[F821]
   |               ^^^
-  |
 help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
   |
@@ -885,7 +871,6 @@ error[RUF103]: Invalid suppression comment: trailing comments are only supported
   |
 4 |     # explanation # ruff:file-ignore[F401] # ruff:ignore[F401]
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 3 |     # error: [unused-noqa]
@@ -912,7 +897,6 @@ error[RUF103]: Invalid suppression comment: missing suppression codes like `[E50
   |
 9 | # explanation # ruff:ignore # ruff:ignore[F821]
   |               ^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
    |
 8  | # error: [unused-noqa]
@@ -945,7 +929,6 @@ error[RUF103]: Invalid suppression comment: unknown ruff directive
   |
 2 | import os  # explanation # ruff:unknown[F401] # another
   |                          ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 1 | # snapshot: invalid-suppression-comment
@@ -961,7 +944,6 @@ error[RUF103]: Invalid suppression comment: missing comma between codes
   |
 4 | import sys  # explanation # ruff:ignore[F401 F841] # another
   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 3 | # snapshot: invalid-suppression-comment
@@ -1008,7 +990,6 @@ error[RUF100]: Unused suppression (non-enabled: `F401`)
   |
 2 | value = 1  # before # ruff:ignore[F401] # after
   |                     ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 1 | # snapshot: unused-noqa
@@ -1024,7 +1005,6 @@ error[RUF100]: Unused suppression (non-enabled: `F401`)
   |
 5 | value = 1  # before # ruff:ignore[F401]
   |                     ^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 4 | # snapshot: unused-noqa

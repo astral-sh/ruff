@@ -298,7 +298,6 @@ PYI062 [*] Duplicate literal member `1`
 32 | Literal[Literal[Literal[1], Literal[1]]]  # once
 33 | Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
    |                                             ^
-   |
 help: Remove duplicates
    |
 32 | Literal[Literal[Literal[1], Literal[1]]]  # once

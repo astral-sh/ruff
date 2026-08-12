@@ -50,17 +50,13 @@ reveal_type(x)  # revealed: LiteralString
 if x != "abc":
     reveal_type(x)  # revealed: LiteralString & ~Literal["abc"]
 
-    # TODO: This should be `Literal[False]`
-    reveal_type(x == "abc")  # revealed: bool
-    # TODO: This should be `Literal[False]`
-    reveal_type("abc" == x)  # revealed: bool
+    reveal_type(x == "abc")  # revealed: Literal[False]
+    reveal_type("abc" == x)  # revealed: Literal[False]
     reveal_type(x == "something else")  # revealed: bool
     reveal_type("something else" == x)  # revealed: bool
 
-    # TODO: This should be `Literal[True]`
-    reveal_type(x != "abc")  # revealed: bool
-    # TODO: This should be `Literal[True]`
-    reveal_type("abc" != x)  # revealed: bool
+    reveal_type(x != "abc")  # revealed: Literal[True]
+    reveal_type("abc" != x)  # revealed: Literal[True]
     reveal_type(x != "something else")  # revealed: bool
     reveal_type("something else" != x)  # revealed: bool
 
@@ -74,6 +70,34 @@ if x != "abc":
 
     reveal_type(x in "abc")  # revealed: bool
     reveal_type("abc" in x)  # revealed: bool
+```
+
+A negative literal-string constraint does not exclude a runtime string with that value unless the
+candidate already has known literal origin.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    reveal_type(value == "hello")  # revealed: bool
+    reveal_type("hello" == value)  # revealed: bool
+```
+
+A negative string-literal constraint likewise leaves the same runtime value possible, with or
+without an explicit `str` constraint.
+
+```py
+def excluded_string_literal(value: Intersection[str, Not[Literal["hello"]]]) -> None:
+    reveal_type(value == "hello")  # revealed: bool
+    reveal_type("hello" == value)  # revealed: bool
+    reveal_type(value != "hello")  # revealed: bool
+
+def excluded_literal(value: Not[Literal["hello"]]) -> None:
+    reveal_type(value == "hello")  # revealed: bool
+    reveal_type("hello" == value)  # revealed: bool
+    reveal_type(value != "hello")  # revealed: bool
 ```
 
 #### Integers
@@ -121,6 +145,18 @@ def f(value: Not[E]) -> None:
         value.does_not_exist  # no error (unreachable branch)
 ```
 
+A `NewType` negation removes its static tag, not the runtime objects of its base: an integer without
+that tag can still be identical to the integer passed into the `NewType` constructor.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+
+def f(value: Not[UserId]) -> None:
+    reveal_type(value is 1)  # revealed: bool
+```
+
 After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true
 when `value` has also been narrowed to `A`, so the inner branch is unreachable.
 
@@ -164,7 +200,6 @@ error[unsupported-operator]: Unsupported `in` operation
    |                         |    |
    |                         |    Has type `NonContainer1 & NonContainer2`
    |                         Has type `Literal[2]`
-   |
 ```
 
 Do not raise an error if at least one of the positive contributions to the intersection type support
@@ -206,7 +241,6 @@ error[unsupported-operator]: Unsupported `in` operation
    |                     |    |
    |                     |    Has type `~NonContainer1`
    |                     Has type `Literal[2]`
-   |
 ```
 
 ### Unsupported operators for negative contributions

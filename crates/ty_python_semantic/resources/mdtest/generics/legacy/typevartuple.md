@@ -614,13 +614,7 @@ def fn0(a: int) -> None: ...
 def fn1(a: int, b: str) -> None: ...
 def fn2(a: int, b: str, c: bytes) -> None: ...
 
-# TODO: Should reveal `tuple[()]` without an error.
-# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `(int, /, *args: tuple[Unknown, ...]) -> None`, found `def fn0(a: int) -> None`"
-reveal_type(test(fn0))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[str]` without an error.
-# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `(int, /, *args: tuple[Unknown, ...]) -> None`, found `def fn1(a: int, b: str) -> None`"
-reveal_type(test(fn1))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[str, bytes]` without an error.
-# error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `(int, /, *args: tuple[Unknown, ...]) -> None`, found `def fn2(a: int, b: str, c: bytes) -> None`"
-reveal_type(test(fn2))  # revealed: tuple[Unknown, ...]
+reveal_type(test(fn0))  # revealed: tuple[()]
+reveal_type(test(fn1))  # revealed: tuple[str]
+reveal_type(test(fn2))  # revealed: tuple[str, bytes]
 ```

@@ -25,7 +25,6 @@ LOG014 [*] `exc_info=` outside exception handlers
 12 | logging.info("", exc_info=True)
 13 | logger.info("", exc_info=True)
    |                 ^^^^^^^^^^^^^
-   |
 help: Remove `exc_info=`
    |
 12 | logging.info("", exc_info=True)
@@ -57,7 +56,6 @@ LOG014 [*] `exc_info=` outside exception handlers
 16 | logging.info("", exc_info=1)
 17 | logger.info("", exc_info=1)
    |                 ^^^^^^^^^^
-   |
 help: Remove `exc_info=`
    |
 16 | logging.info("", exc_info=1)
@@ -91,7 +89,6 @@ LOG014 [*] `exc_info=` outside exception handlers
 21 |     logging.info("", exc_info=True)
 22 |     logger.info("", exc_info=True)
    |                     ^^^^^^^^^^^^^
-   |
 help: Remove `exc_info=`
    |
 21 |     logging.info("", exc_info=True)

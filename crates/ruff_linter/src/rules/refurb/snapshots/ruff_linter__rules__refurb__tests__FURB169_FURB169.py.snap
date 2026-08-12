@@ -293,7 +293,6 @@ FURB169 [*] When checking against `None`, use `is not` instead of comparison wit
 42 | |     a for a in range(0)
 43 | | ) is not type(None)
    | |___________________^
-   |
 help: Replace with `is not None`
    |
 40 |

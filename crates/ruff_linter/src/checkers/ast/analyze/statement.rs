@@ -152,7 +152,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::bad_exit_annotation(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::RedundantNumericUnion) {
-                flake8_pyi::rules::redundant_numeric_union(checker, parameters);
+                flake8_pyi::rules::redundant_numeric_union(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::Pep484StylePositionalOnlyParameter) {
                 flake8_pyi::rules::pep_484_positional_parameter(checker, function_def);
@@ -1358,7 +1358,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
             if checker.is_rule_enabled(Rule::ContinueInFinally) {
-                if checker.target_version() <= PythonVersion::PY38 {
+                if checker.target_version() < PythonVersion::PY38 {
                     pylint::rules::continue_in_finally(checker, finalbody);
                 }
             }

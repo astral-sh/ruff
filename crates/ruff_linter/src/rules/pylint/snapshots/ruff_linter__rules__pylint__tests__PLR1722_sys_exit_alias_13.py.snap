@@ -6,7 +6,6 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
   |
 1 | exit(code=2)
   | ^^^^
-  |
 help: Replace `exit` with `sys.exit()`
   |
   - exit(code=2)

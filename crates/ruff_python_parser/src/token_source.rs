@@ -20,7 +20,7 @@ pub(crate) struct TokenSource<'src> {
 
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
-    pub(crate) fn new(lexer: Lexer<'src>, source: &str, start_offset: TextSize) -> Self {
+    fn new(lexer: Lexer<'src>, source: &str, start_offset: TextSize) -> Self {
         TokenSource {
             lexer,
             tokens: allocate_tokens_vec(&source[start_offset.to_usize()..]),

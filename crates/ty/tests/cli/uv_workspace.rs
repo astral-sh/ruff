@@ -73,6 +73,10 @@ fn command_with_uv(case: &CliTest, virtual_env: Option<&Path>) -> anyhow::Result
         .env("UV_PYTHON_DOWNLOADS", "never")
         .env("TY_OUTPUT_FORMAT", "concise")
         .env("PATH", std::env::var_os("PATH").unwrap_or_default());
+    #[cfg(windows)]
+    if let Some(path_ext) = std::env::var_os("PATHEXT") {
+        command.env("PATHEXT", path_ext);
+    }
     if let Some(virtual_env) = virtual_env {
         command.env("VIRTUAL_ENV", virtual_env);
     }
@@ -333,12 +337,12 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Failures to invoke uv are visible by default instead of silently disabling integration.
+/// Failures to locate uv are visible by default instead of silently disabling integration.
 #[test]
 fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     let case = workspace_case()?.with_filter(
-        "program not found",
-        "No such file or directory (os error 2)",
+        "no path to search and provided name is not an absolute path",
+        "cannot find binary path",
     );
     case.write_file("packages/member/member.py", "value: int = 1")?;
 
@@ -347,7 +351,8 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
         .current_dir(case.root().join("packages/member"))
         .arg(".")
         .env("TY_UV", "1")
-        .env("UV", "missing-uv-executable")
+        .env_remove("UV")
+        .env("PATH", "")
         .env("TY_OUTPUT_FORMAT", "concise");
 
     assert_cmd_snapshot!(command, @"
@@ -357,7 +362,7 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     All checks passed!
 
     ----- stderr -----
-    WARN Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
+    WARN Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
     ");
 
     Ok(())

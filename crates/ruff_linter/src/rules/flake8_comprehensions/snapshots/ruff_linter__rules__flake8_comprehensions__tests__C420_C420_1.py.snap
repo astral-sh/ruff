@@ -6,7 +6,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
   |
 1 | {x: NotImplemented for x in "XY"}
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `dict.fromkeys(iterable)`)
   |
   - {x: NotImplemented for x in "XY"}

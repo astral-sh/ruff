@@ -625,3 +625,356 @@ from typing import Never, Any
 def f(func: Any) -> Never:  # error: [invalid-return-type]
     func()
 ```
+
+## `unsound-return-statement`
+
+In addition to `invalid-return-type`, we also offer a disabled-by-default stricter rule
+`unsound-return-statement`. This rule forbids `return` statements that return an instance of a type
+`A` unless `A` is a *subtype* of the annotated return type:
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Any
+
+# no error, even though `str` is not a subtype of `Any`:
+# the lint only applies to a function if its return annotation is not a dynamic
+# type such as `Any`
+def returns_any() -> Any:
+    return "foo"
+
+def g() -> int:
+    # snapshot: unsound-return-statement
+    return returns_any()
+```
+
+```snapshot
+error[unsound-return-statement]: Unsound return statement
+  --> src/mdtest_snippet.py:11:12
+   |
+ 9 | def g() -> int:
+   |            --- Expected a subtype of `int` because of the return type
+10 |     # snapshot: unsound-return-statement
+11 |     return returns_any()
+   |            ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type prior to the `return` statement
+```
+
+An example with nested error context:
+
+```py
+def h() -> tuple[tuple[int, int]]:
+    # snapshot: unsound-return-statement
+    return ((42, returns_any()),)
+```
+
+```snapshot
+error[unsound-return-statement]: Unsound return statement
+  --> src/mdtest_snippet.py:14:12
+   |
+12 | def h() -> tuple[tuple[int, int]]:
+   |            ---------------------- Expected a subtype of `tuple[tuple[int, int]]` because of the return type
+13 |     # snapshot: unsound-return-statement
+14 |     return ((42, returns_any()),)
+   |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
+info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
+info: the first tuple element is not compatible: `tuple[Literal[42], Any]` is not a subtype of `tuple[int, int]`
+info: └── the second tuple element is not compatible: `Any` is not a subtype of `int`
+help: Consider using an `assert` to narrow the type prior to the `return` statement
+```
+
+The rule is also applied to generator functions:
+
+```py
+from typing import Generator
+
+def f() -> Generator[None, None, int]:
+    yield
+    # snapshot: unsound-return-statement
+    return returns_any()
+```
+
+```snapshot
+error[unsound-return-statement]: Unsound return statement
+  --> src/mdtest_snippet.py:20:12
+   |
+17 | def f() -> Generator[None, None, int]:
+   |            -------------------------- Expected a subtype of `int` because of the return type
+18 |     yield
+19 |     # snapshot: unsound-return-statement
+20 |     return returns_any()
+   |            ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `int`, but not a subtype of `int`
+help: Consider using an `assert` to narrow the type prior to the `return` statement
+```
+
+Aliases of `Any` are also dynamic return annotations and must not trigger the rule:
+
+```py
+from typing_extensions import TypeAliasType
+
+AnyAlias = TypeAliasType("AnyAlias", Any)
+
+def returns_any_alias() -> AnyAlias:
+    return "foo"
+```
+
+The same applies when an alias of `Any` is the return type of a generator:
+
+```py
+def generator_returns_any_alias() -> Generator[None, None, AnyAlias]:
+    yield
+    return "foo"
+```
+
+The rule in fact will not trigger if `Any` appears anywhere in your return type, either implicitly
+or explicitly:
+
+```py
+from typing import Any
+
+# error: [missing-type-argument]
+def returns_unparameterized_tuple() -> tuple:
+    # no error, since the return type is implicitly `tuple[Any, ...]`
+    # (which is what the `missing-type-argument` error is complaining about on the line above!)
+    return returns_any()
+
+def returns_tuple_of_any() -> tuple[Any, Any]:
+    # no error, since the return type is explicitly `tuple[Any, Any]`
+    return returns_any()
+```
+
+Edge case: for `TypeIs`-annotated functions, we want the error message to say "not a subtype of
+`bool`" rather than "not a subtype of `TypeIs`":
+
+```py
+from typing_extensions import TypeIs
+
+def f(x: object) -> TypeIs[int]:
+    # snapshot: unsound-return-statement
+    return returns_any()
+```
+
+```snapshot
+error[unsound-return-statement]: Unsound return statement
+  --> src/mdtest_snippet.py:45:12
+   |
+43 | def f(x: object) -> TypeIs[int]:
+   |                     ----------- Expected a subtype of `bool` because of the return type
+44 |     # snapshot: unsound-return-statement
+45 |     return returns_any()
+   |            ^^^^^^^^^^^^^ Inferred as `Any`
+info: `Any` is assignable to `bool`, but not a subtype of `bool`
+help: Consider using an `assert` to narrow the type prior to the `return` statement
+```
+
+Aliases of `TypeIs` still return `bool`, so diagnostics must mention `bool` rather than the alias:
+
+```py
+TypeIsAlias = TypeAliasType("TypeIsAlias", TypeIs[int])
+
+def returns_type_is_alias(value: object) -> TypeIsAlias:
+    # error: "Unsound return statement: `Any` is not a subtype of `bool`"
+    return returns_any()
+```
+
+Detailed error context for aliases of `TypeIs` must also compare each union member against `bool`,
+rather than against the original `TypeIs` annotation:
+
+```py
+def returns_type_is_alias_union(value: object, result: bool | Any) -> TypeIsAlias:
+    # snapshot: unsound-return-statement
+    return result
+```
+
+```snapshot
+error[unsound-return-statement]: Unsound return statement
+  --> src/mdtest_snippet.py:53:12
+   |
+51 | def returns_type_is_alias_union(value: object, result: bool | Any) -> TypeIsAlias:
+   |                                                                       ----------- Expected a subtype of `bool` because of the return type
+52 |     # snapshot: unsound-return-statement
+53 |     return result
+   |            ^^^^^^ Inferred as `bool | Any`
+info: `bool | Any` is assignable to `bool`, but not a subtype of `bool`
+info: element `Any` of union `bool | Any` is not a subtype of `bool`
+help: Consider using an `assert` to narrow the type prior to the `return` statement
+```
+
+A `Never` return annotation is still a typed boundary, so returning `Any` must trigger the rule:
+
+```py
+from typing_extensions import Never
+
+def never_returns() -> Never:
+    return returns_any()  # error: [unsound-return-statement]
+```
+
+The same applies when `Never` is the return type of a generator:
+
+```py
+def generator_never_returns() -> Generator[None, None, Never]:
+    yield
+    return returns_any()  # error: [unsound-return-statement]
+```
+
+There is currently a limitation in how this rule interacts with contextual inference for collection
+literals. When a function is annotated as returning `list[int]`, the annotation is used as context
+while inferring the type of a list literal in a `return` statement. As a result, a list literal
+containing an `Any` value is inferred as `list[int]` rather than `list[Any]`. The rule therefore
+does not emit a diagnostic for the following unsound return statement. Mypy's `--warn-return-any`
+option has the same limitation. In fact, mypy only rejects return expressions whose entire type is
+`Any`, whereas this rule also rejects an independently inferred `list[Any]` when the annotated
+return type is `list[int]`:
+
+```py
+def returns_list_containing_any() -> list[int]:
+    return [returns_any()]
+```
+
+## Regression test: `unsound-return-statement` uses "pure redundancy"
+
+Internally, the rule uses "pure redundancy" rather than "impure redundancy". The following example
+is a regression test that shows why this internal implementation detail is important. As an
+optimisation as of 06 August 2026, `Phantom[str]` is not currently considered "impurely redundant"
+with `Phantom[int]` (we do not simplify the union `Phantom[str] | Phantom[int]`). But the two
+protocols are considered equivalent, are considered mutual subtypes of each other, and are
+considered mutually redundant, meaning that no `unsound-return-statement` error is reported on this
+snippet:
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Generator, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Phantom(Protocol[T]):
+    def ping(self) -> int: ...
+
+def returns_protocol(value: Phantom[int]) -> Phantom[str]:
+    return value
+
+def generator_returns_protocol(value: Phantom[int]) -> Generator[None, None, Phantom[str]]:
+    yield
+    return value
+```
+
+## Regression test: `unsound-return-statement` with non-fully-static `TypedDict`s
+
+A `TypedDict` with a field or explicit extra items of type `Any` is not fully static, even when the
+dictionary is defined as a class or inherits its fields from another `TypedDict`. The rule is not
+applied to `TypedDict`s like this that are not fully static:
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing_extensions import Any, Generator, TypedDict
+
+class StaticPayload(TypedDict):
+    value: int
+
+class DynamicPayload(TypedDict):
+    value: Any
+
+class InheritedDynamicPayload(DynamicPayload): ...
+class DynamicExtraPayload(TypedDict, extra_items=Any): ...
+
+FunctionalDynamicPayload = TypedDict("FunctionalDynamicPayload", {"value": Any})
+
+def returns_dynamic_typed_dict(value: StaticPayload) -> DynamicPayload:
+    return value
+
+def returns_inherited_dynamic_typed_dict(value: StaticPayload) -> InheritedDynamicPayload:
+    return value
+
+def returns_functional_dynamic_typed_dict(value: StaticPayload) -> FunctionalDynamicPayload:
+    return value
+
+def returns_dynamic_extra_typed_dict(value: Any) -> DynamicExtraPayload:
+    return value
+
+def generator_returns_dynamic_typed_dict(
+    value: StaticPayload,
+) -> Generator[None, None, DynamicPayload]:
+    yield
+    return value
+
+def returns_static_typed_dict(value: Any) -> StaticPayload:
+    return value  # error: [unsound-return-statement]
+```
+
+## Regression test: `unsound-return-statement` + recursive structural types
+
+Recursively specializing a protocol can produce infinitely many distinct types. Checking whether
+such a return annotation is fully static must recognize the recurring protocol definition and
+terminate instead of expanding the recursive member indefinitely, which would lead to a stack
+overflow:
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Growing(Protocol[T]):
+    @property
+    def next(self) -> "Growing[list[T]]": ...
+
+def returns_recursive_protocol(value: Any) -> Growing[int]:
+    return value
+```
+
+The same protection is needed for class-based `TypedDict` fields that recursively specialize their
+containing dictionary.
+
+```py
+from typing import Generic, TypedDict
+
+class GrowingPayload(TypedDict, Generic[T]):
+    child: "GrowingPayload[list[T]]"
+
+def returns_recursive_typed_dict(value: Any) -> GrowingPayload[int]:
+    return value
+```
+
+## Regression test: `unsound-return-statement` + recursive type aliases
+
+Recursively specializing a generic type alias can also produce infinitely many distinct types. The
+check for whether a type is fully static must recognize repeated visits to the same alias
+definition, including when `Any` appears elsewhere in the recursive alias.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Any
+
+type GrowingAlias[T] = list[GrowingAlias[list[T]]]
+type GrowingAliasWithAny[T] = list[GrowingAliasWithAny[list[T]] | Any]
+
+def returns_recursive_alias(value: Any) -> GrowingAlias[int]:
+    return value
+
+def returns_recursive_alias_with_any(value: Any) -> GrowingAliasWithAny[int]:
+    return value
+```

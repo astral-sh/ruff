@@ -34,6 +34,7 @@ mod completions;
 mod configuration;
 mod folding_range;
 mod hover;
+mod implementation;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -1377,9 +1378,41 @@ impl TestServerBuilder {
 
     /// Advertise support for ty's fully rendered diagnostic output.
     pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
-        self.client_capabilities.experimental = Some(serde_json::json!({
-            "fullDiagnosticOutput": true,
-        }));
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert("fullDiagnosticOutput".to_string(), serde_json::json!(true));
+        self
+    }
+
+    /// Advertise support for the `ty.triggerParameterHints` completion command.
+    pub(crate) fn with_trigger_parameter_hints_command(mut self) -> Self {
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert(
+                "commands".to_string(),
+                serde_json::json!({ "commands": ["ty.triggerParameterHints"] }),
+            );
+        self
+    }
+
+    /// Enable or disable location link support for goto implementations
+    pub(crate) fn enable_implementations_link_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .implementation
+            .get_or_insert_default()
+            .link_support = Some(enabled);
         self
     }
 

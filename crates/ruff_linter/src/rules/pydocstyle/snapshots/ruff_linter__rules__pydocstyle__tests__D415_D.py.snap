@@ -8,7 +8,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 354 | def lwnlkjl():
 355 |     """Summary"""
     |     ^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 354 | def lwnlkjl():
@@ -25,7 +24,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 405 |         " or exclamation point (not 'r')")
 406 | def oneliner_withdoc(): """One liner"""
     |                         ^^^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 405 |         " or exclamation point (not 'r')")
@@ -77,7 +75,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 421 | @ignored_decorator
 422 | def oneliner_ignored_decorator(): """One liner"""
     |                                   ^^^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 421 | @ignored_decorator
@@ -94,7 +91,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 428 |         " or exclamation point (not 'r')")
 429 | def oneliner_with_decorator_expecting_errors(): """One liner"""
     |                                                 ^^^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 428 |         " or exclamation point (not 'r')")
@@ -181,7 +177,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 519 | def bad_google_string():  # noqa: D400
 520 |     """Test a valid something"""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 519 | def bad_google_string():  # noqa: D400
@@ -198,7 +193,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 580 | def endswith_quote():
 581 |     """Whitespace at the end, but also a quote" """
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 580 | def endswith_quote():
@@ -217,7 +211,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 616 | |
 617 | |     """
     | |_______^
-    |
 help: Add closing punctuation
     |
 614 | def one_liner():
@@ -251,7 +244,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 640 |
 641 | def same_line(): """This is a docstring on the same line"""
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Add closing punctuation
     |
 640 |
@@ -268,7 +260,6 @@ D415 [*] First line should end with a period, question mark, or exclamation poin
 664 | /     "We enforce a newline after the closing quote for a multi-line docstring \
 665 | |     but continuations shouldn't be considered multi-line"
     | |_________________________________________________________^
-    |
 help: Add closing punctuation
     |
 664 |     "We enforce a newline after the closing quote for a multi-line docstring \
