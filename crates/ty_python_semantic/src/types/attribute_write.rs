@@ -500,8 +500,18 @@ fn class_attribute_write_requirement<'db>(
 
 /// Recover the concrete descriptor hidden by an uncertain metaclass-member annotation.
 ///
-/// For `attribute: type[Base] = Descriptor`, the annotation describes the class object itself,
-/// while the binding can reveal that `Descriptor` has a metaclass implementing `__set__`.
+/// The declared type describes the descriptor object, not the values accepted by its setter.
+/// Inspecting the binding preserves the setter's actual value contract:
+///
+/// ```python
+/// class DescriptorMeta(type):
+///     def __set__(self, instance: object, value: str) -> None: ...
+///
+/// class Descriptor(metaclass=DescriptorMeta): ...
+///
+/// class Meta(type):
+///     attribute: type[object] = Descriptor
+/// ```
 fn possible_class_attribute_descriptor<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -675,18 +685,10 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
-enum ClassObjectMemberPrecedence<'db> {
-    /// The class-object member always shadows the metaclass member.
-    Receiver(PlaceAndQualifiers<'db>),
-    /// The metaclass member's descriptor status is uncertain, so either member can govern the
-    /// write.
-    TypeOrReceiver(PlaceAndQualifiers<'db>),
-}
-
-/// Classify the precedence between a metaclass member and a class-object member.
+/// Resolve class-object members when a class attribute can shadow its metaclass member.
 ///
-/// For example, `C.attribute` governs the assignment below because `Meta.attribute` does not
-/// implement `__set__` or `__delete__`:
+/// A definitely non-data metaclass member is shadowed entirely. If the metaclass member's
+/// descriptor status is uncertain, both members remain possible write targets.
 ///
 /// ```python
 /// class Meta(type):
@@ -697,13 +699,13 @@ enum ClassObjectMemberPrecedence<'db> {
 ///
 /// C.attribute = 1
 /// ```
-fn class_object_member_precedence<'db>(
+fn class_object_assignment_members<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     type_member: PlaceAndQualifiers<'db>,
-) -> Option<ClassObjectMemberPrecedence<'db>> {
+) -> Option<AssignmentAttributeMembers<'db>> {
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
@@ -723,11 +725,14 @@ fn class_object_member_precedence<'db>(
         .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
         .filter(|class_attr| !class_attr.place.is_undefined())?;
 
-    if definitely_non_data_descriptor {
-        Some(ClassObjectMemberPrecedence::Receiver(receiver_member))
+    Some(if definitely_non_data_descriptor {
+        AssignmentAttributeMembers::ReceiverMember(receiver_member)
     } else {
-        Some(ClassObjectMemberPrecedence::TypeOrReceiver(receiver_member))
-    }
+        AssignmentAttributeMembers::TypeMember {
+            member: type_member,
+            receiver_fallback: Some(receiver_member),
+        }
+    })
 }
 
 /// Return the members considered by attribute assignment in lookup-precedence order.
@@ -762,16 +767,11 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         object_ty.class_member(db, env, attribute)
     };
-    let receiver_alternative =
-        match class_object_member_precedence(db, env, object_ty, attribute, type_member) {
-            Some(ClassObjectMemberPrecedence::Receiver(receiver_member)) => {
-                return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
-            }
-            Some(ClassObjectMemberPrecedence::TypeOrReceiver(receiver_member)) => {
-                Some(receiver_member)
-            }
-            None => None,
-        };
+    if let Some(members) =
+        class_object_assignment_members(db, env, object_ty, attribute, type_member)
+    {
+        return Some(members);
+    }
     let needs_receiver_fallback = matches!(
         type_member.place,
         Place::Defined(DefinedPlace {
@@ -779,9 +779,7 @@ pub(super) fn assignment_attribute_members<'db>(
             ..
         }) | Place::Undefined
     );
-    let receiver_fallback = if let Some(receiver_alternative) = receiver_alternative {
-        Some(receiver_alternative)
-    } else if needs_receiver_fallback {
+    let receiver_fallback = if needs_receiver_fallback {
         Some(match object_ty {
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
