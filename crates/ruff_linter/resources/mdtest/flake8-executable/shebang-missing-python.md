@@ -1,5 +1,8 @@
 # `shebang-missing-python` (`EXE003`)
 
+Each shebang needs its own Markdown section. Python code blocks in the same section are concatenated,
+so only the first shebang would appear at the beginning of the file.
+
 ```toml
 lint.select = ["EXE003"]
 ```
@@ -20,10 +23,14 @@ print("hello world")
 print("hello world")
 ```
 
+## `uv` with the `--color` global flag
+
 ```py
 #!/usr/bin/env uv --color=auto run
 print("hello world")
 ```
+
+## `uv` with the `--quiet` global flag
 
 ```py
 #!/usr/bin/env uv --quiet run --script
@@ -37,6 +44,8 @@ print("hello world")
 print("hello world")
 ```
 
+## `uv tool run` with `env -S`
+
 ```py
 #!/usr/bin/env -S uv tool run ruff check --isolated --select EXE003
 print("hello world")
@@ -49,10 +58,14 @@ print("hello world")
 print("hello world")
 ```
 
+## `uvx --quiet`
+
 ```py
 #!/usr/bin/env uvx --quiet
 print("hello world")
 ```
+
+## `uvx` with `env -S`
 
 ```py
 #!/usr/bin/env -S uvx ruff check --isolated --select EXE003
