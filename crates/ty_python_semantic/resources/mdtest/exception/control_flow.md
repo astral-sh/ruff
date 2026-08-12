@@ -443,6 +443,42 @@ except:
 reveal_type(z)  # revealed: Literal[0]
 ```
 
+A nested function body also runs later, so its exceptions cannot reach the handler surrounding its
+definition:
+
+```py
+function_caught = False
+try:
+    def nested_function() -> None:
+        may_raise()
+
+except:
+    function_caught = True
+
+reveal_type(function_caught)  # revealed: Literal[False]
+```
+
+An exception handler inside a lazily evaluated function still catches exceptions raised within that
+function:
+
+```py
+outer_caught = False
+try:
+    def nested_function_with_handler() -> None:
+        inner_caught = False
+        try:
+            may_raise()
+        except:
+            inner_caught = True
+
+        reveal_type(inner_caught)  # revealed: bool
+
+except:
+    outer_caught = True
+
+reveal_type(outer_caught)  # revealed: Literal[False]
+```
+
 ## Assignments in comprehensions
 
 A handler includes the value from before a comprehension and the value visible once it finishes.

@@ -96,13 +96,24 @@ impl TryNodeContextStackManager {
         }
     }
 
-    /// Returns whether any enclosing `try` suite can currently receive exception checkpoints.
+    /// Returns whether an active `try` suite can receive an exception from the current scope.
     ///
     /// A context can remain on the stack for its `finally` suite after its handlers become inactive.
-    pub(super) fn has_active_exception_handler(&self) -> bool {
-        self.0
-            .iter()
-            .any(TryNodeContextStack::has_active_exception_handler)
+    pub(super) fn has_active_exception_handler(&self, builder: &SemanticIndexBuilder) -> bool {
+        debug_assert_eq!(self.0.len(), builder.scope_stack.len());
+
+        for (scope_stack_index, try_context_stack) in self.0.iter().enumerate().rev() {
+            if try_context_stack.has_active_exception_handler() {
+                return true;
+            }
+
+            let scope_id = builder.scope_stack[scope_stack_index].file_scope_id;
+            if !builder.exception_checkpoint_crosses_scope_boundary(scope_id) {
+                return false;
+            }
+        }
+
+        false
     }
 
     /// Retrieve the stack that is at the top of our stack of stacks.

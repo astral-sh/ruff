@@ -2248,7 +2248,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_exception_checkpoint(&mut self) {
         if !self
             .try_node_context_stack_manager
-            .has_active_exception_handler()
+            .has_active_exception_handler(self)
         {
             return;
         }
@@ -2277,7 +2277,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             && self.in_try
             && self
                 .try_node_context_stack_manager
-                .has_active_exception_handler()
+                .has_active_exception_handler(self)
             && self
                 .current_place_table()
                 .symbol_id(name.id.as_str())
@@ -3623,7 +3623,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if msg.is_some()
                     || self
                         .try_node_context_stack_manager
-                        .has_active_exception_handler()
+                        .has_active_exception_handler(self)
                 {
                     let truthy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                         self.flow_restore(snapshots.falsy);
