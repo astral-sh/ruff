@@ -412,8 +412,8 @@ y = MyInt(2)
 z = x + y  # TODO error: [deprecated] "MyInt `+` support is broken"
 ```
 
-Unlike binary operators, unary operators like `~` already fire a diagnostic when their dunder is
-deprecated.
+If a dunder like `__invert__` is deprecated, then the equivalent `~` operator should fire a
+diagnostic.
 
 ```py
 from typing_extensions import deprecated
