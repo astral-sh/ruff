@@ -2295,7 +2295,7 @@ fn descriptor_decorated_protocol_member<'db>(
     // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
     // its `__get__` result would then erase the remaining descriptor structure and weaken the
     // protocol member to a bare `Unknown`.
-    if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
+    if super::visitor::any_over_type(db, env, descriptor_ty, |ty| ty.is_unknown()) {
         return None;
     }
 

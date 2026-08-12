@@ -2929,6 +2929,366 @@ def test_match_exact_tuple_sequence_subclass(value: Pair) -> None:
             reveal_type(value)  # revealed: Pair
 ```
 
+## Negative sequence narrowing through aliases
+
+Aliases do not prevent narrowing individual tuple elements when their values are fully static. This
+includes finite nesting of the same alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = T
+
+def _(x: tuple[Alias[Alias[int]], int | str]) -> str:
+    match x:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(x[1])  # revealed: str
+            return x[1]
+```
+
+An alias that discards `Any` also has a fully static value:
+
+```py
+from typing import Any
+
+type Ignored[T] = int
+
+def _(x: tuple[Ignored[Any], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Ignored[Any], str]
+```
+
+In contrast, preserving `Any` prevents this precise narrowing:
+
+```py
+def _(x: tuple[Alias[Any], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Alias[Any], int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+## Negative sequence narrowing with structural types
+
+Narrowing individual tuple elements also requires protocol members and `TypedDict` fields to be
+fully static:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class Static(Protocol):
+    member: int
+
+def _(x: tuple[Static, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Static, str]
+```
+
+A finite nesting of the same `TypedDict` also has fully static fields:
+
+```py
+from typing import TypedDict
+
+class Payload[T](TypedDict):
+    item: T
+
+def _(x: tuple[Payload[Payload[int]], int | str]) -> str:
+    match x:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(x[1])  # revealed: str
+            return x[1]
+```
+
+A protocol member of type `Any` makes the protocol gradual:
+
+```py
+from typing import Any
+
+class Gradual(Protocol):
+    member: Any
+
+def _(x: tuple[Gradual, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Gradual, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+A `TypedDict` field containing `Any` has the same effect:
+
+```py
+class GradualPayload(TypedDict):
+    member: Any
+
+def _(x: tuple[GradualPayload, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[GradualPayload, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+## Negative sequence narrowing with `NewType`
+
+A `NewType` with a fully static base permits narrowing individual tuple elements:
+
+```py
+from typing import Any, NewType
+
+Static = NewType("Static", list[int])
+
+def _(x: tuple[Static, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Static, str]
+```
+
+Replacing the base's `int` argument with `Any` makes the `NewType` gradual and prevents this
+narrowing:
+
+```py
+Gradual = NewType("Gradual", list[Any])
+
+def _(x: tuple[Gradual, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Gradual, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+## Negative sequence narrowing with recursive callable bounds
+
+A recursive bound can still be fully static. This method's type variable is bounded by the protocol
+itself. Converting the method to a callable preserves that bound, so rejecting the `int` pattern
+leaves `str`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Callable, Protocol
+
+class P(Protocol):
+    def method[T: P](self, value: T) -> T: ...
+
+def as_callable[**P, R](value: Callable[P, R]) -> Callable[P, R]:
+    return value
+
+def _(value: P, item: int | str) -> str:
+    callback = as_callable(value.method)
+    pair = (callback, item)
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(pair[1])  # revealed: str
+            return pair[1]
+```
+
+An `Any` member makes the same bound gradual, even if it appears after the recursive method. This
+prevents element-wise narrowing:
+
+```py
+from typing import Any
+
+class Gradual(Protocol):
+    def method[T: Gradual](self, value: T) -> T: ...
+    value: Any
+
+def _(value: Gradual, item: int | str) -> str:
+    callback = as_callable(value.method)
+    pair = (callback, item)
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(pair[1])  # revealed: int | str
+            return pair[1]  # error: [invalid-return-type]
+```
+
+## Negative sequence narrowing with finite recursive members
+
+A recursive protocol can have fully static members even when its recursive references change
+specialization. This method always returns `Reset[int]`, so starting from `Reset[int]` reaches an
+exact cycle and permits narrowing the neighboring tuple element:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Reset[T](Protocol):
+    def method(self) -> Reset[int]: ...
+
+def _(pair: tuple[Reset[int], int | str]) -> str:
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(pair[1])  # revealed: str
+            return pair[1]
+```
+
+Starting from `Reset[str]` also reaches only `Reset[int]`, but we do not yet recognize that this
+permits the same narrowing:
+
+```py
+def _(pair: tuple[Reset[str], int | str]) -> str:
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            # TODO: This should narrow to `str`.
+            reveal_type(pair[1])  # revealed: int | str
+            return pair[1]  # error: [invalid-return-type]
+```
+
+Swapping two type arguments produces a finite cycle too, but has the same limitation:
+
+```py
+class Rotated[A, B](Protocol):
+    def method(self) -> Rotated[B, A]: ...
+
+def _(pair: tuple[Rotated[int, str], int | str]) -> str:
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            # TODO: This should narrow to `str`.
+            reveal_type(pair[1])  # revealed: int | str
+            return pair[1]  # error: [invalid-return-type]
+```
+
+The same applies when an attribute swaps the arguments:
+
+```py
+class Data[A, B](Protocol):
+    next: Data[B, A]
+
+def _(pair: tuple[Data[int, str], int | str]) -> str:
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            # TODO: This should narrow to `str`.
+            reveal_type(pair[1])  # revealed: int | str
+            return pair[1]  # error: [invalid-return-type]
+```
+
+An argument can stabilize through union normalization. Adding `int` again does not change
+`str | int`, but we do not yet recognize that these members remain fully static:
+
+```py
+class Normalized[T](Protocol):
+    next: Normalized[T | int]
+
+def _(pair: tuple[Normalized[str], int | str]) -> str:
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            # TODO: This should narrow to `str`.
+            reveal_type(pair[1])  # revealed: int | str
+            return pair[1]  # error: [invalid-return-type]
+```
+
+A `TypedDict` whose field swaps its type arguments likewise has only two specializations, but
+currently prevents element-wise narrowing:
+
+```py
+from typing import TypedDict
+
+class Record[A, B](TypedDict):
+    next: Record[B, A]
+
+def _(pair: tuple[Record[int, str], int | str]) -> str:
+    match pair:
+        case (_, int()):
+            return "matched"
+        case _:
+            # TODO: This should narrow to `str`.
+            reveal_type(pair[1])  # revealed: int | str
+            return pair[1]  # error: [invalid-return-type]
+```
+
+## Negative sequence narrowing with growing recursive members
+
+When inspecting a member would expand an unbounded sequence of specializations, we retain the
+original tuple type instead of narrowing its elements:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+def _(x: tuple[Recursive[int], int]) -> None:
+    match x:
+        case (_, 1):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Recursive[int], int]
+```
+
+A `TypedDict` whose recursive field keeps nesting another `list` has the same behavior:
+
+```py
+from typing import TypedDict
+
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+def _(x: tuple[Payload[int], int]) -> None:
+    match x:
+        case (_, 1):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Payload[int], int]
+```
+
 ## Nested sequence patterns
 
 Nested patterns narrow values captured from the positions they inspect. For subjects without a known

@@ -2565,7 +2565,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && target.resolve_type_alias(db).is_dynamic()
             && let Type::TypeVar(typevar) = source.return_ty.resolve_type_alias(db)
             && source.parameters().iter().any(|parameter| {
-                any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                any_over_type(db, self.env, parameter.annotated_type(), |ty| {
                     matches!(ty, Type::TypeVar(other) if other.is_same_typevar_as(db, typevar))
                 })
             })

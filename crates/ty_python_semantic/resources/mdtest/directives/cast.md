@@ -116,6 +116,89 @@ def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
     cast(type[tuple[object, Unknown]], value)
 ```
 
+## Redundant casts of type variables
+
+Casting a value of type `T` back to `T` is redundant when its bound is fully static:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def set(self, value: T) -> None: ...
+
+def _[T: Box[int]](value: T) -> None:
+    cast(T, value)  # error: [redundant-cast]
+```
+
+`Unknown` in the bound suppresses the diagnostic. Casting `Top[T]` back to `T` can restore writes
+that the materialized bound rejects:
+
+```py
+from ty_extensions import Top
+from ty_extensions._internal import Unknown
+
+def _[T: Box[Unknown]](top: Top[T]) -> None:
+    value = cast(T, top)
+    reveal_type(value.get())  # revealed: Unknown
+    value.set(1)
+
+    reveal_type(top.get())  # revealed: object
+    top.set(1)  # error: [invalid-argument-type]
+```
+
+`Unknown` also suppresses the diagnostic in legacy type-variable bounds and in constraints:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=Box[Unknown])
+
+def _(value: T) -> None:
+    result = cast(T, value)
+    reveal_type(result.get())  # revealed: Unknown
+    result.set(1)
+
+def _[T: (Box[Unknown], int)](value: T) -> None:
+    cast(T, value)
+```
+
+An explicit `Any` should permit the same cast. We currently report a false positive because
+type-variable equivalence ignores differences in materialized bounds:
+
+```py
+from typing import Any
+
+def _[T: Box[Any]](top: Top[T]) -> None:
+    # TODO: This cast is not redundant.
+    value = cast(T, top)  # error: [redundant-cast]
+    reveal_type(value.get())  # revealed: Any
+    value.set(1)
+
+    reveal_type(top.get())  # revealed: object
+    top.set(1)  # error: [invalid-argument-type]
+```
+
+A bound whose recursive members keep nesting another `list` cannot be fully inspected. We omit the
+diagnostic:
+
+```py
+from typing import Protocol
+
+class Recursive[T](Protocol):
+    next: "Recursive[list[T]]"
+
+def _[T: Recursive[int]](value: T) -> None:
+    cast(T, value)
+```
+
 ## Disjoint casts
 
 ### Basics

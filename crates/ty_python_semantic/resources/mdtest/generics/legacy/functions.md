@@ -484,6 +484,30 @@ def bad_return(x: T) -> T:
     return x + 1
 ```
 
+## `Self` satisfies variadic constraints
+
+`Box[*tuple[Any, ...]]` accepts any specialization of `Box`, including the implicit `Self` type
+inside its methods:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any, Generic, TypeVar, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+class Box(Generic[Unpack[Ts]]):
+    def _(self) -> None:
+        accept(self)
+
+T = TypeVar("T", Box[Unpack[tuple[Any, ...]]], str)
+
+def accept(value: T) -> None: ...
+```
+
 ## All occurrences of the same typevar have the same type
 
 If a typevar appears multiple times in a function signature, all occurrences have the same type.

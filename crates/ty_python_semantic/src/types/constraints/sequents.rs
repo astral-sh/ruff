@@ -12,7 +12,8 @@ use crate::types::constraints::{
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_typevar_including_lazy_attributes,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{BoundTypeVarInstance, Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
@@ -705,10 +706,11 @@ impl SequentMap {
     ) {
         // Keep this precheck aligned with `variance_of`, which visits lazy types.
         let has_typevar_bound = |constraint: Constraint<'db>| {
-            constraint
-                .iter_stored_bounds()
-                .any(|bound| any_over_type(db, env, bound.ty(), true, Type::is_type_var))
+            constraint.iter_stored_bounds().any(|bound| {
+                any_over_typevar_including_lazy_attributes(db, env, bound.ty(), Type::is_type_var)
+            })
         };
+
         if !has_typevar_bound(storage.constraint_data(left_constraint))
             && !has_typevar_bound(storage.constraint_data(right_constraint))
         {
@@ -1395,10 +1397,8 @@ impl<'db> Type<'db> {
     /// Returns whether this type can participate in a transitive sequent proof.
     ///
     /// Gradual assignability is not transitive, so constraints with dynamic bounds are ineligible.
-    /// Note that we can't use [`is_fully_static`][Type::is_fully_static] here, since that
-    /// considers the declared bounds/constraints of typevars. In the context of a sequent map,
-    /// typevars are opaque symbolic atoms: considering their bounds or defaults could incorrectly
-    /// make their eligibility depend on a specialization that the sequent is meant to constrain.
+    /// Lazy attributes are not expanded, and type variables are treated as symbolic atoms rather
+    /// than inspecting their bounds or defaults.
     pub(super) fn is_static_sequent_eligible(
         self,
         db: &'db dyn Db,
@@ -1413,10 +1413,6 @@ impl<'db> Type<'db> {
         impl<'db> TypeVisitor<'db> for EligibilityVisitor<'_, 'db> {
             fn program_environment(&self) -> &ProgramEnvironment<'db> {
                 self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {

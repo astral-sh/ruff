@@ -1593,9 +1593,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
         //
-        // A lazily inferred class member can contain its own unrelated recursive type, so only
-        // inspect the alias structure and generic arguments when checking whether it is recursive.
-        if any_over_type(db, env, value_ty, false, |ty| ty.is_divergent()) {
+        // Recursion in a lazy attribute does not lose type variables from the stored alias type.
+        if any_over_type(db, env, value_ty, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(

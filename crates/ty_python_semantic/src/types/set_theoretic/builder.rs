@@ -1079,9 +1079,7 @@ impl<'db> UnionBuilder<'db> {
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
                     && [ty, element_type].into_iter().any(|ty| {
-                        any_over_type(db, &self.env, ty, false, |ty| {
-                            matches!(ty, Type::TypeAlias(_))
-                        })
+                        any_over_type(db, &self.env, ty, |ty| matches!(ty, Type::TypeAlias(_)))
                     })
                 {
                     continue;

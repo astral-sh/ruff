@@ -18,11 +18,14 @@ use crate::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
         Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type, definition_expression_type,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type, binding_type,
+        definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{
+            self, TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
+            walk_type_with_recursion_guard,
+        },
     },
 };
 use ty_python_core::{
@@ -43,8 +46,9 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Return whether this type contains type variables without expanding lazy attributes.
     pub(crate) fn has_typevar(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
+        any_over_type(db, env, self, Type::is_type_var)
     }
 
     pub(crate) fn references_typevar(
@@ -53,8 +57,8 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         typevar_id: TypeVarIdentity<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| match ty {
-            Type::TypeVar(bound_typevar) => typevar_id == bound_typevar.typevar(db).identity(db),
+        any_over_type(db, env, self, |ty| match ty {
+            Type::TypeVar(typevar) => typevar_id == typevar.typevar(db).identity(db),
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
                 typevar_id == typevar.identity(db)
             }
@@ -101,8 +105,7 @@ impl<'db> Type<'db> {
             db,
             env,
             self,
-            false,
-            |ty| matches!(ty, Type::TypeVar(tv) if !tv.typevar(db).is_self(db)),
+            |ty| matches!(ty, Type::TypeVar(typevar) if !typevar.typevar(db).is_self(db)),
         )
     }
 
@@ -111,7 +114,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
+        any_over_type(db, env, self, |ty| {
             matches!(
                 ty,
                 Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
@@ -124,7 +127,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
+        any_over_type(db, env, self, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
         })
     }
@@ -134,7 +137,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
+        any_over_type(db, env, self, |ty| {
             ty.as_dynamic()
                 .is_some_and(DynamicType::is_provisional_marker)
         })
@@ -203,38 +206,38 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typevar: TypeVarInstance<'db>,
     visitor: &V,
 ) {
-    if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
-        typevar.bound_or_constraints(db, visitor.program_environment())
-    } else {
-        match typevar._bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
-                Some(bound_or_constraints)
-            }
-            Some(
-                TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
-                | TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
-            ) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                None
-            }
-            _ => None,
+    match typevar._bound_or_constraints(db) {
+        Some(TypeVarBoundOrConstraintsEvaluation::Eager(bounds)) => {
+            walk_type_var_bounds(db, bounds, visitor);
         }
-    } {
-        walk_type_var_bounds(db, bound_or_constraints, visitor);
+        Some(
+            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
+            | TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
+        ) => visitor.notify_skipped_lazy_type_attributes(),
+        None => {}
     }
-    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
-        typevar.default_type(db, visitor.program_environment())
-    } else {
-        match typevar._default(db) {
-            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
-            Some(TypeVarDefaultEvaluation::Lazy) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                None
-            }
-            _ => None,
-        }
-    } {
-        visitor.visit_type(db, default_type);
+
+    match typevar._default(db) {
+        Some(TypeVarDefaultEvaluation::Eager(default)) => visitor.visit_type(db, default),
+        Some(TypeVarDefaultEvaluation::Lazy) => visitor.notify_skipped_lazy_type_attributes(),
+        None => {}
+    }
+}
+
+/// Evaluate and visit a type variable's bounds, constraints, and default.
+///
+/// The caller must guard against recursive types.
+pub(super) fn walk_type_var_attributes<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typevar: TypeVarInstance<'db>,
+    visitor: &V,
+) {
+    let env = visitor.program_environment();
+    if let Some(bounds) = typevar.bound_or_constraints(db, env) {
+        walk_type_var_bounds(db, bounds, visitor);
+    }
+    if let Some(default) = typevar.default_type(db, env) {
+        visitor.visit_type(db, default);
     }
 }
 
@@ -536,7 +539,7 @@ impl<'db> TypeVarInstance<'db> {
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
             let db = state.db;
-            any_over_type(db, state.env, ty, false, |inner_ty| match inner_ty {
+            any_over_type(db, state.env, ty, |inner_ty| match inner_ty {
                 Type::TypeVar(bound_typevar) => typevar_default_is_self_referential(
                     state,
                     bound_typevar.typevar(db),
@@ -946,10 +949,6 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     impl<'db> TypeVisitor<'db> for MatchingFreshnessCollector<'_, 'db> {
         fn program_environment(&self) -> &ProgramEnvironment<'db> {
             self.env
-        }
-
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
         }
 
         fn visit_bound_type_var_type(
@@ -2188,7 +2187,7 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TypeVarConstraints<'db>),
 }
 
-fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bounds: TypeVarBoundOrConstraints<'db>,
     visitor: &V,

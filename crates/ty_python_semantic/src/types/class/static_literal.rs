@@ -504,10 +504,6 @@ impl<'db> StaticClassLiteral<'db> {
                 self.env
             }
 
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
             fn visit_bound_type_var_type(
                 &self,
                 _db: &'db dyn Db,

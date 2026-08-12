@@ -88,6 +88,30 @@ Using a keyword-variadic parameter:
 lambda **kwargs: reveal_type(kwargs)  # revealed: dict[str, Unknown]
 ```
 
+## Protocol context for lambda parameters
+
+The first argument supplies `Item` as context for the lambda's parameter. An `Any`-typed member does
+not prevent us from inferring `item.name` as `str` and rejecting it where `int` is expected:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, Protocol
+
+class Item(Protocol):
+    extra: Any
+    name: str
+
+def use[T](value: T, callback: Callable[[T], None]) -> None: ...
+def accept_int(value: int) -> None: ...
+def _(value: Item) -> None:
+    # error: [invalid-argument-type] "Expected `int`, found `str`"
+    use(value, lambda item: accept_int(item.name))
+```
+
 ## Nested `lambda` expressions
 
 Here, a `lambda` expression is used as the default value for a parameter in another `lambda`
