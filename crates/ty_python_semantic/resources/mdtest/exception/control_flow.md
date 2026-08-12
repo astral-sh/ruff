@@ -668,6 +668,84 @@ async def async_comprehension_assignment(values: AsyncIterable[int], awaitable: 
         reveal_type(state)  # revealed: Literal["ready"] | int
 ```
 
+## Exceptions passing through a `finally` clause
+
+An outer handler includes assignments from an intervening `finally` clause:
+
+```py
+state = 0
+try:
+    try:
+        state = 1
+        raise ValueError
+    finally:
+        state = 2
+except ValueError:
+    reveal_type(state)  # revealed: Literal[1, 2]
+```
+
+Cleanup also runs before an exception escapes an inner handler for a different exception type:
+
+```py
+state = 0
+try:
+    try:
+        state = 1
+        raise ValueError
+    except TypeError:
+        state = 3
+    finally:
+        state = 2
+except ValueError:
+    reveal_type(state)  # revealed: Literal[1, 2]
+```
+
+An exception path must not contaminate the normal continuation after cleanup:
+
+```py
+def may_raise() -> None: ...
+
+state = 0
+try:
+    try:
+        may_raise()
+        state = 1
+    finally:
+        pass
+
+    reveal_type(state)  # revealed: Literal[1]
+except:
+    pass
+```
+
+Cleanup remains visible when earlier and later calls share the same exception checkpoint:
+
+```py
+state = 0
+try:
+    may_raise()
+    try:
+        may_raise()
+        state = 1
+    finally:
+        state = 2
+except:
+    reveal_type(state)  # revealed: Literal[0, 2]
+```
+
+A return passing through non-raising cleanup does not make an outer exception handler reachable:
+
+```py
+def return_through_cleanup() -> None:
+    try:
+        try:
+            return
+        finally:
+            state = 2
+    except:
+        reveal_type(state)  # revealed: Never
+```
+
 ## Nested exception handlers
 
 A bare inner handler catches an exception before it can reach the outer handler:

@@ -4423,10 +4423,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let terminal_finally_entry_snapshots = self
+                let (terminal_finally_entry_snapshots, has_escaping_exception) = self
                     .try_node_context_stack_manager
                     .pop_context()
-                    .into_terminal_finally_entry_snapshots();
+                    .into_finally_entry_state();
 
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
@@ -4449,6 +4449,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.visit_body(finalbody);
                     if !self.flow_snapshot().is_always_unreachable() {
+                        if !finalbody.is_empty() && has_escaping_exception {
+                            self.record_exception_checkpoint();
+                        }
                         self.record_terminal_finally_entry();
                     }
                     self.mark_unreachable();
@@ -4459,6 +4462,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                     }
                     self.visit_body(finalbody);
+                    if !finalbody.is_empty()
+                        && has_escaping_exception
+                        && self.current_use_def_map().reachability
+                            != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
+                        self.record_exception_checkpoint();
+                    }
                 }
                 self.in_try = was_in_try;
             }

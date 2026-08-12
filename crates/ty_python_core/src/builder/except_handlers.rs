@@ -157,14 +157,16 @@ impl TryNodeContextStack {
     }
 
     /// Returns whether an active handler has not yet observed the current flow state.
+    /// Also marks intervening contexts that an exception escapes, even when its snapshot is deduplicated.
     fn needs_exception_checkpoint(
-        &self,
+        &mut self,
         checkpoint_key: (ScopedDefinitionId, ControlFlowRevision),
     ) -> bool {
-        for context in self.0.iter().rev() {
+        for context in self.0.iter_mut().rev() {
             match context.exception_handlers {
-                ExceptionHandlers::None => {}
+                ExceptionHandlers::None => context.has_escaping_exception = true,
                 ExceptionHandlers::Propagating(_) => {
+                    context.has_escaping_exception = true;
                     if context.last_checkpoint_key != Some(checkpoint_key) {
                         return true;
                     }
@@ -227,7 +229,7 @@ impl TryNodeContextStack {
     ) -> bool {
         for context in self.0.iter_mut().rev() {
             match &mut context.exception_handlers {
-                ExceptionHandlers::None => {}
+                ExceptionHandlers::None => context.has_escaping_exception = true,
                 ExceptionHandlers::Propagating(snapshots)
                 | ExceptionHandlers::CatchAll(snapshots) => {
                     if context.last_checkpoint_key != Some(checkpoint_key) {
@@ -237,6 +239,7 @@ impl TryNodeContextStack {
                     if matches!(context.exception_handlers, ExceptionHandlers::CatchAll(_)) {
                         return false;
                     }
+                    context.has_escaping_exception = true;
                 }
             }
         }
@@ -262,12 +265,17 @@ impl TryNodeContextStack {
 pub(super) struct TryNodeContext {
     exception_handlers: ExceptionHandlers,
     last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
+    /// Whether an exception escaped this suite and must also propagate after its cleanup.
+    has_escaping_exception: bool,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
 impl TryNodeContext {
-    pub(super) fn into_terminal_finally_entry_snapshots(self) -> Vec<FlowSnapshot> {
-        self.terminal_finally_entry_snapshots
+    pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool) {
+        (
+            self.terminal_finally_entry_snapshots,
+            self.has_escaping_exception,
+        )
     }
 
     /// Take a record of what the internal state looked like before a terminal control-flow
