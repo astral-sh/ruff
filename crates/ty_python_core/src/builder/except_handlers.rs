@@ -27,6 +27,10 @@ impl ExceptionHandlers {
     fn is_active(&self) -> bool {
         !matches!(self, Self::None)
     }
+
+    fn is_catch_all(&self) -> bool {
+        matches!(self, Self::CatchAll(_))
+    }
 }
 
 /// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
@@ -203,7 +207,7 @@ impl TryNodeContextStack {
                         );
                         context.last_checkpoint_key = Some(checkpoint_key);
                     }
-                    if matches!(context.exception_handlers, ExceptionHandlers::CatchAll(_)) {
+                    if context.exception_handlers.is_catch_all() {
                         return false;
                     }
                     context.has_escaping_exception = true;
