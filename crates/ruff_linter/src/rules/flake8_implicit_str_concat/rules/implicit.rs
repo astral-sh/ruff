@@ -169,7 +169,7 @@ pub(crate) fn implicit(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             ) {
-                diagnostic.set_fix(fix_multiline(a_range, b_range, locator));
+                diagnostic.set_fix(fix_multiline(a_range, b_range, tokens, locator));
             }
         } else {
             if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
@@ -285,16 +285,22 @@ fn has_odd_consecutive_backslashes(mut itr: impl Iterator<Item = u8>) -> bool {
 fn fix_multiline(
     a_range: TextRange,
     b_range: TextRange,
+    tokens: &Tokens,
     locator: &Locator,
 ) -> Fix {
-    let between = locator.slice(TextRange::new(a_range.end(), b_range.start()));
+    let between_range = TextRange::new(a_range.end(), b_range.start());
 
-    if let Some(backslash_offset) = between.find('\\') {
+    if !tokens
+        .in_range(between_range)
+        .iter()
+        .any(|token| token.kind() == TokenKind::NonLogicalNewline)
+    {
         // Backslash continuation: remove the `\` and wrap in parentheses.
         // Also consume any whitespace before the backslash.
-        let before_backslash = &between[..backslash_offset];
+        let backslash_start = locator.line_end(a_range.end()) - TextLen::text_len("\\");
+        let before_backslash = locator.slice(TextRange::new(a_range.end(), backslash_start));
         let trimmed_len = before_backslash.trim_end().len();
-        let replace_start = a_range.end() + TextLen::text_len(&between[..trimmed_len]);
+        let replace_start = a_range.end() + TextLen::text_len(&before_backslash[..trimmed_len]);
 
         let b_line_start = locator.line_start(b_range.start());
         let indent = locator.slice(TextRange::new(b_line_start, b_range.start()));
@@ -312,9 +318,6 @@ fn fix_multiline(
     } else {
         // No backslash (allow-multiline = false): insert ` +` after the first
         // string to make the concatenation explicit.
-        Fix::unsafe_edit(Edit::insertion(
-            " +".to_string(),
-            a_range.end(),
-        ))
+        Fix::unsafe_edit(Edit::insertion(" +".to_string(), a_range.end()))
     }
 }

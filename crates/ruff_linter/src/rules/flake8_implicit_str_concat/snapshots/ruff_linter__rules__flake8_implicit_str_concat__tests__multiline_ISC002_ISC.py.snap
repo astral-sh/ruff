@@ -197,3 +197,21 @@ help: Replace with explicit concatenation
 223 |     "def"
     |
 note: This is an unsafe fix and may change runtime behavior
+
+ISC002 [*] Implicitly concatenated string literals over multiple lines
+   --> ISC.py:236:5
+    |
+235 |   x = (
+236 | /     "abc"  # not a continuation \
+237 | |     "def"
+    | |_________^
+238 |   )
+    |
+help: Replace with explicit concatenation
+    |
+235 | x = (
+    -     "abc"  # not a continuation \
+236 +     "abc" +  # not a continuation \
+237 |     "def"
+    |
+note: This is an unsafe fix and may change runtime behavior
