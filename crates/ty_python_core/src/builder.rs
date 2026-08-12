@@ -4451,11 +4451,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_except_state);
                 }
 
+                let normal_pre_finally_reachability = self.current_use_def_map().reachability;
                 let normal_pre_finally_state = self.flow_snapshot();
                 let (terminal_finally_entry_snapshots, has_escaping_exception) = self
                     .try_node_context_stack_manager
                     .pop_context()
                     .into_finally_entry_state();
+                let has_terminal_finally_entries = !terminal_finally_entry_snapshots.is_empty();
 
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
@@ -4490,6 +4492,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.flow_merge(snapshot);
                         }
                     }
+                    let linear_finally_entry = (has_terminal_finally_entries
+                        && !finalbody.is_empty()
+                        && self.in_function_scope()
+                        && finalbody.iter().all(|statement| {
+                            matches!(statement, ast::Stmt::Expr(_) | ast::Stmt::Pass(_))
+                        }))
+                    .then(|| {
+                        (
+                            self.flow_snapshot(),
+                            self.current_use_def_map().exception_checkpoint_key(),
+                        )
+                    });
                     self.visit_body(finalbody);
                     if !finalbody.is_empty()
                         && has_escaping_exception
@@ -4497,6 +4511,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             != ScopedReachabilityConstraintId::ALWAYS_FALSE
                     {
                         self.record_exception_checkpoint();
+                    }
+                    if !finalbody.is_empty() && has_terminal_finally_entries {
+                        let restored_normal_flow = linear_finally_entry.is_some_and(
+                            |(mixed_finally_entry_state, mixed_finally_entry_key)| {
+                                self.current_use_def_map().exception_checkpoint_key()
+                                    == mixed_finally_entry_key
+                                    && self
+                                        .current_use_def_map_mut()
+                                        .restore_with_pending_constraints(
+                                            &normal_pre_finally_state,
+                                            &mixed_finally_entry_state,
+                                        )
+                            },
+                        );
+                        if !restored_normal_flow {
+                            self.current_use_def_map_mut()
+                                .record_reachability_constraint(normal_pre_finally_reachability);
+                        }
                     }
                 }
                 self.in_try = was_in_try;

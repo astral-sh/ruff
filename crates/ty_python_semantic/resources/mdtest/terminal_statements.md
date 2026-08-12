@@ -86,7 +86,7 @@ def return_in_try(cond: bool):
         reveal_type(x)  # revealed: Literal["before"]
     finally:
         reveal_type(x)  # revealed: Literal["before", "test"]
-    reveal_type(x)  # revealed: Literal["before", "test"]
+    reveal_type(x)  # revealed: Literal["before"]
 
 def return_in_try_without_finally(cond: bool):
     x = "before"
@@ -456,7 +456,9 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 Terminal control flow in a `try`, `except`, or `else` block passes through its `finally` clause
 before terminating the current scope or jumping to its final destination. A `finally` block with
-both normal and terminal entry paths sees the bindings from both.
+both normal and terminal entry paths sees the bindings from both, but only the normal path can
+continue after the block. Straight-line cleanup preserves that distinction; branching cleanup
+currently remains conservative.
 
 ```py
 def finally_runs_after_return():
@@ -516,7 +518,12 @@ def finally_runs_after_mixed_try_paths(cond: bool):
         x = "try-normal"
     finally:
         reveal_type(x)  # revealed: Literal["try-return", "try-normal"]
+```
 
+A `finally` clause also runs on returning paths, so its operations must be checked against values
+from both the returning and continuing paths.
+
+```py
 def requires_int(value: int) -> None: ...
 def finally_checks_returning_path(cond: bool) -> None:
     value = 1
@@ -526,7 +533,66 @@ def finally_checks_returning_path(cond: bool) -> None:
             return
     finally:
         requires_int(value)  # error: [invalid-argument-type]
+```
 
+After a straight-line cleanup suite, assignments from returning paths do not reach the continuing
+path.
+
+```py
+def finally_does_not_leak_returning_binding(cond: bool) -> None:
+    value = 1
+    try:
+        if cond:
+            value = "returned"
+            return
+    finally:
+        pass
+
+    reveal_type(value)  # revealed: Literal[1]
+    requires_int(value)
+```
+
+Ordinary cleanup calls and method calls also preserve the continuing path's narrowing.
+
+```py
+def cleanup() -> None: ...
+
+class Resource:
+    def close(self) -> None: ...
+
+def finally_cleanup_calls_preserve_narrowing(value: int | None, resource: Resource) -> None:
+    try:
+        if value is None:
+            return
+    finally:
+        cleanup()
+        resource.close()
+
+    reveal_type(value)  # revealed: int
+    requires_int(value)
+```
+
+A cleanup call that never returns also prevents any later code from being reached.
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def finally_terminal_cleanup_remains_terminal(value: int | None) -> None:
+    try:
+        if value is None:
+            return
+    finally:
+        stop()
+
+    reveal_type(value)  # revealed: Never
+```
+
+An unconditional assignment in the cleanup suite overwrites the incoming value on both paths.
+
+```py
 def finally_assignment_overwrites_returning_path(cond: bool) -> None:
     value = "before"
     try:
@@ -537,7 +603,30 @@ def finally_assignment_overwrites_returning_path(cond: bool) -> None:
         value = "cleanup"
 
     reveal_type(value)  # revealed: Literal["cleanup"]
+```
 
+Cleanup suites that branch are not analyzed separately for continuing and returning paths. Here,
+only `2` can reach the code after `finally`, but the conservative result also includes `1` from the
+returning path.
+
+```py
+def finally_branching_cleanup_is_conservative(cond: bool) -> None:
+    try:
+        if cond:
+            return
+    finally:
+        if cond:
+            value = 1
+        else:
+            value = 2
+
+    # TODO: Only `Literal[2]` should remain after the returning path exits.
+    reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+A `break` likewise enters the cleanup suite, but its bindings do not reach the continuing path.
+
+```py
 def finally_runs_after_mixed_break_paths(cond: bool):
     x = "before"
     while True:
@@ -549,6 +638,19 @@ def finally_runs_after_mixed_break_paths(cond: bool):
         finally:
             reveal_type(x)  # revealed: Literal["break", "normal"]
         break
+
+def finally_does_not_leak_break_binding(cond: bool) -> None:
+    value = 1
+    for _ in [0]:
+        try:
+            if cond:
+                value = "break"
+                break
+        finally:
+            pass
+
+        reveal_type(value)  # revealed: Literal[1]
+        requires_int(value)
 
 def finally_runs_before_break():
     x = "before"

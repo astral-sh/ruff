@@ -590,13 +590,22 @@ def context_manager_target_may_be_unbound(manager) -> None:
 Earlier context managers have already entered when a later manager raises:
 
 ```py
-def multiple_context_managers(first, second) -> None:
+from typing import Literal
+
+class FirstManager:
+    def __enter__(self) -> Literal[1]:
+        return 1
+
+    def __exit__(self, *_):
+        pass
+
+def multiple_context_managers(first: FirstManager, second) -> None:
     state = 0
     try:
         with first as state, second:
-            state = 1
+            state = 2
     except:
-        reveal_type(state)  # revealed: Literal[0, 1] | Unknown
+        reveal_type(state)  # revealed: Literal[0, 1, 2]
 ```
 
 ## Unpacking can raise

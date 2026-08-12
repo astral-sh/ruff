@@ -2727,6 +2727,48 @@ impl<'db> UseDefMapBuilder<'db> {
         self.member_states.resize(num_members, undefined);
     }
 
+    /// Restores an earlier path while retaining straight-line cleanup reachability and call gates.
+    ///
+    /// Returns `false` without changing the current state if control flow branched away from the
+    /// cleanup entry, since those constraints cannot be applied to another path as a single chain.
+    pub(super) fn restore_with_pending_constraints(
+        &mut self,
+        snapshot: &FlowSnapshot,
+        since: &FlowSnapshot,
+    ) -> bool {
+        let current = self.pending_reachability.current;
+        if self
+            .pending_reachability
+            .common_ancestor(since.pending_reachability, current)
+            != since.pending_reachability
+        {
+            return false;
+        }
+
+        let reachability_constraint = self.pending_reachability.constraint_between(
+            since.pending_reachability,
+            current,
+            &mut self.reachability_constraints,
+        );
+        let narrowing_constraint = self.pending_reachability.narrowing_constraint_between(
+            since.pending_reachability,
+            current,
+            &mut self.narrowing_constraints,
+        );
+        let is_unreachable = self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE;
+
+        self.restore(snapshot.clone());
+        if is_unreachable {
+            self.mark_unreachable();
+        } else if reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            || narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
+        }
+
+        true
+    }
+
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
     /// path to get here. The new state for each place should include definitions from both the
     /// prior state and the snapshot.
