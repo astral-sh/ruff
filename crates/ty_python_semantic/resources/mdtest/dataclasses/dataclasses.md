@@ -1494,6 +1494,26 @@ class A:
     y: int
 ```
 
+The field-level argument is also ignored, so fields remain positional and still participate in
+constructor ordering:
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class PositionalField:
+    value: int = field(default=1, kw_only=True)
+
+reveal_type(PositionalField.__init__)  # revealed: (self: PositionalField, value: int = 1) -> None
+
+PositionalField(1)
+
+@dataclass
+class InvalidFieldOrder:
+    optional: int = field(default=1, kw_only=True)
+    required: str  # error: [dataclass-field-order]
+```
+
 ### `kw_only` - Python 3.13
 
 ```toml
