@@ -2302,6 +2302,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         match expr {
+            ast::Expr::Named(named) if named.target.is_name_expr() => {
+                Self::condition_evaluation_is_known_safe(&named.value)
+            }
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 Self::expression_evaluation_is_known_safe(expr)
             }
@@ -2340,6 +2343,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         match expr {
+            ast::Expr::Named(named) if named.target.is_name_expr() => {
+                Self::expression_evaluation_is_known_safe(&named.value)
+            }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 elts.iter().all(Self::expression_evaluation_is_known_safe)

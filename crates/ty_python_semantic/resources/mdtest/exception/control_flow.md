@@ -363,6 +363,47 @@ def if_condition(value: object) -> None:
         reveal_type(state)  # revealed: Literal[0]
 ```
 
+An assignment expression with a safe value cannot raise, including when it appears in an identity
+comparison:
+
+```py
+def safe_named_expressions() -> None:
+    caught = False
+    try:
+        if value := 1:
+            pass
+        if (value := 1) is not None:
+            pass
+    except:
+        caught = True
+
+    reveal_type(caught)  # revealed: Literal[False]
+```
+
+An assignment expression can still raise while calling its right-hand side or testing an unknown
+value's truthiness:
+
+```py
+def unsafe_named_expressions(value: object, may_raise) -> None:
+    caught = False
+    try:
+        if bound := may_raise():
+            pass
+    except:
+        caught = True
+
+    reveal_type(caught)  # revealed: bool
+
+    caught = False
+    try:
+        if bound := value:
+            pass
+    except:
+        caught = True
+
+    reveal_type(caught)  # revealed: bool
+```
+
 A `while` condition can fail before its first iteration or after an earlier iteration:
 
 ```py
