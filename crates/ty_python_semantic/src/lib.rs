@@ -49,8 +49,8 @@ pub use types::ide_support::{
     type_hierarchy_supertypes,
 };
 pub use types::{
-    DisplaySettings, FixtureBinding, ProgramEnvironment, TypeQualifiers,
-    fixture_bindings_for_parameter,
+    DisplaySettings, FixtureBinding, ProgramEnvironment, SyntheticFixture, TypeQualifiers,
+    fixture_bindings_for_parameter, pytest_global_plugin_files, synthetic_fixture_for_parameter,
 };
 
 mod db;
