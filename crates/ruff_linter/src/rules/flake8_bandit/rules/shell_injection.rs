@@ -334,14 +334,14 @@ fn is_trusted_input(arg: &Expr, semantic: &SemanticModel) -> bool {
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
     let shell_keyword = find_shell_keyword(&call.arguments, checker.semantic());
-    let subprocess_argument = if matches!(call_kind, Some(CallKind::Subprocess)) {
-        find_subprocess_argument(&call.arguments)
-    } else {
-        None
+    let command_argument = match call_kind {
+        Some(CallKind::Subprocess) => find_subprocess_argument(&call.arguments),
+        Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args.first(),
+        None => None,
     };
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
-        if let Some(arg) = subprocess_argument {
+        if let Some(arg) = command_argument {
             match shell_keyword {
                 // S602
                 Some(ShellKeyword {
@@ -402,12 +402,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
 
     // S607
     if checker.is_rule_enabled(Rule::StartProcessWithPartialPath) {
-        let arg = match call_kind {
-            Some(CallKind::Subprocess) => subprocess_argument,
-            Some(CallKind::Shell | CallKind::NoShell) => call.arguments.args.first(),
-            None => None,
-        };
-        if let Some(arg) = arg {
+        if let Some(arg) = command_argument {
             if is_partial_path(arg) {
                 checker.report_diagnostic(StartProcessWithPartialPath, arg.range());
             }
@@ -427,12 +422,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 )
             )
         {
-            let arg = if matches!(call_kind, Some(CallKind::Subprocess)) {
-                subprocess_argument
-            } else {
-                call.arguments.args.first()
-            };
-            if let Some(arg) = arg {
+            if let Some(arg) = command_argument {
                 if is_wildcard_command(arg) {
                     checker.report_diagnostic(UnixCommandWildcardInjection, arg.range());
                 }
