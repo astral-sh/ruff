@@ -975,8 +975,14 @@ impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class constitutes a typed dict specification (inherits from
     /// `typing.TypedDict` or `typing_extensions.TypedDict`, either directly or indirectly).
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        self.instance_flags(db)
-            .contains(ClassInstanceFlags::TYPED_DICT)
+        if let Some(known) = self.known(db) {
+            return known.is_typed_dict_subclass();
+        }
+
+        self.has_explicit_bases(db)
+            && self
+                .instance_flags(db)
+                .contains(ClassInstanceFlags::TYPED_DICT)
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from

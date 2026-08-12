@@ -638,6 +638,12 @@ impl<'db> ClassLiteral<'db> {
 
     /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
     pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        if let Some(class) = self.as_static()
+            && (class.known(db).is_some() || !class.has_explicit_bases(db))
+        {
+            return false;
+        }
+
         self.instance_flags(db)
             .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
     }
