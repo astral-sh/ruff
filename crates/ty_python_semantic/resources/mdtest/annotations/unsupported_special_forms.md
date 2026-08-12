@@ -1,9 +1,9 @@
 # Unsupported special forms
 
-## Partially supported
+## Not yet supported
 
-Several special forms are only partially supported by ty. Valid uses should not produce false
-positives, while the forms modeled precisely should still be checked:
+Several special forms are unsupported by ty currently. However, we also don't emit false-positive
+errors if you use one in an annotation:
 
 ```py
 from typing_extensions import Self, TypeVarTuple, Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, TypeAlias, Callable, TypeVar

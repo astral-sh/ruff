@@ -65,7 +65,8 @@ def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
-# error: [invalid-argument-type]
+# TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
+# from the callback.
 reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
