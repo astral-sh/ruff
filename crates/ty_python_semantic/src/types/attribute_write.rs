@@ -9,6 +9,7 @@
 
 use crate::Db;
 use ty_module_resolver::KnownModule;
+use ty_python_core::use_def_map;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
@@ -16,7 +17,9 @@ use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
 };
 use crate::ProgramEnvironment;
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
+};
 
 /// The operation required to write an attribute.
 ///
@@ -441,16 +444,32 @@ fn class_attribute_write_requirement<'db>(
 
     let member = match type_member {
         PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(place @ DefinedPlace { ty, .. }),
             qualifiers,
-        } => ClassAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(
-                db, env, object_ty, attribute, ty, qualifiers,
-            ),
-            fallback: receiver_fallback.map(|fallback| {
-                class_fallback_write_requirement(db, env, object_ty, class_attr_self_ty, fallback)
-            }),
-        },
+        } => {
+            let descriptor_ty = receiver_fallback
+                .and_then(|_| possible_class_attribute_descriptor(db, env, place))
+                .unwrap_or(ty);
+            ClassAttributeWriteMember::Explicit {
+                member: explicit_attribute_write_requirement(
+                    db,
+                    env,
+                    object_ty,
+                    attribute,
+                    descriptor_ty,
+                    qualifiers,
+                ),
+                fallback: receiver_fallback.map(|fallback| {
+                    class_fallback_write_requirement(
+                        db,
+                        env,
+                        object_ty,
+                        class_attr_self_ty,
+                        fallback,
+                    )
+                }),
+            }
+        }
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
@@ -477,6 +496,36 @@ fn class_attribute_write_requirement<'db>(
     };
 
     AttributeWriteRequirement::Class { object_ty, member }
+}
+
+/// Recover the concrete descriptor hidden by an uncertain metaclass-member annotation.
+///
+/// For `attribute: type[Base] = Descriptor`, the annotation describes the class object itself,
+/// while the binding can reveal that `Descriptor` has a metaclass implementing `__set__`.
+fn possible_class_attribute_descriptor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    member: DefinedPlace<'db>,
+) -> Option<Type<'db>> {
+    if member.ty.is_data_descriptor(db, env) || member.ty.is_definitely_non_data_descriptor(db, env)
+    {
+        return None;
+    }
+
+    let definition = member.provenance.definition()?;
+    let use_def = use_def_map(db, definition.scope(db));
+    let descriptor_ty =
+        place_from_bindings(db, env, use_def.end_of_scope_bindings(definition.place(db)))
+            .place
+            .ignore_possibly_undefined()?;
+    let descriptor_ty = match descriptor_ty.resolve_type_alias(db) {
+        Type::TypeForm(typeform) => typeform.type_argument(db).to_meta_type(db, env),
+        descriptor_ty => descriptor_ty,
+    };
+
+    descriptor_ty
+        .is_data_descriptor(db, env)
+        .then_some(descriptor_ty)
 }
 
 /// Convert an explicitly resolved member into either a descriptor call or a direct type check.
@@ -662,17 +711,22 @@ fn class_object_member_precedence<'db>(
         return None;
     }
 
+    let type_member_ty = type_member.place.ignore_possibly_undefined()?;
+    let definitely_non_data_descriptor = type_member_ty.is_definitely_non_data_descriptor(db, env);
+    if !definitely_non_data_descriptor
+        && (type_member_ty.is_divergent() || type_member_ty.is_data_descriptor(db, env))
+    {
+        return None;
+    }
+
     let receiver_member = object_ty
         .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
         .filter(|class_attr| !class_attr.place.is_undefined())?;
-    let type_member_ty = type_member.place.ignore_possibly_undefined()?;
 
-    if type_member_ty.is_definitely_non_data_descriptor(db, env) {
+    if definitely_non_data_descriptor {
         Some(ClassObjectMemberPrecedence::Receiver(receiver_member))
-    } else if !type_member_ty.is_divergent() && !type_member_ty.is_data_descriptor(db, env) {
-        Some(ClassObjectMemberPrecedence::TypeOrReceiver(receiver_member))
     } else {
-        None
+        Some(ClassObjectMemberPrecedence::TypeOrReceiver(receiver_member))
     }
 }
 
