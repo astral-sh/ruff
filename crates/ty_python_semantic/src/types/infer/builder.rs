@@ -10753,7 +10753,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // similarly check for deprecation of dunder methods on all our literal
                     // type fast paths, but we choose not to pay that extra cost, since it is
                     // implausible that e.g. `int.__neg__` would ever be deprecated.
-                    if let Some(dunder) = operand_type
+                    if let Some(dunder) = literal
+                        .fallback_instance(db, env)
                         .member_lookup_with_policy(
                             db,
                             env,
