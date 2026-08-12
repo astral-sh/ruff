@@ -1468,6 +1468,48 @@ class InvalidKWOnlyDefaultModel:
     z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
 ```
 
+### Keyword-only field specifiers before Python 3.10
+
+Although `dataclasses.field` does not support `kw_only` before Python 3.10, third-party field
+specifiers can support it on earlier Python versions. Inherited keyword-only fields must retain that
+setting so they do not participate in positional field ordering.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import Any, TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+
+def custom_field(*, default: Any = ..., kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(custom_field,))
+def custom_dataclass(cls: type[T]) -> type[T]:
+    return cls
+
+@custom_dataclass
+class Base:
+    optional: float = custom_field(default=1.0, kw_only=True)
+
+@custom_dataclass
+class Child(Base):
+    required: str
+
+reveal_type(Child.__init__)  # revealed: (self: Child, required: str, *, optional: float = ...) -> None
+
+Child("value")
+Child("value", optional=2.0)
+Child("value", 2.0)  # error: [too-many-positional-arguments]
+
+@custom_dataclass
+class InvalidChild(Base):
+    positional_default: str = custom_field(default="default", kw_only=False)
+    required: int  # error: [dataclass-field-order]
+```
+
 ### For metaclass-based transformers
 
 ```py

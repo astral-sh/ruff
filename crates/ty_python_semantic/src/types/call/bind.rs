@@ -1986,7 +1986,11 @@ impl<'db> Bindings<'db> {
                             .map(|init| !init.bool(db, env).is_always_false())
                             .unwrap_or(true);
 
-                        let kw_only = if env.python_version(db) >= PythonVersion::PY310 {
+                        // Only the standard-library field specifier requires Python 3.10 for
+                        // `kw_only`; third-party field specifiers can support it earlier.
+                        let kw_only = if env.python_version(db) >= PythonVersion::PY310
+                            || !function_type.is_known(db, KnownFunction::Field)
+                        {
                             match kw_only.and_then(Type::as_literal_value_kind) {
                                 // We are more conservative here when turning the type for `kw_only`
                                 // into a bool, because a field specifier in a stub might use
