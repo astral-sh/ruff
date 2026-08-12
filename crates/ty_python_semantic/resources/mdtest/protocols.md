@@ -6181,6 +6181,15 @@ def check(value: Left[int]) -> None:
     expect_right2(value)  # error: [invalid-argument-type]
 ```
 
+Generic-call inference must also avoid expanding recursive protocol members when checking whether
+its argument constraints are independent:
+
+```py
+def accept[U, V](outer: U, recursive: V) -> None: ...
+def infer[T](outer: T, recursive: C[int]) -> None:
+    accept(outer, recursive)
+```
+
 ### Recursive legacy generic protocol
 
 ```py

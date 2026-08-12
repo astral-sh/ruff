@@ -89,6 +89,41 @@ def get_int[T]() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Generic call with independent and dependent arguments
+
+Concrete arguments must not erase a type variable inferred from another argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+class Invariant[T]:
+    item: T
+
+class Bounded[T: int]:
+    item: T
+
+def combine[A, B, U](first: Invariant[A], second: Invariant[B], dependent: Invariant[U]) -> tuple[A, B, U]:
+    raise NotImplementedError
+
+class Constructed[T]:
+    def __new__[A, B, U](cls, first: Invariant[A], second: Invariant[B], dependent: Invariant[U]) -> Constructed[tuple[A, B, U]]:
+        raise NotImplementedError
+
+def infer[T](dependent: Invariant[T]) -> None:
+    concrete = Invariant[int]()
+    reveal_type(combine(concrete, concrete, dependent))  # revealed: tuple[int, int, T@infer]
+    reveal_type(Constructed(concrete, concrete, dependent))  # revealed: Constructed[tuple[int, int, T@infer]]
+
+    bounded = Invariant[Bounded[int]]()
+    reveal_type(combine(bounded, bounded, dependent))  # revealed: tuple[Bounded[int], Bounded[int], T@infer]
+    reveal_type(Constructed(bounded, bounded, dependent))  # revealed: Constructed[tuple[Bounded[int], Bounded[int], T@infer]]
+```
+
 ## Generic callable chains
 
 Inferring a chain of generic callable parameters should discard internal typevar artifacts from
