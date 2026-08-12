@@ -393,6 +393,8 @@ AliasClass()  # error: [deprecated] "Use OtherType instead"
 
 ## Dunders
 
+### Binary operators
+
 If a dunder like `__add__` is deprecated, then the equivalent syntactic sugar like `+` should fire a
 diagnostic.
 
@@ -411,6 +413,8 @@ x = MyInt(1)
 y = MyInt(2)
 z = x + y  # TODO error: [deprecated] "MyInt `+` support is broken"
 ```
+
+### Unary operators
 
 If a dunder like `__invert__` is deprecated, then the equivalent `~` operator should fire a
 diagnostic.
