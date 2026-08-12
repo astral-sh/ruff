@@ -21,7 +21,6 @@ error[UP048]: Use `while True:` instead of `while 1:`
   |
 1 | while 1:  # snapshot: while-one
   |       ^
-  |
 help: Replace with `True`
   |
   - while 1:  # snapshot: while-one
@@ -54,7 +53,6 @@ error[UP048]: Use `while True:` instead of `while 1:`
   |
 1 | while 0x1:  # snapshot: while-one
   |       ^^^
-  |
 help: Replace with `True`
   |
   - while 0x1:  # snapshot: while-one
@@ -81,7 +79,6 @@ error[UP048]: Use `while True:` instead of `while 1:`
   |
 3 |     1  # snapshot: while-one
   |     ^
-  |
 help: Replace with `True`
   |
 2 |     # keep me
