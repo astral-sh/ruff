@@ -46,6 +46,14 @@ fn context_manager_can_suppress<'db>(
     let mut return_types = UnionBuilder::new(db, &env);
     for callable in &callables {
         for signature in callable.signatures(db) {
+            if signature
+                .parameters()
+                .get_positional(0)
+                .is_some_and(|parameter| parameter.annotated_type().is_none(db))
+            {
+                continue;
+            }
+
             let return_type = if is_async {
                 let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
                     return false;

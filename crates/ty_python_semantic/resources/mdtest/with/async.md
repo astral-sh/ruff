@@ -93,6 +93,56 @@ async def interrupted_return() -> str:  # error: [invalid-return-type]
         return await may_raise()
 ```
 
+## Overloaded async context manager exits
+
+An overloaded async exit method can distinguish normal exits from exceptions:
+
+```py
+from typing import Literal, overload
+
+class Manager:
+    async def __aenter__(self) -> None: ...
+
+async def may_raise() -> str:
+    raise ValueError
+```
+
+An overload returning `True` only on a normal exit cannot suppress an exception:
+
+```py
+class NormalExitOnly(Manager):
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value, traceback) -> Literal[True]: ...
+    @overload
+    async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[False]: ...
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_value, traceback) -> bool:
+        return exc_type is None
+
+async def normal_exit_only() -> None:
+    result = None
+    async with NormalExitOnly():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+An overload returning `True` when an exception occurs can suppress it:
+
+```py
+class ExceptionalExitOnly(Manager):
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value, traceback) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[True]: ...
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_value, traceback) -> bool | None:
+        return True if exc_type is not None else None
+
+async def exceptional_exit_only() -> None:
+    result = None
+    async with ExceptionalExitOnly():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
 ## Multiple targets
 
 ```py

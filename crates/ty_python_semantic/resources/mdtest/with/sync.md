@@ -243,6 +243,61 @@ def propagating_exception(value: int | str) -> None:
     reveal_type(value)  # revealed: str
 ```
 
+## Overloaded context manager exit methods
+
+An overloaded exit method is classified by the overload used when an exception occurs, not the
+overload used during normal exit:
+
+```py
+from typing import Literal, overload
+
+class Manager:
+    def __enter__(self) -> None: ...
+
+class NormalOnly(Manager):
+    @overload
+    def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> Literal[True]: ...
+    @overload
+    def __exit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: object) -> Literal[False]: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return exc_type is None
+
+class ExceptionOnly(Manager):
+    @overload
+    def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> None: ...
+    @overload
+    def __exit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: object) -> Literal[True]: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True if exc_type is not None else None
+
+def may_raise() -> str:
+    raise ValueError
+
+def requires_str(value: str) -> None: ...
+```
+
+A manager that returns `True` only during normal exit cannot suppress exceptions:
+
+```py
+def normal_only() -> None:
+    value = None
+    with NormalOnly():
+        value = may_raise()
+    reveal_type(value)  # revealed: str
+    requires_str(value)
+```
+
+A manager that returns `True` when handling an exception preserves the previous binding:
+
+```py
+def exception_only() -> None:
+    value = None
+    with ExceptionOnly():
+        value = may_raise()
+    reveal_type(value)  # revealed: None | str
+    requires_str(value)  # error: [invalid-argument-type]
+```
+
 ## Union context manager
 
 ```py
