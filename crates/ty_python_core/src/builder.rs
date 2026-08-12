@@ -2231,138 +2231,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         scope.is_eager() && !matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_))
     }
 
-    /// Captures comprehension walrus bindings that have completed before an exception escapes.
-    ///
-    /// Comprehensions normally publish their bindings only after their scope is popped. An
-    /// exception can escape before then, so an enclosing handler needs an outer-scoped proxy for
-    /// each binding that is live at the checkpoint, without changing normal comprehension flow.
-    ///
-    /// ```python
-    /// state = 0
-    /// try:
-    ///     [(state := 1, may_raise(), state := "later") for _ in [0]]
-    /// except Exception:
-    ///     reveal_type(state)  # int; the later assignment has not executed
-    /// ```
-    ///
-    /// The original outer flow is restored immediately after capturing the checkpoint.
-    fn exception_checkpoint_snapshot(
-        &mut self,
-        scope_id: FileScopeId,
-        crossed_comprehensions: &[usize],
-    ) -> FlowSnapshot {
-        if crossed_comprehensions.is_empty() {
-            return self.use_def_maps[scope_id].snapshot();
-        }
-
-        let original = self.use_def_maps[scope_id].snapshot();
-
-        for &comprehension_stack_index in crossed_comprehensions.iter().rev() {
-            let comprehension_scope = self.scope_stack[comprehension_stack_index].file_scope_id;
-            let containing_scope = self.scope_stack[..comprehension_stack_index]
-                .iter()
-                .rev()
-                .find(|scope| self.scopes[scope.file_scope_id].kind() != ScopeKind::Comprehension)
-                .map(|scope| scope.file_scope_id);
-
-            let mut named_bindings = self.scope_stack[comprehension_stack_index]
-                .this_scope_global_or_nonlocal_declarations
-                .iter()
-                .map(|(name, range)| (name.clone(), *range))
-                .collect::<SmallVec<[(Name, TextRange); 2]>>();
-            named_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-
-            for (name, range) in named_bindings {
-                let Some(source_symbol) = self.place_tables[comprehension_scope].symbol_id(&name)
-                else {
-                    continue;
-                };
-
-                let is_global = self.place_tables[comprehension_scope]
-                    .symbol(source_symbol)
-                    .is_global();
-                let owning_scope = if is_global {
-                    Some(FileScopeId::global())
-                } else {
-                    containing_scope
-                };
-
-                if owning_scope != Some(scope_id) {
-                    continue;
-                }
-
-                let binding_status = self.use_def_maps[comprehension_scope]
-                    .symbol_live_binding_status(source_symbol);
-                if binding_status == LiveBindingStatus::Unbound {
-                    continue;
-                }
-
-                let source_definitions = self.use_def_maps[comprehension_scope]
-                    .current_bindings(source_symbol.into())
-                    .filter(|binding| {
-                        binding.reachability_constraint()
-                            != ScopedReachabilityConstraintId::ALWAYS_FALSE
-                    })
-                    .map(|binding| binding.binding())
-                    .filter(|definition| !definition.is_unbound())
-                    .collect::<SmallVec<[ScopedDefinitionId; 2]>>();
-                if source_definitions.is_empty() {
-                    continue;
-                }
-
-                let (symbol, added) =
-                    self.place_tables[scope_id].add_symbol(Symbol::new(name.clone()));
-                let place = ScopedPlaceId::from(symbol);
-                if added {
-                    self.use_def_maps[scope_id].add_place(place);
-                }
-
-                let declaration = NestedDeclaration {
-                    kind: if is_global {
-                        GlobalOrNonlocal::Global
-                    } else {
-                        GlobalOrNonlocal::Nonlocal
-                    },
-                    file_scope_id: comprehension_scope,
-                    range,
-                    is_bound: true,
-                };
-
-                for (index, source_definition) in source_definitions.into_iter().enumerate() {
-                    let definition = Definition::new(
-                        self.db,
-                        self.scope_ids_by_scope[scope_id],
-                        place,
-                        DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
-                            name: name.clone(),
-                            execution: NestedBindingExecution::EagerAtException {
-                                source_definition,
-                            },
-                            nested_declarations: SmallVec::from_slice(&[declaration]),
-                        })),
-                        false,
-                    );
-
-                    let previous = if index == 0 && binding_status == LiveBindingStatus::Bound {
-                        PreviousDefinitions::AreShadowed
-                    } else {
-                        PreviousDefinitions::AreKept
-                    };
-                    self.use_def_maps[scope_id].record_binding(
-                        place,
-                        definition,
-                        previous,
-                        FutureDefinitions::ShadowThisOne,
-                    );
-                }
-            }
-        }
-
-        let checkpoint = self.use_def_maps[scope_id].snapshot();
-        self.use_def_maps[scope_id].restore(original);
-        checkpoint
-    }
-
     /// Records the current flow state immediately before an operation that may raise an exception.
     ///
     /// Child expressions must already have been visited, so their completed assignments are
@@ -3005,6 +2873,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.record_exception_checkpoint_if(loopback_can_raise);
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
+        if !matches!(scope, NodeWithScopeRef::GeneratorExpression(_)) {
+            self.record_exception_checkpoint();
+        }
 
         self.current_assignments = saved_assignments;
 

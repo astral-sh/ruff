@@ -20,7 +20,7 @@ use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
-use crate::use_def::{BindingWithConstraintsIterator, ScopedDefinitionId};
+use crate::use_def::BindingWithConstraintsIterator;
 use crate::{Db, Program, SemanticIndex};
 
 /// A definition of a place.
@@ -1612,8 +1612,6 @@ impl NestedBindingsDefinitionKind {
     /// Returns every nested binding source and whether it was declared `global`.
     ///
     /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
-    /// Exception checkpoints use reachable bindings rather than end-of-scope bindings because the
-    /// comprehension has not yet finished; inference selects the checkpoint's exact source.
     fn binding_sources<'index, 'db>(
         &'index self,
         index: &'index SemanticIndex<'db>,
@@ -1625,10 +1623,8 @@ impl NestedBindingsDefinitionKind {
                 .symbol_id(&self.name)?;
             let use_def = index.use_def_map(declaration.file_scope_id);
             let bindings = match self.execution {
+                NestedBindingExecution::Lazy => use_def.reachable_bindings(symbol.into()),
                 NestedBindingExecution::Eager => use_def.end_of_scope_bindings(symbol.into()),
-                NestedBindingExecution::Lazy | NestedBindingExecution::EagerAtException { .. } => {
-                    use_def.reachable_bindings(symbol.into())
-                }
             };
             Some((declaration.is_global(), bindings))
         })
@@ -1689,12 +1685,6 @@ pub enum NestedBindingExecution {
     Lazy,
     /// The nested scope is modeled as running while evaluating the containing expression.
     Eager,
-    /// An exception escaped after this specific comprehension binding was evaluated.
-    ///
-    /// Unlike [`Self::Eager`], this excludes assignments that appear later in the comprehension.
-    EagerAtException {
-        source_definition: ScopedDefinitionId,
-    },
 }
 
 #[derive(

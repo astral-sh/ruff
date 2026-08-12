@@ -1,6 +1,3 @@
-use smallvec::SmallVec;
-
-use crate::scope::ScopeKind;
 use crate::use_def::FlowSnapshot;
 
 use super::SemanticIndexBuilder;
@@ -78,19 +75,12 @@ impl TryNodeContextStackManager {
     /// the current point in control flow.
     ///
     /// Crosses eager scopes, but stops at lazy scopes, unreachable flow, and bare handlers.
-    /// Comprehension bindings are materialized only for scopes that actually have active handlers.
     pub(super) fn record_exception_checkpoint(&mut self, builder: &mut SemanticIndexBuilder) {
         debug_assert_eq!(self.0.len(), builder.scope_stack.len());
 
-        let mut crossed_comprehensions = SmallVec::<[usize; 2]>::new();
-
         for (scope_stack_index, try_context_stack) in self.0.iter_mut().enumerate().rev() {
             let scope_id = builder.scope_stack[scope_stack_index].file_scope_id;
-            let snapshot = if try_context_stack.has_active_exception_handler() {
-                builder.exception_checkpoint_snapshot(scope_id, &crossed_comprehensions)
-            } else {
-                builder.use_def_maps[scope_id].snapshot()
-            };
+            let snapshot = builder.use_def_maps[scope_id].snapshot();
 
             // Each scope has an independent flow state, so an enclosing scope can still be
             // reachable while we analyze an unreachable nested scope.
@@ -102,10 +92,6 @@ impl TryNodeContextStackManager {
                 || !builder.exception_checkpoint_crosses_scope_boundary(scope_id)
             {
                 break;
-            }
-
-            if builder.scopes[scope_id].kind() == ScopeKind::Comprehension {
-                crossed_comprehensions.push(scope_stack_index);
             }
         }
     }

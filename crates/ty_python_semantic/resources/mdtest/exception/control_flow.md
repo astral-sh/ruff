@@ -95,7 +95,7 @@ A later local assignment can shadow a builtin and make an earlier reference rais
 ```py
 def shadowed_builtin() -> None:
     try:
-        int
+        int  # ty: ignore[unresolved-reference]
     except NameError:
         int = 1
 
@@ -443,85 +443,74 @@ except:
 reveal_type(z)  # revealed: Literal[0]
 ```
 
-## Assignment order in comprehensions
+## Assignments in comprehensions
 
-An exception handler sees an assignment expression that ran before a later function call raised:
+A handler includes the value from before a comprehension and the value visible once it finishes.
+Assignments overwritten inside the comprehension are not tracked separately, while normal completion
+still preserves the final assignment:
 
 ```py
 def comprehension_may_raise() -> None: ...
-def assignment_before_exception() -> None:
-    state = 0
-    try:
-        [(state := 1, comprehension_may_raise()) for _ in [0]]
-    except:
-        reveal_type(state)  # revealed: int
-```
-
-An exception raised before the assignment leaves the original value unchanged:
-
-```py
-def exception_before_assignment() -> None:
-    state = 0
-    try:
-        [(comprehension_may_raise(), state := 1) for _ in [0]]
-    except:
-        reveal_type(state)  # revealed: Literal[0]
-```
-
-An assignment after the raising call has not run:
-
-```py
-def exception_before_later_assignment() -> None:
-    state = 0
+def overwritten_comprehension_assignment() -> None:
+    state = None
     try:
         [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]
     except:
-        reveal_type(state)  # revealed: int
+        reveal_type(state)  # revealed: None | str
+        return
+
+    reveal_type(state)  # revealed: str
 ```
 
-## Conditional assignments in comprehensions
-
-A conditional assignment may have run before the exception:
+Set and dictionary comprehensions are also evaluated eagerly:
 
 ```py
-def comprehension_may_raise() -> None: ...
-def conditional_assignment_before_exception(flag: bool) -> None:
+def set_comprehension_assignment() -> None:
     state = "before"
     try:
-        state = "ready"
-        [((state := 1) if flag else 0, comprehension_may_raise(), state := 2) for _ in [0]]
+        {(state := 1, comprehension_may_raise()) for _ in [0]}
     except:
-        reveal_type(state)  # revealed: Literal["ready"] | int
+        reveal_type(state)  # revealed: Literal["before"] | int
+
+def dict_comprehension_assignment() -> None:
+    state = "before"
+    try:
+        {item: (state := 1, comprehension_may_raise()) for item in [0]}
+    except:
+        reveal_type(state)  # revealed: Literal["before"] | int
 ```
 
-## Multiple assignments in comprehensions
+## Assignments in lazy generator expressions
 
-Separate assignment targets retain the values they had when the exception was raised:
+Assignments and calls in a generator expression do not execute when the generator is created, so
+they do not make the surrounding exception handler reachable:
 
 ```py
-def comprehension_may_raise() -> None: ...
-def multiple_assignments_before_exception() -> None:
-    first = 0
-    second = 0
+def generator_may_raise() -> None: ...
+def lazy_generator_assignment() -> None:
+    state = 0
+    caught = False
     try:
-        [(first := 1, second := "bound", comprehension_may_raise(), second := 2) for _ in [0]]
+        ((state := 1, generator_may_raise()) for _ in [0])
     except:
-        reveal_type(first)  # revealed: int
-        reveal_type(second)  # revealed: str
+        caught = True
+
+    reveal_type(caught)  # revealed: Literal[False]
 ```
 
 ## Nested comprehension assignments
 
-An inner comprehension can replace a value assigned by the enclosing comprehension:
+An assignment in an inner comprehension still updates the scope containing the outermost
+comprehension:
 
 ```py
 def comprehension_may_raise() -> None: ...
 def nested_comprehension_assignments() -> None:
-    state = 0
+    state = None
     try:
-        [((state := "outer"), [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]) for _ in [0]]
+        [[(state := 1, comprehension_may_raise()) for _ in [0]] for _ in [0]]
     except:
-        reveal_type(state)  # revealed: int
+        reveal_type(state)  # revealed: None | int
 ```
 
 ## Module and global assignments in comprehensions
@@ -535,7 +524,7 @@ module_comprehension_state = "before"
 try:
     [(module_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
 except:
-    reveal_type(module_comprehension_state)  # revealed: int
+    reveal_type(module_comprehension_state)  # revealed: Literal["before"] | int
 ```
 
 An explicitly global assignment updates the same name from inside a function:
@@ -548,7 +537,7 @@ def global_comprehension_assignment() -> None:
     try:
         [(global_comprehension_state := 1, comprehension_may_raise()) for _ in [0]]
     except:
-        reveal_type(global_comprehension_state)  # revealed: Literal["before"] | int
+        reveal_type(global_comprehension_state)  # revealed: int | Literal["before"]
 ```
 
 ## Assignments in asynchronous comprehensions
