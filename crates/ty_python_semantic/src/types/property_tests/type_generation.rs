@@ -384,7 +384,7 @@ fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &
     }
 }
 
-/// A QuickCheck input generated without dynamic components, including in nested unions, tuples,
+/// A `QuickCheck` input generated without dynamic components, including in nested unions, tuples,
 /// and callables.
 ///
 /// Some type properties, such as reflexivity of subtyping, only hold for fully static types. It is
@@ -395,14 +395,14 @@ fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &
 /// ```
 ///
 /// However, the property-test macro implements implications as `!premise || conclusion`. Every
-/// non-static input therefore counts as a successful QuickCheck iteration even though the property
+/// non-static input therefore counts as a successful `QuickCheck` iteration even though the property
 /// itself was never checked. If `QUICKCHECK_TESTS=100000`, the test can report 100,000 successful
 /// iterations while checking reflexivity for far fewer types. Properties with two fully static
 /// inputs lose even more coverage because both inputs must satisfy the premise.
 ///
 /// Filtering also disproportionately removes nested unions, tuples, and callables: each additional
 /// component gives the generated type another opportunity to contain a dynamic type. Generating
-/// fully static components directly ensures that every QuickCheck iteration checks the property
+/// fully static components directly ensures that every `QuickCheck` iteration checks the property
 /// and that complex types remain represented alongside simple ones.
 ///
 /// See <https://github.com/astral-sh/ruff/pull/27693> for the discussion of this coverage problem.
