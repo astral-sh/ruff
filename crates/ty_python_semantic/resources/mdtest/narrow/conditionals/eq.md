@@ -1628,8 +1628,8 @@ def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
 
 ## Narrowing builtin types to literals
 
-Equality with a literal narrows broad `str`, `int`, and `bytes` types to the values that compare
-equal to that literal:
+Equality with a literal narrows broad `str`, `int`, and `bytes` types to that literal. By default,
+integer literals do not introduce the boolean values that compare equal to `0` or `1`:
 
 ```py
 def narrow_string(value: str):
@@ -1644,8 +1644,15 @@ def narrow_reversed_string(value: str):
 
 def narrow_integer(value: int):
     if value == 1:
-        # `True == 1` at runtime.
-        reveal_type(value)  # revealed: Literal[1, True]
+        reveal_type(value)  # revealed: Literal[1]
+
+def narrow_zero(value: int):
+    if value == 0:
+        reveal_type(value)  # revealed: Literal[0]
+
+def narrow_reversed_integer(value: int):
+    if 1 == value:
+        reveal_type(value)  # revealed: Literal[1]
 
 def narrow_bytes(value: bytes):
     if value == b"a":
@@ -2166,6 +2173,64 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[2]
 ```
 
+## Integers and booleans with non-strict equality semantics
+
+With non-strict equality semantics, broad integers narrow to integer literals, while boolean
+literals that compare equal remain in explicitly annotated literal unions.
+
+```toml
+[analysis]
+strict-equality-semantics = false
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: Literal[1]
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
+```
+
+## Integers and booleans with strict equality semantics
+
+With strict equality semantics, broad integers are preserved, while explicitly annotated literal
+unions still narrow to the integer and boolean literals that compare equal.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: int
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
+```
+
 ## Final subclasses of scalar builtins
 
 Final subclasses can inherit the equality behavior of `int`, `str`, or `bytes`. Instances of these
@@ -2618,6 +2683,10 @@ def broad(value: str):
         reveal_type(value)  # revealed: str
     else:
         reveal_type(value)  # revealed: str & ~Literal["a"]
+
+def broad_integer(value: int):
+    if value == 1:
+        reveal_type(value)  # revealed: int
 
 def inequality(value: str):
     if value != "a":
