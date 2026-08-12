@@ -1220,7 +1220,7 @@ A membership check that follows a `TypeGuard` applies to its replacement type. W
 check comes first, the guard discards it along with the other preceding type information:
 
 ```py
-from typing import Literal, TypeGuard, TypedDict
+from typing import TypeGuard, TypedDict
 
 class Original(TypedDict):
     original: int
@@ -1231,7 +1231,7 @@ class Replacement(TypedDict):
 def guard_replacement(value: object) -> TypeGuard[Replacement]:
     return True
 
-def membership_after_typeguard(value: Original | Literal["abc"]) -> None:
+def membership_after_typeguard(value: Original) -> None:
     has_missing = "missing" in value
 
     if guard_replacement(value) and has_missing:
@@ -1247,8 +1247,7 @@ Membership in an optional `TypedDict` field also applies when it follows a guard
 original `TypedDict`:
 
 ```py
-from typing import TypeGuard, TypedDict
-from typing_extensions import NotRequired
+from typing_extensions import NotRequired, TypeGuard, TypedDict
 
 class OptionalKey(TypedDict):
     missing: NotRequired[int]
@@ -1324,13 +1323,12 @@ class AlwaysContains(Mapping[str, int]):
     def __contains__(self, key: object, /) -> Literal[True]:
         return True
 
-class SometimesContains(Mapping[str, int]): ...
 class Target: ...
 
 def guard_mapping_or_target(value: object) -> TypeGuard[AlwaysContains | Target]:
     return True
 
-def absent_key_after_typeguard(value: SometimesContains) -> None:
+def absent_key_after_typeguard(value: Mapping[str, int]) -> None:
     lacks_missing = "missing" not in value
 
     if guard_mapping_or_target(value) and lacks_missing:
@@ -1348,8 +1346,7 @@ can still be copied into a `dict`:
 
 ```py
 from collections.abc import Mapping
-from typing import TypeGuard
-from typing_extensions import TypedDict
+from typing_extensions import TypeGuard, TypedDict
 
 class Present(TypedDict):
     present: int
@@ -1374,8 +1371,7 @@ A `NotRequired[Never]` item can never be present, so a following membership chec
 
 ```py
 from collections.abc import Mapping
-from typing import TypeGuard, TypedDict
-from typing_extensions import Never, NotRequired
+from typing_extensions import Never, NotRequired, TypeGuard, TypedDict
 
 class Present(TypedDict):
     present: int
