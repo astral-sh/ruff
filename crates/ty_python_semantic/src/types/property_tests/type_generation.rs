@@ -384,82 +384,147 @@ fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &
     }
 }
 
-fn arbitrary_core_type(g: &mut Gen) -> Ty {
+/// A QuickCheck input generated without dynamic components, including in nested unions, tuples,
+/// and callables.
+///
+/// Some type properties, such as reflexivity of subtyping, only hold for fully static types. It is
+/// tempting to generate an arbitrary [`Ty`] and express such a property as an implication:
+///
+/// ```text
+/// t.is_fully_static(db, env) => t.is_subtype_of(db, env, t)
+/// ```
+///
+/// However, the property-test macro implements implications as `!premise || conclusion`. Every
+/// non-static input therefore counts as a successful QuickCheck iteration even though the property
+/// itself was never checked. If `QUICKCHECK_TESTS=100000`, the test can report 100,000 successful
+/// iterations while checking reflexivity for far fewer types. Properties with two fully static
+/// inputs lose even more coverage because both inputs must satisfy the premise.
+///
+/// Filtering also disproportionately removes nested unions, tuples, and callables: each additional
+/// component gives the generated type another opportunity to contain a dynamic type. Generating
+/// fully static components directly ensures that every QuickCheck iteration checks the property
+/// and that complex types remain represented alongside simple ones.
+///
+/// See <https://github.com/astral-sh/ruff/pull/27693> for the discussion of this coverage problem.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FullyStaticTy(Ty);
+
+impl FullyStaticTy {
+    pub(crate) fn into_type<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let ty = self.0.into_type(db, env);
+        assert!(
+            ty.is_fully_static(db, env),
+            "FullyStaticTy generated a non-static type: {}",
+            ty.display(db, env),
+        );
+        ty
+    }
+}
+
+// A single draw across both groups keeps unrestricted candidates equally likely without
+// allocating a combined list or maintaining a positional boundary between the groups.
+macro_rules! choose_core_type {
+    (
+        $generator:expr,
+        $fully_static:expr,
+        dynamic_types: [$($dynamic:expr),+ $(,)?],
+        fully_static_types: [$($static:expr),+ $(,)?] $(,)?
+    ) => {{
+        if $fully_static {
+            $generator.choose(&[$($static),+]).unwrap().clone()
+        } else {
+            $generator
+                .choose(&[$($dynamic),+, $($static),+])
+                .unwrap()
+                .clone()
+        }
+    }};
+}
+
+fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     // We could select a random integer here, but this would make it much less
     // likely to explore interesting edge cases:
     let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
-    g.choose(&[
-        Ty::Any,
-        Ty::Unknown,
-        Ty::Divergent,
-        Ty::TopDivergent,
-        Ty::BottomDivergent,
-        Ty::SubclassOfAny,
-        Ty::UnittestMockLiteral,
-        Ty::UnittestMockInstance,
-        Ty::Never,
-        Ty::None,
-        int_lit,
-        bool_lit,
-        Ty::StringLiteral(""),
-        Ty::StringLiteral("a"),
-        Ty::LiteralString,
-        Ty::BytesLiteral(""),
-        Ty::BytesLiteral("\x00"),
-        Ty::EnumLiteral("safe"),
-        Ty::EnumLiteral("unsafe"),
-        Ty::EnumLiteral("unknown"),
-        Ty::SingleMemberEnumLiteral,
-        Ty::KnownClassInstance(KnownClass::Object),
-        Ty::KnownClassInstance(KnownClass::Str),
-        Ty::KnownClassInstance(KnownClass::Int),
-        Ty::KnownClassInstance(KnownClass::Float),
-        Ty::KnownClassInstance(KnownClass::Complex),
-        Ty::KnownClassInstance(KnownClass::Bool),
-        Ty::KnownClassInstance(KnownClass::FunctionType),
-        Ty::KnownClassInstance(KnownClass::SpecialForm),
-        Ty::KnownClassInstance(KnownClass::TypeVar),
-        Ty::KnownClassInstance(KnownClass::TypeAliasType),
-        Ty::KnownClassInstance(KnownClass::NoDefaultType),
-        Ty::TypingLiteral,
-        Ty::BuiltinClassLiteral("str"),
-        Ty::BuiltinClassLiteral("int"),
-        Ty::BuiltinClassLiteral("bool"),
-        Ty::BuiltinClassLiteral("object"),
-        Ty::BuiltinInstance("type"),
-        Ty::AbcInstance("ABC"),
-        Ty::AbcInstance("ABCMeta"),
-        Ty::SubclassOfBuiltinClass("object"),
-        Ty::SubclassOfBuiltinClass("str"),
-        Ty::SubclassOfBuiltinClass("type"),
-        Ty::AbcClassLiteral("ABC"),
-        Ty::AbcClassLiteral("ABCMeta"),
-        Ty::SubclassOfAbcClass("ABC"),
-        Ty::SubclassOfAbcClass("ABCMeta"),
-        Ty::AlwaysTruthy,
-        Ty::AlwaysFalsy,
-        Ty::BuiltinsFunction("chr"),
-        Ty::BuiltinsFunction("ascii"),
-        Ty::BuiltinsBoundMethod {
-            class: "str",
-            method: "isascii",
-        },
-        Ty::BuiltinsBoundMethod {
-            class: "int",
-            method: "bit_length",
-        },
-        Ty::IntNewtypeInstance,
-        Ty::StrNewtypeInstance,
-        Ty::FloatNewtypeInstance,
-        Ty::ComplexNewtypeInstance,
-        Ty::SubNewTypeOfIntInstance,
-        Ty::SubSubNewTypeOfIntInstance,
-        Ty::SubNewTypeOfFloatInstance,
-    ])
-    .unwrap()
-    .clone()
+    choose_core_type!(
+        g,
+        fully_static,
+        dynamic_types: [
+            Ty::Any,
+            Ty::Unknown,
+            Ty::Divergent,
+            Ty::TopDivergent,
+            Ty::BottomDivergent,
+            Ty::SubclassOfAny,
+            Ty::UnittestMockLiteral,
+            Ty::UnittestMockInstance,
+        ],
+        fully_static_types: [
+            Ty::Never,
+            Ty::None,
+            int_lit,
+            bool_lit,
+            Ty::StringLiteral(""),
+            Ty::StringLiteral("a"),
+            Ty::LiteralString,
+            Ty::BytesLiteral(""),
+            Ty::BytesLiteral("\x00"),
+            Ty::EnumLiteral("safe"),
+            Ty::EnumLiteral("unsafe"),
+            Ty::EnumLiteral("unknown"),
+            Ty::SingleMemberEnumLiteral,
+            Ty::KnownClassInstance(KnownClass::Object),
+            Ty::KnownClassInstance(KnownClass::Str),
+            Ty::KnownClassInstance(KnownClass::Int),
+            Ty::KnownClassInstance(KnownClass::Float),
+            Ty::KnownClassInstance(KnownClass::Complex),
+            Ty::KnownClassInstance(KnownClass::Bool),
+            Ty::KnownClassInstance(KnownClass::FunctionType),
+            Ty::KnownClassInstance(KnownClass::SpecialForm),
+            Ty::KnownClassInstance(KnownClass::TypeVar),
+            Ty::KnownClassInstance(KnownClass::TypeAliasType),
+            Ty::KnownClassInstance(KnownClass::NoDefaultType),
+            Ty::TypingLiteral,
+            Ty::BuiltinClassLiteral("str"),
+            Ty::BuiltinClassLiteral("int"),
+            Ty::BuiltinClassLiteral("bool"),
+            Ty::BuiltinClassLiteral("object"),
+            Ty::BuiltinInstance("type"),
+            Ty::AbcInstance("ABC"),
+            Ty::AbcInstance("ABCMeta"),
+            Ty::SubclassOfBuiltinClass("object"),
+            Ty::SubclassOfBuiltinClass("str"),
+            Ty::SubclassOfBuiltinClass("type"),
+            Ty::AbcClassLiteral("ABC"),
+            Ty::AbcClassLiteral("ABCMeta"),
+            Ty::SubclassOfAbcClass("ABC"),
+            Ty::SubclassOfAbcClass("ABCMeta"),
+            Ty::AlwaysTruthy,
+            Ty::AlwaysFalsy,
+            Ty::BuiltinsFunction("chr"),
+            Ty::BuiltinsFunction("ascii"),
+            Ty::BuiltinsBoundMethod {
+                class: "str",
+                method: "isascii",
+            },
+            Ty::BuiltinsBoundMethod {
+                class: "int",
+                method: "bit_length",
+            },
+            Ty::IntNewtypeInstance,
+            Ty::StrNewtypeInstance,
+            Ty::FloatNewtypeInstance,
+            Ty::ComplexNewtypeInstance,
+            Ty::SubNewTypeOfIntInstance,
+            Ty::SubSubNewTypeOfIntInstance,
+            Ty::SubNewTypeOfFloatInstance,
+        ],
+    )
 }
 
 /// Constructs an arbitrary type.
@@ -467,52 +532,54 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
 /// The `size` parameter controls the depth of the type tree. For example,
 /// a simple type like `int` has a size of 0, `Union[int, str]` has a size
 /// of 1, `tuple[int, Union[str, bytes]]` has a size of 2, etc.
-fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
+///
+/// The `fully_static` parameter, if `true`, limits generation to fully static types.
+fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
     if size == 0 {
-        arbitrary_core_type(g)
+        arbitrary_core_type(g, fully_static)
     } else {
         match u32::arbitrary(g) % 6 {
-            0 => arbitrary_core_type(g),
+            0 => arbitrary_core_type(g, fully_static),
             1 => Ty::Union(
                 (0..*g.choose(&[2, 3]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
             2 => Ty::FixedLengthTuple(
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
             3 => Ty::VariableLengthTuple(
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
-                Box::new(arbitrary_type(g, size - 1)),
+                Box::new(arbitrary_type(g, size - 1, fully_static)),
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
             4 => Ty::Intersection {
                 pos: (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
                 neg: (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             },
             5 => Ty::Callable {
                 params: match u32::arbitrary(g) % 2 {
-                    0 => CallableParams::GradualForm,
-                    _ => CallableParams::List(arbitrary_parameter_list(g, size)),
+                    0 if !fully_static => CallableParams::GradualForm,
+                    _ => CallableParams::List(arbitrary_parameter_list(g, size, fully_static)),
                 },
-                returns: Box::new(arbitrary_type(g, size - 1)),
+                returns: Box::new(arbitrary_type(g, size - 1, fully_static)),
             },
             _ => unreachable!(),
         }
     }
 }
 
-fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
+fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<Param> {
     let mut params: Vec<Param> = vec![];
     let mut used_names = FxHashSet::default();
 
@@ -564,11 +631,11 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
         params.push(Param {
             kind: next_kind,
             name,
-            annotated_ty: arbitrary_type(g, size),
+            annotated_ty: arbitrary_type(g, size, fully_static),
             default_ty: if matches!(next_kind, ParamKind::Variadic | ParamKind::KeywordVariadic) {
                 None
             } else {
-                arbitrary_optional_type(g, size)
+                arbitrary_optional_type(g, size, fully_static)
             },
         });
     }
@@ -576,8 +643,8 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
     params
 }
 
-fn arbitrary_optional_type(g: &mut Gen, size: u32) -> Option<Ty> {
-    bool::arbitrary(g).then(|| arbitrary_type(g, size))
+fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
+    bool::arbitrary(g).then(|| arbitrary_type(g, size, fully_static))
 }
 
 fn arbitrary_name(g: &mut Gen) -> Name {
@@ -591,7 +658,7 @@ fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
 impl Arbitrary for Ty {
     fn arbitrary(g: &mut Gen) -> Ty {
         const MAX_SIZE: u32 = 2;
-        arbitrary_type(g, MAX_SIZE)
+        arbitrary_type(g, MAX_SIZE, false)
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
@@ -692,6 +759,17 @@ impl Arbitrary for Ty {
             }
             _ => Box::new(std::iter::empty()),
         }
+    }
+}
+
+impl Arbitrary for FullyStaticTy {
+    fn arbitrary(g: &mut Gen) -> FullyStaticTy {
+        const MAX_SIZE: u32 = 2;
+        FullyStaticTy(arbitrary_type(g, MAX_SIZE, true))
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(self.0.shrink().map(FullyStaticTy))
     }
 }
 

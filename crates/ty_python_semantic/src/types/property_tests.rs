@@ -39,10 +39,10 @@ use type_generation::{intersection, union};
 /// where `t1`, `t2`, ..., `tn` are identifiers that represent arbitrary types, and `<property>`
 /// is an expression using these identifiers.
 macro_rules! type_property_test {
-    ($test_name:ident, $db:ident, $env:ident, forall types $($types:ident),+ . $property:expr) => {
+    (@impl $test_name:ident, $db:ident, $env:ident, $input_type:ty, $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
-        fn $test_name($($types: Ty),+) -> bool {
+        fn $test_name($($types: $input_type),+) -> bool {
             let $db = &get_cached_db();
             let $env = &$db.program_environment();
             $(let $types = $types.into_type($db, $env);)+
@@ -57,14 +57,26 @@ macro_rules! type_property_test {
         }
     };
 
+    ($test_name:ident, $db:ident, $env:ident, forall types $($types:ident),+ . $property:expr) => {
+        type_property_test!(@impl $test_name, $db, $env, Ty, $($types),+ . $property);
+    };
+
+    ($test_name:ident, $db:ident, $env:ident, forall fully_static_types $($types:ident),+ . $property:expr) => {
+        type_property_test!(@impl $test_name, $db, $env, FullyStaticTy, $($types),+ . $property);
+    };
+
     // A property test with a logical implication.
-    ($name:ident, $db:ident, $env:ident, forall types $($types:ident),+ . $premise:expr => $conclusion:expr) => {
-        type_property_test!($name, $db, $env, forall types $($types),+ . !($premise) || ($conclusion));
+    ($name:ident, $db:ident, $env:ident, forall $typekind:ident $($types:ident),+ . $premise:expr => $conclusion:expr) => {
+        type_property_test!($name, $db, $env, forall $typekind $($types),+ . !($premise) || ($conclusion));
     };
 }
 
 mod stable {
-    use super::{setup::get_cached_db, type_generation::Ty, union};
+    use super::{
+        setup::get_cached_db,
+        type_generation::{FullyStaticTy, Ty},
+        union,
+    };
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
@@ -194,7 +206,7 @@ mod stable {
     // types; `Any` is not a subtype of `Any`, only `Never` is.)
     type_property_test!(
         subtype_of_is_reflexive_for_fully_static_types, db, env,
-        forall types t. t.is_fully_static(db, env) => t.is_subtype_of(db, env, t)
+        forall fully_static_types t. t.is_subtype_of(db, env, t)
     );
 
     // For any two fully static types, each type in the pair must be a subtype of their union.
@@ -202,8 +214,7 @@ mod stable {
     // reflexive.)
     type_property_test!(
         all_fully_static_type_pairs_are_subtype_of_their_union, db, env,
-        forall types s, t. s.is_fully_static(db, env) && t.is_fully_static(db, env)
-            => s.is_subtype_of(db, env, union(db, env, [s, t])) && t.is_subtype_of(db, env, union(db, env, [s, t]))
+        forall fully_static_types s, t. s.is_subtype_of(db, env, union(db, env, [s, t])) && t.is_subtype_of(db, env, union(db, env, [s, t]))
     );
 
     // Any type assignable to `Iterable[object]` should be considered iterable.
@@ -243,7 +254,12 @@ mod stable {
 mod flaky {
     use itertools::Itertools;
 
-    use super::{intersection, setup::get_cached_db, type_generation::Ty, union};
+    use super::{
+        intersection,
+        setup::get_cached_db,
+        type_generation::{FullyStaticTy, Ty},
+        union,
+    };
 
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
@@ -255,7 +271,7 @@ mod flaky {
     // https://github.com/astral-sh/ty/issues/216
     type_property_test!(
         negation_of_fully_static_types_is_disjoint, db, env,
-        forall types t. t.is_fully_static(db, env) => t.negate(db, env).is_disjoint_from(db, env, t)
+        forall fully_static_types t. t.negate(db, env).is_disjoint_from(db, env, t)
     );
 
     // For two types, their intersection must be a subtype of each type in the pair.
