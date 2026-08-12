@@ -1,7 +1,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
-use except_handlers::TryNodeContextStackManager;
+use except_handlers::{ExceptionHandlers, TryNodeContextStackManager};
 use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1340,6 +1340,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn flow_snapshot_for_condition(&mut self, condition: &ast::Expr) -> ConditionFlowSnapshot {
+        self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(condition));
+
         if let Some(snapshots) = self.take_condition_flow_snapshots(condition) {
             ConditionFlowSnapshot::Branches(snapshots)
         } else {
@@ -1625,10 +1627,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_pending_capture_binding(id, definition_id);
             self.update_lazy_snapshots(id);
         }
-
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_definition(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
     }
 
     // Creates a definition for each key-value assignment in the dictionary.
@@ -2214,6 +2212,167 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.try_node_context_stack_manager = try_node_stack_manager;
     }
 
+    /// Returns whether an exception raised while evaluating `scope` can propagate directly to its
+    /// enclosing scope. Generator-expression bodies are lazy even though they share the
+    /// comprehension scope kind; their eagerly evaluated first iterable is visited before entering
+    /// the generator scope.
+    ///
+    /// Only the list comprehension's call can reach the handler immediately:
+    ///
+    /// ```python
+    /// try:
+    ///     [may_raise() for _ in [0]]
+    ///     (may_raise() for _ in [0])
+    /// except Exception:
+    ///     ...
+    /// ```
+    fn exception_checkpoint_crosses_scope_boundary(&self, scope_id: FileScopeId) -> bool {
+        let scope = &self.scopes[scope_id];
+        scope.is_eager() && !matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_))
+    }
+
+    /// Records the current flow state immediately before an operation that may raise an exception.
+    ///
+    /// Child expressions must already have been visited, so their completed assignments are
+    /// visible if the parent operation fails:
+    ///
+    /// ```python
+    /// state = 0
+    /// try:
+    ///     may_raise(state := 1)
+    /// except Exception:
+    ///     reveal_type(state)  # Literal[1]
+    /// ```
+    ///
+    /// Skips snapshot construction entirely when no enclosing `try` suite has active handlers.
+    fn record_exception_checkpoint(&mut self) {
+        if !self.in_try
+            || !self
+                .try_node_context_stack_manager
+                .has_active_exception_handler(self)
+        {
+            return;
+        }
+
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager.record_exception_checkpoint(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
+    }
+
+    fn record_exception_checkpoint_if(&mut self, can_raise: bool) {
+        if can_raise {
+            self.record_exception_checkpoint();
+        }
+    }
+
+    /// Returns whether accessing a name, attribute, or subscript can raise.
+    ///
+    /// Only a definitely bound name in the current flow state is known to be safe. In particular,
+    /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
+    fn place_access_can_raise(&mut self, expr: &ast::Expr, is_use: bool) -> bool {
+        let ast::Expr::Name(name) = expr else {
+            return true;
+        };
+
+        is_use
+            && self.in_try
+            && self
+                .try_node_context_stack_manager
+                .has_active_exception_handler(self)
+            && self
+                .current_place_table()
+                .symbol_id(name.id.as_str())
+                .is_none_or(|symbol| {
+                    self.current_use_def_map_mut()
+                        .symbol_live_binding_status(symbol)
+                        != LiveBindingStatus::Bound
+                })
+    }
+
+    /// Returns whether evaluating and truth-testing `expr` cannot invoke Python user code.
+    ///
+    /// Identity comparisons are safe, but testing an arbitrary value may call `__bool__`:
+    ///
+    /// ```python
+    /// if value is None: ...  # safe
+    /// if value: ...  # can raise
+    /// ```
+    fn condition_evaluation_is_known_safe(expr: &ast::Expr) -> bool {
+        if expr.is_literal_expr() || matches!(expr, ast::Expr::Lambda(_)) {
+            return true;
+        }
+
+        match expr {
+            ast::Expr::Named(named) if named.target.is_name_expr() => {
+                Self::condition_evaluation_is_known_safe(&named.value)
+            }
+            ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                Self::expression_evaluation_is_known_safe(expr)
+            }
+            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+                values.iter().all(Self::condition_evaluation_is_known_safe)
+            }
+            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                op: ast::UnaryOp::Not,
+                operand,
+                ..
+            }) => Self::condition_evaluation_is_known_safe(operand),
+            ast::Expr::Compare(ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                ..
+            }) => {
+                ops.iter()
+                    .all(|op| matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot))
+                    && Self::expression_evaluation_is_known_safe(left)
+                    && comparators
+                        .iter()
+                        .all(Self::expression_evaluation_is_known_safe)
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns whether evaluating `expr` cannot invoke Python user code.
+    ///
+    /// Unlike [`Self::condition_evaluation_is_known_safe`], this does not truth-test the resulting
+    /// value, so loading a name is safe even when that value's `__bool__` method could raise.
+    fn expression_evaluation_is_known_safe(expr: &ast::Expr) -> bool {
+        if expr.is_literal_expr() || matches!(expr, ast::Expr::Name(_) | ast::Expr::Lambda(_)) {
+            return true;
+        }
+
+        match expr {
+            ast::Expr::Named(named) if named.target.is_name_expr() => {
+                Self::expression_evaluation_is_known_safe(&named.value)
+            }
+            ast::Expr::List(ast::ExprList { elts, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().all(Self::expression_evaluation_is_known_safe)
+            }
+            ast::Expr::Compare(_) => Self::condition_evaluation_is_known_safe(expr),
+            _ => false,
+        }
+    }
+
+    /// Returns whether iterating `expr` uses an exact builtin iterator that cannot raise anything
+    /// other than `StopIteration` (ignoring ambient failures such as `MemoryError`).
+    ///
+    /// ```python
+    /// for value in [1, 2]: ...  # safe
+    /// for value in values: ...  # can invoke user-defined iteration
+    /// ```
+    fn iteration_is_known_safe(expr: &ast::Expr) -> bool {
+        matches!(
+            expr,
+            ast::Expr::StringLiteral(_)
+                | ast::Expr::BytesLiteral(_)
+                | ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+        ) && Self::expression_evaluation_is_known_safe(expr)
+    }
+
     /// Records a reachability constraint that always evaluates to "ambiguous".
     fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
@@ -2318,6 +2477,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .as_deref()
                         .is_some_and(Self::pattern_has_bindings)
             }
+        }
+    }
+
+    /// Returns whether matching a pattern can invoke Python user code.
+    fn pattern_can_raise(pattern: &ast::Pattern) -> bool {
+        match pattern {
+            ast::Pattern::MatchValue(_)
+            | ast::Pattern::MatchSequence(_)
+            | ast::Pattern::MatchMapping(_)
+            | ast::Pattern::MatchClass(_) => true,
+            ast::Pattern::MatchSingleton(_) | ast::Pattern::MatchStar(_) => false,
+            ast::Pattern::MatchAs(pattern) => pattern
+                .pattern
+                .as_deref()
+                .is_some_and(Self::pattern_can_raise),
+            ast::Pattern::MatchOr(pattern) => pattern.patterns.iter().any(Self::pattern_can_raise),
         }
     }
 
@@ -2660,6 +2835,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // nodes are evaluated in the inner scope.
         let value = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
+        let first_iteration_can_raise =
+            generator.is_async || !Self::iteration_is_known_safe(&generator.iter);
+        self.record_exception_checkpoint_if(first_iteration_can_raise);
+        let mut loopback_can_raise = first_iteration_can_raise || !generator.target.is_name_expr();
 
         // Clear the assignment stack before entering the comprehension scope.
         // If the comprehension appears inside an assignment target (e.g., error-recovered
@@ -2691,6 +2870,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         for generator in generators_iter {
             let value = self.add_standalone_expression(&generator.iter);
             self.visit_expr(&generator.iter);
+            let iteration_can_raise =
+                generator.is_async || !Self::iteration_is_known_safe(&generator.iter);
+            self.record_exception_checkpoint_if(iteration_can_raise);
+            loopback_can_raise |= iteration_can_raise || !generator.target.is_name_expr();
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
@@ -2710,8 +2893,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         for filtered_out_path in filtered_out_paths {
             self.flow_merge(filtered_out_path);
         }
+        self.record_exception_checkpoint_if(loopback_can_raise);
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
+        if !matches!(scope, NodeWithScopeRef::GeneratorExpression(_)) {
+            self.record_exception_checkpoint();
+        }
 
         self.current_assignments = saved_assignments;
 
@@ -2870,6 +3057,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
+        self.record_exception_checkpoint_if(matches!(
+            target,
+            ast::Expr::List(_) | ast::Expr::Tuple(_)
+        ));
+
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
@@ -3095,6 +3287,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // and its `global` counterpart.
                 self.synthesize_nested_binding_definitions(nested_bindings);
 
+                // Decorator application can raise after defaults and annotations are evaluated.
+                self.record_exception_checkpoint_if(!decorator_list.is_empty());
+
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
@@ -3139,6 +3334,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definitions behave lazily, while class bodies are actually evaluated eagerly.
                 self.synthesize_nested_binding_definitions(nested_bindings);
 
+                // Class construction and decorator application can raise after the body executes.
+                self.record_exception_checkpoint();
+
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
                 let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol.into(), class);
@@ -3166,6 +3364,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::Import(node) => {
                 for (alias_index, alias) in node.names.iter().enumerate() {
+                    self.record_exception_checkpoint();
+
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(&alias.name) {
@@ -3192,6 +3392,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                self.record_exception_checkpoint();
+
                 // If we see:
                 //
                 // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
@@ -3267,6 +3469,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
+                    // Loading each imported name can fail after the module import and any earlier
+                    // names or package-submodule side effects have completed.
+                    self.record_exception_checkpoint();
+
                     if &alias.name == "*" {
                         // The following line maintains the invariant that every AST node that
                         // implements `Into<DefinitionNodeKey>` must have an entry in the
@@ -3443,7 +3649,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test);
 
-                if let Some(msg) = msg {
+                if msg.is_some()
+                    || self
+                        .try_node_context_stack_manager
+                        .has_active_exception_handler(self)
+                {
                     let truthy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                         self.flow_restore(snapshots.falsy);
                         snapshots.truthy
@@ -3453,12 +3663,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let negated_predicate = predicate.negated();
                     self.record_narrowing_constraint(negated_predicate);
                     self.record_reachability_constraint(negated_predicate);
-                    self.visit_expr(msg);
-                    self.flow_restore(truthy);
-                } else {
-                    if let Some(truthy) = condition_flow_snapshot.into_truthy() {
-                        self.flow_restore(truthy);
+                    if let Some(msg) = msg {
+                        self.visit_expr(msg);
                     }
+                    self.record_exception_checkpoint();
+                    self.flow_restore(truthy);
+                } else if let Some(truthy) = condition_flow_snapshot.into_truthy() {
+                    self.flow_restore(truthy);
                 }
 
                 self.record_narrowing_constraint(predicate);
@@ -3556,32 +3767,46 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 },
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
+
+                // An augmented assignment loads its target before evaluating the right-hand side,
+                // but only defines the target after the operation succeeds.
+                let is_place_target = matches!(
+                    &**target,
+                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                );
+                if is_place_target {
+                    self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
+                    self.visit_expr(target);
+                    self.pop_assignment();
+                } else {
+                    self.visit_expr(target);
+                }
+
                 self.visit_expr(value);
 
-                match &**target {
-                    ast::Expr::Name(ast::ExprName { id, .. })
-                        if id == "__all__" && op.is_add() && self.in_module_scope() =>
-                    {
-                        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
-                            &**value
-                        {
-                            if attr == "__all__" {
-                                self.add_standalone_expression(value);
-                            }
-                        }
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target
+                    && id == "__all__"
+                    && op.is_add()
+                    && self.in_module_scope()
+                    && let ast::Expr::Attribute(ast::ExprAttribute {
+                        value: module,
+                        attr,
+                        ..
+                    }) = &**value
+                    && attr == "__all__"
+                {
+                    self.add_standalone_expression(module);
+                }
 
-                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
-                        self.visit_expr(target);
-                        self.pop_assignment();
-                    }
-                    ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
-                        self.visit_expr(target);
-                        self.pop_assignment();
-                    }
-                    _ => {
-                        self.visit_expr(target);
-                    }
+                self.record_exception_checkpoint();
+
+                if is_place_target
+                    && let Some(place_expr) = PlaceExpr::try_from_expr(target.as_ref())
+                {
+                    let place_id = self.add_place(place_expr);
+                    self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
+                    self.record_place_definition(place_id, target);
+                    self.pop_assignment();
                 }
             }
             ast::Stmt::If(node) => {
@@ -3754,6 +3979,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
                 }
 
+                self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(
+                    test,
+                ));
+
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time
                 // it's tested. Or it could happen if a _later_ evaluation of the condition yields
@@ -3794,6 +4023,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } in items
                 {
                     self.visit_expr(context_expr);
+                    self.record_exception_checkpoint();
 
                     if let Some(optional_vars) = optional_vars.as_deref() {
                         let context_manager = self.add_standalone_expression(context_expr);
@@ -3808,6 +4038,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
                 self.visit_body(body);
+                self.record_exception_checkpoint();
             }
 
             ast::Stmt::For(
@@ -3825,6 +4056,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
+                let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);
+                self.record_exception_checkpoint_if(iteration_can_raise);
 
                 let literal_iterable_is_non_empty = (!*is_async)
                     .then(|| literal_iterable_truthiness(iter))
@@ -3891,6 +4124,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 {
                     self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
                 }
+
+                self.record_exception_checkpoint_if(iteration_can_raise || !target.is_name_expr());
 
                 if let Some(after_iter) = after_empty_iter {
                     self.flow_restore(after_iter);
@@ -4010,6 +4245,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         &case.pattern,
                         match_pattern_predicate,
                     ));
+                    self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
@@ -4108,28 +4344,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let was_in_try = std::mem::replace(&mut self.in_try, true);
                 self.record_ambiguous_reachability();
 
-                // Save the state prior to visiting any of the `try` block.
-                //
-                // Potentially none of the `try` block could have been executed prior to executing
-                // the `except` block(s) and/or the `finally` block.
-                // We will merge this state with all of the intermediate
-                // states during the `try` block before visiting those suites.
-                let pre_try_block_state = self.flow_snapshot();
-
-                self.try_node_context_stack_manager.push_context();
+                let exception_handlers = if handlers.is_empty() {
+                    ExceptionHandlers::None
+                } else if handlers.iter().any(|handler| {
+                    let ast::ExceptHandler::ExceptHandler(handler) = handler;
+                    handler.type_.is_none()
+                }) {
+                    ExceptionHandlers::catch_all()
+                } else {
+                    ExceptionHandlers::propagating()
+                };
+                self.try_node_context_stack_manager
+                    .push_context(exception_handlers);
 
                 // Visit the `try` block!
                 self.visit_body(body);
 
                 let mut post_except_states = vec![];
 
-                // Take a record also of all the intermediate states we encountered
-                // while visiting the `try` block. Keep the context itself on the stack so that
-                // terminal statements in `except` and `else` suites can still be recorded as
-                // entries to the associated `finally` suite.
-                let try_block_snapshots = self
-                    .try_node_context_stack_manager
-                    .take_try_suite_snapshots();
+                // Take all checkpoints recorded immediately before operations in the `try` suite
+                // that may raise. Keep the context itself on the stack so that terminal statements
+                // in `except` and `else` suites can still be recorded as entries to the associated
+                // `finally` suite.
+                let try_block_snapshots = self.try_node_context_stack_manager.end_try_suite();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
@@ -4140,10 +4377,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // if we hit the `else` block.
                     let post_try_block_state = self.flow_snapshot();
 
-                    // Prepare for visiting the `except` block(s)
-                    self.flow_restore(pre_try_block_state);
-                    for state in try_block_snapshots {
-                        self.flow_merge(state);
+                    // Prepare for visiting the `except` block(s). If the `try` suite contained no
+                    // exception checkpoints, its handlers are unreachable.
+                    let mut try_block_snapshots = try_block_snapshots.into_iter();
+                    if let Some(first_snapshot) = try_block_snapshots.next() {
+                        self.flow_restore(first_snapshot);
+                        for snapshot in try_block_snapshots {
+                            self.flow_merge(snapshot);
+                        }
+                    } else {
+                        self.flow_restore(post_try_block_state.clone());
+                        self.mark_unreachable();
                     }
 
                     let pre_except_state = self.flow_snapshot();
@@ -4209,11 +4453,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let terminal_finally_entry_snapshots = self
+                let (terminal_finally_entry_snapshots, has_escaping_exception) = self
                     .try_node_context_stack_manager
                     .pop_context()
-                    .into_terminal_finally_entry_snapshots();
-
+                    .into_finally_entry_state();
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
                 // the suite twice: once under the (current) assumption that either the `try + else` suite
@@ -4235,6 +4478,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.visit_body(finalbody);
                     if !self.flow_snapshot().is_always_unreachable() {
+                        if !finalbody.is_empty() && has_escaping_exception {
+                            self.record_exception_checkpoint();
+                        }
                         self.record_terminal_finally_entry();
                     }
                     self.mark_unreachable();
@@ -4242,11 +4488,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Mixed normal and terminal entry states are still handled by the normal path
                     // only. See the corresponding TODO tests in `terminal_statements.md`.
                     self.visit_body(finalbody);
+                    if !finalbody.is_empty()
+                        && has_escaping_exception
+                        && self.current_use_def_map().reachability
+                            != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
+                        self.record_exception_checkpoint();
+                    }
                 }
                 self.in_try = was_in_try;
             }
 
-            ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
+            ast::Stmt::Raise(_) => {
+                walk_stmt(self, stmt);
+                self.record_exception_checkpoint();
+                self.record_terminal_finally_entry();
+                // Everything in the current block after a terminal statement is unreachable.
+                self.mark_unreachable();
+            }
+
+            ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
                 self.record_terminal_finally_entry();
                 // Everything in the current block after a terminal statement is unreachable.
@@ -4684,8 +4945,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     let (is_use, is_definition) = match (ctx, self.current_assignment()) {
                         (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // For augmented assignment, the target expression is also used.
-                            (true, true)
+                            // Record the target load now; the definition is recorded separately
+                            // after visiting the right-hand side.
+                            (true, false)
                         }
                         (ast::ExprContext::Load, _) => (true, false),
                         (ast::ExprContext::Store, _) => (false, true),
@@ -4696,6 +4958,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
 
                 walk_expr(self, expr);
+
+                let is_use = deferred_effects
+                    .as_ref()
+                    .is_some_and(|(_, is_use, _)| *is_use);
+                let can_raise = self.place_access_can_raise(expr, is_use);
+                self.record_exception_checkpoint_if(can_raise);
 
                 if let Some((place_expr, is_use, is_definition)) = deferred_effects {
                     let place_id = self.add_place(place_expr);
@@ -4854,6 +5122,32 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.mark_current_comprehension_async();
                 }
             }
+            ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
+                walk_expr(self, expr);
+                self.record_exception_checkpoint();
+            }
+            ast::Expr::UnaryOp(unary) => {
+                walk_expr(self, expr);
+                self.record_exception_checkpoint_if(
+                    unary.op != ast::UnaryOp::Not
+                        || !Self::condition_evaluation_is_known_safe(&unary.operand),
+                );
+            }
+            ast::Expr::Compare(ast::ExprCompare {
+                left,
+                ops,
+                comparators,
+                ..
+            }) => {
+                self.visit_expr(left);
+                for (op, comparator) in ops.iter().zip(comparators) {
+                    self.visit_expr(comparator);
+                    self.record_exception_checkpoint_if(!matches!(
+                        op,
+                        ast::CmpOp::Is | ast::CmpOp::IsNot
+                    ));
+                }
+            }
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
                 range: _,
@@ -4878,6 +5172,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // Only non-final values can short-circuit this boolean operation. The final
                     // value can still have its own outcome-specific flow if it is nested.
                     if index < values.len() - 1 {
+                        self.record_exception_checkpoint_if(
+                            !Self::condition_evaluation_is_known_safe(value),
+                        );
                         let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
                         let predicate = self.build_predicate(value);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
@@ -4971,10 +5268,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.generator_functions.insert(scope);
                 }
                 walk_expr(self, expr);
+                self.record_exception_checkpoint();
             }
             ast::Expr::Await(_) => {
                 self.mark_current_comprehension_async();
                 walk_expr(self, expr);
+                self.record_exception_checkpoint();
             }
             _ => {
                 walk_expr(self, expr);
