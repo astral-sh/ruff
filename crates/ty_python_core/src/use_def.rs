@@ -1757,6 +1757,16 @@ pub(super) struct SingleSymbolSnapshot {
     associated_member_states: FxHashMap<ScopedMemberId, PlaceState>,
 }
 
+/// Identifies a control-flow path within a single scope.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(super) struct ControlFlowRevision(u64);
+
+impl ControlFlowRevision {
+    fn advance(&mut self) {
+        self.0 += 1;
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
@@ -1793,6 +1803,12 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions,
     /// keyed by their text range.
     range_reachability: Vec<(TextRange, RangeInfo)>,
+
+    /// Distinguishes control-flow paths that can have the same set of recorded definitions.
+    ///
+    /// This only moves forward when restoring switches paths or merging widens the current path.
+    /// Revisions are not restored from snapshots, so separate branches cannot appear equivalent.
+    control_flow_revision: ControlFlowRevision,
 
     /// Live bindings for each so-far-recorded definition and, for binding-only definitions, the
     /// live declarations.
@@ -1836,6 +1852,7 @@ impl<'db> UseDefMapBuilder<'db> {
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
+            control_flow_revision: ControlFlowRevision::default(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
@@ -1906,6 +1923,11 @@ impl<'db> UseDefMapBuilder<'db> {
 
     pub(super) fn next_definition_id(&self) -> ScopedDefinitionId {
         self.all_definitions.next_index()
+    }
+
+    /// Identifies the latest definitions and control-flow path observed by an exception handler.
+    pub(super) fn exception_checkpoint_key(&self) -> (ScopedDefinitionId, ControlFlowRevision) {
+        (self.next_definition_id(), self.control_flow_revision)
     }
 
     pub(super) fn record_binding(
@@ -2680,6 +2702,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
     /// Restore the current builder places state to the given snapshot.
     pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
+        self.control_flow_revision.advance();
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
@@ -2723,6 +2746,7 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
+        self.control_flow_revision.advance();
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.

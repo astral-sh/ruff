@@ -228,6 +228,82 @@ def subscript_access(values: list[int]) -> None:
         reveal_type(state)  # revealed: Literal[1]
 ```
 
+## Repeated potentially raising operations
+
+Repeated calls with unchanged bindings do not alter the values visible to an exception handler, but
+a later reassignment must still be included:
+
+```py
+def may_raise() -> None: ...
+def repeated_calls() -> None:
+    state = 0
+    try:
+        may_raise()
+        may_raise()
+        state = "changed"
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0, "changed"]
+```
+
+Branch narrowing changes the state visible to the handler even when neither branch introduces a new
+binding:
+
+```py
+def narrowed_branch(value: int | None) -> None:
+    try:
+        if value is not None:
+            may_raise()
+            may_raise()
+    except:
+        reveal_type(value)  # revealed: int
+```
+
+Both sides of a restored branch remain visible when each can raise:
+
+```py
+def restored_branches(value: int | None) -> None:
+    try:
+        if value is not None:
+            may_raise()
+        else:
+            may_raise()
+    except:
+        reveal_type(value)  # revealed: int | None
+```
+
+Deleting a binding changes the flow state even though the name remains present in the scope:
+
+```py
+def deleted_binding() -> None:
+    state = 1
+    try:
+        may_raise()
+        del state
+        may_raise()
+    except:
+        # error: [possibly-unresolved-reference]
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+A call that cannot return still prevents later assignments from reaching the exception handler:
+
+```py
+from typing import NoReturn
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def call_never_returns() -> None:
+    state = 0
+    try:
+        stop()
+        state = "unreachable"
+        may_raise()
+    except:
+        reveal_type(state)  # revealed: Literal[0]
+```
+
 ## Operators and augmented assignments
 
 An arithmetic operator can raise after evaluating both operands:
@@ -623,6 +699,23 @@ try:
         may_raise()
 except:
     reveal_type(x)  # revealed: Literal[3]
+```
+
+A newly entered inner handler receives exceptions even if an earlier call already reached the outer
+handler without changing any bindings:
+
+```py
+def inner_handler_after_outer_checkpoint() -> None:
+    try:
+        may_raise()
+        try:
+            may_raise()
+        except:
+            caught_inside = True
+
+            reveal_type(caught_inside)  # revealed: Literal[True]
+    except:
+        pass
 ```
 
 Code in an unreachable inner handler cannot make the outer handler reachable:

@@ -1358,6 +1358,26 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
             );
         });
     }
+
+    let mut code = String::from("def f(value: str) -> None:\n");
+    for index in 0..800 {
+        writeln!(&mut code, "    local_{index} = {index}").ok();
+    }
+    code.push_str("    try:\n");
+    code.push_str(&"        value.upper()\n".repeat(800));
+    code.push_str("    except Exception:\n        pass\n");
+
+    criterion.bench_function("ty_micro[repeated_statement_calls_in_try]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 struct ProjectBenchmark<'a> {
