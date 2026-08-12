@@ -372,40 +372,49 @@ def lower_bounds[T]():
 
 ### Intersection of two equality constraints
 
-A type variable cannot be exactly equal to two non-equivalent types. This is stronger than checking
-whether the types are disjoint: two classes can have a common subclass, which makes their
-upper-bound constraints compatible, but that subclass is not exactly equal to either class.
+A type variable cannot be exactly equal to two non-equivalent fully static types. This is stronger
+than checking whether the types are disjoint: two classes can have a common subclass, which makes
+their upper-bound constraints compatible, but that subclass is not exactly equal to either class.
+
+Gradual bounds cannot prove this incompatibility. Sequent maps derive facts via transitivity, but
+gradual assignability is not transitive. That means equality constraints containing dynamic types
+remain conservatively satisfiable. Type variables nested inside a bound are treated as opaque
+symbolic atoms; their declared bounds do not make an otherwise static proof gradual.
 
 ```py
 from typing import Any
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
-class Row: ...
-class RowTuple(Row, tuple[Any, ...]): ...
+class Left: ...
+class Right: ...
+class Both(Left, Right): ...
 
-def _[T, U, V]() -> None:
-    row = ConstraintSet.equality(T, Row)
-    tuple_ = ConstraintSet.equality(T, tuple[Any, ...])
-    static_assert(~(row & tuple_))
+def _[T, U: Any, V]() -> None:
+    left = ConstraintSet.equality(T, Left)
+    right = ConstraintSet.equality(T, Right)
+    static_assert(~(left & right))
 
-    equivalent = row & row
-    static_assert(equivalent == row)
+    equivalent = left & left
+    static_assert(equivalent == left)
 
-    upper_bounds = ConstraintSet.upper_bound(T, Row) & ConstraintSet.upper_bound(T, tuple[Any, ...])
+    upper_bounds = ConstraintSet.upper_bound(T, Left) & ConstraintSet.upper_bound(T, Right)
     static_assert(not ~upper_bounds)
 
-    row_tuple = ConstraintSet.equality(T, RowTuple)
-    static_assert(row_tuple & upper_bounds == row_tuple)
+    both = ConstraintSet.equality(T, Both)
+    static_assert(both & upper_bounds == both)
+
+    symbolic_static_mismatch = ConstraintSet.equality(T, tuple[U, int]) & ConstraintSet.equality(T, tuple[U, str])
+    static_assert(~symbolic_static_mismatch)
 
     gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
-    static_assert(~gradual_mismatch)
+    static_assert(not ~gradual_mismatch)
 
     any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
-    static_assert(~any_mismatch)
+    static_assert(not ~any_mismatch)
 
-    symbolic_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
-    static_assert(~symbolic_mismatch)
+    symbolic_gradual_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
+    static_assert(not ~symbolic_gradual_mismatch)
 
     symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
     static_assert(not ~symbolic_match)

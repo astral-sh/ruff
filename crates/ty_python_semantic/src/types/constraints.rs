@@ -1871,6 +1871,52 @@ pub(crate) struct ConstraintBounds<'db> {
     pub(crate) upper: Option<Type<'db>>,
 }
 
+impl<'db> Type<'db> {
+    /// Returns whether this type can participate in a transitive sequent proof.
+    ///
+    /// Gradual assignability is not transitive, so constraints with dynamic bounds are ineligible.
+    /// Note that we can't use [`is_fully_static`][Type::is_fully_static] here, since that
+    /// considers the declared bounds/constraints of typevars. In the context of a sequent map,
+    /// typevars are opaque symbolic atoms: considering their bounds or defaults could incorrectly
+    /// make their eligibility depend on a specialization that the sequent is meant to constrain.
+    fn is_static_sequent_eligible(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        struct EligibilityVisitor<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            seen: TypeCollector<'db>,
+            eligible: Cell<bool>,
+        }
+
+        impl<'db> TypeVisitor<'db> for EligibilityVisitor<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if !self.eligible.get() || ty.is_type_var() {
+                    return;
+                }
+                if ty.is_dynamic() {
+                    self.eligible.set(false);
+                    return;
+                }
+                walk_type_with_recursion_guard(db, ty, self, &self.seen);
+            }
+        }
+
+        let visitor = EligibilityVisitor {
+            env,
+            seen: TypeCollector::default(),
+            eligible: Cell::new(true),
+        };
+        visitor.visit_type(db, self);
+        visitor.eligible.get()
+    }
+}
+
 impl<'db> ConstraintBounds<'db> {
     pub(crate) fn new(lower: Option<Type<'db>>, upper: Option<Type<'db>>) -> Self {
         Self { lower, upper }
@@ -2514,12 +2560,13 @@ impl ConstraintId {
         let self_constraint = storage.constraint_data(self);
         let other_constraint = storage.constraint_data(other);
 
-        // A typevar cannot be exactly equal to two different types under any specialization. This
-        // is stronger than checking whether the types are disjoint: two classes can have a common
-        // subclass, which makes their upper-bound constraints compatible, but that subclass is not
-        // exactly equal to either class.
+        // A typevar cannot be exactly equal to two different statically eligible types under any
+        // specialization. Gradual bounds cannot prove this incompatibility because the resulting
+        // pair-impossibility sequent participates in transitive closure.
         if let Some(left) = self_constraint.bounds.as_equality()
             && let Some(right) = other_constraint.bounds.as_equality()
+            && left.is_static_sequent_eligible(db, env)
+            && right.is_static_sequent_eligible(db, env)
             && !left.can_be_constraint_set_equivalent_to(db, env, right)
         {
             return IntersectionResult::Disjoint;

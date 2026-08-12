@@ -436,10 +436,11 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
-## Incompatible invariant protocol members
+## Gradual invariant protocol members
 
-When the same inferred type variable appears in multiple invariant protocol members, those members
-must agree on one exact specialization. Gradual consistency between their types is not sufficient.
+When the same inferred type variable appears in multiple invariant protocol members, fully static
+member types must agree on one exact specialization. Gradual members remain conservative
+alternatives because their equality cannot justify a transitive sequent proof.
 
 ```py
 from typing import Any, Generic, Protocol, TypeVar
@@ -460,7 +461,7 @@ def infer_pair(value: Pair[T]) -> T:
 
 def check_pair(value: GradualPair[U]) -> None:
     # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    reveal_type(infer_pair(value))  # revealed: Unknown
+    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
