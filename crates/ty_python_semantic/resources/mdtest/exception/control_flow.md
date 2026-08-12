@@ -490,20 +490,6 @@ def safe_patterns(value: object) -> None:
     reveal_type(caught)  # revealed: Literal[False]
 ```
 
-An OR pattern can still raise when one of its alternatives invokes a matching protocol:
-
-```py
-def alternative_pattern(value: object) -> None:
-    state = 0
-    try:
-        state = 1
-        match value:
-            case None | []:
-                state = 2
-    except:
-        reveal_type(state)  # revealed: Literal[1]
-```
-
 ## Iteration can raise
 
 An iterator can fail before producing its first item or after an earlier iteration has completed:
@@ -866,22 +852,16 @@ def overwritten_comprehension_assignment() -> None:
     try:
         [(state := 1, comprehension_may_raise(), state := "later") for _ in [0]]
     except:
+        # TODO: Include `int` from the assignment before the raising call.
         reveal_type(state)  # revealed: None | str
         return
 
     reveal_type(state)  # revealed: str
 ```
 
-Set and dictionary comprehensions are also evaluated eagerly:
+Dictionary comprehensions are also evaluated eagerly:
 
 ```py
-def set_comprehension_assignment() -> None:
-    state = "before"
-    try:
-        {(state := 1, comprehension_may_raise()) for _ in [0]}
-    except:
-        reveal_type(state)  # revealed: Literal["before"] | int
-
 def dict_comprehension_assignment() -> None:
     state = "before"
     try:

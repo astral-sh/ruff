@@ -1,5 +1,5 @@
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
-use crate::use_def::{ControlFlowRevision, FlowSnapshot, ScopedDefinitionId};
+use crate::use_def::{ControlFlowRevision, FlowSnapshot, ScopedDefinitionId, UseDefMapBuilder};
 
 use super::SemanticIndexBuilder;
 
@@ -93,13 +93,7 @@ impl TryNodeContextStackManager {
                 break;
             }
 
-            let checkpoint_key = use_def_map.exception_checkpoint_key();
-            if try_context_stack.needs_exception_checkpoint(checkpoint_key) {
-                let snapshot = use_def_map.snapshot();
-                if !try_context_stack.record_exception_checkpoint(&snapshot, checkpoint_key) {
-                    break;
-                }
-            } else if try_context_stack.has_catch_all_exception_handler() {
+            if !try_context_stack.record_exception_checkpoint(use_def_map) {
                 break;
             }
 
@@ -157,38 +151,6 @@ impl TryNodeContextStack {
             .any(|context| context.exception_handlers.is_active())
     }
 
-    /// Returns whether an active handler has not yet observed the current flow state.
-    /// Also marks intervening contexts that an exception escapes, even when its snapshot is deduplicated.
-    fn needs_exception_checkpoint(
-        &mut self,
-        checkpoint_key: (ScopedDefinitionId, ControlFlowRevision),
-    ) -> bool {
-        for context in self.0.iter_mut().rev() {
-            match context.exception_handlers {
-                ExceptionHandlers::None => context.has_escaping_exception = true,
-                ExceptionHandlers::Propagating(_) => {
-                    context.has_escaping_exception = true;
-                    if context.last_checkpoint_key != Some(checkpoint_key) {
-                        return true;
-                    }
-                }
-                ExceptionHandlers::CatchAll(_) => {
-                    return context.last_checkpoint_key != Some(checkpoint_key);
-                }
-            }
-        }
-
-        false
-    }
-
-    /// Returns whether a bare handler prevents exceptions from reaching an enclosing scope.
-    fn has_catch_all_exception_handler(&self) -> bool {
-        self.0
-            .iter()
-            .rev()
-            .any(|context| matches!(context.exception_handlers, ExceptionHandlers::CatchAll(_)))
-    }
-
     /// Push a new [`TryNodeContext`] for recording exception checkpoints and terminal entries
     /// while visiting a [`ruff_python_ast::StmtTry`] node.
     fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
@@ -222,19 +184,23 @@ impl TryNodeContextStack {
     /// Records the checkpoint for all enclosing active `try` suites in this scope. Returns whether
     /// the checkpoint should continue propagating to an enclosing scope.
     ///
-    /// A bare handler consumes the exception, preventing any outer handler from seeing it.
-    fn record_exception_checkpoint(
-        &mut self,
-        snapshot: &FlowSnapshot,
-        checkpoint_key: (ScopedDefinitionId, ControlFlowRevision),
-    ) -> bool {
+    /// A bare handler consumes the exception, preventing any outer handler from seeing it. The
+    /// snapshot is constructed only if a handler has not already observed the current flow state.
+    fn record_exception_checkpoint(&mut self, use_def_map: &UseDefMapBuilder<'_>) -> bool {
+        let checkpoint_key = use_def_map.exception_checkpoint_key();
+        let mut snapshot = None;
+
         for context in self.0.iter_mut().rev() {
             match &mut context.exception_handlers {
                 ExceptionHandlers::None => context.has_escaping_exception = true,
                 ExceptionHandlers::Propagating(snapshots)
                 | ExceptionHandlers::CatchAll(snapshots) => {
                     if context.last_checkpoint_key != Some(checkpoint_key) {
-                        snapshots.push(snapshot.clone());
+                        snapshots.push(
+                            snapshot
+                                .get_or_insert_with(|| use_def_map.snapshot())
+                                .clone(),
+                        );
                         context.last_checkpoint_key = Some(checkpoint_key);
                     }
                     if matches!(context.exception_handlers, ExceptionHandlers::CatchAll(_)) {

@@ -2246,9 +2246,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Skips snapshot construction entirely when no enclosing `try` suite has active handlers.
     fn record_exception_checkpoint(&mut self) {
-        if !self
-            .try_node_context_stack_manager
-            .has_active_exception_handler(self)
+        if !self.in_try
+            || !self
+                .try_node_context_stack_manager
+                .has_active_exception_handler(self)
         {
             return;
         }
