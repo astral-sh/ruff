@@ -4422,6 +4422,49 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
     Ok(())
 }
 
+/// Rule codes in `--statistics` output link to the rule documentation, as they do in the concise
+/// and full output formats.
+#[test]
+fn statistics_hyperlinks() -> Result<()> {
+    const CONTENT: &str = "\
+import os as os  # PLC0414
+def mvce(keys, values):
+    return {key: value for key, value in zip(keys, values)}  # C416
+";
+
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // Spell out the hyperlink escapes to keep the snapshot readable, filtering them before
+        // the fixture rewrites the backslash in their `ESC \` terminators. The colors are absent
+        // because test builds enable `colored`'s `no-color` feature; the last filter only keeps
+        // stray escapes out of the snapshot if that ever changes.
+        settings.add_filter(r"\x1b\]8;;(.+?)\x1b\\", "<link ${1}>");
+        settings.add_filter(r"\x1b\]8;;\x1b\\", "</link>");
+        settings.add_filter(r"\x1b", "<ESC>");
+        settings
+    })?;
+    fixture.write_file("input.py", CONTENT)?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .command()
+            .args([
+                "check",
+                "--no-cache",
+                "--select",
+                "C416,PLC0414",
+                "--statistics",
+                "--color",
+                "always",
+                "input.py",
+            ])
+            // Hyperlink support is otherwise detected from the terminal, which varies between
+            // local runs and CI.
+            .env("FORCE_HYPERLINK", "1")
+    );
+
+    Ok(())
+}
+
 #[test]
 fn show_fixes_preview() -> Result<()> {
     let fixture = CliTest::with_file("input.py", "import os  # F401")?;

@@ -10,7 +10,7 @@ use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, HyperlinkMode, SecondaryCode, fmt_with_hyperlink,
+    Diagnostic, DiagnosticStylesheet, DisplayDiagnosticConfig, SecondaryCode, fmt_with_hyperlink,
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
@@ -337,10 +337,13 @@ impl Printer {
                     .unwrap();
                 let any_fixable = statistics.iter().any(ExpandedStatistics::any_fixable);
 
-                // Turning colors off also turns hyperlinks off, matching how the full and concise
-                // output formats build their stylesheets.
-                let hyperlink = colored::control::SHOULD_COLORIZE.should_colorize()
-                    && HyperlinkMode::Auto.is_enabled();
+                // Pick the stylesheet the same way the full and concise renderers do, so that
+                // turning colors off also turns the hyperlinks off.
+                let stylesheet = if colored::control::SHOULD_COLORIZE.should_colorize() {
+                    DiagnosticStylesheet::styled()
+                } else {
+                    DiagnosticStylesheet::plain()
+                };
 
                 let all_fixable = format!("[{}] ", "*".cyan());
                 let partially_fixable = format!("[{}] ", "-".cyan());
@@ -360,7 +363,7 @@ impl Printer {
                                 .red()
                                 .bold(),
                             statistic.url,
-                            hyperlink,
+                            &stylesheet,
                         ),
                         if any_fixable {
                             if statistic.all_fixable {

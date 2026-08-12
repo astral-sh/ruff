@@ -12,7 +12,7 @@ use serde::Serialize;
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
 };
-pub use self::stylesheet::fmt_with_hyperlink;
+pub use self::stylesheet::{DiagnosticStylesheet, fmt_with_hyperlink};
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
@@ -1392,17 +1392,6 @@ pub enum HyperlinkMode {
     Always,
     /// Never emit hyperlinks.
     Never,
-}
-
-impl HyperlinkMode {
-    /// Returns whether hyperlinks should be emitted, detecting terminal support for [`Self::Auto`].
-    pub fn is_enabled(self) -> bool {
-        match self {
-            HyperlinkMode::Auto => supports_hyperlinks::supports_hyperlinks(),
-            HyperlinkMode::Always => true,
-            HyperlinkMode::Never => false,
-        }
-    }
 }
 
 /// Configuration for rendering diagnostics.
