@@ -5568,8 +5568,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
     /// the matched parameter can provide a more specific formal type for the corresponding element.
     fn argument_relations(&self) -> impl Iterator<Item = ArgumentRelation<'db>> + 'a {
-        let signature: &'a Signature<'db> = self.signature;
-        let parameters = signature.parameters();
+        let parameters: &'a Parameters<'db> = self.signature.parameters();
         let argument_matches: &'a [MatchedArgument<'db>] = self.argument_matches;
 
         self.enumerate_argument_types().flat_map(

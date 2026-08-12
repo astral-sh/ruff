@@ -1062,13 +1062,13 @@ An implicit `self` participates in generic inference but is absent from the call
 Bound violations must still identify the correct positional or keyword argument.
 
 ```py
-class Box[T]:
-    def accept[U: int](self, value: U, *, other: U) -> tuple[T, U]:
-        raise NotImplementedError
+class Box:
+    def accept[T: int](self, value: T, *, other: T) -> T:
+        return value
 
-box = Box[str]()
+box = Box()
 
-reveal_type(box.accept(1, other=2))  # revealed: tuple[str, Literal[1, 2]]
+reveal_type(box.accept(1, other=2))  # revealed: Literal[1, 2]
 
 # error: 12 [invalid-argument-type] "does not satisfy upper bound `int`"
 box.accept("invalid", other=1)

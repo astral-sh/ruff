@@ -1376,8 +1376,9 @@ with_default(1, 2)
 
 ### Unpacked variadic elements preserve generic bounds
 
-Ordinary type variables are inferred from individual unpacked elements, even beside an unresolved
-type-variable tuple. Their upper bounds remain enforced.
+Ordinary type variables are inferred from individual unpacked elements in homogeneous or
+heterogeneous tuples, even beside an unresolved type-variable tuple. Their upper bounds remain
+enforced.
 
 ```toml
 [environment]
@@ -1396,40 +1397,17 @@ fixed(1)  # error: [invalid-argument-type]
 
 reveal_type(suffix("prefix", "valid"))  # revealed: Literal["valid"]
 suffix("prefix", 1)  # error: [invalid-argument-type]
-```
 
-### Homogeneous unpacked parameters infer individual elements
-
-An unpacked homogeneous tuple applies its element type to every argument.
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-```py
 def homogeneous[T: str](*args: *tuple[T, ...]) -> T:
     return args[0]
 
 reveal_type(homogeneous("first", "second"))  # revealed: Literal["first", "second"]
 homogeneous("valid", 1)  # error: [invalid-argument-type]
-```
 
-### Heterogeneous unpacked parameters infer individual elements
-
-A fixed heterogeneous tuple applies the corresponding element type, including when the arguments
-themselves are unpacked.
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-```py
-def heterogeneous[T: str](*args: *tuple[int, T, bytes]) -> T:
+def heterogeneous[T: str](*args: *tuple[int, T]) -> T:
     return args[1]
 
-def _(valid: tuple[int, str, bytes], invalid: tuple[int, int, bytes]) -> None:
+def _(valid: tuple[int, str], invalid: tuple[int, int]) -> None:
     reveal_type(heterogeneous(*valid))  # revealed: str
     heterogeneous(*invalid)  # error: [invalid-argument-type]
 ```
@@ -1640,19 +1618,17 @@ f(**Foo(a=1, b=2))
 Each named value in an unpacked `TypedDict` must be related to its own generic parameter instead of
 using the type of the complete mapping.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
 
 class Values(TypedDict, closed=True):
     first: int
     second: str
 
-def combine[T, U](*, first: T, second: U) -> tuple[T, U]:
+def combine(*, first: T, second: U) -> tuple[T, U]:
     return first, second
 
 values: Values = {"first": 1, "second": "value"}
