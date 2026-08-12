@@ -12,15 +12,21 @@ reveal_type(get_int())  # revealed: int
 ## Gradual variadic parameters
 
 ```py
-from typing import Any
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
 def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+def preserves_first(first: T, *args: Any, **kwargs: Any) -> T:
+    return first
 
 accepts_anything(1, "one", object(), keyword=object())
 accepts_anything("not an int")  # error: [invalid-argument-type]
 accepts_only_gradual(1, "one", keyword=object())
 accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+
+reveal_type(preserves_first(1, "other", keyword=object()))  # revealed: Literal[1]
 ```
 
 ## Object variadic parameters
@@ -1392,6 +1398,42 @@ reveal_type(suffix("prefix", "valid"))  # revealed: Literal["valid"]
 suffix("prefix", 1)  # error: [invalid-argument-type]
 ```
 
+### Homogeneous unpacked parameters infer individual elements
+
+An unpacked homogeneous tuple applies its element type to every argument.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def homogeneous[T: str](*args: *tuple[T, ...]) -> T:
+    return args[0]
+
+reveal_type(homogeneous("first", "second"))  # revealed: Literal["first", "second"]
+homogeneous("valid", 1)  # error: [invalid-argument-type]
+```
+
+### Heterogeneous unpacked parameters infer individual elements
+
+A fixed heterogeneous tuple applies the corresponding element type, including when the arguments
+themselves are unpacked.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def heterogeneous[T: str](*args: *tuple[int, T, bytes]) -> T:
+    return args[1]
+
+def _(valid: tuple[int, str, bytes], invalid: tuple[int, int, bytes]) -> None:
+    reveal_type(heterogeneous(*valid))  # revealed: str
+    heterogeneous(*invalid)  # error: [invalid-argument-type]
+```
+
 ### Callable protocols enforce unpacked variadic requirements
 
 Calling a callable protocol uses the same tuple element types and argument-count bounds as calling
@@ -1591,6 +1633,31 @@ def _(kwargs: dict[str, int]) -> None:
 f(**{"a": 1, "b": 2})
 f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
+```
+
+### Unpacked keyword values retain their individual generic types
+
+Each named value in an unpacked `TypedDict` must be related to its own generic parameter instead of
+using the type of the complete mapping.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Values(TypedDict, closed=True):
+    first: int
+    second: str
+
+def combine[T, U](*, first: T, second: U) -> tuple[T, U]:
+    return first, second
+
+values: Values = {"first": 1, "second": "value"}
+
+reveal_type(combine(**values))  # revealed: tuple[int, str]
 ```
 
 ### Keyword-only parameters
