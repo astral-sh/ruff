@@ -3123,7 +3123,12 @@ def string_pattern(value: str):
 def integer_pattern(value: int):
     match value:
         case 1:
-            reveal_type(value)  # revealed: Literal[1, True]
+            reveal_type(value)  # revealed: Literal[1]
+
+def zero_pattern(value: int):
+    match value:
+        case 0:
+            reveal_type(value)  # revealed: Literal[0]
 
 def bytes_pattern(value: bytes):
     match value:

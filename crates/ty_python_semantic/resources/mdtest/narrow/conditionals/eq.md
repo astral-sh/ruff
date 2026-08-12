@@ -1628,8 +1628,8 @@ def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
 
 ## Narrowing builtin types to literals
 
-Equality with a literal narrows broad `str`, `int`, and `bytes` types to the values that compare
-equal to that literal:
+Equality with a literal narrows broad `str`, `int`, and `bytes` types to that literal. By default,
+integer literals do not introduce the Boolean values that compare equal to `0` or `1`:
 
 ```py
 def narrow_string(value: str):
@@ -1644,8 +1644,15 @@ def narrow_reversed_string(value: str):
 
 def narrow_integer(value: int):
     if value == 1:
-        # `True == 1` at runtime.
-        reveal_type(value)  # revealed: Literal[1, True]
+        reveal_type(value)  # revealed: Literal[1]
+
+def narrow_zero(value: int):
+    if value == 0:
+        reveal_type(value)  # revealed: Literal[0]
+
+def narrow_reversed_integer(value: int):
+    if 1 == value:
+        reveal_type(value)  # revealed: Literal[1]
 
 def narrow_bytes(value: bytes):
     if value == b"a":
@@ -2618,6 +2625,10 @@ def broad(value: str):
         reveal_type(value)  # revealed: str
     else:
         reveal_type(value)  # revealed: str & ~Literal["a"]
+
+def broad_integer(value: int):
+    if value == 1:
+        reveal_type(value)  # revealed: int
 
 def inequality(value: str):
     if value != "a":
