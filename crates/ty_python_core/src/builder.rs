@@ -4451,14 +4451,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_except_state);
                 }
 
-                let normal_pre_finally_reachability = self.current_use_def_map().reachability;
                 let normal_pre_finally_state = self.flow_snapshot();
                 let (terminal_finally_entry_snapshots, has_escaping_exception) = self
                     .try_node_context_stack_manager
                     .pop_context()
                     .into_finally_entry_state();
-                let has_terminal_finally_entries = !terminal_finally_entry_snapshots.is_empty();
-
                 // TODO: there's lots of complexity here that isn't yet handled by our model.
                 // In order to accurately model the semantics of `finally` suites, we in fact need to visit
                 // the suite twice: once under the (current) assumption that either the `try + else` suite
@@ -4487,68 +4484,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
-                    // TODO: Analyze cleanup separately for its normal and terminal entry paths.
-                    // Until semantic indexing supports that, merge the paths only when we can
-                    // recover the normal continuation or know that no continuation exists.
-                    //
-                    // For example, after `if value is None: return`, a `finally: cleanup()` suite
-                    // must see both values while the continuation retains the narrowing to `int`.
-                    // We can recover that state when cleanup adds only straight-line call
-                    // constraints. Expressions such as `enabled and cleanup()` or
-                    // `cleanup(value := other)` cannot be separated again after they are merged.
-                    let has_linear_finally = has_terminal_finally_entries
-                        && !finalbody.is_empty()
-                        && self.in_function_scope()
-                        && finalbody.iter().all(|statement| match statement {
-                            ast::Stmt::Expr(expression) => {
-                                // Lambda defaults are evaluated eagerly, but `any_over_expr` does
-                                // not visit them, so a lambda could hide a branch or assignment.
-                                !any_over_expr(&expression.value, |expression| {
-                                    matches!(
-                                        expression,
-                                        ast::Expr::BoolOp(_)
-                                            | ast::Expr::If(_)
-                                            | ast::Expr::Named(_)
-                                            | ast::Expr::Lambda(_)
-                                    )
-                                })
-                            }
-                            ast::Stmt::Pass(_) => true,
-                            _ => false,
-                        });
-                    // An unconditional cleanup exception overrides a pending return, so its
-                    // enclosing handler must see the returning path too. For example:
-                    //
-                    //     try:
-                    //         if value is None:
-                    //             return
-                    //     finally:
-                    //         state = "cleanup"
-                    //         raise RuntimeError
-                    //
-                    // The handler can observe both `value is None` and the cleanup assignment.
-                    // Merging is safe because no path continues beyond the unconditional raise.
-                    //
-                    // TODO: A conditional raise, such as `if enabled: raise RuntimeError`, can
-                    // also override a return. Handling it requires separate cleanup states because
-                    // the non-raising branch still has a normal continuation.
-                    let has_terminal_finally = has_terminal_finally_entries
-                        && matches!(finalbody.last(), Some(ast::Stmt::Raise(_)));
-                    let linear_finally_entry = if has_linear_finally || has_terminal_finally {
-                        for snapshot in terminal_finally_entry_snapshots {
-                            self.flow_merge(snapshot);
-                        }
-                        // Only straight-line cleanup has a continuing path whose original state
-                        // must be recovered after visiting the merged cleanup suite.
-                        has_linear_finally.then(|| {
-                            (
-                                self.flow_snapshot(),
-                                self.current_use_def_map().exception_checkpoint_key(),
-                            )
-                        })
-                    } else {
-                        None
-                    };
+                    // Mixed normal and terminal entry states are still handled by the normal path
+                    // only. See the corresponding TODO tests in `terminal_statements.md`.
                     self.visit_body(finalbody);
                     if !finalbody.is_empty()
                         && has_escaping_exception
@@ -4556,23 +4493,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             != ScopedReachabilityConstraintId::ALWAYS_FALSE
                     {
                         self.record_exception_checkpoint();
-                    }
-                    if let Some((mixed_finally_entry_state, mixed_finally_entry_key)) =
-                        linear_finally_entry
-                    {
-                        let restored_normal_flow =
-                            self.current_use_def_map().exception_checkpoint_key()
-                                == mixed_finally_entry_key
-                                && self
-                                    .current_use_def_map_mut()
-                                    .restore_with_pending_constraints(
-                                        &normal_pre_finally_state,
-                                        &mixed_finally_entry_state,
-                                    );
-                        if !restored_normal_flow {
-                            self.current_use_def_map_mut()
-                                .record_reachability_constraint(normal_pre_finally_reachability);
-                        }
                     }
                 }
                 self.in_try = was_in_try;
