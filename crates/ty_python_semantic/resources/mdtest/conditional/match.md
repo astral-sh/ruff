@@ -567,7 +567,7 @@ the subject after that pattern succeeds.
 
 Value patterns use `==`, and `as` binds the original subject rather than the value written in the
 pattern. Broad builtin types are treated as if they use builtin equality, so matching `1` narrows
-`x` to that integer literal without adding the Boolean literal that compares equal to it. After that
+`x` to that integer literal without adding the boolean literal that compares equal to it. After that
 pattern fails, matching `"foo"` narrows `x` to that string literal.
 
 ```py

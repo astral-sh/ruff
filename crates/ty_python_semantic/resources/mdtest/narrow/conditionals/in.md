@@ -3,7 +3,7 @@
 ## `in` for tuples
 
 Broad integer subjects narrow to the integer literals present in the tuple. By default, equality
-narrowing does not add the Boolean literals that also compare equal to `0` or `1`.
+narrowing does not add the boolean literals that also compare equal to `0` or `1`.
 
 ```py
 def _(x: int):

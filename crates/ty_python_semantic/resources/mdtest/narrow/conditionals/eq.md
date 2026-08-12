@@ -1629,7 +1629,7 @@ def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
 ## Narrowing builtin types to literals
 
 Equality with a literal narrows broad `str`, `int`, and `bytes` types to that literal. By default,
-integer literals do not introduce the Boolean values that compare equal to `0` or `1`:
+integer literals do not introduce the boolean values that compare equal to `0` or `1`:
 
 ```py
 def narrow_string(value: str):
@@ -2171,6 +2171,64 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[1]
     else:
         reveal_type(i)  # revealed: Literal[2]
+```
+
+## Integers and booleans with non-strict equality semantics
+
+With non-strict equality semantics, broad integers narrow to integer literals, while boolean
+literals that compare equal remain in explicitly annotated literal unions.
+
+```toml
+[analysis]
+strict-equality-semantics = false
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: Literal[1]
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
+```
+
+## Integers and booleans with strict equality semantics
+
+With strict equality semantics, broad integers are preserved, while explicitly annotated literal
+unions still narrow to the integer and boolean literals that compare equal.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: int
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
 ```
 
 ## Final subclasses of scalar builtins
