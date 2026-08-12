@@ -38,6 +38,40 @@ reveal_type(x[0].__name__)  # revealed: str
 reveal_type([1, (1, 2), (1, 2, 3)])
 ```
 
+## Tuple promotion with recursive structural types
+
+A tuple in a protocol member does not make the protocol itself a tuple. Recursive members must not
+prevent neighboring tuple literals from being promoted to `tuple[int, ...]`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+    pair: tuple[int, str]
+
+def _(x: Recursive[int]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[Recursive[int] | tuple[int, ...]]
+```
+
+A tuple-valued `TypedDict` field has the same behavior:
+
+```py
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+    pair: tuple[int, str]
+
+def _(x: Payload[int]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[Payload[int] | tuple[int, ...]]
+```
+
 ## None promotion
 
 `None` is promoted to `None | Unknown` in list literals when it is the only element type, so that

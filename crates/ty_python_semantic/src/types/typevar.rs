@@ -43,7 +43,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
+        any_over_type(db, env, self, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
     pub(crate) fn references_typevar(
@@ -52,7 +52,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         typevar_id: TypeVarIdentity<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| match ty {
+        any_over_type(db, env, self, |ty| match ty {
             Type::TypeVar(bound_typevar) => typevar_id == bound_typevar.typevar(db).identity(db),
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
                 typevar_id == typevar.identity(db)
@@ -70,7 +70,6 @@ impl<'db> Type<'db> {
             db,
             env,
             self,
-            false,
             |ty| matches!(ty, Type::TypeVar(tv) if !tv.typevar(db).is_self(db)),
         )
     }
@@ -80,7 +79,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
+        any_over_type(db, env, self, |ty| {
             matches!(
                 ty,
                 Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
@@ -93,7 +92,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
+        any_over_type(db, env, self, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
         })
     }
@@ -155,46 +154,6 @@ pub struct TypeVarInstance<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TypeVarInstance<'_> {}
-
-pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    typevar: TypeVarInstance<'db>,
-    visitor: &V,
-) {
-    if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
-        typevar.bound_or_constraints(db, visitor.program_environment())
-    } else {
-        match typevar._bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
-                Some(bound_or_constraints)
-            }
-            Some(
-                TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
-                | TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
-            ) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                None
-            }
-            _ => None,
-        }
-    } {
-        walk_type_var_bounds(db, bound_or_constraints, visitor);
-    }
-    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
-        typevar.default_type(db, visitor.program_environment())
-    } else {
-        match typevar._default(db) {
-            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
-            Some(TypeVarDefaultEvaluation::Lazy) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                None
-            }
-            _ => None,
-        }
-    } {
-        visitor.visit_type(db, default_type);
-    }
-}
 
 #[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
@@ -505,7 +464,7 @@ impl<'db> TypeVarInstance<'db> {
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
             let db = state.db;
-            any_over_type(db, state.env, ty, false, |inner_ty| match inner_ty {
+            any_over_type(db, state.env, ty, |inner_ty| match inner_ty {
                 Type::TypeVar(bound_typevar) => typevar_default_is_self_referential(
                     state,
                     bound_typevar.typevar(db),
@@ -914,10 +873,6 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
     impl<'db> TypeVisitor<'db> for MatchingFreshnessCollector<'_, 'db> {
         fn program_environment(&self) -> &ProgramEnvironment<'db> {
             self.env
-        }
-
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
         }
 
         fn visit_bound_type_var_type(

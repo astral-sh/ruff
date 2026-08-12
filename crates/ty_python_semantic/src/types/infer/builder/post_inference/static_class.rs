@@ -871,7 +871,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     continue;
                 };
 
-                let first_bad_tvar = find_over_type(db, env, default_ty, false, |t| {
+                let first_bad_tvar = find_over_type(db, env, default_ty, |t| {
                     let tvar = match t {
                         Type::TypeVar(tvar) => tvar.typevar(db),
                         Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,

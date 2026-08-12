@@ -290,6 +290,110 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
+## Tuple-valued generic arguments and return types
+
+A tuple inside a generic argument or callable return type does not make the outer value a tuple. It
+therefore does not prevent neighboring tuple literals from being promoted to `tuple[int, ...]`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+class Box[T]: ...
+
+def _(
+    box: Box[tuple[int, str]],
+    callback: Callable[[], tuple[int, str]],
+) -> None:
+    # revealed: list[Box[tuple[int, str]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), box])
+    reveal_type([(1,), (1, 2), callback])  # revealed: list[(() -> tuple[int, str]) | tuple[int, ...]]
+```
+
+## Tuple promotion through type aliases
+
+Whether an aliased value can be a tuple depends on the alias value. An alias that resolves to `str`
+does not prevent tuple promotion.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = T
+
+def _(x: Alias[Alias[str]]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[str | tuple[int, ...]]
+```
+
+A recursive alias that resolves to `list[...]` also cannot be a tuple:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+def _(x: Recursive[int]) -> None:
+    # revealed: list[list[Recursive[list[int]]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+## Tuple promotion with bounds and defaults
+
+A type parameter's bound or default does not determine the shape of an already-specialized class. A
+tuple in either declaration does not prevent tuple promotion.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int | tuple[int, str])
+U = TypeVar("U", default=tuple[int, str])
+
+class Box(Generic[T]): ...
+class DefaultedBox(Generic[U]): ...
+
+def _(x: Box[int]) -> None:
+    # revealed: list[Box[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+
+def _(x: DefaultedBox[int]) -> None:
+    # revealed: list[DefaultedBox[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+A type variable's default also does not determine the shape of the variable itself:
+
+```py
+def _(x: U) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[U@_ | tuple[int, ...]]
+```
+
+## Tuple-valued structural members
+
+A tuple-valued protocol member or `TypedDict` field does not make the containing value a tuple.
+
+```py
+from typing import Protocol, TypedDict
+
+class Proto(Protocol):
+    pair: tuple[int, str]
+
+class Payload(TypedDict):
+    pair: tuple[int, str]
+
+def _(protocol: Proto, payload: Payload) -> None:
+    reveal_type([(1,), (1, 2), protocol])  # revealed: list[Proto | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), payload])  # revealed: list[Payload | tuple[int, ...]]
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a

@@ -298,6 +298,92 @@ def _[T, U]() -> None:
     ~ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.range(Sub, U, Base)
 ```
 
+### Concrete structural bounds
+
+The bound `U <: list[T]` depends on `T`, but `T <: Recursive[int]` does not depend on another type
+variable. Recursive protocol members do not introduce an additional dependency.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+from ty_extensions._internal import ConstraintSet
+
+class Recursive[V](Protocol):
+    next: Recursive[list[V]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Recursive[int]) & ConstraintSet.upper_bound(U, list[T])
+    # revealed: tuple[Solution[T=Recursive[int], U=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+Recursive `TypedDict` fields also do not introduce a dependency:
+
+```py
+class Payload[V](TypedDict):
+    child: Payload[list[V]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Payload[int]) & ConstraintSet.upper_bound(U, list[T])
+    # revealed: tuple[Solution[T=Payload[int], U=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Type alias arguments in constraints
+
+An alias that preserves its type argument introduces the same dependency as its value.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Alias[V] = V
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Alias[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=U@_, U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+However, an alias that resolves to `int` does not depend on its unused type argument:
+
+```py
+type Ignored[V] = int
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Ignored[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=int, U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Recursive type alias arguments in constraints
+
+A recursive alias can change its specialization each time it expands. Its type argument must still
+introduce a dependency without requiring unbounded expansion.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Recursive[V] = list[Recursive[list[V]]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Recursive[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=list[Recursive[list[U@_]]], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+An alias that ignores its argument does not introduce a dependency, even when its value is
+recursive:
+
+```py
+type Ignored[V] = Recursive[int]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Ignored[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=list[Recursive[list[int]]], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
 ### Intersection of two ranges
 
 The intersection of two ranges is where the ranges "overlap".

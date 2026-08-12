@@ -29,7 +29,6 @@ use crate::types::constraints::{
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
     ApplySpecialization, GenericContext, Specialization, SpecializationBuilder, TypeVarInference,
-    walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
@@ -671,9 +670,6 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     signature: &Signature<'db>,
     visitor: &V,
 ) {
-    if let Some(generic_context) = &signature.generic_context {
-        walk_generic_context(db, *generic_context, visitor);
-    }
     for ty in signature.receiver_constraint_types() {
         visitor.visit_type(db, ty);
     }

@@ -67,6 +67,31 @@ def absurd[T]() -> T:
     raise ValueError("absurd")
 ```
 
+## Legacy type variables in aliased defaults
+
+A legacy type variable cannot appear in a PEP 695 function's type parameter default. Wrapping it in
+an alias does not make the reference valid.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeVar
+
+type Alias[T] = T
+type Ignored[T] = int
+
+Legacy = TypeVar("Legacy")
+
+# error: [unbound-type-variable] "Legacy type variable `Legacy` cannot be used in a function with PEP 695 type parameters"
+def _[T = Alias[Legacy]]() -> None: ...
+
+# error: [unbound-type-variable] "Legacy type variable `Legacy` cannot be used in a function with PEP 695 type parameters"
+def _[T = Ignored[Legacy]]() -> None: ...
+```
+
 ## Inferring generic function parameter types
 
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar

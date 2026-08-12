@@ -3388,6 +3388,134 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Generic setters with concrete structural value types
+
+A setter's value type is deferred only when it depends on one of the setter's type parameters. A
+concrete recursive protocol does not depend on an unrelated method type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Recursive[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue, value: Recursive[int]) -> None:
+    x.value = value
+    x.value = 1  # error: [invalid-assignment]
+```
+
+A concrete recursive `TypedDict` is also independent of the method type parameter:
+
+```py
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+class PayloadDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Payload[int]) -> None: ...
+
+class HasPayload(Protocol):
+    @PayloadDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasPayload, value: Payload[int]) -> None:
+    x.value = value
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Generic setters with concrete recursive aliases
+
+A recursive alias specialized with `int` does not depend on an unrelated method type parameter. Its
+value remains a valid setter type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Recursive[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue, value: Recursive[int]) -> None:
+    x.value = value
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Generic setters with local protocol value types
+
+A local protocol can capture an enclosing type parameter through one of its members. A protocol
+whose only member has type `int` does not capture the setter's type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def _() -> None:
+    class Local(Protocol):
+        member: int
+
+    class Descriptor:
+        def __init__(self, getter: object) -> None: ...
+        def __get__(self, instance: object, owner: type | None = None) -> int:
+            return 1
+
+        def __set__[T](self, instance: object, value: Local) -> None: ...
+
+    class HasValue(Protocol):
+        @Descriptor
+        def value(self) -> int: ...
+
+    class Implementation:
+        @property
+        def value(self) -> int:
+            return 1
+
+        @value.setter
+        def value(self, value: Local) -> None: ...
+
+    static_assert(is_subtype_of(Implementation, HasValue))
+```
+
 ### Type variables from the surrounding function
 
 A type variable supplied by the surrounding function is still the descriptor's value type. Assigning
@@ -3463,6 +3591,37 @@ Assignments through the protocol accept `int` but reject `str`:
 def update_aliased_receiver(value: HasAliasedReceiver) -> None:
     value.value = 1
     value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Unused type parameters in setter aliases
+
+An alias that resolves to `int` does not depend on its unused type argument. A setter using that
+alias therefore accepts `int` and rejects `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Ignored[T] = int
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Ignored[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1
+    x.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Constrained generic setters
@@ -5792,6 +5951,32 @@ class NestedRightProtocol[T](Protocol):
 
 # TODO: These structurally equivalent protocols should be recognized as subtypes.
 static_assert(not is_subtype_of(NestedLeftProtocol[int], NestedRightProtocol[int]))
+```
+
+### Recursive protocols with unrelated recursive aliases
+
+A recursive alias in a protocol member does not refer back to the protocol itself. Checking the
+protocol must not repeatedly expand the alias through different specializations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+type Alias[T] = list[Alias[list[T]]]
+
+class Recursive[T](Protocol):
+    child: Recursive[list[T]]
+    payload: Alias[int]
+
+def f[T](x: Recursive[T]) -> None: ...
+def _(x: Recursive[int]) -> None:
+    f(x)
 ```
 
 ### Disjointness of recursive protocol and recursive final type

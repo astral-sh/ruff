@@ -31,7 +31,7 @@ use crate::types::constraints::{
 };
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization_values};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
@@ -383,7 +383,7 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
     alias: GenericAlias<'db>,
     visitor: &V,
 ) {
-    walk_specialization(db, alias.specialization(db), visitor);
+    walk_specialization_values(db, alias.specialization(db), visitor);
 }
 
 // The Salsa heap is tracked separately.

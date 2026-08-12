@@ -105,17 +105,19 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
+use crate::types::generics::walk_specialization_values;
+use crate::types::type_alias::walk_type_alias_value;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
+    TypeCollector, TypeKind, TypeVisitor, contains_typevar_dependency, walk_non_atomic_type,
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
-    TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeAliasType,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1261,6 +1263,7 @@ impl<'db> ConstraintSetStorage<'db> {
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
             support: RefCell<&'a mut Support>,
             recursion_guard: TypeCollector<'db>,
+            active_type_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
@@ -1268,18 +1271,21 @@ impl<'db> ConstraintSetStorage<'db> {
                 self.env
             }
 
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
             fn notify_skipped_lazy_type_attributes(&self) {
                 self.support.borrow_mut().mark_incomplete();
             }
 
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                // An unused alias argument does not introduce a constraint dependency.
+                self.active_type_aliases.visit(
+                    &Type::TypeAlias(alias).to_type_identity(db),
+                    || {
+                        if let Some(specialization) = alias.specialization(db) {
+                            walk_specialization_values(db, specialization, self);
+                        }
+                    },
+                    || walk_type_alias_value(db, alias, self),
+                );
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -1298,6 +1304,7 @@ impl<'db> ConstraintSetStorage<'db> {
             storage: RefCell::new(self),
             support: RefCell::new(support),
             recursion_guard: TypeCollector::default(),
+            active_type_aliases: ActiveRecursionDetector::default(),
         }
         .visit_type(db, ty);
     }
@@ -1829,10 +1836,6 @@ impl<'db> Type<'db> {
                 self.env
             }
 
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 if !self.eligible.get() || ty.is_type_var() {
                     return;
@@ -2091,10 +2094,6 @@ fn max_constructor_and_typevar_depth<'db>(
         impl<'db> TypeVisitor<'db> for TypeDepthVisitor<'_, 'db> {
             fn program_environment(&self) -> &ProgramEnvironment<'db> {
                 self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -3795,8 +3794,20 @@ impl<'db> PathBounds<'db> {
                         return None;
                     }
 
+                    // A constraint mentioning multiple type variables is relational.
+                    if storage
+                        .constraint_support(interior.constraint)
+                        .iter()
+                        .nth(1)
+                        .is_some()
+                    {
+                        return None;
+                    }
+
                     if iter::chain(constraint.bounds.lower, constraint.bounds.upper).any(|bound| {
-                        bound.has_typevar(db, env) || bound.has_unspecialized_type_var(db, env)
+                        (bound.has_typevar(db, env)
+                            && contains_typevar_dependency(db, env, bound, |_| true))
+                            || bound.has_unspecialized_type_var(db, env)
                     }) {
                         return None;
                     }
@@ -5274,14 +5285,9 @@ impl SequentMap {
         left_constraint: ConstraintId,
         right_constraint: ConstraintId,
     ) {
-        // Keep this precheck aligned with `variance_of`, which visits lazy types.
         let has_typevar_bound = |bounds: ConstraintBounds<'db>| {
-            bounds
-                .lower
-                .is_some_and(|bound| any_over_type(db, env, bound, true, Type::is_type_var))
-                || bounds
-                    .upper
-                    .is_some_and(|bound| any_over_type(db, env, bound, true, Type::is_type_var))
+            iter::chain(bounds.lower, bounds.upper)
+                .any(|bound| contains_typevar_dependency(db, env, bound, |_| true))
         };
         if !has_typevar_bound(storage.constraint_data(left_constraint).bounds)
             && !has_typevar_bound(storage.constraint_data(right_constraint).bounds)

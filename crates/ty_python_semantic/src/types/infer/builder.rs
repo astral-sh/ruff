@@ -113,6 +113,7 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
 use crate::types::unpacker::UnpackResult;
+use crate::types::visitor::contains_typevar_dependency;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
@@ -121,8 +122,8 @@ use crate::types::{
     Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
     Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
-    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{
@@ -8665,10 +8666,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // types learned for the collection. Until collection-use constraints are represented as
         // projected constraint sets, avoid leaking those method-local typevars into the inferred
         // collection literal type.
-        if any_over_type(db, env, constraint, false, |ty| {
-            ty.as_typevar().is_some_and(|typevar| {
-                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
-            })
+        if contains_typevar_dependency(db, env, constraint, |typevar| {
+            !receiver_generic_context.contains(db, typevar.identity(db))
         }) {
             return None;
         }

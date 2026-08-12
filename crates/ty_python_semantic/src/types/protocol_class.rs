@@ -15,7 +15,7 @@ use crate::types::attribute_write::{
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, contains_typevar_dependency};
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -1916,7 +1916,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         env: &ProgramEnvironment<'db>,
     ) -> StructuralMemberPriority {
         let is_recursive_type = |ty| {
-            any_over_type(db, env, ty, false, |nested| {
+            any_over_type(db, env, ty, |nested| {
                 matches!(nested, Type::ProtocolInstance(_) | Type::TypeAlias(_))
             })
         };
@@ -2215,7 +2215,7 @@ fn descriptor_decorated_protocol_member<'db>(
     // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
     // its `__get__` result would then erase the remaining descriptor structure and weaken the
     // protocol member to a bare `Unknown`.
-    if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
+    if super::visitor::any_over_type(db, env, descriptor_ty, |ty| ty.is_unknown()) {
         return None;
     }
 
@@ -2428,8 +2428,8 @@ fn contains_signature_typevar<'db>(
     ty: Type<'db>,
 ) -> bool {
     signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, env, ty, true, |ty| {
-            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
+        contains_typevar_dependency(db, env, ty, |typevar| {
+            generic_context.contains(db, typevar.identity(db))
         })
     })
 }

@@ -168,6 +168,113 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Runtime `TypeVarTuple` arguments
+
+A `TypeVarTuple` nested inside a `Generic` or `Protocol` argument is not yet supported. The argument
+produces a `@Todo` type rather than an invalid-argument diagnostic.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVarTuple
+
+def _(value: TypeVarTuple) -> None:
+    reveal_type(Generic[[value]])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+    reveal_type(Protocol[[value]])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+
+    class GenericBase(Generic[[value]]): ...
+    class ProtocolBase(Protocol[[value]]): ...
+```
+
+The `typing_extensions` variant has the same behavior:
+
+```py
+from typing_extensions import TypeVarTuple as TypeVarTupleExtensions
+
+def _(value: TypeVarTupleExtensions) -> None:
+    reveal_type(Generic[[value]])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+    reveal_type(Protocol[[value]])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+```
+
+An alias, `NewType`, or type-variable bound can also contain a `TypeVarTuple`:
+
+```py
+from typing import NewType, TypeVar
+
+type Alias = list[TypeVarTuple]
+X = NewType("X", list[TypeVarTuple])
+T = TypeVar("T", bound=list[TypeVarTuple])
+
+def _(
+    alias: Alias,
+    newtype: X,
+    bounded: T,
+) -> None:
+    reveal_type(Generic[alias])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+    reveal_type(Generic[newtype])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+    reveal_type(Generic[bounded])  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+```
+
+## Type variable defaults in generic arguments
+
+A default only applies when a type argument is omitted. It does not turn a type variable into a
+`TypeVarTuple` when that variable is passed to `Generic` or `Protocol`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar, TypeVarTuple
+
+T = TypeVar("T", default=list[TypeVarTuple])
+
+def _(value: T) -> None:
+    # error: [invalid-argument-type]
+    Generic[value]
+
+    # error: [invalid-argument-type]
+    Protocol[value]
+```
+
+## Recursive structural types in generic arguments
+
+A protocol or `TypedDict` is not a valid `Generic` argument merely because one of its members
+contains a type variable. Checking the argument must not expand recursive members.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypedDict
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+def _(value: Recursive[int]) -> None:
+    # error: [invalid-argument-type] "`Recursive[int]` is not a valid argument to `Generic`"
+    class X(Generic[value]): ...
+```
+
+A recursive `TypedDict` is also invalid:
+
+```py
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+def _(value: Payload[int]) -> None:
+    # error: [invalid-argument-type] "`Payload[int]` is not a valid argument to `Generic`"
+    class X(Generic[value]): ...
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class

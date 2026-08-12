@@ -861,6 +861,27 @@ to_thread_like(
 )
 ```
 
+### Type context with unused alias arguments
+
+An alias that discards `Any` is not gradual. Its parameter type must still provide context for a
+`TypedDict` literal forwarded through a `ParamSpec`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+type Alias[T] = Payload
+
+def accept(value: list[Alias[Any]]) -> None: ...
+def forward[**P, R](function: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return function(*args, **kwargs)
+
+forward(accept, [{"value": 1}])
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py

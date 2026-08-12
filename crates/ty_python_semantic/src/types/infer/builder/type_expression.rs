@@ -1,9 +1,3 @@
-use itertools::Either;
-use ruff_python_ast::helpers::is_dotted_name;
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_text_size::Ranged;
-
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
@@ -18,16 +12,30 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use crate::types::visitor::any_over_expanded_type;
+use itertools::Either;
+use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::Ranged;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
-    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    todo_type,
+    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, todo_type,
 };
-use crate::{FxOrderSet, add_inferred_python_version_hint_to_diagnostic};
+use crate::{Db, FxOrderSet, ProgramEnvironment, add_inferred_python_version_hint_to_diagnostic};
+
+/// Return whether a legacy type alias expands to a divergent type.
+fn contains_divergent_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    any_over_expanded_type(db, env, ty, |ty| ty.is_divergent())
+}
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -1441,7 +1449,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(db, env, value_ty, true, |ty| ty.is_divergent()) {
+        if contains_divergent_type(db, env, value_ty) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(
