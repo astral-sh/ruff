@@ -366,6 +366,49 @@ def expects_str_return(c: Callable[[int | str], str]) -> None:
 expects_str_return(wide_return_converter)
 ```
 
+## Overload coverage with nested `Any`
+
+An overload set can cover a union parameter even when one of the union's elements contains `Any`.
+Here, the overloads accept both `int` and an alias to `list[Any]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, overload
+
+type Gradual = list[Any]
+
+@overload
+def aliased(value: int) -> int: ...
+@overload
+def aliased(value: Gradual) -> str: ...
+def aliased(value: object) -> int | str:
+    raise NotImplementedError
+
+x: Callable[[int | Gradual], int | str] = aliased
+```
+
+An `Any`-typed protocol member does not prevent the same assignment:
+
+```py
+from typing import Protocol
+
+class Item(Protocol):
+    value: Any
+
+@overload
+def structural(value: int) -> int: ...
+@overload
+def structural(value: Item) -> str: ...
+def structural(value: object) -> int | str:
+    raise NotImplementedError
+
+y: Callable[[int | Item], int | str] = structural
+```
+
 ## Union
 
 ```py

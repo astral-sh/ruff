@@ -172,6 +172,24 @@ class D[T]:
     y: ClassVar[dict[str, T]]
 ```
 
+We do not yet reject type variables inside aliases. An unused alias argument is harmless, but an
+argument exposed by the alias's value should be rejected:
+
+```py
+type Alias[T] = T
+type Ignored[T] = int
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Aliased[T]:
+    # TODO: Reject the type variable exposed by the alias.
+    generic: ClassVar[Alias[T]]
+
+    concrete: ClassVar[Ignored[T]]
+
+    # TODO: Reject the type variable inside the recursive alias.
+    recursive: ClassVar[Recursive[T]]
+```
+
 ## `ClassVar` can contain `Self`
 
 `Self` is allowed inside `ClassVar`.
@@ -199,6 +217,22 @@ reveal_type(Base.all_instances)  # revealed: list[Base]
 class Sub(Base): ...
 
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
+```
+
+`Self` should also be valid in a generic class, but type parameters in its bound currently produce a
+false positive:
+
+```py
+from typing import Generic, TypeVar
+
+U = TypeVar("U")
+
+class GenericBase(Generic[U]):
+    # TODO: Do not reject type variables in `Self`'s bound.
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    direct: ClassVar[Self]
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    nested: ClassVar[list[Self]]
 ```
 
 Assignments through class objects should bind `Self` when writing a `ClassVar`, matching read-side
@@ -246,6 +280,114 @@ class DynamicSaved:
 def store_any(cls: type[Any], value: Any) -> None:
     cls.count = value
     reveal_type(cls.count)  # revealed: Any
+```
+
+## Protocols with generic methods
+
+A protocol's generic methods bind their own type parameters, so the protocol is valid in a
+`ClassVar` annotation:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol
+
+class Callback(Protocol):
+    def __call__[T](self, value: T) -> T: ...
+
+class Holder:
+    callback: ClassVar[Callback]
+```
+
+This remains valid when the protocol is defined inside a function:
+
+```py
+def _() -> None:
+    class Callback(Protocol):
+        def __call__[T](self, value: T) -> T: ...
+
+    class Holder:
+        callback: ClassVar[Callback]
+```
+
+## Generic callable signatures
+
+A generic callable also binds its own type parameters, but we currently reject them in `ClassVar`
+annotations. `CallableTypeOf` preserves the generic signature without specializing it:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar
+from ty_extensions._internal import CallableTypeOf
+
+def identity[T](value: T) -> T:
+    return value
+
+class Holder:
+    # TODO: Permit type variables bound by the callable's own signature.
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    callback: ClassVar[CallableTypeOf[identity]]
+```
+
+## Captured type variables in structural types
+
+A local protocol or `TypedDict` can capture an outer type variable. These captures are not yet
+diagnosed in `ClassVar` annotations:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol, TypedDict
+
+def _[T]() -> None:
+    class Captured(Protocol):
+        value: T
+
+    class Payload(TypedDict):
+        value: T
+
+    class Holder:
+        # TODO: Reject the captured type variable in the protocol member.
+        protocol: ClassVar[Captured]
+        # TODO: Reject the captured type variable in the TypedDict field.
+        payload: ClassVar[Payload]
+```
+
+## Recursive structural types
+
+Concrete recursive protocols and `TypedDict`s are also valid `ClassVar` types. This includes members
+whose recursive references keep changing specialization:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, Protocol, TypedDict
+
+def _() -> None:
+    class Recursive[T](Protocol):
+        next: Recursive[list[T]]
+
+    class Payload[T](TypedDict):
+        next: Payload[list[T]]
+
+    class Holder:
+        protocol: ClassVar[Recursive[int]]
+        payload: ClassVar[Payload[int]]
 ```
 
 ## Assignments through generic aliases

@@ -17,6 +17,7 @@ use super::class::FrozenDataclassDispatch;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension};
 use super::dedicated::pydantic;
 use super::relation::TypeRelationChecker;
+use super::visitor::any_over_typevar_including_lazy_attributes;
 use super::{
     BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
     PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
@@ -1160,7 +1161,7 @@ fn contains_signature_typevar<'db>(
     ty: Type<'db>,
 ) -> bool {
     signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, env, ty, true, |ty| {
+        any_over_typevar_including_lazy_attributes(db, env, ty, |ty| {
             matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
         })
     })
