@@ -2473,6 +2473,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Returns whether matching a pattern can invoke Python user code.
+    fn pattern_can_raise(pattern: &ast::Pattern) -> bool {
+        match pattern {
+            ast::Pattern::MatchValue(_)
+            | ast::Pattern::MatchSequence(_)
+            | ast::Pattern::MatchMapping(_)
+            | ast::Pattern::MatchClass(_) => true,
+            ast::Pattern::MatchSingleton(_) | ast::Pattern::MatchStar(_) => false,
+            ast::Pattern::MatchAs(pattern) => pattern
+                .pattern
+                .as_deref()
+                .is_some_and(Self::pattern_can_raise),
+            ast::Pattern::MatchOr(pattern) => pattern.patterns.iter().any(Self::pattern_can_raise),
+        }
+    }
+
     fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
         match pattern {
             ast::Pattern::MatchValue(pattern) => {
@@ -4222,6 +4238,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         &case.pattern,
                         match_pattern_predicate,
                     ));
+                    self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
                     // unlike in [Stmt::If], we don't reset [no_case_matched]

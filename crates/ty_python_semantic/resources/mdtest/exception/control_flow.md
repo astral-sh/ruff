@@ -375,6 +375,94 @@ def while_condition(value: object) -> None:
         reveal_type(state)  # revealed: Literal[0, 1]
 ```
 
+## Pattern matching can raise
+
+A sequence pattern can raise before its capture target or case body is assigned:
+
+```py
+def sequence_pattern(value: object) -> None:
+    state = 0
+    try:
+        state = 1
+        match value:
+            case [item]:
+                state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+        item  # error: [unresolved-reference]
+```
+
+Mapping, class, and literal patterns can call user-defined matching or equality operations:
+
+```py
+class Point:
+    x: int
+
+def mapping_pattern(value: object) -> None:
+    state = 0
+    try:
+        state = 1
+        match value:
+            case {"x": item}:
+                state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+
+def class_pattern(value: object) -> None:
+    state = 0
+    try:
+        state = 1
+        match value:
+            case Point(x=item):
+                state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+
+def literal_pattern(value: object) -> None:
+    state = 0
+    try:
+        state = 1
+        match value:
+            case 1:
+                state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
+Wildcard, capture, and singleton patterns do not invoke user-defined operations:
+
+```py
+def safe_patterns(value: object) -> None:
+    caught = False
+    try:
+        match value:
+            case None:
+                pass
+            case captured:
+                pass
+        match value:
+            case _:
+                pass
+    except:
+        caught = True
+
+    reveal_type(caught)  # revealed: Literal[False]
+```
+
+An OR pattern can still raise when one of its alternatives invokes a matching protocol:
+
+```py
+def alternative_pattern(value: object) -> None:
+    state = 0
+    try:
+        state = 1
+        match value:
+            case None | []:
+                state = 2
+    except:
+        reveal_type(state)  # revealed: Literal[1]
+```
+
 ## Iteration can raise
 
 An iterator can fail before producing its first item or after an earlier iteration has completed:
