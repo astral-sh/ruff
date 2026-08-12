@@ -586,6 +586,42 @@ def finally_conditional_cleanup_preserves_narrowing(value: int | None, resource:
     requires_int(value)
 ```
 
+Short-circuiting cleanup and conditional cleanup calls also preserve the continuing path's
+narrowing.
+
+```py
+def finally_short_circuit_cleanup_preserves_narrowing(value: int | None, resource: Resource, enabled: bool) -> None:
+    try:
+        if value is None:
+            return
+    finally:
+        enabled and resource.close()
+
+    requires_int(value)
+
+def finally_conditional_cleanup_call_preserves_narrowing(value: int | None, resource: Resource, enabled: bool) -> None:
+    try:
+        if value is None:
+            return
+    finally:
+        (resource.close if enabled else cleanup)()
+
+    requires_int(value)
+```
+
+An assignment expression in a cleanup call does not widen an unrelated narrowed value.
+
+```py
+def finally_assignment_expression_preserves_narrowing(value: int | None, resource: Resource) -> None:
+    try:
+        if value is None:
+            return
+    finally:
+        (selected := resource).close()
+
+    requires_int(value)
+```
+
 A cleanup call that never returns also prevents any later code from being reached.
 
 ```py

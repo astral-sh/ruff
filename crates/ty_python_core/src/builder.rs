@@ -4487,21 +4487,68 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
-                    let linear_finally_entry = (has_terminal_finally_entries
+                    // TODO: Analyze cleanup separately for its normal and terminal entry paths.
+                    // Until semantic indexing supports that, merge the paths only when we can
+                    // recover the normal continuation or know that no continuation exists.
+                    //
+                    // For example, after `if value is None: return`, a `finally: cleanup()` suite
+                    // must see both values while the continuation retains the narrowing to `int`.
+                    // We can recover that state when cleanup adds only straight-line call
+                    // constraints. Expressions such as `enabled and cleanup()` or
+                    // `cleanup(value := other)` cannot be separated again after they are merged.
+                    let has_linear_finally = has_terminal_finally_entries
                         && !finalbody.is_empty()
                         && self.in_function_scope()
-                        && finalbody.iter().all(|statement| {
-                            matches!(statement, ast::Stmt::Expr(_) | ast::Stmt::Pass(_))
-                        }))
-                    .then(|| {
+                        && finalbody.iter().all(|statement| match statement {
+                            ast::Stmt::Expr(expression) => {
+                                // Lambda defaults are evaluated eagerly, but `any_over_expr` does
+                                // not visit them, so a lambda could hide a branch or assignment.
+                                !any_over_expr(&expression.value, |expression| {
+                                    matches!(
+                                        expression,
+                                        ast::Expr::BoolOp(_)
+                                            | ast::Expr::If(_)
+                                            | ast::Expr::Named(_)
+                                            | ast::Expr::Lambda(_)
+                                    )
+                                })
+                            }
+                            ast::Stmt::Pass(_) => true,
+                            _ => false,
+                        });
+                    // An unconditional cleanup exception overrides a pending return, so its
+                    // enclosing handler must see the returning path too. For example:
+                    //
+                    //     try:
+                    //         if value is None:
+                    //             return
+                    //     finally:
+                    //         state = "cleanup"
+                    //         raise RuntimeError
+                    //
+                    // The handler can observe both `value is None` and the cleanup assignment.
+                    // Merging is safe because no path continues beyond the unconditional raise.
+                    //
+                    // TODO: A conditional raise, such as `if enabled: raise RuntimeError`, can
+                    // also override a return. Handling it requires separate cleanup states because
+                    // the non-raising branch still has a normal continuation.
+                    let has_terminal_finally = has_terminal_finally_entries
+                        && matches!(finalbody.last(), Some(ast::Stmt::Raise(_)));
+                    let linear_finally_entry = if has_linear_finally || has_terminal_finally {
                         for snapshot in terminal_finally_entry_snapshots {
                             self.flow_merge(snapshot);
                         }
-                        (
-                            self.flow_snapshot(),
-                            self.current_use_def_map().exception_checkpoint_key(),
-                        )
-                    });
+                        // Only straight-line cleanup has a continuing path whose original state
+                        // must be recovered after visiting the merged cleanup suite.
+                        has_linear_finally.then(|| {
+                            (
+                                self.flow_snapshot(),
+                                self.current_use_def_map().exception_checkpoint_key(),
+                            )
+                        })
+                    } else {
+                        None
+                    };
                     self.visit_body(finalbody);
                     if !finalbody.is_empty()
                         && has_escaping_exception

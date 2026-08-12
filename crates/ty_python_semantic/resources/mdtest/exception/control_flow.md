@@ -982,6 +982,40 @@ except ValueError:
     reveal_type(state)  # revealed: Literal[1, 2]
 ```
 
+A cleanup exception overrides a pending return, so an enclosing handler sees values from both
+returning and continuing paths.
+
+```py
+def requires_int(value: int) -> None: ...
+def cleanup_exception_overrides_return(value: int | None) -> None:
+    try:
+        try:
+            if value is None:
+                return
+        finally:
+            raise RuntimeError
+    except RuntimeError:
+        reveal_type(value)  # revealed: int | None
+        requires_int(value)  # error: [invalid-argument-type]
+```
+
+An assignment before the cleanup exception is also visible to the enclosing handler, without
+discarding values from the returning path.
+
+```py
+def cleanup_assignment_before_exception(value: int | None) -> None:
+    try:
+        try:
+            if value is None:
+                return
+        finally:
+            state = "cleanup"
+            raise RuntimeError
+    except RuntimeError:
+        reveal_type(state)  # revealed: Literal["cleanup"]
+        reveal_type(value)  # revealed: int | None
+```
+
 Cleanup also runs before an exception escapes an inner handler for a different exception type:
 
 ```py
