@@ -1299,26 +1299,6 @@ impl<'db> InvalidSpecialization<'db> {
 
 impl<'db> Specialization<'db> {
     /// Validates one type assignment against its type variable's declared domain.
-    pub(crate) fn validate_type_assignment(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        assignment: Type<'db>,
-    ) -> Result<(), SpecializationError<'db>> {
-        let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db, env)
-        else {
-            return Ok(());
-        };
-        Self::validate_type_assignment_with(
-            db,
-            env,
-            &ConstraintSetBuilder::new(),
-            bound_typevar,
-            assignment,
-            bound_or_constraints,
-        )
-    }
-
     fn validate_type_assignment_with(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
