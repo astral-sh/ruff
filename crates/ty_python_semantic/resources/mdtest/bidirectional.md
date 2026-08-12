@@ -2349,15 +2349,24 @@ def _(flag: bool):
         reveal_type(x2)  # revealed: list[str]
 ```
 
+The declared parameter type of a function call provides type context for an unannotated collection,
+whether that collection is empty or already contains compatible elements:
+
 ```py
 def takes_list_int(x: list[int]): ...
+def takes_list_object(x: list[object]): ...
 
 x3 = []
 takes_list_int(x3)
-# TODO: This should reveal `list[int]`, but we do not currently record
-# argument constraints for arbitrary function calls.
-reveal_type(x3)  # revealed: list[Unknown]
+reveal_type(x3)  # revealed: list[int]
+
+def _(value: str):
+    x1 = [value]
+    takes_list_object(x1)
+    reveal_type(x1)  # revealed: list[object]
 ```
+
+A generic call can also infer the collection's element type from its other arguments:
 
 ```py
 def append[T](x: list[T], y: T):
@@ -2366,9 +2375,7 @@ def append[T](x: list[T], y: T):
 x4 = []
 append(x4, 1)
 append(x4, "2")
-# TODO: This should reveal `list[int | str]`, but we do not currently record
-# argument constraints for arbitrary function calls.
-reveal_type(x4)  # revealed: list[Unknown]
+reveal_type(x4)  # revealed: list[int | str]
 ```
 
 ```py
@@ -2533,6 +2540,92 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+A generic parameter constrains the collection regardless of argument order or whether it is passed
+by keyword:
+
+```py
+def append_value[T](value: T, values: list[T]): ...
+
+x25 = []
+append_value(1, x25)
+reveal_type(x25)  # revealed: list[int]
+
+x26 = []
+append(y="foo", x=x26)
+reveal_type(x26)  # revealed: list[str]
+```
+
+Existing elements remain in the inferred union when another argument introduces a different type:
+
+```py
+x27 = [0]
+append(x27, "foo")
+reveal_type(x27)  # revealed: list[str | int]
+```
+
+Only a matching overload may constrain the collection. An incompatible overload cannot introduce its
+element type into a populated collection or prevent another argument from constraining an empty one:
+
+```py
+from collections.abc import Iterable
+from typing import overload
+
+@overload
+def first(values: Iterable[str]) -> str: ...
+@overload
+def first[T: int](values: Iterable[T]) -> T: ...
+def first(values: object) -> object: ...
+
+x28 = [1]
+first(x28)
+reveal_type(x28)  # revealed: list[int]
+
+@overload
+def append_overload(values: list[str], value: str) -> None: ...
+@overload
+def append_overload[T: int](values: list[T], value: T) -> None: ...
+def append_overload(values: object, value: object) -> None: ...
+
+x29 = []
+append_overload(x29, 1)
+reveal_type(x29)  # revealed: list[int]
+```
+
+Literal arguments are promoted before they become context for a populated nested collection:
+
+```py
+def scale[T](values: list[list[T]], factor: T): ...
+
+x30 = [[1]]
+scale(x30, 2)
+reveal_type(x30)  # revealed: list[list[int]]
+```
+
+An explicitly annotated literal remains precise because its annotation prevents promotion:
+
+```py
+from typing import Literal
+
+value: Literal[1] = 1
+x31 = []
+append(x31, value)
+reveal_type(x31)  # revealed: list[Literal[1]]
+```
+
+Calls with multiple unannotated collections do not yet propagate context to either argument:
+
+```py
+def append_both[T](left: list[T], right: list[T], value: T): ...
+
+x32 = []
+x33 = []
+append_both(x32, x33, 1)
+
+# TODO: Both collections should be inferred as `list[int]`.
+reveal_type(x32)  # revealed: list[Unknown]
+reveal_type(x33)  # revealed: list[Unknown]
 ```
 
 ## Multi-inference diagnostics
