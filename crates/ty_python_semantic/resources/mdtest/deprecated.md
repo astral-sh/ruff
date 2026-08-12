@@ -419,6 +419,8 @@ z = x + y  # TODO error: [deprecated] "MyInt `+` support is broken"
 If a dunder like `__invert__` is deprecated, then the equivalent `~` operator should fire a
 diagnostic.
 
+#### Custom operator
+
 ```py
 from typing_extensions import deprecated
 
@@ -431,6 +433,8 @@ x = MyBits()
 ~x  # error: [deprecated] "MyBits `~` support is broken"
 ```
 
+#### Bool literals
+
 `bool.__invert__` is one such case in typeshed. This applies both to `bool` literals and to
 arbitrary values of type `bool`.
 
@@ -441,7 +445,9 @@ def f(x: bool):
     ~x  # error: [deprecated]
 ```
 
-Type variables constraints also should be checked.
+#### Constrained TypeVars
+
+Type variable constraints also should be checked.
 
 ```py
 from typing import TypeVar
