@@ -3728,14 +3728,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (
-                Type::SubclassOf(formal_subclass),
+                formal @ (Type::SubclassOf(_) | Type::GenericAlias(_)),
                 Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_),
-            ) if matches!(formal_subclass.subclass_of(), SubclassOfInner::Class(_)) => {
-                let when = actual.when_constraint_set_assignable_to_owned(db, self.env, formal);
-                let when = self.constraints.load(db, self.env, &when);
+            ) if formal.is_generic_alias()
+                || matches!(formal, Type::SubclassOf(subclass)
+                    if matches!(subclass.subclass_of(), SubclassOfInner::Class(_))) =>
+            {
+                let when = match polarity {
+                    TypeVarVariance::Covariant | TypeVarVariance::Invariant => {
+                        actual.when_constraint_set_assignable_to_owned(db, self.env, formal)
+                    }
+                    TypeVarVariance::Contravariant => {
+                        formal.when_constraint_set_assignable_to_owned(db, self.env, actual)
+                    }
+                    TypeVarVariance::Bivariant => return Ok(()),
+                };
+                let mut when = self.constraints.load(db, self.env, &when);
+                if matches!(polarity, TypeVarVariance::Invariant) {
+                    let reverse =
+                        formal.when_constraint_set_assignable_to_owned(db, self.env, actual);
+                    let reverse = self.constraints.load(db, self.env, &reverse);
+                    when.intersect(db, self.constraints, reverse);
+                }
                 self.infer_from_constraint_set(when)?;
                 return Ok(());
             }

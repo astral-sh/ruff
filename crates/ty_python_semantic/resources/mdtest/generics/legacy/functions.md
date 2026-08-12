@@ -172,59 +172,88 @@ reveal_type(pick([1]))  # revealed: bool
 
 ## Inferring a class-object parameter through a generic factory
 
+A factory can infer its type arguments from a specialized subclass of its class-object parameter.
+
 ```py
 from typing import Generic, TypeVar
 
-RequestT = TypeVar("RequestT")
-ResponseT = TypeVar("ResponseT")
+T = TypeVar("T")
+U = TypeVar("U")
 
-class BaseService(Generic[RequestT, ResponseT]):
-    Request: type[RequestT]
-    Response: type[ResponseT]
+class Base(Generic[T, U]): ...
+class Specialized(Base[int, str]): ...
 
-class Future(Generic[ResponseT]):
-    def result(self) -> ResponseT | None:
-        raise NotImplementedError
-
-class Client(Generic[RequestT, ResponseT]):
-    def call_async(self, request: RequestT) -> Future[ResponseT]:
-        raise NotImplementedError
-
-def create_client(srv: type[BaseService[RequestT, ResponseT]]) -> Client[RequestT, ResponseT]:
+def create(cls: type[Base[T, U]]) -> tuple[T, U]:
     raise NotImplementedError
 
-class MyRequest: ...
-class MyResponse: ...
-class MyService(BaseService[MyRequest, MyResponse]): ...
-
-def _() -> None:
-    client = create_client(MyService)
-    reveal_type(client)  # revealed: Client[MyRequest, MyResponse]
-    future = client.call_async(MyRequest())
-    reveal_type(future)  # revealed: Future[MyResponse]
-    reveal_type(future.result())  # revealed: MyResponse | None
+reveal_type(create(Specialized))  # revealed: tuple[int, str]
 ```
 
-The same shape as a method, where the specialization comes from the argument's bases:
+## Inferring a class-object parameter through a generic method
+
+A method can likewise infer a type argument from the specialized bases of its class-object
+parameter.
 
 ```py
-from collections.abc import Sequence
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 class Option(Generic[T]): ...
-class StringOptions(Option[Sequence[str]]): ...
+class StringOption(Option[str]): ...
 
 class Options:
     def get_value_for(self, option: type[Option[T]]) -> T:
         raise NotImplementedError
 
-def _(options: Options) -> None:
-    values = options.get_value_for(StringOptions)
-    reveal_type(values)  # revealed: Sequence[str]
-    # error: [unresolved-attribute] "Object of type `Sequence[str]` has no attribute `nonexistent`"
-    values.nonexistent()
+reveal_type(Options().get_value_for(StringOption))  # revealed: str
+```
+
+## Inferring a class-object parameter in a contravariant position
+
+A class-object parameter inside a contravariant generic places an upper bound on its inferred type
+argument. A more specific witness should determine the result, including when the type variable has
+its own declared upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+StrT = TypeVar("StrT", bound=str)
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]): ...
+class Sink(Generic[T_contra]): ...
+
+def infer(sink: Sink[type[Covariant[T]]], witness: T) -> T:
+    return witness
+
+def infer_bounded(sink: Sink[type[Covariant[StrT]]], witness: StrT) -> StrT:
+    return witness
+
+def _(sink: Sink[type[Covariant[object]]]) -> None:
+    reveal_type(infer(sink, 1))  # revealed: Literal[1]
+    reveal_type(infer_bounded(sink, "ok"))  # revealed: Literal["ok"]
+```
+
+## Inferring a class-object parameter for a final generic class
+
+A final generic class has no subclasses, so its class-object parameter is an exact generic alias.
+Its type arguments should still participate in inference.
+
+```py
+from typing import Generic, TypeVar, final
+
+T = TypeVar("T")
+
+@final
+class Final(Generic[T]): ...
+
+def infer(cls: type[Final[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(Final[int]))  # revealed: int
 ```
 
 ## Inferring tuple parameter types
