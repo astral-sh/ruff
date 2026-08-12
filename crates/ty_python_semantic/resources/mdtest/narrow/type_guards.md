@@ -696,6 +696,245 @@ def _(flag: bool, value: int | None) -> None:
     reveal_type(value)  # revealed: int | None
 ```
 
+## Membership conditions after a `TypeGuard`
+
+A membership check that follows a `TypeGuard` applies to its replacement type. When the membership
+check comes first, the guard discards it along with the other preceding type information:
+
+```py
+from typing import Literal, TypeGuard, TypedDict
+
+class Original(TypedDict):
+    original: int
+
+class Replacement(TypedDict):
+    replacement: int
+
+def guard_replacement(value: object) -> TypeGuard[Replacement]:
+    return True
+
+def membership_after_typeguard(value: Original | Literal["abc"]) -> None:
+    has_missing = "missing" in value
+
+    if guard_replacement(value) and has_missing:
+        reveal_type(value["missing"])  # revealed: object
+
+    if has_missing and guard_replacement(value):
+        value["missing"]  # error: [invalid-key]
+```
+
+## Optional `TypedDict` key membership after a `TypeGuard`
+
+Membership in an optional `TypedDict` field also applies when it follows a guard that replaces the
+original `TypedDict`:
+
+```py
+from typing import TypeGuard, TypedDict
+from typing_extensions import NotRequired
+
+class OptionalKey(TypedDict):
+    missing: NotRequired[int]
+
+class Replacement(TypedDict):
+    replacement: int
+
+def guard_replacement(value: object) -> TypeGuard[Replacement]:
+    return True
+
+def optional_key_after_typeguard(value: OptionalKey) -> None:
+    has_missing = "missing" in value
+
+    if guard_replacement(value) and has_missing:
+        reveal_type(value["missing"])  # revealed: object
+```
+
+## Mapping membership after a `TypeGuard`
+
+When the original membership check is performed on a mapping, applying it after a `TypeGuard` still
+establishes that the same key can be used for subscripting:
+
+```py
+from collections.abc import Mapping
+from typing import Literal, TypeGuard, TypedDict
+
+class Original(TypedDict):
+    original: int
+
+def guard_object(value: object) -> TypeGuard[object]:
+    return True
+
+def mapping_membership_after_typeguard(value: Original | Mapping[Literal["known"], int]) -> None:
+    has_missing = "missing" in value
+
+    if guard_object(value) and has_missing:
+        reveal_type(value["missing"])  # revealed: object
+```
+
+## Non-mapping membership after a `TypeGuard`
+
+Membership does not establish that a replacement can be subscripted when any original union member
+only supports containment:
+
+```py
+from collections.abc import Mapping
+from typing import TypeGuard
+
+class ContainsOnly:
+    def __contains__(self, key: object) -> bool:
+        return True
+
+def guard_object(value: object) -> TypeGuard[object]:
+    return True
+
+def non_mapping_membership_after_typeguard(value: Mapping[str, int] | ContainsOnly) -> None:
+    has_missing = "missing" in value
+
+    if guard_object(value) and has_missing:
+        value["missing"]  # error: [not-subscriptable]
+```
+
+## Negative membership conditions after a `TypeGuard`
+
+A negative membership check that follows a `TypeGuard` removes replacement union members whose
+`__contains__` method always returns `True`. The same check is discarded when it precedes the guard:
+
+```py
+from collections.abc import Mapping
+from typing import Literal, TypeGuard
+
+class AlwaysContains(Mapping[str, int]):
+    def __contains__(self, key: object, /) -> Literal[True]:
+        return True
+
+class SometimesContains(Mapping[str, int]): ...
+class Target: ...
+
+def guard_mapping_or_target(value: object) -> TypeGuard[AlwaysContains | Target]:
+    return True
+
+def absent_key_after_typeguard(value: SometimesContains) -> None:
+    lacks_missing = "missing" not in value
+
+    if guard_mapping_or_target(value) and lacks_missing:
+        reveal_type(value)  # revealed: Target
+
+    if lacks_missing and guard_mapping_or_target(value):
+        reveal_type(value)  # revealed: AlwaysContains | Target
+```
+
+## Closed `TypedDict` replacement union membership
+
+A membership check following a `TypeGuard` removes a closed `TypedDict` replacement that cannot
+contain the key. The remaining `TypedDict` and the type of its required value remain precise, and it
+can still be copied into a `dict`:
+
+```py
+from collections.abc import Mapping
+from typing import TypeGuard
+from typing_extensions import TypedDict
+
+class Present(TypedDict):
+    present: int
+
+class Closed(TypedDict, closed=True):
+    other: str
+
+def guard_union(value: Mapping[str, object]) -> TypeGuard[Present | Closed]:
+    return True
+
+def membership_after_typeguard(value: Mapping[str, object]) -> None:
+    if guard_union(value) and "present" in value:
+        reveal_type(value)  # revealed: Present
+        reveal_type(value["present"])  # revealed: int
+        reveal_type(dict(value))  # revealed: dict[str, object]
+```
+
+## Impossible optional `TypedDict` replacement union membership
+
+A `NotRequired[Never]` item can never be present, so a following membership check also removes its
+`TypedDict` from a `TypeGuard` replacement union:
+
+```py
+from collections.abc import Mapping
+from typing import TypeGuard, TypedDict
+from typing_extensions import Never, NotRequired
+
+class Present(TypedDict):
+    present: int
+
+class Impossible(TypedDict):
+    present: NotRequired[Never]
+
+def guard_union(value: Mapping[str, object]) -> TypeGuard[Present | Impossible]:
+    return True
+
+def membership_after_typeguard(value: Mapping[str, object]) -> None:
+    if guard_union(value) and "present" in value:
+        reveal_type(value)  # revealed: Present
+        reveal_type(value["present"])  # revealed: int
+```
+
+## Grouped `TypeGuard` discards preceding positive membership
+
+Grouping a guard with a later nominal refinement must not restore an earlier positive membership
+check that the guard discarded. Both grouped and flattened conditions leave a non-subscriptable
+replacement:
+
+```py
+from collections.abc import Mapping
+from typing import Literal, TypeGuard
+
+class First:
+    kind: Literal["first"] = "first"
+
+class Second:
+    kind: Literal["second"] = "second"
+
+def guard_union(value: object) -> TypeGuard[First | Second]:
+    return True
+
+def grouped(value: Mapping[str, int]) -> None:
+    if "missing" in value and (guard_union(value) and value.kind == "first"):
+        reveal_type(value)  # revealed: First
+        value["missing"]  # error: [not-subscriptable]
+
+def flattened(value: Mapping[str, int]) -> None:
+    if "missing" in value and guard_union(value) and value.kind == "first":
+        reveal_type(value)  # revealed: First
+        value["missing"]  # error: [not-subscriptable]
+```
+
+## Grouped `TypeGuard` discards preceding negative membership
+
+Grouping a guard with a later nominal refinement must also discard an earlier negative membership
+check. Both grouped and flattened conditions retain the matching replacement instead of treating the
+branch as unreachable:
+
+```py
+from collections.abc import Mapping
+from typing import Literal, TypeGuard
+
+class First(Mapping[str, int]):
+    kind: Literal["first"] = "first"
+
+    def __contains__(self, key: object, /) -> Literal[True]:
+        return True
+
+class Second:
+    kind: Literal["second"] = "second"
+
+def guard_union(value: object) -> TypeGuard[First | Second]:
+    return True
+
+def grouped(value: Mapping[str, int]) -> None:
+    if "missing" not in value and (guard_union(value) and value.kind == "first"):
+        reveal_type(value)  # revealed: First
+
+def flattened(value: Mapping[str, int]) -> None:
+    if "missing" not in value and guard_union(value) and value.kind == "first":
+        reveal_type(value)  # revealed: First
+```
+
 ## Boolean logic with TypeGuard and TypeIs
 
 TypeGuard constraints need to properly distribute through boolean operations.

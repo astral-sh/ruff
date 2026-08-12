@@ -6,7 +6,6 @@ use crate::reachability::{
     binding_reachability, narrow_type_by_constraint, type_narrowed_by_previous_patterns,
 };
 use crate::subscript::PyIndex;
-use crate::types::call::CallArguments;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
@@ -43,6 +42,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
+use super::call::CallArguments;
 use super::constraints::{ConstraintSetBuilder, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
@@ -784,15 +784,26 @@ impl<'db> PresentKeyConstraint<'db> {
             return Type::Never;
         }
 
-        if key_membership_implies_subscript(db, env, self.source) {
-            IntersectionType::from_two_elements(
-                db,
-                env,
-                replacement,
-                mapping_present_key_protocol(db, env, self.key.value(db)),
-            )
-        } else {
-            narrow_with_present_key(db, env, replacement, self.key.value(db))
+        let mut membership_implies_subscript = None;
+        let mut apply_to_replacement = |replacement| {
+            if !is_or_contains_typeddict(db, replacement)
+                && *membership_implies_subscript
+                    .get_or_insert_with(|| key_membership_implies_subscript(db, env, self.source))
+            {
+                IntersectionType::from_two_elements(
+                    db,
+                    env,
+                    replacement,
+                    mapping_present_key_protocol(db, env, self.key.value(db)),
+                )
+            } else {
+                narrow_with_present_key(db, env, replacement, self.key.value(db))
+            }
+        };
+
+        match replacement.resolve_type_alias(db) {
+            Type::Union(union) => union.map(db, env, |element| apply_to_replacement(*element)),
+            _ => apply_to_replacement(replacement),
         }
     }
 
@@ -1385,7 +1396,11 @@ impl<'db> NarrowingConstraint<'db> {
         for disjunct in &self.disjuncts {
             for other_conjunction in &other_precomputed_refinement_conjunctions {
                 let merged = ConstraintDisjunct {
-                    kind: ConstraintDisjunctKind::PrecomputedRefinement,
+                    kind: if disjunct.kind == ConstraintDisjunctKind::TypeGuardReplacement {
+                        ConstraintDisjunctKind::TypeGuardReplacement
+                    } else {
+                        ConstraintDisjunctKind::PrecomputedRefinement
+                    },
                     conjunction: other_conjunction
                         .clone()
                         .and_with_key_constraints_from(&disjunct.conjunction),
@@ -5350,7 +5365,7 @@ fn narrow_with_present_key<'db>(
         Type::Union(union) => union.map(db, env, |element| {
             narrow_with_present_key(db, env, *element, key)
         }),
-        resolved if closed_typeddict_excludes_key(db, resolved, key) => Type::Never,
+        resolved if typeddict_excludes_key(db, resolved, key) => Type::Never,
         resolved if typeddict_declares_key(db, resolved, key) => ty,
         resolved if is_or_contains_typeddict(db, resolved) => constrain(
             ty,
@@ -5377,8 +5392,8 @@ fn required_typeddict_key<'db>(
     TypedDictType::from_schema_items(db, schema)
 }
 
-/// Return whether a closed `TypedDict` in `ty` rules out `key`.
-fn closed_typeddict_excludes_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
+/// Return whether a `TypedDict` in `ty` rules out `key`.
+fn typeddict_excludes_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
     match ty.resolve_type_alias(db) {
         Type::TypedDict(typed_dict) => typed_dict
             .key_membership_truthiness(db, key)
@@ -5386,7 +5401,7 @@ fn closed_typeddict_excludes_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str)
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| closed_typeddict_excludes_key(db, *element, key)),
+            .any(|element| typeddict_excludes_key(db, *element, key)),
         _ => false,
     }
 }
@@ -5415,7 +5430,8 @@ fn narrow_with_absent_key<'db>(
 /// Return whether `ty` proves that `key` is present, making a negative membership branch
 /// unreachable.
 ///
-/// Calling `__contains__` with this literal key must have an always-truthy return type.
+/// `TypedDict` schemas track required keys directly. For other types, calling `__contains__` with
+/// this literal key must have an always-truthy return type.
 fn key_is_always_present<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -5423,6 +5439,12 @@ fn key_is_always_present<'db>(
     key: StringLiteralType<'db>,
 ) -> bool {
     let resolved = ty.resolve_type_alias(db);
+    if let Type::TypedDict(typed_dict) = resolved {
+        return typed_dict
+            .key_membership_truthiness(db, key.value(db))
+            .is_always_true();
+    }
+
     if let Type::Intersection(intersection) = resolved
         && intersection
             .positive(db)

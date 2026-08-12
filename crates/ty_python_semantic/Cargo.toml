@@ -32,7 +32,7 @@ bitflags = { workspace = true }
 char_str = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
+get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
