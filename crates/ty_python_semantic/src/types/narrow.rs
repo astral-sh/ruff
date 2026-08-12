@@ -4088,9 +4088,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
-        // Expression inference can temporarily substitute a cycle placeholder for every
-        // subexpression. `None` has a stable type regardless of that cycle, so preserve it when
-        // deriving comparison constraints for recursively inferred attributes.
+        // Expression-inference cycles can replace every subexpression's type, including literals,
+        // with a cycle placeholder. This can prevent comparisons against `None` from narrowing
+        // recursively inferred attributes. Other literals can encounter the same issue, but a
+        // general solution would require broader changes to cycle recovery. For now, intentionally
+        // preserve only `None`, whose type can be recovered directly.
         let expression_type = |expr: &ast::Expr, env: &ProgramEnvironment<'db>| {
             if expr.is_none_literal_expr() {
                 Type::none(db, env)
