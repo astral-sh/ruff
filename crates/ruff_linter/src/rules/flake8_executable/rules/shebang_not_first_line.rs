@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::is_python_whitespace;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 
 use crate::Locator;
 use crate::Violation;
@@ -45,8 +45,9 @@ impl Violation for ShebangNotFirstLine {
 
 /// EXE005
 pub(crate) fn shebang_not_first_line(range: TextRange, locator: &Locator, context: &LintContext) {
-    // If the shebang is at the beginning of the file, abort.
-    if range.start() == TextSize::from(0) {
+    // If the file already has a leading shebang, later shebang-like lines are comments or
+    // tool-specific directives.
+    if locator.contents().starts_with("#!") {
         return;
     }
 
