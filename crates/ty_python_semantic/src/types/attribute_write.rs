@@ -9,6 +9,7 @@
 
 use crate::Db;
 use ty_module_resolver::KnownModule;
+use ty_python_core::use_def_map;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
@@ -16,7 +17,9 @@ use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
 };
 use crate::ProgramEnvironment;
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
+};
 
 /// The operation required to write an attribute.
 ///
@@ -106,7 +109,8 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
 ///
 /// A data descriptor on the metaclass takes precedence over the class object's own attributes,
 /// which in turn take precedence over definitely non-data metaclass members. If the metaclass
-/// member is absent or possibly undefined, the class object's own attributes form the fallback.
+/// member is absent, possibly undefined, or could be a non-data descriptor, the class object's own
+/// attributes form the fallback.
 pub(super) enum ClassAttributeWriteMember<'db> {
     /// A metaclass member governs the write, optionally alongside a class-attribute fallback.
     Explicit {
@@ -150,7 +154,7 @@ impl ExplicitAttributeWriteRequirement<'_> {
     }
 }
 
-/// A write target found through a possibly absent fallback lookup.
+/// A receiver-level write target that can govern the write instead of the type member.
 pub(super) enum FallbackAttributeWriteRequirement<'db> {
     /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
@@ -184,8 +188,8 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
 /// ```
 pub(super) enum AssignmentAttributeMembers<'db> {
     /// The type member governs the write, as `Meta.data` does above because it is a data descriptor.
-    /// If the type member may be missing, the corresponding receiver member (`C.data`) is retained
-    /// as `receiver_fallback`.
+    /// If the type member may be missing or may be a non-data descriptor, the corresponding
+    /// receiver member (`C.data`) is retained as `receiver_fallback`.
     TypeMember {
         member: PlaceAndQualifiers<'db>,
         receiver_fallback: Option<PlaceAndQualifiers<'db>>,
@@ -440,16 +444,32 @@ fn class_attribute_write_requirement<'db>(
 
     let member = match type_member {
         PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(place @ DefinedPlace { ty, .. }),
             qualifiers,
-        } => ClassAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(
-                db, env, object_ty, attribute, ty, qualifiers,
-            ),
-            fallback: receiver_fallback.map(|fallback| {
-                class_fallback_write_requirement(db, env, object_ty, class_attr_self_ty, fallback)
-            }),
-        },
+        } => {
+            let descriptor_ty = receiver_fallback
+                .and_then(|_| possible_class_attribute_descriptor(db, env, place))
+                .unwrap_or(ty);
+            ClassAttributeWriteMember::Explicit {
+                member: explicit_attribute_write_requirement(
+                    db,
+                    env,
+                    object_ty,
+                    attribute,
+                    descriptor_ty,
+                    qualifiers,
+                ),
+                fallback: receiver_fallback.map(|fallback| {
+                    class_fallback_write_requirement(
+                        db,
+                        env,
+                        object_ty,
+                        class_attr_self_ty,
+                        fallback,
+                    )
+                }),
+            }
+        }
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
@@ -476,6 +496,46 @@ fn class_attribute_write_requirement<'db>(
     };
 
     AttributeWriteRequirement::Class { object_ty, member }
+}
+
+/// Recover the concrete descriptor hidden by an uncertain metaclass-member annotation.
+///
+/// The declared type describes the descriptor object, not the values accepted by its setter.
+/// Inspecting the binding preserves the setter's actual value contract:
+///
+/// ```python
+/// class DescriptorMeta(type):
+///     def __set__(self, instance: object, value: str) -> None: ...
+///
+/// class Descriptor(metaclass=DescriptorMeta): ...
+///
+/// class Meta(type):
+///     attribute: type[object] = Descriptor
+/// ```
+fn possible_class_attribute_descriptor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    member: DefinedPlace<'db>,
+) -> Option<Type<'db>> {
+    if member.ty.is_data_descriptor(db, env) || member.ty.is_definitely_non_data_descriptor(db, env)
+    {
+        return None;
+    }
+
+    let definition = member.provenance.definition()?;
+    let use_def = use_def_map(db, definition.scope(db));
+    let descriptor_ty =
+        place_from_bindings(db, env, use_def.end_of_scope_bindings(definition.place(db)))
+            .place
+            .ignore_possibly_undefined()?;
+    let descriptor_ty = match descriptor_ty.resolve_type_alias(db) {
+        Type::TypeForm(typeform) => typeform.type_argument(db).to_meta_type(db, env),
+        descriptor_ty => descriptor_ty,
+    };
+
+    descriptor_ty
+        .is_data_descriptor(db, env)
+        .then_some(descriptor_ty)
 }
 
 /// Convert an explicitly resolved member into either a descriptor call or a direct type check.
@@ -625,37 +685,64 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
-/// Return the class member that takes precedence over a definitely non-data metaclass member.
-fn class_member_preceding_non_data_metaclass_member<'db>(
+/// Resolve class-object members when a class attribute can shadow its metaclass member.
+///
+/// A definitely non-data metaclass member is shadowed entirely. If the metaclass member's
+/// descriptor status is uncertain, both members remain possible write targets.
+///
+/// ```python
+/// class Meta(type):
+///     attribute = object()
+///
+/// class C(metaclass=Meta):
+///     attribute: int
+///
+/// C.attribute = 1
+/// ```
+fn class_object_assignment_members<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     type_member: PlaceAndQualifiers<'db>,
-) -> Option<PlaceAndQualifiers<'db>> {
+) -> Option<AssignmentAttributeMembers<'db>> {
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
-    ) || !type_member
-        .place
-        .ignore_possibly_undefined()?
-        .is_definitely_non_data_descriptor(db, env)
+    ) {
+        return None;
+    }
+
+    let type_member_ty = type_member.place.ignore_possibly_undefined()?;
+    let definitely_non_data_descriptor = type_member_ty.is_definitely_non_data_descriptor(db, env);
+    if !definitely_non_data_descriptor
+        && (type_member_ty.is_divergent() || type_member_ty.is_data_descriptor(db, env))
     {
         return None;
     }
 
-    object_ty
+    let receiver_member = object_ty
         .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
-        .filter(|class_attr| !class_attr.place.is_undefined())
+        .filter(|class_attr| !class_attr.place.is_undefined())?;
+
+    Some(if definitely_non_data_descriptor {
+        AssignmentAttributeMembers::ReceiverMember(receiver_member)
+    } else {
+        AssignmentAttributeMembers::TypeMember {
+            member: type_member,
+            receiver_fallback: Some(receiver_member),
+        }
+    })
 }
 
 /// Return the members considered by attribute assignment in lookup-precedence order.
 ///
 /// The type member comes from class-member lookup. A member found directly on the receiver is
 /// queried when the type member is absent or possibly undefined. For class objects, a class-MRO
-/// member instead takes precedence over a definitely non-data metaclass member. Composite and
-/// dynamic receiver types return `None`; their callers either decompose them before this point or
-/// handle them without member lookup.
+/// member instead takes precedence over a definitely non-data metaclass member and remains an
+/// alternative when the metaclass member's descriptor status is uncertain. Composite and dynamic
+/// receiver types return `None`; their callers either decompose them before this point or handle
+/// them without member lookup.
 ///
 /// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
 /// protocol compatibility, and `Final` validation share exactly the same lookup precedence.
@@ -680,10 +767,10 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         object_ty.class_member(db, env, attribute)
     };
-    if let Some(receiver_member) =
-        class_member_preceding_non_data_metaclass_member(db, env, object_ty, attribute, type_member)
+    if let Some(members) =
+        class_object_assignment_members(db, env, object_ty, attribute, type_member)
     {
-        return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
+        return Some(members);
     }
     let needs_receiver_fallback = matches!(
         type_member.place,
