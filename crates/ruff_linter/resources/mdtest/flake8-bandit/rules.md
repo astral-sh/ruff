@@ -59,7 +59,7 @@ select = ["S607"]
 import os
 import subprocess
 
-os.execv(path="/bin/ls", args=["ls"])
+os.spawnv(mode=os.P_WAIT, file="/bin/ls", args=["ls"])
 subprocess.run(args="git status")  # error: [start-process-with-partial-path]
 ```
 
