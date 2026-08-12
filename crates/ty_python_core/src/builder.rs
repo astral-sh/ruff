@@ -4453,8 +4453,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
-                    // Mixed normal and terminal entry states are still handled by the normal path
-                    // only. See the corresponding TODO tests in `terminal_statements.md`.
+                    if !finalbody.is_empty() {
+                        for snapshot in terminal_finally_entry_snapshots {
+                            self.flow_merge(snapshot);
+                        }
+                    }
                     self.visit_body(finalbody);
                 }
                 self.in_try = was_in_try;

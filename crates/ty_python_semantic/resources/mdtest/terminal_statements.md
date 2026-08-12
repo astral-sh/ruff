@@ -85,8 +85,18 @@ def return_in_try(cond: bool):
     else:
         reveal_type(x)  # revealed: Literal["before"]
     finally:
-        # TODO: should include `Literal["test"]` when the return passes through `finally`
-        reveal_type(x)  # revealed: Literal["before"]
+        reveal_type(x)  # revealed: Literal["before", "test"]
+    reveal_type(x)  # revealed: Literal["before", "test"]
+
+def return_in_try_without_finally(cond: bool):
+    x = "before"
+    try:
+        if cond:
+            x = "returned"
+            return
+    except:
+        pass
+
     reveal_type(x)  # revealed: Literal["before"]
 
 def return_in_nested_then_branch(cond1: bool, cond2: bool):
@@ -444,12 +454,9 @@ def raise_in_both_nested_branches(cond1: bool, cond2: bool):
 
 ## Terminal in `try` with `finally` clause
 
-We model terminal control flow in a `try`, `except`, or `else` block as jumping to a `finally`
-clause before it terminates the current scope or jumps to its final destination when there are no
-normal paths into the `finally` block.
-
-TODO: we don't yet consider both normal and terminal entry states when checking a `finally` block
-that has a mix of normal and terminal entry paths.
+Terminal control flow in a `try`, `except`, or `else` block passes through its `finally` clause
+before terminating the current scope or jumping to its final destination. A `finally` block with
+both normal and terminal entry paths sees the bindings from both.
 
 ```py
 def finally_runs_after_return():
@@ -498,8 +505,7 @@ def finally_runs_after_mixed_except_paths(cond: bool):
             return
         x = "except-normal"
     finally:
-        # TODO: should also include `Literal["except-return"]`
-        reveal_type(x)  # revealed: Literal["except-normal"]
+        reveal_type(x)  # revealed: Literal["before", "except-return", "except-normal"]
 
 def finally_runs_after_mixed_try_paths(cond: bool):
     x = "before"
@@ -509,8 +515,28 @@ def finally_runs_after_mixed_try_paths(cond: bool):
             return
         x = "try-normal"
     finally:
-        # TODO: should also include `Literal["try-return"]`
-        reveal_type(x)  # revealed: Literal["try-normal"]
+        reveal_type(x)  # revealed: Literal["try-return", "try-normal"]
+
+def requires_int(value: int) -> None: ...
+def finally_checks_returning_path(cond: bool) -> None:
+    value = 1
+    try:
+        if cond:
+            value = "returned"
+            return
+    finally:
+        requires_int(value)  # error: [invalid-argument-type]
+
+def finally_assignment_overwrites_returning_path(cond: bool) -> None:
+    value = "before"
+    try:
+        if cond:
+            value = "returned"
+            return
+    finally:
+        value = "cleanup"
+
+    reveal_type(value)  # revealed: Literal["cleanup"]
 
 def finally_runs_after_mixed_break_paths(cond: bool):
     x = "before"
@@ -521,8 +547,7 @@ def finally_runs_after_mixed_break_paths(cond: bool):
                 break
             x = "normal"
         finally:
-            # TODO: should also include `Literal["break"]`
-            reveal_type(x)  # revealed: Literal["normal"]
+            reveal_type(x)  # revealed: Literal["break", "normal"]
         break
 
 def finally_runs_before_break():
