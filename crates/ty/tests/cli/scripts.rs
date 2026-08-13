@@ -122,6 +122,14 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
+    let mismatched = case.command().arg("--python-version=3.11").output()?;
+    assert!(!mismatched.status.success());
+    let stdout = String::from_utf8(mismatched.stdout)?;
+    assert!(stdout.contains("error[unresolved-reference]"));
+    assert!(stdout.contains(
+        "info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.12`"
+    ));
+
     Ok(())
 }
 
@@ -199,6 +207,7 @@ fn environment_options() -> anyhow::Result<()> {
        |
     12 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
+    info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 1 diagnostic
 
@@ -508,12 +517,14 @@ fn explicit_config_replaces_the_script_environment() -> anyhow::Result<()> {
        |
     11 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     info[revealed-type]: Revealed type
       --> script.py:12:13
        |
     12 | reveal_type(sys.platform)
        |             ^^^^^^^^^^^^ `Literal["linux"]`
+    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 2 diagnostics
 
@@ -557,18 +568,32 @@ fn cli_arguments_override_script_environment() -> anyhow::Result<()> {
        |
     11 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     info[revealed-type]: Revealed type
       --> script.py:12:13
        |
     12 | reveal_type(sys.platform)
        |             ^^^^^^^^^^^^ `Literal["linux"]`
+    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 2 diagnostics
 
     ----- stderr -----
     "#
     );
+
+    let concise = case
+        .command()
+        .arg("--python-version")
+        .arg("3.12")
+        .arg("--python-platform")
+        .arg("linux")
+        .arg("--output-format")
+        .arg("concise")
+        .output()?;
+    assert!(concise.status.success());
+    assert!(!String::from_utf8(concise.stdout)?.contains("does not satisfy"));
 
     Ok(())
 }
@@ -612,12 +637,14 @@ fn script_version_and_platform_are_isolated_from_project_configuration() -> anyh
        |
     12 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
+    info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     info[revealed-type]: Revealed type
       --> script.py:13:13
        |
     13 | reveal_type(sys.platform)
        |             ^^^^^^^^^^^^ `Literal["win32"]`
+    info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 2 diagnostics
 

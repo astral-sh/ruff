@@ -743,10 +743,19 @@ pub(crate) fn check_file_impl(
     {
         let db = AssertUnwindSafe(db);
         match catch(&**db, source_file, || {
-            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let mut diagnostics = ty_python_semantic::check_file(*db, file)?;
             let Some(script) = Script::for_file(*db, source_file) else {
                 return Ok(diagnostics);
             };
+
+            if let Some(requires_python) = script.incompatible_python_requirement(*db) {
+                let python_version = script.python_version_with_source(*db).version;
+                for diagnostic in &mut *diagnostics {
+                    diagnostic.info(format_args!(
+                        "Python {python_version} does not satisfy the script's `requires-python` constraint `{requires_python}`"
+                    ));
+                }
+            }
 
             let script_diagnostics = script.diagnostics(*db);
             if script_diagnostics.is_empty() {

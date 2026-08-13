@@ -1,8 +1,11 @@
-use pep440_rs::VersionSpecifiers;
+use std::ops::Bound;
+
+use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ruff_db::source::source_text;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use serde::Deserialize;
@@ -45,6 +48,19 @@ impl<'db> Script<'db> {
         // do not also allocate a tracked `script` memo just to cache another `None`.
         script_metadata(db, file)?;
         script(db, file)
+    }
+
+    /// Returns the script's Python requirement when no release of the selected minor satisfies it.
+    pub(crate) fn incompatible_python_requirement(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db VersionSpecifiers> {
+        let metadata = script_metadata(db, self.file(db))?;
+        let requires_python = metadata.requires_python.as_deref()?;
+        let python_version = self.python_version_with_source(db).version;
+
+        (!python_version_satisfies_requirement(requires_python, python_version))
+            .then_some(requires_python)
     }
 }
 
@@ -214,17 +230,70 @@ impl ScriptMetadata {
     }
 }
 
+/// ty tracks only Python's major and minor version, so any compatible patch release is sufficient.
+fn python_version_satisfies_requirement(
+    requires_python: &VersionSpecifiers,
+    python_version: PythonVersion,
+) -> bool {
+    let major = u64::from(python_version.major);
+    let minor = u64::from(python_version.minor);
+    let selected_minor = Version::new([major, minor]);
+    let next_minor = Version::new([major, minor + 1]);
+
+    release_specifiers_to_ranges(requires_python.clone())
+        .iter()
+        .any(|(lower, upper)| {
+            let starts_before_next_minor = match lower {
+                Bound::Included(version) | Bound::Excluded(version) => version < &next_minor,
+                Bound::Unbounded => true,
+            };
+            let ends_at_or_after_selected_minor = match upper {
+                Bound::Included(version) => version >= &selected_minor,
+                Bound::Excluded(version) => version > &selected_minor,
+                Bound::Unbounded => true,
+            };
+
+            starts_before_next_minor && ends_at_or_after_selected_minor
+        })
+}
+
 #[cfg(test)]
 mod tests {
+    use pep440_rs::VersionSpecifiers;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_python_ast::PythonVersion;
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
     use crate::{Db as _, ProjectMetadata};
 
-    use super::{Script, script};
+    use super::{Script, python_version_satisfies_requirement, script};
+
+    #[test]
+    fn python_requirement_compares_minor_versions() -> anyhow::Result<()> {
+        for (requirement, python_version, expected) in [
+            (">=3.13", PythonVersion::PY312, false),
+            (">=3.13.0b0", PythonVersion::PY312, false),
+            (">=3.13.0b0", PythonVersion::PY313, true),
+            (">=3.12,<3.13", PythonVersion::PY312, true),
+            (">=3.12.5,<3.13", PythonVersion::PY312, true),
+            (">3.12,<3.13", PythonVersion::PY312, true),
+            ("==3.12.5", PythonVersion::PY312, true),
+            (">=3.12,!=3.12.*", PythonVersion::PY312, false),
+            (">=3.12,<3.13", PythonVersion::PY313, false),
+        ] {
+            let requirement = requirement.parse::<VersionSpecifiers>()?;
+            assert_eq!(
+                python_version_satisfies_requirement(&requirement, python_version),
+                expected,
+                "Python {python_version} and requirement `{requirement}`",
+            );
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn ordinary_files_do_not_depend_on_open_files() -> anyhow::Result<()> {
