@@ -1046,7 +1046,8 @@ class AnySelf(Protocol):
 ```
 
 Assignments in a comprehension and augmented assignments are also writes to the instance.
-`__getattr__` provides the read side of `+=` below, so that case tests only the write:
+`__getattr__` provides the read side of `+=` below, although the write is not yet recognized as
+establishing an instance attribute:
 
 ```py
 class AssignmentForms(Protocol):
@@ -1057,14 +1058,15 @@ class AssignmentForms(Protocol):
         [None for self.from_comprehension in [1]]  # error: [ambiguous-protocol-member]
 
     def augmented_assignment(self) -> None:
+        # error: [unresolved-attribute]
         self.augmented += 1  # snapshot: ambiguous-protocol-member
 ```
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:326:9
+   --> src/mdtest_snippet.py:327:9
     |
-326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+327 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
    --> src/mdtest_snippet.py:318:7
