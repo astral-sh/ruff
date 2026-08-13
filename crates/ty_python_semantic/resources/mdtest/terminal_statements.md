@@ -596,6 +596,45 @@ def returns_through_finally() -> None:
         reveal_type(value)  # revealed: Literal["returned"]
 ```
 
+## Possibly unbound names in `finally` after a context manager
+
+When an assignment raises before binding a name, a `finally` block can observe that the name is
+undefined:
+
+```py
+from contextlib import nullcontext
+
+def may_raise() -> str:
+    raise RuntimeError
+
+def without_context_manager() -> str | None:
+    try:
+        value = may_raise()
+        return may_raise()
+    except ValueError:
+        return None
+    finally:
+        # error: [possibly-unresolved-reference]
+        reveal_type(value)  # revealed: str
+```
+
+Adding a non-suppressing context manager currently hides the exceptional path from the `finally`
+block. Properly modeling the continuing and terminating paths is tracked in
+[ty#233](https://github.com/astral-sh/ty/issues/233).
+
+```py
+def with_context_manager() -> str | None:
+    try:
+        value = may_raise()
+        with nullcontext():
+            return may_raise()
+    except ValueError:
+        return None
+    finally:
+        # TODO: should emit [possibly-unresolved-reference] and reveal `str`.
+        reveal_type(value)  # revealed: Never
+```
+
 ## Calls to functions returning `Never` / `NoReturn`
 
 These calls should be treated as terminal statements.
