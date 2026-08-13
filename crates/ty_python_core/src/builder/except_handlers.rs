@@ -68,7 +68,7 @@ impl ExceptionContextStackManager {
     }
 
     /// Registers a context manager after it enters but before its target is assigned.
-    pub(super) fn push_with_context(&mut self) {
+    pub(super) fn push_context_manager_context(&mut self) {
         self.current_exception_context_stack()
             .0
             .push(ExceptionContext {
@@ -82,7 +82,7 @@ impl ExceptionContextStackManager {
     ///
     /// Removing the context before its exit method runs prevents it from suppressing exceptions
     /// raised by its own exit method.
-    pub(super) fn finish_with_context(&mut self) -> Vec<FlowSnapshot> {
+    pub(super) fn finish_context_manager_context(&mut self) -> Vec<FlowSnapshot> {
         let stack = self.current_exception_context_stack();
         let snapshots = stack.take_exception_snapshots();
         let context = stack.pop_context();
@@ -152,7 +152,7 @@ impl ExceptionContextStackManager {
     }
 
     /// Returns whether an enclosing context manager has already seen an exception checkpoint.
-    pub(super) fn has_with_exception_checkpoint(&self) -> bool {
+    pub(super) fn has_context_manager_exception_checkpoint(&self) -> bool {
         self.0.last().is_some_and(|stack| {
             stack.0.iter().any(|context| {
                 matches!(context.kind, ExceptionContextKind::With)
@@ -162,19 +162,19 @@ impl ExceptionContextStackManager {
     }
 
     /// Records that a manager may have made a terminal `try` path appear to continue.
-    pub(super) fn record_suppressed_terminal_with_exit(&mut self) {
+    pub(super) fn record_suppressed_terminal_context_manager_exit(&mut self) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
-            context.has_suppressed_terminal_with_exit = true;
+            context.has_suppressed_terminal_context_manager_exit = true;
         }
     }
 
     /// Forwards a gated terminal state to the nearest enclosing `try`.
-    pub(super) fn propagate_suppressed_terminal_with_exit(
+    pub(super) fn propagate_suppressed_terminal_context_manager_exit(
         &mut self,
         terminal_snapshot: FlowSnapshot,
     ) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
-            context.has_suppressed_terminal_with_exit = true;
+            context.has_suppressed_terminal_context_manager_exit = true;
             context
                 .terminal_finally_entry_snapshots
                 .push(terminal_snapshot);
@@ -284,7 +284,7 @@ impl ExceptionContextStack {
 }
 
 /// Distinguishes `try` contexts that may own a `finally` suite from `with` contexts.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 enum ExceptionContextKind {
     #[default]
     Try,
@@ -302,7 +302,7 @@ pub(super) struct ExceptionContext {
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
     /// Whether a terminal manager body introduced a deferred suppression continuation.
-    has_suppressed_terminal_with_exit: bool,
+    has_suppressed_terminal_context_manager_exit: bool,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
@@ -311,7 +311,7 @@ impl ExceptionContext {
         (
             self.terminal_finally_entry_snapshots,
             self.has_escaping_exception,
-            self.has_suppressed_terminal_with_exit,
+            self.has_suppressed_terminal_context_manager_exit,
         )
     }
 }

@@ -642,6 +642,7 @@ try:
     with nullcontext():
         raise ValueError
 finally:
+    # The diagnostic confirms that `finally` is reachable.
     missing_name  # error: [unresolved-reference]
 ```
 
@@ -659,6 +660,7 @@ try:
     unreachable = 1
     import sys
 finally:
+    # The diagnostic confirms that `finally` is reachable.
     missing_after_unreachable_bindings  # error: [unresolved-reference]
 ```
 
@@ -676,6 +678,7 @@ def does_not_continue() -> int:
             raise ValueError
     finally:
         pass
+    # The absence of a diagnostic confirms that this code is unreachable.
     missing_after_finally
 ```
 
@@ -746,21 +749,26 @@ def nested_cleanup() -> None:
             value = "cleanup"
     finally:
         reveal_type(value)  # revealed: Literal["cleanup"]
+    # The absence of a diagnostic confirms that this code is unreachable.
     missing_after_nested_finally
 ```
 
-## Terminal exception handlers after a context manager
+## Terminal `except` branches after a context manager
 
-A handler that assigns a value before returning still contributes that value to the `finally` block:
+An `except` branch that assigns a value before returning still contributes that value to the
+`finally` block:
 
 ```py
 from contextlib import nullcontext
+
+def unknown_exception() -> Exception:
+    return ValueError()
 
 def handler_returns() -> None:
     value = "before"
     try:
         with nullcontext():
-            raise ValueError
+            raise unknown_exception()
     except ValueError:
         value = "returned"
         return
@@ -768,18 +776,21 @@ def handler_returns() -> None:
         reveal_type(value)  # revealed: Literal["before", "returned"]
 ```
 
-## Named exception handlers after a context manager
+## Named `except` branches after a context manager
 
-Binding an exception does not make a terminal handler a continuing entry into `finally`:
+Binding an exception does not make a terminal `except` branch a continuing entry into `finally`:
 
 ```py
 from contextlib import nullcontext
+
+def unknown_exception() -> Exception:
+    return ValueError()
 
 def named_handler() -> None:
     value = "before"
     try:
         with nullcontext():
-            raise ValueError
+            raise unknown_exception()
     except ValueError as error:
         value = error
         return
@@ -787,18 +798,21 @@ def named_handler() -> None:
         reveal_type(value)  # revealed: Literal["before"] | ValueError
 ```
 
-## Multiple terminal exception handlers after a context manager
+## Multiple terminal `except` branches after a context manager
 
-Every terminal handler contributes its assignment to the `finally` block:
+Every terminal `except` branch contributes its assignment to the `finally` block:
 
 ```py
 from contextlib import nullcontext
+
+def unknown_exception() -> Exception:
+    return ValueError()
 
 def multiple_handlers() -> None:
     value = "before"
     try:
         with nullcontext():
-            raise ValueError
+            raise unknown_exception()
     except ValueError:
         value = "value-error"
         return
@@ -809,9 +823,9 @@ def multiple_handlers() -> None:
         reveal_type(value)  # revealed: Literal["before", "value-error", "type-error"]
 ```
 
-## Continuing exception handlers after a context manager
+## `except` branches without terminal statements after a context manager
 
-A handler that continues normally determines the value observed by `finally`:
+An `except` branch with no terminal statements determines the value observed by `finally`:
 
 ```py
 from contextlib import nullcontext
@@ -828,8 +842,8 @@ finally:
 
 ## Unreachable assignments after a context manager inside `except`
 
-A context manager propagates an exception from a handler even when an unreachable assignment
-follows:
+A context manager propagates an exception from an `except` branch even when an unreachable
+assignment follows:
 
 ```py
 from contextlib import nullcontext
@@ -841,10 +855,11 @@ except ValueError:
         raise RuntimeError
     unreachable = 1
 finally:
+    # The diagnostic confirms that `finally` is reachable.
     missing_after_unreachable_handler_assignment  # error: [unresolved-reference]
 ```
 
-## Raising from a context manager inside a named exception handler
+## Raising from a context manager inside a named `except` branch
 
 Clearing a named exception does not hide the terminal path from `finally`:
 
@@ -857,13 +872,14 @@ except ValueError as error:
     with nullcontext():
         raise RuntimeError
 finally:
+    # The diagnostic confirms that `finally` is reachable.
     missing_name  # error: [unresolved-reference]
 ```
 
-## Terminal nested exception handlers without their own `finally`
+## Terminal nested `except` branches without their own `finally`
 
-An unreachable assignment and a binding in the terminal inner handler do not prevent the path from
-reaching the outer `finally` block:
+An unreachable assignment and a binding in the terminal inner `except` branch do not prevent the
+path from reaching the outer `finally` block:
 
 ```py
 from contextlib import nullcontext
@@ -878,10 +894,11 @@ def nested_unreachable_assignment() -> None:
             local = 1
             return
     finally:
+        # The diagnostic confirms that `finally` is reachable.
         missing_after_nested_unreachable_assignment  # error: [unresolved-reference]
 ```
 
-A `break` through an inner handler also reaches the outer `finally` block:
+A `break` through an inner `except` branch also reaches the outer `finally` block:
 
 ```py
 for _ in [1]:
@@ -892,6 +909,7 @@ for _ in [1]:
         except ValueError:
             break
     finally:
+        # The diagnostic confirms that `finally` is reachable.
         missing_name  # error: [unresolved-reference]
 ```
 
@@ -911,6 +929,7 @@ else:
         raise RuntimeError
     unreachable = 1
 finally:
+    # The diagnostic confirms that `finally` is reachable.
     missing_after_unreachable_else_assignment  # error: [unresolved-reference]
 ```
 

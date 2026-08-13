@@ -196,14 +196,15 @@ continue without returning a value:
 def may_raise() -> int:
     raise ValueError
 
-def interrupted_return() -> int:  # error: [invalid-return-type]
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+def interrupted_return() -> int:
     with suppress(ValueError):
         return may_raise()
 ```
 
 ## Exception handlers inside a suppressing context manager
 
-A bare handler catches an exception before it can reach the surrounding context manager:
+A bare `except:` catches an exception before it can reach the surrounding context manager:
 
 ```py
 from contextlib import suppress
@@ -218,7 +219,7 @@ def caught_before_suppression() -> int:
 
 ## Eager and lazy expressions inside a suppressing context manager
 
-A list comprehension evaluates its body immediately, so a context manager can suppress an exception
+A list comprehension evaluates its body eagerly, so a context manager can suppress an exception
 raised inside it:
 
 ```py
@@ -227,7 +228,8 @@ from contextlib import suppress
 def may_raise() -> int:
     raise ValueError
 
-def eager_comprehension() -> int:  # error: [invalid-return-type]
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+def eager_comprehension() -> int:
     with suppress(ValueError):
         [may_raise() for _ in [0]]
         return 1
@@ -430,7 +432,8 @@ def propagating_exception(value: int | str) -> None:
 ## Overloaded context manager exit methods
 
 Whether an overloaded exit method can suppress an exception depends on the overload used when an
-exception occurs, not the overload used during a normal exit:
+exception occurs, not the overload used when its suite exits without an exception. In the latter
+case, Python calls `__exit__(None, None, None)`:
 
 ```py
 from typing import Literal, overload

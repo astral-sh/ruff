@@ -69,7 +69,9 @@ async def propagating_exit() -> None:
     reveal_type(result)  # revealed: str
 ```
 
-An awaited `Literal[True] | None` return type also does not indicate exception suppression:
+[The typing specification](https://typing.python.org/en/latest/spec/exceptions.html#context-managers)
+treats an awaited `Literal[True] | None` return type as non-suppressing, even though a truthy return
+value would suppress an exception at runtime:
 
 ```py
 class OptionalTrueExit:
@@ -187,7 +189,9 @@ async def normal_exit_only() -> None:
     reveal_type(result)  # revealed: str
 ```
 
-An overload whose exception argument is `Never` cannot suppress an exception:
+Of the following three overloads, the second applies when an exception is raised, and the third
+applies when the suite exits without an exception. The first overload never applies because its
+exception argument is `Never`:
 
 ```py
 class NeverExit:
