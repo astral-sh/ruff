@@ -41,11 +41,11 @@ RUF066 `generator_lambda` is a property without a `return` statement
    |
 
 RUF066 `nested_concrete_property` is a property without a `return` statement
-  --> RUF066.py:82:13
+  --> RUF066.py:90:13
    |
-80 |     class Concrete:
-81 |         @property
-82 |         def nested_concrete_property(self):  # ERROR: Owning class is concrete, not a protocol
+88 |     class Concrete:
+89 |         @property
+90 |         def nested_concrete_property(self):  # ERROR: Owning class is concrete, not a protocol
    |             ^^^^^^^^^^^^^^^^^^^^^^^^
-83 |             self.value
+91 |             self.value
    |

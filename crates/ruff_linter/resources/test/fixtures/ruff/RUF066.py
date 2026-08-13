@@ -75,6 +75,14 @@ class Nested:  # A `yield` in a nested lambda belongs to the lambda, not the pro
     def generator_lambda(self):  # ERROR: The property itself falls through
         lambda: (yield 1)
 
+    @property
+    def yield_in_lambda_default(self):  # OK: the default runs in this scope, so it yields
+        lambda x=(yield 1): None
+
+    @property
+    def yield_in_nested_default(self):  # OK: the default runs in this scope, so it yields
+        def inner(x=(yield 1)): ...
+
 
 class OuterProtocol(typing.Protocol):  # A concrete class nested in a Protocol is not a protocol
     class Concrete:
