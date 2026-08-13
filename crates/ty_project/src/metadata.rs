@@ -17,6 +17,7 @@ use crate::metadata::options::{
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
+use crate::uv;
 pub use options::Options;
 use options::TyTomlError;
 
@@ -24,9 +25,7 @@ mod configuration_file;
 pub mod options;
 pub mod pyproject;
 pub mod python_version;
-pub(crate) mod script;
 pub mod settings;
-mod uv;
 pub mod value;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -640,7 +639,8 @@ mod tests {
     use ruff_ranged_value::ValueSource;
     use ty_static::EnvVars;
 
-    use crate::metadata::{Options, uv::UvWorkspace, value::RelativePathBuf};
+    use crate::metadata::{Options, value::RelativePathBuf};
+    use crate::uv::UvWorkspace;
     use crate::{ProjectMetadata, ProjectMetadataError};
 
     #[test]

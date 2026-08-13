@@ -6,7 +6,7 @@ use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, Options, OutputFormat};
-use crate::metadata::script::script_metadata;
+use crate::script::script_metadata;
 use crate::{Db, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
