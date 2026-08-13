@@ -20,8 +20,7 @@ async def test():
 
 ## Exception-suppressing async context managers
 
-An asynchronous context manager can suppress an exception when its awaited `__aexit__` result has
-type `bool`:
+An asynchronous context manager can suppress exceptions if its `__aexit__` method returns `bool`:
 
 ```py
 class Suppresses:
@@ -39,7 +38,7 @@ async def preserved_binding() -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
-If an interrupted assignment has no earlier binding, the name may remain undefined:
+If an exception interrupts an assignment to a new name, that name may remain undefined:
 
 ```py
 async def missing_binding() -> None:
@@ -49,7 +48,7 @@ async def missing_binding() -> None:
     reveal_type(value)  # revealed: str
 ```
 
-An awaited `None` exit result cannot suppress exceptions:
+An `__aexit__` return type of `None` does not suppress exceptions:
 
 ```py
 class Propagates:
@@ -63,10 +62,17 @@ async def propagating_exit() -> None:
     reveal_type(result)  # revealed: str
 ```
 
-An earlier async context manager can suppress a later manager's entry failure, leaving its target
-undefined:
+## Earlier async context managers can suppress later entry failures
+
+If an earlier async context manager suppresses an exception while a later manager enters, the later
+manager's target may never be assigned:
 
 ```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
 class EnterFails:
     async def __aenter__(self) -> str:
         raise ValueError
@@ -80,28 +86,38 @@ async def later_entry_fails() -> None:
     reveal_type(target)  # revealed: str
 ```
 
-A return without a raising expression remains terminal, but an awaited return expression may raise
-and be suppressed:
+## Returning from an exception-suppressing async context manager
+
+A context manager cannot suppress a return statement:
 
 ```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
 async def bare_return() -> str:
     async with Suppresses():
         return "finished"
+```
+
+An exception raised while evaluating an awaited return expression can be suppressed instead:
+
+```py
+async def may_raise() -> str:
+    raise ValueError
 
 async def interrupted_return() -> str:  # error: [invalid-return-type]
     async with Suppresses():
         return await may_raise()
 ```
 
-## Overloaded async context manager exits
+## Overloaded async context manager exit methods
 
 An overloaded async exit method can distinguish normal exits from exceptions:
 
 ```py
 from typing import Literal, overload
-
-class Manager:
-    async def __aenter__(self) -> None: ...
 
 async def may_raise() -> str:
     raise ValueError
@@ -110,12 +126,13 @@ async def may_raise() -> str:
 An overload returning `True` only on a normal exit cannot suppress an exception:
 
 ```py
-class NormalExitOnly(Manager):
+class NormalExitOnly:
+    async def __aenter__(self) -> None: ...
     @overload
     async def __aexit__(self, exc_type: None, exc_value, traceback) -> Literal[True]: ...
     @overload
     async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[False]: ...
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc_value, traceback) -> bool:
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
         return exc_type is None
 
 async def normal_exit_only() -> None:
@@ -128,13 +145,13 @@ async def normal_exit_only() -> None:
 An overload returning `True` when an exception occurs can suppress it:
 
 ```py
-class ExceptionalExitOnly(Manager):
+class ExceptionalExitOnly:
+    async def __aenter__(self) -> None: ...
     @overload
     async def __aexit__(self, exc_type: None, exc_value, traceback) -> None: ...
     @overload
     async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[True]: ...
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc_value, traceback) -> bool | None:
-        return True if exc_type is not None else None
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool | None: ...
 
 async def exceptional_exit_only() -> None:
     result = None

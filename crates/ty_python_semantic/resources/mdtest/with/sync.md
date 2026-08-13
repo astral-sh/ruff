@@ -36,7 +36,7 @@ with suppress(ValueError):
 reveal_type(result)  # revealed: None | str
 ```
 
-A binding introduced by an assignment that may fail is not guaranteed to exist:
+A new name may remain undefined when an exception interrupts its assignment:
 
 ```py
 with suppress(ValueError):
@@ -57,7 +57,7 @@ with suppress(ValueError):
 deleted  # error: [unresolved-reference]
 ```
 
-An assignment that cannot raise remains definitely bound:
+An assignment that cannot raise is not affected by exception suppression:
 
 ```py
 with suppress(ValueError):
@@ -68,8 +68,8 @@ reveal_type(safe_value)  # revealed: Literal[1]
 
 ## Assigning a context manager target can raise
 
-Unpacking the result of `__enter__` can raise after the context manager has entered. If its exit
-method suppresses that exception, earlier bindings remain visible and new targets may be undefined:
+Unpacking the result of `__enter__` can raise after the context manager has entered. Suppressing
+that exception preserves an earlier binding, while a new target may remain undefined:
 
 ```py
 from collections.abc import Iterable
@@ -113,7 +113,7 @@ reveal_type(target)  # revealed: str
 
 ## Returning from an exception-suppressing context manager
 
-A context manager cannot suppress a return statement that does not raise:
+A context manager cannot suppress a return statement:
 
 ```py
 from contextlib import suppress
@@ -152,8 +152,8 @@ def caught_before_suppression() -> int:
 
 ## Eager and lazy expressions inside a suppressing context manager
 
-A list comprehension can raise immediately, but a generator expression does not evaluate its body
-until it is iterated:
+A list comprehension evaluates its body immediately, so a context manager can suppress an exception
+raised inside it:
 
 ```py
 from contextlib import suppress
@@ -165,7 +165,11 @@ def eager_comprehension() -> int:  # error: [invalid-return-type]
     with suppress(ValueError):
         [may_raise() for _ in [0]]
         return 1
+```
 
+A generator expression does not evaluate its body until it is iterated:
+
+```py
 def lazy_generator() -> int:
     with suppress(ValueError):
         (may_raise() for _ in [0])
@@ -174,12 +178,97 @@ def lazy_generator() -> int:
 
 ## Context manager exit return types
 
-The typing specification treats `bool` and `Literal[True]` exit return types as potentially
-exception-suppressing:
+The typing specification treats an `__exit__` return type of `bool` as potentially suppressing:
 
 ```py
-from typing import Literal
+from typing import Any, Literal
 
+class Manager:
+    def __enter__(self) -> None: ...
+
+class ReturnsBool(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+def may_raise() -> str:
+    raise ValueError
+
+bool_result = None
+with ReturnsBool():
+    bool_result = may_raise()
+reveal_type(bool_result)  # revealed: None | str
+```
+
+An `__exit__` return type of `Literal[True]` can also suppress exceptions:
+
+```py
+class ReturnsTrue(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
+        return True
+
+true_result = None
+with ReturnsTrue():
+    true_result = may_raise()
+reveal_type(true_result)  # revealed: None | str
+```
+
+An `__exit__` return type of `Literal[False]` cannot suppress exceptions:
+
+```py
+class ReturnsFalse(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+false_result = None
+with ReturnsFalse():
+    false_result = may_raise()
+reveal_type(false_result)  # revealed: str
+```
+
+An `__exit__` return type of `None` cannot suppress exceptions:
+
+```py
+class ReturnsNone(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+none_result = None
+with ReturnsNone():
+    none_result = may_raise()
+reveal_type(none_result)  # revealed: str
+```
+
+An `__exit__` return type of `bool | None` does not indicate exception suppression:
+
+```py
+class ReturnsOptionalBool(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return None
+
+optional_result = None
+with ReturnsOptionalBool():
+    optional_result = may_raise()
+reveal_type(optional_result)  # revealed: str
+```
+
+An `__exit__` return type of `Any` does not indicate exception suppression either:
+
+```py
+class ReturnsAny(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Any:
+        return False
+
+any_result = None
+with ReturnsAny():
+    any_result = may_raise()
+reveal_type(any_result)  # revealed: str
+```
+
+## Context managers with a union type
+
+A context manager with a union type may suppress an exception if any member can suppress it, even
+when another member cannot:
+
+```py
 class Manager:
     def __enter__(self) -> None: ...
 
@@ -187,65 +276,40 @@ class Suppresses(Manager):
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         return True
 
-class AlwaysSuppresses(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
-        return True
+class Propagates(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return None
 
 def may_raise() -> str:
     raise ValueError
 
-result = 0
-with AlwaysSuppresses():
-    result = may_raise()
-reveal_type(result)  # revealed: Literal[0] | str
+def possibly_suppressing(manager: Suppresses | Propagates) -> None:
+    result = None
+    with manager:
+        result = may_raise()
+    reveal_type(result)  # revealed: None | str
 ```
 
-Other exit return types, including `Literal[False]`, `None`, and `bool | None`, do not suppress
-exceptions:
+## Non-suppressing context managers preserve narrowing
+
+A non-suppressing manager does not change narrowing after an exception propagates:
 
 ```py
-class PropagatesFalse(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
-        return False
-
-class PropagatesNone(Manager):
+class Manager:
+    def __enter__(self) -> None: ...
     def __exit__(self, exc_type, exc_value, traceback) -> None: ...
 
-class PropagatesOptionalBool(Manager):
-    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
-        return None
-
-for manager in [PropagatesFalse(), PropagatesNone(), PropagatesOptionalBool()]:
-    result = 0
-    with manager:
-        result = may_raise()
-    reveal_type(result)  # revealed: str
-```
-
-A union can still suppress an exception when one of its context managers suppresses exceptions:
-
-```py
-def possibly_suppressing(manager: Suppresses | PropagatesOptionalBool) -> None:
-    result = 0
-    with manager:
-        result = may_raise()
-    reveal_type(result)  # revealed: Literal[0] | str
-```
-
-A non-suppressing manager does not restore a path that ends in an exception:
-
-```py
 def propagating_exception(value: int | str) -> None:
     if isinstance(value, int):
-        with PropagatesNone():
+        with Manager():
             raise ValueError
     reveal_type(value)  # revealed: str
 ```
 
 ## Overloaded context manager exit methods
 
-An overloaded exit method is classified by the overload used when an exception occurs, not the
-overload used during normal exit:
+Whether an overloaded exit method can suppress an exception depends on the overload used when an
+exception occurs, not the overload used during a normal exit:
 
 ```py
 from typing import Literal, overload
@@ -253,6 +317,13 @@ from typing import Literal, overload
 class Manager:
     def __enter__(self) -> None: ...
 
+def may_raise() -> str:
+    raise ValueError
+```
+
+A manager that returns `True` only during normal exit cannot suppress exceptions:
+
+```py
 class NormalOnly(Manager):
     @overload
     def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> Literal[True]: ...
@@ -261,6 +332,15 @@ class NormalOnly(Manager):
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         return exc_type is None
 
+normal_value = None
+with NormalOnly():
+    normal_value = may_raise()
+reveal_type(normal_value)  # revealed: str
+```
+
+A manager that returns `True` when handling an exception preserves the previous binding:
+
+```py
 class ExceptionOnly(Manager):
     @overload
     def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> None: ...
@@ -269,30 +349,10 @@ class ExceptionOnly(Manager):
     def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
         return True if exc_type is not None else None
 
-def may_raise() -> str:
-    raise ValueError
-
-def requires_str(value: str) -> None: ...
-```
-
-A manager that returns `True` only during normal exit cannot suppress exceptions:
-
-```py
-normal_value = None
-with NormalOnly():
-    normal_value = may_raise()
-reveal_type(normal_value)  # revealed: str
-requires_str(normal_value)
-```
-
-A manager that returns `True` when handling an exception preserves the previous binding:
-
-```py
 exceptional_value = None
 with ExceptionOnly():
     exceptional_value = may_raise()
 reveal_type(exceptional_value)  # revealed: None | str
-requires_str(exceptional_value)  # error: [invalid-argument-type]
 ```
 
 ## Union context manager

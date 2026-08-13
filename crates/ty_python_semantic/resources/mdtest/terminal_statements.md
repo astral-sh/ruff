@@ -580,7 +580,8 @@ def finally_assignment_runs_before_break():
 
 ## Returning from a context manager inside `try`
 
-A context manager cannot suppress a return or prevent it from reaching an enclosing `finally` block.
+A context manager cannot prevent a `return` from reaching the enclosing `finally` block. The block
+still sees assignments made before the return.
 
 ```py
 from contextlib import suppress
