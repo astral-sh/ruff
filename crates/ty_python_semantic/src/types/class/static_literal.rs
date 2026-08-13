@@ -3091,10 +3091,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
-                    deferred_updates.push(DeferredMemberUpdate {
-                        definition: binding,
-                        kind: DeferredMemberUpdateKind::RequiresExisting,
-                    });
+                    deferred_updates.push(binding);
                     continue;
                 }
 
@@ -3105,10 +3102,7 @@ impl<'db> StaticClassLiteral<'db> {
                     && use_def_map(db, binding.scope(db))
                         .definition_depends_on_member(binding, member)
                 {
-                    deferred_updates.push(DeferredMemberUpdate {
-                        definition: binding,
-                        kind: DeferredMemberUpdateKind::ReadsPrevious,
-                    });
+                    deferred_updates.push(binding);
                     continue;
                 }
 
@@ -3243,11 +3237,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         if is_attribute_bound {
-            for update in deferred_updates
-                .iter()
-                .filter(|update| update.kind == DeferredMemberUpdateKind::ReadsPrevious)
-            {
-                let binding = update.definition;
+            for binding in deferred_updates.iter().copied() {
                 let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
                     continue;
                 };
@@ -3259,8 +3249,9 @@ impl<'db> StaticClassLiteral<'db> {
                 provenance = provenance.or(Provenance::SingleDefinition(binding));
                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
             }
-            deferred_updates
-                .retain(|update| update.kind == DeferredMemberUpdateKind::RequiresExisting);
+            deferred_updates.retain(|definition| {
+                matches!(definition.kind(db), DefinitionKind::AugmentedAssignment(_))
+            });
         }
 
         let member = if is_attribute_bound {
@@ -3978,27 +3969,11 @@ pub(super) struct ImplicitAttribute<'db> {
     pub(super) deferred_updates: Option<DeferredMemberUpdates<'db>>,
 }
 
-/// Whether a member update can be recovered when no independent value exists.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) enum DeferredMemberUpdateKind {
-    /// An ordinary assignment can still describe a genuinely recursive member type.
-    ReadsPrevious,
-    /// An augmented assignment cannot establish an otherwise missing member.
-    RequiresExisting,
-}
-
-/// A member assignment whose value depends on its incoming state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct DeferredMemberUpdate<'db> {
-    pub(super) definition: Definition<'db>,
-    pub(super) kind: DeferredMemberUpdateKind,
-}
-
 /// Member updates deferred until lookup resolves an independently established value.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct DeferredMemberUpdates<'db> {
     #[returns(deref)]
-    pub(super) updates: Box<[DeferredMemberUpdate<'db>]>,
+    pub(super) definitions: Box<[Definition<'db>]>,
 }
 
 // The Salsa heap is tracked separately.

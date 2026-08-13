@@ -11,8 +11,7 @@ pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
 use self::static_literal::{
-    DeferredMemberUpdateKind, DeferredMemberUpdates, ImplicitAttribute,
-    unanchored_member_update_type,
+    DeferredMemberUpdates, ImplicitAttribute, unanchored_member_update_type,
 };
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
@@ -65,7 +64,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, place_table, use_def_map};
 
@@ -2839,19 +2838,13 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         for (class, updates) in updates {
             let (_, specialization) = class.class_literal_and_specialization(db);
 
-            for update in updates.updates(db) {
-                if independent.is_none()
-                    && update.kind == DeferredMemberUpdateKind::RequiresExisting
-                {
-                    continue;
-                }
-
-                let definition = update.definition;
-                let inferred_ty = match (update.kind, independent) {
-                    (DeferredMemberUpdateKind::ReadsPrevious, Some(independent)) => {
+            for definition in updates.definitions(db).iter().copied() {
+                let inferred_ty = match (definition.kind(db), independent) {
+                    (DefinitionKind::AugmentedAssignment(_), None) => continue,
+                    (DefinitionKind::Assignment(_), Some(independent)) => {
                         deferred_member_update_type(db, definition, independent)
                     }
-                    (DeferredMemberUpdateKind::ReadsPrevious, None) => {
+                    (DefinitionKind::Assignment(_), None) => {
                         unanchored_member_update_type(db, definition)
                     }
                     _ => infer_definition_types(db, definition).binding_type(definition),
