@@ -6177,31 +6177,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         let actual = Type::tuple(TupleType::new(db, self.env, &actual));
 
-        // Preserve an existing return context when the inferred pack would contradict it.
-        if let Some(expected) = self.call_expression_tcx.annotation
-            && !expected.is_dynamic()
-            && let Some(generic_context) = self.signature.generic_context
-        {
-            let constraints = ConstraintSetBuilder::new();
-            let mut projected =
-                SpecializationBuilder::new(db, self.env, &constraints, self.inferable_typevars);
-            projected.infer(formal, actual)?;
-
-            if let Ok(inference) = projected.build_inference_with(generic_context, |_, _| None) {
-                let candidate = self
-                    .return_ty
-                    .apply_specialization(db, inference.specialization(db));
-
-                if !candidate.is_assignable_to(db, self.env, expected)
-                    && !candidate
-                        .promote(db, self.env)
-                        .is_assignable_to(db, self.env, expected)
-                {
-                    return Ok(());
-                }
-            }
-        }
-
         builder.infer(formal, actual)
     }
 
@@ -7374,6 +7349,69 @@ impl<'db> Binding<'db> {
         .then_some(parameter_type)
     }
 
+    /// Returns the expected tuple element for an argument matched to a `TypeVarTuple`.
+    ///
+    /// For `result: tuple[Payload, list[int]] = collect({"value": 1}, [])`, the arguments
+    /// receive `Payload` and `list[int]` as context without overriding their inferred types.
+    fn typevartuple_argument_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: &CallableBinding<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        argument_index: usize,
+        expected_return_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let [matched_parameter] = self
+            .matched_argument_for_call_argument(binding, argument_index)?
+            .parameters
+            .as_slice()
+        else {
+            return None;
+        };
+        let parameter = &self.signature.parameters()[matched_parameter.index];
+        let Type::TypeVar(typevartuple) = parameter.annotated_type() else {
+            return None;
+        };
+        if !parameter.is_variadic()
+            || !parameter.has_starred_annotation()
+            || !typevartuple.is_typevartuple(db)
+        {
+            return None;
+        }
+
+        let return_tuple = self.signature.return_ty.exact_tuple_instance_spec(db)?;
+        let TupleSpec::Variable(return_tuple) = return_tuple.as_ref() else {
+            return None;
+        };
+        if return_tuple.variable().typevartuple()?.identity(db) != typevartuple.identity(db)
+            || arguments_types
+                .iter()
+                .take(argument_index)
+                .any(|(argument, types)| {
+                    matches!(argument, Argument::Variadic)
+                        && types
+                            .get_default()
+                            .is_none_or(|ty| ty.iterate(db, env).len().maximum().is_none())
+                })
+        {
+            return None;
+        }
+
+        let tuple_index = return_tuple.prefix_elements().len().checked_add(
+            (0..argument_index)
+                .filter_map(|index| self.matched_argument_for_call_argument(binding, index))
+                .flat_map(MatchedArgument::iter)
+                .filter(|matched| matched.index == matched_parameter.index)
+                .count(),
+        )?;
+        expected_return_ty
+            .exact_tuple_instance_spec(db)?
+            .as_ref()
+            .py_index(db, env, i32::try_from(tuple_index).ok()?)
+            .ok()
+    }
+
     /// Returns the type context to use for bidirectional inference of a source call argument,
     /// using the provided argument specialization.
     ///
@@ -7470,6 +7508,18 @@ impl<'db> Binding<'db> {
             }
 
             parameter_type = parameter_type.apply_optional_specialization(db, specialization);
+            if let Some(expected_return_ty) = call_expression_tcx.annotation
+                && let Some(expected) = self.typevartuple_argument_context(
+                    db,
+                    env,
+                    binding,
+                    arguments_types,
+                    argument_index,
+                    expected_return_ty,
+                )
+            {
+                parameter_type = expected;
+            }
         }
 
         Some(ArgumentTypeContext::standard(

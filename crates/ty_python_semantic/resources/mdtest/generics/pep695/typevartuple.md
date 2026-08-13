@@ -143,6 +143,20 @@ def _(i: int, s: str) -> None:
     reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
 ```
 
+Constructor arguments determine the class specialization even when the assignment expects a
+different specialization.
+
+```py
+valid: Variadic[int] = Variadic(1)
+
+inferred = Variadic(1)
+reveal_type(inferred)  # revealed: Variadic[int]
+# error: [invalid-assignment]
+indirect: Variadic[str] = inferred
+# error: [invalid-assignment]
+direct: Variadic[str] = Variadic(1)
+```
+
 ### Unspecified type arguments
 
 An unsubscripted variadic generic behaves as if it used an unknown-length tuple of `Any` arguments.
@@ -401,6 +415,9 @@ class Payload(TypedDict):
 def contextual[T](value: T) -> None:
     concrete: tuple[Payload, list[int]] = simple({"value": 1}, [])
     generic: tuple[Payload, T] = simple({"value": 1}, value)
+    # error: [invalid-assignment]
+    # error: [invalid-argument-type]
+    invalid: tuple[Payload] = simple({"value": "wrong"})
 ```
 
 Fixed values next to a type variable tuple keep their normal bound diagnostics.
@@ -426,18 +443,55 @@ def check_splat_error(values: list[int]) -> None:
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `bounded_arguments` is incorrect
-  --> src/mdtest_snippet.py:83:5
+  --> src/mdtest_snippet.py:86:5
    |
-83 | /     bounded_arguments(
-84 | |         b"valid",
-85 | |         *values,
-86 | |     )
+86 | /     bounded_arguments(
+87 | |         b"valid",
+88 | |         *values,
+89 | |     )
    | |_____^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
 info: Type variable defined here
-  --> src/mdtest_snippet.py:71:33
+  --> src/mdtest_snippet.py:74:33
    |
-71 | def bounded_arguments[U: bytes, T: str, *Ts](first: U, *args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
+74 | def bounded_arguments[U: bytes, T: str, *Ts](first: U, *args: *tuple[*Ts, T]) -> tuple[*Ts, T]:
    |                                 ^^^^^^
+```
+
+### Argument types override incompatible contextual return types
+
+A contextual return type can guide compatible arguments, but it must not override the argument types
+or the number of arguments in a call.
+
+```py
+def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
+    return args
+
+valid: tuple[int] = collect(1)
+
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
+
+valid_empty: tuple[()] = collect()
+# error: [invalid-assignment]
+invalid_empty: tuple[str] = collect()
+```
+
+Return statements and arguments to other functions also provide contextual return types.
+
+```py
+def invalid_return() -> tuple[str]:
+    # error: [invalid-return-type]
+    return collect(1)
+
+def accept_strings(values: tuple[str]) -> None: ...
+
+accept_strings(collect("valid"))
+# error: [invalid-argument-type]
+accept_strings(collect(1))
 ```
 
 ### Fixed boundaries around variadic type variable tuples
