@@ -244,7 +244,6 @@ impl ExceptionContextStack {
     /// snapshot is constructed only if a handler has not already observed the current flow state.
     fn record_exception_checkpoint(&mut self, use_def_map: &UseDefMapBuilder<'_>) -> bool {
         let checkpoint_key = use_def_map.exception_checkpoint_key();
-        let mut snapshot = None;
 
         for context in self.0.iter_mut().rev() {
             match &mut context.exception_handlers {
@@ -252,11 +251,7 @@ impl ExceptionContextStack {
                 ExceptionHandlers::Propagating(snapshots)
                 | ExceptionHandlers::CatchAll(snapshots) => {
                     if context.last_checkpoint_key != Some(checkpoint_key) {
-                        snapshots.push(
-                            snapshot
-                                .get_or_insert_with(|| use_def_map.snapshot())
-                                .clone(),
-                        );
+                        snapshots.push(use_def_map.snapshot());
                         context.last_checkpoint_key = Some(checkpoint_key);
                     }
                     if context.exception_handlers.is_catch_all() {
