@@ -2913,6 +2913,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Undefined(TypeQualifiers::empty()));
         let mut pending_deferred_updates = Vec::new();
+        let mut receiver_class = None;
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2930,6 +2931,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     dynamic_type.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
+                    let receiver_class = *receiver_class.get_or_insert(class);
                     let known = class.known(db);
 
                     // Only exclude `object` members if this is not an `object` class itself
@@ -2964,22 +2966,36 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     if let Place::Defined(defined) = &mut member.place
                         && !pending_deferred_updates.is_empty()
                     {
-                        if !defined.origin.is_declared()
-                            && let Some((inferred_ty, inferred_provenance)) =
+                        if !defined.origin.is_declared() {
+                            // Class-object access invokes inherited descriptors with `None` and
+                            // the original owner before using their value in the assignment.
+                            let independent = defined
+                                .ty
+                                .try_call_dunder_get(
+                                    db,
+                                    &self.env,
+                                    None,
+                                    Type::from(receiver_class),
+                                )
+                                .unwrap_or_else(|error| Some(error.fallback()))
+                                .map_or(defined.ty, |result| result.return_type);
+
+                            if let Some((inferred_ty, inferred_provenance)) =
                                 Self::infer_deferred_updates(
                                     db,
                                     &self.env,
                                     &pending_deferred_updates,
-                                    Some(defined.ty),
+                                    Some(independent),
                                 )
-                        {
-                            defined.ty = UnionType::from_two_elements(
-                                db,
-                                &self.env,
-                                defined.ty,
-                                inferred_ty,
-                            );
-                            defined.provenance = defined.provenance.or(inferred_provenance);
+                            {
+                                defined.ty = UnionType::from_two_elements(
+                                    db,
+                                    &self.env,
+                                    defined.ty,
+                                    inferred_ty,
+                                );
+                                defined.provenance = defined.provenance.or(inferred_provenance);
+                            }
                         }
 
                         pending_deferred_updates.clear();

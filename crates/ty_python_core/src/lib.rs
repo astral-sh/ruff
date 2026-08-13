@@ -2033,4 +2033,92 @@ match 1:
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
     }
+
+    #[test]
+    fn member_dependencies_follow_guaranteed_alias_reads() {
+        let cases = [
+            (
+                "direct alias",
+                "previous = self.values\n        self.values = previous",
+                true,
+            ),
+            (
+                "augmented alias",
+                "previous = self.values\n        previous += ['b']\n        self.values = previous",
+                true,
+            ),
+            (
+                "named-expression alias",
+                "(previous := self.values)\n        self.values = previous",
+                true,
+            ),
+            (
+                "loop-carried alias",
+                "previous = self.values\n        for _ in range(2):\n            previous = previous + ['b']\n        self.values = previous",
+                true,
+            ),
+            (
+                "conditional independent alias",
+                "if flag:\n            previous = self.values\n        else:\n            previous = []\n        self.values = previous",
+                false,
+            ),
+            (
+                "overwritten alias",
+                "previous = self.values\n        previous = []\n        self.values = previous",
+                false,
+            ),
+            (
+                "loop resets alias",
+                "previous = self.values\n        for _ in range(2):\n            previous = []\n        self.values = previous",
+                false,
+            ),
+            (
+                "nested loop resets alias",
+                "previous = self.values\n        for _ in range(2):\n            for _ in range(2):\n                previous = []\n            previous = previous + ['b']\n        self.values = previous",
+                false,
+            ),
+            (
+                "short-circuited read",
+                "self.values = False and self.values",
+                false,
+            ),
+            (
+                "short-circuited comparison",
+                "self.values = 0 < -1 < self.values",
+                false,
+            ),
+        ];
+
+        for (scenario, body, expected) in cases {
+            let source =
+                format!("class Example:\n    def update(self, flag=False):\n        {body}\n");
+            let TestCase { db, file } = test_case(&source);
+            let index = semantic_index(&db, program_file(&db, file));
+            let (class_scope, _) = index
+                .child_scopes(FileScopeId::global())
+                .next()
+                .expect("test defines a class");
+            let (method_scope, _) = index
+                .child_scopes(class_scope)
+                .next()
+                .expect("test class defines a method");
+            let member = index
+                .place_table(method_scope)
+                .member_id_by_instance_attribute_name("values")
+                .expect("test method assigns an instance attribute");
+            let use_def = index.use_def_map(method_scope);
+            let assignment = use_def
+                .all_definitions_with_usage()
+                .filter_map(|(_, state, _)| state.definition())
+                .filter(|definition| definition.place(&db) == ScopedPlaceId::Member(member))
+                .last()
+                .expect("test method assigns the member");
+
+            assert_eq!(
+                use_def.definition_depends_on_member(assignment, member),
+                expected,
+                "{scenario}",
+            );
+        }
+    }
 }

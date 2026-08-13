@@ -1402,6 +1402,27 @@ class Child(Base):
 reveal_type(Child().value)  # revealed: str
 ```
 
+#### Inherited descriptors are bound before self-referential class assignments
+
+Reading an inherited descriptor through a class invokes `__get__` with `None` before a classmethod
+stores its updated value.
+
+```py
+class Descriptor:
+    def __get__(self, instance: None, owner: type) -> str:
+        return "value"
+
+class Base:
+    value = Descriptor()
+
+class Child(Base):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value + "b"
+
+reveal_type(Child.value)  # revealed: str
+```
+
 ### Inheritance of class/instance attributes
 
 ```py

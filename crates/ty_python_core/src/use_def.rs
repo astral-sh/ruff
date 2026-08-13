@@ -631,7 +631,7 @@ struct UseDefMapExtra<'db> {
     /// Guaranteed member reads contributing to the value of a local definition.
     ///
     /// Only definitions with at least one such dependency are retained.
-    member_dependencies_by_definition: Box<[(Definition<'db>, ScopedMemberId)]>,
+    member_dependencies_by_definition: ThinVec<(Definition<'db>, ScopedMemberId)>,
 }
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
@@ -2036,6 +2036,83 @@ impl<'db> UseDefMapBuilder<'db> {
         !self.member_dependencies_by_definition.is_empty()
     }
 
+    /// Member reads shared by every current binding of `place`.
+    pub(super) fn current_member_dependencies(
+        &mut self,
+        place: ScopedPlaceId,
+    ) -> SmallVec<[ScopedMemberId; 2]> {
+        if self.member_dependencies_by_definition.is_empty() {
+            return SmallVec::new();
+        }
+
+        let bindings = self
+            .current_bindings(place)
+            .map(|binding| binding.binding())
+            .collect::<SmallVec<[ScopedDefinitionId; 2]>>();
+        let mut bindings = bindings.into_iter();
+        let Some(first) = bindings.next() else {
+            return SmallVec::new();
+        };
+        let DefinitionState::Defined(first) = self.definition(first) else {
+            return SmallVec::new();
+        };
+        let Some(first_dependencies) = self.definition_member_dependencies(first) else {
+            return SmallVec::new();
+        };
+        let mut dependencies = SmallVec::from_slice(first_dependencies);
+
+        for binding in bindings {
+            let DefinitionState::Defined(definition) = self.definition(binding) else {
+                return SmallVec::new();
+            };
+            let Some(next_dependencies) = self.definition_member_dependencies(definition) else {
+                return SmallVec::new();
+            };
+            dependencies.retain(|member| next_dependencies.contains(member));
+            if dependencies.is_empty() {
+                return dependencies;
+            }
+        }
+
+        dependencies
+    }
+
+    /// Discard member dependencies disproved by a loop-back path from loop-created definitions.
+    ///
+    /// Definitions created while traversing the loop may have inherited an optimistic header
+    /// dependency transitively. Removing that member from every definition created since the
+    /// header avoids retaining dependency edges solely to invalidate the affected definitions.
+    pub(super) fn invalidate_member_dependencies(
+        &mut self,
+        members: &[ScopedMemberId],
+        first_affected_definition: ScopedDefinitionId,
+        header_definitions: &[Definition<'db>],
+    ) {
+        if members.is_empty() {
+            return;
+        }
+        let mut affected_definitions = self
+            .all_definitions
+            .iter_enumerated()
+            .filter_map(|(id, definition)| {
+                (id >= first_affected_definition)
+                    .then(|| definition.definition())
+                    .flatten()
+            })
+            .collect::<SmallVec<[Definition<'db>; 4]>>();
+        affected_definitions.extend_from_slice(header_definitions);
+        for definition in affected_definitions {
+            let Some(dependencies) = self.member_dependencies_by_definition.get_mut(&definition)
+            else {
+                continue;
+            };
+            dependencies.retain(|member| !members.contains(member));
+            if dependencies.is_empty() {
+                self.member_dependencies_by_definition.remove(&definition);
+            }
+        }
+    }
+
     /// Guaranteed member dependencies already recorded for an earlier local definition.
     pub(super) fn definition_member_dependencies(
         &self,
@@ -2954,10 +3031,9 @@ impl<'db> UseDefMapBuilder<'db> {
             .flat_map(|(definition, members)| {
                 members.into_iter().map(move |member| (definition, member))
             })
-            .collect::<Vec<_>>();
+            .collect::<ThinVec<_>>();
         member_dependencies_by_definition.sort_unstable();
-        let member_dependencies_by_definition =
-            member_dependencies_by_definition.into_boxed_slice();
+        member_dependencies_by_definition.shrink_to_fit();
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()

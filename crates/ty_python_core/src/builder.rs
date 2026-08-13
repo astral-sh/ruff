@@ -1534,7 +1534,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             Some(CurrentAssignment::AugAssign(aug_assign)) => {
-                self.add_definition(place_id, aug_assign);
+                let assignment = self.add_definition(place_id, aug_assign);
+                if place_id.is_symbol() {
+                    self.record_definition_member_dependencies(assignment);
+                }
             }
             Some(CurrentAssignment::For { node, unpack }) => {
                 self.add_definition(
@@ -1548,7 +1551,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             Some(CurrentAssignment::Named(named)) => {
                 self.mark_comprehension_named_target(place_id, named.target.range());
-                self.add_definition(place_id, named);
+                let assignment = self.add_definition(place_id, named);
+                if place_id.is_symbol() {
+                    self.record_definition_member_dependencies(assignment);
+                }
             }
             Some(CurrentAssignment::Comprehension {
                 unpack,
@@ -1823,30 +1829,44 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Create loop header definitions for all places that are bound within a loop. Return the
-    /// `LoopHeaderId` referenced by those definitions, the set of bound place IDs, and the lower
-    /// bound `ScopedDefinitionId` for definitions created within the loop.
+    /// Create loop header definitions for all places that are bound within a loop.
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
-    ) -> (LoopHeaderId, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
+    ) -> LoopHeaderInfo<'db> {
         let loop_header_id = self.current_use_def_map_mut().reserve_loop_header();
         let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+        let mut dependency_headers = SmallVec::new();
         for place_expr in bound_places {
             let place_id = self.add_place(place_expr);
             if bound_place_ids.insert(place_id) {
+                let dependencies = if place_id.is_symbol() {
+                    self.current_use_def_map_mut()
+                        .current_member_dependencies(place_id)
+                } else {
+                    SmallVec::new()
+                };
                 let loop_header_ref = LoopHeaderDefinitionNodeRef {
                     loop_stmt,
                     place: place_id,
                     loop_header_id,
                 };
                 // Note that `DefinitionKind::LoopHeader` doesn't shadow prior bindings.
-                self.push_additional_definition(place_id, loop_header_ref);
+                let (definition, _) = self.push_additional_definition(place_id, loop_header_ref);
+                if !dependencies.is_empty() {
+                    dependency_headers.push((place_id, definition));
+                    self.current_use_def_map_mut()
+                        .record_definition_member_dependencies(definition, dependencies);
+                }
             }
         }
-        let loop_min_definition_id = self.current_use_def_map_mut().next_definition_id();
-        (loop_header_id, bound_place_ids, loop_min_definition_id)
+        LoopHeaderInfo {
+            id: loop_header_id,
+            bound_places: bound_place_ids,
+            first_body_definition: self.current_use_def_map_mut().next_definition_id(),
+            dependency_headers,
+        }
     }
 
     /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
@@ -1858,6 +1878,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         loop_header_places: &FxHashSet<ScopedPlaceId>,
         loop_header_id: LoopHeaderId,
         loop_min_definition_id: ScopedDefinitionId,
+        dependency_headers: &[(ScopedPlaceId, Definition<'db>)],
     ) {
         let mut loop_header = LoopHeader::new();
         let use_def = self.current_use_def_map_mut();
@@ -1875,6 +1896,43 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
         }
+
+        let mut invalidated_members = SmallVec::<[ScopedMemberId; 2]>::new();
+        for (place_id, header_definition) in dependency_headers {
+            let Some(header_dependencies) =
+                use_def.definition_member_dependencies(*header_definition)
+            else {
+                continue;
+            };
+
+            for member in header_dependencies {
+                if loop_header.bindings_for_place(*place_id).any(|binding| {
+                    let DefinitionState::Defined(definition) =
+                        use_def.definition(binding.binding())
+                    else {
+                        return true;
+                    };
+                    !use_def
+                        .definition_member_dependencies(definition)
+                        .is_some_and(|dependencies| dependencies.contains(member))
+                }) && !invalidated_members.contains(member)
+                {
+                    invalidated_members.push(*member);
+                }
+            }
+        }
+        if !invalidated_members.is_empty() {
+            let header_definitions = dependency_headers
+                .iter()
+                .map(|(_, definition)| *definition)
+                .collect::<SmallVec<[Definition<'db>; 2]>>();
+            use_def.invalidate_member_dependencies(
+                &invalidated_members,
+                loop_min_definition_id,
+                &header_definitions,
+            );
+        }
+
         // Mark the reachability and narrowing constraints as used.
         #[expect(
             clippy::iter_over_hash_type,
@@ -3910,6 +3968,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // An augmented assignment loads its target before evaluating the right-hand side,
                 // but only defines the target after the operation succeeds.
+                let track_dependencies = target.is_name_expr()
+                    && self.is_method_or_eagerly_executed_in_method().is_some();
+                if track_dependencies {
+                    self.assignment_dependencies.push(AssignmentDependencies {
+                        scope: self.current_scope(),
+                        members: SmallVec::new(),
+                        collecting: true,
+                        optional: false,
+                    });
+                }
                 let is_place_target = matches!(
                     &**target,
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
@@ -3923,6 +3991,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 self.visit_expr(value);
+                if track_dependencies && let Some(frame) = self.assignment_dependencies.last_mut() {
+                    frame.collecting = false;
+                }
 
                 if let ast::Expr::Name(ast::ExprName { id, .. }) = &**target
                     && id == "__all__"
@@ -3947,6 +4018,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                     self.record_place_definition(place_id, target);
                     self.pop_assignment();
+                }
+
+                if track_dependencies {
+                    self.assignment_dependencies.pop();
                 }
             }
             ast::Stmt::If(node) => {
@@ -4113,10 +4188,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((header_id, bound_place_ids, loop_min_definition_id)) =
-                    maybe_loop_header_info
+                if let Some(LoopHeaderInfo {
+                    id,
+                    bound_places,
+                    first_body_definition,
+                    dependency_headers,
+                }) = maybe_loop_header_info
                 {
-                    self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
+                    self.populate_loop_header(
+                        &bound_places,
+                        id,
+                        first_body_definition,
+                        &dependency_headers,
+                    );
                 }
 
                 self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(
@@ -4259,10 +4343,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((header_id, bound_place_ids, loop_min_definition_id)) =
-                    maybe_loop_header_info
+                if let Some(LoopHeaderInfo {
+                    id,
+                    bound_places,
+                    first_body_definition,
+                    dependency_headers,
+                }) = maybe_loop_header_info
                 {
-                    self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
+                    self.populate_loop_header(
+                        &bound_places,
+                        id,
+                        first_body_definition,
+                        &dependency_headers,
+                    );
                 }
 
                 self.record_exception_checkpoint_if(iteration_can_raise || !target.is_name_expr());
@@ -5135,7 +5228,23 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
+                let track_dependencies = node.target.is_name_expr()
+                    && self.is_method_or_eagerly_executed_in_method().is_some();
+                let parent_collects = self.assignment_dependencies.last().is_some_and(|frame| {
+                    frame.scope == self.current_scope() && frame.collecting && !frame.optional
+                });
+                if track_dependencies {
+                    self.assignment_dependencies.push(AssignmentDependencies {
+                        scope: self.current_scope(),
+                        members: SmallVec::new(),
+                        collecting: true,
+                        optional: false,
+                    });
+                }
                 self.visit_expr(&node.value);
+                if track_dependencies && let Some(frame) = self.assignment_dependencies.last_mut() {
+                    frame.collecting = false;
+                }
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
@@ -5144,6 +5253,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.pop_assignment();
                 } else {
                     self.visit_expr(&node.target);
+                }
+
+                if track_dependencies
+                    && let Some(frame) = self.assignment_dependencies.pop()
+                    && parent_collects
+                    && let Some(parent) = self.assignment_dependencies.last_mut()
+                {
+                    for member in frame.members {
+                        if !parent.members.contains(&member) {
+                            parent.members.push(member);
+                        }
+                    }
                 }
             }
             ast::Expr::Lambda(lambda) => {
@@ -5766,6 +5887,14 @@ struct AssignmentDependencies {
     members: SmallVec<[ScopedMemberId; 2]>,
     collecting: bool,
     optional: bool,
+}
+
+/// Definitions and dependency assumptions collected before visiting a loop body.
+struct LoopHeaderInfo<'db> {
+    id: LoopHeaderId,
+    bound_places: FxHashSet<ScopedPlaceId>,
+    first_body_definition: ScopedDefinitionId,
+    dependency_headers: SmallVec<[(ScopedPlaceId, Definition<'db>); 2]>,
 }
 
 #[derive(Debug, PartialEq)]

@@ -573,6 +573,76 @@ class Child(Base):
         return self.values
 ```
 
+## Augmented local aliases preserve inherited instance attributes
+
+An augmented assignment to a local alias preserves its dependency on the inherited attribute.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        previous = self.values
+        previous += ["b"]
+        self.values = previous
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Loop-carried local aliases preserve inherited instance attributes
+
+An inherited attribute remains the source of a local alias after updates carried between loop
+iterations.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        previous = self.values
+        for _ in range(1):
+            previous = previous + ["b"]
+        self.values = previous
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Named-expression aliases preserve inherited instance attributes
+
+A named expression assigning the inherited attribute to a local alias preserves that dependency.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        (previous := self.values)
+        self.values = previous + ["b"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
 ## Comprehension iterables preserve inherited instance attributes
 
 A comprehension evaluates its first iterable before assigning its result to the inherited attribute.
