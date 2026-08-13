@@ -1821,7 +1821,23 @@ pub(super) fn report_bad_dunder_get_call<'db>(
     }
 }
 
-/// Reports an invalid implicit `__getattr__` call at the original attribute access.
+/// A special method invoked implicitly while accessing an attribute.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AttributeAccessMethod {
+    GetAttr,
+    GetAttribute,
+}
+
+impl AttributeAccessMethod {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::GetAttr => "__getattr__",
+            Self::GetAttribute => "__getattribute__",
+        }
+    }
+}
+
+/// Reports an invalid implicit `__getattr__` or `__getattribute__` call.
 ///
 /// ```python
 /// class C:
@@ -1831,11 +1847,12 @@ pub(super) fn report_bad_dunder_get_call<'db>(
 /// ```
 ///
 /// Preserves the underlying call diagnostic and explains why attribute access invoked the method.
-pub(super) fn report_bad_dunder_getattr_call<'db>(
+pub(super) fn report_bad_attribute_access_call<'db>(
     context: &InferContext<'db, '_>,
     failure: &CallError<'db>,
     object_type: Type<'db>,
     target: &ast::ExprAttribute,
+    method: AttributeAccessMethod,
 ) {
     let db = context.db();
     let env = &context.program_environment();
@@ -1850,7 +1867,7 @@ pub(super) fn report_bad_dunder_getattr_call<'db>(
                 "Invalid access to attribute `{attribute}` on type `{}`",
                 object_type.display(db, env),
             ),
-            info: "This access implicitly calls `__getattr__`",
+            info: &format!("This access implicitly calls `{}`", method.as_str()),
             argument_ranges: &[target.range()],
         },
     );

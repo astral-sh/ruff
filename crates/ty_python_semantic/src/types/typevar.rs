@@ -165,11 +165,15 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         typevar.bound_or_constraints(db, visitor.program_environment())
     } else {
         match typevar._bound_or_constraints(db) {
-            _ if visitor.should_visit_lazy_type_attributes() => {
-                typevar.bound_or_constraints(db, visitor.program_environment())
-            }
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
                 Some(bound_or_constraints)
+            }
+            Some(
+                TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
+                | TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
+            ) => {
+                visitor.notify_skipped_lazy_type_attributes();
+                None
             }
             _ => None,
         }
@@ -181,6 +185,10 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     } else {
         match typevar._default(db) {
             Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
+            Some(TypeVarDefaultEvaluation::Lazy) => {
+                visitor.notify_skipped_lazy_type_attributes();
+                None
+            }
             _ => None,
         }
     } {

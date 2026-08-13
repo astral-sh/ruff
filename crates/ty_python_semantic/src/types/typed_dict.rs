@@ -1293,6 +1293,7 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         visitor.visit_type(db, defining_class.into());
 
         if !visitor.should_visit_lazy_type_attributes() {
+            visitor.notify_skipped_lazy_type_attributes();
             return;
         }
     }

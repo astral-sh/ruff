@@ -2602,7 +2602,8 @@ def mixed(movie_or_int: Movie | int) -> None:
     dict(movie_or_int)  # error: [no-matching-overload]
 ```
 
-The same result is inferred efficiently for a union of `TypedDict`s:
+The same result is inferred efficiently for a union of `TypedDict`s, including when the result is
+checked against a bare `dict`:
 
 ```toml
 [environment]
@@ -2641,8 +2642,10 @@ X = TypedDict("X", {"type": Literal["x"]})
 
 Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
 
+def takes_bare_dict(value: dict[Any, Any]) -> None: ...
 def _(item: Item) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
+    takes_bare_dict(dict(item))
 
 # Runtime narrowing preserves each `TypedDict` schema without exposing unrestricted dictionary
 # operations. The union should still reuse its common protocol constraints.

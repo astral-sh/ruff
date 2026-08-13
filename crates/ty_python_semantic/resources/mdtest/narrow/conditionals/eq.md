@@ -312,8 +312,8 @@ def compare_functional_flags(left: FunctionalPermission, right: FunctionalPermis
     reveal_type(left == right)  # revealed: bool
 ```
 
-An enum with a custom `_missing_` method can create unnamed members, so two values need not be equal
-even when only one member is declared:
+A custom `_missing_` method does not change the enum's static member set, so an enum with one
+declared member remains a singleton:
 
 ```py
 from enum import Enum
@@ -323,13 +323,13 @@ class MissingValueEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "MissingValueEnum":
-        return object.__new__(cls)
+        return cls.ONLY
 
-def compare_open_enums(left: MissingValueEnum, right: MissingValueEnum):
-    reveal_type(left == right)  # revealed: bool
+def compare_custom_missing_enums(left: MissingValueEnum, right: MissingValueEnum):
+    reveal_type(left == right)  # revealed: Literal[True]
 
     if left != right:
-        reveal_type(left)  # revealed: MissingValueEnum
+        reveal_type(left)  # revealed: Never
 ```
 
 A custom enum metaclass can add members that do not appear in the class body. Two values of a
@@ -662,23 +662,39 @@ def compare_false_to_integer_enum(left: MixedLeft1 | Literal[False], right: Mixe
         reveal_type(right)  # revealed: Literal[MixedRight0.A]
 ```
 
-An open identity-comparing enum can still be narrowed to all of its declared members. Undeclared
-runtime members are not retained merely because every declared member matches:
+An identity-comparing enum with a custom `_missing_` method remains equivalent to the union of its
+declared members:
 
 ```py
 from enum import Enum
 from typing import Literal
 
-class OpenIdentity(Enum):
+class CustomMissingIdentity(Enum):
     A = "a"
     B = "b"
 
     @classmethod
-    def _missing_(cls, value: object) -> "OpenIdentity":
+    def _missing_(cls, value: object) -> "CustomMissingIdentity":
         raise ValueError
 
 class OtherIdentity(Enum):
     C = "c"
+
+def compare_custom_missing_identity(
+    left: CustomMissingIdentity | OtherIdentity,
+    right: Literal[CustomMissingIdentity.A, CustomMissingIdentity.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: CustomMissingIdentity
+```
+
+A metaclass can inject undeclared members, leaving an identity-comparing enum genuinely open.
+Comparing against its declared members can still exclude those undeclared members.
+
+```py
+class OpenIdentity(Enum, metaclass=InjectingEnumMeta):
+    A = "a"
+    B = "b"
 
 def compare_open_identity(
     left: OpenIdentity | OtherIdentity,
@@ -709,7 +725,8 @@ reveal_type(IntegerAliases.ZERO == IntegerAliases.FALSE)  # revealed: Literal[Tr
 ```
 
 Plain enum members from different classes use identity comparison, even when their declared values
-are equal. Custom comparison methods and open scalar enums remain ambiguous:
+are equal. Custom comparison methods remain ambiguous, while scalar enums can compare across enum
+classes:
 
 ```py
 from enum import Enum, StrEnum
@@ -746,12 +763,24 @@ class CustomNeLeft(StrEnum):
 reveal_type(CustomNeLeft.MEMBER == CustomRight.MEMBER)  # revealed: Literal[True]
 reveal_type(CustomNeLeft.MEMBER != CustomRight.MEMBER)  # revealed: bool
 
-class OpenLeft(StrEnum):
+class CustomMissingLeft(StrEnum):
     MEMBER = "shared"
 
     @classmethod
-    def _missing_(cls, value: object) -> "OpenLeft":
+    def _missing_(cls, value: object) -> "CustomMissingLeft":
         raise ValueError
+
+def compare_custom_missing(left: CustomMissingLeft, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: CustomMissingLeft
+```
+
+A metaclass can add undeclared scalar members, so cross-enum comparison must retain the full open
+enum:
+
+```py
+class OpenLeft(StrEnum, metaclass=InjectingEnumMeta):
+    MEMBER = "shared"
 
 def compare_open(left: OpenLeft, right: CustomRight):
     if left == right:
@@ -766,8 +795,17 @@ def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
         reveal_type(left)  # revealed: CustomLeft
 ```
 
-An enum with `_missing_` may have members that do not appear in its definition. Adding `None` must
-not cause the comparison to assume that its declared member is the only possible match:
+A custom `_missing_` method does not affect comparison narrowing, including when the enum is
+combined with `None`:
+
+```py
+def compare_optional_custom_missing(left: CustomMissingLeft | None, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: CustomMissingLeft
+```
+
+Undeclared members of a genuinely open scalar enum must survive cross-enum comparison even when the
+enum is combined with `None`:
 
 ```py
 def compare_optional_open(left: OpenLeft | None, right: CustomRight):
@@ -1628,8 +1666,8 @@ def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
 
 ## Narrowing builtin types to literals
 
-Equality with a literal narrows broad `str`, `int`, and `bytes` types to the values that compare
-equal to that literal:
+Equality with a literal narrows broad `str`, `int`, and `bytes` types to that literal. By default,
+integer literals do not introduce the boolean values that compare equal to `0` or `1`:
 
 ```py
 def narrow_string(value: str):
@@ -1644,8 +1682,15 @@ def narrow_reversed_string(value: str):
 
 def narrow_integer(value: int):
     if value == 1:
-        # `True == 1` at runtime.
-        reveal_type(value)  # revealed: Literal[1, True]
+        reveal_type(value)  # revealed: Literal[1]
+
+def narrow_zero(value: int):
+    if value == 0:
+        reveal_type(value)  # revealed: Literal[0]
+
+def narrow_reversed_integer(value: int):
+    if 1 == value:
+        reveal_type(value)  # revealed: Literal[1]
 
 def narrow_bytes(value: bytes):
     if value == b"a":
@@ -2166,6 +2211,64 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[2]
 ```
 
+## Integers and booleans with non-strict equality semantics
+
+With non-strict equality semantics, broad integers narrow to integer literals, while boolean
+literals that compare equal remain in explicitly annotated literal unions.
+
+```toml
+[analysis]
+strict-equality-semantics = false
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: Literal[1]
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
+```
+
+## Integers and booleans with strict equality semantics
+
+With strict equality semantics, broad integers are preserved, while explicitly annotated literal
+unions still narrow to the integer and boolean literals that compare equal.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: int
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
+```
+
 ## Final subclasses of scalar builtins
 
 Final subclasses can inherit the equality behavior of `int`, `str`, or `bytes`. Instances of these
@@ -2618,6 +2721,10 @@ def broad(value: str):
         reveal_type(value)  # revealed: str
     else:
         reveal_type(value)  # revealed: str & ~Literal["a"]
+
+def broad_integer(value: int):
+    if value == 1:
+        reveal_type(value)  # revealed: int
 
 def inequality(value: str):
     if value != "a":

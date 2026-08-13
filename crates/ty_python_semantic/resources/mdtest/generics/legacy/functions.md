@@ -121,6 +121,11 @@ def takes_in_type(x: type[T]) -> type[T]:
     return x
 
 reveal_type(takes_in_type(int))  # revealed: type[int]
+
+def takes_in_type_of_list(x: type[list[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(takes_in_type_of_list(list[int]))  # revealed: int
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
@@ -134,6 +139,9 @@ reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
+
+reveal_type(takes_in_type_of_list(Sub))  # revealed: int
+reveal_type(takes_in_type_of_list(GenericSub[str]))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub(ExplicitlyImplements[T]): ...
@@ -160,6 +168,92 @@ def pick(x: object) -> str | bool:
     raise NotImplementedError
 
 reveal_type(pick([1]))  # revealed: bool
+```
+
+## Inferring a class-object parameter through a generic factory
+
+A factory can infer its type arguments from a specialized subclass of its class-object parameter.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T, U]): ...
+class Specialized(Base[int, str]): ...
+
+def create(cls: type[Base[T, U]]) -> tuple[T, U]:
+    raise NotImplementedError
+
+reveal_type(create(Specialized))  # revealed: tuple[int, str]
+```
+
+## Inferring a class-object parameter through a generic method
+
+A method can likewise infer a type argument from the specialized bases of its class-object
+parameter.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Option(Generic[T]): ...
+class StringOption(Option[str]): ...
+
+class Options:
+    def get_value_for(self, option: type[Option[T]]) -> T:
+        raise NotImplementedError
+
+reveal_type(Options().get_value_for(StringOption))  # revealed: str
+```
+
+## Inferring a class-object parameter in a contravariant position
+
+A class-object parameter inside a contravariant generic places an upper bound on its inferred type
+argument. A more specific witness should determine the result, including when the type variable has
+its own declared upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+StrT = TypeVar("StrT", bound=str)
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]): ...
+class Sink(Generic[T_contra]): ...
+
+def infer(sink: Sink[type[Covariant[T]]], witness: T) -> T:
+    return witness
+
+def infer_bounded(sink: Sink[type[Covariant[StrT]]], witness: StrT) -> StrT:
+    return witness
+
+def _(sink: Sink[type[Covariant[object]]]) -> None:
+    reveal_type(infer(sink, 1))  # revealed: Literal[1]
+    reveal_type(infer_bounded(sink, "ok"))  # revealed: Literal["ok"]
+```
+
+## Inferring a class-object parameter for a final generic class
+
+A final generic class has no subclasses, so its class-object parameter is an exact generic alias.
+Its type arguments should still participate in inference.
+
+```py
+from typing import Generic, TypeVar, final
+
+T = TypeVar("T")
+
+@final
+class Final(Generic[T]): ...
+
+def infer(cls: type[Final[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(Final[int]))  # revealed: int
 ```
 
 ## Inferring tuple parameter types
@@ -436,10 +530,11 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
 ```
 
-## Incompatible invariant protocol members
+## Gradual invariant protocol members
 
-When the same inferred type variable appears in multiple invariant protocol members, those members
-must agree on one exact specialization. Gradual consistency between their types is not sufficient.
+When the same inferred type variable appears in multiple invariant protocol members, fully static
+member types must agree on one exact specialization. Gradual members remain conservative
+alternatives because their equality cannot justify a transitive sequent proof.
 
 ```py
 from typing import Any, Generic, Protocol, TypeVar
@@ -460,7 +555,7 @@ def infer_pair(value: Pair[T]) -> T:
 
 def check_pair(value: GradualPair[U]) -> None:
     # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    reveal_type(infer_pair(value))  # revealed: Unknown
+    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
 ```
 
 ## Prefer specific compatible constraints over gradual constraints

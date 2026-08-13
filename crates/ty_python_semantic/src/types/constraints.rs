@@ -538,33 +538,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
-    /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
-    ///
-    /// Each typevar has a set of _valid specializations_, which is defined by any upper bound or
-    /// constraints that the typevar has.
-    ///
-    /// Each typevar is also either _inferable_ or _non-inferable_. (You provide a list of the
-    /// `inferable` typevars; all others are considered non-inferable.) For an inferable typevar,
-    /// then there must be _some_ valid specialization that satisfies the constraint set. For a
-    /// non-inferable typevar, then _all_ valid specializations must satisfy it.
-    ///
-    /// Note that we don't have to consider typevars that aren't mentioned in the constraint set,
-    /// since the constraint set cannot be affected by any typevars that it does not mention. That
-    /// means that those additional typevars trivially satisfy the constraint set, regardless of
-    /// whether they are inferable or not.
-    pub(crate) fn satisfied_by_all_typevars(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> bool {
-        self.verify_builder(builder);
-        let mut storage = builder.storage.borrow_mut();
-        self.node
-            .satisfied_by_all_typevars(db, env, &mut storage, inferable, self.source_order)
-    }
-
     /// Updates this constraint set to hold the union of itself and another constraint set.
     ///
     /// In the result's source order, `self` will appear before `other`.
@@ -1338,6 +1311,10 @@ impl<'db> ConstraintSetStorage<'db> {
                 false
             }
 
+            fn notify_skipped_lazy_type_attributes(&self) {
+                self.support.borrow_mut().mark_incomplete();
+            }
+
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
                 for ty in alias.specialization(db).types(db) {
                     self.visit_type(db, *ty);
@@ -1871,6 +1848,52 @@ pub(crate) struct ConstraintBounds<'db> {
     pub(crate) upper: Option<Type<'db>>,
 }
 
+impl<'db> Type<'db> {
+    /// Returns whether this type can participate in a transitive sequent proof.
+    ///
+    /// Gradual assignability is not transitive, so constraints with dynamic bounds are ineligible.
+    /// Note that we can't use [`is_fully_static`][Type::is_fully_static] here, since that
+    /// considers the declared bounds/constraints of typevars. In the context of a sequent map,
+    /// typevars are opaque symbolic atoms: considering their bounds or defaults could incorrectly
+    /// make their eligibility depend on a specialization that the sequent is meant to constrain.
+    fn is_static_sequent_eligible(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        struct EligibilityVisitor<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            seen: TypeCollector<'db>,
+            eligible: Cell<bool>,
+        }
+
+        impl<'db> TypeVisitor<'db> for EligibilityVisitor<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if !self.eligible.get() || ty.is_type_var() {
+                    return;
+                }
+                if ty.is_dynamic() {
+                    self.eligible.set(false);
+                    return;
+                }
+                walk_type_with_recursion_guard(db, ty, self, &self.seen);
+            }
+        }
+
+        let visitor = EligibilityVisitor {
+            env,
+            seen: TypeCollector::default(),
+            eligible: Cell::new(true),
+        };
+        visitor.visit_type(db, self);
+        visitor.eligible.get()
+    }
+}
+
 impl<'db> ConstraintBounds<'db> {
     pub(crate) fn new(lower: Option<Type<'db>>, upper: Option<Type<'db>>) -> Self {
         Self { lower, upper }
@@ -1892,6 +1915,14 @@ impl<'db> ConstraintBounds<'db> {
         let lower = self.lower?;
         let upper = self.upper?;
         (lower == upper).then_some(lower)
+    }
+
+    fn is_concrete(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        iter::chain(self.lower, self.upper).all(|bound| {
+            !bound.has_typevar(db, env)
+                && !bound.has_unspecialized_type_var(db, env)
+                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
+        })
     }
 
     fn materialized_lower(self) -> Type<'db> {
@@ -2514,12 +2545,13 @@ impl ConstraintId {
         let self_constraint = storage.constraint_data(self);
         let other_constraint = storage.constraint_data(other);
 
-        // A typevar cannot be exactly equal to two different types under any specialization. This
-        // is stronger than checking whether the types are disjoint: two classes can have a common
-        // subclass, which makes their upper-bound constraints compatible, but that subclass is not
-        // exactly equal to either class.
+        // A typevar cannot be exactly equal to two different statically eligible types under any
+        // specialization. Gradual bounds cannot prove this incompatibility because the resulting
+        // pair-impossibility sequent participates in transitive closure.
         if let Some(left) = self_constraint.bounds.as_equality()
             && let Some(right) = other_constraint.bounds.as_equality()
+            && left.is_static_sequent_eligible(db, env)
+            && right.is_static_sequent_eligible(db, env)
             && !left.can_be_constraint_set_equivalent_to(db, env, right)
         {
             return IntersectionResult::Disjoint;
@@ -2833,7 +2865,7 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                let mut path = interior.path_assignments(storage, source_order);
+                let mut path = interior.path_assignments(db, env, storage, source_order);
                 path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                     .is_continue()
             }
@@ -2899,7 +2931,7 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
-                    let mut path = interior.path_assignments(storage, source_order);
+                    let mut path = interior.path_assignments(db, env, storage, source_order);
                     path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
                         .is_continue()
                 };
@@ -3166,97 +3198,6 @@ impl NodeId {
         (node, constraint_source_order)
     }
 
-    fn satisfied_by_all_typevars<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-    ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => return true,
-            Node::AlwaysFalse => return false,
-            Node::Interior(_) => {}
-        }
-
-        let mut typevars = FxHashSet::default();
-        self.for_each_unique_constraint_mut(storage, &mut |storage, constraint| {
-            let constraint = storage.constraint_data(constraint);
-            typevars.insert(constraint.typevar);
-        });
-
-        // Specializations can introduce constraints that do not appear in the original BDD.
-        // Compose full constraint sets so those constraints retain their source orders when the
-        // resulting BDD is traversed.
-
-        // Returns if some specialization satisfies this constraint set.
-        let some_specialization_satisfies =
-            |storage: &mut ConstraintSetStorage<'db>,
-             specializations: (NodeId, Option<SourceOrderId>)| {
-                let (specializations, specializations_source_order) = specializations;
-                let when_satisfied = specializations
-                    .implies(storage, self)
-                    .and(storage, specializations);
-                let source_order =
-                    storage.ordered_source_order(source_order, specializations_source_order);
-                !when_satisfied.is_never_satisfied(db, env, storage, source_order)
-            };
-
-        // Returns if all specializations satisfy this constraint set.
-        let all_specializations_satisfy =
-            |storage: &mut ConstraintSetStorage<'db>,
-             specializations: (NodeId, Option<SourceOrderId>)| {
-                let (specializations, specializations_source_order) = specializations;
-                let when_satisfied = specializations
-                    .implies(storage, self)
-                    .and(storage, specializations)
-                    .iff(storage, specializations);
-                let source_order =
-                    storage.ordered_source_order(source_order, specializations_source_order);
-                when_satisfied.is_always_satisfied(db, env, storage, source_order)
-            };
-
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "all type variables must pass the check regardless of order"
-        )]
-        for typevar in typevars {
-            if typevar.is_inferable(db, inferable) {
-                // If the typevar is in inferable position, we need to verify that some valid
-                // specialization satisfies the constraint set.
-                let valid_specializations = typevar.valid_specializations(db, env, storage);
-                if !some_specialization_satisfies(storage, valid_specializations) {
-                    return false;
-                }
-            } else {
-                // If the typevar is in non-inferable position, we need to verify that all required
-                // specializations satisfy the constraint set. Complicating things, the typevar
-                // might have gradual constraints. For those, we need to know the range of valid
-                // materializations, but we only need some materialization to satisfy the
-                // constraint set.
-                //
-                // NB: We could also model this by introducing a synthetic typevar for the gradual
-                // constraint, treating that synthetic typevar as always inferable (so that we only
-                // need to verify for some materialization), and then update this typevar's
-                // constraint to refer to the synthetic typevar instead of the original gradual
-                // constraint.
-                let (static_specializations, gradual_constraints) =
-                    typevar.required_specializations(db, env, storage);
-                if !all_specializations_satisfy(storage, static_specializations) {
-                    return false;
-                }
-                for gradual_constraint in gradual_constraints {
-                    if !some_specialization_satisfies(storage, gradual_constraint) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
-    }
-
     /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
     /// The result will return true whenever `self` returns true for _any_ assignment of those
     /// typevars. The result will not contain any constraints that mention those typevars.
@@ -3325,30 +3266,6 @@ impl NodeId {
             }
             let interior = storage.interior_node_data(node);
             f(interior.constraint);
-            walk(interior.if_true, storage, seen, f);
-            walk(interior.if_uncertain, storage, seen, f);
-            walk(interior.if_false, storage, seen, f);
-        }
-
-        walk(self, storage, &mut FxHashSet::default(), f);
-    }
-
-    fn for_each_unique_constraint_mut<'db>(
-        self,
-        storage: &mut ConstraintSetStorage<'db>,
-        f: &mut dyn FnMut(&mut ConstraintSetStorage<'db>, ConstraintId),
-    ) {
-        fn walk<'db>(
-            node: NodeId,
-            storage: &mut ConstraintSetStorage<'db>,
-            seen: &mut FxHashSet<NodeId>,
-            f: &mut dyn FnMut(&mut ConstraintSetStorage<'db>, ConstraintId),
-        ) {
-            if node.is_terminal() || !seen.insert(node) {
-                return;
-            }
-            let interior = storage.interior_node_data(node);
-            f(storage, interior.constraint);
             walk(interior.if_true, storage, seen, f);
             walk(interior.if_uncertain, storage, seen, f);
             walk(interior.if_false, storage, seen, f);
@@ -3883,7 +3800,7 @@ impl<'db> PathBounds<'db> {
         // is too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let path_source_order = storage.ordered_source_order(source_order, derived_source_order);
-        let mut path = interior.path_assignments(storage, path_source_order);
+        let mut path = interior.path_assignments(db, env, storage, path_source_order);
         let _ = path.visit(db, env, storage, node, &mut collect_visitor);
         collect_visitor.sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
@@ -4665,15 +4582,17 @@ impl InteriorNode {
             }
         }
 
-        let mut path = self.path_assignments(storage, source_order);
+        let mut path = self.path_assignments(db, env, storage, source_order);
         let mut visitor = AbstractVisitor { should_remove };
         let ControlFlow::Continue(result) = path.visit(db, env, storage, self.node(), &mut visitor);
         result
     }
 
-    fn path_assignments(
+    fn path_assignments<'db>(
         self,
-        storage: &mut ConstraintSetStorage<'_>,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
@@ -4692,7 +4611,26 @@ impl InteriorNode {
                 .get_index_of(constraint)
                 .expect("every BDD constraint should have a source-order entry")
         });
-        PathAssignments::new(constraints)
+
+        if !self.node().is_single_conjunction(storage) {
+            return PathAssignments::new(constraints, FxHashSet::default());
+        }
+
+        let mut independent_typevars = FxHashSet::default();
+        let mut dependent_typevars = FxHashSet::default();
+        for constraint_id in &constraints {
+            let constraint = storage.constraint_data(*constraint_id);
+            let typevar = storage.typevar_id(db, constraint.typevar);
+            if constraint.bounds.is_concrete(db, env) {
+                independent_typevars.insert(typevar);
+            } else {
+                dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
+            }
+        }
+
+        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
+
+        PathAssignments::new(constraints, independent_typevars)
     }
 }
 
@@ -6384,6 +6322,10 @@ pub(crate) struct PathAssignments {
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
 
+    /// Type variables that only involve concrete constraints and so do not participate in sequent
+    /// discovery.
+    independent_typevars: FxHashSet<TypeVarId>,
+
     /// Derived assignments that have been queued up to be added to the current path.
     assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
 
@@ -6448,7 +6390,10 @@ impl Ord for AssignmentFuel {
 }
 
 impl PathAssignments {
-    fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
+    fn new(
+        constraints: impl IntoIterator<Item = ConstraintId>,
+        independent_typevars: FxHashSet<TypeVarId>,
+    ) -> Self {
         let discovered = constraints
             .into_iter()
             .map(|constraint| (constraint, false))
@@ -6459,6 +6404,7 @@ impl PathAssignments {
             additional_fuels: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
+            independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
             new_assignments: FxIndexMap::default(),
@@ -6768,6 +6714,22 @@ impl PathAssignments {
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
+                continue;
+            }
+
+            let existing_support = storage.constraint_support(*existing);
+            let constraint_support = storage.constraint_support(constraint);
+
+            // Independent typevars must be checked for disjoint or invalid constraints, but are
+            // otherwise already constrained and do not participate in sequent discovery.
+            if !existing_support.overlaps_with(constraint_support)
+                && existing_support
+                    .iter()
+                    .chain(constraint_support.iter())
+                    .any(|typevar| self.independent_typevars.contains(&typevar))
+                && existing_support.is_complete()
+                && constraint_support.is_complete()
+            {
                 continue;
             }
 
@@ -7157,129 +7119,6 @@ impl SatisfiedClauses {
             .collect();
         clauses.sort();
         clauses.join(" ∨ ")
-    }
-}
-
-impl<'db> BoundTypeVarInstance<'db> {
-    /// Returns the valid specializations of a typevar. This is used when checking a constraint set
-    /// when this typevar is in inferable position, where we only need _some_ specialization to
-    /// satisfy the constraint set.
-    fn valid_specializations(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        if self.paramspec_attr(db).is_some() {
-            // P.args and P.kwargs are variadic, and do not have an upper bound or constraints.
-            return (ALWAYS_TRUE, None);
-        }
-
-        // For gradual upper bounds and constraints, we are free to choose any materialization that
-        // makes the check succeed. In inferable positions, it is most helpful to choose a
-        // materialization that is as permissive as possible, since that maximizes the number of
-        // valid specializations that might satisfy the check. We therefore take the top
-        // materialization of the bound or constraints.
-        //
-        // Moreover, for a gradual constraint, we don't need to worry that typevar constraints are
-        // _equality_ comparisons, not _subtyping_ comparisons — since we are only going to check
-        // that _some_ valid specialization satisfies the constraint set, it's correct for us to
-        // return the range of valid materializations that we can choose from.
-        match self.typevar(db).bound_or_constraints(db, env) {
-            None => (ALWAYS_TRUE, None),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.top_materialization(db, env);
-                Constraint::new_node_with_bounds(db, env, storage, self, None, Some(bound))
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut specializations = ALWAYS_FALSE;
-                let mut source_order = None;
-                for constraint in constraints.elements(db) {
-                    let constraint_lower = constraint.bottom_materialization(db, env);
-                    let constraint_upper = constraint.top_materialization(db, env);
-                    let (constraint, constraint_source_order) = Constraint::new_node_with_bounds(
-                        db,
-                        env,
-                        storage,
-                        self,
-                        Some(constraint_lower),
-                        Some(constraint_upper),
-                    );
-                    specializations = specializations.or(storage, constraint);
-                    source_order =
-                        storage.ordered_source_order(source_order, constraint_source_order);
-                }
-                (specializations, source_order)
-            }
-        }
-    }
-
-    /// Returns the required specializations of a typevar. This is used when checking a constraint
-    /// set when this typevar is in non-inferable position, where we need _all_ specializations to
-    /// satisfy the constraint set.
-    ///
-    /// That causes complications if this is a constrained typevar, where one of the constraints is
-    /// gradual. In that case, we need to return the range of valid materializations, but we don't
-    /// want to require that all of those materializations satisfy the constraint set.
-    ///
-    /// To handle this, we return a "primary" result, and an iterator of any gradual constraints.
-    /// For an unbounded/unconstrained typevar or a bounded typevar, the primary result fully
-    /// specifies the required specializations, and the iterator will be empty. For a constrained
-    /// typevar, the primary result will include the fully static constraints, and the iterator
-    /// will include an entry for each non-fully-static constraint.
-    #[expect(clippy::type_complexity)]
-    fn required_specializations(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-    ) -> (
-        (NodeId, Option<SourceOrderId>),
-        Vec<(NodeId, Option<SourceOrderId>)>,
-    ) {
-        // For upper bounds and constraints, we are free to choose any materialization that makes
-        // the check succeed. In non-inferable positions, it is most helpful to choose a
-        // materialization that is as restrictive as possible, since that minimizes the number of
-        // valid specializations that must satisfy the check. We therefore take the bottom
-        // materialization of the bound or constraints.
-        match self.typevar(db).bound_or_constraints(db, env) {
-            None => ((ALWAYS_TRUE, None), Vec::new()),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.bottom_materialization(db, env);
-                (
-                    Constraint::new_node_with_bounds(db, env, storage, self, None, Some(bound)),
-                    Vec::new(),
-                )
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                let mut non_gradual_constraints = ALWAYS_FALSE;
-                let mut non_gradual_source_order = None;
-                let mut gradual_constraints = Vec::new();
-                for constraint in constraints.elements(db) {
-                    let constraint_lower = constraint.bottom_materialization(db, env);
-                    let constraint_upper = constraint.top_materialization(db, env);
-                    let constraint = Constraint::new_node_with_bounds(
-                        db,
-                        env,
-                        storage,
-                        self,
-                        Some(constraint_lower),
-                        Some(constraint_upper),
-                    );
-                    if constraint_lower == constraint_upper {
-                        non_gradual_constraints = non_gradual_constraints.or(storage, constraint.0);
-                        non_gradual_source_order =
-                            storage.ordered_source_order(non_gradual_source_order, constraint.1);
-                    } else {
-                        gradual_constraints.push(constraint);
-                    }
-                }
-                (
-                    (non_gradual_constraints, non_gradual_source_order),
-                    gradual_constraints,
-                )
-            }
-        }
     }
 }
 
@@ -8344,7 +8183,7 @@ mod tests {
     }
 
     #[test]
-    fn constraint_ordering_changes_derived_upper_bound_display() {
+    fn constraint_ordering_preserves_independent_concrete_solutions() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8370,12 +8209,7 @@ mod tests {
                     .and(storage, int_t)
                     .and(storage, u_int)
             },
-            // TODO: Constraint-ID permutations can still change which equivalent upper-bound
-            // intersection is constructed first.
-            [
-                "never=false always=false merged=[T=int | U, U=T & int] paths=[T=int | U, U=T & int]",
-                "never=false always=false merged=[T=int | U, U=int & T] paths=[T=int | U, U=int & T]",
-            ],
+            ["never=false always=false merged=[T=int, U=int] paths=[T=int, U=int]"],
         );
     }
 
@@ -8715,16 +8549,18 @@ mod tests {
         }
     }
 
-    fn path_assignments_for(
-        builder: &ConstraintSetBuilder<'_>,
+    fn path_assignments_for<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
+        let mut storage = builder.storage.borrow_mut();
         match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([]),
+            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
             Node::Interior(interior) => {
-                let mut storage = builder.storage.borrow_mut();
-                interior.path_assignments(&mut storage, source_order)
+                interior.path_assignments(db, env, &mut storage, source_order)
             }
         }
     }
@@ -8733,6 +8569,7 @@ mod tests {
     fn path_assignments_follow_constraint_source_order() {
         let db = setup_db();
         let db = &db;
+        let env = db.program_environment();
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
@@ -8742,7 +8579,7 @@ mod tests {
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(&builder, set.node, set.source_order);
+        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
         let storage = builder.storage.borrow();
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
@@ -8800,7 +8637,7 @@ mod tests {
             tautology,
             transitive,
         ] {
-            let mut path = path_assignments_for(&builder, set.node, set.source_order);
+            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut fold = ReconstructPathFold { break_at: None };
             let mut storage = builder.storage.borrow_mut();
             let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
@@ -8837,7 +8674,7 @@ mod tests {
             PathFoldBreak::Impossible,
             PathFoldBreak::Combine,
         ] {
-            let mut path = path_assignments_for(&builder, set.node, set.source_order);
+            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut aborting_fold = ReconstructPathFold {
                 break_at: Some(break_at),
             };

@@ -9,7 +9,9 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticStylesheet, DisplayDiagnosticConfig, SecondaryCode, fmt_with_hyperlink,
+};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
@@ -33,6 +35,10 @@ bitflags! {
 #[derive(Serialize)]
 struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
+    /// Skipped when serializing to keep the JSON output unchanged; it only exists to hyperlink
+    /// the code in terminal output.
+    #[serde(skip)]
+    url: Option<&'a str>,
     name: &'static str,
     count: usize,
     #[serde(rename = "fixable")]
@@ -297,6 +303,7 @@ impl Printer {
             .map(
                 |&(code, message, count, fixable_count)| ExpandedStatistics {
                     code,
+                    url: message.documentation_url(),
                     name: message.name(),
                     count,
                     // Backward compatibility: `fixable` is true only when all violations are fixable.
@@ -330,22 +337,32 @@ impl Printer {
                     .unwrap();
                 let any_fixable = statistics.iter().any(ExpandedStatistics::any_fixable);
 
+                // Pick the stylesheet the same way the full and concise renderers do, so that
+                // turning colors off also turns the hyperlinks off.
+                let stylesheet = if colored::control::SHOULD_COLORIZE.should_colorize() {
+                    DiagnosticStylesheet::styled()
+                } else {
+                    DiagnosticStylesheet::plain()
+                };
+
                 let all_fixable = format!("[{}] ", "*".cyan());
                 let partially_fixable = format!("[{}] ", "-".cyan());
                 let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
+                    let code = statistic
+                        .code
+                        .map(SecondaryCode::as_str)
+                        .unwrap_or_default();
+                    let padding_width = code_width - code.len();
+
                     writeln!(
                         writer,
-                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        "{:>count_width$}\t{}{:padding_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic
-                            .code
-                            .map(SecondaryCode::as_str)
-                            .unwrap_or_default()
-                            .red()
-                            .bold(),
+                        fmt_with_hyperlink(code.red().bold(), statistic.url, &stylesheet),
+                        "",
                         if any_fixable {
                             if statistic.all_fixable {
                                 &all_fixable
