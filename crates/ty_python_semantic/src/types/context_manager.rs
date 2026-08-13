@@ -11,97 +11,40 @@ use crate::{
 use ruff_python_ast as ast;
 use ty_python_core::EvaluationMode;
 
-/// Returns whether this context manager can suppress an exception raised inside its suite.
-///
-/// Suppression is cached by manager type because the same predicate can be evaluated repeatedly for
-/// different bindings and context managers. Each alternative in a union is classified separately:
-/// if any possible manager can suppress exceptions, the union can suppress exceptions too. Merging
-/// the alternatives' exit return types first could incorrectly classify a suppressing manager
-/// alongside a non-suppressing manager as returning `bool | None`.
-///
-/// Python passes `(None, None, None)` to an exit method when a suite completes normally and passes
-/// the exception type, value, and traceback when it raises. Consequently, an overload whose first
-/// argument is annotated as `None` cannot describe an exceptional exit and must not affect the
-/// suppression result:
-///
-/// ```python
-/// @overload
-/// def __exit__(self, typ: None, value: None, tb: None) -> None: ...
-///
-/// @overload
-/// def __exit__(
-///     self,
-///     typ: type[BaseException],
-///     value: BaseException,
-///     tb: TracebackType | None,
-/// ) -> Literal[True]: ...
-/// ```
-///
-/// This manager can suppress exceptions despite its normal-exit overload returning `None`. For
-/// asynchronous managers, the return type is awaited before applying the typing specification's
-/// rule: only `bool` and `Literal[True]` indicate that exceptions may be suppressed.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _, _, _| false,
-    heap_size = ruff_memory_usage::heap_size
-)]
-fn context_manager_can_suppress<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
-    manager: Type<'db>,
-    is_async: bool,
-) -> bool {
-    if let Type::Union(union) = manager {
-        return union
-            .elements(db)
-            .iter()
-            .copied()
-            .any(|element| context_manager_can_suppress(db, program, element, is_async));
-    }
-
-    let env = ProgramEnvironment::from_program(program);
-    let method = if is_async { "__aexit__" } else { "__exit__" };
-    let Some(callables) = manager
-        .member_lookup_with_policy(db, &env, method, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
-        .place
-        .ignore_possibly_undefined()
-        .and_then(|exit| exit.try_upcast_to_callable(db, &env))
-    else {
-        return false;
-    };
-
-    let mut return_types = UnionBuilder::new(db, &env);
-    for callable in &callables {
-        for signature in callable.signatures(db) {
-            if let Some(exception_type) = signature.parameters().get_positional(0)
-                && exception_type.annotated_type().is_none(db)
-            {
-                continue;
-            }
-
-            let return_type = if is_async {
-                let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
-                    return false;
-                };
-                awaited
-            } else {
-                signature.return_ty
-            };
-            return_types.add_in_place(return_type);
-        }
-    }
-
-    let return_type = return_types.build();
-    return_type.is_equivalent_to(db, &env, KnownClass::Bool.to_instance(db, &env))
-        || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
-}
-
 impl<'db> Type<'db> {
-    /// Whether this context manager can suppress exceptions according to the typing specification.
+    /// Returns whether this context manager can suppress an exception raised inside its suite.
     ///
     /// Only exit methods returning exactly `bool` or `Literal[True]` are considered suppressing;
-    /// `bool | None` and `Any` are not. Asynchronous exit results are awaited, and manager union
-    /// alternatives are classified independently.
+    /// `bool | None` and `Any` are not. Asynchronous exit results are awaited before applying this
+    /// rule.
+    ///
+    /// Suppression is cached by manager type because the same predicate can be evaluated repeatedly
+    /// for different bindings and context managers. Each alternative in a union is classified
+    /// separately: if any possible manager can suppress exceptions, the union can suppress
+    /// exceptions too. Merging the alternatives' exit return types first could incorrectly
+    /// classify a suppressing manager alongside a non-suppressing manager as returning
+    /// `bool | None`.
+    ///
+    /// Python passes `(None, None, None)` to an exit method when a suite completes normally and
+    /// passes the exception type, value, and traceback when it raises. Consequently, an overload
+    /// whose first argument is annotated as `None` cannot describe an exceptional exit and must
+    /// not affect the suppression result:
+    ///
+    /// ```python
+    /// @overload
+    /// def __exit__(self, typ: None, value: None, tb: None) -> None: ...
+    ///
+    /// @overload
+    /// def __exit__(
+    ///     self,
+    ///     typ: type[BaseException],
+    ///     value: BaseException,
+    ///     tb: TracebackType | None,
+    /// ) -> Literal[True]: ...
+    /// ```
+    ///
+    /// This manager can suppress exceptions despite its normal-exit overload returning `None`.
+    /// Suppression preserves any state from before an operation that raises:
     ///
     /// ```python
     /// from contextlib import suppress
@@ -117,7 +60,68 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> bool {
-        context_manager_can_suppress(db, env.program(db), self, mode.is_async())
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _, _, _| false,
+            heap_size = ruff_memory_usage::heap_size
+        )]
+        fn can_suppress_exceptions_impl<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            manager: Type<'db>,
+            is_async: bool,
+        ) -> bool {
+            if let Type::Union(union) = manager {
+                return union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .any(|element| can_suppress_exceptions_impl(db, program, element, is_async));
+            }
+
+            let env = ProgramEnvironment::from_program(program);
+            let method = if is_async { "__aexit__" } else { "__exit__" };
+            let Some(callables) = manager
+                .member_lookup_with_policy(
+                    db,
+                    &env,
+                    method,
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+                .ignore_possibly_undefined()
+                .and_then(|exit| exit.try_upcast_to_callable(db, &env))
+            else {
+                return false;
+            };
+
+            let mut return_types = UnionBuilder::new(db, &env);
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    if let Some(exception_type) = signature.parameters().get_positional(0)
+                        && exception_type.annotated_type().is_none(db)
+                    {
+                        continue;
+                    }
+
+                    let return_type = if is_async {
+                        let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
+                            return false;
+                        };
+                        awaited
+                    } else {
+                        signature.return_ty
+                    };
+                    return_types.add_in_place(return_type);
+                }
+            }
+
+            let return_type = return_types.build();
+            return_type.is_equivalent_to(db, &env, KnownClass::Bool.to_instance(db, &env))
+                || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
+        }
+
+        can_suppress_exceptions_impl(db, env.program(db), self, mode.is_async())
     }
 
     /// Returns the type bound from a context manager with type `self`.
