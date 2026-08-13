@@ -7,7 +7,7 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::{CallableTypeKind, walk_callable_type};
+use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -3263,31 +3263,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         if !matches!(polarity, TypeVarVariance::Covariant) {
-            let preserve_paramspec_mapping =
-                matches!(formal.kind(db), CallableTypeKind::ParamSpecValue)
-                    && !matches!(polarity, TypeVarVariance::Bivariant);
             let actual = actual_callables
                 .map(|callable| callable.into_regular(db))
                 .into_type(db, self.env);
             let formal = Type::Callable(formal.into_regular(db));
-
-            // ParamSpecs are still solved from the legacy mapping table. Preserve any usable
-            // mapping from the forward relation before the full relation becomes unsatisfiable;
-            // for example, `Concatenate[object, P]` has a positional-only prefix, while an
-            // actual method receiver can also be passed by keyword. Do not add the forward
-            // relation to `pending`: doing so would turn a contravariant comparison invariant.
-            // TODO: Move ParamSpecs into the new constraint solver and align nominal inference
-            // with `specialization_variance`, which accounts for their callable representation.
-            if preserve_paramspec_mapping {
-                let forward =
-                    self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
-                if let Err(ConstraintSetInferenceError::InvalidTypeVar(error)) =
-                    self.add_type_mappings_from_constraint_set(forward)
-                {
-                    return Err(error);
-                }
-            }
-
             let when = self.constraint_for_relation(formal, actual, polarity);
             return self.infer_from_constraint_set(when);
         }
@@ -3393,6 +3372,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // specialize `T` to `int`, and so ignore the `None`.
         let actual = actual.filter_disjoint_elements(db, self.env, formal, self.inferable);
         let formal = formal.filter_disjoint_elements(db, self.env, actual, self.inferable);
+
+        // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
+        // their entire inference context on the existing signature path, and use forward
+        // structural relations so nested variadics and ordinary type variables retain their
+        // mappings. Preserve the original polarity for recursive and ordinary inference.
+        // TODO: Apply full polarity once variadics are supported by the new constraint solver.
+        let relation_polarity = if !polarity.is_covariant()
+            && self
+                .inferable
+                .iter(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+        {
+            TypeVarVariance::Covariant
+        } else {
+            polarity
+        };
 
         match (formal, actual) {
             // Expand PEP 695 type aliases in the formal type.
@@ -3802,7 +3797,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 || matches!(formal, Type::SubclassOf(subclass)
                     if matches!(subclass.subclass_of(), SubclassOfInner::Class(_))) =>
             {
-                let when = self.constraint_for_relation(formal, actual, polarity);
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
                 return self.infer_from_constraint_set(when);
             }
 
@@ -3854,7 +3849,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     let when = Self::relation_directions(
                         (formal_protocol, formal_origin),
                         (actual_protocol, actual_origin),
-                        polarity,
+                        relation_polarity,
                     )
                     .try_fold(
                         ConstraintSet::from_bool(self.constraints, true),
@@ -3892,8 +3887,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
                 // Converting the actual protocol to its nominal origin makes the reversed
                 // comparison impossible: a protocol cannot be assignable to a nominal class.
-                if matches!(formal, Type::ProtocolInstance(_)) && !polarity.is_covariant() {
-                    let when = self.constraint_for_relation(formal, actual, polarity);
+                if matches!(formal, Type::ProtocolInstance(_)) && !relation_polarity.is_covariant()
+                {
+                    let when = self.constraint_for_relation(formal, actual, relation_polarity);
                     return self.infer_from_constraint_set(when);
                 }
 
@@ -4018,7 +4014,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
-                        let when = self.constraint_for_relation(formal, actual, polarity);
+                        let when = self.constraint_for_relation(formal, actual, relation_polarity);
                         return self.infer_from_constraint_set(when);
                     }
 
@@ -4059,19 +4055,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
                 // Common TypedDict constraints prove only `actual <= formal`. Contravariance
                 // reverses that relation, while invariance additionally requires the reverse.
-                let when = if matches!(polarity, TypeVarVariance::Covariant)
+                let when = if matches!(relation_polarity, TypeVarVariance::Covariant)
                     && let Some(common) =
                         self.common_typed_dict_protocol_constraints(formal, actual_union)
                 {
                     common
                 } else {
-                    self.constraint_for_relation(formal, actual, polarity)
+                    self.constraint_for_relation(formal, actual, relation_polarity)
                 };
                 return self.infer_from_constraint_set(when);
             }
 
             (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
-                let when = self.constraint_for_relation(formal, actual, polarity);
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
                 return self.infer_from_constraint_set(when);
             }
 
@@ -4089,14 +4085,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
                 // The protocol interface exposes the callable signature already bound for
                 // instance access.
-                self.infer_from_callable_signature(call_method, actual_callables, polarity)?;
+                self.infer_from_callable_signature(
+                    call_method,
+                    actual_callables,
+                    relation_polarity,
+                )?;
             }
 
             (Type::Callable(formal_callable), _) => {
                 let Some(actual_callables) = actual.try_upcast_to_callable(db, self.env) else {
                     return Ok(());
                 };
-                self.infer_from_callable_signature(formal_callable, actual_callables, polarity)?;
+                self.infer_from_callable_signature(
+                    formal_callable,
+                    actual_callables,
+                    relation_polarity,
+                )?;
             }
 
             // Expand type aliases in the actual type.
