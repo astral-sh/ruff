@@ -16,7 +16,7 @@ use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_options_metadata::OptionsMetadata;
 use ruff_workspace::options::Options;
 
-const DEFAULT_SYMBOL: &str = "🔵";
+const DEFAULT_SYMBOL: &str = "✅";
 const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
 const REMOVED_SYMBOL: &str = "❌";
