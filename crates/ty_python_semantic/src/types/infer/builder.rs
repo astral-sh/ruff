@@ -10809,27 +10809,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 match tvar.typevar(self.db()).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match Self::map_constrained_typevar_constraints(
+                        // Call the dunder method for every constraint up front so deprecation
+                        // reporting doesn't depend on whether any constraint fails.
+                        let outcomes: Vec<_> = constraints
+                            .elements(db)
+                            .iter()
+                            .map(|constraint| {
+                                constraint.try_call_dunder(
+                                    db,
+                                    env,
+                                    unary_dunder_method,
+                                    CallArguments::none(),
+                                    TypeContext::default(),
+                                )
+                            })
+                            .collect();
+                        for outcome in outcomes.iter().filter_map(|outcome| outcome.as_ref().ok()) {
+                            for callable in outcome.iter_flat() {
+                                self.check_deprecated(unary, callable.callable_type);
+                            }
+                        }
+
+                        let mut outcomes = outcomes.into_iter();
+                        let result = Self::map_constrained_typevar_constraints(
                             db,
                             env,
                             operand_type,
                             constraints,
-                            |constraint| {
-                                let outcome = constraint
-                                    .try_call_dunder(
-                                        db,
-                                        env,
-                                        unary_dunder_method,
-                                        CallArguments::none(),
-                                        TypeContext::default(),
-                                    )
-                                    .ok()?;
-                                for callable in outcome.iter_flat() {
-                                    self.check_deprecated(unary, callable.callable_type);
-                                }
+                            |_constraint| {
+                                let outcome = outcomes.next()?.ok()?;
                                 Some(outcome.return_type(db, env))
                             },
-                        ) {
+                        );
+                        match result {
                             Some(ty) => ty,
                             None => {
                                 // At least one constraint failed; report error.

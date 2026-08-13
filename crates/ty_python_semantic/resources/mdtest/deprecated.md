@@ -471,6 +471,23 @@ def f(value: T) -> None:
     ~value
 ```
 
+Deprecation reporting for one constraint does not depend on whether another constraint supports the
+operator
+
+E.g. `Third`, which has no `__invert__` implemented, comes first in the constraint list, but
+`First`'s deprecation is still reported.
+
+```py
+class Third: ...
+
+U = TypeVar("U", Third, First)
+
+def g(value: U) -> None:
+    # error: [unsupported-operator]
+    # error: [deprecated]
+    ~value
+```
+
 ## Overloads
 
 Overloads can be deprecated, but only trigger warnings when invoked.
