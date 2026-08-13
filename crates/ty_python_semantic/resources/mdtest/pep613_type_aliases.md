@@ -151,6 +151,89 @@ def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
 ```
 
+### Specializing legacy aliases containing finite aliases
+
+Specializing a legacy alias must preserve its type arguments when its value contains a finite PEP
+695 alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias, TypeVar
+
+type Nested[U] = list[U]
+
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Nested[Nested[int]]]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Nested[Nested[int]]]
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+### Specializing legacy aliases containing recursive aliases
+
+A recursive PEP 695 alias does not make the containing legacy alias recursive or erase its explicit
+type arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias, TypeVar
+
+type Recursive[U] = list[Recursive[list[U]]]
+
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Recursive[int]]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Recursive[int]]
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+### Specializing legacy aliases containing recursive structural types
+
+A recursive protocol member does not make a containing legacy alias recursive. The alias can still
+be specialized with an explicit type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeAlias, TypeVar, TypedDict
+
+class Recursive[U](Protocol):
+    next: Recursive[list[U]]
+
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Recursive[int]]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Recursive[int]]
+```
+
+A recursive `TypedDict` field also leaves the containing alias unaffected:
+
+```py
+class Payload[U](TypedDict):
+    child: Payload[list[U]]
+
+PayloadAlias: TypeAlias = tuple[T, Payload[int]]
+
+def _(x: PayloadAlias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Payload[int]]
+```
+
 ### Stringified generic alias
 
 #### Explicitly specialized

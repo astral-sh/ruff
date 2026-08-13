@@ -2715,6 +2715,279 @@ def test_match_exact_tuple_sequence_subclass(value: Pair) -> None:
             reveal_type(value)  # revealed: Pair
 ```
 
+## Sequence narrowing with finite nested types
+
+A sequence pattern can precisely narrow a tuple when its remaining elements are fully static.
+Repeatedly specializing a finite alias does not make its value gradual.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = T
+
+def _(x: tuple[Alias[Alias[int]], int | str]) -> str:
+    match x:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(x[1])  # revealed: str
+            return x[1]
+```
+
+A finite `TypedDict` specialization is also fully static:
+
+```py
+from typing import TypedDict
+
+class Payload[T](TypedDict):
+    item: T
+
+def _(x: tuple[Payload[Payload[int]], int | str]) -> str:
+    match x:
+        case (_, int()):
+            return "matched"
+        case _:
+            reveal_type(x[1])  # revealed: str
+            return x[1]
+```
+
+## Unused gradual alias arguments
+
+An alias that resolves to `int` remains fully static when specialized with `Any`. Its unused
+argument does not prevent precise sequence narrowing.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+type Ignored[T] = int
+
+def _(x: tuple[Ignored[Any], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Ignored[Any], str]
+```
+
+An alias that preserves `Any` instead prevents precise narrowing:
+
+```py
+type Preserved[T] = T
+
+def _(x: tuple[Preserved[Any], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Preserved[Any], int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+## Gradual `NewType` bases
+
+A `NewType` is fully static when its base is fully static.
+
+```py
+from typing import Any, NewType
+
+Static = NewType("Static", list[int])
+
+def _(x: tuple[Static, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Static, str]
+```
+
+However, a gradual base makes the `NewType` gradual:
+
+```py
+Dynamic = NewType("Dynamic", list[Any])
+
+def _(x: tuple[Dynamic, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Dynamic, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+## Explicit type arguments and gradual defaults
+
+A default of `Any` does not make a class gradual when its type parameter is explicitly specialized
+with `int`. This applies to `TypedDict`, protocol, and nominal classes.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Protocol, TypedDict
+
+class Payload[T = Any](TypedDict):
+    value: T
+
+class Proto[T = Any](Protocol):
+    value: T
+
+class Box[T = Any]: ...
+
+def _(x: tuple[Payload[int], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Payload[int], str]
+
+def _(x: tuple[Proto[int], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Proto[int], str]
+
+def _(x: tuple[Box[int], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Box[int], str]
+```
+
+Passing `Any` explicitly does make the specialization gradual:
+
+```py
+def _(x: tuple[Payload[Any], int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Payload[Any], int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+## Callable type parameter defaults
+
+A default of `Any` does not make a generic function gradual when its parameters and return type are
+fully static.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any
+
+def f[T = Any](x: int) -> int:
+    return x
+
+def _(x: int | str) -> None:
+    subject = (f, x)
+    match subject:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[def f[T](x: int) -> int, str]
+            reveal_type(subject)
+```
+
+## Sequence narrowing with recursive structural types
+
+A recursively specialized protocol can expand indefinitely. Its members cannot be proven fully
+static, so sequence-pattern fallthrough conservatively preserves the original type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+def _(x: tuple[Recursive[int], int]) -> None:
+    match x:
+        case (_, 1):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Recursive[int], int]
+```
+
+A recursive `TypedDict` has the same behavior:
+
+```py
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+def _(x: tuple[Payload[int], int]) -> None:
+    match x:
+        case (_, 1):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Payload[int], int]
+```
+
+## Gradual protocol and `TypedDict` members
+
+A protocol containing only an `int` member is fully static. Replacing that member with `Any` makes
+the protocol gradual and prevents precise sequence narrowing.
+
+```py
+from typing import Any, Protocol, TypedDict
+
+class Static(Protocol):
+    member: int
+
+class Dynamic(Protocol):
+    member: Any
+
+def _(x: tuple[Static, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(x)  # revealed: tuple[Static, str]
+
+def _(x: tuple[Dynamic, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Dynamic, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
+A `TypedDict` containing `Any` is also gradual:
+
+```py
+class Payload(TypedDict):
+    member: Any
+
+def _(x: tuple[Payload, int | str]) -> None:
+    match x:
+        case (_, int()):
+            pass
+        case _:
+            # revealed: tuple[Payload, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+```
+
 ## Nested sequence patterns
 
 Nested patterns narrow values captured from the positions they inspect. For subjects without a known

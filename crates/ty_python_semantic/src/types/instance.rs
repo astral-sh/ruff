@@ -17,8 +17,9 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
 };
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
-use crate::types::generics::walk_specialization;
+use crate::types::generics::walk_specialization_values;
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
@@ -810,6 +811,7 @@ fn non_recursive_protocol_interface<'db>(
         origin: ClassLiteral<'db>,
         found: Cell<bool>,
         recursion_guard: TypeCollector<'db>,
+        active_type_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
     }
 
     impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'_, 'db> {
@@ -817,12 +819,12 @@ fn non_recursive_protocol_interface<'db>(
             self.env
         }
 
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
         fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-            self.visit_type(db, type_alias.value_type(db));
+            self.active_type_aliases.visit(
+                &Type::TypeAlias(type_alias).to_type_identity(db),
+                || {},
+                || self.visit_type(db, type_alias.value_type(db)),
+            );
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -852,6 +854,7 @@ fn non_recursive_protocol_interface<'db>(
             origin: protocol.class_literal(db),
             found: Cell::new(false),
             recursion_guard: TypeCollector::default(),
+            active_type_aliases: ActiveRecursionDetector::default(),
         };
         walk_protocol_instance_member(db, member, receiver_ty, &visitor);
         !visitor.found.get()
@@ -1069,26 +1072,22 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     protocol: ProtocolInstanceType<'db>,
     visitor: &V,
 ) {
-    if visitor.should_visit_lazy_type_attributes() {
-        walk_protocol_interface(db, protocol.interface(db), visitor);
-    } else {
-        match protocol.inner {
-            Protocol::FromClass(_) | Protocol::Materialized(_) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                if let Some((_, Some(specialization))) = protocol
-                    .class_origin(db)
-                    .and_then(|class| class.static_class_literal(db))
-                {
-                    walk_specialization(db, specialization, visitor);
-                }
+    match protocol.inner {
+        Protocol::FromClass(_) | Protocol::Materialized(_) => {
+            visitor.notify_skipped_lazy_type_attributes();
+            if let Some((_, Some(specialization))) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            {
+                walk_specialization_values(db, specialization, visitor);
             }
-            Protocol::Synthesized(synthesized) => {
-                walk_protocol_interface(
-                    db,
-                    ProtocolInterfaceView::new(synthesized.interface(), None),
-                    visitor,
-                );
-            }
+        }
+        Protocol::Synthesized(synthesized) => {
+            walk_protocol_interface(
+                db,
+                ProtocolInterfaceView::new(synthesized.interface(), None),
+                visitor,
+            );
         }
     }
 }

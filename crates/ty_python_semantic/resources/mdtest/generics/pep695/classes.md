@@ -899,6 +899,22 @@ class Bad[S = T, T = int]: ...
 class AlsoBad[S = list[T], T = int]: ...
 ```
 
+### Defaults referencing later type parameters through aliases
+
+A default cannot reference a later type parameter through an alias, even if the alias does not use
+its type argument.
+
+```py
+type Alias[T] = T
+type Ignored[T] = int
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class X[S = Alias[T], T = int]: ...
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class Y[S = Ignored[T], T = int]: ...
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification

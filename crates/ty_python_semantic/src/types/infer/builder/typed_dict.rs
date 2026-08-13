@@ -39,7 +39,7 @@ fn contains_generic_typed_dict<'db>(
     ty: Type<'db>,
     active_aliases: &ActiveRecursionDetector<Definition<'db>>,
 ) -> bool {
-    any_over_type(db, env, ty, false, |nested| match nested {
+    any_over_type(db, env, ty, |nested| match nested {
         Type::TypedDict(_) => nested.has_typevar(db, env),
         Type::TypeAlias(alias) => active_aliases.visit(
             &alias.definition(db),
@@ -551,7 +551,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_static()
             .zip(call_expression_tcx.annotation)
             .is_some_and(|(class_literal, annotation)| {
-                any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
+                any_over_type(db, env, annotation.resolve_type_alias(db), |ty| {
                     ty.resolve_type_alias(db)
                         .specialization_of(db, env, class_literal)
                         .is_some_and(|specialization| {

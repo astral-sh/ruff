@@ -8,7 +8,7 @@ use crate::{
         KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar},
+        generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_values},
         variance::VarianceInferable,
         visitor,
     },
@@ -305,15 +305,26 @@ pub enum TypeAliasType<'db> {
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
 }
 
+/// Visit the type arguments of a type alias without expanding its value.
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
-    if !visitor.should_visit_lazy_type_attributes() {
-        visitor.notify_skipped_lazy_type_attributes();
-        return;
+    visitor.notify_skipped_lazy_type_attributes();
+    if let Some(specialization) = type_alias.specialization(db) {
+        walk_specialization_values(db, specialization, visitor);
     }
+}
+
+/// Expand a type alias and visit its value.
+///
+/// The caller must guard against recursive aliases.
+pub(super) fn walk_type_alias_value<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    visitor: &V,
+) {
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
             walk_pep_695_type_alias(db, type_alias, visitor);

@@ -165,10 +165,6 @@ fn generic_contexts_mentioned_in_type<'db>(
             self.env
         }
 
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
         fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
             for signature in &callable.signatures(db).overloads {
                 self.visit_signature(db, signature);
@@ -6245,7 +6241,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let parameters_contain_typevartuple = declared_callables.iter().any(|callable| {
             callable.signatures(db).iter().any(|signature| {
                 signature.parameters().iter().any(|parameter| {
-                    any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                    any_over_type(db, self.env, parameter.annotated_type(), |ty| {
                         matches!(
                             ty,
                             Type::TypeVar(typevar) if typevar.is_typevartuple(db)
@@ -6834,10 +6830,6 @@ fn inferable_typevar_occurrences<'db>(
     impl<'db> TypeVisitor<'db> for InferableTypeVarVisitor<'_, 'db> {
         fn program_environment(&self) -> &ProgramEnvironment<'db> {
             self.env
-        }
-
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
