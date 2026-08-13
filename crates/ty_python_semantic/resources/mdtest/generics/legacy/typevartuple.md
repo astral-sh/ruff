@@ -327,6 +327,50 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited specializations containing `Never`
+
+A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
+arguments to a generic base.
+
+```py
+from typing import Any, Generic, Never, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Kind(Generic[*Ts]): ...
+class SupportsKind(Kind[*Ts]): ...
+class Container(SupportsKind[int, Never]): ...
+
+def _(value: Container) -> None:
+    expected: Kind[int, Any] = value
+```
+
+### Callbacks returning containers with `Never` arguments
+
+A callback can return a concrete container whose variadic base contains `Never` when the expected
+container type uses `Any` in that position.
+
+```py
+from collections.abc import Callable
+from typing import Any, Generic, Never, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+
+class Kind(Generic[T, *Ts]): ...
+
+class Result(Kind[T, Never]):
+    def bind(self, callback: Callable[[T], Kind[U, Any]]) -> "Result[U]":
+        raise NotImplementedError
+
+def parse(value: str) -> Result[int]:
+    raise NotImplementedError
+
+def _(result: Result[str]) -> None:
+    reveal_type(result.bind(parse))  # revealed: Result[int]
+```
+
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
@@ -484,6 +528,25 @@ def _(
     reveal_type(a8)  # revealed: tuple[bool]
     reveal_type(a9)  # revealed: tuple[int, str, bool]
     reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+```
+
+### Legacy aliases containing `Never`
+
+A legacy alias must retain free type variables that appear alongside a `Never` argument in a
+variadic specialization.
+
+```py
+from typing import Generic, Never, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class Container(Generic[*Ts]): ...
+
+Padded = Container[T, Never]
+
+def _(value: Padded[int]) -> None:
+    reveal_type(value)  # revealed: Container[int, Never]
 ```
 
 ### Variadic arguments require variadic aliases

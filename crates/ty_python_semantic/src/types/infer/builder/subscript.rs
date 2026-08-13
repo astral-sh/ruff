@@ -233,10 +233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let tuple_generic_alias = |env: &ProgramEnvironment<'db>, tuple: Option<TupleType<'db>>| {
-            let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, env, Type::unknown()));
-            Type::from(tuple.to_class_type(db))
-        };
+        let tuple_generic_alias = |tuple: TupleType<'db>| Type::from(tuple.to_class_type(db));
 
         match value_ty {
             Type::ClassLiteral(class) => {
@@ -248,7 +245,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // special cases, too.
                 if class.is_tuple(db) {
                     return Ok(tuple_generic_alias(
-                        env,
                         self.infer_tuple_type_expression(subscript),
                     ));
                 } else if class.is_known(db, KnownClass::Type) {
@@ -282,7 +278,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Tuple => {
                     return Ok(tuple_generic_alias(
-                        env,
                         self.infer_tuple_type_expression(subscript),
                     ));
                 }

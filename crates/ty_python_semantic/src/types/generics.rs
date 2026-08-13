@@ -1494,7 +1494,7 @@ impl<'db> Specialization<'db> {
         });
 
         let original_tuple_inner = self.tuple_inner(db);
-        let tuple_inner = original_tuple_inner.and_then(|tuple| {
+        let tuple_inner = original_tuple_inner.map(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
 
@@ -1651,7 +1651,7 @@ impl<'db> Specialization<'db> {
             }
         });
         let original_tuple_inner = self.tuple_inner(db);
-        let tuple_inner = original_tuple_inner.and_then(|tuple| {
+        let tuple_inner = original_tuple_inner.map(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.apply_type_mapping_impl(
                 db,
@@ -1778,11 +1778,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Materializing the source otherwise loses the bottom needed to
             // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
             // top and bottom is a possible alternative, but it gets more complex
-            // due to the need to preserve Divergent markers. Also the fact that we currently
-            // simplify tuples containing `Never` to `Never` means that for
-            // `class C[T: tuple[int, int]]`, `C[tuple[Any, int]]` and `C[tuple[int, Any]]`
-            // have the same top and bottom but expose `Any` in different tuple positions.
-            // TODO: Try resolving the above issues so we can compare top/bottom subtyping here.
+            // due to the need to preserve Divergent markers.
+            // TODO: Resolve that issue so we can compare top/bottom subtyping here.
             !matches!(self.relation, TypeRelation::Redundancy { pure: false })
                 || target
                     == target.materialize_impl(
