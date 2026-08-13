@@ -9,14 +9,15 @@ use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
-use crate::types::constraints::{ConstraintSetBuilder, IteratorConstraintsExtension};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{
+    GenericContext, SpecializationError, bind_typevar, collect_specialization_errors,
+};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -30,8 +31,8 @@ use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    UnionTypeInstance, any_over_type, todo_type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, UnionType, UnionTypeInstance, any_over_type,
+    todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -626,8 +627,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         enum ExplicitSpecializationError {
             InvalidParamSpec,
             ParamSpecForTypeVar,
-            UnsatisfiedBound,
-            UnsatisfiedConstraints,
             /// These two errors override the errors above, causing all specializations to be `Unknown`.
             MissingTypeVars,
             TooManyArguments,
@@ -665,7 +664,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let env = self.program_environment();
         let db = self.db();
-        let constraints = ConstraintSetBuilder::new();
         let slice_node = subscript.slice.as_ref();
 
         let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
@@ -943,12 +941,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut error: Option<ExplicitSpecializationError> = None;
 
-        let when_assignable_to = |source: Type<'db>, target: Type<'db>| {
-            // Use the cached relation to preserve cycle recovery for recursive bounds.
-            let relation = source.when_constraint_set_assignable_to_owned(db, env, target);
-            constraints.load(db, env, &relation)
-        };
-
         for (index, item) in typevars
             .iter()
             .copied()
@@ -1026,83 +1018,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    // TODO consider just accepting the given specialization without checking
-                    // against bounds/constraints, but recording the expression for deferred
-                    // checking at end of scope. This would avoid a lot of cycles caused by eagerly
-                    // doing assignment checks here.
-                    match typevar.typevar(db).bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if when_assignable_to(provided_type, bound).is_never_satisfied(db, env)
-                            {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Type `{}` is not assignable to upper bound `{}` \
-                                            of type variable `{}`",
-                                        provided_type.display(db, env),
-                                        bound.display(db, env),
-                                        typevar.identity(db).display(db),
-                                    ));
-                                    add_typevar_definition(db, &mut diagnostic, typevar);
-                                    provided_type
-                                        .assignability_error_context(db, env, bound)
-                                        .attach_to(db, env, &mut diagnostic);
-                                }
-                                error = Some(ExplicitSpecializationError::UnsatisfiedBound);
-                                specialization_types.push(Some(Type::unknown()));
-                            } else {
-                                specialization_types.push(Some(provided_type));
-                            }
-                        }
-                        Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
-                            if typevar_constraints
-                                .elements(db)
-                                .iter()
-                                .copied()
-                                .when_any(db, &constraints, |c| {
-                                    // We can't use `when_equivalent_to` here, because that checks
-                                    // full gradual equivalence, which requires the two types to
-                                    // have exactly the same set of materializations. That rejects
-                                    // `Any` or `Unknown` against a concrete declared constraint.
-                                    //
-                                    // Instead we use bi-assignability, which correctly rejects
-                                    // strict subtypes and unions while allowing gradual
-                                    // assignments.
-                                    let left = when_assignable_to(provided_type, c);
-                                    let right = when_assignable_to(c, provided_type);
-                                    left.and(db, &constraints, || right)
-                                })
-                                .is_never_satisfied(db, env)
-                            {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&INVALID_TYPE_ARGUMENTS, type_argument.node)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Type `{}` does not satisfy constraints `{}` \
-                                            of type variable `{}`",
-                                        provided_type.display(db, env),
-                                        typevar_constraints
-                                            .elements(db)
-                                            .iter()
-                                            .map(|c| c.display(db, env))
-                                            .format("`, `"),
-                                        typevar.identity(db).display(db),
-                                    ));
-                                    add_typevar_definition(db, &mut diagnostic, typevar);
-                                }
-                                error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
-                                specialization_types.push(Some(Type::unknown()));
-                            } else {
-                                specialization_types.push(Some(provided_type));
-                            }
-                        }
-                        None => {
-                            specialization_types.push(Some(provided_type));
-                        }
-                    }
+                    specialization_types.push(Some(provided_type));
                 }
                 EitherOrBoth::Left(typevar) => {
                     if typevar.default_type(db).is_none() {
@@ -1199,7 +1115,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        match error {
+        let specialized = match error {
             Some(ExplicitSpecializationError::NonGeneric) => Type::unknown(),
             Some(
                 ExplicitSpecializationError::MissingTypeVars
@@ -1220,13 +1136,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 specialize(&unknowns)
             }
             Some(
-                ExplicitSpecializationError::UnsatisfiedBound
-                | ExplicitSpecializationError::UnsatisfiedConstraints
-                | ExplicitSpecializationError::InvalidParamSpec
+                ExplicitSpecializationError::InvalidParamSpec
                 | ExplicitSpecializationError::ParamSpecForTypeVar,
             )
             | None => specialize(&specialization_types),
+        };
+
+        for specialization_error in collect_specialization_errors(db, env, specialized) {
+            let Some(builder) = self
+                .context
+                .report_lint(&INVALID_TYPE_ARGUMENTS, slice_node)
+            else {
+                continue;
+            };
+            let mut diagnostic = match specialization_error {
+                SpecializationError::MismatchedBound {
+                    bound_typevar,
+                    assignment,
+                    bound,
+                } => {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Type `{}` is not assignable to upper bound `{}` of type variable `{}`",
+                        assignment.display(db, env),
+                        bound.display(db, env),
+                        bound_typevar.identity(db).display(db),
+                    ));
+                    assignment
+                        .assignability_error_context(db, env, bound)
+                        .attach_to(db, env, &mut diagnostic);
+                    diagnostic
+                }
+                SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    assignment,
+                    constraints,
+                } => builder.into_diagnostic(format_args!(
+                    "Type `{}` does not satisfy constraints `{}` of type variable `{}`",
+                    assignment.display(db, env),
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|constraint| constraint.display(db, env))
+                        .format("`, `"),
+                    bound_typevar.identity(db).display(db),
+                )),
+            };
+            add_typevar_definition(db, &mut diagnostic, specialization_error.bound_typevar());
         }
+
+        specialized
     }
 
     /// Infer the type of the expression that represents an explicit specialization of a
