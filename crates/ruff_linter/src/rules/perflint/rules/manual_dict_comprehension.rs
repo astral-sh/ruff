@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
+    self as ast, Expr, PythonVersion, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
@@ -8,7 +8,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
-use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::perflint::helpers::{
+    comment_strings_in_range, references_class_cell, statement_deletion_range,
+};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -184,6 +186,17 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     };
     if !is_dict(binding, checker.semantic()) {
+        return;
+    }
+
+    // On Python < 3.12, comprehensions have their own scope (pre-PEP 709), so a key, value, or
+    // filter that relies on the `__class__` cell — a bare `super()` or `__class__` — cannot be
+    // moved into a dict comprehension without raising at runtime. Don't suggest the conversion.
+    if checker.target_version() < PythonVersion::PY312
+        && (references_class_cell(key, checker.semantic())
+            || references_class_cell(value, checker.semantic())
+            || if_test.is_some_and(|test| references_class_cell(test, checker.semantic())))
+    {
         return;
     }
 

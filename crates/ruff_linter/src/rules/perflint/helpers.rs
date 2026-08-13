@@ -1,3 +1,5 @@
+use ruff_python_ast::{Expr, helpers::any_over_expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{
     BackwardsTokenizer, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
@@ -5,6 +7,27 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+
+/// Returns `true` if `expr` relies on the implicit `__class__` cell — i.e. it contains a
+/// zero-argument `super()` call or a `__class__` reference.
+///
+/// Such an expression cannot be moved into a comprehension on Python < 3.12: before [PEP 709]
+/// comprehensions have their own scope, which does not have access to the enclosing method's
+/// `__class__` cell, so a bare `super()` raises `RuntimeError`/`TypeError` at runtime.
+///
+/// [PEP 709]: https://peps.python.org/pep-0709/
+pub(super) fn references_class_cell(expr: &Expr, semantic: &SemanticModel) -> bool {
+    any_over_expr(expr, |expr| match expr {
+        // A zero-argument `super()` call. `super(cls, self)` takes explicit arguments and does
+        // not rely on the `__class__` cell, so it is unaffected.
+        Expr::Call(call) => {
+            call.arguments.is_empty() && semantic.match_builtin_expr(&call.func, "super")
+        }
+        // A direct `__class__` load.
+        Expr::Name(name) => name.id.as_str() == "__class__" && name.ctx.is_load(),
+        _ => false,
+    })
+}
 
 pub(super) fn comment_strings_in_range<'a>(
     checker: &'a Checker,

@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:34:13
+   |
+32 |         result = []
+33 |         for _ in range(10):
+34 |             result.append(super(B, self).foo())  # explicit args: fine, still flagged
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 |         return result
+   |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:40:13
+   |
+38 |         result = []
+39 |         for x in range(10):
+40 |             result.append(x + 1)  # no class cell: always flagged
+   |             ^^^^^^^^^^^^^^^^^^^^
+41 |         return result
+   |
+help: Replace for loop with list comprehension

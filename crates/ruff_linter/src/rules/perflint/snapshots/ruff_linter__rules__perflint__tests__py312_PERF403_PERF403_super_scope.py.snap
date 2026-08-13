@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super_scope.py:17:17
+   |
+15 |         for i in range(10):
+16 |             if super().cond():  # zero-arg super() in the filter: unsafe below 3.12
+17 |                 result[i] = i
+   |                 ^^^^^^^^^^^^^
+18 |         return result
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super_scope.py:24:17
+   |
+22 |         for i in range(10):
+23 |             if __class__.__name__:  # __class__ reference in the filter: unsafe below 3.12
+24 |                 result[i] = i
+   |                 ^^^^^^^^^^^^^
+25 |         return result
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super_scope.py:31:17
+   |
+29 |         for i in range(10):
+30 |             if super(B, self).cond():  # explicit args: fine, still flagged
+31 |                 result[i] = i
+   |                 ^^^^^^^^^^^^^
+32 |         return result
+   |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_super_scope.py:38:17
+   |
+36 |         for i in range(10):
+37 |             if i % 2:  # no class cell: always flagged
+38 |                 result[i] = i
+   |                 ^^^^^^^^^^^^^
+39 |         return result
+   |
+help: Replace for loop with dict comprehension

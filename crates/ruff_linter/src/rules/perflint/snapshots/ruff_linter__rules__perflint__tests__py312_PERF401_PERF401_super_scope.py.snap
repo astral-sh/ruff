@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:15:13
+   |
+13 |         result = []
+14 |         for _ in range(10):
+15 |             result.append(super().foo())  # zero-arg super(): unsafe below 3.12
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |         return result
+   |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:21:13
+   |
+19 |         result = []
+20 |         for _ in range(10):
+21 |             result.append(__class__.__name__)  # __class__ reference: unsafe below 3.12
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |         return result
+   |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:28:17
+   |
+26 |         for x in range(10):
+27 |             if super().foo():  # zero-arg super() in the filter: unsafe below 3.12
+28 |                 result.append(x)
+   |                 ^^^^^^^^^^^^^^^^
+29 |         return result
+   |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:34:13
+   |
+32 |         result = []
+33 |         for _ in range(10):
+34 |             result.append(super(B, self).foo())  # explicit args: fine, still flagged
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 |         return result
+   |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+  --> PERF401_super_scope.py:40:13
+   |
+38 |         result = []
+39 |         for x in range(10):
+40 |             result.append(x + 1)  # no class cell: always flagged
+   |             ^^^^^^^^^^^^^^^^^^^^
+41 |         return result
+   |
+help: Replace for loop with list comprehension
