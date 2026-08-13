@@ -410,6 +410,58 @@ rejected just because another arm is incompatible.
 reveal_type(contravariant(Contravariant[Callable[[], Middle] | Callable[[], str]](), Derived()))  # revealed: Derived
 ```
 
+Covariance accepts an overloaded callable when one overload matches. Contravariance and invariance
+additionally require the formal callable to cover every overload, so an extra `str` overload is
+incompatible with a callable accepting only `int`.
+
+```py
+from typing import overload
+
+@overload
+def overloaded(value: int, /) -> Middle: ...
+@overload
+def overloaded(value: str, /) -> Middle: ...
+def overloaded(value: int | str, /) -> Middle:
+    raise NotImplementedError
+
+def wrap_covariant[T](value: T) -> Covariant[T]:
+    raise NotImplementedError
+
+def wrap_contravariant[T](value: T) -> Contravariant[T]:
+    raise NotImplementedError
+
+def wrap_invariant[T](value: T) -> Invariant[T]:
+    raise NotImplementedError
+
+def covariant_overload[T](container: Covariant[Callable[[int], T]]) -> T:
+    raise NotImplementedError
+
+def contravariant_overload[T](container: Contravariant[Callable[[int], T]]) -> T:
+    raise NotImplementedError
+
+def invariant_overload[T](container: Invariant[Callable[[int], T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(covariant_overload(wrap_covariant(overloaded)))  # revealed: Middle
+contravariant_overload(wrap_contravariant(overloaded))  # error: [invalid-argument-type]
+invariant_overload(wrap_invariant(overloaded))  # error: [invalid-argument-type]
+```
+
+When every overload is covered by the formal `int` parameter, all three wrapper variances accept it.
+
+```py
+@overload
+def covered(value: bool, /) -> Middle: ...
+@overload
+def covered(value: int, /) -> Middle: ...
+def covered(value: int, /) -> Middle:
+    raise NotImplementedError
+
+reveal_type(covariant_overload(wrap_covariant(covered)))  # revealed: Middle
+reveal_type(contravariant_overload(wrap_contravariant(covered)))  # revealed: Middle
+reveal_type(invariant_overload(wrap_invariant(covered)))  # revealed: Middle
+```
+
 Callable parameter types are already contravariant. An outer contravariant class reverses their
 relationship a second time, producing the same lower bound as a covariant callable return type.
 
