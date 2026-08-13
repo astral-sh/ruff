@@ -49,8 +49,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe if the affected expression contains comments. Otherwise,
-/// the fix can be applied safely.
+/// This rule's fix is marked as unsafe if the affected expression contains comments.
+///
+/// It is also marked as unsafe for `bytes` patterns unless the target is a string or bytes
+/// literal, because a `bytes` pattern accepts any bytes-like/buffer object (`bytearray`,
+/// `memoryview`, `array`, `mmap`, …) for which the replacement can change behavior — e.g.
+/// `b"ab" in memoryview(b"abc")` tests element membership rather than a subsequence — or raise.
+/// Otherwise, the fix can be applied safely.
 ///
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
@@ -137,9 +142,19 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
     );
 
     if let Some(repl) = repl {
+        // The `str`-method / `in` replacements assume the target behaves like a `str`/`bytes`.
+        // That always holds for a `str` pattern, since `re.search("...", x)` requires `x` to be a
+        // `str`. A `bytes` pattern, however, accepts any bytes-like/buffer object — `bytearray`,
+        // `memoryview`, `array`, `mmap`, … — and the replacement can silently change behavior
+        // (e.g. `b"ab" in memoryview(b"abc")` tests element membership, not a subsequence) or even
+        // raise (`memoryview` has no `.startswith`). So a `bytes`-pattern fix is only safe when the
+        // target is provably a string/bytes literal.
+        let target_is_string_or_bytes = resolve_literal(re_func.string, semantic).is_some();
+        let is_unsafe = checker.comment_ranges().intersects(re_func.range)
+            || (matches!(literal, Literal::Bytes(_)) && !target_is_string_or_bytes);
         diagnostic.set_fix(Fix::applicable_edit(
             Edit::range_replacement(repl, re_func.range),
-            if checker.comment_ranges().intersects(re_func.range) {
+            if is_unsafe {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
