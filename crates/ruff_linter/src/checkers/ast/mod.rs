@@ -815,7 +815,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
-            | SemanticSyntaxErrorKind::DuplicateKeywordArgs(_)
+            | SemanticSyntaxErrorKind::DuplicateKeywordArgument(_)
             | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel
             | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
             | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)

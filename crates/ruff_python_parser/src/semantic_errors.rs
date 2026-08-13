@@ -36,8 +36,6 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
-
-    unique_keyword_args: FxHashSet<ast::Identifier>,
 }
 
 impl SemanticSyntaxChecker {
@@ -229,10 +227,19 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                type_params: Some(type_params),
+                type_params,
+                arguments,
                 ..
-            })
-            | Stmt::TypeAlias(ast::StmtTypeAlias {
+            }) => {
+                if let Some(type_params) = type_params {
+                    Self::duplicate_type_parameter_name(type_params, ctx);
+                    Self::type_parameter_default_order(type_params, ctx);
+                }
+                if let Some(arguments) = arguments {
+                    Self::duplicate_keyword_args(arguments, ctx);
+                }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
                 type_params: Some(type_params),
                 ..
             }) => {
@@ -771,30 +778,20 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn duplicate_keyword_args<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        args: &ast::Arguments,
-        ctx: &Ctx,
-    ) {
-        let mut keyword_arguments = args
-            .keywords
-            .iter()
-            .filter_map(|key| key.arg.as_ref())
-            .peekable();
-
-        let Some(first) = keyword_arguments.next() else {
-            return;
-        };
-
-        if keyword_arguments.peek().is_none() {
+    fn duplicate_keyword_args<Ctx: SemanticSyntaxContext>(args: &ast::Arguments, ctx: &Ctx) {
+        if args.keywords.len() < 2 {
             return;
         }
 
-        self.unique_keyword_args.insert(first.clone());
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(args.keywords.len(), FxBuildHasher);
 
-        for ident in keyword_arguments {
-            let range = ident.range();
-            if !self.unique_keyword_args.insert(ident.clone()) {
+        for (ident, range) in args
+            .keywords
+            .iter()
+            .filter_map(|keyword| keyword.arg.as_ref().map(|arg| (arg, keyword.range)))
+        {
+            if !all_arg_names.insert(ident.as_str()) {
                 // test_err duplicate_keyword_args
                 // def foo(x): ...
                 // foo(x=1, x=2)
@@ -808,13 +805,11 @@ impl SemanticSyntaxChecker {
                 // foo(x="a", y=1, z=True)
                 Self::add_error(
                     ctx,
-                    SemanticSyntaxErrorKind::DuplicateKeywordArgs(ident.to_string()),
+                    SemanticSyntaxErrorKind::DuplicateKeywordArgument(ident.to_string()),
                     range,
                 );
             }
         }
-
-        self.unique_keyword_args.clear();
     }
 
     fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
@@ -1067,7 +1062,7 @@ impl SemanticSyntaxChecker {
                 Self::duplicate_parameter_name(parameters, ctx);
             }
             Expr::Call(ast::ExprCall { arguments, .. }) => {
-                self.duplicate_keyword_args(arguments, ctx);
+                Self::duplicate_keyword_args(arguments, ctx);
             }
             _ => {}
         }
@@ -1436,8 +1431,8 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
                 write!(f, "nonlocal declaration not allowed at module level")
             }
-            SemanticSyntaxErrorKind::DuplicateKeywordArgs(arg) => {
-                write!(f, "keyword argument repeated: {arg}")
+            SemanticSyntaxErrorKind::DuplicateKeywordArgument(name) => {
+                write!(f, "Duplicate keyword argument `{name}`")
             }
             SemanticSyntaxErrorKind::NonlocalAndGlobal(name) => {
                 write!(f, "name `{name}` is nonlocal and global")
@@ -1884,15 +1879,16 @@ pub enum SemanticSyntaxErrorKind {
     /// ```
     DuplicateParameter(String),
 
-    /// Represents duplicated keyword arguments in a function call.
+    /// Represents duplicated keyword arguments in a function call or class definition.
     ///
     /// ## Examples
     ///
     /// ```python
     /// def f(x): ...
     /// f(x=1, x=2)
+    /// class C(metaclass=type, metaclass=type): ...
     /// ```
-    DuplicateKeywordArgs(String),
+    DuplicateKeywordArgument(String),
 
     /// Represents a nonlocal declaration at module level
     NonlocalDeclarationAtModuleLevel,

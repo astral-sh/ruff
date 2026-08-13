@@ -315,12 +315,12 @@ Module(
     },
 )
 ```
-## Errors
+## Semantic Syntax Errors
 
   |
 1 | def foo(x): ...
 2 | foo(x=1, x=2)
-  |          ^^^ Syntax Error: Duplicate keyword argument "x"
+  |          ^^^ Syntax Error: Duplicate keyword argument `x`
 3 | def baz(x, y, z): ...
 4 | baz(x, y=1, z=3, y=4)
   |
@@ -330,4 +330,4 @@ Module(
 2 | foo(x=1, x=2)
 3 | def baz(x, y, z): ...
 4 | baz(x, y=1, z=3, y=4)
-  |                  ^^^ Syntax Error: Duplicate keyword argument "y"
+  |                  ^^^ Syntax Error: Duplicate keyword argument `y`
