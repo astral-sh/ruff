@@ -7,7 +7,7 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::walk_callable_type;
+use crate::types::callable::{CallableTypeKind, walk_callable_type};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -3263,10 +3263,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         if !matches!(polarity, TypeVarVariance::Covariant) {
+            let preserve_paramspec_mapping =
+                matches!(formal.kind(db), CallableTypeKind::ParamSpecValue)
+                    && !matches!(polarity, TypeVarVariance::Bivariant);
             let actual = actual_callables
                 .map(|callable| callable.into_regular(db))
                 .into_type(db, self.env);
             let formal = Type::Callable(formal.into_regular(db));
+
+            // ParamSpecs are still solved from the legacy mapping table. Preserve any usable
+            // mapping from the forward relation before the full relation becomes unsatisfiable;
+            // for example, `Concatenate[object, P]` has a positional-only prefix, while an
+            // actual method receiver can also be passed by keyword. Do not add the forward
+            // relation to `pending`: doing so would turn a contravariant comparison invariant.
+            // TODO: Move ParamSpecs into the new constraint solver and align nominal inference
+            // with `specialization_variance`, which accounts for their callable representation.
+            if preserve_paramspec_mapping {
+                let forward =
+                    self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
+                if let Err(ConstraintSetInferenceError::InvalidTypeVar(error)) =
+                    self.add_type_mappings_from_constraint_set(forward)
+                {
+                    return Err(error);
+                }
+            }
+
             let when = self.constraint_for_relation(formal, actual, polarity);
             return self.infer_from_constraint_set(when);
         }

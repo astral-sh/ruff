@@ -1864,6 +1864,29 @@ class Example:
         pass
 ```
 
+An invalid descriptor receiver must not discard the inferred `ParamSpec` for its bound callable.
+Even though `Concatenate` makes the receiver positional-only, the remaining parameters still retain
+their precise types.
+
+```py
+class Decorator(Generic[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    def __get__(self: "Decorator[Concatenate[Any, P2]]", instance: Any, owner: Any) -> "Decorator[P2]":
+        raise NotImplementedError
+
+def decorate(fn: Callable[P, Any]) -> Decorator[P]:
+    raise NotImplementedError
+
+class Decorated:
+    @decorate
+    def method(self, value: str) -> None: ...
+
+# error: [invalid-attribute-access]
+bound = Decorated().method
+reveal_type(bound)  # revealed: Decorator[(value: str)]
+bound(1)  # error: [invalid-argument-type]
+```
+
 [descriptors]: https://docs.python.org/3/howto/descriptor.html
 [precedence chain]: https://github.com/python/cpython/blob/3.13/Objects/typeobject.c#L5393-L5481
 [simple example]: https://docs.python.org/3/howto/descriptor.html#simple-example-a-descriptor-that-returns-a-constant

@@ -746,6 +746,53 @@ takes_int_job(defaulted_job)
 takes_int_job(wrong_job)  # error: [invalid-argument-type]
 ```
 
+## Inferring an invariant `ParamSpec` through `Concatenate`
+
+A `Concatenate` prefix is positional-only, so a callback whose first parameter also accepts a
+keyword is not compatible with an invariant wrapper. Even though that argument is rejected, its
+remaining parameters must still be inferred precisely.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+remaining = without_first(Callback(original))  # error: [invalid-argument-type]
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+## Inferring a contravariant `ParamSpec` through `Concatenate`
+
+The same callback is compatible with a contravariant wrapper, and its remaining parameters must
+still be inferred precisely enough to reject an incompatible later argument.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec
+
+P = ParamSpec("P", contravariant=True)
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+remaining = without_first(Callback(original))
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
 
 <!-- snapshot-diagnostics -->
