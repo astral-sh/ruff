@@ -1206,6 +1206,7 @@ jobs:
         uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           mode: ${{ matrix.mode }}
+          cycle-estimation: false
           run: cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
 
   benchmarks-walltime-build:
