@@ -1,0 +1,45 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_10.py:6:13
+  |
+6 |   def f(value=["""first
+  |  _____________^
+7 | | second"""]):
+  | |__________^
+8 |       return value
+  |
+help: Replace with `None`; initialize within function
+  |
+5 |
+  - def f(value=["""first
+  - second"""]):
+6 + def f(value=None):
+7 +     if value is None:
+8 +         value = ["""first\nsecond"""]
+9 |     return value
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_10.py:12:23
+   |
+11 |   class C:
+12 |       def m(self, value=["""first
+   |  _______________________^
+13 | | second"""]):
+   | |__________^
+14 |           return value
+   |
+help: Replace with `None`; initialize within function
+   |
+11 | class C:
+   -     def m(self, value=["""first
+   - second"""]):
+12 +     def m(self, value=None):
+13 +         if value is None:
+14 +             value = ["""first\nsecond"""]
+15 |         return value
+   |
+note: This is an unsafe fix and may change runtime behavior

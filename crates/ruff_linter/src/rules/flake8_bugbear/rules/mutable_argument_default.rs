@@ -178,37 +178,33 @@ fn move_initialization(
         return Some(Fix::unsafe_edit(default_edit));
     }
 
-    // Add an `if`, to set the argument to its original value if still `None`.
+    // Add an `if`, to set the argument to its original value if still `None`. Build only the
+    // structural part (the guard and the start of the assignment) here; the default value is
+    // appended *after* indentation below, because it may span multiple lines (e.g. a multiline
+    // string literal) whose interior lines must not be re-indented.
     let mut content = String::new();
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.parameter.name(),
-            locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
-                    .unwrap_or(default.range())
-            )
-        );
-    } else {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.name(),
-            checker.generator().expr(default)
-        );
-    }
-
-    content.push_str(stylist.line_ending().as_str());
+    let _ = write!(&mut content, "{} = ", parameter.parameter.name());
 
     // Determine the indentation depth of the function body.
     let indentation = indentation_at_offset(statement.start(), locator.contents())?;
 
-    // Indent the edit to match the body indentation.
+    // Indent the structural part to match the body indentation, then append the default value
+    // verbatim so that re-indentation does not alter multiline literals.
     let mut content = textwrap::indent(&content, indentation).to_string();
+    if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
+        content.push_str(
+            locator.slice(
+                parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                    .unwrap_or(default.range()),
+            ),
+        );
+    } else {
+        content.push_str(&checker.generator().expr(default));
+    }
+    content.push_str(stylist.line_ending().as_str());
 
     // Find the position to insert the initialization after docstring and imports
     let mut pos = locator.line_start(statement.start());
