@@ -3150,35 +3150,39 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             continue;
                         }
 
+                        // A class stores the descriptor, but instance lookup and assignments read
+                        // its bound value using the original receiver rather than its MRO base.
+                        let receiver = Type::instance(db, &self.env, receiver_class);
+                        let bound_class_member_ty = class_member_ty
+                            .try_call_dunder_get(
+                                db,
+                                &self.env,
+                                Some(receiver),
+                                receiver.to_meta_type(db, &self.env),
+                            )
+                            .unwrap_or_else(|error| Some(error.fallback()))
+                            .map_or(class_member_ty, |result| result.return_type);
+
                         if origin.is_declared() {
                             if union.is_empty() {
-                                return InstanceMemberResult::Done(class_member.inner);
+                                return InstanceMemberResult::Done(
+                                    class_member.inner.map_type(|_| bound_class_member_ty),
+                                );
                             }
 
-                            union = union.add(class_member_ty);
+                            union = union.add(bound_class_member_ty);
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
-                            // A class stores the descriptor, but an instance assignment first reads
-                            // its bound value using the original receiver rather than its MRO base.
-                            let receiver = Type::instance(db, &self.env, receiver_class);
-                            let class_member_ty = class_member_ty
-                                .try_call_dunder_get(
-                                    db,
-                                    &self.env,
-                                    Some(receiver),
-                                    receiver.to_meta_type(db, &self.env),
-                                )
-                                .unwrap_or_else(|error| Some(error.fallback()))
-                                .map_or(class_member_ty, |result| result.return_type);
-                            let independent = independent.map_or(class_member_ty, |previous| {
-                                UnionType::from_two_elements(
-                                    db,
-                                    &self.env,
-                                    previous,
-                                    class_member_ty,
-                                )
-                            });
+                            let independent =
+                                independent.map_or(bound_class_member_ty, |previous| {
+                                    UnionType::from_two_elements(
+                                        db,
+                                        &self.env,
+                                        previous,
+                                        bound_class_member_ty,
+                                    )
+                                });
                             if let Some((inferred_ty, inferred_provenance)) =
                                 Self::infer_deferred_updates(
                                     db,

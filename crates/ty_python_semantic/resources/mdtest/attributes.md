@@ -1402,6 +1402,29 @@ class Child(Base):
 reveal_type(Child().value)  # revealed: str
 ```
 
+#### Inherited annotated descriptors are bound before self-referential assignments
+
+An inherited descriptor's annotation constrains assignments without changing the bound value read
+before an assignment.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class Base:
+    value: Descriptor = Descriptor()
+
+class Child(Base):
+    def update(self) -> None:
+        self.value = self.value + "b"  # error: [invalid-assignment]
+
+    def get_value(self) -> str:
+        return self.value
+
+reveal_type(Child().value)  # revealed: str
+```
+
 #### Inherited descriptors are bound before self-referential class assignments
 
 Reading an inherited descriptor through a class invokes `__get__` with `None` before a classmethod
