@@ -5502,7 +5502,25 @@ impl<'db> Type<'db> {
                     binding.bake_bound_type_into_overloads(db, env);
                     binding.into()
                 } else {
-                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                    let typing_self_type = bound_method.typing_self_type(db);
+                    // Solve exact receiver constraints before checking the other arguments, but
+                    // retain the receiver itself for call inference and receiver diagnostics.
+                    let overloads = signature.overloads.iter().map(|overload| {
+                        if overload.has_explicit_positional_receiver_annotation()
+                            && let Some(specialized) = overload.specialize_for_bound_receiver(
+                                db,
+                                env,
+                                self_instance,
+                                typing_self_type,
+                            )
+                        {
+                            specialized
+                        } else {
+                            overload.clone()
+                        }
+                    });
+
+                    CallableBinding::from_overloads(self, overloads)
                         .with_bound_type(self_instance)
                         .into()
                 }

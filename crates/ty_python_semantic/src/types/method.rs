@@ -153,6 +153,10 @@ impl<'db> BoundMethodType<'db> {
             );
         };
 
+        let signature = signature
+            .specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+            .unwrap_or_else(|| signature.clone());
+
         CallableSignature::single(signature.bind_self_with_receiver(
             db,
             env,

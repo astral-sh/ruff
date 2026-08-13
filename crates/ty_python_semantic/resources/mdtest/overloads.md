@@ -274,7 +274,7 @@ def union_receiver(reader: Reader[int | str]):
 
 ## Method type variables inferred from `self`
 
-Binding an overload whose explicit receiver introduces a method type variable should infer that
+Binding a method whose explicit receiver introduces a method type variable should infer that
 variable from the concrete receiver and apply it to the remainder of the signature.
 
 ```toml
@@ -295,6 +295,9 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
+    def single[S, U](self: "ReceiverGeneric[S]", value: U) -> tuple[S, U]:
+        return self.value, value
+
 reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
 
 def takes_callable(fn: Callable[..., Any]) -> None: ...
@@ -302,6 +305,15 @@ def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
     # revealed: Overload[(value: T@use_generic_receiver) -> T@use_generic_receiver, (value: bytes) -> bytes]
     reveal_type(value.method)
     takes_callable(value.method)
+```
+
+Non-overloaded methods should also specialize receiver-determined type variables while preserving
+other type variables for argument inference.
+
+```py
+# revealed: bound method ReceiverGeneric[str].single[U](value: U) -> tuple[str, U]
+reveal_type(ReceiverGeneric[str]().single)
+reveal_type(ReceiverGeneric[str]().single(1))  # revealed: tuple[str, Literal[1]]
 ```
 
 ## Constrained method type variables inferred from `self`
