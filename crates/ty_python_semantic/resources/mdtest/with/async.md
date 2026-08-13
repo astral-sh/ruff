@@ -28,6 +28,8 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import Literal
+
 class Suppresses:
     async def __aenter__(self) -> None: ...
     async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
@@ -63,6 +65,21 @@ class Propagates:
 async def propagating_exit() -> None:
     result = None
     async with Propagates():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+An awaited `Literal[True] | None` return type also does not indicate exception suppression:
+
+```py
+class OptionalTrueExit:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True
+
+async def optional_true_exit() -> None:
+    result = None
+    async with OptionalTrueExit():
         result = await may_raise()
     reveal_type(result)  # revealed: str
 ```
@@ -145,6 +162,7 @@ An overloaded async exit method can distinguish normal exits from exceptions:
 
 ```py
 from typing import Literal, overload
+from typing_extensions import Never
 
 async def may_raise() -> str:
     raise ValueError
@@ -165,6 +183,27 @@ class NormalExitOnly:
 async def normal_exit_only() -> None:
     result = None
     async with NormalExitOnly():
+        result = await may_raise()
+    reveal_type(result)  # revealed: str
+```
+
+An overload whose exception argument is `Never` cannot suppress an exception:
+
+```py
+class NeverExit:
+    async def __aenter__(self) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: Never, exc_value, traceback) -> Literal[True]: ...
+    @overload
+    async def __aexit__(self, exc_type: type[BaseException], exc_value, traceback) -> Literal[False]: ...
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value, traceback) -> Literal[False]: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return False
+
+async def impossible_exit() -> None:
+    result = None
+    async with NeverExit():
         result = await may_raise()
     reveal_type(result)  # revealed: str
 ```

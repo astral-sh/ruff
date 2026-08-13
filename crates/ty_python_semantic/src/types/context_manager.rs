@@ -14,9 +14,14 @@ use ty_python_core::EvaluationMode;
 impl<'db> Type<'db> {
     /// Returns whether this context manager can suppress an exception raised inside its suite.
     ///
-    /// Only exit methods returning exactly `bool` or `Literal[True]` are considered suppressing;
-    /// `bool | None` and `Any` are not. Asynchronous exit results are awaited before applying this
-    /// rule.
+    /// Following the [typing specification], only exit methods returning exactly `bool` or
+    /// `Literal[True]` are considered suppressing; `bool | None` and `Any` are not. This
+    /// intentionally differs from runtime truthiness: non-suppressing context managers are
+    /// commonly annotated as returning `bool | None`, so treating every potentially truthy return
+    /// type as suppressing would incorrectly preserve exception paths for ordinary managers.
+    /// Asynchronous exit results are awaited before applying this rule.
+    ///
+    /// [typing specification]: https://typing.python.org/en/latest/spec/exceptions.html#context-managers
     ///
     /// Suppression is cached by manager type because the same predicate can be evaluated repeatedly
     /// for different bindings and context managers. Each alternative in a union is classified
@@ -26,9 +31,9 @@ impl<'db> Type<'db> {
     /// suppressing exit alongside a non-suppressing exit as returning `bool | None`.
     ///
     /// Python passes `(None, None, None)` to an exit method when a suite completes normally and
-    /// passes the exception type, value, and traceback when it raises. Consequently, an overload
-    /// whose first argument is annotated as `None` cannot describe an exceptional exit and must
-    /// not affect the suppression result:
+    /// passes the exception type, value, and traceback when it raises. Consequently, overloads
+    /// whose first two arguments cannot accept an exception type and instance cannot describe an
+    /// exceptional exit and must not affect the suppression result:
     ///
     /// ```python
     /// @overload
@@ -94,12 +99,30 @@ impl<'db> Type<'db> {
                 return false;
             };
 
+            let exception_type = KnownClass::BaseException.to_subclass_of(db, &env);
+            let exception_instance = KnownClass::BaseException.to_instance(db, &env);
             for signature in callables
                 .iter()
                 .flat_map(|callable| callable.signatures(db))
             {
-                if let Some(exception_type) = signature.parameters().get_positional(0)
-                    && exception_type.annotated_type().is_none(db)
+                if signature
+                    .parameters()
+                    .get_positional(0)
+                    .is_some_and(|parameter| {
+                        parameter
+                            .annotated_type()
+                            .is_disjoint_from(db, &env, exception_type)
+                    })
+                    || signature
+                        .parameters()
+                        .get_positional(1)
+                        .is_some_and(|parameter| {
+                            parameter.annotated_type().is_disjoint_from(
+                                db,
+                                &env,
+                                exception_instance,
+                            )
+                        })
                 {
                     continue;
                 }

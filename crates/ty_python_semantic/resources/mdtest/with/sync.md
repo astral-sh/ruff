@@ -303,7 +303,9 @@ with ReturnsNone():
 reveal_type(none_result)  # revealed: str
 ```
 
-An `__exit__` return type of `bool | None` does not indicate exception suppression:
+[The typing specification](https://typing.python.org/en/latest/spec/exceptions.html#context-managers)
+classifies `bool | None` as non-suppressing for compatibility with common non-suppressing context
+managers, even though a truthy return value can suppress an exception at runtime:
 
 ```py
 class ReturnsOptionalBool(Manager):
@@ -314,6 +316,32 @@ optional_result = None
 with ReturnsOptionalBool():
     optional_result = may_raise()
 reveal_type(optional_result)  # revealed: str
+```
+
+This convention also treats `Literal[True] | None` as non-suppressing:
+
+```py
+class ReturnsOptionalTrue(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True
+
+optional_true_result = None
+with ReturnsOptionalTrue():
+    optional_true_result = may_raise()
+reveal_type(optional_true_result)  # revealed: str
+```
+
+An `__exit__` return type of `Literal[False] | None` cannot suppress exceptions either:
+
+```py
+class ReturnsOptionalFalse(Manager):
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False] | None:
+        return False
+
+optional_false_result = None
+with ReturnsOptionalFalse():
+    optional_false_result = may_raise()
+reveal_type(optional_false_result)  # revealed: str
 ```
 
 An `__exit__` return type of `Any` does not indicate exception suppression either:
@@ -406,6 +434,7 @@ exception occurs, not the overload used during a normal exit:
 
 ```py
 from typing import Literal, overload
+from typing_extensions import Never
 
 class Manager:
     def __enter__(self) -> None: ...
@@ -429,6 +458,27 @@ normal_value = None
 with NormalOnly():
     normal_value = may_raise()
 reveal_type(normal_value)  # revealed: str
+```
+
+An exceptional overload cannot suppress an exception if either exception argument is uninhabited:
+
+```py
+class ImpossibleExceptionalExit(Manager):
+    @overload
+    def __exit__(self, exc_type: Never, exc_value: BaseException, traceback: object) -> Literal[True]: ...
+    @overload
+    def __exit__(self, exc_type: type[BaseException], exc_value: Never, traceback: object) -> Literal[True]: ...
+    @overload
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: object | None
+    ) -> Literal[False]: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return False
+
+impossible_exception_value = None
+with ImpossibleExceptionalExit():
+    impossible_exception_value = may_raise()
+reveal_type(impossible_exception_value)  # revealed: str
 ```
 
 An exceptional overload can suppress its exception even if another exceptional overload cannot:
