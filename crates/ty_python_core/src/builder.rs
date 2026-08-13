@@ -2216,8 +2216,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// enclosing scope.
     ///
     /// Generator expressions follow the eager comprehension-scope convention used throughout our
-    /// flow model: although generators are lazy at runtime, their bodies are assumed to execute
-    /// immediately.
+    /// flow model. Although generators are lazy at runtime, their bodies are assumed to execute
+    /// immediately, since in practice they are almost always eagerly iterated over.
     ///
     /// ```python
     /// try:

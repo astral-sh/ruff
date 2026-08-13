@@ -791,7 +791,8 @@ except:
 reveal_type(y)  # revealed: Literal[0, 1]
 ```
 
-Generator expressions are also assumed to run eagerly for exception-flow analysis:
+Generator expressions are also assumed to run eagerly for exception-flow analysis, since in practice
+they are almost always eagerly consumed in real-world code:
 
 ```py
 z = 0
@@ -873,7 +874,8 @@ def dict_comprehension_assignment() -> None:
 ## Assignments in generator expressions
 
 Generator expressions are assumed to run eagerly, so their assignments and calls can reach the
-surrounding exception handler:
+surrounding exception handler. Strictly speaking generator expressions *can* be lazy, but in
+practice they are almost always eagerly consumed in real-world code:
 
 ```py
 def generator_may_raise() -> None: ...
