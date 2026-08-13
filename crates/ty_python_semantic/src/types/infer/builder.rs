@@ -10709,6 +10709,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     outcome.return_type(db, env)
                 }
                 Err(e) => {
+                    let bindings = match &e {
+                        CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings),
+                        CallDunderError::CallError(_, bindings, _) => Some(bindings),
+                        CallDunderError::MethodNotAvailable => None,
+                    };
+                    if let Some(bindings) = bindings {
+                        for callable in bindings.iter_flat() {
+                            self.check_deprecated(unary, callable.callable_type);
+                        }
+                    }
                     self.report_unsupported_unary_operator(
                         unary,
                         op,

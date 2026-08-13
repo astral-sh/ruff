@@ -433,6 +433,28 @@ x = MyBits()
 ~x  # error: [deprecated] "MyBits `~` support is broken"
 ```
 
+#### Possibly unbound operator
+
+If the operand's type is a union and the dunder is missing on some members, it's possibly unbound.
+This should still report the deprecation on the members where it is found and is deprecated,
+alongside `unsupported-operator` diagnostic.
+
+```py
+from typing_extensions import deprecated
+
+class MyBits:
+    @deprecated("MyBits `~` support is broken")
+    def __invert__(self):
+        return self
+
+class NoBits: ...
+
+def f(x: MyBits | NoBits):
+    # error: [unsupported-operator]
+    # error: [deprecated]
+    ~x
+```
+
 #### Bool literals
 
 `bool.__invert__` is one such case in typeshed. This applies both to `bool` literals and to
