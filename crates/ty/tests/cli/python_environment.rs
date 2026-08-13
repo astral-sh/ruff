@@ -59,6 +59,107 @@ fn config_override_python_version() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn project_python_requirement_mismatch_only_explains_version_sensitive_errors() -> anyhow::Result<()>
+{
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.13"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            from typing import reveal_type
+
+            PythonFinalizationError
+            print(missing)
+            reveal_type(1)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> test.py:4:1
+      |
+    4 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because it was specified on the command line
+    info: Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`
+     --> pyproject.toml:3:19
+      |
+    3 | requires-python = ">=3.13"
+      |                   ^^^^^^^^ Python version requirement
+
+    error[unresolved-reference]: Name `missing` used when not defined
+     --> test.py:5:7
+      |
+    5 | print(missing)
+      |       ^^^^^^^
+
+    info[revealed-type]: Revealed type
+     --> test.py:6:13
+      |
+    6 | reveal_type(1)
+      |             ^ `Literal[1]`
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    case.write_file(
+        "ty.toml",
+        r#"
+        [environment]
+        python-version = "3.12"
+        "#,
+    )?;
+    let configured = case.command().output()?;
+    assert!(!configured.status.success());
+    let stdout = String::from_utf8(configured.stdout)?;
+    assert!(stdout.contains("--> ty.toml:3:18"));
+    assert!(stdout.contains("--> pyproject.toml:3:19"));
+    assert_eq!(
+        stdout
+            .matches("does not satisfy the `requires-python`")
+            .count(),
+        1
+    );
+
+    let concise = case
+        .command()
+        .arg("--python-version=3.12")
+        .arg("--output-format=concise")
+        .output()?;
+    assert!(!concise.status.success());
+    assert!(!String::from_utf8(concise.stdout)?.contains("does not satisfy"));
+
+    let clean = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.13"
+            "#,
+        ),
+        ("test.py", "value = 1"),
+    ])?;
+    let output = clean.command().arg("--python-version=3.12").output()?;
+    assert!(output.status.success());
+    assert!(!String::from_utf8(output.stdout)?.contains("does not satisfy"));
+
+    Ok(())
+}
+
 /// Same as above, but for the Python platform.
 #[test]
 fn config_override_python_platform() -> anyhow::Result<()> {
@@ -897,6 +998,15 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
 
     ----- stderr -----
     ");
+
+    let incompatible = case.command().arg("--python-version=3.7").output()?;
+    assert!(!incompatible.status.success());
+    let stdout = String::from_utf8(incompatible.stdout)?;
+    assert!(stdout.contains("error[invalid-syntax]"));
+    assert!(
+        stdout.contains("Python 3.7 does not satisfy the `requires-python` constraint `>=3.8`")
+    );
+    assert!(stdout.contains("--> pyproject.toml:3:19"));
 
     Ok(())
 }

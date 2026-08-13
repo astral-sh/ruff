@@ -1,6 +1,6 @@
 use crate::lint::{LintRegistry, RuleSelection};
 use crate::{AnalysisSettings, PythonVersionWithSource};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, SubDiagnostic};
 use ruff_db::files::File;
 use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
@@ -14,6 +14,11 @@ pub trait Db: PythonCoreDb {
 
     /// Returns the Python version and its configuration source for `file`.
     fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource;
+
+    /// Returns a source-annotated explanation when the selected Python version violates metadata.
+    fn incompatible_python_requirement_diagnostic(&self, _file: File) -> Option<SubDiagnostic> {
+        None
+    }
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;

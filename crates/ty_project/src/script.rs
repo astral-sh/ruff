@@ -1,13 +1,11 @@
-use std::ops::Bound;
-
-use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
+use pep440_rs::VersionSpecifiers;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ruff_db::source::source_text;
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
+use ruff_text_size::TextRange;
 use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
@@ -50,17 +48,16 @@ impl<'db> Script<'db> {
         script(db, file)
     }
 
-    /// Returns the script's Python requirement when no release of the selected minor satisfies it.
-    pub(crate) fn incompatible_python_requirement(
+    /// Returns the script's Python requirement and its location in the inline metadata.
+    pub(crate) fn python_requirement(
         self,
         db: &'db dyn Db,
-    ) -> Option<&'db VersionSpecifiers> {
+    ) -> Option<(&'db RangedValue<VersionSpecifiers>, Option<TextRange>)> {
         let metadata = script_metadata(db, self.file(db))?;
-        let requires_python = metadata.requires_python.as_deref()?;
-        let python_version = self.python_version_with_source(db).version;
-
-        (!python_version_satisfies_requirement(requires_python, python_version))
-            .then_some(requires_python)
+        Some((
+            metadata.requires_python.as_ref()?,
+            metadata.requires_python_range,
+        ))
     }
 }
 
@@ -197,9 +194,20 @@ pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<Scrip
     }
 
     let tag = ScriptTag::parse(source.as_bytes())?;
-    let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), false);
     // FIXME: Report invalid TOML in script metadata instead of silently ignoring it.
-    let mut metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+    let mut metadata: ScriptMetadata = {
+        let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), false);
+        toml::from_str(tag.metadata()).ok()?
+    };
+
+    if metadata.requires_python.is_some() {
+        let metadata_source = tag.metadata_with_source_offsets(source.as_str())?;
+        let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), true);
+        let requirement: ScriptPythonRequirementSource = toml::from_str(&metadata_source).ok()?;
+        metadata.requires_python_range = requirement
+            .requires_python
+            .and_then(|requirement| requirement.range());
+    }
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
         options.prioritize_all_selectors();
@@ -213,7 +221,15 @@ pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<Scrip
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct ScriptMetadata {
     requires_python: Option<RangedValue<VersionSpecifiers>>,
+    #[serde(skip)]
+    requires_python_range: Option<TextRange>,
     tool: Option<Tool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct ScriptPythonRequirementSource {
+    requires_python: Option<RangedValue<String>>,
 }
 
 impl ScriptMetadata {
@@ -230,33 +246,6 @@ impl ScriptMetadata {
     }
 }
 
-/// ty tracks only Python's major and minor version, so any compatible patch release is sufficient.
-fn python_version_satisfies_requirement(
-    requires_python: &VersionSpecifiers,
-    python_version: PythonVersion,
-) -> bool {
-    let major = u64::from(python_version.major);
-    let minor = u64::from(python_version.minor);
-    let selected_minor = Version::new([major, minor]);
-    let next_minor = Version::new([major, minor + 1]);
-
-    release_specifiers_to_ranges(requires_python.clone())
-        .iter()
-        .any(|(lower, upper)| {
-            let starts_before_next_minor = match lower {
-                Bound::Included(version) | Bound::Excluded(version) => version < &next_minor,
-                Bound::Unbounded => true,
-            };
-            let ends_at_or_after_selected_minor = match upper {
-                Bound::Included(version) => version >= &selected_minor,
-                Bound::Excluded(version) => version > &selected_minor,
-                Bound::Unbounded => true,
-            };
-
-            starts_before_next_minor && ends_at_or_after_selected_minor
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use pep440_rs::VersionSpecifiers;
@@ -267,9 +256,10 @@ mod tests {
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
+    use crate::metadata::pyproject::python_version_satisfies_requirement;
     use crate::{Db as _, ProjectMetadata};
 
-    use super::{Script, python_version_satisfies_requirement, script};
+    use super::{Script, script};
 
     #[test]
     fn python_requirement_compares_minor_versions() -> anyhow::Result<()> {

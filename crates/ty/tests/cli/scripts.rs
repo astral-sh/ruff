@@ -122,13 +122,101 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
-    let mismatched = case.command().arg("--python-version=3.11").output()?;
-    assert!(!mismatched.status.success());
-    let stdout = String::from_utf8(mismatched.stdout)?;
-    assert!(stdout.contains("error[unresolved-reference]"));
-    assert!(stdout.contains(
-        "info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.12`"
-    ));
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.11"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> script.py:6:1
+      |
+    6 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.11 was assumed when resolving types because it was specified on the command line
+    info: Python 3.11 does not satisfy the `requires-python` constraint `>=3.12`
+     --> script.py:3:21
+      |
+    3 | # requires-python = ">=3.12"
+      |                     ^^^^^^^^ Python version requirement
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    case.write_file(
+        "explicit.toml",
+        r#"
+        [environment]
+        python-version = "3.11"
+        "#,
+    )?;
+    let configured = case
+        .command()
+        .arg("--config-file")
+        .arg("explicit.toml")
+        .output()?;
+    assert!(!configured.status.success());
+    let stdout = String::from_utf8(configured.stdout)?;
+    assert!(stdout.contains("--> explicit.toml:3:18"));
+    assert!(stdout.contains("--> script.py:3:21"));
+    assert!(stdout.contains("Python version requirement"));
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_only_explains_version_sensitive_errors() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python = ">=3.13"
+        # ///
+
+        from typing import reveal_type
+
+        PythonFinalizationError
+        print(missing)
+        reveal_type(1)
+        "#,
+    )?;
+
+    let output = case.command().arg("--python-version=3.12").output()?;
+    assert!(!output.status.success());
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("error[unresolved-reference]: Name `PythonFinalizationError`"));
+    assert!(stdout.contains("error[unresolved-reference]: Name `missing`"));
+    assert!(stdout.contains("info[revealed-type]: Revealed type"));
+    assert_eq!(
+        stdout
+            .matches("does not satisfy the `requires-python`")
+            .count(),
+        1
+    );
+    assert!(stdout.contains("--> script.py:3:21"));
+
+    let concise = case
+        .command()
+        .arg("--python-version=3.12")
+        .arg("--output-format=concise")
+        .output()?;
+    assert!(!concise.status.success());
+    assert!(!String::from_utf8(concise.stdout)?.contains("does not satisfy"));
+
+    let clean = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python = ">=3.13"
+        # ///
+
+        value = 1
+        "#,
+    )?;
+    let output = clean.command().arg("--python-version=3.12").output()?;
+    assert!(output.status.success());
+    assert!(!String::from_utf8(output.stdout)?.contains("does not satisfy"));
 
     Ok(())
 }
@@ -207,7 +295,6 @@ fn environment_options() -> anyhow::Result<()> {
        |
     12 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
-    info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 1 diagnostic
 
@@ -517,14 +604,12 @@ fn explicit_config_replaces_the_script_environment() -> anyhow::Result<()> {
        |
     11 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
-    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     info[revealed-type]: Revealed type
       --> script.py:12:13
        |
     12 | reveal_type(sys.platform)
        |             ^^^^^^^^^^^^ `Literal["linux"]`
-    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 2 diagnostics
 
@@ -568,14 +653,12 @@ fn cli_arguments_override_script_environment() -> anyhow::Result<()> {
        |
     11 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
-    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     info[revealed-type]: Revealed type
       --> script.py:12:13
        |
     12 | reveal_type(sys.platform)
        |             ^^^^^^^^^^^^ `Literal["linux"]`
-    info: Python 3.12 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 2 diagnostics
 
@@ -637,14 +720,12 @@ fn script_version_and_platform_are_isolated_from_project_configuration() -> anyh
        |
     12 | reveal_type(sys.version_info[:2])
        |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
-    info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     info[revealed-type]: Revealed type
       --> script.py:13:13
        |
     13 | reveal_type(sys.platform)
        |             ^^^^^^^^^^^^ `Literal["win32"]`
-    info: Python 3.11 does not satisfy the script's `requires-python` constraint `>=3.13`
 
     Found 2 diagnostics
 

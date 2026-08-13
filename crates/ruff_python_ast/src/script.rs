@@ -25,6 +25,61 @@ impl ScriptTag {
         &self.metadata
     }
 
+    /// Returns metadata padded so TOML spans refer to offsets in the original Python source.
+    ///
+    /// PEP 723 removes the `# ` prefix from every metadata line. Replacing those prefixes and the
+    /// preceding source with whitespace instead preserves each metadata value's original offset.
+    pub fn metadata_with_source_offsets(&self, source: &str) -> Option<String> {
+        let prelude = source.get(..self.prelude.len())?;
+        if prelude != self.prelude {
+            return None;
+        }
+
+        let mut lines = source.get(self.prelude.len()..)?.split_inclusive('\n');
+        let opening = lines.next()?;
+        let mut metadata = String::with_capacity(self.prelude.len() + self.metadata.len());
+        metadata.extend(prelude.bytes().chain(opening.bytes()).map(|byte| {
+            if matches!(byte, b'\n' | b'\r') {
+                char::from(byte)
+            } else {
+                ' '
+            }
+        }));
+
+        for expected in self.metadata.lines() {
+            let line = lines.next()?;
+            let without_newline = line.strip_suffix('\n').unwrap_or(line);
+            let body = without_newline
+                .strip_suffix('\r')
+                .unwrap_or(without_newline);
+
+            if expected.is_empty() && body == "# ///" {
+                break;
+            }
+
+            let content = if let Some(content) = body.strip_prefix("# ") {
+                content
+            } else if body == "#" {
+                ""
+            } else {
+                return None;
+            };
+
+            if content != expected {
+                return None;
+            }
+
+            metadata.push(' ');
+            if body.starts_with("# ") {
+                metadata.push(' ');
+            }
+            metadata.push_str(content);
+            metadata.push_str(&line[body.len()..]);
+        }
+
+        Some(metadata)
+    }
+
     /// Given the contents of a Python file, extract the `script` metadata block with leading
     /// comment hashes removed, any preceding shebang or content (prelude), and the remaining Python
     /// script.
@@ -153,5 +208,35 @@ impl ScriptTag {
             metadata,
             postlude,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScriptTag;
+
+    #[test]
+    fn metadata_offsets_match_python_source() {
+        for source in [
+            "# /// script\n# requires-python = \">=3.12\"\n# ///\n",
+            "#!/usr/bin/env python\n# /// script\n#\n# requires-python = \">=3.12\"\n# ///\n",
+            "# café\r\n# /// script\r\n#\r\n# requires-python = \">=3.12\"\r\n# ///\r\n",
+        ] {
+            let metadata_offset = ScriptTag::parse(source.as_bytes())
+                .and_then(|tag| tag.metadata_with_source_offsets(source))
+                .and_then(|metadata| metadata.find("\">=3.12\""));
+
+            assert_eq!(metadata_offset, source.find("\">=3.12\""), "{source:?}");
+        }
+    }
+
+    #[test]
+    fn empty_metadata_preserves_source_offsets() {
+        let source = "# /// script\n# ///\n";
+        assert!(
+            ScriptTag::parse(source.as_bytes())
+                .and_then(|tag| tag.metadata_with_source_offsets(source))
+                .is_some()
+        );
     }
 }

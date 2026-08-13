@@ -130,6 +130,33 @@ pub(super) fn resolve_requires_python_lower_bound(
     ))
 }
 
+/// ty tracks only Python's major and minor version, so any compatible patch release is sufficient.
+pub(crate) fn python_version_satisfies_requirement(
+    requires_python: &VersionSpecifiers,
+    python_version: PythonVersion,
+) -> bool {
+    let major = u64::from(python_version.major);
+    let minor = u64::from(python_version.minor);
+    let selected_minor = Version::new([major, minor]);
+    let next_minor = Version::new([major, minor + 1]);
+
+    release_specifiers_to_ranges(requires_python.clone())
+        .iter()
+        .any(|(lower, upper)| {
+            let starts_before_next_minor = match lower {
+                Bound::Included(version) | Bound::Excluded(version) => version < &next_minor,
+                Bound::Unbounded => true,
+            };
+            let ends_at_or_after_selected_minor = match upper {
+                Bound::Included(version) => version >= &selected_minor,
+                Bound::Excluded(version) => version > &selected_minor,
+                Bound::Unbounded => true,
+            };
+
+            starts_before_next_minor && ends_at_or_after_selected_minor
+        })
+}
+
 #[derive(Debug, Error)]
 pub enum ResolveRequiresPythonError {
     #[error("The major version `{0}` is larger than the maximum supported value 255")]

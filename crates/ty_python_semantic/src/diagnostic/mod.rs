@@ -148,6 +148,10 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
             ));
         }
     }
+
+    if let Some(requirement_diagnostic) = db.incompatible_python_requirement_diagnostic(file) {
+        diagnostic.sub(requirement_diagnostic);
+    }
 }
 
 /// Format a list of elements as a human-readable enumeration.

@@ -5,12 +5,14 @@ use std::{cmp, fmt};
 
 pub use self::changes::ChangeResult;
 use crate::CollectReporter;
+use crate::metadata::pyproject::python_version_satisfies_requirement;
 use crate::metadata::settings::file_settings;
 use crate::script::Script;
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use get_size2::StandardTracker;
+use pep440_rs::VersionSpecifiers;
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
@@ -34,6 +36,45 @@ pub trait Db: SemanticDb {
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
 fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
     db.project().open_files(db).contains(&file)
+}
+
+/// Explains Python-version-dependent errors when project or script metadata excludes that version.
+fn incompatible_python_requirement_diagnostic(db: &dyn Db, file: File) -> Option<SubDiagnostic> {
+    let parsed_project_requirement;
+    let (requirement, source, range) = match Script::for_file(db, file) {
+        Some(script) => {
+            let (requirement, range) = script.python_requirement(db)?;
+            (&**requirement, requirement.source(), range)
+        }
+        None => {
+            let requirement = db.project().metadata(db).requires_python()?;
+            parsed_project_requirement = requirement.parse::<VersionSpecifiers>().ok()?;
+            (
+                &parsed_project_requirement,
+                requirement.source(),
+                requirement.range(),
+            )
+        }
+    };
+
+    let python_version = db.python_version_with_source(file).version;
+    if python_version_satisfies_requirement(requirement, python_version) {
+        return None;
+    }
+
+    let requirement_file = source.file(db)?;
+    let mut diagnostic = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format_args!(
+            "Python {python_version} does not satisfy the `requires-python` constraint `{requirement}`"
+        ),
+    );
+    diagnostic.annotate(
+        Annotation::primary(Span::from(requirement_file).with_optional_range(range))
+            .message("Python version requirement"),
+    );
+
+    Some(diagnostic)
 }
 
 #[salsa::db]
@@ -543,6 +584,10 @@ impl SemanticDb for ProjectDatabase {
         }
     }
 
+    fn incompatible_python_requirement_diagnostic(&self, file: File) -> Option<SubDiagnostic> {
+        incompatible_python_requirement_diagnostic(self, file)
+    }
+
     fn rule_selection(&self, file: File) -> &RuleSelection {
         let settings = file_settings(self, file);
         settings.rules(self)
@@ -635,7 +680,7 @@ pub(crate) mod testing {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, SubDiagnostic};
     use ruff_db::files::{File, FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -797,6 +842,10 @@ pub(crate) mod testing {
                 None => &self.project().program_settings(self).python_version,
                 Some(script) => script.python_version_with_source(self),
             }
+        }
+
+        fn incompatible_python_requirement_diagnostic(&self, file: File) -> Option<SubDiagnostic> {
+            super::incompatible_python_requirement_diagnostic(self, file)
         }
 
         #[inline]

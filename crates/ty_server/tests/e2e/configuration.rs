@@ -145,6 +145,70 @@ def foo() -> str:
 }
 
 #[test]
+fn editor_python_version_override_reports_requirement_as_related_information() -> Result<()> {
+    for (path, content, project_metadata, requirement_path) in [
+        (
+            "src/project.py",
+            "PythonFinalizationError\n",
+            Some("[project]\nrequires-python = \">=3.13\"\n"),
+            "src/pyproject.toml",
+        ),
+        (
+            "src/script.py",
+            "# /// script\n# requires-python = \">=3.13\"\n# ///\n\nPythonFinalizationError\n",
+            None,
+            "src/script.py",
+        ),
+    ] {
+        let workspace_root = SystemPath::new("src");
+        let file = SystemPath::new(path);
+        let mut builder = TestServerBuilder::new()?
+            .enable_diagnostic_related_information(true)
+            .with_workspace(
+                workspace_root,
+                Some(ClientOptions {
+                    workspace: WorkspaceOptions {
+                        configuration: Some(
+                            Map::from_iter([(
+                                "environment".to_string(),
+                                json!({"python-version": "3.12"}),
+                            )])
+                            .into(),
+                        ),
+                        ..WorkspaceOptions::default()
+                    },
+                    ..ClientOptions::default()
+                }),
+            )?
+            .with_file(file, content)?;
+
+        if let Some(project_metadata) = project_metadata {
+            builder = builder.with_file("src/pyproject.toml", project_metadata)?;
+        }
+
+        let mut server = builder.build().wait_until_workspaces_are_initialized();
+        server.open_text_document(file, content, 1);
+        let diagnostics = serde_json::to_value(server.document_diagnostic_request(file, None))?;
+        assert_eq!(diagnostics["items"].as_array().map(Vec::len), Some(1));
+
+        let related = &diagnostics["items"][0]["relatedInformation"];
+        assert_eq!(related.as_array().map(Vec::len), Some(1));
+        assert!(related[0]["message"].as_str().is_some_and(|message| {
+            message
+                .contains("Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`")
+        }));
+        assert!(
+            related[0]["location"]["uri"]
+                .as_str()
+                .is_some_and(|uri| uri.ends_with(requirement_path))
+        );
+        assert_eq!(related[0]["location"]["range"]["start"]["line"], 1);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn unsupported_editor_python_version() -> Result<()> {
     let _filter = filter_result_id();
 
