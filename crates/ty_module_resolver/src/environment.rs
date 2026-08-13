@@ -1,5 +1,3 @@
-use std::fmt;
-
 use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
 
@@ -22,34 +20,20 @@ impl<'db> ResolverEnvironment<'db> {
         self,
         db: &'db dyn Db,
         mode: ModuleResolveMode,
-    ) -> DisplaySearchPaths<'db> {
-        DisplaySearchPaths {
-            db,
-            resolver_environment: self,
-            mode,
-        }
-    }
-}
+    ) -> impl std::fmt::Display {
+        std::fmt::from_fn(move |f| {
+            let mut paths = search_paths(db, self, mode).peekable();
 
-pub struct DisplaySearchPaths<'db> {
-    db: &'db dyn Db,
-    resolver_environment: ResolverEnvironment<'db>,
-    mode: ModuleResolveMode,
-}
+            if paths.peek().is_none() {
+                return f.write_str("[]");
+            }
 
-impl fmt::Display for DisplaySearchPaths<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut paths = search_paths(self.db, self.resolver_environment, self.mode).peekable();
-
-        if paths.peek().is_none() {
-            return f.write_str("[]");
-        }
-
-        writeln!(f, "[")?;
-        for path in paths {
-            writeln!(f, "  {path},")?;
-        }
-        f.write_str("]")
+            writeln!(f, "[")?;
+            for path in paths {
+                writeln!(f, "  {path},")?;
+            }
+            f.write_str("]")
+        })
     }
 }
 

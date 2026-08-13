@@ -1586,42 +1586,24 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
 
 impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
-        DisplayBoundTypeVarIdentity {
-            bound_typevar_identity: self,
-            db,
-            settings: DisplaySettings::default(),
-        }
+        self.display_with(db, DisplaySettings::default())
     }
 
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
-        DisplayBoundTypeVarIdentity {
-            bound_typevar_identity: self,
-            db,
-            settings,
-        }
-    }
-}
-
-struct DisplayBoundTypeVarIdentity<'db> {
-    bound_typevar_identity: BoundTypeVarIdentity<'db>,
-    db: &'db dyn Db,
-    settings: DisplaySettings<'db>,
-}
-
-impl Display for DisplayBoundTypeVarIdentity<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
-        let binding_context = self.bound_typevar_identity.binding_context;
-        if let Some(binding_context_name) = binding_context.name(self.db)
-            && let Some(definition) = binding_context.definition()
-            && !self.settings.active_scopes.contains(&definition)
-        {
-            write!(f, "@{binding_context_name}")?;
-        }
-        if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
-            write!(f, ".{paramspec_attr}")?;
-        }
-        Ok(())
+        std::fmt::from_fn(move |f| {
+            f.write_str(self.identity.name(db))?;
+            let binding_context = self.binding_context;
+            if let Some(binding_context_name) = binding_context.name(db)
+                && let Some(definition) = binding_context.definition()
+                && !settings.active_scopes.contains(&definition)
+            {
+                write!(f, "@{binding_context_name}")?;
+            }
+            if let Some(paramspec_attr) = self.paramspec_attr {
+                write!(f, ".{paramspec_attr}")?;
+            }
+            Ok(())
+        })
     }
 }
 
@@ -3596,29 +3578,19 @@ impl Display for DisplayTypeArray<'_, '_> {
 }
 
 impl<'db> StringLiteralType<'db> {
-    fn display(self, db: &'db dyn Db) -> DisplayStringLiteralType<'db> {
-        DisplayStringLiteralType {
-            string: self.value(db),
-        }
-    }
-}
-
-struct DisplayStringLiteralType<'db> {
-    string: &'db str,
-}
-
-impl Display for DisplayStringLiteralType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_char('"')?;
-        for ch in self.string.chars() {
-            match ch {
-                // `escape_debug` will escape even single quotes, which is not necessary for our
-                // use case as we are already using double quotes to wrap the string.
-                '\'' => f.write_char('\''),
-                _ => ch.escape_debug().fmt(f),
-            }?;
-        }
-        f.write_char('"')
+    fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        std::fmt::from_fn(move |f| {
+            f.write_char('"')?;
+            for ch in self.value(db).chars() {
+                match ch {
+                    // `escape_debug` will escape even single quotes, which is not necessary for our
+                    // use case as we are already using double quotes to wrap the string.
+                    '\'' => f.write_char('\''),
+                    _ => ch.escape_debug().fmt(f),
+                }?;
+            }
+            f.write_char('"')
+        })
     }
 }
 
