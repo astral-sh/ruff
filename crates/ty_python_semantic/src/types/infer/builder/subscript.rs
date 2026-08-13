@@ -1,14 +1,19 @@
+use std::cell::RefCell;
+
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, ArgOrKeyword, ExprContext};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 use ty_module_resolver::file_to_module;
 
 use super::TypeInferenceBuilder;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
+use crate::types::class::GenericAlias;
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
@@ -16,24 +21,29 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationError, bind_typevar,
-    collect_specialization_errors,
+    GenericContext, Specialization, SpecializationError, bind_typevar, walk_specialization,
 };
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
+use crate::types::known_instance::walk_known_instance_type;
+use crate::types::protocol_class::walk_protocol_instance_interface;
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
+use crate::types::type_alias::walk_type_alias_type;
+use crate::types::typed_dict::walk_typed_dict_type;
 use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
+use crate::types::typevar::TypeVarInstance;
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, UnionType, UnionTypeInstance, any_over_type,
-    todo_type,
+    MemberLookupPolicy, Parameter, Parameters, ProtocolInstanceType, SpecialFormType,
+    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypedDictType,
+    UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -1141,7 +1151,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let specialized = specialize(source_specialization);
 
         for specialization_error in
-            collect_specialization_errors(db, env, source_specialization, specialized)
+            Self::collect_specialization_errors(db, env, source_specialization, specialized)
         {
             let Some(builder) = self
                 .context
@@ -1185,6 +1195,162 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         specialized
+    }
+
+    /// Collects errors from the source specialization, `ty`, and every type nested within it.
+    ///
+    /// Lazy type attributes are visited so that errors introduced while specializing a type alias,
+    /// protocol, or typed dictionary body are included. Recursive definitions are guarded by their
+    /// definition identities because their specializations can grow on every recursive expansion.
+    fn collect_specialization_errors(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source_specialization: Specialization<'db>,
+        ty: Type<'db>,
+    ) -> Vec<SpecializationError<'db>> {
+        struct SpecializationErrorCollector<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            recursion_guard: TypeCollector<'db>,
+            active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+            active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+            active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
+            visited_specializations: RefCell<FxHashSet<Specialization<'db>>>,
+            errors: RefCell<Vec<SpecializationError<'db>>>,
+        }
+
+        impl<'db> SpecializationErrorCollector<'_, 'db> {
+            fn visit_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) {
+                if !self
+                    .visited_specializations
+                    .borrow_mut()
+                    .insert(specialization)
+                {
+                    return;
+                }
+
+                if let Some(errors) = specialization.errors(db) {
+                    self.errors.borrow_mut().extend(errors.iter().cloned());
+                }
+                walk_specialization(db, specialization, self);
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for SpecializationErrorCollector<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+
+            // TypeVar declarations are not nested result types. Following their lazy metadata can
+            // recursively request the default specialization that is currently being inspected.
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                _bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+            }
+
+            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {}
+
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                self.visit_specialization(db, alias.specialization(db));
+            }
+
+            fn visit_known_instance_type(
+                &self,
+                db: &'db dyn Db,
+                known_instance: KnownInstanceType<'db>,
+            ) {
+                if let KnownInstanceType::Specialization(specialization) = known_instance {
+                    self.visit_specialization(db, specialization);
+                } else {
+                    walk_known_instance_type(db, known_instance, self);
+                }
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                if let Some(specialization) = alias.specialization(db) {
+                    self.visit_specialization(db, specialization);
+                }
+                self.active_type_aliases.visit(
+                    &alias.definition(db),
+                    || {},
+                    || walk_type_alias_type(db, alias, self),
+                );
+            }
+
+            fn visit_protocol_instance_type(
+                &self,
+                db: &'db dyn Db,
+                protocol: ProtocolInstanceType<'db>,
+            ) {
+                let protocol_ty = Type::ProtocolInstance(protocol);
+                let Some(class) = protocol.class_origin(db) else {
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                    return;
+                };
+                let Some((origin, specialization)) = class.static_class_literal(db) else {
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                    return;
+                };
+
+                if let Some(specialization) = specialization {
+                    self.visit_specialization(db, specialization);
+                }
+                self.active_class_protocols.visit(
+                    &origin,
+                    || {},
+                    || {
+                        walk_protocol_instance_interface(
+                            db,
+                            protocol.interface(db),
+                            protocol_ty,
+                            self,
+                        );
+                    },
+                );
+            }
+
+            fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+                let Some(class) = typed_dict.defining_class() else {
+                    walk_typed_dict_type(db, typed_dict, self);
+                    return;
+                };
+                let Some((origin, specialization)) = class.static_class_literal(db) else {
+                    walk_typed_dict_type(db, typed_dict, self);
+                    return;
+                };
+
+                if let Some(specialization) = specialization {
+                    self.visit_specialization(db, specialization);
+                }
+                self.active_class_typed_dicts.visit(
+                    &origin,
+                    || {},
+                    || walk_typed_dict_type(db, typed_dict, self),
+                );
+            }
+        }
+
+        let collector = SpecializationErrorCollector {
+            env,
+            recursion_guard: TypeCollector::default(),
+            active_class_protocols: ActiveRecursionDetector::default(),
+            active_class_typed_dicts: ActiveRecursionDetector::default(),
+            active_type_aliases: ActiveRecursionDetector::default(),
+            visited_specializations: RefCell::default(),
+            errors: RefCell::default(),
+        };
+        collector.visit_specialization(db, source_specialization);
+        collector.visit_type(db, ty);
+        collector.errors.into_inner()
     }
 
     /// Infer the type of the expression that represents an explicit specialization of a
