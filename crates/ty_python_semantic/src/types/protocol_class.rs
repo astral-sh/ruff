@@ -400,7 +400,11 @@ impl<'db> ProtocolInterfaceView<'db> {
         })
     }
 
-    fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
+    pub(super) fn member_by_name<'a>(
+        self,
+        db: &'db dyn Db,
+        name: &'a str,
+    ) -> Option<ProtocolMember<'a, 'db>> {
         self.interface
             .inner(db)
             .get(name)
