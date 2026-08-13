@@ -2007,7 +2007,25 @@ def materialized_inference(inherited: Top[InheritedInferenceAny]) -> None:
 
 def materialized_structural_inference(structural: Top[StructuralInferenceAny]) -> None:
     reveal_type(infer_item(structural))  # revealed: object
+```
 
+A top-materialized structural protocol nested inside a contravariant class supplies an upper bound
+without widening a narrower argument.
+
+```py
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+def infer_contravariant_item[T](container: Contravariant[InferenceBase[T]], value: T) -> T:
+    return value
+
+def nested_inference(container: Contravariant[Top[StructuralInferenceAny]], value: bool) -> None:
+    reveal_type(infer_contravariant_item(container, value))  # revealed: bool
+```
+
+Bounds and constraints still reject a materialized `object` property when its type is incompatible.
+
+```py
 def bounded_item[T: str](value: InferenceBase[T]) -> T:
     raise NotImplementedError
 
@@ -2154,6 +2172,47 @@ def recursive_materialized_inference(
     reveal_type(infer_recursive_value(top))  # revealed: object
     reveal_type(infer_recursive_value(valid))  # revealed: str
     reveal_type(infer_recursive_value(bottom))  # revealed: Never
+```
+
+A materialized recursive protocol nested inside a contravariant class contributes an upper bound
+without expanding its recursive property.
+
+```py
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+def infer_contravariant_value[T](container: Contravariant[RecursiveValue[T]], value: T) -> T:
+    return value
+
+def nested_recursive_inference(container: Contravariant[Top[RecursiveAny]], value: bool) -> None:
+    reveal_type(infer_contravariant_value(container, value))  # revealed: bool
+```
+
+When a materialized protocol has no nonrecursive members, inference must defer to a separate
+argument rather than expand its recursive requirement or reject the call.
+
+```py
+class RecursiveOnlyTarget[T](Protocol):
+    @property
+    def child(self) -> RecursiveOnlyTarget[T]: ...
+
+class RecursiveOnlySource[T](Protocol):
+    @property
+    def child(self) -> RecursiveOnlySource[T]: ...
+
+def infer_recursive_only[T](value: RecursiveOnlyTarget[T], witness: T) -> T:
+    return witness
+
+def infer_contravariant_recursive_only[T](value: Contravariant[RecursiveOnlyTarget[T]], witness: T) -> T:
+    return witness
+
+def no_finite_recursive_members(
+    top: Top[RecursiveOnlySource[Any]],
+    contravariant: Contravariant[Top[RecursiveOnlySource[Any]]],
+    witness: bool,
+) -> None:
+    reveal_type(infer_recursive_only(top, witness))  # revealed: bool
+    reveal_type(infer_contravariant_recursive_only(contravariant, witness))  # revealed: bool
 ```
 
 The nonrecursive property is used only to infer the specialization. The complete protocol must still

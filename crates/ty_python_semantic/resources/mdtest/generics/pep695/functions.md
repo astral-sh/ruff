@@ -186,6 +186,201 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Inferring through nested nominal generic classes
+
+When a nominal generic class is nested inside another, the outer class determines whether the inner
+specialization contributes a lower bound, an upper bound, or both.
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Invariant[T]:
+    value: T
+
+class Producer[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def covariant[T](container: Covariant[Producer[T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Producer[T]], value: T) -> T:
+    return value
+
+def invariant[T](container: Invariant[Producer[T]], value: T) -> T:
+    return value
+```
+
+Covariance permits the broader `Base`, contravariance accepts the narrower `Derived`, and invariance
+preserves `Middle`.
+
+```py
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Producer[Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Producer[Middle]](), Derived()))  # revealed: Derived
+reveal_type(invariant(Invariant[Producer[Middle]](), Middle()))  # revealed: Middle
+```
+
+## Inferring through nested generic protocols
+
+Generic protocols must preserve the variance of the outer class when constructing their structural
+constraints, just as nominal generic classes do.
+
+```py
+from typing import Protocol
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Invariant[T]:
+    value: T
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+def covariant[T](container: Covariant[Producer[T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Producer[T]], value: T) -> T:
+    return value
+
+def invariant[T](container: Invariant[Producer[T]], value: T) -> T:
+    return value
+```
+
+A covariant outer class permits the broader `Base`, a contravariant class accepts the narrower
+`Derived`, and an invariant class requires exactly `Middle`.
+
+```py
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Producer[Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Producer[Middle]](), Derived()))  # revealed: Derived
+reveal_type(invariant(Invariant[Producer[Middle]](), Middle()))  # revealed: Middle
+invariant(Invariant[Producer[Middle]](), Base())  # error: [invalid-argument-type]
+```
+
+A consuming protocol reverses the relationship once more. Nesting that protocol inside a
+contravariant class therefore turns its upper bound back into a lower bound.
+
+```py
+class Consumer[T](Protocol):
+    def put(self, value: T) -> None: ...
+
+def consumer[T](container: Covariant[Consumer[T]], value: T) -> T:
+    return value
+
+def double_contravariant[T](container: Contravariant[Consumer[T]], value: T) -> T:
+    return value
+
+reveal_type(consumer(Covariant[Consumer[Middle]](), Derived()))  # revealed: Derived
+reveal_type(double_contravariant(Contravariant[Consumer[Middle]](), Derived()))  # revealed: Middle
+```
+
+## Inferring through nested generic callables
+
+Callable return types are covariant, but nesting a callable inside a contravariant or invariant
+generic class changes which constraints its return type supplies.
+
+```py
+from typing import Callable
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Invariant[T]:
+    value: T
+
+def covariant[T](container: Covariant[Callable[[], T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Callable[[], T]], value: T) -> T:
+    return value
+
+def invariant[T](container: Invariant[Callable[[], T]], value: T) -> T:
+    return value
+
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Callable[[], Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Callable[[], Middle]](), Derived()))  # revealed: Derived
+reveal_type(invariant(Invariant[Callable[[], Middle]](), Middle()))  # revealed: Middle
+invariant(Invariant[Callable[[], Middle]](), Base())  # error: [invalid-argument-type]
+```
+
+A union of callable return types offers alternative upper bounds; a compatible arm must not be
+rejected just because another arm is incompatible.
+
+```py
+reveal_type(contravariant(Contravariant[Callable[[], Middle] | Callable[[], str]](), Derived()))  # revealed: Derived
+```
+
+Callable parameter types are already contravariant. An outer contravariant class reverses their
+relationship a second time, producing the same lower bound as a covariant callable return type.
+
+```py
+def consumer[T](container: Covariant[Callable[[T], None]], value: T) -> T:
+    return value
+
+def double_contravariant[T](container: Contravariant[Callable[[T], None]], value: T) -> T:
+    return value
+
+reveal_type(consumer(Covariant[Callable[[Middle], None]](), Derived()))  # revealed: Derived
+reveal_type(double_contravariant(Contravariant[Callable[[Middle], None]](), Derived()))  # revealed: Middle
+```
+
+## Inferring through nested callable protocols
+
+A callable assigned to a callback protocol contributes the same return-type constraints through its
+signature, including when an outer generic class reverses their direction.
+
+```py
+from typing import Callable, Protocol
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def put(self, value: T) -> None: ...
+
+class Callback[T](Protocol):
+    def __call__(self) -> T: ...
+
+def covariant[T](container: Covariant[Callback[T]], value: T) -> T:
+    return value
+
+def contravariant[T](container: Contravariant[Callback[T]], value: T) -> T:
+    return value
+
+class Base: ...
+class Middle(Base): ...
+class Derived(Middle): ...
+
+reveal_type(covariant(Covariant[Callable[[], Middle]](), Base()))  # revealed: Base
+reveal_type(contravariant(Contravariant[Callable[[], Middle]](), Derived()))  # revealed: Derived
+```
+
 ## Bound violations inferred through protocols
 
 If matching a protocol argument infers a type that violates a type variable's bound, the call should
