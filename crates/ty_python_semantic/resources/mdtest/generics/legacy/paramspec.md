@@ -794,7 +794,8 @@ remaining(1)  # error: [invalid-argument-type]
 ```
 
 A contravariant callback can accept a broader positional-only prefix than a bounded type variable
-requires. The witness determines the narrower specialization without rejecting the valid callback.
+requires. The separate `Middle()` argument determines the narrower specialization without rejecting
+the valid callback.
 
 ```py
 class Base: ...
@@ -850,9 +851,9 @@ def without_first(callback: Callback[Concatenate[Base, Q]]) -> Callable[Q, None]
 def original(first: Middle, /, value: str) -> None: ...
 
 wrapped = Callback(original)
-# TODO: Should reveal `(value: str) -> None`.
+# TODO: Should reveal `(value: str) -> None`. Needs ParamSpecs in the new constraint solver.
 reveal_type(without_first(wrapped))  # revealed: (...) -> None
-# TODO: Should reveal `(value: str) -> None`.
+# TODO: Should reveal `(value: str) -> None`. Needs ParamSpecs in the new constraint solver.
 reveal_type(without_first(Callback(original)))  # revealed: (...) -> None
 ```
 
