@@ -24,7 +24,7 @@ trait MermaidGraph<'a>: DirectedGraph<'a> {
         let num_nodes = self.num_nodes();
         for idx in 0..num_nodes {
             let node = Self::Node::new(idx);
-            graph.push(format!("\tnode{}{}", idx, &self.draw_node(node)));
+            graph.push(format!("\tnode{}{}", idx, self.draw_node(node)));
         }
 
         // Draw edges
@@ -208,7 +208,7 @@ impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
                 return MermaidNode {
                     content: "EXIT".to_string(),
                     shape: MermaidNodeShape::DoubleCircle,
-                }
+                };
             }
         };
 

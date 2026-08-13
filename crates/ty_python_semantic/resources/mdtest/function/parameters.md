@@ -1,15 +1,54 @@
 # Function parameter types
 
+## Basic
+
 Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
-not annotated). The initial inferred type is the union of the declared type with the type of the
-default value expression (if any). If both are fully static types, this union should simplify to the
-annotated type (since the default value type must be assignable to the annotated type, and for fully
-static types this means subtype-of, which simplifies in unions). But if the annotated type is
-Unknown or another non-fully-static type, the default value type may still be relevant as lower
-bound.
+not annotated). The initial inferred type is the annotated type of the parameter, if any:
+
+```py
+def f(declared: int, unannotated):
+    reveal_type(declared)  # revealed: int
+    reveal_type(unannotated)  # revealed: Unknown
+```
 
 The variadic parameter is a variadic tuple of its annotated type; the variadic-keywords parameter is
-a dictionary from strings to its annotated type.
+a dictionary from strings to its annotated type:
+
+```py
+def g(*args: int, **kwargs: int):
+    reveal_type(args)  # revealed: tuple[int, ...]
+    reveal_type(kwargs)  # revealed: dict[str, int]
+```
+
+## Unannotated parameters with defaults
+
+If there is no annotation but there is a default value, the inferred paramter type is the union of
+the inferred type of the default value and `Unknown`:
+
+```py
+def f(a="foo", b=0, c=True, d=None):
+    reveal_type(a)  # revealed: Unknown | Literal["foo"]
+    reveal_type(b)  # revealed: Unknown | Literal[0]
+    reveal_type(c)  # revealed: Unknown | Literal[True]
+    reveal_type(d)  # revealed: Unknown | None
+```
+
+This means that the code in the function body needs to handle the case where the parameter is set to
+the default value:
+
+```py
+def g(x=0):
+    print(x + 1)
+
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `Unknown | Literal[0]` and `Literal["foo"]`"
+    x + "foo"
+```
+
+But it still allows callers to pass in arguments of a wider type:
+
+```py
+g(1.5)  # fine
+```
 
 ## Parameter kinds
 
@@ -41,13 +80,13 @@ def g(*args, **kwargs):
 
 ## Annotation is present but not a fully static type
 
-The default value type should be a lower bound on the inferred type.
+If there is an annotation, we respect it fully and don't union in the default value type.
 
 ```py
 from typing import Any
 
 def f(x: Any = 1):
-    reveal_type(x)  # revealed: Any | Literal[1]
+    reveal_type(x)  # revealed: Any
 ```
 
 ## Default value type must be assignable to annotated type
@@ -64,7 +103,38 @@ def f(x: int = "foo"):
 from typing import Any
 
 def g(x: Any = "foo"):
-    reveal_type(x)  # revealed: Any | Literal["foo"]
+    reveal_type(x)  # revealed: Any
+```
+
+## TypedDict defaults use annotation context
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+
+def x(a: Foo = {"x": 42}): ...
+def y(a: Foo = dict(x=42)): ...
+```
+
+## TypedDict defaults still validate keys and value types
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+    y: int
+
+# error: [missing-typed-dict-key]
+def missing_key(a: Foo = {"x": 42}): ...
+
+# error: [invalid-argument-type]
+def wrong_type(a: Foo = {"x": "s", "y": 1}): ...
+
+# error: [invalid-key]
+def extra_key(a: Foo = {"x": 1, "y": 2, "z": 3}): ...
 ```
 
 ## Stub functions
@@ -109,4 +179,16 @@ def x(y: None = ...) -> None: ...
 @overload
 def x(y: int) -> str: ...
 def x(y: int | None = None) -> str | None: ...
+```
+
+### In `if TYPE_CHECKING` blocks
+
+We generally view code in `if TYPE_CHECKING` blocks as having the same semantics and exemptions to
+code in stub files:
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    def foo(x: bool = ...): ...  # fine
 ```

@@ -19,3 +19,18 @@ class MyClass:
 
     def attribute_usage(self) -> id:
         pass
+
+
+class C:
+    @staticmethod
+    def property(f):
+        return f
+
+    id = 1
+
+    @[property][0]
+    def f(self, x=[id]):
+        return x
+
+    bin = 2
+    foo = [bin]

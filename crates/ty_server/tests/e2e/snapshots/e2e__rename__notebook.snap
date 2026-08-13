@@ -1,0 +1,75 @@
+---
+source: crates/ty_server/tests/e2e/rename.rs
+expression: edits
+---
+{
+  "changes": {
+    "vscode-notebook-cell://test.ipynb#1": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 15
+          },
+          "end": {
+            "line": 0,
+            "character": 19
+          }
+        },
+        "newText": "text"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 2,
+            "character": 15
+          },
+          "end": {
+            "line": 2,
+            "character": 19
+          }
+        },
+        "newText": "text"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 4,
+            "character": 15
+          },
+          "end": {
+            "line": 4,
+            "character": 19
+          }
+        },
+        "newText": "text"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 6,
+            "character": 15
+          },
+          "end": {
+            "line": 6,
+            "character": 19
+          }
+        },
+        "newText": "text"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 7,
+            "character": 13
+          },
+          "end": {
+            "line": 7,
+            "character": 17
+          }
+        },
+        "newText": "text"
+      }
+    ]
+  }
+}

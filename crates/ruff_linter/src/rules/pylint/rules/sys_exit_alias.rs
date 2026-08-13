@@ -1,10 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `exit()` and `quit()`.
@@ -50,6 +50,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Python documentation: Constants added by the `site` module](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct SysExitAlias {
     name: String,
 }
@@ -77,7 +78,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
     if !matches!(builtin, "exit" | "quit") {
         return;
     }
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SysExitAlias {
             name: builtin.to_string(),
         },
@@ -91,7 +92,6 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         .any(|kwarg| kwarg.arg.is_none());
     // only one optional argument allowed, and we can't convert **kwargs
     if call.arguments.len() > 1 || has_star_kwargs {
-        checker.report_diagnostic(diagnostic);
         return;
     }
 
@@ -111,5 +111,4 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
         }
         Ok(Fix::unsafe_edits(import_edit, edits))
     });
-    checker.report_diagnostic(diagnostic);
 }

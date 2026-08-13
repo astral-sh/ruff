@@ -48,8 +48,6 @@ from typing import no_type_check
 @unknown_decorator  # error: [unresolved-reference]
 @no_type_check
 def test() -> int:
-    # TODO: this should not be an error
-    # error: [unresolved-reference]
     return a + 5
 ```
 
@@ -66,8 +64,6 @@ from typing import no_type_check
 @no_type_check
 @unknown_decorator
 def test() -> int:
-    # TODO: this should not be an error
-    # error: [unresolved-reference]
     return a + 5
 ```
 
@@ -91,9 +87,20 @@ def test() -> Undefined:
     return x + 5
 ```
 
+## Errors in function declarations
+
+Post-inference checks on the function declaration are also suppressed.
+
+```py
+from typing import no_type_check
+
+@no_type_check
+def positional(x: int, __y: str): ...
+```
+
 ## `no_type_check` on classes isn't supported
 
-ty does not support decorating classes with `no_type_check`. The behaviour of `no_type_check` when
+ty does not support decorating classes with `no_type_check`. The behavior of `no_type_check` when
 applied to classes is
 [not specified currently](https://typing.python.org/en/latest/spec/directives.html#no-type-check),
 and is not supported by Pyright or mypy.
@@ -117,6 +124,6 @@ from typing import no_type_check
 
 @no_type_check
 def test():
-    # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+    # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
     return x + 5  # ty: ignore[unresolved-reference]
 ```

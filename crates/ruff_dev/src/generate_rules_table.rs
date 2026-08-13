@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::FixAvailability;
+use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_options_metadata::OptionsMetadata;
@@ -18,43 +18,52 @@ const FIX_SYMBOL: &str = "🛠️";
 const PREVIEW_SYMBOL: &str = "🧪";
 const REMOVED_SYMBOL: &str = "❌";
 const WARNING_SYMBOL: &str = "⚠️";
-const STABLE_SYMBOL: &str = "✔️";
 const SPACER: &str = "&nbsp;&nbsp;&nbsp;&nbsp;";
 
+/// Style for the rule's fixability and status icons.
+const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
+/// Style for the container wrapping the fixability and status icons.
+const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
+
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
-    table_out.push_str("| Code | Name | Message | |");
+    table_out.push_str("| Code { scope='col' } | Name { scope='col' } | Message { scope='col' } | Fix/Status { scope='col' .sr-only } |");
     table_out.push('\n');
-    table_out.push_str("| ---- | ---- | ------- | ------: |");
+    table_out.push_str("| ---- | ---- | ------- | -: |");
     table_out.push('\n');
     for rule in rules {
         let status_token = match rule.group() {
-            RuleGroup::Removed => {
-                format!("<span title='Rule has been removed'>{REMOVED_SYMBOL}</span>")
+            RuleGroup::Removed { since } => {
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule was removed in {since}'>{REMOVED_SYMBOL}</span><span class='sr-only'>Rule was removed in {since}</span>"
+                )
             }
-            RuleGroup::Deprecated => {
-                format!("<span title='Rule has been deprecated'>{WARNING_SYMBOL}</span>")
+            RuleGroup::Deprecated { since } => {
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been deprecated since {since}'>{WARNING_SYMBOL}</span><span class='sr-only'>Rule has been deprecated since {since}</span>"
+                )
             }
-            RuleGroup::Preview => {
-                format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
+            RuleGroup::Preview { since } => {
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been in preview since {since}'>{PREVIEW_SYMBOL}</span><span class='sr-only'>Rule has been in preview since {since}</span>"
+                )
             }
-            RuleGroup::Stable => {
-                // A full opacity checkmark is a bit aggressive for indicating stable
-                format!("<span title='Rule is stable' style='opacity: 0.6'>{STABLE_SYMBOL}</span>")
+            RuleGroup::Stable { since } => {
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Rule has been stable since {since}'></span><span class='sr-only'>Rule has been stable since {since}</span>"
+                )
             }
         };
 
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
+                format!(
+                    "<span aria-hidden='true' {SYMBOL_STYLE} title='Automatic fix available'>{FIX_SYMBOL}</span><span class='sr-only'>Automatic fix available</span>"
+                )
             }
-            FixAvailability::None => {
-                format!("<span title='Automatic fix not available' style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
-            }
+            FixAvailability::None => format!("<span {SYMBOL_STYLE}></span>"),
         };
 
-        let tokens = format!("{status_token} {fix_token}");
-
-        let rule_name = rule.as_ref();
+        let rule_name = rule.name();
 
         // If the message ends in a bracketed expression (like: "Use {replacement}"), escape the
         // brackets. Otherwise, it'll be interpreted as an HTML attribute via the `attr_list`
@@ -80,15 +89,14 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         #[expect(clippy::or_fun_call)]
         let _ = write!(
             table_out,
-            "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {ss}{4}{se} |",
-            linter.common_prefix(),
-            linter.code_for_rule(rule).unwrap(),
-            rule.explanation()
+            "| {ss}{prefix}{code}{se} {{ #{prefix}{code} }} | {ss}{explanation}{se} | {ss}{message}{se} | <div {SYMBOLS_CONTAINER}>{status_token}{fix_token}</div>|",
+            prefix = linter.common_prefix(),
+            code = linter.code_for_rule(rule).unwrap(),
+            explanation = rule
+                .explanation()
                 .is_some()
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))
                 .unwrap_or(format_args!("{rule_name}")),
-            message,
-            tokens,
         );
         table_out.push('\n');
     }
@@ -104,29 +112,28 @@ pub(crate) fn generate() -> String {
 
     let _ = write!(
         &mut table_out,
-        "{SPACER}{STABLE_SYMBOL}{SPACER} The rule is stable."
-    );
-    table_out.push_str("<br />");
-
-    let _ = write!(&mut table_out,
         "{SPACER}{PREVIEW_SYMBOL}{SPACER} The rule is unstable and is in [\"preview\"](faq.md#what-is-preview)."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{REMOVED_SYMBOL}{SPACER} The rule has been removed only the documentation is available."
     );
     table_out.push_str("<br />");
 
-    let _ = write!(&mut table_out,
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
     );
-    table_out.push_str("<br />");
+    table_out.push_str("\n\n");
+    table_out.push_str("All rules not marked as preview, deprecated or removed are stable.");
     table_out.push('\n');
 
     for linter in Linter::iter() {
@@ -168,12 +175,14 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if Options::metadata().has(&format!("lint.{}", linter.name())) {
+        // The linter names for Ruff and NumPy are suffixed with "-specific rules."
+        let linter_name = linter.name().trim_end_matches("-specific rules");
+        // Several linter names are capitalized, but their settings are not.
+        let linter_name_lower = linter_name.to_lowercase();
+        if Options::metadata().has(&format!("lint.{linter_name_lower}")) {
             let _ = write!(
                 table_out,
-                "For related settings, see [{}](settings.md#lint{}).",
-                linter.name(),
-                linter.name(),
+                "For related settings, see [{linter_name}](settings.md#lint{linter_name_lower}).",
             );
             table_out.push('\n');
             table_out.push('\n');

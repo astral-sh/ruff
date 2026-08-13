@@ -1,5 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -7,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for uses of `bin(...).count("1")` to perform a population count.
@@ -39,6 +39,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## References
 /// - [Python documentation:`int.bit_count`](https://docs.python.org/3/library/stdtypes.html#int.bit_count)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct BitCount {
     existing: SourceCodeSnippet,
     replacement: SourceCodeSnippet,
@@ -137,6 +138,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         Expr::StringLiteral(inner) => inner.value.is_implicit_concatenated(),
         Expr::BytesLiteral(inner) => inner.value.is_implicit_concatenated(),
         Expr::FString(inner) => inner.value.is_implicit_concatenated(),
+        Expr::TString(inner) => inner.value.is_implicit_concatenated(),
 
         Expr::Await(_)
         | Expr::Starred(_)
@@ -183,10 +185,10 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         format!("{literal_text}.bit_count()")
     };
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         BitCount {
             existing: SourceCodeSnippet::from_str(literal_text),
-            replacement: SourceCodeSnippet::new(replacement.to_string()),
+            replacement: SourceCodeSnippet::new(replacement.clone()),
         },
         call.range(),
     );
@@ -194,6 +196,4 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         Edit::range_replacement(replacement, call.range()),
         applicability,
     ));
-
-    checker.report_diagnostic(diagnostic);
 }

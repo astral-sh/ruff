@@ -1,5 +1,5 @@
-use crate::printer::call_stack::PrintElementArgs;
 use crate::FormatElement;
+use crate::printer::call_stack::PrintElementArgs;
 
 /// Stores the queued line suffixes.
 #[derive(Debug, Default)]

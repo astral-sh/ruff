@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for membership tests on `list` and `tuple` literals.
@@ -25,13 +25,16 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as the use of a `set` literal will
-/// error at runtime if the sequence contains unhashable elements (like lists
-/// or dictionaries). While Ruff will attempt to infer the hashability of the
-/// elements, it may not always be able to do so.
+/// error at runtime if either the element being tested for membership (the
+/// left-hand side) or any element of the sequence (the right-hand side)
+/// is unhashable (like lists or dictionaries). While Ruff will attempt to
+/// infer the hashability of both sides and skip the fix when it can determine
+/// that either side is unhashable, it may not always be able to do so.
 ///
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.1")]
 pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {
@@ -101,7 +104,7 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(LiteralMembership, right.range());
+    let mut diagnostic = checker.report_diagnostic(LiteralMembership, right.range());
 
     let literal = checker.locator().slice(right);
     let set = format!("{{{}}}", &literal[1..literal.len() - 1]);
@@ -109,6 +112,4 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
         set,
         right.range(),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }

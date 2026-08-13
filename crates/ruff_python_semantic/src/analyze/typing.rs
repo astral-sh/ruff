@@ -8,14 +8,13 @@ use ruff_python_ast::{
     StmtAssign,
 };
 use ruff_python_stdlib::typing::{
-    as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
-    is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
-    is_mutable_return_type, is_pep_593_generic_member, is_pep_593_generic_type,
-    is_standard_library_generic, is_standard_library_generic_member, is_standard_library_literal,
-    is_typed_dict, is_typed_dict_member,
+    as_pep_585_generic, is_immutable_generic_type, is_immutable_non_generic_type,
+    is_immutable_return_type, is_literal_member, is_mutable_return_type, is_pep_593_generic_member,
+    is_pep_593_generic_type, is_standard_library_generic, is_standard_library_generic_member,
+    is_standard_library_literal, is_typed_dict, is_typed_dict_member,
 };
 use ruff_text_size::Ranged;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
@@ -152,10 +151,60 @@ pub fn is_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
         .is_some_and(|qualified_name| {
-            let [module, name] = qualified_name.segments() else {
-                return false;
-            };
-            has_pep_585_generic(module, name)
+            matches!(
+                qualified_name.segments(),
+                ["", "dict" | "frozenset" | "list" | "set" | "tuple" | "type"]
+                    | [
+                        "collections",
+                        "deque" | "defaultdict" | "ChainMap" | "Counter" | "OrderedDict"
+                    ]
+                    | ["asyncio", "Future" | "Task"]
+                    | [
+                        "contextlib",
+                        "AbstractAsyncContextManager" | "AbstractContextManager"
+                    ]
+                    | ["dataclasses", "Field"]
+                    | ["functools", "cached_property" | "partialmethod"]
+                    | ["os", "PathLike"]
+                    | [
+                        "queue",
+                        "LifoQueue" | "PriorityQueue" | "Queue" | "SimpleQueue"
+                    ]
+                    | ["re", "Match" | "Pattern"]
+                    | ["shelve", "BsdDbShelf" | "DbfilenameShelf" | "Shelf"]
+                    | ["types", "MappingProxyType"]
+                    | [
+                        "weakref",
+                        "WeakKeyDictionary" | "WeakMethod" | "WeakSet" | "WeakValueDictionary"
+                    ]
+                    | [
+                        "collections",
+                        "abc",
+                        "AsyncGenerator"
+                            | "AsyncIterable"
+                            | "AsyncIterator"
+                            | "Awaitable"
+                            | "ByteString"
+                            | "Callable"
+                            | "Collection"
+                            | "Container"
+                            | "Coroutine"
+                            | "Generator"
+                            | "ItemsView"
+                            | "Iterable"
+                            | "Iterator"
+                            | "KeysView"
+                            | "Mapping"
+                            | "MappingView"
+                            | "MutableMapping"
+                            | "MutableSequence"
+                            | "MutableSet"
+                            | "Reversible"
+                            | "Sequence"
+                            | "Set"
+                            | "ValuesView"
+                    ]
+            )
         })
 }
 
@@ -252,9 +301,7 @@ pub fn is_immutable_annotation(
                 .is_some_and(|qualified_name| {
                     is_immutable_non_generic_type(qualified_name.segments())
                         || is_immutable_generic_type(qualified_name.segments())
-                        || extend_immutable_calls
-                            .iter()
-                            .any(|target| qualified_name == *target)
+                        || extend_immutable_calls.contains(&qualified_name)
                 })
         }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => semantic
@@ -289,6 +336,7 @@ pub fn is_immutable_annotation(
             op: Operator::BitOr,
             right,
             range: _,
+            node_index: _,
         }) => {
             is_immutable_annotation(left, semantic, extend_immutable_calls)
                 && is_immutable_annotation(right, semantic, extend_immutable_calls)
@@ -308,9 +356,7 @@ pub fn is_immutable_func(
         .resolve_qualified_name(map_subscript(func))
         .is_some_and(|qualified_name| {
             is_immutable_return_type(qualified_name.segments())
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| qualified_name == *target)
+                || extend_immutable_calls.contains(&qualified_name)
         })
 }
 
@@ -396,9 +442,8 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
         // for this specific check even if it's defined somewhere else, like the current module.
         // Ex) `if TYPE_CHECKING:`
         Expr::Name(ast::ExprName { id, .. }) => {
-            id == "TYPE_CHECKING"
-                // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
-                || semantic.match_typing_expr(test, "TYPE_CHECKING")
+            // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
+            id == "TYPE_CHECKING" || semantic.match_typing_expr(test, "TYPE_CHECKING")
         }
         // Ex) `if typing.TYPE_CHECKING:`
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",
@@ -410,7 +455,7 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
 pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
-    any_over_expr(test, &|expr| {
+    any_over_expr(test, |expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| {
@@ -432,11 +477,51 @@ pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a E
 where
     F: FnMut(&'a Expr, &'a Expr),
 {
+    traverse_union_options(func, semantic, expr, UnionTraversalOptions::default());
+}
+
+/// Traverse a "union" type annotation, applying `func` to each union member.
+///
+/// Supports traversal of `Union`, `|`, and `Optional` union expressions.
+///
+/// The function is called with each expression in the union (excluding declarations of nested
+/// unions) and the parent expression.
+pub fn traverse_union_and_optional<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+where
+    F: FnMut(&'a Expr, &'a Expr),
+{
+    traverse_union_options(
+        func,
+        semantic,
+        expr,
+        UnionTraversalOptions {
+            traverse_optional: true,
+        },
+    );
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+/// Options for traversing union types.
+///
+/// See also [`traverse_union_options`].
+struct UnionTraversalOptions {
+    traverse_optional: bool,
+}
+
+fn traverse_union_options<'a, F>(
+    func: &mut F,
+    semantic: &SemanticModel,
+    expr: &'a Expr,
+    options: UnionTraversalOptions,
+) where
+    F: FnMut(&'a Expr, &'a Expr),
+{
     fn inner<'a, F>(
         func: &mut F,
         semantic: &SemanticModel,
         expr: &'a Expr,
         parent: Option<&'a Expr>,
+        options: UnionTraversalOptions,
     ) where
         F: FnMut(&'a Expr, &'a Expr),
     {
@@ -446,6 +531,7 @@ where
             left,
             right,
             range: _,
+            node_index: _,
         }) = expr
         {
             // The union data structure usually looks like this:
@@ -458,25 +544,31 @@ where
             // in the order they appear in the source code.
 
             // Traverse the left then right arms
-            inner(func, semantic, left, Some(expr));
-            inner(func, semantic, right, Some(expr));
+            inner(func, semantic, left, Some(expr), options);
+            inner(func, semantic, right, Some(expr), options);
             return;
         }
 
-        // Ex) `Union[x, y]`
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            // Ex) `Union[x, y]`
             if semantic.match_typing_expr(value, "Union") {
                 if let Expr::Tuple(tuple) = &**slice {
                     // Traverse each element of the tuple within the union recursively to handle cases
                     // such as `Union[..., Union[...]]`
                     tuple
                         .iter()
-                        .for_each(|elem| inner(func, semantic, elem, Some(expr)));
+                        .for_each(|elem| inner(func, semantic, elem, Some(expr), options));
                     return;
                 }
 
                 // Ex) `Union[Union[a, b]]` and `Union[a | b | c]`
-                inner(func, semantic, slice, Some(expr));
+                inner(func, semantic, slice, Some(expr), options);
+                return;
+            }
+            // Ex) `Optional[x]`
+            if options.traverse_optional && semantic.match_typing_expr(value, "Optional") {
+                inner(func, semantic, value, Some(expr), options);
+                inner(func, semantic, slice, Some(expr), options);
                 return;
             }
         }
@@ -487,7 +579,7 @@ where
         }
     }
 
-    inner(func, semantic, expr, None);
+    inner(func, semantic, expr, None, options);
 }
 
 /// Traverse a "literal" type annotation, applying `func` to each literal member.
@@ -768,7 +860,7 @@ impl BuiltinTypeChecker for FloatChecker {
     const EXPR_TYPE: PythonType = PythonType::Number(NumberLike::Float);
 }
 
-pub struct IoBaseChecker;
+struct IoBaseChecker;
 
 impl TypeChecker for IoBaseChecker {
     fn match_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
@@ -881,7 +973,7 @@ impl TypeChecker for PathlibPathChecker {
     }
 }
 
-pub struct FastApiRouteChecker;
+struct FastApiRouteChecker;
 
 impl FastApiRouteChecker {
     fn is_fastapi_route_constructor(semantic: &SemanticModel, expr: &Expr) -> bool {
@@ -910,7 +1002,7 @@ impl TypeChecker for FastApiRouteChecker {
     }
 }
 
-pub struct TypeVarLikeChecker;
+struct TypeVarLikeChecker;
 
 impl TypeVarLikeChecker {
     /// Returns `true` if an [`Expr`] is a `TypeVar`, `TypeVarTuple`, or `ParamSpec` call.
@@ -1053,7 +1145,7 @@ pub fn is_fastapi_route(binding: &Binding, semantic: &SemanticModel) -> bool {
 }
 
 /// Test whether the given binding is for an old-style `TypeVar`, `TypeVarTuple` or a `ParamSpec`.
-pub fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_type_var_like(binding: &Binding, semantic: &SemanticModel) -> bool {
     check_type::<TypeVarLikeChecker>(binding, semantic)
 }
 
@@ -1132,7 +1224,7 @@ pub fn resolve_assignment<'a>(
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
 pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
-    let binding_id = semantic.lookup_symbol(symbol)?;
+    let binding_id = semantic.lookup_symbol(symbol).binding_id()?;
     let binding = semantic.binding(binding_id);
     find_binding_value(binding, semantic)
 }
@@ -1165,7 +1257,7 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
             Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
                 return targets
                     .iter()
-                    .find_map(|target| match_value(binding, target, value))
+                    .find_map(|target| match_value(binding, target, value));
             }
             Some(Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value),
@@ -1245,10 +1337,8 @@ fn match_target<'a>(binding: &Binding, targets: &[Expr], values: &'a [Expr]) -> 
                     _ => (),
                 }
             }
-            Expr::Name(name) => {
-                if name.range() == binding.range() {
-                    return Some(value);
-                }
+            Expr::Name(name) if name.range() == binding.range() => {
+                return Some(value);
             }
             _ => (),
         }

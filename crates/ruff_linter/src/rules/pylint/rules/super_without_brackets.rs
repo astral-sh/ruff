@@ -1,11 +1,11 @@
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{analyze::function_type, ScopeKind};
+use ruff_python_semantic::{ScopeKind, analyze::function_type};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Detects attempts to use `super` without parentheses.
@@ -46,7 +46,16 @@ use crate::checkers::ast::Checker;
 ///         original_speak = super().speak()  # Correct: `super().speak()`
 ///         return f"{original_speak} But as a dog, it barks!"
 /// ```
+///
+/// ## Options
+///
+/// This rule applies to regular, static, and class methods. You can customize how Ruff categorizes
+/// methods with the following options:
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct SuperWithoutBrackets;
 
 impl AlwaysFixableViolation for SuperWithoutBrackets {
@@ -96,8 +105,8 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
         &function_def.decorator_list,
         parent,
         checker.semantic(),
-        &checker.settings.pep8_naming.classmethod_decorators,
-        &checker.settings.pep8_naming.staticmethod_decorators,
+        &checker.settings().pep8_naming.classmethod_decorators,
+        &checker.settings().pep8_naming.staticmethod_decorators,
     );
     if !matches!(
         classification,
@@ -108,12 +117,10 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperWithoutBrackets, value.range());
+    let mut diagnostic = checker.report_diagnostic(SuperWithoutBrackets, value.range());
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "super()".to_string(),
         value.range(),
     )));
-
-    checker.report_diagnostic(diagnostic);
 }

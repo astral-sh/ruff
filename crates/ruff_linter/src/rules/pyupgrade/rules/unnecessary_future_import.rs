@@ -1,12 +1,17 @@
-use itertools::Itertools;
-use ruff_python_ast::{Alias, Stmt};
+use std::collections::{BTreeSet, HashMap};
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use itertools::Itertools;
+use ruff_python_semantic::NodeId;
+
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
+use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
+use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
 /// Checks for unnecessary `__future__` imports.
@@ -30,22 +35,25 @@ use crate::fix;
 /// print("Hello, world!")
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked unsafe if applying it would delete a comment.
+///
 /// ## Options
 /// - `target-version`
 ///
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
-pub(crate) struct UnnecessaryFutureImport {
-    pub names: Vec<String>,
+#[violation_metadata(stable_since = "v0.0.155")]
+pub(crate) struct UnnecessaryFutureImport<'a> {
+    pub names: &'a [&'a str],
 }
 
-impl AlwaysFixableViolation for UnnecessaryFutureImport {
+impl AlwaysFixableViolation for UnnecessaryFutureImport<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryFutureImport { names } = self;
-        if names.len() == 1 {
-            let import = &names[0];
+        if let [import] = names {
             format!("Unnecessary `__future__` import `{import}` for target Python version")
         } else {
             let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
@@ -58,74 +66,133 @@ impl AlwaysFixableViolation for UnnecessaryFutureImport {
     }
 }
 
-const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
+const REMOVE_FUTURES: &[&str] = &[
+    // Removed in Python 3.3
     "nested_scopes",
     "generators",
     "with_statement",
     "division",
     "absolute_import",
-    "with_statement",
     "print_function",
     "unicode_literals",
-];
-
-const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
-    "nested_scopes",
-    "generators",
-    "with_statement",
-    "division",
-    "absolute_import",
-    "with_statement",
-    "print_function",
-    "unicode_literals",
+    // Removed in Python 3.7
     "generator_stop",
 ];
 
+pub(crate) type RequiredImports = BTreeSet<NameImport>;
+
+pub(crate) fn is_import_required_by_isort(
+    required_imports: &RequiredImports,
+    stmt: StmtRef,
+    alias: &Alias,
+) -> bool {
+    match stmt {
+        StmtRef::ImportFrom(ast::StmtImportFrom {
+            module: Some(module),
+            ..
+        }) => {
+            let mut builder = QualifiedNameBuilder::with_capacity(module.split('.').count() + 1);
+            builder.extend(module.split('.'));
+            builder.push(alias.name.as_str());
+            let qualified = builder.build();
+
+            required_imports
+                .iter()
+                .any(|required_import| required_import.qualified_name() == qualified)
+        }
+        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. })
+        | StmtRef::Import(ast::StmtImport { .. }) => {
+            let name = alias.name.as_str();
+            let qualified = if name.contains('.') {
+                QualifiedName::from_dotted_name(name)
+            } else {
+                QualifiedName::user_defined(name)
+            };
+
+            required_imports
+                .iter()
+                .any(|required_import| required_import.qualified_name() == qualified)
+        }
+        _ => false,
+    }
+}
+
 /// UP010
-pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
-    let mut unused_imports: Vec<&Alias> = vec![];
-    for alias in names {
-        if alias.asname.is_some() {
-            continue;
-        }
-        if PY33_PLUS_REMOVE_FUTURES.contains(&alias.name.as_str())
-            || PY37_PLUS_REMOVE_FUTURES.contains(&alias.name.as_str())
-        {
-            unused_imports.push(alias);
+pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
+    let mut unused_imports: HashMap<NodeId, Vec<&Alias>> = HashMap::new();
+    for future_name in REMOVE_FUTURES {
+        for binding_id in scope.get_all(future_name) {
+            let binding = checker.semantic().binding(binding_id);
+            if binding.kind.is_future_import() && binding.is_unused() {
+                let Some(node_id) = binding.source else {
+                    continue;
+                };
+
+                let stmt = checker.semantic().statement(node_id);
+                if let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = stmt {
+                    let Some(alias) = names
+                        .iter()
+                        .find(|alias| alias.name.as_str() == binding.name(checker.source()))
+                    else {
+                        continue;
+                    };
+
+                    if alias.asname.is_some() {
+                        continue;
+                    }
+
+                    if is_import_required_by_isort(
+                        &checker.settings().isort.required_imports,
+                        stmt.into(),
+                        alias,
+                    ) {
+                        continue;
+                    }
+                    unused_imports.entry(node_id).or_default().push(alias);
+                }
+            }
         }
     }
 
-    if unused_imports.is_empty() {
-        return;
-    }
-    let mut diagnostic = Diagnostic::new(
-        UnnecessaryFutureImport {
-            names: unused_imports
-                .iter()
-                .map(|alias| alias.name.to_string())
-                .sorted()
-                .collect(),
-        },
-        stmt.range(),
-    );
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each import statement produces an independent diagnostic and fix"
+    )]
+    for (node_id, unused_aliases) in unused_imports {
+        let names: Vec<_> = unused_aliases
+            .iter()
+            .map(|alias| alias.name.as_str())
+            .sorted()
+            .collect();
+        let mut diagnostic = checker.report_diagnostic(
+            UnnecessaryFutureImport { names: &names },
+            checker.semantic().statement(node_id).range(),
+        );
 
-    diagnostic.try_set_fix(|| {
-        let statement = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
-        let edit = fix::edits::remove_unused_imports(
-            unused_imports
-                .iter()
-                .map(|alias| &alias.name)
-                .map(ruff_python_ast::Identifier::as_str),
-            statement,
-            parent,
-            checker.locator(),
-            checker.stylist(),
-            checker.indexer(),
-        )?;
-        Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )))
-    });
-    checker.report_diagnostic(diagnostic);
+        diagnostic.try_set_fix(|| {
+            let statement = checker.semantic().statement(node_id);
+            let parent = checker.semantic().parent_statement(node_id);
+            let edit = fix::edits::remove_unused_imports(
+                names.into_iter(),
+                statement,
+                parent,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+            )?;
+
+            let range = edit.range();
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Ok(
+                Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+                    checker.semantic().current_statement_parent_id(),
+                )),
+            )
+        });
+    }
 }

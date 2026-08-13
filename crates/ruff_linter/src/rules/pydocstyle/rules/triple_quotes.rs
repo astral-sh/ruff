@@ -1,14 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for docstrings that use `'''triple single quotes'''` instead of
-/// `"""triple double quotes"""`.
+/// Checks for docstrings that don't use `"""triple double quotes"""`.
 ///
 /// ## Why is this bad?
 /// [PEP 257](https://peps.python.org/pep-0257/#what-is-a-docstring) recommends
@@ -19,17 +18,27 @@ use crate::docstrings::Docstring;
 /// ```python
 /// def kos_root():
 ///     '''Return the pathname of the KOS root directory.'''
+///
+/// def kos_branch():
+///     'Return the branch name.'
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def kos_root():
 ///     """Return the pathname of the KOS root directory."""
+///
+/// def kos_branch():
+///     """Return the branch name."""
 /// ```
 ///
 /// ## Formatter compatibility
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent quotes, making the rule redundant.
+///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -38,6 +47,7 @@ use crate::docstrings::Docstring;
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.69")]
 pub(crate) struct TripleSingleQuotes {
     expected_quote: Quote,
 }
@@ -79,8 +89,8 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
     match expected_quote {
         Quote::Single => {
             if !opener.ends_with("'''") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('\'') {
@@ -89,14 +99,12 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
         }
         Quote::Double => {
             if !opener.ends_with("\"\"\"") {
-                let mut diagnostic =
-                    Diagnostic::new(TripleSingleQuotes { expected_quote }, docstring.range());
+                let mut diagnostic = checker
+                    .report_diagnostic(TripleSingleQuotes { expected_quote }, docstring.range());
 
                 let body = docstring.body().as_str();
                 if !body.ends_with('"') {
@@ -105,8 +113,6 @@ pub(crate) fn triple_quotes(checker: &Checker, docstring: &Docstring) {
                         docstring.range(),
                     )));
                 }
-
-                checker.report_diagnostic(diagnostic);
             }
         }
     }

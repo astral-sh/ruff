@@ -1,15 +1,24 @@
+"""Internal support module for sre"""
+
 import sys
 from re import error as error
 from typing import Final
-from typing_extensions import Self
+from typing_extensions import Self, disjoint_base
 
 MAXGROUPS: Final[int]
 
 MAGIC: Final[int]
 
-class _NamedIntConstant(int):
-    name: str
-    def __new__(cls, value: int, name: str) -> Self: ...
+if sys.version_info >= (3, 12):
+    class _NamedIntConstant(int):
+        name: str
+        def __new__(cls, value: int, name: str) -> Self: ...
+
+else:
+    @disjoint_base
+    class _NamedIntConstant(int):
+        name: str
+        def __new__(cls, value: int, name: str) -> Self: ...
 
 MAXREPEAT: Final[_NamedIntConstant]
 OPCODES: list[_NamedIntConstant]
@@ -23,6 +32,8 @@ AT_LOCALE: dict[_NamedIntConstant, _NamedIntConstant]
 AT_UNICODE: dict[_NamedIntConstant, _NamedIntConstant]
 CH_LOCALE: dict[_NamedIntConstant, _NamedIntConstant]
 CH_UNICODE: dict[_NamedIntConstant, _NamedIntConstant]
+if sys.version_info >= (3, 14):
+    CH_NEGATE: dict[_NamedIntConstant, _NamedIntConstant]
 # flags
 if sys.version_info < (3, 13):
     SRE_FLAG_TEMPLATE: Final = 1

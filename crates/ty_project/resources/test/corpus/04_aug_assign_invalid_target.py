@@ -1,1 +1,0 @@
-../../../../ruff_python_parser/resources/invalid/statements/invalid_augmented_assignment_target.py

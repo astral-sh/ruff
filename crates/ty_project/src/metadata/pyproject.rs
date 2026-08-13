@@ -1,14 +1,16 @@
 use crate::metadata::options::Options;
-use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
-use pep440_rs::{release_specifiers_to_ranges, Version, VersionSpecifiers};
+use crate::metadata::python_version::SupportedPythonVersion;
+use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
 use std::ops::Deref;
+use strum::IntoEnumIterator;
 use thiserror::Error;
 
 /// A `pyproject.toml` as specified in PEP 517.
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProject {
     /// PEP 621-compliant project metadata.
@@ -35,31 +37,52 @@ impl PyProject {
         source: ValueSource,
     ) -> Result<Self, PyProjectError> {
         let _guard = ValueSourceGuard::new(source, true);
-        toml::from_str(content).map_err(PyProjectError::TomlSyntax)
+        Self::deserialize_toml(content)
+    }
+
+    pub(crate) fn from_toml_str_without_spans(
+        content: &str,
+        source: ValueSource,
+    ) -> Result<Self, PyProjectError> {
+        let _guard = ValueSourceGuard::new(source, false);
+        Self::deserialize_toml(content)
+    }
+
+    fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
+        let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
+        // TOML tables are unordered and the `toml` crate sorts keys
+        // lexicographically. Normalize rule order so that the `all` selector
+        // is applied before per-rule selectors.
+        if let Some(tool) = &mut pyproject.tool {
+            if let Some(ty) = &mut tool.ty {
+                ty.prioritize_all_selectors();
+            }
+        }
+        Ok(pyproject)
     }
 }
 
 /// PEP 621 project metadata (`project`).
 ///
 /// See <https://packaging.python.org/en/latest/specifications/pyproject-toml>.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Project {
     /// The name of the project
     ///
     /// Note: Intentionally option to be more permissive during deserialization.
     /// `PackageMetadata::from_pyproject` reports missing names.
-    pub name: Option<RangedValue<PackageName>>,
+    pub(crate) name: Option<RangedValue<PackageName>>,
     /// The version of the project
-    pub version: Option<RangedValue<Version>>,
+    pub(crate) version: Option<RangedValue<Version>>,
     /// The Python versions this project is compatible with.
-    pub requires_python: Option<RangedValue<VersionSpecifiers>>,
+    pub(crate) requires_python: Option<RangedValue<VersionSpecifiers>>,
 }
 
 impl Project {
     pub(super) fn resolve_requires_python_lower_bound(
         &self,
-    ) -> Result<Option<RangedValue<PythonVersion>>, ResolveRequiresPythonError> {
+    ) -> Result<Option<RangedValue<SupportedPythonVersion>>, ResolveRequiresPythonError> {
         let Some(requires_python) = self.requires_python.as_ref() else {
             return Ok(None);
         };
@@ -85,7 +108,7 @@ impl Project {
             Bound::Unbounded => {
                 return Err(ResolveRequiresPythonError::NoLowerBound(
                     requires_python.to_string(),
-                ))
+                ));
             }
         };
 
@@ -105,10 +128,18 @@ impl Project {
         let minor =
             u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
 
+        let lower_bound = PythonVersion::from((major, minor));
+        let supported_version = SupportedPythonVersion::iter()
+            .find(|supported_version| supported_version.to_python_version() >= lower_bound);
+
+        let Some(supported_version) = supported_version else {
+            return Err(ResolveRequiresPythonError::NoSupportedVersion(
+                requires_python.to_string(),
+            ));
+        };
+
         Ok(Some(
-            requires_python
-                .clone()
-                .map_value(|_| PythonVersion::from((major, minor))),
+            requires_python.clone().map_value(|_| supported_version),
         ))
     }
 }
@@ -119,8 +150,14 @@ pub enum ResolveRequiresPythonError {
     TooLargeMajor(u64),
     #[error("The minor version `{0}` is larger than the maximum supported value 255")]
     TooLargeMinor(u64),
-    #[error("value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.")]
+    #[error(
+        "value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`."
+    )]
     NoLowerBound(String),
+    #[error(
+        "value `{0}` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly."
+    )]
+    NoSupportedVersion(String),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -140,7 +177,7 @@ pub struct PackageName(String);
 
 impl PackageName {
     /// Create a validated, normalized package name.
-    pub(crate) fn new(name: String) -> Result<Self, InvalidPackageNameError> {
+    fn new(name: String) -> Result<Self, InvalidPackageNameError> {
         if name.is_empty() {
             return Err(InvalidPackageNameError::Empty);
         }
@@ -193,7 +230,7 @@ impl PackageName {
     }
 
     /// Returns the underlying package name.
-    pub(crate) fn as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         &self.0
     }
 }
@@ -233,7 +270,8 @@ pub(crate) enum InvalidPackageNameError {
     NonAlphanumericStart(char),
     #[error("name must end with letter or number but it ends with '{0}'")]
     NonAlphanumericEnd(char),
-    #[error("valid name consists only of ASCII letters and numbers, period, underscore and hyphen but name contains '{0}'"
+    #[error(
+        "valid name consists only of ASCII letters and numbers, period, underscore and hyphen but name contains '{0}'"
     )]
     InvalidCharacter(char),
     #[error("name must not be empty")]

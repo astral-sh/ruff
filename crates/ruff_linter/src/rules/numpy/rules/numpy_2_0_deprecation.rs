@@ -1,6 +1,4 @@
-use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
@@ -10,6 +8,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of NumPy functions and constants that were removed from
@@ -50,6 +50,7 @@ use crate::importer::ImportRequest;
 /// np.round(arr2)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct Numpy2Deprecation {
     existing: String,
     migration_guide: Option<String>,
@@ -68,7 +69,7 @@ impl Violation for Numpy2Deprecation {
         } = self;
         match migration_guide {
             Some(migration_guide) => {
-                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}",)
+                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}")
             }
             None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0"),
         }
@@ -269,13 +270,17 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         ["numpy", "deprecate"] => Replacement {
             existing: "deprecate",
             details: Details::Manual {
-                guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
+                guideline: Some(
+                    "Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.",
+                ),
             },
         },
         ["numpy", "deprecate_with_doc"] => Replacement {
             existing: "deprecate_with_doc",
             details: Details::Manual {
-                guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
+                guideline: Some(
+                    "Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`.",
+                ),
             },
         },
         ["numpy", "disp"] => Replacement {
@@ -293,14 +298,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         ["numpy", "find_common_type"] => Replacement {
             existing: "find_common_type",
             details: Details::Manual {
-                guideline: Some("Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`."),
+                guideline: Some(
+                    "Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`.",
+                ),
             },
         },
         ["numpy", "get_array_wrap"] => Replacement {
             existing: "get_array_wrap",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "float_"] => Replacement {
             existing: "float_",
@@ -318,10 +323,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "in1d"] => Replacement {
             existing: "in1d",
-            details: Details::AutoImport {
-                path: "numpy",
-                name: "isin",
-                compatibility: Compatibility::BackwardsCompatible,
+            details: Details::Manual {
+                guideline: Some(
+                    "Use `np.isin` instead. Unlike `np.in1d`, `np.isin` preserves the shape of its input, so `np.in1d(ar1, ar2)` is equivalent to `np.isin(ar1, ar2).ravel()`.",
+                ),
             },
         },
         ["numpy", "INF"] => Replacement {
@@ -358,9 +363,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "issctype"] => Replacement {
             existing: "issctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "issubclass_"] => Replacement {
             existing: "issubclass_",
@@ -386,9 +389,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "maximum_sctype"] => Replacement {
             existing: "maximum_sctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", existing @ ("NaN" | "NAN")] => Replacement {
             existing,
@@ -440,9 +441,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "obj2sctype"] => Replacement {
             existing: "obj2sctype",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "PINF"] => Replacement {
             existing: "PINF",
@@ -494,15 +493,11 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "sctype2char"] => Replacement {
             existing: "sctype2char",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "sctypes"] => Replacement {
             existing: "sctypes",
-            details: Details::Manual {
-                guideline: None,
-            },
+            details: Details::Manual { guideline: None },
         },
         ["numpy", "seterrobj"] => Replacement {
             existing: "seterrobj",
@@ -673,7 +668,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         Numpy2Deprecation {
             existing: replacement.existing.to_string(),
             migration_guide: replacement.details.guideline(),
@@ -688,12 +683,26 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
             compatibility,
         } => {
             diagnostic.try_set_fix(|| {
+                // `numpy.char` is not an importable module path on NumPy 1.x.
+                let (path, name, attribute) = if matches!(
+                    (path, name),
+                    ("numpy.char", "chararray" | "compare_chararrays")
+                ) {
+                    ("numpy", "char", Some(name))
+                } else {
+                    (path, name, None)
+                };
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import_from(path, name),
                     expr.start(),
                     checker.semantic(),
                 )?;
-                let replacement_edit = Edit::range_replacement(binding, expr.range());
+                let replacement = if let Some(attribute) = attribute {
+                    format!("{binding}.{attribute}")
+                } else {
+                    binding
+                };
+                let replacement_edit = Edit::range_replacement(replacement, expr.range());
                 Ok(match compatibility {
                     Compatibility::BackwardsCompatible => {
                         Fix::safe_edits(import_edit, [replacement_edit])
@@ -707,7 +716,6 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         )),
         Details::Manual { guideline: _ } => {}
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Ignore attempts to access a `numpy` member via its deprecated name
@@ -765,7 +773,7 @@ fn is_guarded_by_try_except(
             try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);

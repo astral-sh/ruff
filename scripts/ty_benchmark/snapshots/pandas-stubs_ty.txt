@@ -1,0 +1,2 @@
+All checks passed!
+WARN Ignoring the `tool.ty` section in `<CWD>/pyproject.toml` because `<CWD>/ty.toml` takes precedence.

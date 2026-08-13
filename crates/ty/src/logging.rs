@@ -1,16 +1,18 @@
 //! Sets up logging for ty
 
+use crate::args::TerminalColor;
 use anyhow::Context;
 use colored::Colorize;
 use std::fmt;
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, IsTerminal};
 use tracing::{Event, Subscriber};
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
-use tracing_subscriber::EnvFilter;
+use ty_static::EnvVars;
 
 /// Logging flags to `#[command(flatten)]` into your CLI
 #[derive(clap::Args, Debug, Clone, Default)]
@@ -22,15 +24,33 @@ pub(crate) struct Verbosity {
         help = "Use verbose output (or `-vv` and `-vvv` for more verbose output)",
         action = clap::ArgAction::Count,
         global = true,
+        overrides_with = "quiet",
     )]
     verbose: u8,
+
+    #[arg(
+        long,
+        short,
+        help = "Use quiet output (or `-qq` for silent output)",
+        action = clap::ArgAction::Count,
+        global = true,
+        overrides_with = "verbose",
+    )]
+    quiet: u8,
 }
 
 impl Verbosity {
-    /// Returns the verbosity level based on the number of `-v` flags.
+    /// Returns the verbosity level based on the number of `-v` and `-q` flags.
     ///
     /// Returns `None` if the user did not specify any verbosity flags.
     pub(crate) fn level(&self) -> VerbosityLevel {
+        // `--quiet` and `--verbose` are mutually exclusive in Clap, so we can just check one first.
+        match self.quiet {
+            0 => {}
+            1 => return VerbosityLevel::Quiet,
+            _ => return VerbosityLevel::Silent,
+        }
+
         match self.verbose {
             0 => VerbosityLevel::Default,
             1 => VerbosityLevel::Verbose,
@@ -40,9 +60,17 @@ impl Verbosity {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub(crate) enum VerbosityLevel {
+    /// Silent output. Does not show any logging output or summary information.
+    Silent,
+
+    /// Quiet output.  Only shows Ruff and ty events up to the [`ERROR`](tracing::Level::ERROR).
+    /// Silences output except for summary information.
+    Quiet,
+
     /// Default output level. Only shows Ruff and ty events up to the [`WARN`](tracing::Level::WARN).
+    #[default]
     Default,
 
     /// Enables verbose output. Emits Ruff and ty events up to the [`INFO`](tracing::Level::INFO).
@@ -60,6 +88,8 @@ pub(crate) enum VerbosityLevel {
 impl VerbosityLevel {
     const fn level_filter(self) -> LevelFilter {
         match self {
+            VerbosityLevel::Silent => LevelFilter::OFF,
+            VerbosityLevel::Quiet => LevelFilter::ERROR,
             VerbosityLevel::Default => LevelFilter::WARN,
             VerbosityLevel::Verbose => LevelFilter::INFO,
             VerbosityLevel::ExtraVerbose => LevelFilter::DEBUG,
@@ -67,28 +97,33 @@ impl VerbosityLevel {
         }
     }
 
-    pub(crate) const fn is_trace(self) -> bool {
+    const fn is_trace(self) -> bool {
         matches!(self, VerbosityLevel::Trace)
     }
 
-    pub(crate) const fn is_extra_verbose(self) -> bool {
+    const fn is_extra_verbose(self) -> bool {
         matches!(self, VerbosityLevel::ExtraVerbose)
     }
 }
 
-pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuard> {
+pub(crate) fn setup_tracing(
+    level: VerbosityLevel,
+    color: TerminalColor,
+) -> anyhow::Result<TracingGuard> {
     use tracing_subscriber::prelude::*;
 
     // The `TY_LOG` environment variable overrides the default log level.
-    let filter = if let Ok(log_env_variable) = std::env::var("TY_LOG") {
+    let filter = if let Ok(log_env_variable) = std::env::var(EnvVars::TY_LOG) {
         EnvFilter::builder()
             .parse(log_env_variable)
             .context("Failed to parse directives specified in TY_LOG environment variable.")?
     } else {
         match level {
             VerbosityLevel::Default => {
-                // Show warning traces
-                EnvFilter::default().add_directive(LevelFilter::WARN.into())
+                // Show warning traces for ty and ruff but not for other crates
+                EnvFilter::default()
+                    .add_directive("ty=warn".parse().unwrap())
+                    .add_directive("ruff=warn".parse().unwrap())
             }
             level => {
                 let level_filter = level.level_filter();
@@ -115,16 +150,21 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
         .with(filter)
         .with(profiling_layer);
 
+    let ansi = match color {
+        TerminalColor::Auto => {
+            colored::control::SHOULD_COLORIZE.should_colorize() && std::io::stderr().is_terminal()
+        }
+        TerminalColor::Always => true,
+        TerminalColor::Never => false,
+    };
+
     if level.is_trace() {
         let subscriber = registry.with(
-            tracing_tree::HierarchicalLayer::default()
-                .with_indent_lines(true)
-                .with_indent_amount(2)
-                .with_bracketed_fields(true)
+            tracing_subscriber::fmt::layer()
+                .event_format(tracing_subscriber::fmt::format().pretty())
                 .with_thread_ids(true)
-                .with_targets(true)
-                .with_writer(std::io::stderr)
-                .with_timer(tracing_tree::time::Uptime::default()),
+                .with_ansi(ansi)
+                .with_writer(std::io::stderr),
         );
 
         subscriber.init();
@@ -136,6 +176,7 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
                     display_timestamp: level.is_extra_verbose(),
                     show_spans: false,
                 })
+                .with_ansi(ansi)
                 .with_writer(std::io::stderr),
         );
 
@@ -155,7 +196,7 @@ fn setup_profile<S>() -> (
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    if let Ok("1" | "true") = std::env::var("TY_LOG_PROFILE").as_deref() {
+    if let Ok("1" | "true") = std::env::var(EnvVars::TY_LOG_PROFILE).as_deref() {
         let (layer, guard) = tracing_flame::FlameLayer::with_file("tracing.folded")
             .expect("Flame layer to be created");
         (Some(layer), Some(guard))

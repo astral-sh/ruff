@@ -1,4 +1,8 @@
-import sys
+"""distutils.command
+
+Package containing implementation of all the standard Distutils
+commands.
+"""
 
 from . import (
     bdist,
@@ -41,8 +45,3 @@ __all__ = [
     "check",
     "upload",
 ]
-
-if sys.version_info < (3, 10):
-    from . import bdist_wininst
-
-    __all__ += ["bdist_wininst"]

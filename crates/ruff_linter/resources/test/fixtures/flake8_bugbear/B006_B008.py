@@ -98,7 +98,7 @@ def dont_forget_me(value=collections.deque()):
     ...
 
 
-# N.B. we're also flagging the function call in the comprehension
+# B006 still flags mutable comprehension defaults.
 def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
     pass
 
@@ -199,6 +199,9 @@ def bytes_okay(value=bytes(1)):
 def int_okay(value=int("12")):
     pass
 
+# Allow immutable slice()
+def slice_okay(value=slice(1,2)):
+    pass
 
 # Allow immutable complex() value
 def complex_okay(value=complex(1,2)):

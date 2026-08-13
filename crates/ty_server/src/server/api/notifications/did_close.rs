@@ -1,44 +1,40 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidCloseTextDocument;
-use lsp_types::DidCloseTextDocumentParams;
-use ty_project::watch::ChangeEvent;
+use lsp_types::DidCloseTextDocumentNotification;
+use lsp_types::{DidCloseTextDocumentParams, TextDocumentIdentifier};
 
-use crate::server::api::diagnostics::clear_diagnostics;
-use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::api::LSPResult;
-use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
+use crate::server::api::LSPResult;
+use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
-use crate::system::{url_to_any_system_path, AnySystemPath};
+use crate::session::client::Client;
 
 pub(crate) struct DidCloseTextDocumentHandler;
 
 impl NotificationHandler for DidCloseTextDocumentHandler {
-    type NotificationType = DidCloseTextDocument;
+    type NotificationType = DidCloseTextDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidCloseTextDocumentHandler {
     fn run(
         session: &mut Session,
-        notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: DidCloseTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
-            return Ok(());
-        };
+        let DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri },
+        } = params;
 
-        let key = session.key_from_url(params.text_document.uri);
-        session
-            .close_document(&key)
+        let document = session
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        if let AnySystemPath::SystemVirtual(virtual_path) = path {
-            let db = session.default_project_db_mut();
-            db.apply_changes(vec![ChangeEvent::DeletedVirtual(virtual_path)], None);
-        }
+        let should_clear_diagnostics = document
+            .close(session)
+            .with_failure_code(ErrorCode::InternalError)?;
 
-        clear_diagnostics(key.url(), &notifier)?;
+        if should_clear_diagnostics {
+            session.clear_diagnostics_if_needed(&document, client);
+        }
 
         Ok(())
     }

@@ -1,0 +1,17 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/visitor.rs
+expression: trace
+---
+- StmtExpr
+  - ExprTString
+    - TString
+      - InterpolatedStringLiteralElement
+    - TString
+      - InterpolatedStringLiteralElement
+      - InterpolatedElement
+        - ExprName
+        - InterpolatedStringLiteralElement
+        - InterpolatedElement
+          - ExprName
+        - InterpolatedStringLiteralElement
+      - InterpolatedStringLiteralElement

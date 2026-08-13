@@ -10,11 +10,11 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::flake8_builtins;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
@@ -59,7 +59,23 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
+    fn deferred_annotations_diff(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "deferred_annotations_diff_{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_builtins").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY313),
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY314),
+        );
         Ok(())
     }
 
@@ -89,7 +105,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -112,7 +128,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -136,7 +152,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -163,7 +179,7 @@ mod tests {
             },
         )?;
 
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -207,7 +223,7 @@ mod tests {
             },
         )?;
 
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -216,12 +232,9 @@ mod tests {
         let snapshot = format!("{}_{}_py38", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY38),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

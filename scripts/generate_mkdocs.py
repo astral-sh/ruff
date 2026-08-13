@@ -47,13 +47,13 @@ SECTIONS: list[Section] = [
     Section("Configuring Ruff", "configuration.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
+    Section("Default Rules", "default-rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
     Section("Versioning", "versioning.md", generated=False),
     Section("Integrations", "integrations.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
 ]
-
 
 LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/": "index.md",
@@ -62,18 +62,23 @@ LINK_REWRITES: dict[str, str] = {
         "configuration.md#config-file-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
+    "https://docs.astral.sh/ruff/editors": "editors/index.md",
     "https://docs.astral.sh/ruff/editors/setup": "editors/setup.md",
-    "https://docs.astral.sh/ruff/integrations/": "integrations.md",
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
         "faq.md#how-does-ruffs-linter-compare-to-flake8"
+    ),
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort": (
+        "faq.md#how-does-ruffs-import-sorting-compare-to-isort"
     ),
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
         "faq.md#how-does-ruffs-formatter-compare-to-black"
     ),
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
+    "https://docs.astral.sh/ruff/default-rules/": "default-rules.md",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
     "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
+    "https://docs.astral.sh/ruff/preview/": "preview.md",
 }
 
 
@@ -205,6 +210,11 @@ def main() -> None:
             if filename == "settings.md":
                 file_content = subprocess.check_output(
                     ["cargo", "dev", "generate-options"],
+                    encoding="utf-8",
+                )
+            elif filename == "default-rules.md":
+                file_content = subprocess.check_output(
+                    ["cargo", "dev", "generate-default-rules"],
                     encoding="utf-8",
                 )
             else:

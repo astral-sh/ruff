@@ -1,30 +1,31 @@
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for usage of `datetime.date.today()`.
 ///
 /// ## Why is this bad?
-/// Python datetime objects can be naive or timezone-aware. While an aware
+/// Python date objects are naive, that is, not timezone-aware. While an aware
 /// object represents a specific moment in time, a naive object does not
 /// contain enough information to unambiguously locate itself relative to other
 /// datetime objects. Since this can lead to errors, it is recommended to
 /// always use timezone-aware objects.
 ///
-/// `datetime.date.today` returns a naive datetime object. Instead, use
-/// `datetime.datetime.now(tz=...).date()` to create a timezone-aware object.
+/// `datetime.date.today` returns a naive date object without taking timezones
+/// into account. Instead, use `datetime.datetime.now(tz=...).date()` to
+/// create a timezone-aware object and retrieve its date component.
 ///
 /// ## Example
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.today()
+/// datetime.date.today()
 /// ```
 ///
 /// Use instead:
@@ -44,6 +45,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDateToday;
 
 impl Violation for CallDateToday {
@@ -57,6 +59,7 @@ impl Violation for CallDateToday {
     }
 }
 
+/// DTZ011
 pub(crate) fn call_date_today(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;
@@ -69,6 +72,6 @@ pub(crate) fn call_date_today(checker: &Checker, func: &Expr, location: TextRang
             matches!(qualified_name.segments(), ["datetime", "date", "today"])
         })
     {
-        checker.report_diagnostic(Diagnostic::new(CallDateToday, location));
+        checker.report_diagnostic(CallDateToday, location);
     }
 }

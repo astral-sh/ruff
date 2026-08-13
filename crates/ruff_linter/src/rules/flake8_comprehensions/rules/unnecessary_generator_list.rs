@@ -1,15 +1,15 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::ExprGenerator;
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary generators that can be rewritten as list
@@ -42,6 +42,7 @@ use super::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.61")]
 pub(crate) struct UnnecessaryGeneratorList {
     short_circuit: bool,
 }
@@ -94,22 +95,23 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
     if let [generator] = generators.as_slice() {
         if generator.ifs.is_empty() && !generator.is_async {
             if ComparableExpr::from(elt) == ComparableExpr::from(&generator.target) {
-                let diagnostic = Diagnostic::new(
-                    UnnecessaryGeneratorList {
-                        short_circuit: true,
-                    },
-                    call.range(),
-                );
                 let iterator = format!("list({})", checker.locator().slice(generator.iter.range()));
                 let fix = Fix::unsafe_edit(Edit::range_replacement(iterator, call.range()));
-                checker.report_diagnostic(diagnostic.with_fix(fix));
+                checker
+                    .report_diagnostic(
+                        UnnecessaryGeneratorList {
+                            short_circuit: true,
+                        },
+                        call.range(),
+                    )
+                    .set_fix(fix);
                 return;
             }
         }
     }
 
     // Convert `list(f(x) for x in y)` to `[f(x) for x in y]`.
-    let diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UnnecessaryGeneratorList {
             short_circuit: false,
         },
@@ -140,13 +142,9 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
         if *parenthesized {
             // The generator's range will include the innermost parentheses, but it could be
             // surrounded by additional parentheses.
-            let range = parenthesized_range(
-                argument.into(),
-                (&call.arguments).into(),
-                checker.comment_ranges(),
-                checker.locator().contents(),
-            )
-            .unwrap_or(argument.range());
+            let range =
+                parenthesized_range(argument.into(), (&call.arguments).into(), checker.tokens())
+                    .unwrap_or(argument.range());
 
             // The generator always parenthesizes the expression; trim the parentheses.
             let generator = checker.generator().expr(argument);
@@ -158,5 +156,5 @@ pub(crate) fn unnecessary_generator_list(checker: &Checker, call: &ast::ExprCall
             Fix::unsafe_edits(call_start, [call_end])
         }
     };
-    checker.report_diagnostic(diagnostic.with_fix(fix));
+    diagnostic.set_fix(fix);
 }

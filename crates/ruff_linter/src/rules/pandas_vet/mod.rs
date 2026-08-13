@@ -10,8 +10,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::test::{test_path, test_snippet};
-    use crate::{assert_messages, settings};
+    use crate::test::{assert_notebook_path, test_path, test_resource_path, test_snippet};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(
         r#"
@@ -28,6 +28,21 @@ mod tests {
         x.drop(["a"], axis=1, inplace=True)
     "#,
         "PD002_fail"
+    )]
+    #[test_case(
+        r"
+        import polars as pl
+        x = pl.DataFrame()
+        x.drop(['a'], inplace=True)
+        ",
+        "PD002_pass_polars"
+    )]
+    #[test_case(
+        r"
+        x = DataFrame()
+        x.drop(['a'], inplace=True)
+        ",
+        "PD002_pass_no_import"
     )]
     #[test_case(
         r"
@@ -355,7 +370,7 @@ mod tests {
             contents,
             &settings::LinterSettings::for_rules(Linter::PandasVet.rules()),
         );
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
     }
 
     #[test_case(
@@ -370,7 +385,22 @@ mod tests {
             Path::new("pandas_vet").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn pd002_fix_at_notebook_cell_start() -> Result<()> {
+        let actual = test_resource_path("fixtures").join("pandas_vet/PD002_cell_start.ipynb");
+        let expected =
+            test_resource_path("fixtures").join("pandas_vet/PD002_cell_start_expected.ipynb");
+
+        assert_notebook_path(
+            actual,
+            expected,
+            &settings::LinterSettings::for_rule(Rule::PandasUseOfInplaceArgument),
+        )?;
+
         Ok(())
     }
 }

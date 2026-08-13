@@ -6,13 +6,13 @@ use ruff_python_ast::{
 };
 use smallvec::SmallVec;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_semantic::{analyze::visibility::is_overload, SemanticModel};
+use ruff_python_semantic::{SemanticModel, analyze::visibility::is_overload};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for incorrect function signatures on `__exit__` and `__aexit__`
@@ -47,6 +47,7 @@ use crate::checkers::ast::Checker;
 ///     ) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct BadExitAnnotation {
     func_kind: FuncKind,
     error_kind: ErrorKind,
@@ -59,17 +60,31 @@ impl Violation for BadExitAnnotation {
     fn message(&self) -> String {
         let method_name = self.func_kind.to_string();
         match self.error_kind {
-            ErrorKind::StarArgsNotAnnotated => format!("Star-args in `{method_name}` should be annotated with `object`"),
-            ErrorKind::MissingArgs => format!("If there are no star-args, `{method_name}` should have at least 3 non-keyword-only args (excluding `self`)"),
-            ErrorKind::ArgsAfterFirstFourMustHaveDefault => format!("All arguments after the first four in `{method_name}` must have a default value"),
-            ErrorKind::AllKwargsMustHaveDefault => format!("All keyword-only arguments in `{method_name}` must have a default value"),
-            ErrorKind::FirstArgBadAnnotation => format!("The first argument in `{method_name}` should be annotated with `object` or `type[BaseException] | None`"),
-            ErrorKind::SecondArgBadAnnotation => format!("The second argument in `{method_name}` should be annotated with `object` or `BaseException | None`"),
-            ErrorKind::ThirdArgBadAnnotation => format!("The third argument in `{method_name}` should be annotated with `object` or `types.TracebackType | None`"),
+            ErrorKind::StarArgsNotAnnotated => {
+                format!("Star-args in `{method_name}` should be annotated with `object`")
+            }
+            ErrorKind::MissingArgs => format!(
+                "If there are no star-args, `{method_name}` should have at least 3 non-keyword-only args (excluding `self`)"
+            ),
+            ErrorKind::ArgsAfterFirstFourMustHaveDefault => format!(
+                "All arguments after the first four in `{method_name}` must have a default value"
+            ),
+            ErrorKind::AllKwargsMustHaveDefault => {
+                format!("All keyword-only arguments in `{method_name}` must have a default value")
+            }
+            ErrorKind::FirstArgBadAnnotation => format!(
+                "The first argument in `{method_name}` should be annotated with `object` or `type[BaseException] | None`"
+            ),
+            ErrorKind::SecondArgBadAnnotation => format!(
+                "The second argument in `{method_name}` should be annotated with `object` or `BaseException | None`"
+            ),
+            ErrorKind::ThirdArgBadAnnotation => format!(
+                "The third argument in `{method_name}` should be annotated with `object` or `types.TracebackType | None`"
+            ),
             ErrorKind::UnrecognizedExitOverload => format!(
                 "Annotations for a three-argument `{method_name}` overload (excluding `self`) \
                 should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`"
-            )
+            ),
         }
     }
 
@@ -167,13 +182,13 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         .skip(3)
         .filter(|parameter| parameter.default.is_none())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::ArgsAfterFirstFourMustHaveDefault,
             },
             parameter.range(),
-        ));
+        );
     }
 
     // ...as should all keyword-only arguments.
@@ -182,13 +197,13 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         .iter()
         .filter(|arg| arg.default.is_none())
     {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::AllKwargsMustHaveDefault,
             },
             parameter.range(),
-        ));
+        );
     }
 
     check_positional_args_for_non_overloaded_method(checker, &non_self_positional_args, func_kind);
@@ -202,7 +217,7 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
             .annotation()
             .filter(|ann| !is_object_or_unused(ann, checker.semantic()))
         {
-            let mut diagnostic = Diagnostic::new(
+            let mut diagnostic = checker.report_diagnostic(
                 BadExitAnnotation {
                     func_kind,
                     error_kind: ErrorKind::StarArgsNotAnnotated,
@@ -219,17 +234,15 @@ fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: 
                 let binding_edit = Edit::range_replacement(binding, annotation.range());
                 Ok(Fix::safe_edits(binding_edit, import_edit))
             });
-
-            checker.report_diagnostic(diagnostic);
         }
     } else {
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind,
                 error_kind: ErrorKind::MissingArgs,
             },
             parameters.range(),
-        ));
+        );
     }
 }
 
@@ -270,13 +283,13 @@ fn check_positional_args_for_non_overloaded_method(
             continue;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
+        checker.report_diagnostic(
             BadExitAnnotation {
                 func_kind: kind,
                 error_kind: error_info,
             },
             annotation.range(),
-        ));
+        );
     }
 }
 
@@ -335,6 +348,7 @@ fn check_positional_args_for_overloaded_method(
         // If any overloads have any variadic arguments, don't do any checking
         let Parameters {
             range: _,
+            node_index: _,
             posonlyargs,
             args,
             vararg: None,
@@ -409,13 +423,13 @@ fn check_positional_args_for_overloaded_method(
     }
 
     // Okay, neither of them match...
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         BadExitAnnotation {
             func_kind: kind,
             error_kind: ErrorKind::UnrecognizedExitOverload,
         },
         parameters_range,
-    ));
+    );
 }
 
 /// Return the non-`None` annotation element of a PEP 604-style union or `Optional` annotation.

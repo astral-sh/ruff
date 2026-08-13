@@ -1,10 +1,6 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast};
-use ruff_python_semantic::ScopeKind;
-use ruff_text_size::Ranged;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::checkers::ast::Checker;
+use crate::Violation;
 
 /// ## What it does
 /// Checks for uses of `yield from` in async functions.
@@ -28,21 +24,12 @@ use crate::checkers::ast::Checker;
 ///         yield number
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct YieldFromInAsyncFunction;
 
 impl Violation for YieldFromInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         "`yield from` statement in async function; use `async for` instead".to_string()
-    }
-}
-
-/// PLE1700
-pub(crate) fn yield_from_in_async_function(checker: &Checker, expr: &ast::ExprYieldFrom) {
-    if matches!(
-        checker.semantic().current_scope().kind,
-        ScopeKind::Function(ast::StmtFunctionDef { is_async: true, .. })
-    ) {
-        checker.report_diagnostic(Diagnostic::new(YieldFromInAsyncFunction, expr.range()));
     }
 }

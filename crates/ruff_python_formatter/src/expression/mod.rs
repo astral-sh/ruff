@@ -2,21 +2,21 @@ use std::cmp::Ordering;
 use std::slice;
 
 use ruff_formatter::{
-    write, FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions,
+    FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions, write,
 };
-use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::visitor::source_order::{walk_expr, SourceOrderVisitor};
+use ruff_python_ast::token::parentheses_iterator;
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
+use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
-    OptionalParentheses, Parentheses, Parenthesize,
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, optional_parentheses,
+    parenthesized,
 };
 use crate::prelude::*;
 use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
@@ -50,6 +50,7 @@ pub(crate) mod expr_slice;
 pub(crate) mod expr_starred;
 pub(crate) mod expr_string_literal;
 pub(crate) mod expr_subscript;
+pub(crate) mod expr_t_string;
 pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
@@ -94,6 +95,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
+            Expr::TString(expr) => expr.format().fmt(f),
             Expr::StringLiteral(expr) => expr.format().fmt(f),
             Expr::BytesLiteral(expr) => expr.format().fmt(f),
             Expr::NumberLiteral(expr) => expr.format().fmt(f),
@@ -110,11 +112,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
         let parenthesize = match parentheses {
-            Parentheses::Preserve => is_expression_parenthesized(
-                expression.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            ),
+            Parentheses::Preserve => f.context().is_expression_parenthesized(expression.into()),
             Parentheses::Always => true,
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
@@ -214,13 +212,8 @@ fn format_with_parentheses_comments(
     //     )
     // )
     // ```
-    let range_with_parens = parentheses_iterator(
-        expression.into(),
-        None,
-        f.context().comments().ranges(),
-        f.context().source(),
-    )
-    .last();
+    let range_with_parens =
+        parentheses_iterator(expression.into(), None, f.context().tokens()).last();
 
     let (leading_split, trailing_split) = if let Some(range_with_parens) = range_with_parens {
         let leading_split = node_comments
@@ -282,6 +275,7 @@ fn format_with_parentheses_comments(
         Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::TString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::NumberLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -357,11 +351,8 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         } = self;
 
         let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized(
-                (*expression).into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            );
+            && f.context()
+                .is_expression_parenthesized((*expression).into());
 
         // If we want to preserve parentheses, short-circuit.
         if preserve_parentheses {
@@ -391,7 +382,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                         .fmt(f)
                 } else {
                     expression.format().with_options(Parentheses::Never).fmt(f)
-                }
+                };
             }
             needs_parentheses => needs_parentheses,
         };
@@ -480,6 +471,7 @@ impl NeedsParentheses for Expr {
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
+            Expr::TString(expr) => expr.needs_parentheses(parent, context),
             Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
@@ -681,6 +673,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             #[expect(clippy::cast_possible_truncation)]
             Expr::BoolOp(ast::ExprBoolOp {
                 range: _,
+                node_index: _,
                 op: _,
                 values,
             }) => self.update_max_precedence_with_count(
@@ -692,6 +685,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 left: _,
                 right: _,
                 range: _,
+                node_index: _,
             }) => self.update_max_precedence(OperatorPrecedence::from(*op)),
 
             Expr::If(_) => {
@@ -704,6 +698,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             #[expect(clippy::cast_possible_truncation)]
             Expr::Compare(ast::ExprCompare {
                 range: _,
+                node_index: _,
                 left: _,
                 ops,
                 comparators: _,
@@ -714,7 +709,8 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 );
             }
             Expr::Call(ast::ExprCall {
-                range: _,
+                range_start: _,
+                node_index: _,
                 func,
                 arguments: _,
             }) => {
@@ -736,6 +732,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
                 range: _,
+                node_index: _,
                 value,
                 attr: _,
                 ctx: _,
@@ -756,6 +753,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             // Visit the sub-expressions because the sub expressions may be the end of the entire expression.
             Expr::UnaryOp(ast::ExprUnaryOp {
                 range: _,
+                node_index: _,
                 op,
                 operand: _,
             }) => {
@@ -775,6 +773,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be at the end).
             Expr::FString(_)
+            | Expr::TString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)
@@ -797,11 +796,7 @@ impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'i
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(
-            expr.into(),
-            self.context.comments().ranges(),
-            self.context.source(),
-        ) {
+        if self.context.is_expression_parenthesized(expr.into()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -865,6 +860,22 @@ impl<'a> First<'a> {
 ///     )
 /// ).all()
 /// ```
+///
+/// In [`preview`](crate::preview::is_fluent_layout_split_first_call_enabled), we also track the position of the leftmost call or
+/// subscript on an attribute in the chain and break just before the dot.
+///
+/// So, for example, the right-hand summand in the above expression
+/// would get formatted as:
+/// ```python
+///     Blog.objects
+///     .filter(
+///         entry__headline__contains="McCartney",
+///     )
+///     .limit_results[:10]
+///     .filter(
+///         entry__pub_date__year=2010,
+///     )
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum CallChainLayout {
     /// The root of a call chain
@@ -872,19 +883,145 @@ pub enum CallChainLayout {
     Default,
 
     /// A nested call chain element that uses fluent style.
-    Fluent,
+    Fluent(AttributeState),
 
     /// A nested call chain element not using fluent style.
     NonFluent,
 }
 
+/// Records information about the current position within
+/// a call chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttributeState {
+    /// Stores the number of calls or subscripts
+    /// to the left of the current position in a chain.
+    ///
+    /// Consecutive calls/subscripts on a single
+    /// object only count once. For example, if we are at
+    /// `c` in `a.b()[0]()().c()` then this number would be 1.
+    ///
+    /// Caveat: If the root of the chain is parenthesized,
+    /// it contributes +1 to this count, even if it is not
+    /// a call or subscript. But the name
+    /// `CallLikeOrParenthesizedRootPreceding`
+    /// is a tad unwieldy, and this also rarely occurs.
+    CallLikePreceding(u32),
+    /// Indicates that we are at the first called or
+    /// subscripted object in the chain
+    ///
+    /// For example, if we are at `b` in `a.b()[0]()().c()`
+    FirstCallLike,
+    /// Indicates that we are to the left of the first
+    /// called or subscripted object in the chain, and therefore
+    /// need not break.
+    ///
+    /// For example, if we are at `a` in `a.b()[0]()().c()`
+    BeforeFirstCallLike,
+}
+
 impl CallChainLayout {
-    pub(crate) fn from_expression(
-        mut expr: ExprRef,
-        comment_ranges: &CommentRanges,
-        source: &str,
-    ) -> Self {
-        let mut attributes_after_parentheses = 0;
+    /// Returns new state decreasing count of remaining calls/subscripts
+    /// to traverse, or the state `FirstCallOrSubscript`, as appropriate.
+    #[must_use]
+    fn decrement_call_like_count(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::CallLikePreceding(x)) => {
+                if x > 1 {
+                    // Recall that we traverse call chains from right to
+                    // left. So after moving from a call/subscript into
+                    // an attribute, we _decrease_ the count of
+                    // _remaining_ calls or subscripts to the left of our
+                    // current position.
+                    Self::Fluent(AttributeState::CallLikePreceding(x - 1))
+                } else {
+                    Self::Fluent(AttributeState::FirstCallLike)
+                }
+            }
+            _ => self,
+        }
+    }
+
+    /// Returns with state change
+    /// `FirstCallOrSubscript` -> `BeforeFirstCallOrSubscript`
+    /// and otherwise returns unchanged.
+    #[must_use]
+    fn transition_after_attribute(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::FirstCallLike) => {
+                Self::Fluent(AttributeState::BeforeFirstCallLike)
+            }
+            _ => self,
+        }
+    }
+
+    fn is_first_call_like(self) -> bool {
+        matches!(self, Self::Fluent(AttributeState::FirstCallLike))
+    }
+
+    /// Returns either `Fluent` or `NonFluent` depending on a
+    /// heuristic computed for the whole chain.
+    ///
+    /// Explicitly, the criterion to return `Fluent` is
+    /// as follows:
+    ///
+    /// 1. Beginning from the right (i.e. the `expr` itself),
+    ///    traverse inwards past calls, subscripts, and attribute
+    ///    expressions until we meet the first expression that is
+    ///    either none of these or else is parenthesized. This will
+    ///    be the _root_ of the call chain.
+    /// 2. Count the number of _attribute values_ that are _called
+    ///    or subscripted_ in the chain (note that this includes the
+    ///    root but excludes the rightmost attribute in the chain since
+    ///    it is not the _value_ of some attribute).
+    /// 3. If the root is parenthesized, add 1 to that value.
+    /// 4. If the total is at least 2, return `Fluent`. Otherwise
+    ///    return `NonFluent`
+    fn from_expression(mut expr: ExprRef, context: &PyFormatContext) -> Self {
+        // TODO(dylan): Once the fluent layout preview style is
+        // stabilized, see if it is possible to simplify some of
+        // the logic around parenthesized roots. (While supporting
+        // both styles it is more difficult to do this.)
+
+        // Count of attribute _values_ which are called or
+        // subscripted, after the leftmost parenthesized
+        // value.
+        //
+        // Examples:
+        // ```
+        // # Count of 3 - notice that .d()
+        // # does not contribute
+        // a().b().c[0]()().d()
+        // # Count of 2 - notice that a()
+        // # does not contribute
+        // (a()).b().c[0].d
+        // ```
+        let mut computed_attribute_values_after_parentheses = 0;
+
+        // Similar to the above, but instead looks at all calls
+        // and subscripts rather than looking only at those on
+        // _attribute values_. So this count can differ from the
+        // above.
+        //
+        // Examples of `computed_attribute_values_after_parentheses` vs
+        // `call_like_count`:
+        //
+        // a().b --->  1 vs 1
+        // a.b().c --> 1 vs 1
+        // a.b() --->  0 vs 1
+        let mut call_like_count = 0;
+
+        // Going from right to left, we traverse calls, subscripts,
+        // and attributes until we get to an expression of a different
+        // kind _or_ to a parenthesized expression. This records
+        // the case where we end the traversal at a parenthesized expression.
+        //
+        // In these cases, the inferred semantics of the chain are different.
+        // We interpret this as the user indicating:
+        // "this parenthesized value is the object of interest and we are
+        // doing transformations on it". This increases our confidence that
+        // this should be fluently formatted, and also means we should make
+        // our first break after this value.
+        let mut root_value_parenthesized = false;
         loop {
             match expr {
                 ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
@@ -894,12 +1031,12 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    if is_expression_parenthesized(value.into(), comment_ranges, source) {
+                    if context.is_expression_parenthesized(value.into()) {
                         // `(a).b`. We preserve these parentheses so don't recurse
-                        attributes_after_parentheses += 1;
+                        root_value_parenthesized = true;
                         break;
                     } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
-                        attributes_after_parentheses += 1;
+                        computed_attribute_values_after_parentheses += 1;
                     }
 
                     expr = ExprRef::from(value.as_ref());
@@ -914,37 +1051,74 @@ impl CallChainLayout {
                 // ```
                 ExprRef::Call(ast::ExprCall { func: inner, .. })
                 | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    // We preserve these parentheses so don't recurse
+                    // e.g. (a)[0].x().y().z()
+                    //         ^stop here
+                    if context.is_expression_parenthesized(inner.into()) {
+                        break;
+                    }
+
+                    // Accumulate the `call_like_count`, but we only
+                    // want to count things like `a()[0]()()` once.
+                    if !inner.is_call_expr() && !inner.is_subscript_expr() {
+                        call_like_count += 1;
+                    }
+
                     expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
-                    // We to format the following in fluent style:
-                    // ```
-                    // f2 = (a).w().t(1,)
-                    //       ^ expr
-                    // ```
-                    if is_expression_parenthesized(expr, comment_ranges, source) {
-                        attributes_after_parentheses += 1;
-                    }
-
                     break;
                 }
             }
-
-            // We preserve these parentheses so don't recurse
-            if is_expression_parenthesized(expr, comment_ranges, source) {
-                break;
-            }
         }
-        if attributes_after_parentheses < 2 {
+
+        if computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
-            CallChainLayout::Fluent
+            CallChainLayout::Fluent(AttributeState::CallLikePreceding(
+                // We count a parenthesized root value as an extra
+                // call for the purposes of tracking state.
+                //
+                // The reason is that, in this case, we want the first
+                // "special" break to happen right after the root, as
+                // opposed to right after the first called/subscripted
+                // attribute.
+                //
+                // For example:
+                //
+                // ```
+                // (object_of_interest)
+                // .data.filter()
+                // .agg()
+                // .etc()
+                // ```
+                //
+                // instead of (in preview):
+                //
+                // ```
+                // (object_of_interest)
+                // .data
+                // .filter()
+                // .etc()
+                // ```
+                //
+                // For comparison, if we didn't have parentheses around
+                // the root, we want (and get, in preview):
+                //
+                // ```
+                // object_of_interest.data
+                // .filter()
+                // .agg()
+                // .etc()
+                // ```
+                call_like_count + u32::from(root_value_parenthesized),
+            ))
         }
     }
 
     /// Determine whether to actually apply fluent layout in attribute, call and subscript
     /// formatting
-    pub(crate) fn apply_in_node<'a>(
+    fn apply_in_node<'a>(
         self,
         item: impl Into<ExprRef<'a>>,
         f: &mut PyFormatter,
@@ -952,17 +1126,17 @@ impl CallChainLayout {
         match self {
             CallChainLayout::Default => {
                 if f.context().node_level().is_parenthesized() {
-                    CallChainLayout::from_expression(
-                        item.into(),
-                        f.context().comments().ranges(),
-                        f.context().source(),
-                    )
+                    CallChainLayout::from_expression(item.into(), f.context())
                 } else {
                     CallChainLayout::NonFluent
                 }
             }
-            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+            layout @ (CallChainLayout::Fluent(_) | CallChainLayout::NonFluent) => layout,
         }
+    }
+
+    fn is_fluent(self) -> bool {
+        matches!(self, CallChainLayout::Fluent(_))
     }
 }
 
@@ -997,7 +1171,7 @@ pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if is_expression_parenthesized(expr.into(), context.comments().ranges(), context.source()) {
+    if context.is_expression_parenthesized(expr.into()) {
         return Some(OwnParentheses::NonEmpty);
     }
 
@@ -1126,6 +1300,7 @@ pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> 
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::FString(_)
+        | Expr::TString(_)
         | Expr::EllipsisLiteral(_) => false,
     }
 }
@@ -1210,17 +1385,11 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
 
         Expr::Call(ast::ExprCall {
             arguments, func, ..
-        }) => {
-            !arguments.is_empty()
-                || is_expression_parenthesized(
-                    func.as_ref().into(),
-                    context.comments().ranges(),
-                    context.source(),
-                )
-        }
+        }) => !arguments.is_empty() || context.is_expression_parenthesized(func.as_ref().into()),
 
         // String like literals can expand if they are implicit concatenated.
         Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
+        Expr::TString(tstring) => tstring.value.is_implicit_concatenated(),
         Expr::StringLiteral(string) => string.value.is_implicit_concatenated(),
         Expr::BytesLiteral(bytes) => bytes.value.is_implicit_concatenated(),
 
@@ -1234,13 +1403,19 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::Attribute(ast::ExprAttribute {
             value: expression, ..
         }) => {
-            is_expression_parenthesized(
-                expression.into(),
-                context.comments().ranges(),
-                context.source(),
-            ) || is_splittable_expression(expression.as_ref(), context)
+            context.is_expression_parenthesized(expression.into())
+                || is_splittable_expression(expression.as_ref(), context)
         }
     }
+}
+
+/// Returns `true` if `expr` is invalid in a type-expression position unless the source keeps it
+/// parenthesized.
+pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Named(_) | Expr::Await(_) | Expr::Yield(_) | Expr::YieldFrom(_)
+    )
 }
 
 /// Returns the sub-expression to which the left-most character in expression belongs.
@@ -1251,11 +1426,7 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
 ///
 /// Parenthesized expressions are treated as belonging to the enclosing expression. Therefore, the left
 /// most expression for `(a + b) * c` is `a + b` and not `a`.
-pub(crate) fn left_most<'expr>(
-    expression: &'expr Expr,
-    comment_ranges: &CommentRanges,
-    source: &str,
-) -> &'expr Expr {
+pub(crate) fn left_most<'expr>(expression: &'expr Expr, trivia: &TriviaRanges) -> &'expr Expr {
     let mut current = expression;
     loop {
         let left = match current {
@@ -1278,6 +1449,7 @@ pub(crate) fn left_most<'expr>(
             | Expr::Name(_)
             | Expr::Starred(_)
             | Expr::FString(_)
+            | Expr::TString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)
@@ -1303,7 +1475,7 @@ pub(crate) fn left_most<'expr>(
             break current;
         };
 
-        if is_expression_parenthesized(left.into(), comment_ranges, source) {
+        if trivia.parenthesized().contains(left.range()) {
             break current;
         }
 

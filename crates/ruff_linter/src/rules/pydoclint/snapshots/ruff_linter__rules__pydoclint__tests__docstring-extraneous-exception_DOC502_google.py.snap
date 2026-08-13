@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC502_google.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+  --> DOC502_google.py:7:5
    |
  5 |   # DOC502
  6 |   def calculate_speed(distance: float, time: float) -> float:
@@ -17,12 +18,13 @@ DOC502_google.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterT
 16 | |     Raises:
 17 | |         FasterThanLightError: If speed is greater than the speed of light.
 18 | |     """
-   | |_______^ DOC502
+   | |_______^
 19 |       return distance / time
    |
-   = help: Remove `FasterThanLightError` from the docstring
+help: Remove `FasterThanLightError` from the docstring
 
-DOC502_google.py:24:5: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+  --> DOC502_google.py:24:5
    |
 22 |   # DOC502
 23 |   def calculate_speed(distance: float, time: float) -> float:
@@ -39,12 +41,13 @@ DOC502_google.py:24:5: DOC502 Raised exceptions are not explicitly raised: `Fast
 34 | |         FasterThanLightError: If speed is greater than the speed of light.
 35 | |         DivisionByZero: Divide by zero.
 36 | |     """
-   | |_______^ DOC502
+   | |_______^
 37 |       return distance / time
    |
-   = help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
+help: Remove `FasterThanLightError`, `DivisionByZero` from the docstring
 
-DOC502_google.py:42:5: DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+DOC502 Raised exception is not explicitly raised: `DivisionByZero`
+  --> DOC502_google.py:42:5
    |
 40 |   # DOC502
 41 |   def calculate_speed(distance: float, time: float) -> float:
@@ -61,8 +64,8 @@ DOC502_google.py:42:5: DOC502 Raised exception is not explicitly raised: `Divisi
 52 | |         FasterThanLightError: If speed is greater than the speed of light.
 53 | |         DivisionByZero: Divide by zero.
 54 | |     """
-   | |_______^ DOC502
+   | |_______^
 55 |       try:
 56 |           return distance / time
    |
-   = help: Remove `DivisionByZero` from the docstring
+help: Remove `DivisionByZero` from the docstring

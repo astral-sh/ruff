@@ -114,8 +114,17 @@ impl<'a> TypingTarget<'a> {
             Expr::StringLiteral(string_expr) => checker
                 .parse_type_annotation(string_expr)
                 .ok()
-                .map(|parsed_annotation| {
-                    TypingTarget::ForwardReference(parsed_annotation.expression())
+                .and_then(|parsed_annotation| {
+                    let inner = parsed_annotation.expression();
+                    if inner.is_string_literal_expr() {
+                        // A forward reference that resolves to another string literal
+                        // (e.g. `"'int'"`) is not a valid type annotation. Avoid
+                        // recursing, which would loop forever when `relocate_expr`
+                        // gives the inner literal the same text range as the outer.
+                        None
+                    } else {
+                        Some(TypingTarget::ForwardReference(inner))
+                    }
                 }),
             _ => semantic.resolve_qualified_name(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the
@@ -244,9 +253,8 @@ pub(crate) fn type_hint_explicitly_allows_none<'a>(
     version: ast::PythonVersion,
 ) -> Option<&'a Expr> {
     match TypingTarget::try_from_expr(annotation, checker, version) {
-        None |
-            // Short circuit on top level `None`, `Any` or `Optional`
-            Some(TypingTarget::None | TypingTarget::Optional(_) | TypingTarget::Any) => None,
+        // Short-circuit on top level `None`, `Any` or `Optional`
+        None | Some(TypingTarget::None | TypingTarget::Optional(_) | TypingTarget::Any) => None,
         // Top-level `Annotated` node should check for the inner type and
         // return the inner type if it doesn't allow `None`. If `Annotated`
         // is found nested inside another type, then the outer type should

@@ -1,4 +1,5 @@
 //! Rules from [django-flake8](https://pypi.org/project/flake8-django/)
+mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -10,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::DjangoNullableModelStringField, Path::new("DJ001.py"))]
     #[test_case(Rule::DjangoLocalsInRenderFunction, Path::new("DJ003.py"))]
@@ -25,7 +26,7 @@ mod tests {
             Path::new("flake8_django").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

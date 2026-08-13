@@ -62,7 +62,7 @@ To run the fuzzer, execute the following command
 (requires [`uv`](https://github.com/astral-sh/uv) to be installed):
 
 ```sh
-uvx --from ./python/py-fuzzer fuzz
+uv run --project=./python/py-fuzzer fuzz
 ```
 
 Refer to the [py-fuzzer](https://github.com/astral-sh/ruff/blob/main/python/py-fuzzer/fuzz.py)

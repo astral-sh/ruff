@@ -7,13 +7,16 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/named/missin
 ```
 Module(
     ModModule {
+        node_index: NodeIndex(None),
         range: 0..75,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 71..72,
                     value: Name(
                         ExprName {
+                            node_index: NodeIndex(None),
                             range: 71..72,
                             id: Name("x"),
                             ctx: Load,
@@ -32,7 +35,6 @@ Module(
 2 |
 3 | x :=
   |   ^^ Syntax Error: Expected a statement
-  |
 
 
   |
@@ -40,4 +42,3 @@ Module(
 2 |
 3 | x :=
   |     ^ Syntax Error: Expected a statement
-  |

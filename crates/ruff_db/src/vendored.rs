@@ -2,58 +2,70 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::{self, Debug};
 use std::io::{self, Read, Write};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 
-use crate::file_revision::FileRevision;
-use zip::result::ZipResult;
-use zip::write::FileOptions;
-use zip::{read::ZipFile, CompressionMethod, ZipArchive, ZipWriter};
+use zip::result::{ZipError, ZipResult};
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipArchive, ZipWriter, read::ZipFile};
 
 pub use self::path::{VendoredPath, VendoredPathBuf};
+use crate::file_revision::FileRevision;
 
 mod path;
 
 type Result<T> = io::Result<T>;
-type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 
 /// File system that stores all content in a static zip archive
 /// bundled as part of the Ruff binary.
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
+///
+/// # Path separators
+///
+/// At time of writing (2025-07-11), this implementation always uses `/` as a
+/// path separator, even in Windows environments where `\` is traditionally
+/// used as a file path separator. Namely, this is only currently used with zip
+/// files built by `crates/ty_vendored/build.rs`.
+///
+/// Callers using this may provide paths that use a `\` as a separator. It will
+/// be transparently normalized to `/`.
+///
+/// This is particularly important because the presence of a trailing separator
+/// in a zip file is conventionally used to indicate a directory entry.
 #[derive(Clone)]
 pub struct VendoredFileSystem {
-    inner: Arc<Mutex<VendoredZipArchive>>,
+    inner: Arc<VendoredZipArchive>,
 }
 
 impl VendoredFileSystem {
     pub fn new_static(raw_bytes: &'static [u8]) -> Result<Self> {
-        Self::new_impl(Cow::Borrowed(raw_bytes))
+        Self::new_impl(ArchiveData::Static(raw_bytes))
     }
 
     pub fn new(raw_bytes: Vec<u8>) -> Result<Self> {
-        Self::new_impl(Cow::Owned(raw_bytes))
+        Self::new_impl(ArchiveData::Owned(raw_bytes.into()))
     }
 
-    fn new_impl(data: Cow<'static, [u8]>) -> Result<Self> {
+    fn new_impl(data: ArchiveData) -> Result<Self> {
         Ok(Self {
-            inner: Arc::new(Mutex::new(VendoredZipArchive::new(data)?)),
+            inner: Arc::new(VendoredZipArchive::new(data)?),
         })
     }
 
     pub fn exists(&self, path: impl AsRef<VendoredPath>) -> bool {
         fn exists(fs: &VendoredFileSystem, path: &VendoredPath) -> bool {
             let normalized = NormalizedVendoredPath::from(path);
-            let mut archive = fs.lock_archive();
+            let archive = &fs.inner;
 
             // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            archive.lookup_path(&normalized).is_ok()
+            archive.index_for_path(&normalized).is_some()
                 || archive
-                    .lookup_path(&normalized.with_trailing_slash())
-                    .is_ok()
+                    .index_for_path(&normalized.with_trailing_slash())
+                    .is_some()
         }
 
         exists(self, path.as_ref())
@@ -62,17 +74,16 @@ impl VendoredFileSystem {
     pub fn metadata(&self, path: impl AsRef<VendoredPath>) -> Result<Metadata> {
         fn metadata(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<Metadata> {
             let normalized = NormalizedVendoredPath::from(path);
-            let mut archive = fs.lock_archive();
+            let mut archive = fs.archive_reader();
 
             // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            if let Ok(zip_file) = archive.lookup_path(&normalized) {
-                return Ok(Metadata::from_zip_file(zip_file));
+            if let Ok(metadata) = archive.metadata_for_path(&normalized) {
+                return Ok(metadata);
             }
-            let zip_file = archive.lookup_path(&normalized.with_trailing_slash())?;
-            Ok(Metadata::from_zip_file(zip_file))
+            archive.metadata_for_path(&normalized.with_trailing_slash())
         }
 
         metadata(self, path.as_ref())
@@ -96,7 +107,7 @@ impl VendoredFileSystem {
     /// - The contents of the zip file at `path` contain invalid UTF-8
     pub fn read_to_string(&self, path: impl AsRef<VendoredPath>) -> Result<String> {
         fn read_to_string(fs: &VendoredFileSystem, path: &VendoredPath) -> Result<String> {
-            let mut archive = fs.lock_archive();
+            let mut archive = fs.archive_reader();
             let mut zip_file = archive.lookup_path(&NormalizedVendoredPath::from(path))?;
 
             // Pre-allocate the buffer with the size specified in the ZIP file metadata
@@ -115,20 +126,72 @@ impl VendoredFileSystem {
         read_to_string(self, path.as_ref())
     }
 
-    /// Acquire a lock on the underlying zip archive.
-    /// The call will block until it is able to acquire the lock.
+    /// Read the direct children of the directory
+    /// identified by `path`.
     ///
-    /// ## Panics:
-    /// If the current thread already holds the lock.
-    fn lock_archive(&self) -> LockedZipArchive {
-        self.inner.lock().unwrap()
+    /// If `path` is not a directory, then this will
+    /// return an empty iterator.
+    pub fn read_directory(
+        &self,
+        dir: impl AsRef<VendoredPath>,
+    ) -> impl Iterator<Item = DirectoryEntry> + '_ {
+        let directory_prefix = NormalizedVendoredPath::from(dir.as_ref())
+            .with_trailing_slash()
+            .0
+            .into_owned();
+
+        self.inner.0.file_names().filter_map(move |name| {
+            // Any entry that doesn't have the `path` (with a
+            // trailing slash) as a prefix cannot possibly be in
+            // the directory referenced by `path`.
+            let without_dir_prefix = name.strip_prefix(&directory_prefix)?;
+            // Filter out an entry equivalent to the path given
+            // since we only want children of the directory.
+            if without_dir_prefix.is_empty() {
+                return None;
+            }
+            // We only want *direct* children. Files that are
+            // direct children cannot have any slashes (or else
+            // they are not direct children). Directories that
+            // are direct children can only have one slash and
+            // it must be at the end.
+            //
+            // (We do this manually ourselves to avoid doing a
+            // full file lookup and metadata retrieval via the
+            // `zip` crate.)
+            let file_type = FileType::from_zip_file_name(without_dir_prefix);
+            let slash_count = without_dir_prefix.matches('/').count();
+            match file_type {
+                FileType::File if slash_count > 0 => return None,
+                FileType::Directory if slash_count > 1 => return None,
+                _ => {}
+            }
+
+            Some(DirectoryEntry {
+                path: VendoredPathBuf::from(name),
+                file_type,
+            })
+        })
+    }
+
+    /// Creates a reader with its own cursor over the shared archive data.
+    ///
+    /// `ZipArchive` stores the current seek position in its reader. Cloning it gives each operation
+    /// an independent cursor, so reads can seek and decompress files concurrently without
+    /// synchronizing access to shared reader state.
+    ///
+    /// The clone is cheap: `ZipArchive` shares its parsed central-directory metadata, while
+    /// `ArchiveData` either copies a static reference or increments an `Arc` reference count. The
+    /// ZIP bytes themselves are never copied.
+    fn archive_reader(&self) -> VendoredZipArchive {
+        self.inner.as_ref().clone()
     }
 }
 
 impl fmt::Debug for VendoredFileSystem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut archive = self.lock_archive();
         if f.alternate() {
+            let mut archive = self.archive_reader();
             let mut paths: Vec<String> = archive.0.file_names().map(String::from).collect();
             paths.sort();
             let debug_info: BTreeMap<String, ZipFileDebugInfo> = paths
@@ -141,12 +204,11 @@ impl fmt::Debug for VendoredFileSystem {
                 })
                 .collect();
             f.debug_struct("VendoredFileSystem")
-                .field("inner_mutex_poisoned", &self.inner.is_poisoned())
                 .field("paths", &paths)
                 .field("data_by_path", &debug_info)
                 .finish()
         } else {
-            write!(f, "VendoredFileSystem(<{} paths>)", archive.len())
+            write!(f, "VendoredFileSystem(<{} paths>)", self.inner.len())
         }
     }
 }
@@ -157,7 +219,7 @@ impl Default for VendoredFileSystem {
         let mut cursor = io::Cursor::new(&mut bytes);
 
         {
-            let mut writer = ZipWriter::new(&mut cursor);
+            let writer = ZipWriter::new(&mut cursor);
             writer.finish().unwrap();
         }
 
@@ -181,8 +243,8 @@ struct ZipFileDebugInfo {
     kind: FileType,
 }
 
-impl<'a> From<ZipFile<'a>> for ZipFileDebugInfo {
-    fn from(value: ZipFile<'a>) -> Self {
+impl<'a, R: Read> From<ZipFile<'a, R>> for ZipFileDebugInfo {
+    fn from(value: ZipFile<'a, R>) -> Self {
         Self {
             crc32_hash: value.crc32(),
             compressed_size: value.compressed_size(),
@@ -206,6 +268,14 @@ pub enum FileType {
 }
 
 impl FileType {
+    fn from_zip_file_name(name: &str) -> FileType {
+        if name.ends_with('/') {
+            FileType::Directory
+        } else {
+            FileType::File
+        }
+    }
+
     pub const fn is_file(self) -> bool {
         matches!(self, Self::File)
     }
@@ -222,7 +292,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    fn from_zip_file(zip_file: ZipFile) -> Self {
+    fn from_zip_file<R: Read>(zip_file: ZipFile<'_, R>) -> Self {
         let kind = if zip_file.is_dir() {
             FileType::Directory
         } else {
@@ -244,17 +314,69 @@ impl Metadata {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct DirectoryEntry {
+    path: VendoredPathBuf,
+    file_type: FileType,
+}
+
+impl DirectoryEntry {
+    pub fn new(path: VendoredPathBuf, file_type: FileType) -> Self {
+        Self { path, file_type }
+    }
+
+    pub fn into_path(self) -> VendoredPathBuf {
+        self.path
+    }
+
+    pub fn path(&self) -> &VendoredPath {
+        &self.path
+    }
+
+    pub fn file_type(&self) -> FileType {
+        self.file_type
+    }
+}
+
+/// Immutable archive data that is cheap to clone into an independent reader.
+#[derive(Clone, Debug)]
+enum ArchiveData {
+    Static(&'static [u8]),
+    Owned(Arc<[u8]>),
+}
+
+impl AsRef<[u8]> for ArchiveData {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Static(data) => data,
+            Self::Owned(data) => data,
+        }
+    }
+}
+
 /// Newtype wrapper around a ZipArchive.
-#[derive(Debug)]
-struct VendoredZipArchive(ZipArchive<io::Cursor<Cow<'static, [u8]>>>);
+#[derive(Clone, Debug)]
+struct VendoredZipArchive(ZipArchive<io::Cursor<ArchiveData>>);
 
 impl VendoredZipArchive {
-    fn new(data: Cow<'static, [u8]>) -> Result<Self> {
+    fn new(data: ArchiveData) -> Result<Self> {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
-    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile> {
+    fn index_for_path(&self, path: &NormalizedVendoredPath) -> Option<usize> {
+        self.0.index_for_name(path.as_str())
+    }
+
+    fn lookup_path(
+        &mut self,
+        path: &NormalizedVendoredPath,
+    ) -> Result<ZipFile<'_, io::Cursor<ArchiveData>>> {
         Ok(self.0.by_name(path.as_str())?)
+    }
+
+    fn metadata_for_path(&mut self, path: &NormalizedVendoredPath) -> Result<Metadata> {
+        let index = self.index_for_path(path).ok_or(ZipError::FileNotFound)?;
+        Ok(Metadata::from_zip_file(self.0.by_index_raw(index)?))
     }
 
     fn len(&self) -> usize {
@@ -370,14 +492,14 @@ impl VendoredFileSystemBuilder {
             .add_directory(path.as_ref().as_str(), self.options())
     }
 
-    pub fn finish(mut self) -> Result<VendoredFileSystem> {
+    pub fn finish(self) -> Result<VendoredFileSystem> {
         let buffer = self.writer.finish()?;
 
         VendoredFileSystem::new(buffer.into_inner())
     }
 
-    fn options(&self) -> FileOptions {
-        FileOptions::default()
+    fn options(&self) -> SimpleFileOptions {
+        SimpleFileOptions::default()
             .compression_method(self.compression_method)
             .unix_permissions(0o644)
     }
@@ -420,7 +542,6 @@ pub(crate) mod tests {
     fn filesystem_debug_implementation_alternate() {
         assert_snapshot!(format!("{:#?}", mock_typeshed()), @r#"
         VendoredFileSystem {
-            inner_mutex_poisoned: false,
             paths: [
                 "stdlib/",
                 "stdlib/asyncio/",
@@ -498,14 +619,69 @@ pub(crate) mod tests {
         test_directory("./stdlib/asyncio/../asyncio/")
     }
 
+    fn readdir_snapshot(fs: &VendoredFileSystem, path: &str) -> String {
+        let mut paths = fs
+            .read_directory(VendoredPath::new(path))
+            .map(|entry| entry.path().to_string())
+            .collect::<Vec<String>>();
+        paths.sort();
+        paths.join("\n")
+    }
+
+    #[test]
+    fn read_directory_stdlib() {
+        let mock_typeshed = mock_typeshed();
+
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib"), @"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib/"), @"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib"), @"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib/"), @"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+    }
+
+    #[test]
+    fn read_directory_asyncio() {
+        let mock_typeshed = mock_typeshed();
+
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "stdlib/asyncio"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "./stdlib/asyncio"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "stdlib/asyncio/"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "./stdlib/asyncio/"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+    }
+
     fn test_nonexistent_path(path: &str) {
         let mock_typeshed = mock_typeshed();
         let path = VendoredPath::new(path);
         assert!(!mock_typeshed.exists(path));
         assert!(mock_typeshed.metadata(path).is_err());
-        assert!(mock_typeshed
-            .read_to_string(path)
-            .is_err_and(|err| err.to_string().contains("file not found")));
+        assert!(
+            mock_typeshed
+                .read_to_string(path)
+                .is_err_and(|err| err.to_string().contains("file not found"))
+        );
     }
 
     #[test]
@@ -541,8 +717,7 @@ pub(crate) mod tests {
         test_file(&mock_typeshed, path);
         let functools_stub = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub.as_str(), FUNCTOOLS_CONTENTS);
-        // Test that using the RefCell doesn't mutate
-        // the internal state of the underlying zip archive incorrectly:
+        // Test that reading the file doesn't leave the archive cursor in the wrong position.
         let functools_stub_again = mock_typeshed.read_to_string(path).unwrap();
         assert_eq!(functools_stub_again.as_str(), FUNCTOOLS_CONTENTS);
     }

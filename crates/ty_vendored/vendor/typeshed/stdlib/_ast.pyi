@@ -58,6 +58,15 @@ from ast import (
     LShift as LShift,
     Lt as Lt,
     LtE as LtE,
+    Match as Match,
+    MatchAs as MatchAs,
+    MatchClass as MatchClass,
+    MatchMapping as MatchMapping,
+    MatchOr as MatchOr,
+    MatchSequence as MatchSequence,
+    MatchSingleton as MatchSingleton,
+    MatchStar as MatchStar,
+    MatchValue as MatchValue,
     MatMult as MatMult,
     Mod as Mod,
     Module as Module,
@@ -101,38 +110,32 @@ from ast import (
     expr as expr,
     expr_context as expr_context,
     keyword as keyword,
+    match_case as match_case,
     mod as mod,
     operator as operator,
+    pattern as pattern,
     stmt as stmt,
     type_ignore as type_ignore,
     unaryop as unaryop,
     withitem as withitem,
 )
-from typing import Literal
+from typing import Final
 
 if sys.version_info >= (3, 12):
-    from ast import ParamSpec as ParamSpec, TypeVar as TypeVar, TypeVarTuple as TypeVarTuple, type_param as type_param
+    from ast import (
+        ParamSpec as ParamSpec,
+        TypeAlias as TypeAlias,
+        TypeVar as TypeVar,
+        TypeVarTuple as TypeVarTuple,
+        type_param as type_param,
+    )
 
 if sys.version_info >= (3, 11):
     from ast import TryStar as TryStar
 
-if sys.version_info >= (3, 10):
-    from ast import (
-        MatchAs as MatchAs,
-        MatchClass as MatchClass,
-        MatchMapping as MatchMapping,
-        MatchOr as MatchOr,
-        MatchSequence as MatchSequence,
-        MatchSingleton as MatchSingleton,
-        MatchStar as MatchStar,
-        MatchValue as MatchValue,
-        match_case as match_case,
-        pattern as pattern,
-    )
-
-PyCF_ALLOW_TOP_LEVEL_AWAIT: Literal[8192]
-PyCF_ONLY_AST: Literal[1024]
-PyCF_TYPE_COMMENTS: Literal[4096]
+PyCF_ALLOW_TOP_LEVEL_AWAIT: Final = 8192
+PyCF_ONLY_AST: Final = 1024
+PyCF_TYPE_COMMENTS: Final = 4096
 
 if sys.version_info >= (3, 13):
-    PyCF_OPTIMIZED_AST: Literal[33792]
+    PyCF_OPTIMIZED_AST: Final = 33792

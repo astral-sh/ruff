@@ -1,11 +1,11 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprIf};
 
 use crate::comments::leading_comments;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space,
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
+    in_parentheses_only_soft_line_break_or_space,
 };
 use crate::prelude::*;
 
@@ -46,6 +46,7 @@ impl FormatNodeRule<ExprIf> for FormatExprIf {
     fn fmt_fields(&self, item: &ExprIf, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprIf {
             range: _,
+            node_index: _,
             test,
             body,
             orelse,
@@ -104,13 +105,7 @@ struct FormatOrElse<'a> {
 impl Format<PyFormatContext<'_>> for FormatOrElse<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self.orelse {
-            Expr::If(expr)
-                if !is_expression_parenthesized(
-                    expr.into(),
-                    f.context().comments().ranges(),
-                    f.context().source(),
-                ) =>
-            {
+            Expr::If(expr) if !f.context().is_expression_parenthesized(expr.into()) => {
                 write!(f, [expr.format().with_options(ExprIfLayout::Nested)])
             }
             _ => write!(f, [in_parentheses_only_group(&self.orelse.format())]),

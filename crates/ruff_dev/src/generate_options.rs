@@ -31,7 +31,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
                 .filter_map(|set| set.name())
                 .chain(std::iter::once(name.as_str()))
                 .join(".");
-            writeln!(output, "#### `{title}`\n",).unwrap();
+            writeln!(output, "#### `{title}`\n").unwrap();
         }
     }
 
@@ -62,7 +62,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
         generate_set(
             output,
             Set::Named {
-                name: set_name.to_string(),
+                name: set_name.clone(),
                 set: *sub_set,
             },
             parents,
@@ -100,8 +100,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     if parents_anchor.is_empty() {
         let _ = writeln!(output, "{header_level} [`{name}`](#{name}) {{: #{name} }}");
     } else {
-        let _ =
-            writeln!(output,
+        let _ = writeln!(
+            output,
             "{header_level} [`{name}`](#{parents_anchor}_{name}) {{: #{parents_anchor}_{name} }}"
         );
 
@@ -131,7 +131,11 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
 
     output.push_str(field.doc);
     output.push_str("\n\n");
-    let _ = writeln!(output, "**Default value**: `{}`", field.default);
+    if parents_anchor == "lint" && name == "select" {
+        output.push_str("**Default value**: See [Default Rules](default-rules.md).\n");
+    } else {
+        let _ = writeln!(output, "**Default value**: `{}`", field.default);
+    }
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');

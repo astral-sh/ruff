@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for `return` statements outside of functions.
@@ -17,6 +18,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// ## References
 /// - [Python documentation: `return`](https://docs.python.org/3/reference/simple_stmts.html#the-return-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct ReturnOutsideFunction;
 
 impl Violation for ReturnOutsideFunction {

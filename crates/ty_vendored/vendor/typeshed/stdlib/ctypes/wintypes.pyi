@@ -21,8 +21,8 @@ from ctypes import (
     c_wchar,
     c_wchar_p,
 )
-from typing import Any, TypeVar
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, TypeAlias, TypeVar
+from typing_extensions import Self
 
 if sys.version_info >= (3, 12):
     from ctypes import c_ubyte
@@ -83,6 +83,15 @@ HACCEL = HANDLE
 HBITMAP = HANDLE
 HBRUSH = HANDLE
 HCOLORSPACE = HANDLE
+if sys.version_info >= (3, 14):
+    HCONV = HANDLE
+    HCONVLIST = HANDLE
+    HCURSOR = HANDLE
+    HDDEDATA = HANDLE
+    HDROP = HANDLE
+    HFILE = INT
+    HRESULT = LONG
+    HSZ = HANDLE
 HDC = HANDLE
 HDESK = HANDLE
 HDWP = HANDLE
@@ -168,7 +177,7 @@ class MSG(Structure):
     pt: _CField[POINT, POINT, POINT]
 
 tagMSG = MSG
-MAX_PATH: int
+MAX_PATH: Final = 260
 
 class WIN32_FIND_DATAA(Structure):
     dwFileAttributes: _CIntLikeField[DWORD]

@@ -1,14 +1,14 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sequence_sorting::{
-    sort_single_line_elements_sequence, MultilineStringSequenceValue, SequenceKind,
-    SortClassification, SortingStyle,
+    MultilineStringSequenceValue, SequenceKind, SortClassification, SortingStyle,
+    sort_single_line_elements_sequence,
 };
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `__all__` definitions that are not ordered
@@ -89,6 +89,7 @@ use crate::rules::ruff::rules::sequence_sorting::{
 /// iteration order of the items in `__all__`, in which case this
 /// rule's fix could theoretically cause breakage.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct UnsortedDunderAll;
 
 impl Violation for UnsortedDunderAll {
@@ -158,6 +159,7 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &Checker, node: &ast::StmtAnnA
     }
 }
 
+/// RUF022
 /// Sort a tuple or list that defines or mutates the global variable `__all__`.
 ///
 /// This routine checks whether the tuple or list is sorted, and emits a
@@ -199,15 +201,13 @@ fn sort_dunder_all(checker: &Checker, target: &ast::Expr, node: &ast::Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
+    let mut diagnostic = checker.report_diagnostic(UnsortedDunderAll, range);
 
     if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
         if let Some(fix) = create_fix(range, elts, &items, kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Attempt to return `Some(fix)`, where `fix` is a `Fix`

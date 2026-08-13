@@ -21,14 +21,67 @@ export function stringify(settings: Settings): string {
 }
 
 /**
- * Persist the configuration to a URL.
+ * Save the configuration and return a shareable URL.
+ */
+async function shareUrl(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<string> {
+  const id = await savePlayground({ settingsSource, pythonSource });
+  return `${window.location.origin}/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Persist the configuration and copy a shareable URL to clipboard.
  */
 export async function persist(
   settingsSource: string,
   pythonSource: string,
 ): Promise<void> {
-  const id = await savePlayground({ settingsSource, pythonSource });
-  await navigator.clipboard.writeText(`${window.location.origin}/${id}`);
+  const url = await shareUrl(settingsSource, pythonSource);
+  await navigator.clipboard.writeText(url);
+}
+
+/**
+ * Persist the configuration and copy a markdown link to clipboard.
+ */
+export async function copyAsMarkdownLink(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<void> {
+  const url = await shareUrl(settingsSource, pythonSource);
+  await navigator.clipboard.writeText(`[Playground](${url})`);
+}
+
+/**
+ * Persist the configuration and copy markdown with code to clipboard.
+ */
+export async function copyAsMarkdown(
+  settingsSource: string,
+  pythonSource: string,
+): Promise<void> {
+  const [url, toml] = await Promise.all([
+    shareUrl(settingsSource, pythonSource),
+    import("smol-toml"),
+  ]);
+
+  let settingsBlock: string;
+  try {
+    settingsBlock = `\`\`\`toml\n${toml.stringify(JSON.parse(settingsSource))}\n\`\`\``;
+  } catch {
+    settingsBlock = `\`\`\`json\n${settingsSource}\n\`\`\``;
+  }
+
+  await navigator.clipboard.writeText(
+    `\`\`\`py
+${pythonSource}
+\`\`\`
+
+${settingsBlock}
+
+[Playground](${url})
+`,
+  );
 }
 
 /**
@@ -79,6 +132,15 @@ export function persistLocal({
   settingsSource: string;
   pythonSource: string;
 }) {
+  const totalLength = settingsSource.length + pythonSource.length;
+
+  // Don't persist large files to local storage because they can exceed the local storage quota
+  // The number here is picked rarely arbitrarily. Also note, JS uses UTF 16:
+  // that means the limit here is strings larger than 1MB (because UTf 16 uses 2 bytes per character)
+  if (totalLength > 500_000) {
+    return;
+  }
+
   localStorage.setItem(
     "source",
     JSON.stringify([settingsSource, pythonSource]),

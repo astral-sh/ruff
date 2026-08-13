@@ -2,11 +2,12 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::num::{
-    NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU128, NonZeroU16,
-    NonZeroU32, NonZeroU64, NonZeroU8,
+    NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroU8, NonZeroU16, NonZeroU32,
+    NonZeroU64, NonZeroU128,
 };
 use std::path::{Path, PathBuf};
 
+use char_str::CharStr;
 use glob::Pattern;
 use itertools::Itertools;
 use regex::Regex;
@@ -253,6 +254,13 @@ impl CacheKey for String {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         self.hash(&mut *state);
+    }
+}
+
+impl CacheKey for CharStr {
+    #[inline]
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.as_str().cache_key(state);
     }
 }
 

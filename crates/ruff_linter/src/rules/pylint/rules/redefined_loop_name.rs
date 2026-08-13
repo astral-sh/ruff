@@ -3,13 +3,14 @@ use std::{fmt, iter};
 use regex::Regex;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt, WithItem};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::is_mutable_expr;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -48,7 +49,14 @@ use crate::checkers::ast::Checker;
 ///         f = path2.open()
 ///     print(f.readline())  # prints a line from path2
 /// ```
+///
+/// ## Options
+///
+/// The rule ignores assignments to dummy variables, as specified by:
+///
+/// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct RedefinedLoopName {
     name: String,
     outer_kind: OuterBindingKind,
@@ -186,7 +194,23 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     ),
                 );
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            Stmt::AugAssign(ast::StmtAugAssign {
+                target, value, op, ..
+            }) => {
+                // Check for in-place update of mutable type
+                if is_mutable_expr(value, self.context)
+                    && matches!(
+                        op,
+                        ast::Operator::Add
+                            | ast::Operator::Sub
+                            | ast::Operator::BitOr
+                            | ast::Operator::BitAnd
+                            | ast::Operator::BitXor
+                    )
+                {
+                    return;
+                }
+
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
@@ -280,11 +304,13 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             value,
             range: _,
+            node_index: _,
         }) => Box::new(iter::once(value.as_ref())),
         Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
             range: _,
+            node_index: _,
         }) => {
             // Ignore dummy variables.
             if dummy_variable_rgx.is_match(id) {
@@ -297,6 +323,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
@@ -305,6 +332,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
             parenthesized: _,
         }) => Box::new(
             elts.iter()
@@ -342,7 +370,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
+                assignment_targets_from_with_items(items, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::With,
@@ -350,7 +378,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                     .collect();
             let mut visitor = InnerForWithAssignTargetsVisitor {
                 context: checker.semantic(),
-                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
             for stmt in body {
@@ -360,7 +388,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         }
         Stmt::For(ast::StmtFor { target, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
+                assignment_targets_from_expr(target, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::For,
@@ -368,7 +396,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                     .collect();
             let mut visitor = InnerForWithAssignTargetsVisitor {
                 context: checker.semantic(),
-                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
             for stmt in body {
@@ -379,25 +407,21 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         _ => panic!("redefined_loop_name called on Statement that is not a `With` or `For`"),
     };
 
-    let mut diagnostics = Vec::new();
-
     for outer_assignment_target in &outer_assignment_targets {
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                diagnostics.push(Diagnostic::new(
+                checker.report_diagnostic(
                     RedefinedLoopName {
                         name: checker.generator().expr(outer_assignment_target.expr),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },
                     inner_assignment_target.expr.range(),
-                ));
+                );
             }
         }
     }
-
-    checker.report_diagnostics(diagnostics);
 }

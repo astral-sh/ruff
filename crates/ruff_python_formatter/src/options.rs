@@ -62,6 +62,13 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// Controls the quote style for nested strings in Python 3.12+.
+    ///
+    /// When set to `alternating` (default), Ruff will alternate quote styles for nested strings
+    /// inside interpolated string expressions. When set to `preferred`, Ruff will use
+    /// the configured `quote-style`.
+    nested_string_quote_style: NestedStringQuoteStyle,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +98,7 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            nested_string_quote_style: NestedStringQuoteStyle::default(),
         }
     }
 }
@@ -124,7 +132,7 @@ impl PyFormatOptions {
         self.source_type
     }
 
-    pub const fn source_map_generation(&self) -> SourceMapGeneration {
+    pub(crate) const fn source_map_generation(&self) -> SourceMapGeneration {
         self.source_map_generation
     }
 
@@ -142,6 +150,10 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn nested_string_quote_style(&self) -> NestedStringQuoteStyle {
+        self.nested_string_quote_style
     }
 
     #[must_use]
@@ -205,6 +217,15 @@ impl PyFormatOptions {
     }
 
     #[must_use]
+    pub fn with_nested_string_quote_style(
+        mut self,
+        nested_string_quote_style: NestedStringQuoteStyle,
+    ) -> Self {
+        self.nested_string_quote_style = nested_string_quote_style;
+        self
+    }
+
+    #[must_use]
     pub fn with_source_map_generation(mut self, source_map: SourceMapGeneration) -> Self {
         self.source_map_generation = source_map;
         self
@@ -249,18 +270,23 @@ pub enum QuoteStyle {
 }
 
 impl QuoteStyle {
-    pub const fn is_preserve(self) -> bool {
+    pub(crate) const fn is_preserve(self) -> bool {
         matches!(self, QuoteStyle::Preserve)
+    }
+
+    /// Returns the string representation of the quote style.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            QuoteStyle::Single => "single",
+            QuoteStyle::Double => "double",
+            QuoteStyle::Preserve => "preserve",
+        }
     }
 }
 
 impl fmt::Display for QuoteStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Single => write!(f, "single"),
-            Self::Double => write!(f, "double"),
-            Self::Preserve => write!(f, "preserve"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -291,7 +317,7 @@ pub enum MagicTrailingComma {
 }
 
 impl MagicTrailingComma {
-    pub const fn is_respect(self) -> bool {
+    pub(crate) const fn is_respect(self) -> bool {
         matches!(self, Self::Respect)
     }
 
@@ -302,10 +328,10 @@ impl MagicTrailingComma {
 
 impl fmt::Display for MagicTrailingComma {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Respect => write!(f, "respect"),
-            Self::Ignore => write!(f, "ignore"),
-        }
+        f.write_str(match self {
+            MagicTrailingComma::Respect => "respect",
+            MagicTrailingComma::Ignore => "ignore",
+        })
     }
 }
 
@@ -351,6 +377,31 @@ impl fmt::Display for PreviewMode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum NestedStringQuoteStyle {
+    #[default]
+    Alternating,
+    Preferred,
+}
+
+impl NestedStringQuoteStyle {
+    pub(crate) const fn is_preferred(self) -> bool {
+        matches!(self, NestedStringQuoteStyle::Preferred)
+    }
+}
+
+impl fmt::Display for NestedStringQuoteStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Alternating => write!(f, "alternating"),
+            Self::Preferred => write!(f, "preferred"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum DocstringCode {
     #[default]
     Disabled,
@@ -359,7 +410,7 @@ pub enum DocstringCode {
 }
 
 impl DocstringCode {
-    pub const fn is_enabled(self) -> bool {
+    pub(crate) const fn is_enabled(self) -> bool {
         matches!(self, DocstringCode::Enabled)
     }
 }
@@ -398,15 +449,12 @@ pub enum DocstringCodeLineWidth {
 #[cfg(feature = "schemars")]
 mod schema {
     use ruff_formatter::LineWidth;
-    use schemars::gen::SchemaGenerator;
-    use schemars::schema::{Metadata, Schema, SubschemaValidation};
+    use schemars::{Schema, SchemaGenerator};
+    use serde_json::Value;
 
     /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
     pub(super) fn dynamic(_: &mut SchemaGenerator) -> Schema {
-        Schema::Object(schemars::schema::SchemaObject {
-            const_value: Some("dynamic".to_string().into()),
-            ..Default::default()
-        })
+        schemars::json_schema!({ "const": "dynamic" })
     }
 
     // We use a manual schema for `fixed` even thought it isn't strictly necessary according to the
@@ -415,21 +463,16 @@ mod schema {
     //
     // The only difference to the automatically derived schema is that we use `oneOf` instead of
     // `allOf`. There's no semantic difference between `allOf` and `oneOf` for single element lists.
-    pub(super) fn fixed(gen: &mut SchemaGenerator) -> Schema {
-        let schema = gen.subschema_for::<LineWidth>();
-        Schema::Object(schemars::schema::SchemaObject {
-            metadata: Some(Box::new(Metadata {
-                description: Some(
-                    "Wrap docstring code examples at a fixed line width.".to_string(),
-                ),
-                ..Metadata::default()
-            })),
-            subschemas: Some(Box::new(SubschemaValidation {
-                one_of: Some(vec![schema]),
-                ..SubschemaValidation::default()
-            })),
-            ..Default::default()
-        })
+    pub(super) fn fixed(generator: &mut SchemaGenerator) -> Schema {
+        let schema = generator.subschema_for::<LineWidth>();
+        let mut schema_object = Schema::default();
+        let map = schema_object.ensure_object();
+        map.insert(
+            "description".to_string(),
+            Value::String("Wrap docstring code examples at a fixed line width.".to_string()),
+        );
+        map.insert("oneOf".to_string(), Value::Array(vec![schema.into()]));
+        schema_object
     }
 }
 
@@ -457,7 +500,7 @@ fn deserialize_docstring_code_line_width_dynamic<'de, D>(d: D) -> Result<(), D::
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::{de::Error, Deserialize};
+    use serde::{Deserialize, de::Error};
 
     let value = String::deserialize(d)?;
     match &*value {

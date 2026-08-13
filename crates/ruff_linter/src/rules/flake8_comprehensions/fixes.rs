@@ -1,6 +1,6 @@
 use std::iter;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use itertools::Itertools;
 use libcst_native::{
     Arg, AssignEqual, AssignTargetExpression, Call, Comma, Comment, CompFor, Dict, DictComp,
@@ -10,17 +10,18 @@ use libcst_native::{
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
 
-use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
+use unicode_normalization::UnicodeNormalization;
 
+use crate::Locator;
 use crate::cst::helpers::{negate, space};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::pad;
 use crate::rules::flake8_comprehensions::rules::ObjectType;
-use crate::Locator;
+use crate::{Edit, Fix};
 use crate::{
     checkers::ast::Checker,
     cst::matchers::{
@@ -43,7 +44,10 @@ pub(crate) fn fix_unnecessary_generator_dict(expr: &Expr, checker: &Checker) -> 
     // Extract the (k, v) from `(k, v) for ...`.
     let generator_exp = match_generator_exp(&arg.value)?;
     let tuple = match_tuple(&generator_exp.elt)?;
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    let [
+        Element::Simple { value: key, .. },
+        Element::Simple { value, .. },
+    ] = &tuple.elements[..]
     else {
         bail!("Expected tuple to contain two elements");
     };
@@ -103,7 +107,10 @@ pub(crate) fn fix_unnecessary_list_comprehension_dict(
 
     let tuple = match_tuple(&list_comp.elt)?;
 
-    let [Element::Simple { value: key, .. }, Element::Simple { value, .. }] = &tuple.elements[..]
+    let [
+        Element::Simple { value: key, .. },
+        Element::Simple { value, .. },
+    ] = &tuple.elements[..]
     else {
         bail!("Expected tuple with two elements");
     };
@@ -230,9 +237,15 @@ pub(crate) fn fix_unnecessary_collection_call(
     // below.
     let mut arena: Vec<String> = vec![];
 
-    let quote = checker.f_string_quote_style().unwrap_or(stylist.quote());
+    let quote = checker
+        .interpolated_string_quote_style()
+        .unwrap_or(stylist.quote());
 
     // Quote each argument.
+    //
+    // Python normalizes identifiers to NFKC, but string literals are not normalized. Emitting the
+    // raw source text of a keyword argument would change the dictionary key at runtime, so the
+    // name has to be normalized. See https://github.com/astral-sh/ruff/issues/16234.
     for arg in &call.args {
         let quoted = format!(
             "{}{}{}",
@@ -240,7 +253,8 @@ pub(crate) fn fix_unnecessary_collection_call(
             arg.keyword
                 .as_ref()
                 .expect("Expected dictionary argument to be kwarg")
-                .value,
+                .value
+                .nfkc(),
             quote,
         );
         arena.push(quoted);
@@ -305,13 +319,13 @@ pub(crate) fn fix_unnecessary_collection_call(
 /// However, this is a syntax error under the f-string grammar. As such,
 /// this method will pad the start and end of an expression as needed to
 /// avoid producing invalid syntax.
-pub(crate) fn pad_expression(
+fn pad_expression(
     content: String,
     range: TextRange,
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content;
     }
 
@@ -343,7 +357,7 @@ pub(crate) fn pad_start(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content.into();
     }
 
@@ -364,7 +378,7 @@ pub(crate) fn pad_end(
     locator: &Locator,
     semantic: &SemanticModel,
 ) -> String {
-    if !semantic.in_f_string() {
+    if !semantic.in_interpolated_string() {
         return content.into();
     }
 
@@ -792,10 +806,10 @@ pub(crate) fn fix_unnecessary_map(
 
     let mut content = tree.codegen_stylist(stylist);
 
-    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // If the expression is embedded in an interpolated string, surround it with spaces to avoid
     // syntax errors.
     if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-        if parent.is_some_and(Expr::is_f_string_expr) {
+        if parent.is_some_and(|expr| expr.is_f_string_expr() || expr.is_t_string_expr()) {
             content = format!(" {content} ");
         }
     }

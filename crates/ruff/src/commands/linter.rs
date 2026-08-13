@@ -16,6 +16,8 @@ struct LinterInfo {
     prefix: &'static str,
     name: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     categories: Option<Vec<LinterCategoryInfo>>,
 }
 
@@ -50,6 +52,7 @@ pub(crate) fn linter(format: HelpFormat) -> Result<()> {
                 .map(|linter_info| LinterInfo {
                     prefix: linter_info.common_prefix(),
                     name: linter_info.name(),
+                    url: linter_info.url(),
                     categories: linter_info.upstream_categories().map(|cats| {
                         cats.iter()
                             .map(|c| LinterCategoryInfo {

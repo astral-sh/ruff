@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -15,11 +15,11 @@ use crate::checkers::ast::Checker;
 /// The default value of the `schedule` parameter on Airflow 2 and
 /// `schedule_interval` on Airflow 1 is `timedelta(days=1)`, which is almost
 /// never what a user is looking for. Airflow 3 changed the default value to `None`,
-/// and would break existing dags using the implicit default.
+/// and would break existing Dags using the implicit default.
 ///
-/// If your dag does not have an explicit `schedule` / `schedule_interval` argument,
+/// If your Dag does not have an explicit `schedule` / `schedule_interval` argument,
 /// Airflow 2 schedules a run for it every day (at the time determined by `start_date`).
-/// Such a dag will no longer be scheduled on Airflow 3 at all, without any
+/// Such a Dag will no longer be scheduled on Airflow 3 at all, without any
 /// exceptions or other messages visible to the user.
 ///
 /// ## Example
@@ -41,12 +41,13 @@ use crate::checkers::ast::Checker;
 /// dag = DAG(dag_id="my_dag", schedule=timedelta(days=1))
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct AirflowDagNoScheduleArgument;
 
 impl Violation for AirflowDagNoScheduleArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "DAG should have an explicit `schedule` argument".to_string()
+        "`DAG` or `@dag` should have an explicit `schedule` argument".to_string()
     }
 }
 
@@ -86,6 +87,5 @@ pub(crate) fn dag_no_schedule_argument(checker: &Checker, expr: &Expr) {
     }
 
     // Produce a diagnostic when the `schedule` keyword argument is not found.
-    let diagnostic = Diagnostic::new(AirflowDagNoScheduleArgument, expr.range());
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(AirflowDagNoScheduleArgument, expr.range());
 }

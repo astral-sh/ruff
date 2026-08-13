@@ -1,10 +1,10 @@
 use ruff_python_ast::{Expr, StmtIf};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::stmt_if::if_elif_branches;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct IfTuple;
 
 impl Violation for IfTuple {
@@ -47,6 +48,6 @@ pub(crate) fn if_tuple(checker: &Checker, stmt_if: &StmtIf) {
         if tuple.is_empty() {
             continue;
         }
-        checker.report_diagnostic(Diagnostic::new(IfTuple, branch.test.range()));
+        checker.report_diagnostic(IfTuple, branch.test.range());
     }
 }

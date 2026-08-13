@@ -1,19 +1,20 @@
 use std::borrow::Cow;
 
-use lsp_types::request::DocumentDiagnosticRequest;
+use lsp_types::DocumentDiagnosticRequest;
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
-    NumberOrString, Range, RelatedFullDocumentDiagnosticReport, Url,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, FullDocumentDiagnosticReport,
+    RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri,
 };
 
-use crate::document::ToRangeExt;
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::{client::Notifier, Result};
+use crate::server::Result;
+use crate::server::api::diagnostics::compute_diagnostics;
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::DocumentSnapshot;
-use ruff_db::diagnostic::Severity;
-use ruff_db::source::{line_index, source_text};
-use ty_project::{Db, ProjectDatabase};
+use crate::session::client::Client;
+use ty_project::ProjectDatabase;
 
 pub(crate) struct DocumentDiagnosticRequestHandler;
 
@@ -22,98 +23,71 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
+    fn document_uri(params: &DocumentDiagnosticParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
-        _notifier: Notifier,
-        _params: DocumentDiagnosticParams,
-    ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(&snapshot, &db);
+        db: &ProjectDatabase,
+        snapshot: &DocumentSnapshot,
+        _client: &Client,
+        params: DocumentDiagnosticParams,
+    ) -> Result<DocumentDiagnosticReport> {
+        if snapshot.global_settings().diagnostic_mode().is_off() {
+            return Ok(RelatedFullDocumentDiagnosticReport::default().into());
+        }
 
-        Ok(DocumentDiagnosticReportResult::Report(
-            DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-                related_documents: None,
-                full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                    result_id: None,
-                    items: diagnostics,
-                },
-            }),
-        ))
+        let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
+
+        let Some(diagnostics) = diagnostics else {
+            return Ok(RelatedFullDocumentDiagnosticReport::default().into());
+        };
+
+        let result_id = diagnostics.result_id(db, snapshot.resolved_client_capabilities());
+
+        let report = match result_id {
+            Some(new_id) if Some(&new_id) == params.previous_result_id.as_ref() => {
+                RelatedUnchangedDocumentDiagnosticReport {
+                    related_documents: None,
+                    unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                        result_id: new_id,
+                    },
+                }
+                .into()
+            }
+            new_id => {
+                RelatedFullDocumentDiagnosticReport {
+                    related_documents: None,
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: new_id,
+                        // SAFETY: Pull diagnostic requests are only called for text documents, not for
+                        // notebook documents.
+                        items: diagnostics
+                            .to_lsp_diagnostics(
+                                db,
+                                snapshot.resolved_client_capabilities(),
+                                snapshot.global_settings(),
+                            )
+                            .expect_text_document(),
+                    },
+                }
+                .into()
+            }
+        };
+
+        Ok(report)
     }
 }
 
-fn compute_diagnostics(snapshot: &DocumentSnapshot, db: &ProjectDatabase) -> Vec<Diagnostic> {
-    let Some(file) = snapshot.file(db) else {
-        tracing::info!(
-            "No file found for snapshot for `{}`",
-            snapshot.query().file_url()
-        );
-        return vec![];
-    };
-
-    let diagnostics = match db.check_file(file) {
-        Ok(diagnostics) => diagnostics,
-        Err(cancelled) => {
-            tracing::info!("Diagnostics computation {cancelled}");
-            return vec![];
+impl RetriableRequestHandler for DocumentDiagnosticRequestHandler {
+    fn salsa_cancellation_error() -> lsp_server::ResponseError {
+        lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::ServerCancelled as i32,
+            message: "server cancelled the request".to_owned(),
+            data: serde_json::to_value(lsp_types::DiagnosticServerCancellationData {
+                retrigger_request: true,
+            })
+            .ok(),
         }
-    };
-
-    diagnostics
-        .as_slice()
-        .iter()
-        .map(|message| to_lsp_diagnostic(db, message, snapshot.encoding()))
-        .collect()
-}
-
-fn to_lsp_diagnostic(
-    db: &dyn Db,
-    diagnostic: &ruff_db::diagnostic::Diagnostic,
-    encoding: crate::PositionEncoding,
-) -> Diagnostic {
-    let range = if let Some(span) = diagnostic.primary_span() {
-        let file = span.expect_ty_file();
-        let index = line_index(db.upcast(), file);
-        let source = source_text(db.upcast(), file);
-
-        span.range()
-            .map(|range| range.to_lsp_range(&source, &index, encoding))
-            .unwrap_or_default()
-    } else {
-        Range::default()
-    };
-
-    let severity = match diagnostic.severity() {
-        Severity::Info => DiagnosticSeverity::INFORMATION,
-        Severity::Warning => DiagnosticSeverity::WARNING,
-        Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
-    };
-
-    let tags = diagnostic
-        .primary_tags()
-        .map(|tags| {
-            tags.iter()
-                .map(|tag| match tag {
-                    ruff_db::diagnostic::DiagnosticTag::Unnecessary => DiagnosticTag::UNNECESSARY,
-                    ruff_db::diagnostic::DiagnosticTag::Deprecated => DiagnosticTag::DEPRECATED,
-                })
-                .collect::<Vec<DiagnosticTag>>()
-        })
-        .filter(|mapped_tags| !mapped_tags.is_empty());
-
-    Diagnostic {
-        range,
-        severity: Some(severity),
-        tags,
-        code: Some(NumberOrString::String(diagnostic.id().to_string())),
-        code_description: None,
-        source: Some("ty".into()),
-        message: diagnostic.concise_message().to_string(),
-        related_information: None,
-        data: None,
     }
 }

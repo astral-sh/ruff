@@ -145,3 +145,44 @@ def func():
             sleep = 10
 
     anyio.run(main)
+
+
+async def test_anyio_async115_helpers():
+    import anyio
+
+    await anyio.sleep(delay=1)  # OK
+    await anyio.sleep(seconds=1)  # OK
+
+    await anyio.sleep(delay=0)  # ASYNC115
+    await anyio.sleep(seconds=0)  # OK
+
+
+async def test_trio_async115_helpers():
+    import trio
+
+    await trio.sleep(seconds=1)  # OK
+    await trio.sleep(delay=1)  # OK
+
+    await trio.sleep(seconds=0)  # ASYNC115
+    await trio.sleep(delay=0)  # OK
+
+# https://github.com/astral-sh/ruff/issues/18740
+# The autofix for this is unsafe due to the comments.
+async def func():
+    import trio
+
+    await (
+    trio # comment
+    .sleep( # comment
+    0 # comment
+    )
+    )
+
+
+async def func():
+    # https://github.com/astral-sh/ruff/issues/21693
+    # The autofix for anyio should use `import anyio.lowlevel` instead of
+    # `from anyio import lowlevel`, since `anyio.lowlevel` is a submodule.
+    from anyio import sleep as anyio_sleep
+
+    await anyio_sleep(0)  # ASYNC115

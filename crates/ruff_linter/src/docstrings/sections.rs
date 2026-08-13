@@ -36,6 +36,7 @@ pub(crate) enum SectionKind {
     OtherParameters,
     Parameters,
     Raises,
+    Receives,
     References,
     Return,
     Returns,
@@ -51,7 +52,7 @@ pub(crate) enum SectionKind {
 }
 
 impl SectionKind {
-    pub(crate) fn from_str(s: &str) -> Option<Self> {
+    fn from_str(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
             "args" => Some(Self::Args),
             "arguments" => Some(Self::Arguments),
@@ -76,6 +77,7 @@ impl SectionKind {
             "other parameters" => Some(Self::OtherParameters),
             "parameters" => Some(Self::Parameters),
             "raises" => Some(Self::Raises),
+            "receives" => Some(Self::Receives),
             "references" => Some(Self::References),
             "return" => Some(Self::Return),
             "returns" => Some(Self::Returns),
@@ -117,6 +119,7 @@ impl SectionKind {
             Self::OtherParameters => "Other Parameters",
             Self::Parameters => "Parameters",
             Self::Raises => "Raises",
+            Self::Receives => "Receives",
             Self::References => "References",
             Self::Return => "Return",
             Self::Returns => "Returns",
@@ -152,11 +155,31 @@ impl<'a> SectionContexts<'a> {
         // Skip the first line, which is the summary.
         let mut previous_line = lines.next();
 
-        while let Some(line) = lines.next() {
-            if let Some(section_kind) = suspected_as_section(&line, style) {
-                let indent = leading_space(&line);
-                let indent_size = indent.text_len();
+        // Track only the outermost RST directive. Nested directives remain in its body
+        // until a non-blank line dedents to the outermost indentation.
+        // See: https://github.com/astral-sh/ruff/issues/23562
+        let mut directive_indent = None;
 
+        while let Some(line) = lines.next() {
+            let indent = leading_space(&line);
+            let indent_size = indent.text_len();
+
+            if let Some(active_indent) = directive_indent
+                && (line.trim().is_empty() || indent_size > active_indent)
+            {
+                previous_line = Some(line);
+                continue;
+            }
+
+            directive_indent = None;
+
+            if line.trim_start().starts_with(".. ") {
+                directive_indent = Some(indent_size);
+                previous_line = Some(line);
+                continue;
+            }
+
+            if let Some(section_kind) = suspected_as_section(&line, style) {
                 let section_name = leading_words(&line);
                 let section_name_size = section_name.text_len();
 
@@ -208,7 +231,7 @@ impl<'a> SectionContexts<'a> {
         self.contexts.len()
     }
 
-    pub(crate) fn iter(&self) -> SectionContextsIter {
+    pub(crate) fn iter(&self) -> SectionContextsIter<'_> {
         SectionContextsIter {
             docstring_body: self.docstring.body(),
             inner: self.contexts.iter(),
@@ -444,8 +467,7 @@ fn is_docstring_section(
         if next_line.is_empty() {
             false
         } else {
-            let next_line_is_underline = next_line.chars().all(|char| matches!(char, '-' | '='));
-            next_line_is_underline
+            next_line.chars().all(|char| matches!(char, '-' | '='))
         }
     });
     if next_line_is_underline {

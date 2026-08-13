@@ -1,7 +1,8 @@
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{error::RelaxedDecoratorError, TokenKind};
+use crate::error::RelaxedDecoratorError;
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
@@ -21,26 +22,32 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
         Expr::List(ast::ExprList { elts, ctx, .. })
         | Expr::Tuple(ast::ExprTuple { elts, ctx, .. }) => {
             *ctx = new_ctx;
-            elts.iter_mut()
-                .for_each(|element| set_expr_ctx(element, new_ctx));
+            for element in elts.iter_mut() {
+                set_expr_ctx(element, new_ctx);
+            }
         }
         _ => {}
     }
 }
 
-/// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
-pub(super) const fn token_kind_to_cmp_op(tokens: [TokenKind; 2]) -> Option<CmpOp> {
-    Some(match tokens {
-        [TokenKind::Is, TokenKind::Not] => CmpOp::IsNot,
-        [TokenKind::Is, _] => CmpOp::Is,
-        [TokenKind::Not, TokenKind::In] => CmpOp::NotIn,
-        [TokenKind::In, _] => CmpOp::In,
-        [TokenKind::EqEqual, _] => CmpOp::Eq,
-        [TokenKind::NotEqual, _] => CmpOp::NotEq,
-        [TokenKind::Less, _] => CmpOp::Lt,
-        [TokenKind::LessEqual, _] => CmpOp::LtE,
-        [TokenKind::Greater, _] => CmpOp::Gt,
-        [TokenKind::GreaterEqual, _] => CmpOp::GtE,
+/// Converts a [`TokenKind`] into its corresponding [`CmpOp`].
+///
+/// `next` is only needed to distinguish `is not` and `not in`.
+pub(super) const fn token_kind_to_cmp_op(
+    current: TokenKind,
+    next: Option<TokenKind>,
+) -> Option<CmpOp> {
+    Some(match (current, next) {
+        (TokenKind::Is, Some(TokenKind::Not)) => CmpOp::IsNot,
+        (TokenKind::Is, _) => CmpOp::Is,
+        (TokenKind::Not, Some(TokenKind::In)) => CmpOp::NotIn,
+        (TokenKind::In, _) => CmpOp::In,
+        (TokenKind::EqEqual, _) => CmpOp::Eq,
+        (TokenKind::NotEqual, _) => CmpOp::NotEq,
+        (TokenKind::Less, _) => CmpOp::Lt,
+        (TokenKind::LessEqual, _) => CmpOp::LtE,
+        (TokenKind::Greater, _) => CmpOp::Gt,
+        (TokenKind::GreaterEqual, _) => CmpOp::GtE,
         _ => return None,
     })
 }
@@ -58,7 +65,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::Name(_) => return None,
 
         Expr::Attribute(attribute) => {
-            return detect_invalid_pre_py39_decorator_node(&attribute.value)
+            return detect_invalid_pre_py39_decorator_node(&attribute.value);
         }
 
         Expr::Call(_) => return Some((RelaxedDecoratorError::CallExpression, expr.range())),
@@ -94,6 +101,7 @@ pub(super) fn detect_invalid_pre_py39_decorator_node(
         Expr::YieldFrom(_) => "`yield from` expression",
         Expr::Compare(_) => "comparison expression",
         Expr::FString(_) => "f-string",
+        Expr::TString(_) => "t-string",
         Expr::Named(_) => "assignment expression",
         Expr::Subscript(_) => "subscript expression",
         Expr::IpyEscapeCommand(_) => "IPython escape command",

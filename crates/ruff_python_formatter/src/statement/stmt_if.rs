@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -15,6 +15,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
     fn fmt_fields(&self, item: &StmtIf, f: &mut PyFormatter) -> FormatResult<()> {
         let StmtIf {
             range: _,
+            node_index: _,
             test,
             body,
             elif_else_clauses,
@@ -25,22 +26,17 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::If(item),
-                    trailing_colon_comment,
-                    &format_args![
-                        token("if"),
-                        space(),
-                        maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
-                    ],
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(elif_else_clauses.is_empty()),
-                    trailing_colon_comment
-                ),
-            ]
+            [clause(
+                ClauseHeader::If(item),
+                &format_args![
+                    token("if"),
+                    space(),
+                    maybe_parenthesize_expression(test, item, Parenthesize::IfBreaks),
+                ],
+                trailing_colon_comment,
+                body,
+                SuiteKind::other(elif_else_clauses.is_empty()),
+            )]
         )?;
 
         let mut last_node = body.last().unwrap().into();
@@ -68,6 +64,7 @@ pub(crate) fn format_elif_else_clause(
 ) -> FormatResult<()> {
     let ElifElseClause {
         range: _,
+        node_index: _,
         test,
         body,
     } = item;
@@ -79,9 +76,8 @@ pub(crate) fn format_elif_else_clause(
     write!(
         f,
         [
-            clause_header(
+            clause(
                 ClauseHeader::ElifElse(item),
-                trailing_colon_comment,
                 &format_with(|f: &mut PyFormatter| {
                     f.options()
                         .source_map_generation()
@@ -101,9 +97,11 @@ pub(crate) fn format_elif_else_clause(
                         token("else").fmt(f)
                     }
                 }),
+                trailing_colon_comment,
+                body,
+                suite_kind,
             )
             .with_leading_comments(leading_comments, last_node),
-            clause_body(body, suite_kind, trailing_colon_comment),
             f.options()
                 .source_map_generation()
                 .is_enabled()

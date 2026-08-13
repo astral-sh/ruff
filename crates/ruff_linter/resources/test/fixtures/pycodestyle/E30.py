@@ -974,3 +974,39 @@ BANANA = 100
 APPLE = 200
 
 # end
+
+
+# https://github.com/astral-sh/ruff/issues/19752
+class foo:
+    async def recv(self, *, length=65536):
+        loop = asyncio.get_event_loop()
+        def callback():
+            loop.remove_reader(self._fd)
+        loop.add_reader(self._fd, callback)
+# end
+
+
+# E301
+class Foo:
+    if True:
+        print("conditional")
+        def test():
+            pass
+# end
+
+
+# Test case for nested class scenario
+class Bar:
+    def f():
+        x = 1
+        def g():
+            return 1
+        return 2
+
+    def f():
+        class Baz:
+            x = 1
+            def g():
+                return 1
+            return 2
+# end

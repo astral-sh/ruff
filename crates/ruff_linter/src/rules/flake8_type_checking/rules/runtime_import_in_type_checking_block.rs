@@ -3,8 +3,7 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Imported, NodeId, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
@@ -14,6 +13,7 @@ use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for imports that are required at runtime but are only defined in
@@ -54,6 +54,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct RuntimeImportInTypeCheckingBlock {
     qualified_name: String,
     strategy: Strategy,
@@ -108,7 +109,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
     let ignore_dunder_all_references = checker
         .semantic()
         .lookup_symbol_in_scope("__getattr__", ScopeId::global(), false)
-        .is_some();
+        .is_bound();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -122,11 +123,12 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         };
 
         if binding.context.is_typing()
-            && binding.references().any(|reference_id| {
+            && let Some(runtime_reference) = binding.references().find_map(|reference_id| {
                 let reference = checker.semantic().reference(reference_id);
 
-                reference.in_runtime_context()
-                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
+                (reference.in_runtime_context()
+                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition()))
+                .then_some(reference)
             })
         {
             let Some(node_id) = binding.source else {
@@ -139,6 +141,8 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 binding,
                 range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
+                needs_future_import: false, // TODO(brent) See #19359.
+                runtime_reference: Some(runtime_reference),
             };
 
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.start())
@@ -164,7 +168,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 //       since some people will consistently use their
                 //       type aliases at runtimes, while others won't, so
                 //       the best solution is unclear.
-                if checker.settings.flake8_type_checking.quote_annotations
+                if checker.settings().flake8_type_checking.quote_annotations
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
                         reference.in_typing_context() || reference.in_runtime_evaluated_annotation()
@@ -184,6 +188,10 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         }
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each statement group produces diagnostics and a fix independently"
+    )]
     for ((node_id, action), imports) in actions {
         match action {
             // Generate a diagnostic for every import, but share a fix across all imports within the same
@@ -195,23 +203,26 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     import,
                     range,
                     parent_range,
+                    runtime_reference,
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
                         },
                         range,
                     );
+                    if let Some(runtime_reference) = runtime_reference {
+                        diagnostic.secondary_annotation("Used at runtime here", runtime_reference);
+                    }
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
                     if let Some(fix) = fix.as_ref() {
                         diagnostic.set_fix(fix.clone());
                     }
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -224,21 +235,24 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     import,
                     range,
                     parent_range,
+                    runtime_reference,
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::QuoteUsages,
                         },
                         range,
                     );
+                    if let Some(runtime_reference) = runtime_reference {
+                        diagnostic.secondary_annotation("Used at runtime here", runtime_reference);
+                    }
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
                     diagnostic.set_fix(fix.clone());
-                    checker.report_diagnostic(diagnostic);
                 }
             }
 
@@ -252,7 +266,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     ..
                 } in imports
                 {
-                    let mut diagnostic = Diagnostic::new(
+                    let mut diagnostic = checker.report_diagnostic(
                         RuntimeImportInTypeCheckingBlock {
                             qualified_name: import.qualified_name().to_string(),
                             strategy: Strategy::MoveImport,
@@ -262,7 +276,6 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
-                    checker.report_diagnostic(diagnostic);
                 }
             }
         }

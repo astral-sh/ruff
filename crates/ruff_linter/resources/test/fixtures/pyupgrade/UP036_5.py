@@ -71,3 +71,47 @@ if sys.version_info <= (3, 14, 0):
 
 if sys.version_info <= (3, 14, 15):
     print()
+
+# https://github.com/astral-sh/ruff/issues/18165
+
+if sys.version_info.major >= 3:
+    print("3")
+else:
+    print("2")
+
+if sys.version_info.major > 3:
+    print("3")
+else:
+    print("2")
+
+if sys.version_info.major <= 3:
+    print("3")
+else:
+    print("2")
+
+if sys.version_info.major < 3:
+    print("3")
+else:
+    print("2")
+
+if sys.version_info.major == 3:
+    print("3")
+else:
+    print("2")
+
+# Semantically incorrect, skip fixing
+
+if sys.version_info.major[1] > 3:
+    print(3)
+else:
+    print(2)
+
+if sys.version_info.major > (3, 13):
+    print(3)
+else:
+    print(2)
+
+if sys.version_info.major[:2] > (3, 13):
+    print(3)
+else:
+    print(2)

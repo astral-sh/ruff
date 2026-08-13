@@ -23,3 +23,11 @@ def test_error():
     assert list([])
     assert set(set())
     assert tuple("")
+
+# https://github.com/astral-sh/ruff/issues/19935
+def test_all_ok():
+    assert f"{b""}"
+    assert f"{""=}"
+    assert f"{""!a}"
+    assert f"{""!r}"
+    assert f"{"":1}"

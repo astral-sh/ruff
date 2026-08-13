@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import overload, cast
+from typing import overload, cast, TypeVar
 from typing_extensions import override
 
 
@@ -245,3 +245,26 @@ def f(bar: str):
 class C:
     def __init__(self, x) -> None:
         print(locals())
+
+###
+# Should trigger for t-string here
+# even though the corresponding f-string
+# does not trigger (since it is common in stubs)
+###
+class C:
+    def f(self, x, y):
+        """Docstring."""
+        msg = t"{x}..."
+        raise NotImplementedError(msg)
+    
+
+###
+# Unused arguments with `**kwargs`.
+###
+
+def f(
+    default: object = None,  # noqa: ARG001
+    **kwargs: object,
+) -> None:
+    TypeVar(**kwargs)
+

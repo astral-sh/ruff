@@ -1,18 +1,20 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_list;
+use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `for` loops that can be replaced by a making a copy of a list.
+/// Checks for `for` loops that append every item of an iterable to a list,
+/// which can be replaced with a call to `list`.
 ///
 /// ## Why is this bad?
-/// When creating a copy of an existing list using a for-loop, prefer
-/// `list` or `list.copy` instead. Making a direct copy is more readable and
-/// more performant.
+/// When populating a list from an iterable with a `for` loop, prefer `list`
+/// instead. The `list` call is more readable and more performant. For an
+/// existing list, you can also use `list.copy` instead of `list`.
 ///
 /// Using the below as an example, the `list`-based copy is ~2x faster on
 /// Python 3.11.
@@ -35,6 +37,7 @@ use crate::checkers::ast::Checker;
 /// filtered = list(original)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct ManualListCopy;
 
 impl Violation for ManualListCopy {
@@ -69,12 +72,15 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
-        range,
+        range_start: _,
+        node_index: _,
     }) = value.as_ref()
     else {
         return;
     };
+    let call_range = value.range();
 
     if !keywords.is_empty() {
         return;
@@ -98,7 +104,7 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
     }
 
     // Avoid, e.g., `for x in y: filtered[x].append(x)`.
-    if any_over_expr(value, &|expr| {
+    if any_over_expr(value, |expr| {
         expr.as_name_expr().is_some_and(|expr| expr.id == *id)
     }) {
         return;
@@ -119,5 +125,5 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(ManualListCopy, *range));
+    checker.report_diagnostic(ManualListCopy, call_range);
 }

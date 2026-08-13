@@ -26,3 +26,8 @@
 "{.real}".format({1, 2})
 "{.real}".format({1: 2, 3: 4})
 "{}".format((i for i in range(2)))
+
+# https://github.com/astral-sh/ruff/issues/21017
+"{.real}".format(1_2)
+"{0.real}".format(1_2)
+"{a.real}".format(a=1_2)

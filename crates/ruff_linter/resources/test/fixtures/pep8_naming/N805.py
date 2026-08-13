@@ -104,7 +104,7 @@ class SelfInArgsClass:
     def self_as_kw_only_argument(this, *, self):
         pass
 
-    def self_as_varags(this, *self):
+    def self_as_varargs(this, *self):
         pass
 
     def self_as_kwargs(this, **self):
@@ -134,3 +134,9 @@ class MyMeta(type):
 
 class MyProtocolMeta(type(Protocol)):
     def __subclasscheck__(cls, other): ...
+
+
+# https://github.com/astral-sh/ruff/issues/18459
+class C:
+    def f(this):
+        self = 123

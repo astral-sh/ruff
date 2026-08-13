@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{helpers::map_subscript, Arguments, StmtClassDef};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Arguments, StmtClassDef, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
+use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
@@ -14,6 +14,9 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// Use the `UserDict`, `UserList`, and `UserString` objects from the `collections` module
 /// instead.
+///
+/// This rule does not apply to stub files, which should faithfully represent the runtime
+/// implementation and may be out of the author's control.
 ///
 /// ## Example
 ///
@@ -57,6 +60,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// - [Python documentation: `collections`](https://docs.python.org/3/library/collections.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.3")]
 pub(crate) struct SubclassBuiltin {
     subclass: String,
     replacement: String,
@@ -82,6 +86,10 @@ impl AlwaysFixableViolation for SubclassBuiltin {
 
 /// FURB189
 pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };
@@ -105,7 +113,7 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
 
     let user_symbol = supported_builtin.user_symbol();
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         SubclassBuiltin {
             subclass: symbol.to_string(),
             replacement: user_symbol.to_string(),
@@ -121,7 +129,6 @@ pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
         let other_edit = Edit::range_replacement(binding, base_expr.range());
         Ok(Fix::unsafe_edits(import_edit, [other_edit]))
     });
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

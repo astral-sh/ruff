@@ -1,14 +1,12 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAugAssign;
 
-use crate::comments::SourceComment;
-use crate::expression::parentheses::is_expression_parenthesized;
+use crate::prelude::*;
 use crate::statement::stmt_assign::{
-    has_target_own_parentheses, AnyAssignmentOperator, AnyBeforeOperator,
-    FormatStatementsLastExpression,
+    AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
+    has_target_own_parentheses,
 };
 use crate::statement::trailing_semicolon;
-use crate::{has_skip_comment, prelude::*};
 use crate::{AsFormat, FormatNodeRule};
 
 #[derive(Default)]
@@ -21,14 +19,11 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
             op,
             value,
             range: _,
+            node_index: _,
         } = item;
 
         if has_target_own_parentheses(target, f.context())
-            && !is_expression_parenthesized(
-                target.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            )
+            && !f.context().is_expression_parenthesized(target.into())
         {
             FormatStatementsLastExpression::RightToLeft {
                 before_operator: AnyBeforeOperator::Expression(target),
@@ -60,13 +55,5 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
         }
 
         Ok(())
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }

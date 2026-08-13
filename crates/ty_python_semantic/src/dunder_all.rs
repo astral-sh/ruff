@@ -1,38 +1,22 @@
-use rustc_hash::FxHashSet;
-
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashSet;
+use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::symbol::ScopeId;
-use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
-use crate::types::{infer_expression_types, Truthiness, Type};
-use crate::{resolve_module, Db, ModuleName};
-
-#[allow(clippy::ref_option)]
-fn dunder_all_names_cycle_recover(
-    _db: &dyn Db,
-    _value: &Option<FxHashSet<Name>>,
-    _count: u32,
-    _file: File,
-) -> salsa::CycleRecoveryAction<Option<FxHashSet<Name>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet<Name>> {
-    None
-}
+use crate::types::{Type, TypeContext, infer_expression_types};
+use crate::{Db, ProgramEnvironment};
+use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_ref), cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial)]
-pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
-    let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxHashSet<Name>> {
+    let source_file = file.file(db);
+    let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
-    let module = parsed_module(db.upcast(), file);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());
@@ -42,12 +26,8 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name
 /// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
-    file: File,
-
-    /// The scope in which the `__all__` names are being collected from.
-    ///
-    /// This is always going to be the global scope of the module.
-    scope: ScopeId<'db>,
+    env: ProgramEnvironment<'db>,
+    file: ProgramFile<'db>,
 
     /// The semantic index for the module.
     index: &'db SemanticIndex<'db>,
@@ -64,11 +44,11 @@ struct DunderAllNamesCollector<'db> {
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
-    fn new(db: &'db dyn Db, file: File, index: &'db SemanticIndex<'db>) -> Self {
+    fn new(db: &'db dyn Db, file: ProgramFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
         Self {
             db,
+            env: ProgramEnvironment::from_file(file),
             file,
-            scope: global_scope(db, file),
             index,
             origin: None,
             invalid: false,
@@ -92,6 +72,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns `true` if the expression is a valid list/tuple/set or module `__all__`, `false` otherwise.
     fn extend(&mut self, expr: &ast::Expr) -> bool {
+        let db = self.db;
         match expr {
             // `__all__ += [...]`
             // `__all__.extend([...])`
@@ -105,12 +86,16 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
+
                 let Type::ModuleLiteral(module_literal) = self.standalone_expression_type(value)
                 else {
                     return false;
                 };
-                let Some(module_dunder_all_names) =
-                    dunder_all_names(self.db, module_literal.module(self.db).file())
+                let Some(module_dunder_all_names) = module_literal
+                    .module(db)
+                    .file(db)
+                    .map(|file| ProgramFile::new(db, file, self.env.program(db)))
+                    .and_then(|file| dunder_all_names(db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
                     return false;
@@ -176,10 +161,17 @@ impl<'db> DunderAllNamesCollector<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
+        let db = self.db;
+
+        let importing_file =
+            ImportingFile::File(self.file.file(db), self.env.resolver_environment(db));
         let module_name =
-            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, &module_name)?;
-        dunder_all_names(self.db, module.file())
+            ModuleName::from_import_statement(db, importing_file, import_from).ok()?;
+        let module = resolve_module(db, importing_file, &module_name)?;
+        dunder_all_names(
+            db,
+            ProgramFile::new(db, module.file(db)?, self.env.program(db)),
+        )
     }
 
     /// Infer the type of a standalone expression.
@@ -188,15 +180,19 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// This function panics if `expr` was not marked as a standalone expression during semantic indexing.
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        infer_expression_types(self.db, self.index.expression(expr))
-            .expression_type(expr.scoped_expression_id(self.db, self.scope))
+        let db = self.db;
+        infer_expression_types(db, self.index.expression(expr), TypeContext::default())
+            .expression_type(expr)
     }
 
     /// Evaluate the given expression and return its truthiness.
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
-        self.standalone_expression_type(expr).try_bool(self.db).ok()
+        let db = self.db;
+        self.standalone_expression_type(expr)
+            .try_bool(db, &self.env)
+            .ok()
     }
 
     /// Add valid names to the set.
@@ -216,13 +212,15 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns [`None`] if `__all__` is not defined in the current module or if it contains
     /// invalid elements.
-    fn into_names(self) -> Option<FxHashSet<Name>> {
+    fn into_names(mut self) -> Option<FxHashSet<Name>> {
+        let db = self.db;
         if self.origin.is_none() {
             None
         } else if self.invalid {
-            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
+            tracing::debug!("Invalid `__all__` in `{}`", self.file.file(db).path(db));
             None
         } else {
+            self.names.shrink_to_fit();
             Some(self.names)
         }
     }

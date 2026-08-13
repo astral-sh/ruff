@@ -1,0 +1,283 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/remove_lone_list_item_parens.py
+---
+## Input
+
+```python
+items = [(123)]
+items = [(True)]
+items = [(((((True)))))]
+items = [(((((True,)))))]
+items = [((((()))))]
+items = [(x for x in [1])]
+items = {(123)}
+items = {(True)}
+items = {(((((True)))))}
+
+# Requires `hug_parens_with_braces_and_square_brackets` unstable style to remove parentheses
+# around multiline values
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2"}
+        if some_var == ""
+        else {"key": "val"}
+    )
+]
+
+# Comments should not cause crashes
+items = [
+    (  # comment
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )  # comment
+]
+
+items = [  # comment
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]  # comment
+
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}  # comment
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+
+items = [  # comment
+    (  # comment
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )  # comment
+]  # comment
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,12 +1,12 @@
+-items = [123]
+-items = [True]
+-items = [True]
+-items = [(True,)]
+-items = [()]
++items = [(123)]
++items = [(True)]
++items = [(True)]
++items = [((True,))]
++items = [(())]
+ items = [(x for x in [1])]
+-items = {123}
+-items = {True}
+-items = {True}
++items = {(123)}
++items = {(True)}
++items = {(True)}
+ 
+ # Requires `hug_parens_with_braces_and_square_brackets` unstable style to remove parentheses
+ # around multiline values
+@@ -17,7 +17,7 @@
+         else {"key": "val"}
+     )
+ ]
+-items = [{"key1": "val1", "key2": "val2"} if some_var == "" else {"key": "val"}]
++items = [({"key1": "val1", "key2": "val2"} if some_var == "" else {"key": "val"})]
+ 
+ # Comments should not cause crashes
+ items = [
+```
+
+## Ruff Output
+
+```python
+items = [(123)]
+items = [(True)]
+items = [(True)]
+items = [((True,))]
+items = [(())]
+items = [(x for x in [1])]
+items = {(123)}
+items = {(True)}
+items = {(True)}
+
+# Requires `hug_parens_with_braces_and_square_brackets` unstable style to remove parentheses
+# around multiline values
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [({"key1": "val1", "key2": "val2"} if some_var == "" else {"key": "val"})]
+
+# Comments should not cause crashes
+items = [
+    (  # comment
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )  # comment
+]
+
+items = [  # comment
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]  # comment
+
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}  # comment
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+
+items = [  # comment
+    (  # comment
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )  # comment
+]  # comment
+```
+
+## Black Output
+
+```python
+items = [123]
+items = [True]
+items = [True]
+items = [(True,)]
+items = [()]
+items = [(x for x in [1])]
+items = {123}
+items = {True}
+items = {True}
+
+# Requires `hug_parens_with_braces_and_square_brackets` unstable style to remove parentheses
+# around multiline values
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [{"key1": "val1", "key2": "val2"} if some_var == "" else {"key": "val"}]
+
+# Comments should not cause crashes
+items = [
+    (  # comment
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )  # comment
+]
+
+items = [  # comment
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]  # comment
+
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}  # comment
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+
+items = [  # comment
+    (  # comment
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )
+]
+items = [
+    (
+        {"key1": "val1", "key2": "val2", "key3": "val3"}
+        if some_var == "long strings"
+        else {"key": "val"}
+    )  # comment
+]  # comment
+```

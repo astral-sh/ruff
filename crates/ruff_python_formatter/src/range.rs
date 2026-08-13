@@ -2,28 +2,29 @@ use tracing::Level;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
-    format, FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode,
+    FormatContext, FormatError, FormatOptions, IndentStyle, PrintedRange, SourceCode, format,
 };
-use ruff_python_ast::visitor::source_order::{walk_body, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
-use ruff_python_parser::{parse, ParseOptions};
+use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
-    indentation_at_offset, BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, TriviaRanges, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::Comments;
 use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
-use crate::statement::suite::DocstringStmt;
+use crate::statement::suite::{DocstringStmt, skip_range};
 use crate::verbatim::{ends_suppression, starts_suppression};
-use crate::{format_module_source, FormatModuleError, PyFormatOptions};
+use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
 /// Formats the given `range` in source rather than the entire file.
 ///
 /// The returned formatted range guarantees to cover at least `range` (excluding whitespace), but the range might be larger.
 /// Some cases in which the returned range is larger than `range` are:
-/// * The logical lines in `range` use a indentation different from the configured [`IndentStyle`] and [`IndentWidth`].
+/// * The logical lines in `range` use a indentation different from the configured [`IndentStyle`]
+///   and [`IndentWidth`](ruff_formatter::IndentWidth).
 /// * `range` is smaller than a logical lines and the formatter needs to format the entire logical line.
 /// * `range` falls on a single line body.
 ///
@@ -75,13 +76,14 @@ pub fn format_range(
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-    let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, &trivia);
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
         source,
         comments,
+        &trivia,
         parsed.tokens(),
     );
 
@@ -129,16 +131,19 @@ pub fn format_range(
 /// b) formatting a sub-expression has fewer split points than formatting the entire expressions.
 ///
 /// ### Possible docstrings
-/// Strings that are suspected to be docstrings are excluded from the search to format the enclosing suite instead
-/// so that the formatter's docstring detection in [`FormatSuite`] correctly detects and formats the docstrings.
+/// Strings that are suspected to be docstrings are excluded from the search to format the enclosing
+/// suite instead so that the formatter's docstring detection in
+/// [`FormatSuite`](crate::statement::suite::FormatSuite) correctly detects and formats the
+/// docstrings.
 ///
 /// ### Compound statements with a simple statement body
 /// Don't include simple-statement bodies of compound statements `if True: pass` because the formatter
-/// must run [`FormatClauseBody`] to determine if the body should be collapsed or not.
+/// must run `FormatClauseBody` to determine if the body should be collapsed or not.
 ///
 /// ### Incorrectly indented code
-/// Code that uses indentations that don't match the configured [`IndentStyle`] and [`IndentWidth`] are excluded from the search,
-/// because formatting such nodes on their own can lead to indentation mismatch with its sibling nodes.
+/// Code that uses indentations that don't match the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search, because formatting
+/// such nodes on their own can lead to indentation mismatch with its sibling nodes.
 ///
 /// ## Suppression comments
 /// The search ends when `range` falls into a suppressed range because there's nothing to format. It also avoids that the
@@ -247,7 +252,29 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         // We only visit statements that aren't suppressed that's why we don't need to track the suppression
         // state in a stack. Assert that this assumption is safe.
         debug_assert!(self.suppressed.is_no());
-        walk_body(self, body);
+
+        let mut iter = body.iter();
+
+        while let Some(stmt) = iter.next() {
+            // If the range intersects a skip range then we need to
+            // format the entire suite to properly handle the case
+            // where a `fmt: skip` affects multiple statements.
+            //
+            // For example, in the case
+            //
+            // ```
+            // <RANGE_START>x=1<RANGE_END>;x=2 # fmt: skip
+            // ```
+            //
+            // the statement `x=1` does not "know" that it is
+            // suppressed, but the suite does.
+            if let Some(verbatim_range) = skip_range(stmt, iter.as_slice(), self.context)
+                && verbatim_range.intersect(self.range).is_some()
+            {
+                break;
+            }
+            self.visit_stmt(stmt);
+        }
         self.suppressed = Suppressed::No;
     }
 }
@@ -279,13 +306,15 @@ enum EnclosingNode<'a> {
 ///
 /// ## Compound statements with simple statement bodies
 /// Similar to [`find_enclosing_node`], exclude the compound statement's body if it is a simple statement (not a suite) from the search to format the entire clause header
-/// with the body. This ensures that the formatter runs [`FormatClauseBody`] that determines if the body should be indented.s
+/// with the body. This ensures that the formatter runs `FormatClauseBody` that determines if the body should be indented.
 ///
 /// ## Non-standard indentation
-/// Node's that use an indentation that doesn't match the configured [`IndentStyle`] and [`IndentWidth`] are excluded from the search.
-/// This is because the formatter always uses the configured [`IndentStyle`] and [`IndentWidth`], resulting in the
-/// formatted nodes using a different indentation than the unformatted sibling nodes. This would be tolerable
-/// in non whitespace sensitive languages like JavaScript but results in lexical errors in Python.
+/// Nodes that use an indentation that doesn't match the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search. This is because the
+/// formatter always uses the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth), resulting in the formatted nodes using a different
+/// indentation than the unformatted sibling nodes. This would be tolerable in non whitespace
+/// sensitive languages like JavaScript but results in lexical errors in Python.
 ///
 /// ## Implementation
 /// It would probably be possible to merge this visitor with [`FindEnclosingNode`] but they are separate because
@@ -369,6 +398,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 subject: _,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 if let Some(saved_state) = self.enter_level(cases.first().map(AnyNodeRef::from)) {
                     for match_case in cases {
@@ -387,6 +417,7 @@ impl SourceOrderVisitor<'_> for NarrowRange<'_> {
                 finalbody,
                 is_star: _,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_body(body);
                 if let Some(except_handler_saved) =
@@ -476,7 +507,7 @@ impl NarrowRange<'_> {
             }) = BackwardsTokenizer::up_to(
                 first_child.start(),
                 self.context.source(),
-                self.context.comments().ranges(),
+                self.context.trivia().comments(),
             )
             .skip_trivia()
             .next()
@@ -510,32 +541,26 @@ impl NarrowRange<'_> {
             // The challenge here is that the second line of the multiline string uses a 4 space indentation. Using `dedent` would
             // dedent the second line to 0 spaces and the `indent` then adds a 2 space indentation to match the indentation in the source.
             // This is incorrect because the leading whitespace is the content of the string and not indentation, resulting in changed string content.
-            if let Some(indentation) =
-                indentation_at_offset(first_child.start(), self.context.source())
-            {
-                let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
-                let expected_indents = self.level;
+            // Missing indentation indicates a simple-statement body of a compound statement (not a suite body).
+            // Don't narrow the range because the formatter must run `FormatClauseBody` to determine if the body should be collapsed or not.
+            let indentation = indentation_at_offset(first_child.start(), self.context.source())?;
+            let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
+            let expected_indents = self.level;
 
-                // Each level must always add one level of indent. That's why an empty relative indent to the parent node tells us that the enclosing node is the Module.
-                let has_expected_indentation = match self.context.options().indent_style() {
-                    IndentStyle::Tab => {
-                        relative_indent.len() == expected_indents
-                            && relative_indent.chars().all(|c| c == '\t')
-                    }
-                    IndentStyle::Space => {
-                        relative_indent.len()
-                            == expected_indents
-                                * self.context.options().indent_width().value() as usize
-                            && relative_indent.chars().all(|c| c == ' ')
-                    }
-                };
-
-                if !has_expected_indentation {
-                    return None;
+            // Each level must always add one level of indent. That's why an empty relative indent to the parent node tells us that the enclosing node is the Module.
+            let has_expected_indentation = match self.context.options().indent_style() {
+                IndentStyle::Tab => {
+                    relative_indent.len() == expected_indents
+                        && relative_indent.chars().all(|c| c == '\t')
                 }
-            } else {
-                // Simple-statement body of a compound statement (not a suite body).
-                // Don't narrow the range because the formatter must run `FormatClauseBody` to determine if the body should be collapsed or not.
+                IndentStyle::Space => {
+                    relative_indent.len()
+                        == expected_indents * self.context.options().indent_width().value() as usize
+                        && relative_indent.chars().all(|c| c == ' ')
+                }
+            };
+
+            if !has_expected_indentation {
                 return None;
             }
         }
@@ -553,7 +578,7 @@ impl NarrowRange<'_> {
 }
 
 pub(crate) const fn is_logical_line(node: AnyNodeRef) -> bool {
-    // Make sure to update [`FormatEnclosingLine`] when changing this.
+    // Make sure to update [`FormatEnclosingNode`] when changing this.
     node.is_statement()
         || node.is_decorator()
         || node.is_except_handler()
@@ -659,10 +684,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprYieldFrom(_)
             | AnyNodeRef::ExprCompare(_)
             | AnyNodeRef::ExprCall(_)
-            | AnyNodeRef::FStringExpressionElement(_)
-            | AnyNodeRef::FStringLiteralElement(_)
-            | AnyNodeRef::FStringFormatSpec(_)
+            | AnyNodeRef::InterpolatedElement(_)
+            | AnyNodeRef::InterpolatedStringLiteralElement(_)
+            | AnyNodeRef::InterpolatedStringFormatSpec(_)
             | AnyNodeRef::ExprFString(_)
+            | AnyNodeRef::ExprTString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
             | AnyNodeRef::ExprNumberLiteral(_)
@@ -679,6 +705,7 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
             | AnyNodeRef::ExprIpyEscapeCommand(_)
             | AnyNodeRef::FString(_)
             | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::TString(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -709,9 +736,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
     }
 }
 
-/// Computes the level of indentation for `indentation` when using the configured [`IndentStyle`] and [`IndentWidth`].
+/// Computes the level of indentation for `indentation` when using the configured [`IndentStyle`]
+/// and [`IndentWidth`](ruff_formatter::IndentWidth).
 ///
-/// Returns `None` if the indentation doesn't conform to the configured [`IndentStyle`] and [`IndentWidth`].
+/// Returns `None` if the indentation doesn't conform to the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth).
 ///
 /// # Panics
 /// If `offset` is outside of `source`.

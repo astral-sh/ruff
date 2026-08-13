@@ -80,3 +80,7 @@ x: TypeAlias = Literal["fooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 # Ok
 y: TypeAlias = Annotated[int, "metadataaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]
+
+ttoo: str = t"50 character stringggggggggggggggggggggggggggggggg"  # OK
+
+tbar: str = t"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053

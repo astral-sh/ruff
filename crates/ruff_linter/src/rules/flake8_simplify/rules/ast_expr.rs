@@ -1,13 +1,14 @@
-use ruff_python_ast::{self as ast, str_prefix::StringLiteralPrefix, Arguments, Expr};
+use ruff_diagnostics::Applicability;
+use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::fix::snippet::SourceCodeSnippet;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_semantic::analyze::typing::is_dict;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
+use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.
@@ -15,8 +16,12 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// By convention, environment variables should be capitalized.
 ///
-/// On Windows, environment variables are case-insensitive and are converted to
-/// uppercase, so using lowercase environment variables can lead to subtle bugs.
+/// Furthermore, `os.environ` behaves differently across platforms. On Windows,
+/// `os.environ` automatically converts environment variable names to uppercase.
+/// This means that if you define a lowercase environment variable (e.g., `foo=1`),
+/// iterating over `os.environ` will yield `FOO` on Windows, but
+/// `foo` on Linux and macOS. This can lead to subtle bugs in cross-platform code
+/// if it assumes environment variables preserve their original case.
 ///
 /// ## Example
 /// ```python
@@ -41,6 +46,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -88,9 +94,13 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// age = ages.get("Cat")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.261")]
 pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -175,13 +185,13 @@ pub(crate) fn use_capital_environment_variables(checker: &Checker, expr: &Expr) 
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
             actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         arg.range(),
-    ));
+    );
 }
 
 fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
@@ -215,7 +225,7 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var.clone()),
             actual: SourceCodeSnippet::new(env_var.to_string()),
@@ -232,13 +242,13 @@ fn check_os_environ_subscript(checker: &Checker, expr: &Expr) {
             }
         }),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&new_env_var),
         slice.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// SIM910
@@ -246,7 +256,8 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        range: _,
+        range_start: _,
+        node_index: _,
     }) = expr
     else {
         return;
@@ -263,9 +274,6 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Some(key) = args.first() else {
         return;
     };
-    if !(key.is_literal_expr() || key.is_name_expr()) {
-        return;
-    }
     let Some(default) = args.get(1) else {
         return;
     };
@@ -279,7 +287,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         Expr::Name(name) => {
             let Some(binding) = checker
                 .semantic()
-                .only_binding(name)
+                .resolve_name(name)
                 .map(|id| checker.semantic().binding(id))
             else {
                 return;
@@ -298,16 +306,22 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     );
     let actual = checker.locator().slice(expr);
 
-    let mut diagnostic = Diagnostic::new(
+    let mut diagnostic = checker.report_diagnostic(
         DictGetWithNoneDefault {
             expected: SourceCodeSnippet::new(expected.clone()),
             actual: SourceCodeSnippet::from_str(actual),
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
-    checker.report_diagnostic(diagnostic);
+
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }

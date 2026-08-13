@@ -1,3 +1,5 @@
+"""The machinery of importlib: finders, loaders, hooks, etc."""
+
 import sys
 from importlib._bootstrap import BuiltinImporter as BuiltinImporter, FrozenImporter as FrozenImporter, ModuleSpec as ModuleSpec
 from importlib._bootstrap_external import (
@@ -16,5 +18,29 @@ from importlib._bootstrap_external import (
 
 if sys.version_info >= (3, 11):
     from importlib._bootstrap_external import NamespaceLoader as NamespaceLoader
+if sys.version_info >= (3, 14):
+    from importlib._bootstrap_external import AppleFrameworkLoader as AppleFrameworkLoader
 
-def all_suffixes() -> list[str]: ...
+def all_suffixes() -> list[str]:
+    """Returns a list of all recognized module suffixes for this process"""
+
+if sys.version_info >= (3, 14):
+    __all__ = [
+        "AppleFrameworkLoader",
+        "BYTECODE_SUFFIXES",
+        "BuiltinImporter",
+        "DEBUG_BYTECODE_SUFFIXES",
+        "EXTENSION_SUFFIXES",
+        "ExtensionFileLoader",
+        "FileFinder",
+        "FrozenImporter",
+        "ModuleSpec",
+        "NamespaceLoader",
+        "OPTIMIZED_BYTECODE_SUFFIXES",
+        "PathFinder",
+        "SOURCE_SUFFIXES",
+        "SourceFileLoader",
+        "SourcelessFileLoader",
+        "WindowsRegistryFinder",
+        "all_suffixes",
+    ]

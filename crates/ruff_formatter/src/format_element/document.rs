@@ -8,8 +8,8 @@ use crate::prelude::tag::GroupMode;
 use crate::prelude::*;
 use crate::source_code::SourceCode;
 use crate::{
-    format, write, BufferExtensions, Format, FormatContext, FormatElement, FormatOptions,
-    FormatResult, Formatter, IndentStyle, IndentWidth, LineWidth, PrinterOptions,
+    BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
+    IndentStyle, IndentWidth, LineWidth, PrinterOptions, format, write,
 };
 
 use super::tag::Tag;
@@ -222,7 +222,7 @@ impl FormatContext for IrFormatContext<'_> {
         &IrFormatOptions
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         self.source_code
     }
 }
@@ -811,8 +811,8 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::prelude::*;
-    use crate::{format, format_args, write};
     use crate::{SimpleFormatContext, SourceCode};
+    use crate::{format, format_args, write};
 
     #[test]
     fn display_elements() {

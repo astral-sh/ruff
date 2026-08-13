@@ -21,6 +21,7 @@ use {
 /// These escape hatches are primarily required for unit testing and when
 /// converting from UTF-8 size to another coordinate space, such as UTF-16.
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TextSize {
     pub(crate) raw: u32,
 }
@@ -32,6 +33,9 @@ impl fmt::Debug for TextSize {
 }
 
 impl TextSize {
+    /// A `TextSize` of zero.
+    pub const ZERO: TextSize = TextSize::new(0);
+
     /// Creates a new `TextSize` at the given `offset`.
     ///
     /// # Examples
@@ -101,6 +105,25 @@ impl TextSize {
     #[inline]
     pub fn checked_sub(self, rhs: TextSize) -> Option<TextSize> {
         self.raw.checked_sub(rhs.raw).map(|raw| TextSize { raw })
+    }
+
+    /// Saturating addition. Returns maximum `TextSize` if overflow occurred.
+    #[inline]
+    #[must_use]
+    pub fn saturating_add(self, rhs: TextSize) -> TextSize {
+        TextSize {
+            raw: self.raw.saturating_add(rhs.raw),
+        }
+    }
+
+    /// Saturating subtraction. Returns minimum `TextSize` if overflow
+    /// occurred.
+    #[inline]
+    #[must_use]
+    pub fn saturating_sub(self, rhs: TextSize) -> TextSize {
+        TextSize {
+            raw: self.raw.saturating_sub(rhs.raw),
+        }
     }
 }
 

@@ -15,6 +15,17 @@ reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
+reveal_type(__builtins__)  # revealed: Any
+# error: [possibly-unresolved-reference] "Name `__warningregistry__` used when possibly not defined"
+reveal_type(__warningregistry__)  # revealed: dict[Any, int]
+
+import sys
+
+reveal_type(sys.__builtins__)  # revealed: Any
+
+from builtins import __builtins__ as __bi__
+
+reveal_type(__bi__)  # revealed: Any
 
 class X:
     reveal_type(__name__)  # revealed: str
@@ -40,6 +51,18 @@ reveal_type(__dict__)
 reveal_type(__init__)
 ```
 
+## `__doc__` reflects the module's actual docstring
+
+Typeshed annotates `types.ModuleType.__doc__` as `str | None`, but a module with a literal docstring
+always has `__doc__` set (unless Python is run in `-OO` mode, which we ignore as a possibility). In
+that case, we narrow `__doc__` to `str`:
+
+```py
+"""Some docstring"""
+
+reveal_type(__doc__)  # revealed: str
+```
+
 ## `ModuleType` globals combined with explicit assignments and declarations
 
 A `ModuleType` attribute can be overridden in the global scope with a different type, but it must be
@@ -62,10 +85,12 @@ __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is no
 ```py
 import module
 
-reveal_type(module.__file__)  # revealed: Unknown | None
+reveal_type(module.__file__)  # revealed: None
 reveal_type(module.__path__)  # revealed: list[str]
 reveal_type(module.__doc__)  # revealed: Unknown
-reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
+reveal_type(module.__spec__)  # revealed: ModuleSpec | None
+# error: [unresolved-attribute]
+reveal_type(module.__warningregistry__)  # revealed: Unknown
 
 def nested_scope():
     global __loader__
@@ -78,39 +103,78 @@ def nested_scope():
 `ModuleType` attributes can also be accessed as attributes on module-literal types. The special
 attributes `__dict__` and `__init__`, and all attributes on `builtins.object`, can also be accessed
 as attributes on module-literal types, despite the fact that these are inaccessible as globals from
-inside the module:
+inside the module. They can even be accessed on namespace packages:
+
+`namespace_package/foo.py`:
+
+```py
+```
+
+`a.py`:
 
 ```py
 import typing
+import namespace_package
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
 
-# For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
-# unset, but we follow typeshed here):
-reveal_type(typing.__file__)  # revealed: str | None
+# Note that since the source for the `typing` module is a stub file,
+# we can't know for sure that it's not a C extension at runtime,
+# and C extensions don't necessarily have a `__file__` global attribute
+# at all (in which case this attribute access would fail). However, we
+# *do* know that `typing` is not a namespace package, so if `__file__`
+# does exist, it will be of type `str` (`__file__` is only `None` for
+# namespace packages).
+reveal_type(typing.__file__)  # revealed: str
 
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
-
 reveal_type(typing.__class__)  # revealed: <class 'ModuleType'>
-
 reveal_type(typing.__dict__)  # revealed: dict[str, Any]
+
+reveal_type(namespace_package.__name__)  # revealed: str
+reveal_type(namespace_package.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
+reveal_type(namespace_package.__file__)  # revealed: None
+reveal_type(namespace_package.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
+reveal_type(namespace_package.__class__)  # revealed: <class 'ModuleType'>
+reveal_type(namespace_package.__dict__)  # revealed: dict[str, Any]
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
 dynamic imports; but we ignore that for module-literal types where we know exactly which module
 we're dealing with:
 
+`b.py`:
+
 ```py
+import typing
+
 # error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
+```
+
+However, if we have a `ModuleType` instance, we make `__getattr__` available. This means that
+arbitrary attribute accesses are allowed (with a result type of `Any`):
+
+`c.py`:
+
+```py
+import types
+
+reveal_type(types.ModuleType.__getattr__)  # revealed: def __getattr__(self, name: str) -> Any
+
+def f(module: types.ModuleType):
+    reveal_type(module.__getattr__)  # revealed: bound method ModuleType.__getattr__(name: str) -> Any
+
+    reveal_type(module.__all__)  # revealed: Any
+    reveal_type(module.whatever)  # revealed: Any
 ```
 
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
 
 It's impossible to override the `__dict__` attribute of `types.ModuleType` instances from inside the
-module; we should prioritise the attribute in the `types.ModuleType` stub over a variable named
+module; we should prioritize the attribute in the `types.ModuleType` stub over a variable named
 `__dict__` in the module's global namespace:
 
 `foo.py`:
@@ -184,6 +248,7 @@ typeshed = "/typeshed"
 
 ```pyi
 class object: ...
+class tuple: ...
 class int: ...
 class bytes: ...
 

@@ -1,0 +1,44 @@
+---
+source: crates/ruff_db/src/diagnostic/render/gitlab.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+[
+  {
+    "check_name": "invalid-syntax",
+    "description": "invalid-syntax: Expected one or more symbol names after import",
+    "severity": "major",
+    "fingerprint": "<redacted>",
+    "location": {
+      "path": "syntax_errors.py",
+      "positions": {
+        "begin": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 2,
+          "column": 1
+        }
+      }
+    }
+  },
+  {
+    "check_name": "invalid-syntax",
+    "description": "invalid-syntax: Expected ')', found newline",
+    "severity": "major",
+    "fingerprint": "<redacted>",
+    "location": {
+      "path": "syntax_errors.py",
+      "positions": {
+        "begin": {
+          "line": 3,
+          "column": 12
+        },
+        "end": {
+          "line": 4,
+          "column": 1
+        }
+      }
+    }
+  }
+]

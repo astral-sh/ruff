@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::backtrace::BacktraceStatus;
 use std::cell::Cell;
 use std::panic::Location;
@@ -15,26 +16,63 @@ pub struct PanicError {
 pub struct Payload(Box<dyn std::any::Any + Send>);
 
 impl Payload {
-    pub fn as_str(&self) -> Option<&str> {
+    pub fn downcast_ref<R: Any>(&self) -> Option<&R> {
+        self.0.downcast_ref::<R>()
+    }
+}
+
+impl std::fmt::Display for Payload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(s) = self.0.downcast_ref::<String>() {
-            Some(s)
+            f.write_str(s)
         } else if let Some(s) = self.0.downcast_ref::<&str>() {
-            Some(s)
+            f.write_str(s)
+        } else if let Some(s) = self.0.downcast_ref::<salsa::Cancelled>() {
+            write!(f, "{s}")
         } else {
-            None
+            f.write_str("Box<dyn Any>")
         }
+    }
+}
+
+impl PanicError {
+    pub fn resume_unwind(self) -> ! {
+        std::panic::resume_unwind(self.payload.0)
+    }
+
+    pub fn to_diagnostic_message(&self, path: Option<impl std::fmt::Display>) -> String {
+        use std::fmt::Write;
+
+        let mut message = String::new();
+        message.push_str("Panicked");
+
+        if let Some(location) = &self.location {
+            let _ = write!(&mut message, " at {location}");
+        }
+
+        if let Some(path) = path {
+            let _ = write!(&mut message, " when checking `{path}`");
+        }
+
+        let _ = write!(&mut message, ": `{payload}`", payload = self.payload);
+
+        message
     }
 }
 
 impl std::fmt::Display for PanicError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "panicked at")?;
+        write!(f, "panicked at")?;
         if let Some(location) = &self.location {
             write!(f, " {location}")?;
         }
-        if let Some(payload) = self.payload.as_str() {
-            write!(f, ":\n{payload}")?;
+
+        write!(f, ":\n{payload}", payload = self.payload)?;
+
+        if let Some(query_trace) = self.salsa_backtrace.as_ref() {
+            let _ = writeln!(f, "{query_trace}");
         }
+
         if let Some(backtrace) = &self.backtrace {
             match backtrace.status() {
                 BacktraceStatus::Disabled => {
@@ -49,6 +87,7 @@ impl std::fmt::Display for PanicError {
                 _ => {}
             }
         }
+
         Ok(())
     }
 }
@@ -113,7 +152,7 @@ where
         // Try to get the backtrace and location from our custom panic hook.
         // The custom panic hook only runs once when `panic!` is called (or similar). It doesn't
         // run when the panic is propagated with `std::panic::resume_unwind`. The panic hook
-        // is also not called when the panic is raised with `std::panic::resum_unwind` as is the
+        // is also not called when the panic is raised with `std::panic::resume_unwind` as is the
         // case for salsa unwinds (see the ignored test below).
         // Because of that, always take the payload from `catch_unwind` because it may have been transformed
         // by an inner `std::panic::catch_unwind` handlers and only use the information
@@ -144,10 +183,11 @@ mod tests {
     fn no_backtrace_for_salsa_cancelled() {
         #[salsa::input]
         struct Input {
+            #[returns(copy)]
             value: u32,
         }
 
-        #[salsa::tracked]
+        #[salsa::tracked(returns(copy))]
         fn test_query(db: &dyn Database, input: Input) -> u32 {
             loop {
                 // This should throw a cancelled error

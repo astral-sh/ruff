@@ -994,6 +994,39 @@ else:
 reveal_type(x)  # revealed: Literal[1]
 ```
 
+#### `if` nested inside `while True`
+
+These are regression test for <https://github.com/astral-sh/ty/issues/365>. First, make sure that we
+do not panic in the original scenario:
+
+```py
+def flag() -> bool:
+    return True
+
+while True:
+    if flag():
+        break
+    else:
+        c = 1
+        break
+
+c  # error: [possibly-unresolved-reference]
+```
+
+And also check that we understand control flow correctly:
+
+```py
+c = 1
+
+while True:
+    if False:
+        c = 2
+        break
+    break
+
+reveal_type(c)  # revealed: Literal[1]
+```
+
 ## `match` statements
 
 ```toml
@@ -1001,7 +1034,7 @@ reveal_type(x)  # revealed: Literal[1]
 python-version = "3.10"
 ```
 
-### Single-valued types, always true
+### Literal subject, always true
 
 ```py
 x = 1
@@ -1015,7 +1048,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Single-valued types, always true, with wildcard pattern
+### Literal subject, always true, with wildcard pattern
 
 ```py
 x = 1
@@ -1031,7 +1064,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Single-valued types, always true, with guard
+### Literal subject, always true, with guard
 
 Make sure we don't infer a static truthiness in case there is a case guard:
 
@@ -1052,7 +1085,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-### Single-valued types, always false
+### Literal subject, always false
 
 ```py
 x = 1
@@ -1066,7 +1099,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, always false, with wildcard pattern
+### Literal subject, always false, with wildcard pattern
 
 ```py
 x = 1
@@ -1082,7 +1115,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, always false, with guard
+### Literal subject, always false, with guard
 
 For definitely-false cases, the presence of a guard has no influence:
 
@@ -1103,7 +1136,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Non-single-valued types
+### Broad subject type
 
 ```py
 def _(s: str):
@@ -1209,17 +1242,26 @@ def f() -> None:
 
 #### `if True`
 
+`mod.py`:
+
 ```py
 x: str
 
 if True:
     x: int
+```
 
-def f() -> None:
-    reveal_type(x)  # revealed: int
+`main.py`:
+
+```py
+from mod import x
+
+reveal_type(x)  # revealed: int
 ```
 
 #### `if False … else`
+
+`mod.py`:
 
 ```py
 x: str
@@ -1228,12 +1270,19 @@ if False:
     pass
 else:
     x: int
+```
 
-def f() -> None:
-    reveal_type(x)  # revealed: int
+`main.py`:
+
+```py
+from mod import x
+
+reveal_type(x)  # revealed: int
 ```
 
 ### Ambiguous
+
+`mod.py`:
 
 ```py
 def flag() -> bool:
@@ -1243,9 +1292,14 @@ x: str
 
 if flag():
     x: int
+```
 
-def f() -> None:
-    reveal_type(x)  # revealed: str | int
+`main.py`:
+
+```py
+from mod import x
+
+reveal_type(x)  # revealed: str | int
 ```
 
 ## Conditional function definitions
@@ -1445,6 +1499,8 @@ if False:
 ```py
 # error: [unresolved-import]
 from module import symbol
+
+reveal_type(symbol)  # revealed: Unknown
 ```
 
 #### Always true, bound
@@ -1474,7 +1530,7 @@ if flag():
 ```
 
 ```py
-# error: [possibly-unbound-import]
+# error: [possibly-missing-import]
 from module import symbol
 ```
 
@@ -1506,6 +1562,39 @@ if True:
 ```py
 # no error
 from module import symbol
+```
+
+## Non-definitely bound symbols in conditions
+
+When a non-definitely bound symbol is used as a (part of a) condition, we always infer an ambiguous
+truthiness. If we didn't do that, `x` would be considered definitely bound in the following example:
+
+```py
+def _(flag: bool):
+    if flag:
+        ALWAYS_TRUE_IF_BOUND = True
+
+    # error: [possibly-unresolved-reference] "Name `ALWAYS_TRUE_IF_BOUND` used when possibly not defined"
+    if True and ALWAYS_TRUE_IF_BOUND:
+        x = 1
+
+    # no error, x is considered definitely bound
+    x
+```
+
+```py
+def _(flag: bool):
+    if flag:
+        ALWAYS_TRUE_IF_BOUND = True
+
+    # error: [possibly-unresolved-reference] "Name `ALWAYS_TRUE_IF_BOUND` used when possibly not defined"
+    if True and ALWAYS_TRUE_IF_BOUND:
+        x = 1
+    else:
+        x = 2
+
+    # If `ALWAYS_TRUE_IF_BOUND` were not defined, an error would occur, and therefore the `x = 2` branch would never be executed.
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Unreachable code

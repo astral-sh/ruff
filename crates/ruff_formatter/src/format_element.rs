@@ -69,7 +69,7 @@ pub enum FormatElement {
 }
 
 impl FormatElement {
-    pub fn tag_kind(&self) -> Option<TagKind> {
+    pub(crate) fn tag_kind(&self) -> Option<TagKind> {
         if let FormatElement::Tag(tag) = self {
             Some(tag.kind())
         } else {
@@ -191,13 +191,9 @@ impl Deref for Interned {
     }
 }
 
-const LINE_SEPARATOR: char = '\u{2028}';
-const PARAGRAPH_SEPARATOR: char = '\u{2029}';
-pub const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR];
-
 /// Replace the line terminators matching the provided list with "\n"
 /// since its the only line break type supported by the printer
-pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<str> {
+pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) -> Cow<'_, str> {
     let mut result = String::new();
     let mut last_end = 0;
 
@@ -229,7 +225,7 @@ impl FormatElement {
         matches!(self, FormatElement::Tag(_))
     }
 
-    /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_start`] is `true`.
+    /// Returns `true` if self is a [`FormatElement::Tag`] and `Tag::is_start` is `true`.
     pub const fn is_start_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_start(),
@@ -238,14 +234,14 @@ impl FormatElement {
     }
 
     /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_end`] is `true`.
-    pub const fn is_end_tag(&self) -> bool {
+    const fn is_end_tag(&self) -> bool {
         match self {
             FormatElement::Tag(tag) => tag.is_end(),
             _ => false,
         }
     }
 
-    pub const fn is_text(&self) -> bool {
+    const fn is_text(&self) -> bool {
         matches!(
             self,
             FormatElement::SourceCodeSlice { .. }
@@ -254,7 +250,7 @@ impl FormatElement {
         )
     }
 
-    pub const fn is_space(&self) -> bool {
+    const fn is_space(&self) -> bool {
         matches!(self, FormatElement::Space)
     }
 }
@@ -339,7 +335,7 @@ impl BestFittingVariants {
     ///
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     #[doc(hidden)]
-    pub fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
+    pub(crate) fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
         debug_assert!(
             variants
                 .iter()
@@ -368,7 +364,7 @@ impl BestFittingVariants {
         self.into_iter().last().unwrap()
     }
 
-    pub fn as_slice(&self) -> &[FormatElement] {
+    fn as_slice(&self) -> &[FormatElement] {
         &self.0
     }
 
@@ -377,7 +373,7 @@ impl BestFittingVariants {
     /// # Panics
     ///
     /// When the number of variants is less than two.
-    pub fn most_flat(&self) -> &[FormatElement] {
+    pub(crate) fn most_flat(&self) -> &[FormatElement] {
         assert!(
             self.as_slice()
                 .iter()
@@ -487,14 +483,14 @@ pub trait FormatElements {
 /// Represents the width by adding 1 to the actual width so that the width can be represented by a [`NonZeroU32`],
 /// allowing [`TextWidth`] or [`Option<Width>`] fit in 4 bytes rather than 8.
 ///
-/// This means that 2^32 can not be precisely represented and instead has the same value as 2^32-1.
+/// This means that 2^32 cannot be precisely represented and instead has the same value as 2^32-1.
 /// This imprecision shouldn't matter in practice because either text are longer than any configured line width
 /// and thus, the text should break.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Width(NonZeroU32);
 
 impl Width {
-    pub(crate) const fn new(width: u32) -> Self {
+    const fn new(width: u32) -> Self {
         Width(NonZeroU32::MIN.saturating_add(width))
     }
 
@@ -513,8 +509,26 @@ pub enum TextWidth {
 
 impl TextWidth {
     pub fn from_text(text: &str, indent_width: IndentWidth) -> TextWidth {
+        const fn is_printable_ascii(byte: u8) -> bool {
+            matches!(byte, b' '..=b'~')
+        }
+
         let mut width = 0u32;
 
+        for (index, byte) in text.bytes().enumerate() {
+            match byte {
+                b'\t' => width += indent_width.value(),
+                b'\n' => return TextWidth::Multiline,
+                byte if is_printable_ascii(byte) => width += 1,
+                _ => return Self::from_text_slow(&text[index..], indent_width, width),
+            }
+        }
+
+        Self::Width(Width::new(width))
+    }
+
+    #[cold]
+    fn from_text_slow(text: &str, indent_width: IndentWidth, mut width: u32) -> TextWidth {
         for c in text.chars() {
             let char_width = match c {
                 '\t' => indent_width.value(),
@@ -535,15 +549,33 @@ impl TextWidth {
         }
     }
 
-    pub(crate) const fn is_multiline(self) -> bool {
+    const fn is_multiline(self) -> bool {
         matches!(self, TextWidth::Multiline)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    const LINE_SEPARATOR: char = '\u{2028}';
+    const PARAGRAPH_SEPARATOR: char = '\u{2029}';
+    const LINE_TERMINATORS: [char; 3] = ['\r', LINE_SEPARATOR, PARAGRAPH_SEPARATOR];
 
-    use crate::format_element::{normalize_newlines, LINE_TERMINATORS};
+    use crate::IndentWidth;
+    use crate::format_element::{TextWidth, normalize_newlines};
+
+    #[test]
+    fn text_width() {
+        let indent_width = IndentWidth::try_from(4).unwrap();
+        let width = |text| {
+            TextWidth::from_text(text, indent_width)
+                .width()
+                .map(super::Width::value)
+        };
+
+        assert_eq!(width("hello"), Some(5));
+        assert_eq!(width("a寿司b"), Some(6));
+        assert_eq!(width("a\0b"), Some(2));
+    }
 
     #[test]
     fn test_normalize_newlines() {

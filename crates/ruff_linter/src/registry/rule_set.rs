@@ -5,7 +5,7 @@ use ruff_macros::CacheKey;
 
 use crate::registry::Rule;
 
-const RULESET_SIZE: usize = 15;
+const RULESET_SIZE: usize = 16;
 
 /// A set of [`Rule`]s.
 ///
@@ -22,10 +22,6 @@ impl RuleSet {
     /// Returns an empty rule set.
     pub const fn empty() -> Self {
         Self(Self::EMPTY)
-    }
-
-    pub fn clear(&mut self) {
-        self.0 = Self::EMPTY;
     }
 
     #[inline]
@@ -257,7 +253,7 @@ impl RuleSet {
 
     /// Returns `true` if any of the rules in `rules` are in this set.
     #[inline]
-    pub const fn any(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any(&self, rules: &[Rule]) -> bool {
         let mut any = false;
         let mut i = 0;
 
@@ -302,9 +298,8 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                let name = rule.as_ref();
                 let code = rule.noqa_code();
-                writeln!(f, "\t{name} ({code}),")?;
+                writeln!(f, "\t{name} ({code}),", name = rule.name())?;
             }
             write!(f, "]")?;
         }

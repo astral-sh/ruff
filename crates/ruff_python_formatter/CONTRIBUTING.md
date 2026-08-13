@@ -74,7 +74,7 @@ def f():  # a
 The other option is to use the playground (also check the playground README):
 
 ```shell
-cd playground && npm install && npm run dev:wasm && npm run dev
+cd playground && npm ci --ignore-scripts && npm run dev:wasm && npm run dev
 ```
 
 Run`npm run dev:wasm` and reload the page in the browser to refresh.
@@ -204,7 +204,7 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
         // Here we destructure item and make sure each field is listed.
         // We generally don't need range if it's underscore-ignored
-        let StmtReturn { range: _, value } = item;
+        let StmtReturn { range: _, node_index: _, value } = item;
         // Implement some formatting logic, in this case no space (and no value) after a return with
         // no value
         if let Some(value) = value {

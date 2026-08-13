@@ -8,7 +8,11 @@ pub enum MarkupKind {
 }
 
 impl MarkupKind {
-    pub(crate) const fn fenced_code_block<T>(self, code: T, language: &str) -> FencedCodeBlock<T>
+    pub(crate) const fn fenced_code_block<T>(
+        self,
+        code: T,
+        language: &str,
+    ) -> FencedCodeBlock<'_, T>
     where
         T: fmt::Display,
     {

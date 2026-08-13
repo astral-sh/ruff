@@ -1,0 +1,14 @@
+#:schema ../ty.schema.json
+# Configuration overrides for ty ecosystem analysis
+
+# Enable off-by-default rules.
+[rules]
+blanket-ignore-comment = "warn"
+division-by-zero = "warn"
+missing-type-argument = "warn"
+possibly-missing-attribute = "warn"
+possibly-missing-import = "warn"
+possibly-unresolved-reference = "warn"
+unsound-return-statement = "warn"
+unsound-yield = "warn"
+unsupported-dynamic-base = "warn"

@@ -1,15 +1,15 @@
 use std::ops::Range;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{Expr, ExprBinOp, ExprCall, Operator};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::rules::flake8_use_pathlib::helpers::is_pure_path_subclass_with_preview;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for `pathlib.Path` objects that are initialized with the current
@@ -33,9 +33,14 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// _ = Path()
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked unsafe if there are comments inside the parentheses, as applying
+/// the fix will delete them.
+///
 /// ## References
 /// - [Python documentation: `Path`](https://docs.python.org/3/library/pathlib.html#pathlib.Path)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct PathConstructorCurrentDirectory;
 
 impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
@@ -50,7 +55,11 @@ impl AlwaysFixableViolation for PathConstructorCurrentDirectory {
 }
 
 /// PTH201
-pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprCall) {
+pub(crate) fn path_constructor_current_directory(
+    checker: &Checker,
+    call: &ExprCall,
+    segments: &[&str],
+) {
     let applicability = |range| {
         if checker.comment_ranges().intersects(range) {
             Applicability::Unsafe
@@ -59,15 +68,9 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
         }
     };
 
-    let (func, arguments) = (&call.func, &call.arguments);
+    let arguments = &call.arguments;
 
-    if !checker
-        .semantic()
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pathlib", "Path" | "PurePath"])
-        })
-    {
+    if !is_pure_path_subclass_with_preview(checker, segments) {
         return;
     }
 
@@ -83,13 +86,9 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, arg.range());
+    let mut diagnostic = checker.report_diagnostic(PathConstructorCurrentDirectory, arg.range());
 
-    match parent_and_next_path_fragment_range(
-        checker.semantic(),
-        checker.comment_ranges(),
-        checker.source(),
-    ) {
+    match parent_and_next_path_fragment_range(checker.semantic(), checker.tokens()) {
         Some((parent_range, next_fragment_range)) => {
             let next_fragment_expr = checker.locator().slice(next_fragment_range);
             let call_expr = checker.locator().slice(call.range());
@@ -107,18 +106,21 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability(parent_range)));
         }
         None => diagnostic.try_set_fix(|| {
-            let edit = remove_argument(arg, arguments, Parentheses::Preserve, checker.source())?;
+            let edit = remove_argument(
+                arg,
+                arguments,
+                Parentheses::Preserve,
+                checker.source(),
+                checker.tokens(),
+            )?;
             Ok(Fix::applicable_edit(edit, applicability(call.range())))
         }),
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 fn parent_and_next_path_fragment_range(
     semantic: &SemanticModel,
-    comment_ranges: &CommentRanges,
-    source: &str,
+    tokens: &ruff_python_ast::token::Tokens,
 ) -> Option<(TextRange, TextRange)> {
     let parent = semantic.current_expression_parent()?;
 
@@ -134,6 +136,6 @@ fn parent_and_next_path_fragment_range(
 
     Some((
         parent.range(),
-        parenthesized_range(right.into(), parent.into(), comment_ranges, source).unwrap_or(range),
+        parenthesized_range(right.into(), parent.into(), tokens).unwrap_or(range),
     ))
 }

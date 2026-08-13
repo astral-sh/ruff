@@ -9,17 +9,13 @@ use ruff_macros::CacheKey;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum Quote {
     /// Use double quotes.
+    #[default]
     Double,
     /// Use single quotes.
     Single,
-}
-
-impl Default for Quote {
-    fn default() -> Self {
-        Self::Double
-    }
 }
 
 impl From<ruff_python_ast::str::Quote> for Quote {
@@ -68,7 +64,7 @@ impl Display for Settings {
 
 impl Quote {
     #[must_use]
-    pub const fn opposite(self) -> Self {
+    pub(crate) const fn opposite(self) -> Self {
         match self {
             Self::Double => Self::Single,
             Self::Single => Self::Double,
@@ -76,7 +72,7 @@ impl Quote {
     }
 
     /// Get the character used to represent this quote.
-    pub const fn as_char(self) -> char {
+    pub(crate) const fn as_char(self) -> char {
         match self {
             Self::Double => '"',
             Self::Single => '\'',

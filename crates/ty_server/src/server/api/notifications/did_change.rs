@@ -1,54 +1,46 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidChangeTextDocument;
-use lsp_types::DidChangeTextDocumentParams;
+use lsp_types::{
+    DidChangeTextDocumentNotification, DidChangeTextDocumentParams, TextDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
+};
 
-use ty_project::watch::ChangeEvent;
-
-use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
-use crate::server::api::LSPResult;
-use crate::server::client::{Notifier, Requester};
 use crate::server::Result;
+use crate::server::api::LSPResult;
+use crate::server::api::diagnostics::publish_diagnostics_if_needed;
+use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
-use crate::system::{url_to_any_system_path, AnySystemPath};
+use crate::session::client::Client;
 
 pub(crate) struct DidChangeTextDocumentHandler;
 
 impl NotificationHandler for DidChangeTextDocumentHandler {
-    type NotificationType = DidChangeTextDocument;
+    type NotificationType = DidChangeTextDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
     fn run(
         session: &mut Session,
-        _notifier: Notifier,
-        _requester: &mut Requester,
+        client: &Client,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
-            return Ok(());
-        };
+        let DidChangeTextDocumentParams {
+            text_document:
+                VersionedTextDocumentIdentifier {
+                    text_document_identifier: TextDocumentIdentifier { uri },
+                    version,
+                },
+            content_changes,
+        } = params;
 
-        let key = session.key_from_url(params.text_document.uri);
-
-        session
-            .update_text_document(&key, params.content_changes, params.text_document.version)
+        let mut document = session
+            .document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match path {
-            AnySystemPath::System(path) => {
-                let db = match session.project_db_for_path_mut(path.as_std_path()) {
-                    Some(db) => db,
-                    None => session.default_project_db_mut(),
-                };
-                db.apply_changes(vec![ChangeEvent::file_content_changed(path)], None);
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
-                db.apply_changes(vec![ChangeEvent::ChangedVirtual(virtual_path)], None);
-            }
-        }
+        document
+            .update_text_document(session, content_changes, version)
+            .with_failure_code(ErrorCode::InternalError)?;
 
-        // TODO(dhruvmanila): Publish diagnostics if the client doesn't support pull diagnostics
+        publish_diagnostics_if_needed(&document, session, client);
 
         Ok(())
     }

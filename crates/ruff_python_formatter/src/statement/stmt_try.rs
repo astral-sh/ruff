@@ -1,15 +1,15 @@
-use ruff_formatter::{write, FormatRuleWithOptions};
+use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::{ExceptHandler, StmtTry};
 use ruff_text_size::Ranged;
 
 use crate::comments;
-use crate::comments::leading_alternate_branch_comments;
 use crate::comments::SourceComment;
+use crate::comments::leading_alternate_branch_comments;
 use crate::other::except_handler_except_handler::{
     ExceptHandlerKind, FormatExceptHandlerExceptHandler,
 };
 use crate::prelude::*;
-use crate::statement::clause::{clause_body, clause_header, ClauseHeader, ElseClause};
+use crate::statement::clause::{ClauseHeader, ElseClause, clause};
 use crate::statement::suite::SuiteKind;
 use crate::statement::{FormatRefWithRule, Stmt};
 
@@ -66,6 +66,7 @@ impl FormatNodeRule<StmtTry> for FormatStmtTry {
             finalbody,
             is_star,
             range: _,
+            node_index: _,
         } = item;
 
         let comments_info = f.context().comments().clone();
@@ -153,15 +154,14 @@ fn format_case<'a>(
 
         write!(
             f,
-            [
-                clause_header(header, trailing_case_comments, &token(kind.keyword()))
-                    .with_leading_comments(leading_case_comments, previous_node),
-                clause_body(
-                    body,
-                    SuiteKind::other(last_suite_in_statement),
-                    trailing_case_comments
-                ),
-            ]
+            [clause(
+                header,
+                &token(kind.keyword()),
+                trailing_case_comments,
+                body,
+                SuiteKind::other(last_suite_in_statement),
+            )
+            .with_leading_comments(leading_case_comments, previous_node),]
         )?;
         (Some(last), rest)
     } else {

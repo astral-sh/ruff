@@ -28,9 +28,23 @@ yaml.load("{}", SafeLoader)
 yaml.load("{}", yaml.SafeLoader)
 yaml.load("{}", CSafeLoader)
 yaml.load("{}", yaml.CSafeLoader)
+yaml.load("{}", yaml.cyaml.CSafeLoader)
 yaml.load("{}", NewSafeLoader)
 yaml.load("{}", Loader=SafeLoader)
 yaml.load("{}", Loader=yaml.SafeLoader)
 yaml.load("{}", Loader=CSafeLoader)
 yaml.load("{}", Loader=yaml.CSafeLoader)
+yaml.load("{}", Loader=yaml.cyaml.CSafeLoader)
 yaml.load("{}", Loader=NewSafeLoader)
+
+# no issue should be found (preview mode only)
+yaml.load("{}", Loader=yaml.BaseLoader)
+yaml.load("{}", Loader=yaml.CBaseLoader)
+yaml.load("{}", yaml.BaseLoader)
+yaml.load("{}", yaml.CBaseLoader)
+from yaml import BaseLoader
+yaml.load("{}", Loader=BaseLoader)
+from yaml.loader import BaseLoader as BL
+yaml.load("{}", Loader=BL)
+from yaml.cyaml import CBaseLoader
+yaml.load("{}", Loader=CBaseLoader)

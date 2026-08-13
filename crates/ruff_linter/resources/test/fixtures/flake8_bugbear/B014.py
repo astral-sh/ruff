@@ -88,3 +88,14 @@ try:
     pas
 except(re.error, re.error):
     p
+
+
+try:
+    pass
+except (
+    ValueError,
+    ValueError,
+    # text
+    TypeError,
+):
+    pass

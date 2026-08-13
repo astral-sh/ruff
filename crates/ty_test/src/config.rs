@@ -4,15 +4,25 @@
 //!
 //! ```toml
 //! log = true # or log = "ty=WARN"
+//!
+//! [rules]
+//! possibly-unresolved-reference = "warn"
+//!
 //! [environment]
 //! python-version = "3.10"
+//!
+//! [project]
+//! dependencies = ["pydantic==2.12.2"]
 //! ```
 
-use anyhow::Context;
+use std::collections::BTreeMap;
+
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
-use ty_python_semantic::PythonPlatform;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::lint::Level;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -21,17 +31,24 @@ pub(crate) struct MarkdownTestConfig {
 
     pub(crate) log: Option<Log>,
 
+    pub(crate) rules: Option<Rules>,
+
+    pub(crate) analysis: Option<Analysis>,
+
     /// The [`ruff_db::system::System`] to use for tests.
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
     pub(crate) system: Option<SystemKind>,
+
+    /// Project configuration for installing external dependencies.
+    pub(crate) project: Option<Project>,
+
+    /// Simulate the use passing `-v` on the command line,
+    /// which can be used to show more information in test diagnostics.
+    pub(crate) verbose: Option<bool>,
 }
 
 impl MarkdownTestConfig {
-    pub(crate) fn from_str(s: &str) -> anyhow::Result<Self> {
-        toml::from_str(s).context("Error while parsing Markdown TOML config")
-    }
-
     pub(crate) fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref()?.python_version
     }
@@ -51,7 +68,43 @@ impl MarkdownTestConfig {
     pub(crate) fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
     }
+
+    pub(crate) fn dependencies(&self) -> Option<&[String]> {
+        self.project.as_ref()?.dependencies.as_deref()
+    }
+
+    pub(crate) fn verbose(&self) -> bool {
+        self.verbose.unwrap_or_default()
+    }
 }
+
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct ScriptOptions {
+    pub(crate) rules: Option<Rules>,
+    pub(crate) analysis: Option<Analysis>,
+}
+
+impl ScriptOptions {
+    pub(crate) fn from_source(source: &str) -> Option<Self> {
+        let tag = ScriptTag::parse(source.as_bytes())?;
+        let metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+
+        Some(metadata.tool.and_then(|tool| tool.ty).unwrap_or_default())
+    }
+}
+
+#[derive(Deserialize)]
+struct ScriptMetadata {
+    tool: Option<ScriptTool>,
+}
+
+#[derive(Deserialize)]
+struct ScriptTool {
+    ty: Option<ScriptOptions>,
+}
+
+pub(crate) type Rules = BTreeMap<String, Level>;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -63,19 +116,19 @@ pub(crate) struct Environment {
     ///
     /// By default, the Python version is inferred as the lower bound of the project's
     /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
-    /// stable version supported by ty is used, which is currently 3.13.
+    /// stable version supported by ty is used (see `ty check --help` output).
     ///
     /// ty will not infer the Python version from the Python environment at this time.
-    pub(crate) python_version: Option<PythonVersion>,
+    python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
-    pub(crate) python_platform: Option<PythonPlatform>,
+    python_platform: Option<PythonPlatform>,
 
     /// Path to a custom typeshed directory.
-    pub(crate) typeshed: Option<SystemPathBuf>,
+    typeshed: Option<SystemPathBuf>,
 
     /// Additional search paths to consider when resolving modules.
-    pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
+    extra_paths: Option<Vec<SystemPathBuf>>,
 
     /// Path to the Python environment.
     ///
@@ -89,7 +142,25 @@ pub(crate) struct Environment {
     /// ty will search in the resolved environment's `site-packages` directories for type
     /// information and third-party imports.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub python: Option<SystemPathBuf>,
+    python: Option<SystemPathBuf>,
+}
+
+#[derive(Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Analysis {
+    /// Whether narrowing with generic classes uses the top materialization.
+    pub(crate) strict_generic_narrowing: Option<bool>,
+
+    /// Whether equality-based checks should preserve possible subclass behavior.
+    #[serde(alias = "strict-literal-narrowing")]
+    pub(crate) strict_equality_semantics: Option<bool>,
+
+    /// Whether ty should support `type: ignore` comments.
+    pub(crate) respect_type_ignore_comments: Option<bool>,
+
+    pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
+
+    pub(crate) replace_imports_with_any: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -105,7 +176,7 @@ pub(crate) enum Log {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum SystemKind {
-    /// Use an in-memory system with a case sensitive file system..
+    /// Use an in-memory system with a case-sensitive file system.
     ///
     /// This is recommended for all tests because it's fast.
     #[default]
@@ -115,4 +186,17 @@ pub(crate) enum SystemKind {
     ///
     /// This system should only be used when testing system or OS specific behavior.
     Os,
+}
+
+/// Project configuration for tests that need external dependencies.
+#[derive(Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Project {
+    /// List of Python package dependencies in `pyproject.toml` format.
+    ///
+    /// These will be installed using `uv sync` into a temporary virtual environment.
+    /// The site-packages directory will then be copied into the test's filesystem.
+    ///
+    /// Example: `dependencies = ["pydantic==2.12.2"]`
+    dependencies: Option<Vec<String>>,
 }

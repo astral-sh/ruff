@@ -1,8 +1,8 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
@@ -32,8 +32,8 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// o = 123
 /// i = 42
 /// ```
-///
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.34")]
 pub(crate) struct AmbiguousVariableName(pub String);
 
 impl Violation for AmbiguousVariableName {
@@ -50,9 +50,6 @@ pub(crate) fn ambiguous_variable_name(checker: &Checker, name: &str, range: Text
         return;
     }
     if is_ambiguous_name(name) {
-        checker.report_diagnostic(Diagnostic::new(
-            AmbiguousVariableName(name.to_string()),
-            range,
-        ));
+        checker.report_diagnostic(AmbiguousVariableName(name.to_string()), range);
     }
 }

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/return_annotation.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -198,6 +197,11 @@ def double(a: int) -> (
 def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
+    pass
+
+
+# Preserve parentheses around invalid type expressions.
+async def preserve_await_return_annotation() -> (await g()):
     pass
 ```
 
@@ -507,5 +511,10 @@ def double(
 def process_board_action(
     payload: WildValue, action_type: Optional[str]
 ) -> Optional[Tuple[str, str]]:
+    pass
+
+
+# Preserve parentheses around invalid type expressions.
+async def preserve_await_return_annotation() -> (await g()):
     pass
 ```

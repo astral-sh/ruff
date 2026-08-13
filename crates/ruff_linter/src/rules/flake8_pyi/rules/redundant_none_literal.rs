@@ -1,11 +1,11 @@
 use anyhow::Result;
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast,
+    self as ast, Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
     helpers::{pep_604_union, typing_optional},
     name::Name,
-    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
+    operator_precedence::OperatorPrecedence,
+    token::{Tokens, parenthesized_range},
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 
 use crate::checkers::ast::Checker;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for redundant `Literal[None]` annotations.
@@ -38,7 +39,11 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety and availability
-/// This rule's fix is marked as safe unless the literal contains comments.
+/// In Python files, this rule's fix is marked as unsafe because replacing
+/// `Literal[...]` can change runtime-visible annotation objects, such as the
+/// result of `typing.get_args`.
+///
+/// In stub files, the fix is marked as safe unless the literal contains comments.
 ///
 /// There is currently no fix available when applying the fix would lead to
 /// a `TypeError` from an expression of the form `None | None` or when we
@@ -48,6 +53,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct RedundantNoneLiteral {
     union_kind: UnionKind,
 }
@@ -60,10 +66,10 @@ impl Violation for RedundantNoneLiteral {
         match self.union_kind {
             UnionKind::NoUnion => "Use `None` rather than `Literal[None]`".to_string(),
             UnionKind::TypingOptional => {
-                "Use `Optional[Literal[...]]` rather than `Literal[None, ...]` ".to_string()
+                "Use `Optional[Literal[...]]` rather than `Literal[None, ...]`".to_string()
             }
             UnionKind::BitOr => {
-                "Use `Literal[...] | None` rather than `Literal[None, ...]` ".to_string()
+                "Use `Literal[...] | None` rather than `Literal[None, ...]`".to_string()
             }
         }
     }
@@ -121,7 +127,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
     // N.B. Applying the fix can leave an unused import to be fixed by the `unused-import` rule.
     for none_expr in none_exprs {
         let mut diagnostic =
-            Diagnostic::new(RedundantNoneLiteral { union_kind }, none_expr.range());
+            checker.report_diagnostic(RedundantNoneLiteral { union_kind }, none_expr.range());
         diagnostic.try_set_optional_fix(|| {
             create_fix(
                 checker,
@@ -137,7 +143,6 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
                 fix.map(|fix| fix.isolate(Checker::isolation(semantic.current_statement_id())))
             })
         });
-        checker.report_diagnostic(diagnostic);
     }
 }
 
@@ -191,7 +196,9 @@ fn create_fix(
         }
     }
 
-    let applicability = if checker.comment_ranges().intersects(literal_expr.range()) {
+    let applicability = if checker.comment_ranges().intersects(literal_expr.range())
+        || !checker.source_type.is_stub()
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -207,11 +214,13 @@ fn create_fix(
     let new_literal_expr = Expr::Subscript(ast::ExprSubscript {
         value: Box::new(literal_subscript.clone()),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         ctx: ExprContext::Load,
         slice: Box::new(if literal_elements.len() > 1 {
             Expr::Tuple(ast::ExprTuple {
                 elts: literal_elements.into_iter().cloned().collect(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 ctx: ExprContext::Load,
                 parenthesized: true,
             })
@@ -235,9 +244,18 @@ fn create_fix(
         UnionKind::BitOr => {
             let none_expr = Expr::NoneLiteral(ExprNoneLiteral {
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
-            let content = checker.generator().expr(&union_expr);
+
+            // Check if we need parentheses to preserve operator precedence
+            let content =
+                if needs_parentheses_for_precedence(semantic, literal_expr, checker.tokens()) {
+                    format!("({})", checker.generator().expr(&union_expr))
+                } else {
+                    checker.generator().expr(&union_expr)
+                };
+
             let union_edit = Edit::range_replacement(content, literal_expr.range());
             Fix::applicable_edit(union_edit, applicability)
         }
@@ -254,4 +272,30 @@ enum UnionKind {
     NoUnion,
     TypingOptional,
     BitOr,
+}
+
+/// Check if the union expression needs parentheses to preserve operator precedence.
+/// This is needed when the union is part of a larger expression where the `|` operator
+/// has lower precedence than the surrounding operations (like attribute access).
+fn needs_parentheses_for_precedence(
+    semantic: &ruff_python_semantic::SemanticModel,
+    literal_expr: &Expr,
+    tokens: &Tokens,
+) -> bool {
+    // Get the parent expression to check if we're in a context that needs parentheses
+    let Some(parent_expr) = semantic.current_expression_parent() else {
+        return false;
+    };
+
+    // Check if the literal expression is already parenthesized
+    if parenthesized_range(literal_expr.into(), parent_expr.into(), tokens).is_some() {
+        return false; // Already parenthesized, don't add more
+    }
+
+    // Check if the parent expression has higher precedence than the `|` operator
+    let union_precedence = OperatorPrecedence::BitOr;
+    let parent_precedence = OperatorPrecedence::from(parent_expr);
+
+    // If the parent operation has higher precedence than `|`, we need parentheses
+    parent_precedence > union_precedence
 }

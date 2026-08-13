@@ -1,9 +1,14 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "This implementation is specific to real file systems."
+)]
+
 use notify::event::{CreateKind, MetadataKind, ModifyKind, RemoveKind, RenameMode};
-use notify::{recommended_watcher, EventKind, RecommendedWatcher, RecursiveMode, Watcher as _};
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _, recommended_watcher};
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 
-use crate::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use crate::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind, ExistingPathKind};
 
 /// Creates a new watcher observing file system changes.
 ///
@@ -34,9 +39,9 @@ where
                 // * Take any new incoming change events and merge them with the previous change events
                 // * If there are no new incoming change events after 10 ms, flush the changes and wait for the next notify event.
                 // * Flush no later than after 3s.
-                loop {
-                    let start = std::time::Instant::now();
+                let batch_start = std::time::Instant::now();
 
+                loop {
                     crossbeam::select! {
                         recv(receiver) -> message => {
                             match message {
@@ -44,7 +49,7 @@ where
                                     debouncer.add_result(event);
 
                                     // Ensure that we flush the changes eventually.
-                                    if start.elapsed() > std::time::Duration::from_secs(3) {
+                                    if batch_start.elapsed() > std::time::Duration::from_secs(3) {
                                         break;
                                     }
                                 }
@@ -107,20 +112,11 @@ struct WatcherInner {
 }
 
 impl Watcher {
-    /// Sets up file watching for `path`.
-    pub fn watch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Watching path: `{path}`");
-
-        self.inner_mut()
-            .watcher
-            .watch(path.as_std_path(), RecursiveMode::Recursive)
-    }
-
-    /// Stops file watching for `path`.
-    pub fn unwatch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Unwatching path: `{path}`");
-
-        self.inner_mut().watcher.unwatch(path.as_std_path())
+    /// Returns a transaction-like view for updating watched paths in one backend operation.
+    pub(crate) fn paths_mut(&mut self) -> WatcherPathsMut<'_> {
+        WatcherPathsMut {
+            inner: self.inner_mut().watcher.paths_mut(),
+        }
     }
 
     /// Stops the file watcher.
@@ -128,13 +124,13 @@ impl Watcher {
     /// Pending events will be discarded.
     ///
     /// The call blocks until the watcher has stopped.
-    pub fn stop(mut self) {
+    pub(crate) fn stop(mut self) {
         tracing::debug!("Stop file watcher");
         self.set_stop();
     }
 
     /// Flushes any pending events.
-    pub fn flush(&self) {
+    pub(crate) fn flush(&self) {
         self.inner()
             .debouncer_sender
             .send(DebouncerMessage::Flush)
@@ -162,6 +158,26 @@ impl Watcher {
 
     fn inner_mut(&mut self) -> &mut WatcherInner {
         self.inner.as_mut().expect("Watcher to be running")
+    }
+}
+
+pub(crate) struct WatcherPathsMut<'a> {
+    inner: Box<dyn notify::PathsMut + 'a>,
+}
+
+impl WatcherPathsMut<'_> {
+    pub(crate) fn add(&mut self, path: &SystemPath) -> notify::Result<()> {
+        tracing::debug!("Watching path: `{path}`");
+        self.inner.add(path.as_std_path(), RecursiveMode::Recursive)
+    }
+
+    pub(crate) fn remove(&mut self, path: &SystemPath) -> notify::Result<()> {
+        tracing::debug!("Unwatching path: `{path}`");
+        self.inner.remove(path.as_std_path())
+    }
+
+    pub(crate) fn commit(self) -> notify::Result<()> {
+        self.inner.commit()
     }
 }
 
@@ -236,9 +252,9 @@ impl Debouncer {
                 let kind = match create {
                     CreateKind::File => CreatedKind::File,
                     CreateKind::Folder => CreatedKind::Directory,
-                    CreateKind::Any | CreateKind::Other => {
-                        CreatedKind::from(FileType::from_path(&path))
-                    }
+                    CreateKind::Any | CreateKind::Other => CreatedKind::from(
+                        ExistingPathKind::from_io_metadata(&path.as_std_path().metadata()),
+                    ),
                 };
 
                 ChangeEvent::Created { path, kind }
@@ -246,7 +262,9 @@ impl Debouncer {
 
             EventKind::Modify(modify) => match modify {
                 ModifyKind::Metadata(metadata) => {
-                    if FileType::from_path(&path) != FileType::File {
+                    if ExistingPathKind::from_io_metadata(&path.as_std_path().metadata())
+                        != ExistingPathKind::File
+                    {
                         // Only interested in file metadata events.
                         return;
                     }
@@ -288,7 +306,9 @@ impl Debouncer {
                     }
 
                     RenameMode::To => ChangeEvent::Created {
-                        kind: CreatedKind::from(FileType::from_path(&path)),
+                        kind: CreatedKind::from(ExistingPathKind::from_io_metadata(
+                            &path.as_std_path().metadata(),
+                        )),
                         path,
                     },
 
@@ -308,7 +328,8 @@ impl Debouncer {
                     RenameMode::Any => {
                         // Guess the action based on the current file system state
                         if path.as_std_path().exists() {
-                            let file_type = FileType::from_path(&path);
+                            let file_type =
+                                ExistingPathKind::from_io_metadata(&path.as_std_path().metadata());
 
                             ChangeEvent::Created {
                                 kind: file_type.into(),
@@ -327,7 +348,8 @@ impl Debouncer {
                     return;
                 }
                 ModifyKind::Any => {
-                    if !path.as_std_path().is_file() {
+                    if !ExistingPathKind::from_io_metadata(&path.as_std_path().metadata()).is_file()
+                    {
                         return;
                     }
 
@@ -387,37 +409,5 @@ where
     fn handle(&self, changes: Vec<ChangeEvent>) {
         let f = self;
         f(changes);
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum FileType {
-    /// The event is related to a directory.
-    File,
-
-    /// The event is related to a directory.
-    Directory,
-
-    /// It's unknown whether the event is related to a file or a directory or if it is any other file type.
-    Any,
-}
-
-impl FileType {
-    fn from_path(path: &SystemPath) -> FileType {
-        match path.as_std_path().metadata() {
-            Ok(metadata) if metadata.is_file() => FileType::File,
-            Ok(metadata) if metadata.is_dir() => FileType::Directory,
-            Ok(_) | Err(_) => FileType::Any,
-        }
-    }
-}
-
-impl From<FileType> for CreatedKind {
-    fn from(value: FileType) -> Self {
-        match value {
-            FileType::File => Self::File,
-            FileType::Directory => Self::Directory,
-            FileType::Any => Self::Any,
-        }
     }
 }

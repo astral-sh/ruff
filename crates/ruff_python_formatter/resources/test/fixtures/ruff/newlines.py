@@ -335,3 +335,96 @@ def overload4():
     # trailing comment
 
 def overload4(a: int): ...
+
+
+# In preview, we preserve these newlines at the start of functions:
+def preserved1():
+
+    return 1
+
+def preserved2():
+
+    pass
+
+def preserved3():
+
+    def inner(): ...
+
+def preserved4():
+
+    def inner():
+        print("with a body")
+        return 1
+
+    return 2
+
+def preserved5():
+
+    ...
+    # trailing comment prevents collapsing the stub
+
+
+def preserved6():
+
+    # Comment
+
+    return 1
+
+
+def preserved7():
+
+    # comment
+    # another line
+    # and a third
+
+    return 0
+
+
+def preserved8():  # this also prevents collapsing the stub
+
+    ...
+
+
+# But we still discard these newlines:
+def removed1():
+
+    "Docstring"
+
+    return 1
+
+
+def removed2():
+
+    ...
+
+
+def removed3():
+
+    ...  # trailing same-line comment does not prevent collapsing the stub
+
+
+# And we discard empty lines after the first:
+def partially_preserved1():
+
+
+    return 1
+
+
+# We only preserve blank lines, not add new ones
+def untouched1():
+    # comment
+
+    return 0
+
+
+def untouched2():
+    # comment
+    return 0
+
+
+def untouched3():
+    # comment
+    # another line
+    # and a third
+
+    return 0

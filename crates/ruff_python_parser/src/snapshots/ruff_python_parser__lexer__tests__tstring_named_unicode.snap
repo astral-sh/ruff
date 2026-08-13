@@ -1,0 +1,13 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    TStringStart 0..2 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 2..28 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringEnd 28..29 (flags = DOUBLE_QUOTES | T_STRING),
+    Newline 29..29,
+]
+```

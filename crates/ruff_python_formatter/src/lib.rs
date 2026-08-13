@@ -1,3 +1,5 @@
+use ruff_db::PythonFile;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -6,24 +8,23 @@ use tracing::Level;
 
 pub use range::format_range;
 use ruff_formatter::prelude::*;
-use ruff_formatter::{format, write, FormatError, Formatted, PrintError, Printed, SourceCode};
+use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, format, write};
 use ruff_python_ast::{AnyNodeRef, Mod};
-use ruff_python_parser::{parse, ParseError, ParseOptions, Parsed};
-use ruff_python_trivia::CommentRanges;
-use ruff_text_size::Ranged;
+use ruff_python_parser::{ParseError, ParseOptions, Parsed, parse};
+use ruff_python_trivia::TriviaRanges;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
+    Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::db::Db;
 pub use crate::options::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, NestedStringQuoteStyle, PreviewMode,
+    PyFormatOptions, QuoteStyle,
 };
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
-use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -60,48 +61,42 @@ where
         let node_ref = AnyNodeRef::from(node);
         let node_comments = comments.leading_dangling_trailing(node_ref);
 
-        if self.is_suppressed(node_comments.trailing, f.context()) {
-            suppressed_node(node_ref).fmt(f)
-        } else {
-            leading_comments(node_comments.leading).fmt(f)?;
+        leading_comments(node_comments.leading).fmt(f)?;
 
-            // Emit source map information for nodes that are valid "narrowing" targets
-            // in range formatting. Never emit source map information if they're disabled
-            // for performance reasons.
-            let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
-                && f.options().source_map_generation().is_enabled();
+        // Emit source map information for nodes that are valid "narrowing" targets
+        // in range formatting. Never emit source map information if they're disabled
+        // for performance reasons.
+        let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
+            && f.options().source_map_generation().is_enabled();
 
-            emit_source_position
-                .then_some(source_position(node.start()))
-                .fmt(f)?;
+        emit_source_position
+            .then_some(source_position(node.start()))
+            .fmt(f)?;
 
-            self.fmt_fields(node, f)?;
+        self.fmt_fields(node, f)?;
 
-            debug_assert!(node_comments.dangling.iter().all(SourceComment::is_formatted), "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`.");
+        debug_assert!(
+            node_comments
+                .dangling
+                .iter()
+                .all(SourceComment::is_formatted),
+            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`."
+        );
 
-            write!(
-                f,
-                [
-                    emit_source_position.then_some(source_position(node.end())),
-                    trailing_comments(node_comments.trailing)
-                ]
-            )
-        }
+        write!(
+            f,
+            [
+                emit_source_position.then_some(source_position(node.end())),
+                trailing_comments(node_comments.trailing)
+            ]
+        )
     }
 
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
-
-    fn is_suppressed(
-        &self,
-        _trailing_comments: &[SourceComment],
-        _context: &PyFormatContext,
-    ) -> bool {
-        false
-    }
 }
 
-#[derive(Error, Debug, salsa::Update, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum FormatModuleError {
     #[error(transparent)]
     ParseError(#[from] ParseError),
@@ -111,6 +106,33 @@ pub enum FormatModuleError {
     PrintError(#[from] PrintError),
 }
 
+impl FormatModuleError {
+    pub fn range(&self) -> Option<TextRange> {
+        match self {
+            FormatModuleError::ParseError(parse_error) => Some(parse_error.range()),
+            FormatModuleError::FormatError(_) | FormatModuleError::PrintError(_) => None,
+        }
+    }
+}
+
+impl From<&FormatModuleError> for Diagnostic {
+    fn from(error: &FormatModuleError) -> Self {
+        match error {
+            FormatModuleError::ParseError(parse_error) => Diagnostic::new(
+                DiagnosticId::InternalError,
+                Severity::Error,
+                &parse_error.error,
+            ),
+            FormatModuleError::FormatError(format_error) => {
+                Diagnostic::new(DiagnosticId::InternalError, Severity::Error, format_error)
+            }
+            FormatModuleError::PrintError(print_error) => {
+                Diagnostic::new(DiagnosticId::InternalError, Severity::Error, print_error)
+            }
+        }
+    }
+}
+
 #[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
 pub fn format_module_source(
     source: &str,
@@ -118,23 +140,23 @@ pub fn format_module_source(
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
     let parsed = parse(source, ParseOptions::from(source_type))?;
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-    let formatted = format_module_ast(&parsed, &comment_ranges, source, options)?;
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &trivia, source, options)?;
     Ok(formatted.print()?)
 }
 
 pub fn format_module_ast<'a>(
     parsed: &'a Parsed<Mod>,
-    comment_ranges: &'a CommentRanges,
+    trivia: &'a TriviaRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
-    format_node(parsed, comment_ranges, source, options)
+    format_node(parsed, trivia, source, options)
 }
 
 fn format_node<'a, N>(
     parsed: &'a Parsed<N>,
-    comment_ranges: &'a CommentRanges,
+    trivia: &'a TriviaRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>>
@@ -143,10 +165,10 @@ where
     &'a N: Into<AnyNodeRef<'a>>,
 {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
+    let comments = Comments::from_ast(parsed.syntax(), source_code, trivia);
 
     let formatted = format!(
-        PyFormatContext::new(options, source, comments, parsed.tokens()),
+        PyFormatContext::new(options, source, comments, trivia, parsed.tokens()),
         [parsed.syntax().format()]
     )?;
     formatted
@@ -159,16 +181,16 @@ where
 pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
     let options = db.format_options(file);
 
-    let parsed = parsed_module(db.upcast(), file);
+    let parsed = parsed_module(db, PythonFile::new(db, file, options.target_version())).load(db);
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));
     }
 
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-    let source = source_text(db.upcast(), file);
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let source = source_text(db, file);
 
-    let formatted = format_node(parsed, &comment_ranges, &source, options)?;
+    let formatted = format_node(&parsed, &trivia, &source, options)?;
     let printed = formatted.print()?;
 
     if printed.as_code() == &*source {
@@ -179,9 +201,9 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(module: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
+pub fn pretty_comments(module: &Mod, trivia: &TriviaRanges, source: &str) -> String {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(module, source_code, comment_ranges);
+    let comments = Comments::from_ast(module, source_code, trivia);
 
     std::format!("{comments:#?}", comments = comments.debug(source_code))
 }
@@ -194,11 +216,11 @@ mod tests {
     use insta::assert_snapshot;
 
     use ruff_python_ast::PySourceType;
-    use ruff_python_parser::{parse, ParseOptions};
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_parser::{ParseOptions, parse};
+    use ruff_python_trivia::TriviaRanges;
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::{format_module_ast, format_module_source, format_range, PyFormatOptions};
+    use crate::{PyFormatOptions, format_module_ast, format_module_source, format_range};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
@@ -226,23 +248,19 @@ if True:
     #[test]
     fn quick_test() {
         let source = r#"
-def main() -> None:
-    if True:
-        some_very_long_variable_name_abcdefghijk = Foo()
-        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
-            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
-            == "This is a very long string abcdefghijk"
-        ]
+def hello(): ...
 
+@lambda _, /: _
+class A: ...
 "#;
         let source_type = PySourceType::Python;
 
         // Parse the AST.
         let source_path = "code_inline.py";
         let parsed = parse(source, ParseOptions::from(source_type)).unwrap();
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted = format_module_ast(&parsed, &comment_ranges, source, options).unwrap();
+        let formatted = format_module_ast(&parsed, &trivia, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
@@ -304,7 +322,7 @@ def main() -> None:
         let options = PyFormatOptions::from_source_type(source_type);
         let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
 
-        let mut formatted = source.to_string();
+        let mut formatted = source.clone();
         formatted.replace_range(
             std::ops::Range::<usize>::from(printed.source_range()),
             printed.as_code(),

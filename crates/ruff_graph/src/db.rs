@@ -1,17 +1,14 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use zip::CompressionMethod;
 
-use ruff_db::files::{File, Files};
-use ruff_db::system::{OsSystem, System, SystemPathBuf};
+use ruff_db::Db as SourceDb;
+use ruff_db::files::Files;
+use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_db::{Db as SourceDb, Upcast};
-use ruff_python_ast::PythonVersion;
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{
-    default_lint_registry, Db, Program, ProgramSettings, PythonPath, PythonPlatform,
-    SearchPathSettings,
-};
+use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
+use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
@@ -20,47 +17,47 @@ static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::Lazy
 });
 
 #[salsa::db]
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
-    system: OsSystem,
-    rule_selection: Arc<RuleSelection>,
+    system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 }
 
 impl ModuleDb {
-    /// Initialize a [`ModuleDb`] from the given source root.
-    pub fn from_src_roots(
-        src_roots: Vec<SystemPathBuf>,
-        python_version: PythonVersion,
-        venv_path: Option<SystemPathBuf>,
-    ) -> Result<Self> {
-        let mut search_paths = SearchPathSettings::new(src_roots);
-        if let Some(venv_path) = venv_path {
-            search_paths.python_path = PythonPath::from_cli_flag(venv_path);
+    /// Initialize a [`ModuleDb`] for the given system.
+    pub fn new<S>(system: S) -> Self
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        Self {
+            storage: salsa::Storage::new(None),
+            files: Files::default(),
+            system: Arc::new(system),
         }
-
-        let db = Self::default();
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version,
-                python_platform: PythonPlatform::default(),
-                search_paths,
-            },
-        )?;
-
-        Ok(db)
     }
 }
 
-impl Upcast<dyn SourceDb> for ModuleDb {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
+/// Resolve module search paths for the given source roots and Python environment.
+pub fn resolve_search_paths(
+    system: &dyn System,
+    src_roots: Vec<SystemPathBuf>,
+    venv_path: Option<SystemPathBuf>,
+) -> Result<SearchPaths> {
+    let mut search_path_settings = SearchPathSettings::new(src_roots);
+    // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
+    if let Some(venv_path) = venv_path {
+        let environment =
+            PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, system)?;
+        search_path_settings.site_packages_paths = environment
+            .site_packages_paths(system)
+            .context("Failed to discover the site-packages directory")?
+            .into_vec();
     }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
-    }
+
+    search_path_settings
+        .to_search_paths(system, &EMPTY_VENDORED, &FallibleStrategy)
+        .context("Invalid search path settings")
 }
 
 #[salsa::db]
@@ -70,32 +67,16 @@ impl SourceDb for ModuleDb {
     }
 
     fn system(&self) -> &dyn System {
-        &self.system
+        &*self.system
     }
 
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
-impl Db for ModuleDb {
-    fn is_file_open(&self, file: File) -> bool {
-        !file.path(self).is_vendored_path()
-    }
-
-    fn rule_selection(&self) -> &RuleSelection {
-        &self.rule_selection
-    }
-
-    fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
-    }
-}
+impl ty_module_resolver::Db for ModuleDb {}
 
 #[salsa::db]
 impl salsa::Database for ModuleDb {}

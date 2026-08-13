@@ -1,14 +1,13 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::Violation;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
+use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
 /// Checks for uses of `.isnull` on Pandas objects.
@@ -41,6 +40,7 @@ use crate::rules::pandas_vet::helpers::{test_expression, Resolution};
 /// - [Pandas documentation: `isnull`](https://pandas.pydata.org/docs/reference/api/pandas.isnull.html#pandas.isnull)
 /// - [Pandas documentation: `isna`](https://pandas.pydata.org/docs/reference/api/pandas.isna.html#pandas.isna)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotIsNull;
 
 impl Violation for PandasUseOfDotIsNull {
@@ -81,6 +81,7 @@ impl Violation for PandasUseOfDotIsNull {
 /// - [Pandas documentation: `notnull`](https://pandas.pydata.org/docs/reference/api/pandas.notnull.html#pandas.notnull)
 /// - [Pandas documentation: `notna`](https://pandas.pydata.org/docs/reference/api/pandas.notna.html#pandas.notna)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotNotNull;
 
 impl Violation for PandasUseOfDotNotNull {
@@ -117,6 +118,7 @@ impl Violation for PandasUseOfDotNotNull {
 /// - [Pandas documentation: Reshaping and pivot tables](https://pandas.pydata.org/docs/user_guide/reshaping.html)
 /// - [Pandas documentation: `pivot_table`](https://pandas.pydata.org/docs/reference/api/pandas.pivot_table.html#pandas.pivot_table)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotPivotOrUnstack;
 
 impl Violation for PandasUseOfDotPivotOrUnstack {
@@ -154,6 +156,7 @@ impl Violation for PandasUseOfDotPivotOrUnstack {
 /// - [Pandas documentation: `melt`](https://pandas.pydata.org/docs/reference/api/pandas.melt.html)
 /// - [Pandas documentation: `stack`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.stack.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotStack;
 
 impl Violation for PandasUseOfDotStack {
@@ -171,26 +174,6 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func else {
         return;
     };
-    let violation: DiagnosticKind = match attr.as_str() {
-        "isnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotIsNull) => {
-            PandasUseOfDotIsNull.into()
-        }
-        "notnull" if checker.settings.rules.enabled(Rule::PandasUseOfDotNotNull) => {
-            PandasUseOfDotNotNull.into()
-        }
-        "pivot" | "unstack"
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::PandasUseOfDotPivotOrUnstack) =>
-        {
-            PandasUseOfDotPivotOrUnstack.into()
-        }
-        "stack" if checker.settings.rules.enabled(Rule::PandasUseOfDotStack) => {
-            PandasUseOfDotStack.into()
-        }
-        _ => return,
-    };
 
     // Ignore irrelevant bindings (like imports).
     if !matches!(
@@ -200,5 +183,24 @@ pub(crate) fn call(checker: &Checker, func: &Expr) {
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(violation, func.range()));
+    let range = func.range();
+    match attr.as_str() {
+        // PD003
+        "isnull" if checker.is_rule_enabled(Rule::PandasUseOfDotIsNull) => {
+            checker.report_diagnostic(PandasUseOfDotIsNull, range);
+        }
+        // PD004
+        "notnull" if checker.is_rule_enabled(Rule::PandasUseOfDotNotNull) => {
+            checker.report_diagnostic(PandasUseOfDotNotNull, range);
+        }
+        // PD010
+        "pivot" | "unstack" if checker.is_rule_enabled(Rule::PandasUseOfDotPivotOrUnstack) => {
+            checker.report_diagnostic(PandasUseOfDotPivotOrUnstack, range);
+        }
+        // PD013
+        "stack" if checker.is_rule_enabled(Rule::PandasUseOfDotStack) => {
+            checker.report_diagnostic(PandasUseOfDotStack, range);
+        }
+        _ => {}
+    }
 }

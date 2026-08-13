@@ -1,0 +1,100 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+--- Linter settings ---
+-linter.unresolved_target_version = 3.13
++linter.unresolved_target_version = 3.14
+
+--- Summary ---
+Removed: 7
+Added: 0
+
+--- Removed ---
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:21:1
+   |
+20 | ### Errors
+21 | path.with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^
+22 | path.with_suffix("py")
+23 | path.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:27:1
+   |
+25 | path.with_suffix(suffix="js")
+26 |
+27 | posix_path.with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 | posix_path.with_suffix("py")
+29 | posix_path.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:33:1
+   |
+31 | posix_path.with_suffix(suffix="js")
+32 |
+33 | pure_path.with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+34 | pure_path.with_suffix("py")
+35 | pure_path.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:39:1
+   |
+37 | pure_path.with_suffix(suffix="js")
+38 |
+39 | pure_posix_path.with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 | pure_posix_path.with_suffix("py")
+41 | pure_posix_path.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:45:1
+   |
+43 | pure_posix_path.with_suffix(suffix="js")
+44 |
+45 | pure_windows_path.with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 | pure_windows_path.with_suffix("py")
+47 | pure_windows_path.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:51:1
+   |
+49 | pure_windows_path.with_suffix(suffix="js")
+50 |
+51 | windows_path.with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 | windows_path.with_suffix("py")
+53 | windows_path.with_suffix(r"s")
+   |
+help: Remove "." or extend to valid suffix
+
+
+PTH210 Invalid suffix passed to `.with_suffix()`
+  --> PTH210.py:57:1
+   |
+55 | windows_path.with_suffix(suffix="js")
+56 |
+57 | Path().with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+58 | Path().with_suffix("py")
+59 | PosixPath().with_suffix("py")
+   |
+help: Remove "." or extend to valid suffix

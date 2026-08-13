@@ -1,4 +1,5 @@
 import sys
+from typing import Final
 
 if sys.platform == "win32":
     from . import Table
@@ -89,6 +90,6 @@ if sys.platform == "win32":
     Upgrade: Table
     Verb: Table
 
-    tables: list[Table]
+    tables: Final[list[Table]]
 
     _Validation_records: list[tuple[str, str, str, int | None, int | None, str | None, int | None, str | None, str | None, str]]

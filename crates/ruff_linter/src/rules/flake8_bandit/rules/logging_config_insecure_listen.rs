@@ -1,9 +1,9 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -25,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `logging.config.listen()`](https://docs.python.org/3/library/logging.config.html#logging.config.listen)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct LoggingConfigInsecureListen;
 
 impl Violation for LoggingConfigInsecureListen {
@@ -51,9 +52,6 @@ pub(crate) fn logging_config_insecure_listen(checker: &Checker, call: &ast::Expr
             return;
         }
 
-        checker.report_diagnostic(Diagnostic::new(
-            LoggingConfigInsecureListen,
-            call.func.range(),
-        ));
+        checker.report_diagnostic(LoggingConfigInsecureListen, call.func.range());
     }
 }

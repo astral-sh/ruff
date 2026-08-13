@@ -1,5 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
@@ -7,8 +6,9 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
-use crate::rules::flake8_logging::rules::helpers::outside_handlers;
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::rules::flake8_logging::helpers::outside_handlers;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for logging calls with `exc_info=` outside exception handlers.
@@ -41,9 +41,35 @@ use crate::rules::flake8_logging::rules::helpers::outside_handlers;
 /// logging.warning("Foobar")
 /// ```
 ///
+/// ## Known limitations
+/// This rule checks whether a call is _defined_ inside an exception handler, not
+/// whether it _executes_ inside one. A function defined in an `except` block but
+/// called outside of it will not be flagged, despite the fact that the call may
+/// not have access to an active exception at runtime:
+///
+/// ```python
+/// import logging
+///
+///
+/// try:
+///     raise ValueError()
+/// except Exception:
+///
+///     def handler():
+///         logging.error("Foobar", exc_info=True)  # LOG014 not raised (false negative)
+///
+///
+/// handler()
+/// ```
+///
 /// ## Fix safety
 /// The fix is always marked as unsafe, as it changes runtime behavior.
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ExcInfoOutsideExceptHandler;
 
 impl Violation for ExcInfoOutsideExceptHandler {
@@ -59,6 +85,7 @@ impl Violation for ExcInfoOutsideExceptHandler {
     }
 }
 
+/// LOG014
 pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
@@ -68,7 +95,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
 
     match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            if !is_logger_candidate(func, semantic, &checker.settings.logger_objects) {
+            if !is_logger_candidate(func, semantic, &checker.settings().logger_objects) {
                 return;
             }
 
@@ -98,6 +125,10 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
         return;
     };
 
+    if !exc_info.value.is_literal_expr() {
+        return;
+    }
+
     let truthiness = Truthiness::from_expr(&exc_info.value, |id| semantic.has_builtin_binding(id));
 
     if truthiness.into_bool() != Some(true) {
@@ -105,14 +136,17 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     }
 
     let arguments = &call.arguments;
-    let source = checker.source();
 
-    let mut diagnostic = Diagnostic::new(ExcInfoOutsideExceptHandler, exc_info.range);
+    let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
-        let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, source)?;
+        let edit = remove_argument(
+            exc_info,
+            arguments,
+            Parentheses::Preserve,
+            checker.source(),
+            checker.tokens(),
+        )?;
         Ok(Fix::unsafe_edit(edit))
     });
-
-    checker.report_diagnostic(diagnostic);
 }

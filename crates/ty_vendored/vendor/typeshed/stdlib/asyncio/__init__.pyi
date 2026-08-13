@@ -1,9 +1,10 @@
-# ruff: noqa: PLR5501 # This condition is so big, it's clearer to keep to platform condition in two blocks
+"""The asyncio package, tracking PEP 3156."""
+
+# This condition is so big, it's clearer to keep to platform condition in two blocks
 # Can't NOQA on a specific line: https://github.com/plinss/flake8-noqa/issues/22
 import sys
 from collections.abc import Awaitable, Coroutine, Generator
-from typing import Any, TypeVar
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias, TypeVar
 
 # As at runtime, this depends on all submodules defining __all__ accurately.
 from .base_events import *
@@ -21,6 +22,9 @@ from .tasks import *
 from .threads import *
 from .transports import *
 
+if sys.version_info >= (3, 14):
+    from .graph import *
+
 if sys.version_info >= (3, 11):
     from .taskgroups import *
     from .timeouts import *
@@ -30,14 +34,32 @@ if sys.platform == "win32":
 else:
     from .unix_events import *
 
+if sys.version_info >= (3, 14):
+    from .events import _AbstractEventLoopPolicy
+
+    AbstractEventLoopPolicy = _AbstractEventLoopPolicy
+
 if sys.platform == "win32":
     if sys.version_info >= (3, 14):
+        from .windows_events import _DefaultEventLoopPolicy, _WindowsProactorEventLoopPolicy, _WindowsSelectorEventLoopPolicy
+
+        DefaultEventLoopPolicy = _DefaultEventLoopPolicy
+        WindowsProactorEventLoopPolicy = _WindowsProactorEventLoopPolicy
+        WindowsSelectorEventLoopPolicy = _WindowsSelectorEventLoopPolicy
+else:
+    if sys.version_info >= (3, 14):
+        from .unix_events import _DefaultEventLoopPolicy
+
+        DefaultEventLoopPolicy = _DefaultEventLoopPolicy
+
+if sys.platform == "win32":
+    if sys.version_info >= (3, 14):
+
         __all__ = (
             "BaseEventLoop",  # from base_events
             "Server",  # from base_events
             "iscoroutinefunction",  # from coroutines
             "iscoroutine",  # from coroutines
-            "AbstractEventLoopPolicy",  # from events
             "AbstractEventLoop",  # from events
             "AbstractServer",  # from events
             "Handle",  # from events
@@ -60,6 +82,13 @@ if sys.platform == "win32":
             "Future",  # from futures
             "wrap_future",  # from futures
             "isfuture",  # from futures
+            "future_discard_from_awaited_by",  # from futures
+            "future_add_to_awaited_by",  # from futures
+            "capture_call_graph",  # from graph
+            "format_call_graph",  # from graph
+            "print_call_graph",  # from graph
+            "FrameCallGraphEntry",  # from graph
+            "FutureCallGraph",  # from graph
             "Lock",  # from locks
             "Event",  # from locks
             "Condition",  # from locks
@@ -121,9 +150,9 @@ if sys.platform == "win32":
             "SelectorEventLoop",  # from windows_events
             "ProactorEventLoop",  # from windows_events
             "IocpProactor",  # from windows_events
-            "DefaultEventLoopPolicy",  # from windows_events
-            "WindowsSelectorEventLoopPolicy",  # from windows_events
-            "WindowsProactorEventLoopPolicy",  # from windows_events
+            "_DefaultEventLoopPolicy",  # from windows_events
+            "_WindowsSelectorEventLoopPolicy",  # from windows_events
+            "_WindowsProactorEventLoopPolicy",  # from windows_events
             "EventLoop",  # from windows_events
         )
     elif sys.version_info >= (3, 13):
@@ -504,7 +533,6 @@ else:
             "Server",  # from base_events
             "iscoroutinefunction",  # from coroutines
             "iscoroutine",  # from coroutines
-            "AbstractEventLoopPolicy",  # from events
             "AbstractEventLoop",  # from events
             "AbstractServer",  # from events
             "Handle",  # from events
@@ -527,6 +555,13 @@ else:
             "Future",  # from futures
             "wrap_future",  # from futures
             "isfuture",  # from futures
+            "future_discard_from_awaited_by",  # from futures
+            "future_add_to_awaited_by",  # from futures
+            "capture_call_graph",  # from graph
+            "format_call_graph",  # from graph
+            "print_call_graph",  # from graph
+            "FrameCallGraphEntry",  # from graph
+            "FutureCallGraph",  # from graph
             "Lock",  # from locks
             "Event",  # from locks
             "Condition",  # from locks
@@ -588,7 +623,6 @@ else:
             "DatagramTransport",  # from transports
             "SubprocessTransport",  # from transports
             "SelectorEventLoop",  # from unix_events
-            "DefaultEventLoopPolicy",  # from unix_events
             "EventLoop",  # from unix_events
         )
     elif sys.version_info >= (3, 13):

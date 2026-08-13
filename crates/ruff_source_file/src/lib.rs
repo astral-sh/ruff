@@ -1,17 +1,18 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
+use std::hash::Hash;
 use std::sync::{Arc, OnceLock};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed, PositionEncoding};
 pub use crate::line_ranges::LineRanges;
 pub use crate::newlines::{
-    find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
-    UniversalNewlines,
+    Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator, UniversalNewlines,
+    find_newline,
 };
 
 mod line_index;
@@ -54,19 +55,7 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         self.index.line_index(offset)
     }
 
-    /// Take the source code up to the given [`TextSize`].
-    #[inline]
-    pub fn up_to(&self, offset: TextSize) -> &'src str {
-        &self.text[TextRange::up_to(offset)]
-    }
-
-    /// Take the source code after the given [`TextSize`].
-    #[inline]
-    pub fn after(&self, offset: TextSize) -> &'src str {
-        &self.text[usize::from(offset)..]
-    }
-
-    /// Take the source code between the given [`TextRange`].
+    /// Take the source code between the given [`ruff_text_size::TextRange`].
     pub fn slice<T: Ranged>(&self, ranged: T) -> &'src str {
         &self.text[ranged.range()]
     }
@@ -81,10 +70,6 @@ impl<'src, 'index> SourceCode<'src, 'index> {
 
     pub fn line_end_exclusive(&self, line: OneIndexed) -> TextSize {
         self.index.line_end_exclusive(line, self.text)
-    }
-
-    pub fn line_range(&self, line: OneIndexed) -> TextRange {
-        self.index.line_range(line, self.text)
     }
 
     /// Returns the source text of the line with the given index
@@ -131,16 +116,6 @@ impl SourceFileBuilder {
         }
     }
 
-    #[must_use]
-    pub fn line_index(mut self, index: LineIndex) -> Self {
-        self.index = Some(index);
-        self
-    }
-
-    pub fn set_line_index(&mut self, index: LineIndex) {
-        self.index = Some(index);
-    }
-
     /// Consumes `self` and returns the [`SourceFile`].
     pub fn finish(self) -> SourceFile {
         let index = if let Some(index) = self.index {
@@ -162,7 +137,8 @@ impl SourceFileBuilder {
 /// A source file that is identified by its name. Optionally stores the source code and [`LineIndex`].
 ///
 /// Cloning a [`SourceFile`] is cheap, because it only requires bumping a reference count.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct SourceFile {
     inner: Arc<SourceFileInner>,
 }
@@ -183,12 +159,7 @@ impl SourceFile {
         &self.inner.name
     }
 
-    #[inline]
-    pub fn slice(&self, range: TextRange) -> &str {
-        &self.source_text()[range]
-    }
-
-    pub fn to_source_code(&self) -> SourceCode {
+    pub fn to_source_code(&self) -> SourceCode<'_, '_> {
         SourceCode {
             text: self.source_text(),
             index: self.index(),
@@ -225,6 +196,7 @@ impl Ord for SourceFile {
     }
 }
 
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 struct SourceFileInner {
     name: Box<str>,
     code: Box<str>,
@@ -238,6 +210,13 @@ impl PartialEq for SourceFileInner {
 }
 
 impl Eq for SourceFileInner {}
+
+impl Hash for SourceFileInner {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.code.hash(state);
+    }
+}
 
 /// The line and column of an offset in a source file.
 ///

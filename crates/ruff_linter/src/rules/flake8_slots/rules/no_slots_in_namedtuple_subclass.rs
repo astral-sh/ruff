@@ -1,12 +1,12 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, identifier::Identifier, Arguments, Expr, Stmt, StmtClassDef};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt, StmtClassDef, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_slots::rules::helpers::has_slots;
+use crate::rules::flake8_slots::helpers::has_slots;
 
 /// ## What it does
 /// Checks for subclasses of `collections.namedtuple` or `typing.NamedTuple`
@@ -47,6 +47,7 @@ use crate::rules::flake8_slots::rules::helpers::has_slots;
 /// ## References
 /// - [Python documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 
 impl Violation for NoSlotsInNamedtupleSubclass {
@@ -88,10 +89,10 @@ pub(crate) fn no_slots_in_namedtuple_subclass(
 
     if let Some(namedtuple_kind) = namedtuple_base(bases, checker.semantic()) {
         if !has_slots(&class.body) {
-            checker.report_diagnostic(Diagnostic::new(
+            checker.report_diagnostic(
                 NoSlotsInNamedtupleSubclass(namedtuple_kind),
                 stmt.identifier(),
-            ));
+            );
         }
     }
 }

@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_ast_integration_tests/tests/source_order.rs
+expression: trace
+---
+- ModModule
+  - StmtExpr
+    - ExprTString
+      - TString
+        - InterpolatedStringLiteralElement
+      - TString
+        - InterpolatedStringLiteralElement
+        - InterpolatedElement
+          - ExprName
+          - InterpolatedStringLiteralElement
+          - InterpolatedElement
+            - ExprName
+          - InterpolatedStringLiteralElement
+        - InterpolatedStringLiteralElement

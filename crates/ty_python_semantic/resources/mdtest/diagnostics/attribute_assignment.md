@@ -1,7 +1,5 @@
 # Attribute assignment
 
-<!-- snapshot-diagnostics -->
-
 This test suite demonstrates various kinds of diagnostics that can be emitted in a
 `obj.attr = value` assignment.
 
@@ -15,16 +13,41 @@ class C:
 
 instance = C()
 instance.attr = 1  # fine
-instance.attr = "wrong"  # error: [invalid-assignment]
 
 C.attr = 1  # fine
-C.attr = "wrong"  # error: [invalid-assignment]
+```
+
+But if the type is incorrect, we emit an error:
+
+```py
+instance.attr = "wrong"  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | instance.attr = "wrong"  # snapshot: invalid-assignment
+  | ^^^^^^^^^^^^^
+```
+
+And on the class object:
+
+```py
+C.attr = "wrong"  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | C.attr = "wrong"  # snapshot: invalid-assignment
+  | ^^^^^^
 ```
 
 ## Pure instance attributes
 
-These can only be set on instances. When trying to set them on class objects, we generate a useful
-diagnostic that mentions that the attribute is only available on instances.
+These can only be set on instances.
 
 ```py
 class C:
@@ -34,14 +57,99 @@ class C:
 instance = C()
 instance.attr = 1  # fine
 instance.attr = "wrong"  # error: [invalid-assignment]
+```
 
-C.attr = 1  # error: [invalid-attribute-access]
+When trying to set them on class objects, we generate a useful diagnostic that mentions that the
+attribute is only available on instances:
+
+```py
+C.attr = 1  # snapshot: invalid-attribute-access
+```
+
+```snapshot
+error[invalid-attribute-access]: Cannot assign to instance attribute `attr` from the class object `<class 'C'>`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | C.attr = 1  # snapshot: invalid-attribute-access
+  | ^^^^^^
+```
+
+## Invalid annotated assignment to attribute
+
+Annotated assignments to attributes on method receivers should be validated against their
+annotation.
+
+```py
+class C:
+    def __init__(self):
+        self.attr: str = None  # snapshot: invalid-assignment
+        self.attr2: int = 1  # fine
+
+    @classmethod
+    def initialize(cls):
+        cls.class_attr1: str = None  # snapshot: invalid-assignment
+        cls.class_attr2: int = 1  # fine
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `None` is not assignable to `str`
+ --> src/mdtest_snippet.py:3:26
+  |
+3 |         self.attr: str = None  # snapshot: invalid-assignment
+  |                    ---   ^^^^ Incompatible value of type `None`
+  |                    |
+  |                    Declared type
+
+
+error[invalid-assignment]: Object of type `None` is not assignable to `str`
+ --> src/mdtest_snippet.py:8:32
+  |
+8 |         cls.class_attr1: str = None  # snapshot: invalid-assignment
+  |                          ---   ^^^^ Incompatible value of type `None`
+  |                          |
+  |                          Declared type
+```
+
+Annotations on other attribute targets are ignored, and the assignment is checked against the
+attribute already declared on the object's type.
+
+```py
+class C:
+    declared: int
+
+instance = C()
+
+# error: [invalid-type-form] "Type annotations are not allowed on this attribute expression"
+# error: [invalid-assignment]
+instance.declared: str = "wrong"
+
+# error: [invalid-type-form]
+# error: [unresolved-attribute]
+instance.missing: str = "wrong"
+
+class Other:
+    declared: int
+
+class Static:
+    @staticmethod
+    def assign(other: Other):
+        # error: [invalid-type-form]
+        # error: [invalid-assignment]
+        other.declared: str = "wrong"
+
+class WithNew:
+    declared: int
+
+    def __new__(cls):
+        # error: [invalid-type-form]
+        # error: [invalid-assignment]
+        cls.declared: str = "wrong"
+        return super().__new__(cls)
 ```
 
 ## `ClassVar`s
 
-These can only be set on class objects. When trying to set them on instances, we generate a useful
-diagnostic that mentions that the attribute is only available on class objects.
+These can only be set on class objects:
 
 ```py
 from typing import ClassVar
@@ -51,9 +159,22 @@ class C:
 
 C.attr = 1  # fine
 C.attr = "wrong"  # error: [invalid-assignment]
+```
 
+When trying to set them on instances, we generate a useful diagnostic that mentions that the
+attribute is only available on class objects.
+
+```py
 instance = C()
-instance.attr = 1  # error: [invalid-attribute-access]
+instance.attr = 1  # snapshot: invalid-attribute-access
+```
+
+```snapshot
+error[invalid-attribute-access]: Cannot assign to ClassVar `attr` from an instance of type `C`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | instance.attr = 1  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^
 ```
 
 ## Unknown attributes
@@ -63,13 +184,33 @@ When trying to set an attribute that is not defined, we also emit errors:
 ```py
 class C: ...
 
-C.non_existent = 1  # error: [unresolved-attribute]
-
-instance = C()
-instance.non_existent = 1  # error: [unresolved-attribute]
+C.non_existent = 1  # snapshot: unresolved-attribute
 ```
 
-## Possibly-unbound attributes
+```snapshot
+error[unresolved-attribute]: Unresolved attribute `non_existent` on type `<class 'C'>`.
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | C.non_existent = 1  # snapshot: unresolved-attribute
+  | ^^^^^^^^^^^^^^
+```
+
+And on instances:
+
+```py
+instance = C()
+instance.non_existent = 1  # snapshot: unresolved-attribute
+```
+
+```snapshot
+error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | instance.non_existent = 1  # snapshot: unresolved-attribute
+  | ^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Possibly-missing attributes
 
 When trying to set an attribute that is not defined in all branches, we emit errors:
 
@@ -79,10 +220,30 @@ def _(flag: bool) -> None:
         if flag:
             attr: int = 0
 
-    C.attr = 1  # error: [possibly-unbound-attribute]
+    C.attr = 1  # snapshot: possibly-missing-attribute
+```
 
+```snapshot
+info[possibly-missing-attribute]: Attribute `attr` may be missing on class `C`
+ --> src/mdtest_snippet.py:6:5
+  |
+6 |     C.attr = 1  # snapshot: possibly-missing-attribute
+  |     ^^^^^^
+```
+
+And on instances:
+
+```py
     instance = C()
-    instance.attr = 1  # error: [possibly-unbound-attribute]
+    instance.attr = 1  # snapshot: possibly-missing-attribute
+```
+
+```snapshot
+info[possibly-missing-attribute]: Attribute `attr` may be missing on object of type `C`
+ --> src/mdtest_snippet.py:8:5
+  |
+8 |     instance.attr = 1  # snapshot: possibly-missing-attribute
+  |     ^^^^^^^^^^^^^
 ```
 
 ## Data descriptors
@@ -103,8 +264,26 @@ class C:
 instance = C()
 instance.attr = 1  # fine
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
-instance.attr = "wrong"  # error: [invalid-assignment]
+instance.attr = "wrong"  # snapshot: invalid-assignment
+
+# Check that the concise diagnostic retains the useful expected and provided types.
+# error: [invalid-assignment] "Expected `int`, found `Literal["also wrong"]`"
+instance.attr = "also wrong"
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+  --> src/mdtest_snippet.py:11:17
+   |
+11 | instance.attr = "wrong"  # snapshot: invalid-assignment
+   |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
+info: Argument to function `Descriptor.__set__` is incorrect
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance: object, value: int) -> None:
+  |         ^^^^^^^                         ---------- Parameter declared here
 ```
 
 ### Invalid `__set__` method signature
@@ -119,8 +298,85 @@ class C:
 
 instance = C()
 
-# TODO: ideally, we would mention why this is an invalid assignment (wrong number of arguments for `__set__`)
-instance.attr = 1  # error: [invalid-assignment]
+instance.attr = 1  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr` on type `C`
+  --> src/mdtest_snippet.py:10:1
+   |
+10 | instance.attr = 1  # snapshot: invalid-assignment
+   | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of function `WrongDescriptor.__set__`
+info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:2:53
+  |
+2 |     def __set__(self, instance: object, value: int, extra: int) -> None:
+  |                                                     ^^^^^^^^^^
+```
+
+### Invalid property setter argument type
+
+```py
+class Document: ...
+
+class HasDocumentRef:
+    @property
+    def document(self) -> Document | None: ...
+    @document.setter
+    def document(self, document: Document) -> None: ...
+
+class Model(HasDocumentRef):
+    def detach(self) -> None:
+        self.document = None  # snapshot: invalid-assignment
+
+        # Check that the concise diagnostic identifies the actual setter argument mismatch.
+        # error: [invalid-assignment] "Expected `Document`, found `None`"
+        self.document = None
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `document` on type `Self@detach`
+  --> src/mdtest_snippet.py:11:25
+   |
+11 |         self.document = None  # snapshot: invalid-assignment
+   |                         ^^^^ Expected `Document`, found `None`
+info: Argument to function `HasDocumentRef.document` is incorrect
+info: This assignment implicitly calls `__set__` on a descriptor of type `property`
+info: Function defined here
+ --> src/mdtest_snippet.py:7:9
+  |
+7 |     def document(self, document: Document) -> None: ...
+  |         ^^^^^^^^       ------------------ Parameter declared here
+```
+
+### Nested argument type
+
+```py
+class Descriptor:
+    def __set__(self, instance, value: tuple[int, str]) -> None: ...
+
+class C:
+    x = Descriptor()
+
+c = C()
+c.x = (1, b"")  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` on type `C`
+ --> src/mdtest_snippet.py:8:7
+  |
+8 | c.x = (1, b"")  # snapshot: invalid-assignment
+  |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+info: Argument to function `Descriptor.__set__` is incorrect
+info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
+info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
+info: Function defined here
+ --> src/mdtest_snippet.py:2:9
+  |
+2 |     def __set__(self, instance, value: tuple[int, str]) -> None: ...
+  |         ^^^^^^^                 ---------------------- Parameter declared here
 ```
 
 ## Setting attributes on union types
@@ -135,8 +391,7 @@ def _(flag: bool) -> None:
         class C1:
             attr: str = ""
 
-    # TODO: The error message here could be improved to explain why the assignment fails.
-    C1.attr = 1  # error: [invalid-assignment]
+    C1.attr = 1  # snapshot: invalid-assignment
 
     class C2:
         if flag:
@@ -146,4 +401,14 @@ def _(flag: bool) -> None:
 
     # TODO: This should be an error
     C2.attr = 1
+```
+
+TODO: The error message here could be improved to explain *why* the assignment fails.
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to attribute `attr` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3:15'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:7:15'>`
+  --> src/mdtest_snippet.py:10:5
+   |
+10 |     C1.attr = 1  # snapshot: invalid-assignment
+   |     ^^^^^^^
 ```

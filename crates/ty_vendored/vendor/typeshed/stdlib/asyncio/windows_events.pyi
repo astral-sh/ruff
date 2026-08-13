@@ -1,14 +1,27 @@
+"""Selector and proactor event loops for Windows."""
+
 import socket
 import sys
 from _typeshed import Incomplete, ReadableBuffer, WriteableBuffer
 from collections.abc import Callable
-from typing import IO, Any, ClassVar, Final, NoReturn
+from typing import IO, Any, ClassVar, Final
+from typing_extensions import Never
 
 from . import events, futures, proactor_events, selector_events, streams, windows_utils
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.platform == "win32":
-    if sys.version_info >= (3, 13):
+    if sys.version_info >= (3, 14):
+        __all__ = (
+            "SelectorEventLoop",
+            "ProactorEventLoop",
+            "IocpProactor",
+            "_DefaultEventLoopPolicy",
+            "_WindowsSelectorEventLoopPolicy",
+            "_WindowsProactorEventLoopPolicy",
+            "EventLoop",
+        )
+    elif sys.version_info >= (3, 13):
         # 3.13 added `EventLoop`.
         __all__ = (
             "SelectorEventLoop",
@@ -37,14 +50,22 @@ if sys.platform == "win32":
     CONNECT_PIPE_MAX_DELAY: float
 
     class PipeServer:
+        """Class representing a pipe server.
+
+        This is much like a bound, listening socket.
+        """
+
         def __init__(self, address: str) -> None: ...
         def __del__(self) -> None: ...
         def closed(self) -> bool: ...
         def close(self) -> None: ...
 
-    class _WindowsSelectorEventLoop(selector_events.BaseSelectorEventLoop): ...
+    class _WindowsSelectorEventLoop(selector_events.BaseSelectorEventLoop):
+        """Windows version of selector event loop."""
 
     class ProactorEventLoop(proactor_events.BaseProactorEventLoop):
+        """Windows version of proactor event loop using IOCP."""
+
         def __init__(self, proactor: IocpProactor | None = None) -> None: ...
         async def create_pipe_connection(
             self, protocol_factory: Callable[[], streams.StreamReaderProtocol], address: str
@@ -54,6 +75,8 @@ if sys.platform == "win32":
         ) -> list[PipeServer]: ...
 
     class IocpProactor:
+        """Proactor implementation using IOCP."""
+
         def __init__(self, concurrency: int = 0xFFFFFFFF) -> None: ...
         def __del__(self) -> None: ...
         def set_loop(self, loop: events.AbstractEventLoop) -> None: ...
@@ -76,7 +99,13 @@ if sys.platform == "win32":
         def sendfile(self, sock: socket.socket, file: IO[bytes], offset: int, count: int) -> futures.Future[Any]: ...
         def accept_pipe(self, pipe: socket.socket) -> futures.Future[Any]: ...
         async def connect_pipe(self, address: str) -> windows_utils.PipeHandle: ...
-        def wait_for_handle(self, handle: windows_utils.PipeHandle, timeout: int | None = None) -> bool: ...
+        def wait_for_handle(self, handle: windows_utils.PipeHandle, timeout: int | None = None) -> bool:
+            """Wait for a handle.
+
+            Return a Future object. The result of the future is True if the wait
+            completed, or False if the wait did not complete (on timeout).
+            """
+
         def close(self) -> None: ...
         if sys.version_info >= (3, 11):
             def recvfrom_into(
@@ -85,17 +114,33 @@ if sys.platform == "win32":
 
     SelectorEventLoop = _WindowsSelectorEventLoop
 
-    class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
-        _loop_factory: ClassVar[type[SelectorEventLoop]]
-        if sys.version_info < (3, 14):
-            def get_child_watcher(self) -> NoReturn: ...
-            def set_child_watcher(self, watcher: Any) -> NoReturn: ...
+    if sys.version_info >= (3, 14):
+        class _WindowsSelectorEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[SelectorEventLoop]]
 
-    class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
-        _loop_factory: ClassVar[type[ProactorEventLoop]]
-        def get_child_watcher(self) -> NoReturn: ...
-        def set_child_watcher(self, watcher: Any) -> NoReturn: ...
+        class _WindowsProactorEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[ProactorEventLoop]]
 
-    DefaultEventLoopPolicy = WindowsSelectorEventLoopPolicy
+    else:
+        class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[SelectorEventLoop]]
+            def get_child_watcher(self) -> Never:
+                """Get the watcher for child processes."""
+
+            def set_child_watcher(self, watcher: Any) -> Never:
+                """Set the watcher for child processes."""
+
+        class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
+            _loop_factory: ClassVar[type[ProactorEventLoop]]
+            def get_child_watcher(self) -> Never:
+                """Get the watcher for child processes."""
+
+            def set_child_watcher(self, watcher: Any) -> Never:
+                """Set the watcher for child processes."""
+
+    if sys.version_info >= (3, 14):
+        _DefaultEventLoopPolicy = _WindowsProactorEventLoopPolicy
+    else:
+        DefaultEventLoopPolicy = WindowsProactorEventLoopPolicy
     if sys.version_info >= (3, 13):
         EventLoop = ProactorEventLoop

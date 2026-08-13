@@ -19,7 +19,7 @@ b = Unit()(3.0)  # error: "Object of type `Unit` is not callable"
 reveal_type(b)  # revealed: Unknown
 ```
 
-## Possibly unbound `__call__` method
+## Possibly missing `__call__` method
 
 ```py
 def _(flag: bool):
@@ -29,7 +29,7 @@ def _(flag: bool):
                 return 1
 
     a = PossiblyNotCallable()
-    result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+    result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
     reveal_type(result)  # revealed: int
 ```
 
@@ -54,7 +54,7 @@ class NonCallable:
     __call__ = 1
 
 a = NonCallable()
-# error: [call-non-callable] "Object of type `Literal[1]` is not callable"
+# error: [call-non-callable] "Object of type `NonCallable` is not callable"
 reveal_type(a())  # revealed: Unknown
 ```
 
@@ -85,7 +85,7 @@ class C:
 
 c = C()
 
-# error: 15 [invalid-argument-type] "Argument to bound method `__call__` is incorrect: Expected `int`, found `Literal["foo"]`"
+# error: 15 [invalid-argument-type] "Argument to bound method `C.__call__` is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(c("foo"))  # revealed: int
 ```
 
@@ -99,13 +99,13 @@ class C:
 
 c = C()
 
-# error: 13 [invalid-argument-type] "Argument to bound method `__call__` is incorrect: Expected `int`, found `C`"
+# error: 13 [invalid-argument-type] "Argument to bound method `C.__call__` is incorrect: Expected `int`, found `C`"
 reveal_type(c())  # revealed: int
 ```
 
 ## Union over callables
 
-### Possibly unbound `__call__`
+### Possibly missing `__call__`
 
 ```py
 def outer(cond1: bool):
@@ -122,6 +122,6 @@ def outer(cond1: bool):
         else:
             a = Other()
 
-            # error: [call-non-callable] "Object of type `Test` is not callable (possibly unbound `__call__` method)"
+        # error: [call-non-callable] "Object of type `Test` is not callable (possibly missing `__call__` method)"
         a()
 ```

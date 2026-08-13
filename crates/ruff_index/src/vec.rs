@@ -1,12 +1,12 @@
-use crate::slice::IndexSlice;
 use crate::Idx;
+use crate::slice::IndexSlice;
 use std::borrow::{Borrow, BorrowMut};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, RangeBounds};
 
 /// An owned sequence of `T` indexed by `I`
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[repr(transparent)]
 pub struct IndexVec<I, T> {
     pub raw: Vec<T>,
@@ -182,15 +182,7 @@ impl<I: Idx, T, const N: usize> From<[T; N]> for IndexVec<I, T> {
 #[expect(unsafe_code)]
 unsafe impl<I: Idx, T> Send for IndexVec<I, T> where T: Send {}
 
+// SAFETY: `IndexVec` owns its elements; `I` is only a marker.
 #[expect(unsafe_code)]
 #[cfg(feature = "salsa")]
-unsafe impl<I, T> salsa::Update for IndexVec<I, T>
-where
-    T: salsa::Update,
-{
-    #[expect(unsafe_code)]
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_vec: &mut IndexVec<I, T> = unsafe { &mut *old_pointer };
-        salsa::Update::maybe_update(&mut old_vec.raw, new_value.raw)
-    }
-}
+unsafe impl<I, T: salsa::SalsaValue> salsa::SalsaValue for IndexVec<I, T> {}

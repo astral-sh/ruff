@@ -21,9 +21,9 @@ class A:
 
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `not in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
+# error: [unsupported-operator] "Operator `not in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 not in A())  # revealed: bool
 ```
 
@@ -65,6 +65,27 @@ reveal_type(42 in A())  # revealed: bool
 reveal_type(42 not in A())  # revealed: bool
 ```
 
+## `__contains__` implemented via descriptor
+
+If `__contains__` is implemented as a descriptor (e.g., a class with `__get__` that returns a
+callable), the descriptor protocol should be properly invoked:
+
+```py
+class Target:
+    def __call__(self, item: object) -> bool:
+        return True
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> Target:
+        return Target()
+
+class Container:
+    __contains__: Descriptor = Descriptor()
+
+reveal_type(1 in Container())  # revealed: bool
+reveal_type("hello" not in Container())  # revealed: bool
+```
+
 ## Wrong Return Type
 
 Python coerces the results of containment checks to `bool`, even if `__contains__` returns a
@@ -101,6 +122,111 @@ reveal_type(42 in AlwaysFalse())  # revealed: Literal[False]
 reveal_type(42 not in AlwaysFalse())  # revealed: Literal[True]
 ```
 
+## Required and optional `TypedDict` keys
+
+A required key is always present, while an optional key may or may not be present.
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+class Items(TypedDict):
+    required: int
+    optional: NotRequired[int]
+
+def membership(items: Items) -> None:
+    reveal_type("required" in items)  # revealed: Literal[True]
+    reveal_type("required" not in items)  # revealed: Literal[False]
+    reveal_type("optional" in items)  # revealed: bool
+    reveal_type("optional" not in items)  # revealed: bool
+```
+
+## Absent keys in closed `TypedDict`s
+
+A closed `TypedDict` cannot contain an undeclared key or an optional key whose value type is
+uninhabited. Declaring `extra_items=Never` closes a `TypedDict` in the same way as `closed=True`.
+
+```py
+from typing_extensions import Never, NotRequired, TypedDict
+
+class Closed(TypedDict, closed=True):
+    present: int
+    impossible: NotRequired[Never]
+
+class ClosedByExtraItems(TypedDict, extra_items=Never):
+    present: int
+
+def closed_membership(closed: Closed, closed_by_extra_items: ClosedByExtraItems) -> None:
+    reveal_type("missing" in closed)  # revealed: Literal[False]
+    reveal_type("missing" not in closed)  # revealed: Literal[True]
+    reveal_type("impossible" in closed)  # revealed: Literal[False]
+    reveal_type("impossible" not in closed)  # revealed: Literal[True]
+    reveal_type("missing" in closed_by_extra_items)  # revealed: Literal[False]
+    reveal_type("missing" not in closed_by_extra_items)  # revealed: Literal[True]
+```
+
+## Undeclared keys in open `TypedDict`s
+
+Open `TypedDict`s and `TypedDict`s with nonempty extra items may contain keys that their schemas do
+not declare.
+
+```py
+from typing_extensions import TypedDict
+
+class Open(TypedDict):
+    present: int
+
+class ExtraItems(TypedDict, extra_items=int):
+    present: int
+
+def open_membership(open_items: Open, extra_items: ExtraItems) -> None:
+    reveal_type("missing" in open_items)  # revealed: bool
+    reveal_type("missing" not in open_items)  # revealed: bool
+    reveal_type("missing" in extra_items)  # revealed: bool
+    reveal_type("missing" not in extra_items)  # revealed: bool
+```
+
+## `TypedDict` membership with unions and non-literal keys
+
+Membership remains ambiguous when either the key or the `TypedDict` can vary between a present and
+an absent alternative. A key missing from every closed alternative is always absent.
+
+```py
+from typing_extensions import Literal, TypedDict
+
+class Left(TypedDict, closed=True):
+    left: int
+
+class Right(TypedDict, closed=True):
+    right: int
+
+def union_membership(
+    left: Left,
+    either: Left | Right,
+    literal_key: Literal["left", "missing"],
+    unknown_key: str,
+) -> None:
+    reveal_type("missing" in either)  # revealed: Literal[False]
+    reveal_type("missing" not in either)  # revealed: Literal[True]
+    reveal_type("left" in either)  # revealed: bool
+    reveal_type(literal_key in left)  # revealed: bool
+    reveal_type(unknown_key in left)  # revealed: bool
+```
+
+## Functional closed `TypedDict` membership
+
+Functional `TypedDict` definitions expose the same key-presence information as class-based
+definitions.
+
+```py
+from typing_extensions import TypedDict
+
+Closed = TypedDict("Closed", {"present": int}, closed=True)
+
+def functional_membership(closed: Closed) -> None:
+    reveal_type("present" in closed)  # revealed: Literal[True]
+    reveal_type("missing" in closed)  # revealed: Literal[False]
+```
+
 ## No Fallback for `__contains__`
 
 If `__contains__` is implemented, checking membership of a type it doesn't accept is an error; it
@@ -127,9 +253,9 @@ class A:
 
 reveal_type(CheckContains() in A())  # revealed: bool
 
-# error: [unsupported-operator] "Operator `in` is not supported for types `CheckIter` and `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `CheckIter` and `A`"
 reveal_type(CheckIter() in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `in` is not supported for types `CheckGetItem` and `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `CheckGetItem` and `A`"
 reveal_type(CheckGetItem() in A())  # revealed: bool
 
 class B:
@@ -155,9 +281,9 @@ class A:
     def __getitem__(self, key: str) -> str:
         return "foo"
 
-# error: [unsupported-operator] "Operator `in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `in` is not supported for types `str` and `A`, in comparing `Literal["hello"]` with `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal["hello"]` and `A`"
 reveal_type("hello" in A())  # revealed: bool
 ```
 
@@ -176,6 +302,18 @@ def contains(y, x):
 
 where the `bool()` conversion itself implicitly calls `__bool__` under the hood.
 
+```py
+class NotBoolable:
+    __bool__: int = 3
+
+class WithContains:
+    def __contains__(self, item) -> NotBoolable:
+        return NotBoolable()
+
+# snapshot: unsupported-bool-conversion
+10 in WithContains()
+```
+
 TODO: Ideally the message would explain to the user what's wrong. E.g,
 
 ```ignore
@@ -187,18 +325,25 @@ error: [operator] cannot use `in` operator on object of type `WithContains`
 
 It may also be more appropriate to use `unsupported-operator` as the error code.
 
-<!-- snapshot-diagnostics -->
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | 10 in WithContains()
+  | ^^^^^^^^^^^^^^^^^^^^
+info: `__bool__` on `NotBoolable` must be callable
+```
 
 ```py
-class NotBoolable:
-    __bool__: int = 3
-
-class WithContains:
-    def __contains__(self, item) -> NotBoolable:
-        return NotBoolable()
-
-# error: [unsupported-bool-conversion]
-10 in WithContains()
-# error: [unsupported-bool-conversion]
+# snapshot: unsupported-bool-conversion
 10 not in WithContains()
+```
+
+```snapshot
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
+  --> src/mdtest_snippet.py:11:1
+   |
+11 | 10 not in WithContains()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
+info: `__bool__` on `NotBoolable` must be callable
 ```

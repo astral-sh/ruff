@@ -2,13 +2,12 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   dependencyDashboard: true,
   suppressNotifications: ["prEditedNotification"],
-  extends: ["config:recommended"],
+  extends: ["github>astral-sh/renovate-config"],
   labels: ["internal"],
-  schedule: ["before 4am on Monday"],
+  schedule: ["before 4am on Wednesday"],
   semanticCommits: "disabled",
   separateMajorMinor: false,
-  prHourlyLimit: 10,
-  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm"],
+  enabledManagers: ["github-actions", "pre-commit", "cargo", "pep621", "pip_requirements", "npm", "custom.regex"],
   cargo: {
     // See https://docs.renovatebot.com/configuration-options/#rangestrategy
     rangeStrategy: "update-lockfile",
@@ -16,7 +15,7 @@
   pep621: {
     // The default for this package manager is to only search for `pyproject.toml` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/pep621/#file-matching
-    fileMatch: ["^(python|scripts)/.*pyproject\\.toml$"],
+    managerFilePatterns: ["^(python|scripts)/.*pyproject\\.toml$"],
   },
   pip_requirements: {
     // The default for this package manager is to run on all requirements.txt files:
@@ -34,7 +33,7 @@
   npm: {
     // The default for this package manager is to only search for `package.json` files
     // found at the repository root: https://docs.renovatebot.com/modules/manager/npm/#file-matching
-    fileMatch: ["^playground/.*package\\.json$"],
+    managerFilePatterns: ["^playground/.*package\\.json$"],
   },
   "pre-commit": {
     enabled: true,
@@ -56,7 +55,7 @@
       groupName: "Artifact GitHub Actions dependencies",
       matchManagers: ["github-actions"],
       matchDatasources: ["gitea-tags", "github-tags"],
-      matchPackageNames: ["actions/.*-artifact"],
+      matchPackageNames: ["actions/upload-artifact", "actions/download-artifact"],
       description: "Weekly update of artifact-related GitHub Actions dependencies",
     },
     {
@@ -70,30 +69,21 @@
       enabled: false,
     },
     {
-      // Disable updates of `zip-rs`; intentionally pinned for now due to ownership change
-      // See: https://github.com/astral-sh/uv/issues/3642
-      matchPackageNames: ["zip"],
-      matchManagers: ["cargo"],
-      enabled: false,
-    },
-    {
-      // `mkdocs-material` requires a manual update to keep the version in sync
-      // with `mkdocs-material-insider`.
-      // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
-      matchManagers: ["pip_requirements"],
-      matchPackageNames: ["mkdocs-material"],
-      enabled: false,
-    },
-    {
-      groupName: "pre-commit dependencies",
+      groupName: "prek dependencies",
       matchManagers: ["pre-commit"],
-      description: "Weekly update of pre-commit dependencies",
+      description: "Weekly update of prek dependencies",
     },
     {
       groupName: "NPM Development dependencies",
       matchManagers: ["npm"],
       matchDepTypes: ["devDependencies"],
       description: "Weekly update of NPM development dependencies",
+    },
+    {
+      groupName: "ESLint dependencies",
+      matchManagers: ["npm"],
+      matchPackageNames: ["@eslint/js", "eslint"],
+      description: "Weekly update of ESLint dependencies",
     },
     {
       groupName: "Monaco",
@@ -104,9 +94,64 @@
     {
       groupName: "strum",
       matchManagers: ["cargo"],
-      matchPackageNames: ["strum"],
+      matchPackageNames: ["strum", "strum_macros"],
       description: "Weekly update of strum dependencies",
-    }
+    },
+    {
+      commitMessageTopic: "MSRV",
+      matchManagers: ["custom.regex"],
+      matchDepNames: ["msrv"],
+      // We have a rolling support policy for the MSRV
+      // 2 releases back * 6 weeks per release * 7 days per week + 1
+      minimumReleaseAge: "85 days",
+      internalChecksFilter: "strict",
+      groupName: "MSRV",
+    },
+    {
+      matchManagers: ["custom.regex"],
+      matchDepNames: ["rust"],
+      commitMessageTopic: "Rust",
+    },
+    {
+      matchManagers: ["custom.regex"],
+      matchDepNames: ["maturin"],
+      commitMessageTopic: "maturin",
+    },
+  ],
+  customManagers: [
+    // Maturin version used in maturin-action
+    {
+      customType: "regex",
+      managerFilePatterns: [
+        "/.github/workflows/build-binaries\\.yml$/",
+      ],
+      matchStrings: ["maturin-version: (?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      depNameTemplate: "maturin",
+      packageNameTemplate: "PyO3/maturin",
+      datasourceTemplate: "github-releases",
+    },
+    // Minimum supported Rust toolchain version
+    {
+      customType: "regex",
+      managerFilePatterns: ["/(^|/)Cargo\\.toml?$/"],
+      matchStrings: [
+        'rust-version\\s*=\\s*"(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"',
+      ],
+      depNameTemplate: "msrv",
+      packageNameTemplate: "rust-lang/rust",
+      datasourceTemplate: "github-releases",
+    },
+    // Rust toolchain version
+    {
+      customType: "regex",
+      managerFilePatterns: ["/(^|/)rust-toolchain\\.toml?$/"],
+      matchStrings: [
+        'channel\\s*=\\s*"(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"',
+      ],
+      depNameTemplate: "rust",
+      packageNameTemplate: "rust-lang/rust",
+      datasourceTemplate: "github-releases",
+    },
   ],
   vulnerabilityAlerts: {
     commitMessageSuffix: "",

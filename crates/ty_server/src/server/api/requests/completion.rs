@@ -1,58 +1,232 @@
 use std::borrow::Cow;
+use std::time::Instant;
 
-use lsp_types::request::Completion;
-use lsp_types::{CompletionItem, CompletionParams, CompletionResponse, Url};
-use ruff_db::source::{line_index, source_text};
-use ty_ide::completion;
-use ty_project::ProjectDatabase;
+use lsp_types::{
+    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    CompletionParams, CompletionRequest, CompletionResponse, Documentation, InsertTextFormat,
+    TextEdit, Uri,
+};
+use ruff_source_file::OneIndexed;
+use ruff_text_size::Ranged;
+use ty_ide::{
+    CompletionCapabilities, CompletionCommand, CompletionInsertTextFormat, CompletionKind,
+    completion,
+};
+use ty_project::{ProjectDatabase, SemanticDb as _};
+use ty_python_semantic::ProgramEnvironment;
 
-use crate::document::PositionExt;
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
-use crate::server::client::Notifier;
-use crate::DocumentSnapshot;
+use crate::capabilities::ResolvedClientCapabilities;
+use crate::document::{PositionExt, ToRangeExt};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::session::DocumentSnapshot;
+use crate::session::client::Client;
 
 pub(crate) struct CompletionRequestHandler;
 
 impl RequestHandler for CompletionRequestHandler {
-    type RequestType = Completion;
+    type RequestType = CompletionRequest;
 }
 
 impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
-    fn document_url(params: &CompletionParams) -> Cow<Url> {
-        Cow::Borrowed(&params.text_document_position.text_document.uri)
+    fn document_uri(params: &CompletionParams) -> Cow<'_, Uri> {
+        Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
-        db: ProjectDatabase,
-        _notifier: Notifier,
+        db: &ProjectDatabase,
+        snapshot: &DocumentSnapshot,
+        _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
-        let Some(file) = snapshot.file(&db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
+        let start = Instant::now();
+
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
+            return Ok(None);
+        }
+
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(&db, file);
-        let line_index = line_index(&db, file);
-        let offset = params.text_document_position.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
+            db,
+            file,
+            snapshot.uri(),
             snapshot.encoding(),
+        ) else {
+            return Ok(None);
+        };
+        let client_capabilities = snapshot.resolved_client_capabilities();
+        let program_file = db.program_file(file);
+        let env = ProgramEnvironment::from_file(program_file);
+        let completions = completion(
+            db,
+            snapshot.workspace_settings().completions(),
+            CompletionCapabilities::default()
+                .snippets(client_capabilities.supports_completion_item_snippets()),
+            program_file,
+            offset,
         );
-        let completions = completion(&db, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }
 
+        // Safety: we just checked that completions is not empty.
+        let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
         let items: Vec<CompletionItem> = completions
             .into_iter()
-            .map(|comp| CompletionItem {
-                label: comp.label,
-                ..Default::default()
+            .enumerate()
+            .map(|(i, comp)| {
+                let kind = comp.kind.map(ty_kind_to_lsp_kind);
+                let type_display = comp.ty.map(|ty| ty.display(db, &env).to_string());
+                let import_edit = comp.import.as_ref().and_then(|edit| {
+                    let range = edit
+                        .range()
+                        .to_lsp_range(db, file, snapshot.encoding())?
+                        .local_range();
+                    Some(TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    })
+                });
+
+                let label = comp.label().to_string();
+                let import_suffix = comp
+                    .module_name
+                    .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
+                let (label, label_details) = if snapshot
+                    .resolved_client_capabilities()
+                    .supports_completion_item_label_details()
+                {
+                    let label_details = CompletionItemLabelDetails {
+                        detail: import_suffix,
+                        description: type_display.clone(),
+                    };
+                    (label, Some(label_details))
+                } else {
+                    let label = import_suffix
+                        .map(|suffix| format!("{label}{suffix}"))
+                        .unwrap_or(label);
+                    (label, None)
+                };
+
+                let documentation = comp.documentation.map(|docstring| {
+                    let (kind, value) = if snapshot
+                        .resolved_client_capabilities()
+                        .prefers_markdown_in_completion()
+                    {
+                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                    } else {
+                        (
+                            lsp_types::MarkupKind::PlainText,
+                            docstring.render_plaintext(),
+                        )
+                    };
+
+                    Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
+                });
+                let insert_text = comp.insert.map(String::from);
+                let insert_text_format = match comp.insert_text_format {
+                    CompletionInsertTextFormat::PlainText => None,
+                    CompletionInsertTextFormat::Snippet => Some(InsertTextFormat::Snippet),
+                };
+
+                CompletionItem {
+                    label,
+                    kind,
+                    sort_text: Some(format!("{i:-max_index_len$}")),
+                    detail: type_display,
+                    label_details,
+                    insert_text,
+                    insert_text_format,
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation,
+                    command: comp
+                        .command
+                        .and_then(|command| to_lsp_command(command, client_capabilities)),
+                    ..Default::default()
+                }
             })
             .collect();
-        let response = CompletionResponse::Array(items);
+        let len = items.len();
+        let response = CompletionResponse::CompletionList(CompletionList {
+            is_incomplete: true,
+            items,
+            item_defaults: None,
+            apply_kind: None,
+        });
+        tracing::debug!(
+            "Completions request returned {len} suggestions in {elapsed:?}",
+            elapsed = Instant::now().duration_since(start)
+        );
         Ok(Some(response))
+    }
+}
+
+impl RetriableRequestHandler for CompletionRequestHandler {
+    const RETRY_ON_CANCELLATION: bool = true;
+}
+
+/// Maps an editor-neutral completion intent to the concrete LSP command the
+/// client should run after applying the completion.
+///
+/// The intent itself is decided in `ty_ide`; this is the single place that knows
+/// any editor-specific command identifiers.
+///
+/// Returns `None` when the client has not advertised support for the command,
+/// so that clients without a handler never receive one.
+fn to_lsp_command(
+    command: CompletionCommand,
+    client_capabilities: ResolvedClientCapabilities,
+) -> Option<Command> {
+    match command {
+        CompletionCommand::TriggerSignatureHelp => client_capabilities
+            .supports_trigger_parameter_hints_command()
+            .then(|| Command {
+                title: "Trigger parameter hints".into(),
+                tooltip: None,
+                command: "ty.triggerParameterHints".into(),
+                arguments: None,
+            }),
+    }
+}
+
+fn ty_kind_to_lsp_kind(kind: CompletionKind) -> CompletionItemKind {
+    // Gimme my dang globs in tight scopes!
+    #[allow(clippy::enum_glob_use)]
+    use self::CompletionKind::*;
+
+    // ref https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind
+    match kind {
+        Text => CompletionItemKind::Text,
+        Method => CompletionItemKind::Method,
+        Function => CompletionItemKind::Function,
+        Constructor => CompletionItemKind::Constructor,
+        Field => CompletionItemKind::Field,
+        Variable => CompletionItemKind::Variable,
+        Class => CompletionItemKind::Class,
+        Interface => CompletionItemKind::Interface,
+        Module => CompletionItemKind::Module,
+        Property => CompletionItemKind::Property,
+        Unit => CompletionItemKind::Unit,
+        Value => CompletionItemKind::Value,
+        Enum => CompletionItemKind::Enum,
+        Keyword => CompletionItemKind::Keyword,
+        Snippet => CompletionItemKind::Snippet,
+        Color => CompletionItemKind::Color,
+        File => CompletionItemKind::File,
+        Reference => CompletionItemKind::Reference,
+        Folder => CompletionItemKind::Folder,
+        EnumMember => CompletionItemKind::EnumMember,
+        Constant => CompletionItemKind::Constant,
+        Struct => CompletionItemKind::Struct,
+        Event => CompletionItemKind::Event,
+        Operator => CompletionItemKind::Operator,
+        TypeParameter => CompletionItemKind::TypeParameter,
     }
 }

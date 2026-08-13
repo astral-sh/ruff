@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::identifier::Identifier;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
+use ruff_python_ast::identifier::Identifier;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 /// def function(): ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct StubBodyMultipleStatements;
 
 impl Violation for StubBodyMultipleStatements {
@@ -41,9 +42,6 @@ impl Violation for StubBodyMultipleStatements {
 /// PYI048
 pub(crate) fn stub_body_multiple_statements(checker: &Checker, stmt: &Stmt, body: &[Stmt]) {
     if body.len() > 1 {
-        checker.report_diagnostic(Diagnostic::new(
-            StubBodyMultipleStatements,
-            stmt.identifier(),
-        ));
+        checker.report_diagnostic(StubBodyMultipleStatements, stmt.identifier());
     }
 }

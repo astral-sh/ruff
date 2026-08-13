@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_comments7.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -157,7 +156,12 @@ square = Square(4) # type: Optional[Square]
 ```diff
 --- Black
 +++ Ruff
-@@ -34,13 +34,9 @@
+@@ -29,17 +29,14 @@
+     MyLovelyCompanyTeamProjectComponent as component,  # DRY
+ )
+ 
++
+ result = 1  # look ma, no comment migration xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
  
  result = 1  # look ma, no comment migration xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
  
@@ -173,7 +177,7 @@ square = Square(4) # type: Optional[Square]
  
  
  def func():
-@@ -52,12 +48,19 @@
+@@ -51,12 +48,19 @@
          0.0789,
          a[-1],  # type: ignore
      )
@@ -194,7 +198,7 @@ square = Square(4) # type: Optional[Square]
          0.0456,
          0.0789,
          0.0123,
-@@ -91,53 +94,39 @@
+@@ -90,53 +94,39 @@
              # metadata_version errors.
              (
                  {},
@@ -264,7 +268,7 @@ square = Square(4) # type: Optional[Square]
              ),
          ],
      )
-@@ -150,8 +139,8 @@
+@@ -149,8 +139,8 @@
  
  # Regression test for https://github.com/psf/black/issues/3756.
  [
@@ -465,7 +469,6 @@ from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component 
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
     MyLovelyCompanyTeamProjectComponent as component,  # DRY
 )
-
 
 result = 1  # look ma, no comment migration xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 

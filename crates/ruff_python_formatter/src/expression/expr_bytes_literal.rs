@@ -2,11 +2,11 @@ use ruff_python_ast::ExprBytesLiteral;
 use ruff_python_ast::{AnyNodeRef, StringLike};
 
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
 };
 use crate::prelude::*;
 use crate::string::implicit::FormatImplicitConcatenatedStringFlat;
-use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
+use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedString};
 
 #[derive(Default)]
 pub struct FormatExprBytesLiteral;

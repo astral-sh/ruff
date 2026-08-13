@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/type_param_defaults.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -25,6 +24,8 @@ def trailing_comma1[T=int,](a: str):
 
 def trailing_comma2[T=int](a: str,):
     pass
+
+def weird_syntax[T=lambda: 42, **P=lambda: 43, *Ts=lambda: 44](): pass
 ```
 
 ## Black Differences
@@ -32,7 +33,7 @@ def trailing_comma2[T=int](a: str,):
 ```diff
 --- Black
 +++ Ruff
-@@ -8,20 +8,20 @@
+@@ -8,9 +8,9 @@
  type D[
      *something_that_is_very_very_very_long = *something_that_is_very_very_very_long
  ] = float
@@ -44,35 +45,18 @@ def trailing_comma2[T=int](a: str,):
 +)
  
  
--def simple[
--    T = something_that_is_long
--](short1: int, short2: str, short3: bytes) -> float:
-+def simple[T = something_that_is_long](
-+    short1: int, short2: str, short3: bytes
-+) -> float:
+ def simple[T = something_that_is_long](
+@@ -27,9 +27,7 @@
+ 
+ def trailing_comma1[
+     T = int,
+-](
+-    a: str,
+-):
++](a: str):
      pass
  
  
--def longer[
--    something_that_is_long = something_that_is_long
--](something_that_is_long: something_that_is_long) -> something_that_is_long:
-+def longer[something_that_is_long = something_that_is_long](
-+    something_that_is_long: something_that_is_long,
-+) -> something_that_is_long:
-     pass
- 
- 
-@@ -31,7 +31,7 @@
-     pass
- 
- 
--def trailing_comma2[
--    T = int
--](a: str,):
-+def trailing_comma2[T = int](
-+    a: str,
-+):
-     pass
 ```
 
 ## Ruff Output
@@ -115,6 +99,10 @@ def trailing_comma2[T = int](
     a: str,
 ):
     pass
+
+
+def weird_syntax[T = lambda: 42, **P = lambda: 43, *Ts = lambda: 44]():
+    pass
 ```
 
 ## Black Output
@@ -135,26 +123,32 @@ type something_that_is_long[
 ] = something_that_is_long
 
 
-def simple[
-    T = something_that_is_long
-](short1: int, short2: str, short3: bytes) -> float:
+def simple[T = something_that_is_long](
+    short1: int, short2: str, short3: bytes
+) -> float:
     pass
 
 
-def longer[
-    something_that_is_long = something_that_is_long
-](something_that_is_long: something_that_is_long) -> something_that_is_long:
+def longer[something_that_is_long = something_that_is_long](
+    something_that_is_long: something_that_is_long,
+) -> something_that_is_long:
     pass
 
 
 def trailing_comma1[
     T = int,
-](a: str):
+](
+    a: str,
+):
     pass
 
 
-def trailing_comma2[
-    T = int
-](a: str,):
+def trailing_comma2[T = int](
+    a: str,
+):
+    pass
+
+
+def weird_syntax[T = lambda: 42, **P = lambda: 43, *Ts = lambda: 44]():
     pass
 ```

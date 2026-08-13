@@ -1,17 +1,21 @@
+#![allow(clippy::disallowed_methods)]
+
+mod ignore;
+
+use self::ignore::IgnoreFiles;
 use super::walk_directory::{
-    self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    self, DirectoryWalker, IgnoreIncremental, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
 use crate::max_parallelism;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+    Command, CommandExecutor, DirectoryEntry, FileType, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashSet;
 use std::num::NonZeroUsize;
-use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -25,10 +29,6 @@ pub struct OsSystem {
 struct OsSystemInner {
     cwd: SystemPathBuf,
 
-    real_case_cache: CaseSensitivePathsCache,
-
-    case_sensitivity: CaseSensitivity,
-
     /// Overrides the user's configuration directory for testing.
     /// This is an `Option<Option<..>>` to allow setting an override of `None`.
     #[cfg(feature = "testing")]
@@ -40,10 +40,8 @@ impl OsSystem {
         let cwd = cwd.as_ref();
         assert!(cwd.as_utf8_path().is_absolute());
 
-        let case_sensitivity = detect_case_sensitivity(cwd);
-
         tracing::debug!(
-            "Architecture: {}, OS: {}, case-sensitive: {case_sensitivity}",
+            "Architecture: {}, OS: {}",
             std::env::consts::ARCH,
             std::env::consts::OS,
         );
@@ -52,7 +50,6 @@ impl OsSystem {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
-                case_sensitivity,
                 ..Default::default()
             }),
         }
@@ -91,6 +88,10 @@ impl System for OsSystem {
         })
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        same_file::is_same_file(first.as_std_path(), second.as_std_path())
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
     }
@@ -114,24 +115,29 @@ impl System for OsSystem {
         path.as_std_path().exists()
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        if self.case_sensitivity().is_case_sensitive() {
-            self.path_exists(path)
-        } else {
-            self.path_exists_case_sensitive_fast(path)
-                .unwrap_or_else(|| self.path_exists_case_sensitive_slow(path, prefix))
+    fn which(&self, name: &str) -> WhichResult {
+        let path = which::which(name).map_err(|err| match err {
+            which::Error::CannotFindBinaryPath => WhichError::CannotFindBinaryPath,
+            which::Error::CannotGetCurrentDirAndPathListEmpty => {
+                WhichError::CannotGetCurrentDirAndPathListEmpty
+            }
+            which::Error::CannotCanonicalize => WhichError::CannotCanonicalize,
+        })?;
+
+        match SystemPathBuf::from_path_buf(path) {
+            Ok(path) => Ok(path),
+            Err(_) => Err(WhichError::NonUtf8Path),
         }
     }
 
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.inner.case_sensitivity
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        Some(self)
     }
 
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
         // In testing, we allow overriding the user configuration directory by using a
         // thread local because overriding the environment variables breaks test isolation
@@ -148,48 +154,46 @@ impl System for OsSystem {
         SystemPathBuf::from_path_buf(strategy.config_dir()).ok()
     }
 
-    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
-    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
-    #[cfg(target_arch = "wasm32")]
-    fn user_config_directory(&self) -> Option<SystemPathBuf> {
-        #[cfg(feature = "testing")]
-        if let Ok(directory_override) = self.try_get_user_config_directory_override() {
-            return directory_override;
-        }
+    /// Returns an absolute cache directory on the system.
+    ///
+    /// On Linux and macOS, uses `$XDG_CACHE_HOME/ty` or `.cache/ty`.
+    /// On Windows, uses `C:\Users\User\AppData\Local\ty\cache`.
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        use etcetera::BaseStrategy as _;
 
-        None
+        let cache_dir = etcetera::base_strategy::choose_base_strategy()
+            .ok()
+            .map(|dirs| dirs.cache_dir().join("ty"))
+            .map(|cache_dir| {
+                if cfg!(windows) {
+                    // On Windows, we append `cache` to the LocalAppData directory, i.e., prefer
+                    // `C:\Users\User\AppData\Local\ty\cache` over `C:\Users\User\AppData\Local\ty`.
+                    cache_dir.join("cache")
+                } else {
+                    cache_dir
+                }
+            })
+            .and_then(|path| SystemPathBuf::from_path_buf(path).ok())
+            .unwrap_or_else(|| SystemPathBuf::from(".ty_cache"));
+
+        Some(cache_dir)
     }
 
     /// Creates a builder to recursively walk `path`.
     ///
-    /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
+    /// The walker ignores files according to [`::ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+        WalkDirectoryBuilder::new(
+            path,
+            OsDirectoryWalker {
+                cwd: self.current_directory().to_path_buf(),
+            },
+        )
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> std::result::Result<
-        Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>>>,
-        glob::PatternError,
-    > {
-        glob::glob(pattern).map(|inner| {
-            let iterator = inner.map(|result| {
-                let path = result?;
-
-                let system_path = SystemPathBuf::from_path_buf(path).map_err(|path| GlobError {
-                    path,
-                    error: GlobErrorKind::NonUtf8Path,
-                })?;
-
-                Ok(system_path)
-            });
-
-            let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
-            boxed
-        })
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -214,100 +218,48 @@ impl System for OsSystem {
             })
         })))
     }
-}
 
-impl OsSystem {
-    /// Path sensitive testing if a path exists by canonicalization the path and comparing it with `path`.
-    ///
-    /// This is faster than the slow path, because it requires a single system call for each path
-    /// instead of at least one system call for each component between `path` and `prefix`.
-    ///
-    /// However, using `canonicalize` to resolve the path's casing doesn't work in two cases:
-    /// * if `path` is a symlink because `canonicalize` then returns the symlink's target and not the symlink's source path.
-    /// * on Windows: If `path` is a mapped network drive because `canonicalize` then returns the UNC path
-    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` then returns `\\?\UNC\server\share`).
-    ///
-    /// Symlinks and mapped network drives should be rare enough that this fast path is worth trying first,
-    /// even if it comes at a cost for those rare use cases.
-    fn path_exists_case_sensitive_fast(&self, path: &SystemPath) -> Option<bool> {
-        // This is a more forgiving version of `dunce::simplified` that removes all `\\?\` prefixes on Windows.
-        // We use this more forgiving version because we don't intend on using either path for anything other than comparison
-        // and the prefix is only relevant when passing the path to other programs and its longer than 200 something
-        // characters.
-        fn simplify_ignore_verbatim(path: &SystemPath) -> &SystemPath {
-            if cfg!(windows) {
-                if path.as_utf8_path().as_str().starts_with(r"\\?\") {
-                    SystemPath::new(&path.as_utf8_path().as_str()[r"\\?\".len()..])
-                } else {
-                    path
-                }
-            } else {
-                path
-            }
-        }
-
-        let simplified = simplify_ignore_verbatim(path);
-
-        let Ok(canonicalized) = simplified.as_std_path().canonicalize() else {
-            // The path doesn't exist or can't be accessed. The path doesn't exist.
-            return Some(false);
-        };
-
-        let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
-            // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
-            // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!("Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8");
-            return None;
-        };
-
-        let simplified_canonicalized = simplify_ignore_verbatim(&canonicalized);
-
-        // Test if the paths differ by anything other than casing. If so, that suggests that
-        // `path` pointed to a symlink (or some other none reversible path normalization happened).
-        // In this case, fall back to the slow path.
-        if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!("Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing");
-            return None;
-        }
-
-        // If there are no symlinks involved, then `path` exists only if it is the same as the canonicalized path.
-        Some(simplified_canonicalized == simplified)
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        std::env::var(name)
     }
 
-    fn path_exists_case_sensitive_slow(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        // Iterate over the sub-paths up to prefix and check if they match the casing as on disk.
-        for ancestor in path.ancestors() {
-            if ancestor == prefix {
-                break;
-            }
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
 
-            match self.inner.real_case_cache.has_name_case(ancestor) {
-                Ok(true) => {
-                    // Component has correct casing, continue with next component
-                }
-                Ok(false) => {
-                    // Component has incorrect casing
-                    return false;
-                }
-                Err(_) => {
-                    // Directory doesn't exist or can't be accessed. We can assume that the file with
-                    // the given casing doesn't exist.
-                    return false;
-                }
-            }
-        }
+impl CommandExecutor for OsSystem {
+    fn execute(&self, command: Command) -> Result<Output> {
+        let directory = command
+            .get_current_dir()
+            .unwrap_or_else(|| self.current_directory());
 
-        true
+        std::process::Command::new(command.get_executable())
+            .args(command.get_args())
+            .current_dir(directory.as_std_path())
+            .output()
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
+        Box::new(self.clone())
     }
 }
 
 impl WritableSystem for OsSystem {
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        std::fs::File::create_new(path).map(drop)
+    }
+
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
 
@@ -320,86 +272,10 @@ impl Default for OsSystem {
     }
 }
 
-#[derive(Debug, Default)]
-struct CaseSensitivePathsCache {
-    by_lower_case: dashmap::DashMap<SystemPathBuf, ListedDirectory>,
-}
-
-impl CaseSensitivePathsCache {
-    /// Test if `path`'s file name uses the exact same casing as the file on disk.
-    ///
-    /// Returns `false` if the file doesn't exist.
-    ///
-    /// Components other than the file portion are ignored.
-    fn has_name_case(&self, path: &SystemPath) -> Result<bool> {
-        let Some(parent) = path.parent() else {
-            // The root path is always considered to exist.
-            return Ok(true);
-        };
-
-        let Some(file_name) = path.file_name() else {
-            // We can only get here for paths ending in `..` or the root path. Root paths are handled above.
-            // Return `true` for paths ending in `..` because `..` is the same regardless of casing.
-            return Ok(true);
-        };
-
-        let lower_case_path = SystemPathBuf::from(parent.as_str().to_lowercase());
-        let last_modification_time =
-            FileTime::from_last_modification_time(&parent.as_std_path().metadata()?);
-
-        let entry = self.by_lower_case.entry(lower_case_path);
-
-        if let dashmap::Entry::Occupied(entry) = &entry {
-            // Only do a cached lookup if the directory hasn't changed.
-            if entry.get().last_modification_time == last_modification_time {
-                tracing::trace!("Use cached case-sensitive entry for directory `{}`", parent);
-                return Ok(entry.get().names.contains(file_name));
-            }
-        }
-
-        tracing::trace!(
-            "Reading directory `{}` for its case-sensitive filenames",
-            parent
-        );
-        let start = std::time::Instant::now();
-        let mut names = FxHashSet::default();
-
-        for entry in parent.as_std_path().read_dir()? {
-            let Ok(entry) = entry else {
-                continue;
-            };
-
-            let Ok(name) = entry.file_name().into_string() else {
-                continue;
-            };
-
-            names.insert(name.into_boxed_str());
-        }
-
-        let directory = entry.insert(ListedDirectory {
-            last_modification_time,
-            names,
-        });
-
-        tracing::debug!(
-            "Caching the case-sensitive paths for directory `{parent}` took {:?}",
-            start.elapsed()
-        );
-
-        Ok(directory.names.contains(file_name))
-    }
-}
-
-impl RefUnwindSafe for CaseSensitivePathsCache {}
-
-#[derive(Debug, Eq, PartialEq)]
-struct ListedDirectory {
-    last_modification_time: FileTime,
-    names: FxHashSet<Box<str>>,
-}
-
 #[derive(Debug)]
-struct OsDirectoryWalker;
+struct OsDirectoryWalker {
+    cwd: SystemPathBuf,
+}
 
 impl DirectoryWalker for OsDirectoryWalker {
     fn walk(
@@ -417,7 +293,8 @@ impl DirectoryWalker for OsDirectoryWalker {
             return;
         };
 
-        let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        let mut builder = ::ignore::WalkBuilder::new(first.as_std_path());
+        builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
         builder.hidden(hidden);
@@ -463,7 +340,7 @@ impl DirectoryWalker for OsDirectoryWalker {
                                 }));
 
                                 // Skip the entire directory because all the paths won't be UTF-8 paths.
-                                ignore::WalkState::Skip
+                                ::ignore::WalkState::Skip
                             }
                         }
                     }
@@ -474,22 +351,40 @@ impl DirectoryWalker for OsDirectoryWalker {
                             // (which, should not be reported here but the `ignore` crate doesn't distinguish between ignore and IO errors).
                             // Let's log the error to at least make it visible.
                             tracing::warn!("Failed to traverse directory: {error}.");
-                            ignore::WalkState::Continue
+                            ::ignore::WalkState::Continue
                         }
                     },
                 }
             })
         });
     }
+
+    fn incremental_matcher(
+        &self,
+        configuration: WalkDirectoryConfiguration,
+    ) -> Box<dyn IgnoreIncremental> {
+        let WalkDirectoryConfiguration {
+            paths,
+            ignore_hidden: hidden,
+            standard_filters,
+        } = configuration;
+
+        let mut builder = ::ignore::WalkBuilder::from_iter(paths.iter().map(|p| p.as_std_path()));
+        builder.current_dir(self.cwd.as_std_path());
+        builder.standard_filters(standard_filters);
+        builder.hidden(hidden);
+        let root_matchers = builder.build_matchers();
+        Box::new(IgnoreFiles { root_matchers })
+    }
 }
 
 #[cold]
 fn ignore_to_walk_directory_error(
-    error: ignore::Error,
+    error: ::ignore::Error,
     path: Option<PathBuf>,
     depth: Option<usize>,
-) -> std::result::Result<walk_directory::Error, ignore::Error> {
-    use ignore::Error;
+) -> std::result::Result<walk_directory::Error, ::ignore::Error> {
+    use ::ignore::Error;
 
     match error {
         Error::WithPath { path, err } => ignore_to_walk_directory_error(*err, Some(path), depth),
@@ -547,12 +442,12 @@ impl From<std::fs::FileType> for FileType {
     }
 }
 
-impl From<WalkState> for ignore::WalkState {
+impl From<WalkState> for ::ignore::WalkState {
     fn from(value: WalkState) -> Self {
         match value {
-            WalkState::Continue => ignore::WalkState::Continue,
-            WalkState::Skip => ignore::WalkState::Skip,
-            WalkState::Quit => ignore::WalkState::Quit,
+            WalkState::Continue => ::ignore::WalkState::Continue,
+            WalkState::Skip => ::ignore::WalkState::Skip,
+            WalkState::Quit => ::ignore::WalkState::Quit,
         }
     }
 }
@@ -619,51 +514,12 @@ pub(super) mod testing {
     }
 }
 
-#[cfg(not(unix))]
-fn detect_case_sensitivity(_path: &SystemPath) -> CaseSensitivity {
-    // 99% of windows systems aren't case sensitive Don't bother checking.
-    CaseSensitivity::Unknown
-}
-
-#[cfg(unix)]
-fn detect_case_sensitivity(path: &SystemPath) -> CaseSensitivity {
-    use std::os::unix::fs::MetadataExt;
-
-    let Ok(original_case_metadata) = path.as_std_path().metadata() else {
-        return CaseSensitivity::Unknown;
-    };
-
-    let upper_case = SystemPathBuf::from(path.as_str().to_uppercase());
-    if &*upper_case == path {
-        return CaseSensitivity::Unknown;
-    }
-
-    match upper_case.as_std_path().metadata() {
-        Ok(uppercase_meta) => {
-            // The file system is case insensitive if the upper case and mixed case paths have the same inode.
-            if uppercase_meta.ino() == original_case_metadata.ino() {
-                CaseSensitivity::CaseInsensitive
-            } else {
-                CaseSensitivity::CaseSensitive
-            }
-        }
-        // In the error case, the file system is case sensitive if the file in all upper case doesn't exist.
-        Err(error) => {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                CaseSensitivity::CaseSensitive
-            } else {
-                CaseSensitivity::Unknown
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
 
-    use crate::system::walk_directory::tests::DirectoryEntryToString;
     use crate::system::DirectoryEntry;
+    use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
 

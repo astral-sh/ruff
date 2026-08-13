@@ -1,3 +1,12 @@
+"""Operator interface.
+
+This module exports a set of functions implemented in C corresponding
+to the intrinsic operators of Python.  For example, operator.add(x, y)
+is equivalent to the expression x+y.  The function names are those
+used for special methods; variants without leading and trailing
+'__' are also provided for convenience.
+"""
+
 import sys
 from _operator import (
     abs as abs,
@@ -182,6 +191,13 @@ if sys.version_info >= (3, 11):
 # them here.
 @final
 class attrgetter(Generic[_T_co]):
+    """Return a callable object that fetches the given attribute(s) from its operand.
+    After f = attrgetter('name'), the call f(r) returns r.name.
+    After g = attrgetter('name', 'date'), the call g(r) returns (r.name, r.date).
+    After h = attrgetter('name.first', 'name.last'), the call h(r) returns
+    (r.name.first, r.name.last).
+    """
+
     @overload
     def __new__(cls, attr: str, /) -> attrgetter[Any]: ...
     @overload
@@ -192,24 +208,42 @@ class attrgetter(Generic[_T_co]):
     def __new__(cls, attr: str, attr2: str, attr3: str, attr4: str, /) -> attrgetter[tuple[Any, Any, Any, Any]]: ...
     @overload
     def __new__(cls, attr: str, /, *attrs: str) -> attrgetter[tuple[Any, ...]]: ...
-    def __call__(self, obj: Any, /) -> _T_co: ...
+
+    def __call__(self, obj: Any, /) -> _T_co:
+        """Call self as a function."""
 
 @final
 class itemgetter(Generic[_T_co]):
+    """Return a callable object that fetches the given item(s) from its operand.
+    After f = itemgetter(2), the call f(r) returns r[2].
+    After g = itemgetter(2, 5, 3), the call g(r) returns (r[2], r[5], r[3])
+    """
+
     @overload
     def __new__(cls, item: _T, /) -> itemgetter[_T]: ...
     @overload
     def __new__(cls, item1: _T1, item2: _T2, /, *items: Unpack[_Ts]) -> itemgetter[tuple[_T1, _T2, Unpack[_Ts]]]: ...
+
     # __key: _KT_contra in SupportsGetItem seems to be causing variance issues, ie:
     # TypeVar "_KT_contra@SupportsGetItem" is contravariant
     #   "tuple[int, int]" is incompatible with protocol "SupportsIndex"
     # preventing [_T_co, ...] instead of [Any, ...]
     #
-    # A suspected mypy issue prevents using [..., _T] instead of [..., Any] here.
-    # https://github.com/python/mypy/issues/14032
-    def __call__(self, obj: SupportsGetItem[Any, Any]) -> Any: ...
+    # If we can't infer a literal key from __new__ (ie: `itemgetter[Literal[0]]` for `itemgetter(0)`),
+    # then we can't annotate __call__'s return type or it'll break on tuples
+    #
+    # These issues are best demonstrated by the `itertools.check_itertools_recipes.unique_justseen` test.
+    def __call__(self, obj: SupportsGetItem[Any, Any]) -> Any:
+        """Call self as a function."""
 
 @final
 class methodcaller:
+    """Return a callable object that calls the given method on its operand.
+    After f = methodcaller('name'), the call f(r) returns r.name().
+    After g = methodcaller('name', 'date', foo=1), the call g(r) returns
+    r.name('date', foo=1).
+    """
+
     def __new__(cls, name: str, /, *args: Any, **kwargs: Any) -> Self: ...
-    def __call__(self, obj: Any) -> Any: ...
+    def __call__(self, obj: Any) -> Any:
+        """Call self as a function."""

@@ -1,6 +1,7 @@
 [package]
 name = "ruff_python_ast_integration_tests"
 version = "0.0.0"
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -9,11 +10,9 @@ repository.workspace = true
 authors.workspace = true
 license.workspace = true
 
-[dependencies]
-
 [dev-dependencies]
-ruff_python_parser = { workspace = true }
 ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
 
@@ -21,3 +20,7 @@ insta = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+test = false
+doctest = false

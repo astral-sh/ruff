@@ -3,21 +3,22 @@ use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_graph::AnalyzeSettings;
 use ruff_linter::display_settings;
+use ruff_linter::settings::LinterSettings;
 use ruff_linter::settings::types::{
     CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern, FilePatternSet, OutputFormat,
     UnsafeFixes,
 };
-use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{PySourceType, PythonVersion};
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
-    QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, NestedStringQuoteStyle, PreviewMode,
+    PyFormatOptions, QuoteStyle,
 };
 use ruff_source_file::find_newline;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     #[cache_key(ignore)]
@@ -30,6 +31,8 @@ pub struct Settings {
     pub unsafe_fixes: UnsafeFixes,
     #[cache_key(ignore)]
     pub output_format: OutputFormat,
+    #[cache_key(ignore)]
+    pub output_prefer_rule_codes: bool,
     #[cache_key(ignore)]
     pub show_fixes: bool,
 
@@ -47,6 +50,7 @@ impl Default for Settings {
             fix: false,
             fix_only: false,
             output_format: OutputFormat::default(),
+            output_prefer_rule_codes: false,
             show_fixes: false,
             unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
@@ -67,6 +71,7 @@ impl fmt::Display for Settings {
                 self.fix,
                 self.fix_only,
                 self.output_format,
+                self.output_prefer_rule_codes,
                 self.show_fixes,
                 self.unsafe_fixes,
                 self.file_resolver | nested,
@@ -143,6 +148,19 @@ pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.pyi"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
+    FilePattern::Builtin("**/ruff.toml"),
+    FilePattern::Builtin("**/.ruff.toml"),
+    FilePattern::Builtin("*.md"),
+];
+pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
+    FilePattern::Builtin("*.py"),
+    FilePattern::Builtin("*.pyi"),
+    FilePattern::Builtin("*.pyw"),
+    FilePattern::Builtin("*.ipynb"),
+    FilePattern::Builtin("**/pyproject.toml"),
+    FilePattern::Builtin("**/ruff.toml"),
+    FilePattern::Builtin("**/.ruff.toml"),
+    FilePattern::Builtin("*.md"),
 ];
 
 impl FileResolverSettings {
@@ -182,6 +200,7 @@ pub struct FormatterSettings {
     pub indent_width: IndentWidth,
 
     pub quote_style: QuoteStyle,
+    pub nested_string_quote_style: NestedStringQuoteStyle,
 
     pub magic_trailing_comma: MagicTrailingComma,
 
@@ -228,6 +247,7 @@ impl FormatterSettings {
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
+            .with_nested_string_quote_style(self.nested_string_quote_style)
             .with_magic_trailing_comma(self.magic_trailing_comma)
             .with_preview(self.preview)
             .with_line_ending(line_ending)
@@ -263,6 +283,7 @@ impl Default for FormatterSettings {
             indent_style: default_options.indent_style(),
             indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
+            nested_string_quote_style: default_options.nested_string_quote_style(),
             magic_trailing_comma: default_options.magic_trailing_comma(),
             docstring_code_format: default_options.docstring_code(),
             docstring_code_line_width: default_options.docstring_code_line_width(),
@@ -286,6 +307,7 @@ impl fmt::Display for FormatterSettings {
                 self.indent_style,
                 self.indent_width,
                 self.quote_style,
+                self.nested_string_quote_style,
                 self.magic_trailing_comma,
                 self.docstring_code_format,
                 self.docstring_code_line_width,

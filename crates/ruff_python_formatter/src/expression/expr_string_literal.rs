@@ -1,6 +1,6 @@
 use crate::builders::parenthesize_if_expands;
 use crate::expression::parentheses::{
-    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
+    NeedsParentheses, OptionalParentheses, in_parentheses_only_group,
 };
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
@@ -8,7 +8,7 @@ use crate::string::implicit::{
     FormatImplicitConcatenatedStringExpanded, FormatImplicitConcatenatedStringFlat,
     ImplicitConcatenatedLayout,
 };
-use crate::string::{implicit::FormatImplicitConcatenatedString, StringLikeExtensions};
+use crate::string::{StringLikeExtensions, implicit::FormatImplicitConcatenatedString};
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::{AnyNodeRef, ExprStringLiteral, StringLike};
 

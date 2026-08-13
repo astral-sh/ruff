@@ -1,9 +1,29 @@
+use std::sync::LazyLock;
+
+use regex::Regex;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-
+use crate::Violation;
+use crate::checkers::ast::LintContext;
 use crate::comments::shebang::ShebangDirective;
+
+static UV_RUN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+        \b
+        (?:
+            # Part A: uv or uv tool (these MUST be followed by run)
+            (?:uv|uv\s+tool) \s+ (?:--?[a-zA-Z][\w-]*(?:[=\s]\S+)?\s+)* run
+            |
+            # Part B: uvx (stands alone, run is optional/redundant)
+            uvx (?: \s+ .* )?
+        )
+        \b
+    ",
+    )
+    .unwrap()
+});
 
 /// ## What it does
 /// Checks for a shebang directive in `.py` files that does not contain `python`,
@@ -31,6 +51,7 @@ use crate::comments::shebang::ShebangDirective;
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct ShebangMissingPython;
 
 impl Violation for ShebangMissingPython {
@@ -44,10 +65,11 @@ impl Violation for ShebangMissingPython {
 pub(crate) fn shebang_missing_python(
     range: TextRange,
     shebang: &ShebangDirective,
-) -> Option<Diagnostic> {
-    if shebang.contains("python") || shebang.contains("pytest") || shebang.contains("uv run") {
-        return None;
+    context: &LintContext,
+) {
+    if shebang.contains("python") || shebang.contains("pytest") || UV_RUN_REGEX.is_match(shebang) {
+        return;
     }
 
-    Some(Diagnostic::new(ShebangMissingPython, range))
+    context.report_diagnostic_if_enabled(ShebangMissingPython, range);
 }

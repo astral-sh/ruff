@@ -1,5 +1,5 @@
-use crate::vec::IndexVec;
 use crate::Idx;
+use crate::vec::IndexVec;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut, Range};
@@ -43,6 +43,16 @@ impl<I: Idx, T> IndexSlice<I, T> {
     #[inline]
     pub const fn first(&self) -> Option<&T> {
         self.raw.first()
+    }
+
+    #[inline]
+    pub const fn last(&self) -> Option<&T> {
+        self.raw.last()
+    }
+
+    #[inline]
+    pub const fn last_mut(&mut self) -> Option<&mut T> {
+        self.raw.last_mut()
     }
 
     #[inline]

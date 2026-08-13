@@ -13,11 +13,13 @@ use std::process::ExitCode;
 mod format_dev;
 mod generate_all;
 mod generate_cli_help;
+mod generate_default_rules;
 mod generate_docs;
 mod generate_json_schema;
 mod generate_options;
 mod generate_rules_table;
 mod generate_ty_cli_reference;
+mod generate_ty_env_vars_reference;
 mod generate_ty_options;
 mod generate_ty_rules;
 mod generate_ty_schema;
@@ -49,10 +51,14 @@ enum Command {
     GenerateTySchema(generate_ty_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
     GenerateRulesTable,
+    /// Generate a Markdown-compatible listing of default lint rules.
+    GenerateDefaultRules,
     GenerateTyRules(generate_ty_rules::Args),
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions,
     GenerateTyOptions(generate_ty_options::Args),
+    /// Generate environment variables reference for ty.
+    GenerateTyEnvVarsReference(generate_ty_env_vars_reference::Args),
     /// Generate CLI help.
     GenerateCliHelp(generate_cli_help::Args),
     /// Generate Markdown docs.
@@ -95,9 +101,11 @@ fn main() -> Result<ExitCode> {
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateTySchema(args) => generate_ty_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
+        Command::GenerateDefaultRules => println!("{}", generate_default_rules::generate()),
         Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
         Command::GenerateTyOptions(args) => generate_ty_options::main(&args)?,
+        Command::GenerateTyEnvVarsReference(args) => generate_ty_env_vars_reference::main(&args)?,
         Command::GenerateCliHelp(args) => generate_cli_help::main(&args)?,
         Command::GenerateDocs(args) => generate_docs::main(&args)?,
         Command::PrintAST(args) => print_ast::main(&args)?,

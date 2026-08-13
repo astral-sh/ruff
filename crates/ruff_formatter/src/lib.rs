@@ -38,7 +38,7 @@ use crate::prelude::TagKind;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
-use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
+use std::num::{NonZeroU8, NonZeroU16, TryFromIntError};
 
 use crate::format_element::document::Document;
 use crate::printer::{Printer, PrinterOptions};
@@ -50,7 +50,7 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
+pub use format_element::{FormatElement, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -81,14 +81,19 @@ impl IndentStyle {
     pub const fn is_space(&self) -> bool {
         matches!(self, IndentStyle::Space)
     }
+
+    /// Returns the string representation of the indent style.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            IndentStyle::Tab => "tab",
+            IndentStyle::Space => "space",
+        }
+    }
 }
 
 impl std::fmt::Display for IndentStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndentStyle::Tab => std::write!(f, "tab"),
-            IndentStyle::Space => std::write!(f, "space"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -193,7 +198,7 @@ pub trait FormatContext {
     fn options(&self) -> &Self::Options;
 
     /// Returns the source code from the document that gets formatted.
-    fn source_code(&self) -> SourceCode;
+    fn source_code(&self) -> SourceCode<'_>;
 }
 
 /// Options customizing how the source code should be formatted.
@@ -239,7 +244,7 @@ impl FormatContext for SimpleFormatContext {
         &self.options
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         SourceCode::new(&self.source_code)
     }
 }
@@ -326,7 +331,7 @@ where
         printer.print_with_indent(&self.document, indent)
     }
 
-    fn create_printer(&self) -> Printer {
+    fn create_printer(&self) -> Printer<'_> {
         let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
 
@@ -356,7 +361,7 @@ pub struct Printed {
 }
 
 impl Printed {
-    pub fn new(
+    fn new(
         code: String,
         range: Option<TextRange>,
         sourcemap: Vec<SourceMarker>,
@@ -946,12 +951,12 @@ impl<Context> FormatState<Context> {
         }
     }
 
-    pub fn into_context(self) -> Context {
+    fn into_context(self) -> Context {
         self.context
     }
 
     /// Returns the context specifying how to format the current CST
-    pub fn context(&self) -> &Context {
+    fn context(&self) -> &Context {
         &self.context
     }
 
@@ -963,7 +968,7 @@ impl<Context> FormatState<Context> {
     /// Creates a new group id that is unique to this document. The passed debug name is used in the
     /// [`std::fmt::Debug`] of the document if this is a debug build.
     /// The name is unused for production builds and has no meaning on the equality of two group ids.
-    pub fn group_id(&self, debug_name: &'static str) -> GroupId {
+    fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.group_id_builder.group_id(debug_name)
     }
 }

@@ -1,7 +1,7 @@
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextRange};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 
 /// Returns the control flow graph associated to an array of statements
 pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
@@ -28,7 +28,7 @@ impl<'stmt> ControlFlowGraph<'stmt> {
     }
 
     /// Index of terminal block
-    pub fn terminal(&self) -> BlockId {
+    pub(crate) fn terminal(&self) -> BlockId {
         self.terminal
     }
 
@@ -126,12 +126,12 @@ impl Edges {
     }
 
     /// Returns iterator over indices of blocks targeted by given edges
-    pub fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
+    pub(crate) fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
         self.targets.iter().copied()
     }
 
     /// Returns iterator over [`Condition`]s which must be satisfied to traverse corresponding edge
-    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
+    pub(crate) fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
         self.conditions.iter()
     }
 

@@ -10,7 +10,7 @@ use crate::format_element::document::Document;
 use crate::format_element::tag::{Condition, GroupMode};
 use crate::format_element::{BestFittingMode, BestFittingVariants, LineMode, PrintMode};
 use crate::prelude::tag::{DedentMode, Tag, TagKind, VerbatimKind};
-use crate::prelude::{tag, TextWidth};
+use crate::prelude::{TextWidth, tag};
 use crate::printer::call_stack::{
     CallStack, FitsCallStack, PrintCallStack, PrintElementArgs, StackFrame,
 };
@@ -39,7 +39,7 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
+    pub(crate) fn new(source_code: SourceCode<'a>, options: PrinterOptions) -> Self {
         Self {
             source_code,
             options,
@@ -48,14 +48,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Prints the passed in element as well as all its content
-    pub fn print(self, document: &'a Document) -> PrintResult<Printed> {
+    pub(crate) fn print(self, document: &'a Document) -> PrintResult<Printed> {
         self.print_with_indent(document, 0)
     }
 
     /// Prints the passed in element as well as all its content,
     /// starting at the specified indentation level
     #[tracing::instrument(level = "debug", name = "Printer::print", skip_all)]
-    pub fn print_with_indent(
+    pub(crate) fn print_with_indent(
         mut self,
         document: &'a Document,
         indent: u16,
@@ -88,6 +88,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Prints a single element and push the following elements to queue
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // element visited by the printing loop.
+    #[inline(always)]
     fn print_element(
         &mut self,
         stack: &mut PrintCallStack,
@@ -438,27 +441,34 @@ impl<'a> Printer<'a> {
         Ok(print_mode)
     }
 
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // text element visited by the printing loop.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
-            let (indent_char, repeat_count) = match self.options.indent_style() {
-                IndentStyle::Tab => ('\t', 1),
-                IndentStyle::Space => (' ', self.options.indent_width()),
+            let indent = std::mem::take(&mut self.state.pending_indent);
+            let indent_level = indent.level();
+            let align = indent.align();
+            let indent_width = self.options.indent_width();
+            let line_width = u32::from(indent_level) * indent_width + u32::from(align);
+            let indent_level = usize::from(indent_level);
+            let align = usize::from(align);
+            let (indent_char, total_indent_char_count) = match self.options.indent_style() {
+                IndentStyle::Tab => ('\t', indent_level),
+                IndentStyle::Space => (' ', indent_level * indent_width as usize),
             };
 
-            let indent = std::mem::take(&mut self.state.pending_indent);
-            let total_indent_char_count = indent.level() as usize * repeat_count as usize;
-
-            self.state
-                .buffer
-                .reserve(total_indent_char_count + indent.align() as usize);
-
+            let buffer = &mut self.state.buffer;
+            buffer.reserve(total_indent_char_count + align);
             for _ in 0..total_indent_char_count {
-                self.print_char(indent_char);
+                buffer.push(indent_char);
+            }
+            for _ in 0..align {
+                buffer.push(' ');
             }
 
-            for _ in 0..indent.align() {
-                self.print_char(' ');
-            }
+            self.state.line_width += line_width;
         }
 
         self.push_marker();
@@ -1150,6 +1160,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     }
 
     /// Tests if the passed element fits on the current line or not.
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // element visited by the fitting loop.
+    #[inline(always)]
     fn fits_element(&mut self, element: &'a FormatElement) -> PrintResult<Fits> {
         #[allow(clippy::enum_glob_use)]
         use Tag::*;
@@ -1199,7 +1212,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                         text_width: *text_width,
                     },
                     args,
-                ))
+                ));
             }
             FormatElement::SourceCodeSlice { slice, text_width } => {
                 let text = slice.text(self.printer.source_code);
@@ -1597,11 +1610,7 @@ enum Fits {
 
 impl From<bool> for Fits {
     fn from(value: bool) -> Self {
-        if value {
-            Fits::Yes
-        } else {
-            Fits::No
-        }
+        if value { Fits::Yes } else { Fits::No }
     }
 }
 
@@ -1662,8 +1671,8 @@ mod tests {
     use crate::printer::{LineEnding, Printer, PrinterOptions};
     use crate::source_code::SourceCode;
     use crate::{
-        format_args, write, Document, FormatState, IndentStyle, IndentWidth, LineWidth, Printed,
-        VecBuffer,
+        Document, FormatState, IndentStyle, IndentWidth, LineWidth, Printed, VecBuffer,
+        format_args, write,
     };
 
     fn format(root: &dyn Format<SimpleFormatContext>) -> Printed {
@@ -1985,10 +1994,23 @@ two lines`,
                 token("]")
             ]),
             token(";"),
-            line_suffix(&format_args![space(), token("// Using reserved width causes this content to not fit even though it's a line suffix element")], 93)
+            line_suffix(
+                &format_args![
+                    space(),
+                    token(
+                        "// Using reserved width causes this content \
+                        to not fit even though it's a line suffix element"
+                    )
+                ],
+                93
+            )
         ]);
 
-        assert_eq!(printed.as_code(), "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element");
+        assert_eq!(
+            printed.as_code(),
+            "[\n  1, 2, 3\n]; // Using reserved width causes this content \
+            to not fit even though it's a line suffix element"
+        );
     }
 
     #[test]
@@ -2002,12 +2024,19 @@ two lines`,
                         token("The referenced group breaks."),
                         hard_line_break()
                     ])
-                    .with_group_id(Some(group_id)),
+                    .with_id(Some(group_id)),
                     group(&format_args![
                         token("This group breaks because:"),
                         soft_line_break_or_space(),
-                        if_group_fits_on_line(&token("This content fits but should not be printed.")).with_group_id(Some(group_id)),
-                        if_group_breaks(&token("It measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text.")).with_group_id(Some(group_id)),
+                        if_group_fits_on_line(&token(
+                            "This content fits but should not be printed."
+                        ))
+                        .with_group_id(Some(group_id)),
+                        if_group_breaks(&token(
+                            "It measures with the 'if_group_breaks' variant because the \
+                            referenced group breaks and that's just way too much text."
+                        ))
+                        .with_group_id(Some(group_id)),
                     ])
                 ]
             )
@@ -2015,7 +2044,14 @@ two lines`,
 
         let printed = format(&content);
 
-        assert_eq!(printed.as_code(), "The referenced group breaks.\nThis group breaks because:\nIt measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text.");
+        assert_eq!(
+            printed.as_code(),
+            "\
+The referenced group breaks.
+This group breaks because:
+It measures with the 'if_group_breaks' variant because the referenced group breaks \
+and that's just way too much text."
+        );
     }
 
     #[test]
@@ -2027,7 +2063,7 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-2")).with_group_id(Some(id_2)),
+                    group(&token("Group with id-2")).with_id(Some(id_2)),
                     hard_line_break()
                 ]
             )?;
@@ -2035,7 +2071,11 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_group_id(Some(id_1)),
+                    group(&token(
+                        "Group with id-1 does not fit on the line \
+                        because it exceeds the line width of 80 characters by"
+                    ))
+                    .with_id(Some(id_1)),
                     hard_line_break()
                 ]
             )?;

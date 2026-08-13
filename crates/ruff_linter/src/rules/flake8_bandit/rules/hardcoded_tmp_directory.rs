@@ -1,9 +1,9 @@
 use ruff_python_ast::{self as ast, Expr, StringLike};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-379](https://cwe.mitre.org/data/definitions/379.html)
 /// - [Python documentation: `tempfile`](https://docs.python.org/3/library/tempfile.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct HardcodedTempFile {
     string: String,
 }
@@ -75,13 +76,16 @@ pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
                 }
             }
         }
+        // These are not actually strings
         StringLike::Bytes(_) => (),
+        // TODO(dylan) - verify that we should skip these
+        StringLike::TString(_) => (),
     }
 }
 
 fn check(checker: &Checker, value: &str, range: TextRange) {
     if !checker
-        .settings
+        .settings()
         .flake8_bandit
         .hardcoded_tmp_directory
         .iter()
@@ -102,10 +106,10 @@ fn check(checker: &Checker, value: &str, range: TextRange) {
         }
     }
 
-    checker.report_diagnostic(Diagnostic::new(
+    checker.report_diagnostic(
         HardcodedTempFile {
             string: value.to_string(),
         },
         range,
-    ));
+    );
 }

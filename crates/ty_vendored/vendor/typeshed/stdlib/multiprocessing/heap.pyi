@@ -1,13 +1,16 @@
 import sys
-from _typeshed import Incomplete
 from collections.abc import Callable
 from mmap import mmap
-from typing import Protocol
-from typing_extensions import TypeAlias
+from multiprocessing import popen_forkserver, popen_spawn_posix, resource_sharer
+from typing import Protocol, TypeAlias, type_check_only
 
 __all__ = ["BufferWrapper"]
 
 class Arena:
+    """
+    A shared memory area backed by a temporary file (POSIX).
+    """
+
     size: int
     buffer: mmap
     if sys.platform == "win32":
@@ -20,10 +23,16 @@ class Arena:
 _Block: TypeAlias = tuple[Arena, int, int]
 
 if sys.platform != "win32":
+    @type_check_only
     class _SupportsDetach(Protocol):
         def detach(self) -> int: ...
 
-    def reduce_arena(a: Arena) -> tuple[Callable[[int, _SupportsDetach], Arena], tuple[int, Incomplete]]: ...
+    def reduce_arena(
+        a: Arena,
+    ) -> tuple[
+        Callable[[int, _SupportsDetach], Arena],
+        tuple[int, popen_forkserver._DupFd | popen_spawn_posix._DupFd | resource_sharer.DupFd],
+    ]: ...
     def rebuild_arena(size: int, dupfd: _SupportsDetach) -> Arena: ...
 
 class Heap:

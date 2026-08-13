@@ -69,3 +69,11 @@ def func():
     Returns:
         the value
         """
+
+
+def func():
+    ("""Docstring.
+
+    Raises:
+        ValueError: An error.
+    """)

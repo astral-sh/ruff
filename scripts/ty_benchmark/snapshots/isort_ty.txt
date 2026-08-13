@@ -1,0 +1,21 @@
+isort/api.py:201:33: warning[possibly-unresolved-reference] Name `file_content` used when possibly not defined
+isort/api.py:562:12: warning[possibly-unresolved-reference] Name `key` used when possibly not defined
+isort/api.py:562:20: warning[possibly-unresolved-reference] Name `key` used when possibly not defined
+isort/api.py:563:22: warning[possibly-unresolved-reference] Name `key` used when possibly not defined
+isort/exceptions.py:13:28: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/main.py:1153:36: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/output.py:587:73: warning[possibly-unresolved-reference] Name `from_import` used when possibly not defined
+isort/output.py:618:97: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/output.py:645:70: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/output.py:652:74: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/place.py:104:31: warning[possibly-missing-submodule] Submodule `machinery` might not have been imported
+isort/settings.py:154:52: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/settings.py:259:81: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/settings.py:260:70: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/wrap.py:74:72: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/wrap.py:86:53: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/wrap.py:87:51: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/wrap.py:152:102: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+isort/wrap_modes.py:41:17: error[unresolved-attribute] Object of type `(...) -> str` has no attribute `__name__`
+isort/wrap_modes.py:373:25: warning[unused-type-ignore-comment] Unused blanket `type: ignore` directive
+Found 20 diagnostics

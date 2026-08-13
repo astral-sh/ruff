@@ -5,8 +5,7 @@ use tracing::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_db::Upcast;
-use ty_python_semantic::system_module_search_paths;
+use ty_module_resolver::system_module_search_paths;
 
 use crate::db::{Db, ProjectDatabase};
 use crate::watch::Watcher;
@@ -41,7 +40,8 @@ impl ProjectWatcher {
     }
 
     pub fn update(&mut self, db: &ProjectDatabase) {
-        let search_paths: Vec<_> = system_module_search_paths(db.upcast()).collect();
+        let environment = db.project().program(db).resolver_environment(db);
+        let search_paths: Vec<_> = system_module_search_paths(db, environment).collect();
         let project_path = db.project().root(db);
 
         let new_cache_key = Self::compute_cache_key(project_path, &search_paths);
@@ -49,6 +49,8 @@ impl ProjectWatcher {
         if self.cache_key == Some(new_cache_key) {
             return;
         }
+
+        let mut watcher_paths = self.watcher.paths_mut();
 
         // Unregister all watch paths because ordering is important for linux because
         // it only emits an event for the last added watcher if a subtree is covered by multiple watchers.
@@ -61,19 +63,14 @@ impl ProjectWatcher {
         //   - foo.py
         // ```
         for path in self.watched_paths.drain(..) {
-            if let Err(error) = self.watcher.unwatch(&path) {
+            if let Err(error) = watcher_paths.remove(&path) {
                 info!("Failed to remove the file watcher for path `{path}`: {error}");
             }
         }
 
         self.has_errored_paths = false;
 
-        let config_paths = db
-            .project()
-            .metadata(db)
-            .extra_configuration_paths()
-            .iter()
-            .map(SystemPathBuf::as_path);
+        let config_paths = db.project().metadata(db).extra_configuration_paths();
 
         // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
         // This is necessary to observe changes to files that are outside the project root.
@@ -100,16 +97,24 @@ impl ProjectWatcher {
         for path in included_paths
             .chain(unique_module_paths)
             .chain(config_paths)
+            .map(SystemPath::to_path_buf)
         {
-            // Log a warning. It's not worth aborting if registering a single folder fails because
-            // Ruff otherwise stills works as expected.
-            if let Err(error) = self.watcher.watch(path) {
+            if let Err(error) = watcher_paths.add(&path) {
                 // TODO: Log a user-facing warning.
-                tracing::warn!("Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results.");
+                tracing::warn!(
+                    "Failed to setup watcher for path `{path}`: {error}. You have to restart ty after making changes to files under this path or you might see stale results."
+                );
                 self.has_errored_paths = true;
             } else {
-                self.watched_paths.push(path.to_path_buf());
+                self.watched_paths.push(path);
             }
+        }
+
+        if let Err(error) = watcher_paths.commit() {
+            tracing::warn!(
+                "Failed to apply file watcher updates: {error}. You have to restart ty after making changes to watched files or you might see stale results."
+            );
+            self.has_errored_paths = true;
         }
 
         info!(

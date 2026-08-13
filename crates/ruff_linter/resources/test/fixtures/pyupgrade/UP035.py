@@ -110,8 +110,25 @@ from typing_extensions import CapsuleType
 # UP035 on py313+ only
 from typing_extensions import deprecated
 
+# UP035 on py313+ only
+from typing_extensions import get_type_hints
 
 # https://github.com/astral-sh/ruff/issues/15780
 from typing_extensions import is_typeddict
 # https://github.com/astral-sh/ruff/pull/15800#pullrequestreview-2580704217
 from typing_extensions import TypedDict
+
+# UP035 on py37+ only
+from typing.io import BinaryIO
+
+# UP035 on py37+ only
+from typing.io import IO
+
+# UP035 on py37+ only
+from typing.io import TextIO
+
+# UP035 on py37+ only
+from typing.re import Match
+
+# UP035 on py37+ only
+from typing.re import Pattern

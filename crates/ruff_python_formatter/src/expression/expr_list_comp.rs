@@ -1,8 +1,8 @@
-use ruff_formatter::{format_args, write, FormatResult};
+use ruff_formatter::{FormatResult, format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprListComp;
 
-use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -12,6 +12,7 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
     fn fmt_fields(&self, item: &ExprListComp, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprListComp {
             range: _,
+            node_index: _,
             elt,
             generators,
         } = item;

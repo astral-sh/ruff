@@ -1,26 +1,27 @@
+"""Internal support module for sre"""
+
 import sys
 from collections.abc import Iterable
 from re import Match, Pattern as _Pattern
 from sre_constants import *
 from sre_constants import _NamedIntConstant as _NIC, error as _Error
-from typing import Any, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, TypeAlias, overload
 
-SPECIAL_CHARS: str
-REPEAT_CHARS: str
-DIGITS: frozenset[str]
-OCTDIGITS: frozenset[str]
-HEXDIGITS: frozenset[str]
-ASCIILETTERS: frozenset[str]
-WHITESPACE: frozenset[str]
-ESCAPES: dict[str, tuple[_NIC, int]]
-CATEGORIES: dict[str, tuple[_NIC, _NIC] | tuple[_NIC, list[tuple[_NIC, _NIC]]]]
-FLAGS: dict[str, int]
-TYPE_FLAGS: int
-GLOBAL_FLAGS: int
+SPECIAL_CHARS: Final = ".\\[{()*+?^$|"
+REPEAT_CHARS: Final = "*+?{"
+DIGITS: Final[frozenset[str]]
+OCTDIGITS: Final[frozenset[str]]
+HEXDIGITS: Final[frozenset[str]]
+ASCIILETTERS: Final[frozenset[str]]
+WHITESPACE: Final[frozenset[str]]
+ESCAPES: Final[dict[str, tuple[_NIC, int]]]
+CATEGORIES: Final[dict[str, tuple[_NIC, _NIC] | tuple[_NIC, list[tuple[_NIC, _NIC]]]]]
+FLAGS: Final[dict[str, int]]
+TYPE_FLAGS: Final[int]
+GLOBAL_FLAGS: Final[int]
 
 if sys.version_info >= (3, 11):
-    MAXWIDTH: int
+    MAXWIDTH: Final[int]
 
 if sys.version_info < (3, 11):
     class Verbose(Exception): ...
@@ -39,7 +40,7 @@ class State:
     lookbehindgroups: int | None
     @property
     def groups(self) -> int: ...
-    def opengroup(self, name: str | None = ...) -> int: ...
+    def opengroup(self, name: str | None = None) -> int: ...
     def closegroup(self, gid: int, p: SubPattern) -> None: ...
     def checkgroup(self, gid: int) -> bool: ...
     def checklookbehindgroup(self, gid: int, source: Tokenizer) -> None: ...
@@ -91,7 +92,6 @@ if sys.version_info >= (3, 12):
     def parse_template(source: str, pattern: _Pattern[Any]) -> _TemplateType: ...
     @overload
     def parse_template(source: bytes, pattern: _Pattern[Any]) -> _TemplateByteType: ...
-
 else:
     @overload
     def parse_template(source: str, state: _Pattern[Any]) -> _TemplateType: ...

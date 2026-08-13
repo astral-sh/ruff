@@ -2,7 +2,7 @@ def func():
     import re
 
     # OK
-    if re.match("^hello", "hello world", re.IGNORECASE):
+    if re.search("^hello", "hello world", re.IGNORECASE):
         pass
 
 
@@ -10,13 +10,13 @@ def func():
     import re
 
     # FURB167
-    if re.match("^hello", "hello world", re.I):
+    if re.search("^hello", "hello world", re.I):
         pass
 
 
 def func():
-    from re import match, I
+    from re import search, I
 
     # FURB167
-    if match("^hello", "hello world", I):
+    if search("^hello", "hello world", I):
         pass

@@ -1,0 +1,58 @@
+---
+source: crates/ruff_python_parser/src/string.rs
+expression: suite
+---
+[
+    Expr(
+        StmtExpr {
+            node_index: NodeIndex(None),
+            range: 0..11,
+            value: TString(
+                ExprTString {
+                    node_index: NodeIndex(None),
+                    range: 0..11,
+                    value: TStringValue {
+                        inner: Single(
+                            TString {
+                                range: 0..11,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Literal(
+                                        InterpolatedStringLiteralElement {
+                                            range: 4..5,
+                                            node_index: NodeIndex(None),
+                                            value: "\n",
+                                        },
+                                    ),
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 5..8,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 6..7,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: true,
+                                    unclosed: false,
+                                },
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

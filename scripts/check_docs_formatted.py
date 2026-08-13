@@ -57,6 +57,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "incorrect-blank-line-after-class",
     "incorrect-blank-line-before-class",
     "indentation-with-invalid-multiple",
+    "indentation-with-invalid-multiple-comment",
     "line-too-long",
     "missing-trailing-comma",
     "missing-whitespace",
@@ -110,13 +111,17 @@ KNOWN_FORMATTING_VIOLATIONS = [
 
 # For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
+    "ban-lazy",  # requires Python 3.15
     "blank-line-with-whitespace",
-    "indentation-with-invalid-multiple-comment",
     "indented-form-feed",
+    "lazy-import-immediately-resolved",  # requires Python 3.15
+    "lazy-import-mismatch",  # requires Python 3.15
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
     "non-pep695-type-alias",  # requires Python 3.12
+    "quadratic-list-summation",  # requires Python 3.15
+    "require-lazy",  # requires Python 3.15
     "syntax-error",
     "tab-after-comma",
     "tab-after-keyword",

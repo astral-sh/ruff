@@ -266,3 +266,63 @@ def f():
     result = list()  # this should be replaced with a comprehension
     for i in values:
         result.append(i + 1)  # PERF401
+
+def f():
+    src = [1]
+    dst = []
+
+    for i in src:
+        if True if True else False:
+            dst.append(i)
+
+    for i in src:
+        if lambda: 0:
+            dst.append(i)
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append(x for x in [i])
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append((x for x in [i]))
+
+G_INDEX = None
+def f():
+    global G_INDEX
+    result = []
+    for G_INDEX in range(3):
+        result.append(G_INDEX)
+
+def f():
+    NL_INDEX = None
+    def x():
+        nonlocal NL_INDEX
+        result = []
+        for NL_INDEX in range(3):
+            result.append(NL_INDEX)
+
+def f():
+    # comment duplication in if test (https://github.com/astral-sh/ruff/issues/18787)
+    original = list(range(10000))
+    filtered = []
+    for i in original:
+        if (
+            i
+            # comment
+        ):
+            filtered.append(i)
+
+def f():
+    # comment duplication in target (https://github.com/astral-sh/ruff/issues/18787)
+    original = list(range(10000))
+    filtered = []
+    for (
+        i  # comment
+    ) in original:
+        if i > 0:
+            filtered.append(i)

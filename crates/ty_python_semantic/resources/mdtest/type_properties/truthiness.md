@@ -58,7 +58,7 @@ Checks that we don't get into a cycle if someone sets their `__bool__` method to
 class BoolIsBool:
     __bool__ = bool
 
-reveal_type(bool(BoolIsBool()))  # revealed: bool
+reveal_type(bool(BoolIsBool()))  # revealed: Literal[False]
 ```
 
 ### Conditional __bool__ method
@@ -106,7 +106,8 @@ python-version = "3.12"
 import types
 import typing
 import sys
-from ty_extensions import AlwaysTruthy, static_assert, is_subtype_of
+from ty_extensions import AlwaysTruthy, static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import _NoDefaultType
 
 static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))
@@ -121,17 +122,29 @@ static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
 static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```
 
+### Subclassable special-cased classes
+
+`Path` and `super` cannot be inferred as always truthy because subclasses can override `__bool__`.
+
+```py
+from pathlib import Path
+
+def _(path: Path, superclass: super):
+    reveal_type(bool(path))  # revealed: bool
+    reveal_type(bool(superclass))  # revealed: bool
+```
+
 ### `Callable` types always have ambiguous truthiness
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def f(x: Callable, y: Callable[[int], str]):
+def f(x: Callable[..., Any], y: Callable[[int], str]):
     reveal_type(bool(x))  # revealed: bool
     reveal_type(bool(y))  # revealed: bool
 ```
 
-But certain callable single-valued types are known to be always truthy:
+But certain callable objects are known to be always truthy:
 
 ```py
 from types import FunctionType
@@ -142,4 +155,119 @@ class A:
 reveal_type(bool(A().method))  # revealed: Literal[True]
 reveal_type(bool(f.__get__))  # revealed: Literal[True]
 reveal_type(bool(FunctionType.__get__))  # revealed: Literal[True]
+```
+
+## Enums
+
+```py
+from enum import Enum
+from typing import Literal
+
+class NormalEnum(Enum):
+    NO = 0
+    YES = 1
+
+class FalsyEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __bool__(self) -> Literal[False]:
+        return False
+
+class AmbiguousEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __bool__(self) -> bool:
+        return self is AmbiguousEnum.YES
+
+class AmbiguousBase(Enum):
+    def __bool__(self) -> bool:
+        return True
+
+class AmbiguousEnum2(AmbiguousBase):
+    NO = 0
+    YES = 1
+
+class CustomLenEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __len__(self):
+        return 0
+
+reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]
+reveal_type(bool(NormalEnum.YES))  # revealed: Literal[True]
+
+def normal_enum_complement(value: NormalEnum):
+    if value is NormalEnum.NO:
+        return
+    reveal_type(bool(value))  # revealed: Literal[True]
+
+reveal_type(bool(FalsyEnum.NO))  # revealed: Literal[False]
+reveal_type(bool(FalsyEnum.YES))  # revealed: Literal[False]
+
+# All of the following must be `bool`:
+
+reveal_type(bool(AmbiguousEnum.NO))  # revealed: bool
+reveal_type(bool(AmbiguousEnum.YES))  # revealed: bool
+
+reveal_type(bool(AmbiguousEnum2.NO))  # revealed: bool
+reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
+
+reveal_type(bool(AmbiguousEnum2.NO))  # revealed: bool
+reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
+
+reveal_type(bool(CustomLenEnum.NO))  # revealed: bool
+reveal_type(bool(CustomLenEnum.YES))  # revealed: bool
+```
+
+## TypedDict
+
+It may be feasible to infer `Literal[True]` for some `TypedDict` types, if `{}` can definitely be
+excluded as a possible value. We currently do not attempt to do this.
+
+If `{}` is the *only* possible value, we could infer `Literal[False]`. This might only be possible
+if something like <https://peps.python.org/pep-0728> is accepted, a `TypedDict` has no defined
+items, and `closed=True` is used.
+
+```py
+from typing_extensions import TypedDict, Literal, NotRequired
+
+class Normal(TypedDict):
+    a: str
+    b: int
+
+def _(n: Normal) -> None:
+    reveal_type(bool(n))  # revealed: Literal[True]
+
+class OnlyFalsyItems(TypedDict):
+    wrong: Literal[False]
+
+def _(n: OnlyFalsyItems) -> None:
+    # (it does not matter if all items are falsy)
+    reveal_type(bool(n))  # revealed: Literal[True]
+
+class Empty(TypedDict):
+    pass
+
+def _(e: Empty) -> None:
+    # This should be `bool`. `Literal[False]` would be wrong, as `Empty` can be subclassed.
+    reveal_type(bool(e))  # revealed: bool
+
+class AllKeysOptional(TypedDict, total=False):
+    a: str
+    b: int
+
+def _(a: AllKeysOptional) -> None:
+    # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
+    reveal_type(bool(a))  # revealed: bool
+
+class AllKeysNotRequired(TypedDict):
+    a: NotRequired[str]
+    b: NotRequired[int]
+
+def _(a: AllKeysNotRequired) -> None:
+    # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
+    reveal_type(bool(a))  # revealed: bool
 ```

@@ -1,19 +1,10 @@
-# Configuration for the zizmor static analysis tool, run via pre-commit in CI
-# https://woodruffw.github.io/zizmor/configuration/
-#
-# TODO: can we remove the ignores here so that our workflows are more secure?
 rules:
-  dangerous-triggers:
+  # TODO(charlie): Move these workflows to use dedicated GitHub environments.
+  secrets-outside-env:
     ignore:
-      - pr-comment.yaml
-  cache-poisoning:
-    ignore:
-      - build-docker.yml
-      - publish-playground.yml
-  excessive-permissions:
-    # it's hard to test what the impact of removing these ignores would be
-    # without actually running the release workflow...
-    ignore:
-      - build-docker.yml
-      - publish-playground.yml
+      - notify-dependents.yml
       - publish-docs.yml
+      - publish-playground.yml
+      - publish-ty-playground.yml
+      - publish-versions.yml
+      - publish-wasm.yml

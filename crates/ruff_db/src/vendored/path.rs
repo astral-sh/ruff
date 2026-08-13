@@ -17,6 +17,10 @@ impl VendoredPath {
         unsafe { &*(path as *const Utf8Path as *const VendoredPath) }
     }
 
+    pub fn file_name(&self) -> Option<&str> {
+        self.0.file_name()
+    }
+
     pub fn to_path_buf(&self) -> VendoredPathBuf {
         VendoredPathBuf(self.0.to_path_buf())
     }
@@ -33,7 +37,7 @@ impl VendoredPath {
         self.0.as_std_path()
     }
 
-    pub fn components(&self) -> Utf8Components {
+    pub fn components(&self) -> Utf8Components<'_> {
         self.0.components()
     }
 
@@ -87,6 +91,12 @@ impl ToOwned for VendoredPath {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct VendoredPathBuf(Utf8PathBuf);
 
+impl get_size2::GetSize for VendoredPathBuf {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (self.0.capacity(), tracker)
+    }
+}
+
 impl Default for VendoredPathBuf {
     fn default() -> Self {
         Self::new()
@@ -105,6 +115,33 @@ impl VendoredPathBuf {
 
     pub fn push(&mut self, component: impl AsRef<VendoredPath>) {
         self.0.push(component.as_ref())
+    }
+}
+
+impl From<&VendoredPath> for Box<VendoredPath> {
+    fn from(path: &VendoredPath) -> Self {
+        Box::from(path.to_path_buf())
+    }
+}
+
+impl From<VendoredPathBuf> for Box<VendoredPath> {
+    fn from(path: VendoredPathBuf) -> Self {
+        let path = Box::into_raw(path.0.into_boxed_path()) as *mut VendoredPath;
+        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
+        // *mut Utf8Path to a *mut VendoredPath is valid.
+        unsafe { Box::from_raw(path) }
+    }
+}
+
+impl Clone for Box<VendoredPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<VendoredPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
     }
 }
 

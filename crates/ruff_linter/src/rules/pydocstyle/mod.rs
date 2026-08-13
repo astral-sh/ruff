@@ -14,7 +14,7 @@ mod tests {
 
     use super::settings::{Convention, Settings};
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::MissingBlankLineAfterLastSection, Path::new("sections.py"))]
     #[test_case(Rule::NoBlankLineAfterSection, Path::new("sections.py"))]
@@ -85,13 +85,21 @@ mod tests {
     #[test_case(Rule::MissingSectionNameColon, Path::new("D.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSection, Path::new("D214_module.py"))]
+    #[test_case(Rule::OverindentedSection, Path::new("sphinx_directive.py"))]
+    #[test_case(Rule::NonCapitalizedSectionName, Path::new("sphinx_directive.py"))]
+    #[test_case(
+        Rule::MissingBlankLineAfterLastSection,
+        Path::new("sphinx_directive.py")
+    )]
     #[test_case(Rule::OverindentedSectionUnderline, Path::new("D215.py"))]
     #[test_case(Rule::MissingSectionUnderlineAfterName, Path::new("sections.py"))]
     #[test_case(Rule::MismatchedSectionUnderlineLength, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSectionUnderline, Path::new("sections.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
+    #[test_case(Rule::OverloadWithDocstring, Path::new("D418.pyi"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
+    #[test_case(Rule::PropertyDocstringStartsWithVerb, Path::new("D421.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -109,7 +117,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -119,7 +127,7 @@ mod tests {
             Path::new("pydocstyle/bom.py"),
             &settings::LinterSettings::for_rule(Rule::TripleSingleQuotes),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -134,7 +142,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -147,7 +155,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -164,7 +172,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -181,7 +189,7 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -198,7 +206,25 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Convention::Numpy, Path::new("D420_numpy.py"))]
+    #[test_case(Convention::Google, Path::new("D420_google.py"))]
+    fn d420(convention: Convention, path: &Path) -> Result<()> {
+        let snapshot = format!("D420_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pydocstyle").join(path).as_path(),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(convention),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::IncorrectSectionOrder)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -211,7 +237,7 @@ mod tests {
                 Rule::MissingTrailingPeriod,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -230,7 +256,7 @@ mod tests {
                 Rule::UndocumentedPublicInit,
             ]),
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

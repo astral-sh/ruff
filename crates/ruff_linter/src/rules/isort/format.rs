@@ -22,6 +22,9 @@ pub(crate) fn format_import(
         output.push_str(comment);
         output.push_str(&stylist.line_ending());
     }
+    if alias.is_lazy {
+        output.push_str("lazy ");
+    }
     if let Some(asname) = alias.asname {
         output.push_str("import ");
         output.push_str(alias.name);
@@ -124,12 +127,16 @@ fn format_single_line(
     }
 
     let module_name = import_from.module_name();
+    if import_from.is_lazy {
+        output.push_str("lazy ");
+        line_width = line_width.add_width(5);
+    }
     output.push_str("from ");
     output.push_str(&module_name);
     output.push_str(" import ");
     line_width = line_width.add_width(5).add_str(&module_name).add_width(8);
 
-    for (index, (AliasData { name, asname }, _)) in aliases.iter().enumerate() {
+    for (index, (AliasData { name, asname, .. }, _)) in aliases.iter().enumerate() {
         if let Some(asname) = asname {
             output.push_str(name);
             output.push_str(" as ");
@@ -205,6 +212,9 @@ fn format_multi_line(
         output.push_str(&stylist.line_ending());
     }
 
+    if import_from.is_lazy {
+        output.push_str("lazy ");
+    }
     output.push_str("from ");
     output.push_str(&import_from.module_name());
     output.push_str(" import ");
@@ -216,7 +226,7 @@ fn format_multi_line(
     }
     output.push_str(&stylist.line_ending());
 
-    for (AliasData { name, asname }, comments) in aliases {
+    for (AliasData { name, asname, .. }, comments) in aliases {
         for comment in &comments.atop {
             output.push_str(stylist.indentation());
             output.push_str(comment);

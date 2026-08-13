@@ -60,7 +60,7 @@ class ClsInArgsClass(ABCMeta):
     def cls_as_kw_only_argument(this, *, cls):
         pass
 
-    def cls_as_varags(this, *cls):
+    def cls_as_varargs(this, *cls):
         pass
 
     def cls_as_kwargs(this, **cls):
@@ -81,3 +81,9 @@ foo = {}
 class Bar(type(foo)):
     def foo_method(self):
         pass
+
+# https://github.com/astral-sh/ruff/issues/18459
+class Example:
+    @classmethod
+    def function(this):
+        cls = 1234

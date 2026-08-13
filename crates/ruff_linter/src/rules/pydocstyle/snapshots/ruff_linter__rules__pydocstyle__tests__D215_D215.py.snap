@@ -1,20 +1,19 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
-D215.py:3:5: D215 [*] Section underline is over-indented ("TODO")
+D215 [*] Section underline is over-indented ("TODO")
+ --> D215.py:3:5
   |
 1 | """
 2 | TODO:
 3 |     -
-  |     ^ D215
+  |     ^
 4 | """
   |
-  = help: Remove over-indentation from "TODO" underline
-
-ℹ Safe fix
-1 1 | """
-2 2 | TODO:
-3   |-    -
-  3 |+
-4 4 | """
+help: Remove over-indentation from "TODO" underline
+  |
+2 | TODO:
+  -     -
+3 +
+4 | """
+  |

@@ -5,9 +5,9 @@
 The type guard removes `None` from the union type:
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: None | Literal[1]):
     if x is not None:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -16,7 +16,33 @@ def _(flag: bool):
     reveal_type(x)  # revealed: None | Literal[1]
 ```
 
+## `None is not x` (reversed operands)
+
+```py
+from typing import Literal
+
+def _(x: None | Literal[1]):
+    if None is not x:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: None
+
+    reveal_type(x)  # revealed: None | Literal[1]
+```
+
+This also works for other singleton types with reversed operands:
+
+```py
+def _(x: bool):
+    if False is not x:
+        reveal_type(x)  # revealed: Literal[True]
+    else:
+        reveal_type(x)  # revealed: Literal[False]
+```
+
 ## `is not` for other singleton types
+
+Boolean literals:
 
 ```py
 def _(flag: bool):
@@ -27,6 +53,38 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Literal[True]
     else:
         reveal_type(x)  # revealed: Literal[False]
+```
+
+Enum literals:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    if answer is not Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+    else:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+
+    reveal_type(answer)  # revealed: Answer
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x is not Single.VALUE:
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: Single
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x is not Answer.NO:
+        reveal_type(x)  # revealed: list[int]
 ```
 
 ## `is not` for non-singleton types
@@ -47,11 +105,9 @@ else:
 ## `is not` for other types
 
 ```py
-def _(flag: bool):
-    class A: ...
-    x = A()
-    y = x if flag else None
+class A: ...
 
+def _(x: A, y: A | None):
     if y is not x:
         reveal_type(y)  # revealed: A | None
     else:
@@ -81,6 +137,18 @@ def _(x_flag: bool, y_flag: bool):
 
         reveal_type(x)  # revealed: bool
         reveal_type(y)  # revealed: bool
+```
+
+## `is not` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+def _(x: None, y: int | None):
+    if x is not y:
+        reveal_type(y)  # revealed: int
+    if y is not x:
+        reveal_type(y)  # revealed: int
 ```
 
 ## Assignment expressions

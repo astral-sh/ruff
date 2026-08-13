@@ -1,9 +1,10 @@
 import asyncio
 import dataclasses
 import json
+from collections.abc import Awaitable
 from enum import Enum
 from pathlib import Path
-from typing import Awaitable, TypeVar
+from typing import TypeVar
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.check import compare_check, markdown_check_result
@@ -95,8 +96,6 @@ async def main(
                     raise ValueError(f"Unknown target Ruff command {command}")
         case _:
             raise ValueError(f"Unknown output format {format}")
-
-    return None
 
 
 async def clone_and_compare(

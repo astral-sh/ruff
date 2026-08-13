@@ -5,12 +5,6 @@ use std::str::FromStr;
 
 use crate::Case;
 
-trait FormatParse {
-    fn parse(text: &str) -> (Option<Self>, &str)
-    where
-        Self: Sized;
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FormatConversion {
     Str,
@@ -19,7 +13,7 @@ pub enum FormatConversion {
     Bytes,
 }
 
-impl FormatParse for FormatConversion {
+impl FormatConversion {
     fn parse(text: &str) -> (Option<Self>, &str) {
         let Some(conversion) = Self::from_string(text) else {
             return (None, text);
@@ -32,7 +26,7 @@ impl FormatParse for FormatConversion {
 }
 
 impl FormatConversion {
-    pub fn from_char(c: char) -> Option<FormatConversion> {
+    fn from_char(c: char) -> Option<FormatConversion> {
         match c {
             's' => Some(FormatConversion::Str),
             'r' => Some(FormatConversion::Repr),
@@ -72,7 +66,7 @@ impl FormatAlign {
     }
 }
 
-impl FormatParse for FormatAlign {
+impl FormatAlign {
     fn parse(text: &str) -> (Option<Self>, &str) {
         let mut chars = text.chars();
         if let Some(maybe_align) = chars.next().and_then(Self::from_char) {
@@ -90,15 +84,16 @@ pub enum FormatSign {
     MinusOrSpace,
 }
 
-impl FormatParse for FormatSign {
+impl FormatSign {
     fn parse(text: &str) -> (Option<Self>, &str) {
         let mut chars = text.chars();
-        match chars.next() {
-            Some('-') => (Some(Self::Minus), chars.as_str()),
-            Some('+') => (Some(Self::Plus), chars.as_str()),
-            Some(' ') => (Some(Self::MinusOrSpace), chars.as_str()),
-            _ => (None, text),
-        }
+        let kind = match chars.next() {
+            Some('-') => Self::Minus,
+            Some('+') => Self::Plus,
+            Some(' ') => Self::MinusOrSpace,
+            Some(_) | None => return (None, text),
+        };
+        (Some(kind), chars.as_str())
     }
 }
 
@@ -108,13 +103,13 @@ pub enum FormatGrouping {
     Underscore,
 }
 
-impl FormatParse for FormatGrouping {
+impl FormatGrouping {
     fn parse(text: &str) -> (Option<Self>, &str) {
         let mut chars = text.chars();
         match chars.next() {
             Some('_') => (Some(Self::Underscore), chars.as_str()),
             Some(',') => (Some(Self::Comma), chars.as_str()),
-            _ => (None, text),
+            Some(_) | None => (None, text),
         }
     }
 }
@@ -157,29 +152,40 @@ impl From<&FormatType> for char {
     }
 }
 
-impl FormatParse for FormatType {
-    fn parse(text: &str) -> (Option<Self>, &str) {
+impl FormatType {
+    /// Attempt to parse the [conversion type] of the f-string.
+    ///
+    /// A conversion type is optional in an f-string.
+    /// If it is present, it is always the last character of the format specifier.
+    ///
+    /// If a valid conversion type was encountered, this function returns `Ok((Some(FormatType), remaining_text))`.
+    /// If an invalid conversion type was encountered, this function returns `Err(invalid_char)`.
+    /// If no conversion type was encountered, this function returns `Ok((None, remaining_text))`.
+    ///
+    /// [conversion type]: https://docs.python.org/3/library/string.html#format-specification-mini-language
+    fn parse(text: &str) -> Result<(Option<Self>, &str), char> {
         let mut chars = text.chars();
-        match chars.next() {
-            Some('s') => (Some(Self::String), chars.as_str()),
-            Some('b') => (Some(Self::Binary), chars.as_str()),
-            Some('c') => (Some(Self::Character), chars.as_str()),
-            Some('d') => (Some(Self::Decimal), chars.as_str()),
-            Some('o') => (Some(Self::Octal), chars.as_str()),
-            Some('n') => (Some(Self::Number(Case::Lower)), chars.as_str()),
-            Some('N') => (Some(Self::Number(Case::Upper)), chars.as_str()),
-            Some('x') => (Some(Self::Hex(Case::Lower)), chars.as_str()),
-            Some('X') => (Some(Self::Hex(Case::Upper)), chars.as_str()),
-            Some('e') => (Some(Self::Exponent(Case::Lower)), chars.as_str()),
-            Some('E') => (Some(Self::Exponent(Case::Upper)), chars.as_str()),
-            Some('f') => (Some(Self::FixedPoint(Case::Lower)), chars.as_str()),
-            Some('F') => (Some(Self::FixedPoint(Case::Upper)), chars.as_str()),
-            Some('g') => (Some(Self::GeneralFormat(Case::Lower)), chars.as_str()),
-            Some('G') => (Some(Self::GeneralFormat(Case::Upper)), chars.as_str()),
-            Some('%') => (Some(Self::Percentage), chars.as_str()),
-            Some(_) => (None, chars.as_str()),
-            _ => (None, text),
-        }
+        let kind = match chars.next() {
+            Some('s') => Self::String,
+            Some('b') => Self::Binary,
+            Some('c') => Self::Character,
+            Some('d') => Self::Decimal,
+            Some('o') => Self::Octal,
+            Some('n') => Self::Number(Case::Lower),
+            Some('N') => Self::Number(Case::Upper),
+            Some('x') => Self::Hex(Case::Lower),
+            Some('X') => Self::Hex(Case::Upper),
+            Some('e') => Self::Exponent(Case::Lower),
+            Some('E') => Self::Exponent(Case::Upper),
+            Some('f') => Self::FixedPoint(Case::Lower),
+            Some('F') => Self::FixedPoint(Case::Upper),
+            Some('g') => Self::GeneralFormat(Case::Lower),
+            Some('G') => Self::GeneralFormat(Case::Upper),
+            Some('%') => Self::Percentage,
+            Some(invalid) => return Err(invalid),
+            None => return Ok((None, text)),
+        };
+        Ok((Some(kind), chars.as_str()))
     }
 }
 
@@ -297,7 +303,7 @@ fn parse_alternate_form(text: &str) -> (bool, &str) {
     let mut chars = text.chars();
     match chars.next() {
         Some('#') => (true, chars.as_str()),
-        _ => (false, text),
+        Some(_) | None => (false, text),
     }
 }
 
@@ -323,7 +329,7 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
                 (None, text)
             }
         }
-        _ => (None, text),
+        Some(_) | None => (None, text),
     })
 }
 
@@ -368,20 +374,13 @@ impl FormatSpec {
         let (grouping_option, text) = FormatGrouping::parse(text);
         let (precision, text) = parse_precision(text)?;
 
-        let (format_type, _text) = if text.is_empty() {
-            (None, text)
-        } else {
-            // If there's any remaining text, we should yield a valid format type and consume it
-            // all.
-            let (format_type, text) = FormatType::parse(text);
-            if format_type.is_none() {
-                return Err(FormatSpecError::InvalidFormatType);
-            }
-            if !text.is_empty() {
-                return Err(FormatSpecError::InvalidFormatSpecifier);
-            }
-            (format_type, text)
-        };
+        // If there's any remaining text, we should yield a valid format type and consume it
+        // all.
+        let (format_type, text) =
+            FormatType::parse(text).map_err(FormatSpecError::InvalidFormatType)?;
+        if !text.is_empty() {
+            return Err(FormatSpecError::InvalidFormatSpecifier);
+        }
 
         if zero && fill.is_none() {
             fill.replace('0');
@@ -407,7 +406,7 @@ pub enum FormatSpecError {
     DecimalDigitsTooMany,
     PrecisionTooBig,
     InvalidFormatSpecifier,
-    InvalidFormatType,
+    InvalidFormatType(char),
     InvalidPlaceholder(FormatParseError),
     PlaceholderRecursionExceeded,
     UnspecifiedFormat(char, char),
@@ -589,14 +588,28 @@ impl FormatString {
         Ok((first_char, chars.as_str()))
     }
 
-    fn parse_literal(text: &str) -> Result<(FormatPart, &str), FormatParseError> {
+    fn parse_literal(text: &str, is_raw: bool) -> Result<(FormatPart, &str), FormatParseError> {
         let mut cur_text = text;
         let mut result_string = String::new();
+        let mut pending_escape = false;
         while !cur_text.is_empty() {
+            // Raw strings: \N{...} is literal, not a Unicode escape
+            if !is_raw
+                && pending_escape
+                && let Some((unicode_string, remaining)) =
+                    FormatString::parse_escaped_unicode_string(cur_text)
+            {
+                result_string.push_str(unicode_string);
+                cur_text = remaining;
+                pending_escape = false;
+                continue;
+            }
+
             match FormatString::parse_literal_single(cur_text) {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
                     cur_text = remaining;
+                    pending_escape = next_char == '\\' && !pending_escape;
                 }
                 Err(err) => {
                     return if result_string.is_empty() {
@@ -678,23 +691,21 @@ impl FormatString {
         }
         Err(FormatParseError::UnmatchedBracket)
     }
-}
 
-pub trait FromTemplate<'a>: Sized {
-    type Err;
-    fn from_str(s: &'a str) -> Result<Self, Self::Err>;
-}
+    fn parse_escaped_unicode_string(text: &str) -> Option<(&str, &str)> {
+        text.strip_prefix("N{")?.find('}').map(|idx| {
+            let end_idx = idx + 3; // 3 for "N{"
+            (&text[..end_idx], &text[end_idx..])
+        })
+    }
 
-impl<'a> FromTemplate<'a> for FormatString {
-    type Err = FormatParseError;
-
-    fn from_str(text: &'a str) -> Result<Self, Self::Err> {
+    fn parse(text: &str, is_raw: bool) -> Result<Self, FormatParseError> {
         let mut cur_text: &str = text;
         let mut parts: Vec<FormatPart> = Vec::new();
         while !cur_text.is_empty() {
             // Try to parse both literals and bracketed format parts until we
             // run out of text
-            cur_text = FormatString::parse_literal(cur_text)
+            cur_text = FormatString::parse_literal(cur_text, is_raw)
                 .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
                 .map(|(part, new_text)| {
                     parts.push(part);
@@ -704,6 +715,24 @@ impl<'a> FromTemplate<'a> for FormatString {
         Ok(FormatString {
             format_parts: parts,
         })
+    }
+}
+
+pub trait FromTemplate<'a>: Sized {
+    type Err;
+    fn from_str(s: &'a str) -> Result<Self, Self::Err>;
+    fn from_raw_str(s: &'a str) -> Result<Self, Self::Err>;
+}
+
+impl<'a> FromTemplate<'a> for FormatString {
+    type Err = FormatParseError;
+
+    fn from_str(text: &'a str) -> Result<Self, Self::Err> {
+        FormatString::parse(text, false)
+    }
+
+    fn from_raw_str(text: &'a str) -> Result<Self, Self::Err> {
+        FormatString::parse(text, true)
     }
 }
 
@@ -939,7 +968,7 @@ mod tests {
         );
         assert_eq!(
             FormatSpec::parse("}"),
-            Err(FormatSpecError::InvalidFormatType)
+            Err(FormatSpecError::InvalidFormatType('}'))
         );
         assert_eq!(
             FormatSpec::parse("{}}"),
@@ -965,7 +994,7 @@ mod tests {
         );
         assert_eq!(
             FormatSpec::parse("z"),
-            Err(FormatSpecError::InvalidFormatType)
+            Err(FormatSpecError::InvalidFormatType('z'))
         );
     }
 
@@ -1019,5 +1048,49 @@ mod tests {
             FieldName::parse("key[0]after"),
             Err(FormatParseError::InvalidCharacterAfterRightBracket)
         );
+    }
+
+    #[test]
+    fn test_format_unicode_escape() {
+        let expected = Ok(FormatString {
+            format_parts: vec![FormatPart::Literal("I am a \\N{snowman}".to_owned())],
+        });
+
+        assert_eq!(FormatString::from_str("I am a \\N{snowman}"), expected);
+    }
+
+    #[test]
+    fn test_format_unicode_escape_with_field() {
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("I am a \\N{snowman}".to_owned()),
+                FormatPart::Field {
+                    field_name: "snowman".to_owned(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        });
+
+        assert_eq!(
+            FormatString::from_str("I am a \\N{snowman}{snowman}"),
+            expected
+        );
+    }
+
+    #[test]
+    fn test_format_multiple_escape_with_field() {
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("I am a \\\\N".to_owned()),
+                FormatPart::Field {
+                    field_name: "snowman".to_owned(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        });
+
+        assert_eq!(FormatString::from_str("I am a \\\\N{snowman}"), expected);
     }
 }

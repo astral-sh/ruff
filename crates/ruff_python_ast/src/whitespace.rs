@@ -1,4 +1,4 @@
-use ruff_python_trivia::{indentation_at_offset, is_python_whitespace, PythonWhitespace};
+use ruff_python_trivia::{PythonWhitespace, indentation_at_offset, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 

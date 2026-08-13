@@ -1,7 +1,6 @@
 use crate::{
     lint::DiagnosticsMap,
-    server::client::Notifier,
-    session::{DocumentQuery, DocumentSnapshot},
+    session::{Client, DocumentQuery, DocumentSnapshot},
 };
 
 use super::LSPResult;
@@ -13,6 +12,9 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMa
             document,
             snapshot.encoding(),
             snapshot.client_settings().show_syntax_errors(),
+            snapshot
+                .resolved_client_capabilities()
+                .diagnostic_related_information,
         )
     } else {
         DiagnosticsMap::default()
@@ -21,11 +23,15 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMa
 
 pub(super) fn publish_diagnostics_for_document(
     snapshot: &DocumentSnapshot,
-    notifier: &Notifier,
+    client: &Client,
 ) -> crate::server::Result<()> {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "diagnostic notifications for distinct document URIs are independent"
+    )]
     for (uri, diagnostics) in generate_diagnostics(snapshot) {
-        notifier
-            .notify::<lsp_types::notification::PublishDiagnostics>(
+        client
+            .send_notification::<lsp_types::PublishDiagnosticsNotification>(
                 lsp_types::PublishDiagnosticsParams {
                     uri,
                     diagnostics,
@@ -40,12 +46,12 @@ pub(super) fn publish_diagnostics_for_document(
 
 pub(super) fn clear_diagnostics_for_document(
     query: &DocumentQuery,
-    notifier: &Notifier,
+    client: &Client,
 ) -> crate::server::Result<()> {
-    notifier
-        .notify::<lsp_types::notification::PublishDiagnostics>(
+    client
+        .send_notification::<lsp_types::PublishDiagnosticsNotification>(
             lsp_types::PublishDiagnosticsParams {
-                uri: query.make_key().into_url(),
+                uri: query.make_key().into_uri(),
                 diagnostics: vec![],
                 version: Some(query.version()),
             },

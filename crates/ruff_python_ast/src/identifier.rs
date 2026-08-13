@@ -13,7 +13,7 @@
 use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use ruff_python_trivia::{is_python_whitespace, Cursor};
+use ruff_python_trivia::{Cursor, is_python_whitespace};
 
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.
@@ -160,14 +160,14 @@ pub(crate) struct IdentifierTokenizer<'a> {
 }
 
 impl<'a> IdentifierTokenizer<'a> {
-    pub(crate) fn new(source: &'a str, range: TextRange) -> Self {
+    fn new(source: &'a str, range: TextRange) -> Self {
         Self {
             cursor: Cursor::new(&source[range]),
             offset: range.start(),
         }
     }
 
-    pub(crate) fn starts_at(offset: TextSize, source: &'a str) -> Self {
+    fn starts_at(offset: TextSize, source: &'a str) -> Self {
         let range = TextRange::new(offset, source.text_len());
         Self::new(source, range)
     }

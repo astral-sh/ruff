@@ -1,10 +1,10 @@
-# The lexer doesn't emit a string token if it's unterminated
+# The lexer emits a string token if it's unterminated
 "a" "b
 "a" "b" "c
 "a" """b
 c""" "d
 
-# For f-strings, the `FStringRanges` won't contain the range for
+# This is also true for
 # unterminated f-strings.
 f"a" f"b
 f"a" f"b" f"c

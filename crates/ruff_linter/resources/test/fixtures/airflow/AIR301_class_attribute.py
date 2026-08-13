@@ -10,7 +10,8 @@ from airflow.datasets import (
 )
 from airflow.datasets.manager import DatasetManager
 from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector
-from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
+from airflow.models.dag import DAG
+from airflow.providers.amazon.aws.auth_manager.aws_auth_manager import AwsAuthManager
 from airflow.providers.apache.beam.hooks import BeamHook, NotAir302HookError
 from airflow.providers.google.cloud.secrets.secret_manager import (
     CloudSecretManagerBackend,
@@ -19,6 +20,7 @@ from airflow.providers.hashicorp.secrets.vault import NotAir302SecretError, Vaul
 from airflow.providers_manager import ProvidersManager
 from airflow.secrets.base_secrets import BaseSecretsBackend
 from airflow.secrets.local_filesystem import LocalFilesystemBackend
+
 
 # airflow.Dataset
 dataset_from_root = DatasetFromRoot()
@@ -56,6 +58,10 @@ hlc.add_input_dataset()
 hlc.add_output_dataset()
 hlc.collected_datasets()
 
+# airflow.models.dag.DAG
+test_dag = DAG(dag_id="test_dag")
+test_dag.create_dagrun()
+
 # airflow.providers.amazon.auth_manager.aws_auth_manager
 aam = AwsAuthManager()
 aam.is_authorized_dataset()
@@ -83,8 +89,7 @@ not_an_error.get_conn_uri()
 
 # airflow.providers_manager
 pm = ProvidersManager()
-pm.initialize_providers_asset_uri_resources()
-pm.dataset_factories
+pm.initialize_providers_dataset_uri_resources()
 pm.dataset_factories
 pm.dataset_uri_handlers
 pm.dataset_to_openlineage_converters
@@ -97,3 +102,15 @@ base_secret_backend.get_connections()
 # airflow.secrets.local_filesystem
 lfb = LocalFilesystemBackend()
 lfb.get_connections()
+
+from airflow.models import DAG
+
+# airflow.DAG
+test_dag = DAG(dag_id="test_dag")
+test_dag.create_dagrun()
+
+from airflow import DAG
+
+# airflow.DAG
+test_dag = DAG(dag_id="test_dag")
+test_dag.create_dagrun()

@@ -10,19 +10,18 @@ use itertools::Itertools;
 use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
-use ruff_python_ast::{str::Quote, AnyStringFlags, StringFlags};
+use ruff_python_ast::{AnyStringFlags, StringFlags, str::Quote};
 use ruff_python_parser::ParseOptions;
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
 use {
-    ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
-    ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
+    ruff_formatter::{FormatOptions, IndentStyle, LineWidth, Printed, write},
+    ruff_python_trivia::{PythonWhitespace, is_python_whitespace, tab_offset},
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
 use super::NormalizedString;
-use crate::preview::is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled;
 use crate::string::StringQuotes;
-use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
+use crate::{DocstringCodeLineWidth, FormatModuleError, prelude::*};
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -168,7 +167,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(normalized.flags(), trim_end, f.context())
+        if needs_chaperone_space(normalized.flags(), trim_end)
             || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
@@ -208,7 +207,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(normalized.flags(), trim_end, f.context()) {
+    if needs_chaperone_space(normalized.flags(), trim_end) {
         space().fmt(f)?;
     }
 
@@ -783,7 +782,7 @@ enum CodeExampleKind<'src> {
     ///
     /// Documentation describing doctests and how they're recognized can be
     /// found as part of the Python standard library:
-    /// https://docs.python.org/3/library/doctest.html.
+    /// <https://docs.python.org/3/library/doctest.html>.
     ///
     /// (You'll likely need to read the [regex matching] used internally by the
     /// doctest module to determine more precisely how it works.)
@@ -1582,11 +1581,11 @@ fn docstring_format_source(
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
     let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
-    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let trivia = TriviaRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
-    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &trivia);
 
-    let ctx = PyFormatContext::new(options, source, comments, parsed.tokens())
+    let ctx = PyFormatContext::new(options, source, comments, &trivia, parsed.tokens())
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [parsed.syntax().format()])?;
     formatted
@@ -1599,36 +1598,28 @@ fn docstring_format_source(
 /// If the last line of the docstring is `content""""` or `content\"""`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This only applies to un-escaped backslashes,
 /// so `content\\"""` doesn't need a space while `content\\\"""` does.
-pub(super) fn needs_chaperone_space(
-    flags: AnyStringFlags,
-    trim_end: &str,
-    context: &PyFormatContext,
-) -> bool {
+pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
     if count_consecutive_chars_from_end(trim_end, '\\') % 2 == 1 {
         // Odd backslash count; chaperone avoids escaping closing quotes
         // `"\ "` -> prevent that this becomes `"\"` which escapes the closing quote.
         return true;
     }
 
-    if is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled(context) {
-        if flags.is_triple_quoted() {
-            if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
-                if count_consecutive_chars_from_end(before_quote, '\\') % 2 == 0 {
-                    // Even backslash count preceding quote;
-                    // ```py
-                    // """a "  """
-                    // """a \\"  """
-                    // ```
-                    // The chaperon is needed or the triple quoted string "ends" with 4 instead of 3 quotes.
-                    return true;
-                }
+    if flags.is_triple_quoted() {
+        if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
+            if count_consecutive_chars_from_end(before_quote, '\\').is_multiple_of(2) {
+                // Even backslash count preceding quote;
+                // ```py
+                // """a "  """
+                // """a \\"  """
+                // ```
+                // The chaperon is needed or the triple quoted string "ends" with 4 instead of 3 quotes.
+                return true;
             }
         }
-
-        false
-    } else {
-        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
+
+    false
 }
 
 fn count_consecutive_chars_from_end(s: &str, target: char) -> usize {
@@ -1702,7 +1693,7 @@ impl Indentation {
         for char in iter {
             if char == '\t' {
                 // Pad to the next multiple of tab_width
-                width += Self::TAB_INDENT_WIDTH - (width.rem_euclid(Self::TAB_INDENT_WIDTH));
+                width += tab_offset(width, Self::TAB_INDENT_WIDTH);
                 len += '\t'.text_len();
             } else if char.is_whitespace() {
                 width += char.len_utf8();
@@ -1729,7 +1720,7 @@ impl Indentation {
             Self::TabSpaces { tabs, spaces } => tabs * Self::TAB_INDENT_WIDTH + spaces,
             Self::SpacesTabs { spaces, tabs } => {
                 let mut indent = spaces;
-                indent += Self::TAB_INDENT_WIDTH - indent.rem_euclid(Self::TAB_INDENT_WIDTH);
+                indent += tab_offset(indent, Self::TAB_INDENT_WIDTH);
                 indent + (tabs - 1) * Self::TAB_INDENT_WIDTH
             }
             Self::Mixed { width, .. } => width,
@@ -1796,7 +1787,7 @@ impl Indentation {
                     }),
 
                     _ => None,
-                }
+                };
             }
             Self::Mixed { .. } => return None,
         };
@@ -1836,8 +1827,7 @@ impl Indentation {
             }
             if char == '\t' {
                 // Pad to the next multiple of tab_width
-                seen_indent_len +=
-                    Self::TAB_INDENT_WIDTH - (seen_indent_len.rem_euclid(Self::TAB_INDENT_WIDTH));
+                seen_indent_len += tab_offset(seen_indent_len, Self::TAB_INDENT_WIDTH);
                 trimmed = &trimmed[1..];
             } else if char.is_whitespace() {
                 seen_indent_len += char.len_utf8();

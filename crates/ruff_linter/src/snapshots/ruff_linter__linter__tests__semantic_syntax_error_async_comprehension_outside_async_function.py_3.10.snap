@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+ --> resources/test/fixtures/semantic_errors/async_comprehension_outside_async_function.py:1:27
+  |
+1 | async def f(): return [[x async for x in foo(n)] for n in range(3)]
+  |                           ^^^^^^^^^^^^^^^^^^^^^
+2 |
+3 | async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+  |

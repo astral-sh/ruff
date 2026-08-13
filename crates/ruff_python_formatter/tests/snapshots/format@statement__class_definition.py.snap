@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/class_definition.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -251,7 +250,7 @@ class Foo4: ...
 
 @decorator
 # comment
-@decorato2
+@decorator2
 class Foo5: ...
 ```
 
@@ -536,6 +535,6 @@ class Foo4: ...
 
 @decorator
 # comment
-@decorato2
+@decorator2
 class Foo5: ...
 ```

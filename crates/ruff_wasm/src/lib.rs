@@ -1,8 +1,10 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message};
+use ruff_db::diagnostic;
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -11,27 +13,30 @@ use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
-use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
+use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
-use ruff_linter::Locator;
+use ruff_linter::{Locator, UnresolvedRuleSelector};
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
-use ruff_python_formatter::{format_module_ast, pretty_comments, PyFormatContext, QuoteStyle};
+use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{parse, parse_unchecked, Mode, ParseOptions, Parsed};
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
+use ruff_python_trivia::TriviaRanges;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
+use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
+use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
-use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    tags: DiagnosticTag[];
+    annotations: DiagnosticAnnotation[];
+    subDiagnostics: SubDiagnostic[];
     start_location: {
         row: number;
         column: number;
@@ -55,15 +60,115 @@ export interface Diagnostic {
         }[];
     } | null;
 }
+
+export type DiagnosticTag = "unnecessary" | "deprecated";
+
+export interface DiagnosticAnnotation {
+    primary: boolean;
+    message: string | null;
+    location: DiagnosticLocation | null;
+}
+
+export interface SubDiagnostic {
+    severity: SubDiagnosticSeverity;
+    message: string;
+    location: DiagnosticLocation | null;
+}
+
+export enum SubDiagnosticSeverity {
+    Help = "help",
+    Info = "info",
+    Warning = "warning",
+    Error = "error",
+    Fatal = "fatal",
+}
+
+export interface DiagnosticLocation {
+    path: string;
+    start_location: {
+        row: number;
+        column: number;
+    };
+    end_location: {
+        row: number;
+        column: number;
+    };
+}
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: Option<String>,
+    pub code: String,
     pub message: String,
+    pub tags: Vec<ExpandedDiagnosticTag>,
+    pub annotations: Vec<ExpandedDiagnosticAnnotation>,
+    #[serde(rename = "subDiagnostics")]
+    pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
     pub start_location: Location,
     pub end_location: Location,
     pub fix: Option<ExpandedFix>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedDiagnosticAnnotation {
+    pub primary: bool,
+    pub message: Option<String>,
+    pub location: Option<ExpandedDiagnosticLocation>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedSubDiagnostic {
+    pub severity: SubDiagnosticSeverity,
+    pub message: String,
+    pub location: Option<ExpandedDiagnosticLocation>,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedDiagnosticLocation {
+    pub path: String,
+    pub start_location: Location,
+    pub end_location: Location,
+}
+
+fn expanded_diagnostic_location(
+    span: &diagnostic::Span,
+    position_encoding: SourcePositionEncoding,
+) -> Option<ExpandedDiagnosticLocation> {
+    let source_file = span.as_ruff_file()?;
+    let source_code = source_file.to_source_code();
+    let range = span.range()?;
+
+    Some(ExpandedDiagnosticLocation {
+        path: source_file.name().to_string(),
+        start_location: source_code
+            .source_location(range.start(), position_encoding)
+            .into(),
+        end_location: source_code
+            .source_location(range.end(), position_encoding)
+            .into(),
+    })
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -79,9 +184,44 @@ struct ExpandedEdit {
     content: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpandedDiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for ExpandedDiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
+}
+
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
+    before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -91,13 +231,44 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// ## Panics
+/// If this function is called more than once.
+#[wasm_bindgen(js_name = "initLogging")]
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("`initLogging` to only be called at most once.");
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
+        }
+    }
 }
 
 #[wasm_bindgen]
 pub struct Workspace {
     settings: Settings,
+    position_encoding: SourcePositionEncoding,
 }
 
 #[wasm_bindgen]
@@ -107,7 +278,8 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -116,7 +288,10 @@ impl Workspace {
             .into_settings(Path::new("."))
             .map_err(into_error)?;
 
-        Ok(Workspace { settings })
+        Ok(Workspace {
+            settings,
+            position_encoding: position_encoding.into(),
+        })
     }
 
     #[wasm_bindgen(js_name = defaultSettings)]
@@ -137,7 +312,15 @@ impl Workspace {
                     allowed_confusables: Some(Vec::default()),
                     dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
                     ignore: Some(Vec::default()),
-                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    select: Some(
+                        DEFAULT_SELECTORS
+                            .iter()
+                            .map(|selector| {
+                                let (prefix, code) = selector.prefix_and_code();
+                                UnresolvedRuleSelector::cli(format!("{prefix}{code}"))
+                            })
+                            .collect(),
+                    ),
                     extend_fixable: Some(Vec::default()),
                     extend_select: Some(Vec::default()),
                     external: Some(Vec::default()),
@@ -160,7 +343,10 @@ impl Workspace {
         let source_type = PySourceType::default();
 
         // TODO(dhruvmanila): Support Jupyter Notebooks
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
 
         // Use the unresolved version because we don't have a file path.
         let target_version = self.settings.linter.unresolved_target_version;
@@ -184,13 +370,20 @@ impl Workspace {
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            directives::Flags::empty(),
+            directives::Flags::from_settings(&self.settings.linter),
             &locator,
             &indexer,
         );
 
+        let suppressions = Suppressions::from_tokens(
+            locator.contents(),
+            parsed.tokens(),
+            &indexer,
+            &self.settings.linter,
+        );
+
         // Generate checks.
-        let messages = check_path(
+        let diagnostics = check_path(
             Path::new("<filename>"),
             None,
             &locator,
@@ -203,44 +396,88 @@ impl Workspace {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
 
         let source_code = locator.to_source_code();
 
-        let messages: Vec<ExpandedMessage> = messages
+        let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|message| match message {
-                Message::Diagnostic(DiagnosticMessage {
-                    kind, range, fix, ..
-                }) => ExpandedMessage {
-                    code: Some(kind.rule().noqa_code().to_string()),
-                    message: kind.body,
-                    start_location: source_code.line_column(range.start()).into(),
-                    end_location: source_code.line_column(range.end()).into(),
-                    fix: fix.map(|fix| ExpandedFix {
-                        message: kind.suggestion,
+            .map(|msg| {
+                let range = msg.range().unwrap_or_default();
+                let annotations = msg
+                    .annotations()
+                    .iter()
+                    .map(|annotation| ExpandedDiagnosticAnnotation {
+                        primary: annotation.is_primary(),
+                        message: annotation.get_message().map(ToOwned::to_owned),
+                        location: expanded_diagnostic_location(
+                            annotation.get_span(),
+                            self.position_encoding,
+                        ),
+                    })
+                    .collect();
+                let sub_diagnostics = msg
+                    .sub_diagnostics()
+                    .iter()
+                    .map(|sub_diagnostic| ExpandedSubDiagnostic {
+                        severity: sub_diagnostic.severity().into(),
+                        message: sub_diagnostic.concise_message().to_string(),
+                        location: sub_diagnostic.primary_span_ref().and_then(|span| {
+                            expanded_diagnostic_location(span, self.position_encoding)
+                        }),
+                    })
+                    .collect();
+
+                let code = if (!is_human_readable_names_enabled(self.settings.linter.preview)
+                    || self.settings.output_prefer_rule_codes)
+                    && let Some(code) = msg.secondary_code()
+                {
+                    code.as_str()
+                } else {
+                    msg.id().as_str()
+                };
+
+                ExpandedMessage {
+                    code: code.to_string(),
+                    message: msg.concise_message().to_string(),
+                    tags: msg
+                        .primary_tags()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(ExpandedDiagnosticTag::from)
+                        .collect(),
+                    annotations,
+                    sub_diagnostics,
+                    start_location: source_code
+                        .source_location(range.start(), self.position_encoding)
+                        .into(),
+                    end_location: source_code
+                        .source_location(range.end(), self.position_encoding)
+                        .into(),
+                    fix: msg.fix().map(|fix| ExpandedFix {
+                        message: msg.first_help_text().map(ToString::to_string),
                         edits: fix
                             .edits()
                             .iter()
                             .map(|edit| ExpandedEdit {
-                                location: source_code.line_column(edit.start()).into(),
-                                end_location: source_code.line_column(edit.end()).into(),
+                                location: source_code
+                                    .source_location(edit.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(edit.end(), self.position_encoding)
+                                    .into(),
                                 content: edit.content().map(ToString::to_string),
                             })
                             .collect(),
                     }),
-                },
-                Message::SyntaxError(_) => ExpandedMessage {
-                    code: None,
-                    message: message.body().to_string(),
-                    start_location: source_code.line_column(message.range().start()).into(),
-                    end_location: source_code.line_column(message.range().end()).into(),
-                    fix: None,
-                },
+                }
             })
             .collect();
 
-        serde_wasm_bindgen::to_value(&messages).map_err(into_error)
+        messages
+            .serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(true))
+            .map_err(into_error)
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
@@ -260,8 +497,8 @@ impl Workspace {
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let comment_ranges = CommentRanges::from(parsed.parsed.tokens());
-        let comments = pretty_comments(parsed.parsed.syntax(), &comment_ranges, contents);
+        let trivia_ranges = TriviaRanges::from(parsed.parsed.tokens());
+        let comments = pretty_comments(parsed.parsed.syntax(), &trivia_ranges, contents);
         Ok(comments)
     }
 
@@ -286,47 +523,65 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 struct ParsedModule<'a> {
     source_code: &'a str,
     parsed: Parsed<Mod>,
-    comment_ranges: CommentRanges,
+    trivia_ranges: TriviaRanges,
 }
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
         let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia_ranges = TriviaRanges::from(parsed.tokens());
         Ok(Self {
             source_code,
             parsed,
-            comment_ranges,
+            trivia_ranges,
         })
     }
 
-    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext>> {
+    fn format(&self, settings: &Settings) -> FormatResult<Formatted<PyFormatContext<'_>>> {
         // TODO(konstin): Add an options for py/pyi to the UI (2/2)
         let options = settings
             .formatter
             .to_format_options(PySourceType::default(), self.source_code, None)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(
-            &self.parsed,
-            &self.comment_ranges,
-            self.source_code,
-            options,
-        )
+        format_module_ast(&self.parsed, &self.trivia_ranges, self.source_code, options)
     }
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Location {
     pub row: OneIndexed,
+    /// The character offset from the start of the line.
+    ///
+    /// The semantic of the offset depends on the [`PositionEncoding`] used when creating
+    /// the [`Workspace`].
     pub column: OneIndexed,
 }
 
-impl From<LineColumn> for Location {
-    fn from(value: LineColumn) -> Self {
+impl From<SourceLocation> for Location {
+    fn from(value: SourceLocation) -> Self {
         Self {
             row: value.line,
-            column: value.column,
+            column: value.character_offset,
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+#[wasm_bindgen]
+pub enum PositionEncoding {
+    #[default]
+    Utf8,
+    Utf16,
+    Utf32,
+}
+
+impl From<PositionEncoding> for SourcePositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::Utf8 => Self::Utf8,
+            PositionEncoding::Utf16 => Self::Utf16,
+            PositionEncoding::Utf32 => Self::Utf32,
         }
     }
 }

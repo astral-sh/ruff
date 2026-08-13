@@ -1,13 +1,21 @@
-use crate::db::tests::TestDb;
-use crate::symbol::{builtins_symbol, known_module_symbol};
+use crate::Db;
+use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
+use crate::types::enums::is_single_member_enum;
+use crate::types::known_instance::KnownInstanceType;
+use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
-    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
+    ApplyTypeMappingVisitor, BoundMethodType, EnumLiteralType, IntersectionBuilder,
+    IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
+    SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, KnownModule};
-use hashbrown::HashSet;
+use crate::{Program, ProgramEnvironment};
+use itertools::Either;
 use quickcheck::{Arbitrary, Gen};
+use ruff_db::files::system_path_to_file;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
+use ty_module_resolver::KnownModule;
+use ty_python_core::ProgramFile;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
@@ -17,6 +25,9 @@ use ruff_python_ast::name::Name;
 pub(crate) enum Ty {
     Never,
     Unknown,
+    Divergent,
+    TopDivergent,
+    BottomDivergent,
     None,
     Any,
     IntLiteral(i64),
@@ -24,6 +35,10 @@ pub(crate) enum Ty {
     StringLiteral(&'static str),
     LiteralString,
     BytesLiteral(&'static str),
+    // An enum literal variant, using `uuid.SafeUUID` as base
+    EnumLiteral(&'static str),
+    // A single-member enum literal, using `dataclasses.MISSING`
+    SingleMemberEnumLiteral,
     // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
     BuiltinInstance(&'static str),
     /// Members of the `abc` stdlib module
@@ -38,7 +53,8 @@ pub(crate) enum Ty {
         pos: Vec<Ty>,
         neg: Vec<Ty>,
     },
-    Tuple(Vec<Ty>),
+    FixedLengthTuple(Vec<Ty>),
+    VariableLengthTuple(Vec<Ty>, Box<Ty>, Vec<Ty>),
     SubclassOfAny,
     SubclassOfBuiltinClass(&'static str),
     SubclassOfAbcClass(&'static str),
@@ -51,8 +67,22 @@ pub(crate) enum Ty {
     },
     Callable {
         params: CallableParams,
-        returns: Option<Box<Ty>>,
+        returns: Box<Ty>,
     },
+    /// `unittest.mock.Mock` is interesting because it is a nominal instance type
+    /// where the class has `Any` in its MRO
+    UnittestMockInstance,
+    UnittestMockLiteral,
+    /// Instances of various `NewType`s that we construct in `setup.rs`.
+    /// `FloatNewType` and `ComplexNewType` are interesting because they are the only
+    /// kinds of `NewType`s that can have unions as their concrete base types.
+    IntNewtypeInstance,
+    StrNewtypeInstance,
+    FloatNewtypeInstance,
+    ComplexNewtypeInstance,
+    SubNewTypeOfIntInstance,
+    SubSubNewTypeOfIntInstance,
+    SubNewTypeOfFloatInstance,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -62,27 +92,65 @@ pub(crate) enum CallableParams {
 }
 
 impl CallableParams {
-    pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
+    fn into_parameters<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Parameters<'db> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(params.into_iter().map(|param| {
-                let mut parameter = match param.kind {
-                    ParamKind::PositionalOnly => Parameter::positional_only(param.name),
-                    ParamKind::PositionalOrKeyword => {
-                        Parameter::positional_or_keyword(param.name.unwrap())
+            CallableParams::List(params) => Parameters::from_annotation(
+                db,
+                params.into_iter().map(|param| {
+                    let parameter = match param.kind {
+                        ParamKind::PositionalOnly => Parameter::positional_only(param.name),
+                        ParamKind::PositionalOrKeyword => {
+                            Parameter::positional_or_keyword(param.name.unwrap())
+                        }
+                        ParamKind::Variadic => Parameter::variadic(param.name.unwrap()),
+                        ParamKind::KeywordOnly => Parameter::keyword_only(param.name.unwrap()),
+                        ParamKind::KeywordVariadic => {
+                            Parameter::keyword_variadic(param.name.unwrap())
+                        }
+                    };
+                    parameter
+                        .with_annotated_type(param.annotated_ty.into_type(db, env))
+                        .with_optional_default_type(param.default_ty.map(|t| t.into_type(db, env)))
+                }),
+            ),
+        }
+    }
+
+    fn shrink(self) -> impl Iterator<Item = Self> {
+        match self {
+            // If the failure does not depend on accepting arbitrary arguments, replace `...`
+            // with the simplest concrete signature: one that accepts no arguments.
+            Self::GradualForm => Either::Left(std::iter::once(Self::List(Vec::new()))),
+            Self::List(params) => {
+                // Removing one parameter at a time preserves the ordering and names of all
+                // remaining parameters, so each candidate is still a valid signature.
+                let removed_parameters = (0..params.len()).map({
+                    let params = params.clone();
+                    move |index| {
+                        let mut shrunk = params.clone();
+                        shrunk.remove(index);
+                        Self::List(shrunk)
                     }
-                    ParamKind::Variadic => Parameter::variadic(param.name.unwrap()),
-                    ParamKind::KeywordOnly => Parameter::keyword_only(param.name.unwrap()),
-                    ParamKind::KeywordVariadic => Parameter::keyword_variadic(param.name.unwrap()),
-                };
-                if let Some(annotated_ty) = param.annotated_ty {
-                    parameter = parameter.with_annotated_type(annotated_ty.into_type(db));
-                }
-                if let Some(default_ty) = param.default_ty {
-                    parameter = parameter.with_default_type(default_ty.into_type(db));
-                }
-                parameter
-            })),
+                });
+
+                // If a parameter cannot be removed without losing the failure, try simplifying its
+                // name, default, or annotation while preserving the rest of the signature.
+                let shrunk_parameters = (0..params.len()).flat_map(move |index| {
+                    let params = params.clone();
+                    params[index].clone().shrink().map(move |parameter| {
+                        let mut shrunk = params.clone();
+                        shrunk[index] = parameter;
+                        Self::List(shrunk)
+                    })
+                });
+
+                Either::Right(removed_parameters.chain(shrunk_parameters))
+            }
         }
     }
 }
@@ -91,8 +159,46 @@ impl CallableParams {
 pub(crate) struct Param {
     kind: ParamKind,
     name: Option<Name>,
-    annotated_ty: Option<Ty>,
+    annotated_ty: Ty,
     default_ty: Option<Ty>,
+}
+
+impl Param {
+    fn shrink(self) -> impl Iterator<Item = Self> {
+        let without_name =
+            (self.kind == ParamKind::PositionalOnly && self.name.is_some()).then(|| Self {
+                name: None,
+                ..self.clone()
+            });
+
+        let shrunk_defaults = self.default_ty.shrink().map({
+            let parameter = self.clone();
+            move |default_ty| Self {
+                default_ty,
+                ..parameter.clone()
+            }
+        });
+
+        let shrunk_annotations = shrink_callable_component(&self.annotated_ty).map({
+            let parameter = self.clone();
+            move |annotated_ty| Self {
+                annotated_ty,
+                ..parameter.clone()
+            }
+        });
+
+        without_name
+            .into_iter()
+            .chain(shrunk_defaults)
+            .chain(shrunk_annotations)
+    }
+}
+
+fn shrink_callable_component(ty: &Ty) -> impl Iterator<Item = Ty> + use<> {
+    let object = Ty::KnownClassInstance(KnownClass::Object);
+    let simplified = (ty != &object).then_some(object);
+
+    simplified.into_iter().chain(ty.shrink())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -104,111 +210,214 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
+    program: Program<'db>,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
+    let env = ProgramEnvironment::from_program(program);
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance(db).unwrap(),
+        builtins_class.to_instance_approximation(db, &env).unwrap(),
     ))
 }
 
 impl Ty {
-    pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
+    pub(crate) fn into_type<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
-            Ty::None => Type::none(db),
+            Ty::Divergent => divergent(db, env, 1, None),
+            Ty::TopDivergent => divergent(db, env, 2, Some(MaterializationKind::Top)),
+            Ty::BottomDivergent => divergent(db, env, 3, Some(MaterializationKind::Bottom)),
+            Ty::None => Type::none(db, env),
             Ty::Any => Type::any(),
-            Ty::IntLiteral(n) => Type::IntLiteral(n),
+            Ty::IntLiteral(n) => Type::int_literal(n),
             Ty::StringLiteral(s) => Type::string_literal(db, s),
-            Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
-            Ty::LiteralString => Type::LiteralString,
+            Ty::BooleanLiteral(b) => Type::bool_literal(b),
+            Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
-                .symbol
+            Ty::EnumLiteral(name) => {
+                let enum_class = known_module_symbol(db, env, KnownModule::Uuid, "SafeUUID")
+                    .place
+                    .expect_type()
+                    .expect_class_literal()
+                    .into_enum_class(db)
+                    .expect("`uuid.SafeUUID` is an enum");
+                Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
+            }
+            Ty::SingleMemberEnumLiteral => {
+                let ty = known_module_symbol(db, env, KnownModule::Dataclasses, "MISSING")
+                    .place
+                    .expect_type();
+                debug_assert!(
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db, env)))
+                );
+                ty
+            }
+            Ty::BuiltinInstance(s) => builtins_symbol(db, env, s)
+                .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db, env)
                 .unwrap(),
-            Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .symbol
+            Ty::AbcInstance(s) => known_module_symbol(db, env, KnownModule::Abc, s)
+                .place
                 .expect_type()
-                .to_instance(db)
+                .to_instance_approximation(db, env)
                 .unwrap(),
-            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
-                .symbol
+            Ty::AbcClassLiteral(s) => known_module_symbol(db, env, KnownModule::Abc, s)
+                .place
                 .expect_type(),
-            Ty::TypingLiteral => Type::KnownInstance(KnownInstanceType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).symbol.expect_type(),
-            Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
+            Ty::UnittestMockLiteral => {
+                known_module_symbol(db, env, KnownModule::UnittestMock, "Mock")
+                    .place
+                    .expect_type()
+            }
+            Ty::UnittestMockInstance => Ty::UnittestMockLiteral
+                .into_type(db, env)
+                .to_instance_approximation(db, env)
+                .unwrap(),
+            Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
+            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, env, s).place.expect_type(),
+            Ty::KnownClassInstance(known_class) => known_class.to_instance(db, env),
             Ty::Union(tys) => {
-                UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
+                UnionType::from_elements(db, env, tys.into_iter().map(|ty| ty.into_type(db, env)))
             }
             Ty::Intersection { pos, neg } => {
-                let mut builder = IntersectionBuilder::new(db);
+                let mut builder = IntersectionBuilder::new(db, env);
                 for p in pos {
-                    builder = builder.add_positive(p.into_type(db));
+                    builder.add_positive_in_place(p.into_type(db, env));
                 }
                 for n in neg {
-                    builder = builder.add_negative(n.into_type(db));
+                    builder.add_negative_in_place(n.into_type(db, env));
                 }
                 builder.build()
             }
-            Ty::Tuple(tys) => {
-                let elements = tys.into_iter().map(|ty| ty.into_type(db));
-                TupleType::from_elements(db, elements)
+            Ty::FixedLengthTuple(tys) => {
+                let elements = tys.into_iter().map(|ty| ty.into_type(db, env));
+                Type::heterogeneous_tuple(db, env, elements)
+            }
+            Ty::VariableLengthTuple(prefix, variable, suffix) => {
+                let prefix = prefix.into_iter().map(|ty| ty.into_type(db, env));
+                let variable = variable.into_type(db, env);
+                let suffix = suffix.into_iter().map(|ty| ty.into_type(db, env));
+                Type::tuple(TupleType::mixed(db, env, prefix, variable, suffix))
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
-                builtins_symbol(db, s)
-                    .symbol
+                env,
+                builtins_symbol(db, env, s)
+                    .place
                     .expect_type()
                     .expect_class_literal()
                     .default_specialization(db),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
-                known_module_symbol(db, KnownModule::Abc, s)
-                    .symbol
+                env,
+                known_module_symbol(db, env, KnownModule::Abc, s)
+                    .place
                     .expect_type()
                     .expect_class_literal()
                     .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).symbol.expect_type(),
+            Ty::BuiltinsFunction(name) => builtins_symbol(db, env, name).place.expect_type(),
             Ty::BuiltinsBoundMethod { class, method } => {
-                let builtins_class = builtins_symbol(db, class).symbol.expect_type();
-                let function = builtins_class.member(db, method).symbol.expect_type();
+                let builtins_class = builtins_symbol(db, env, class).place.expect_type();
+                let function = builtins_class.member(db, env, method).place.expect_type();
 
-                create_bound_method(db, function, builtins_class)
+                create_bound_method(db, env.program(db), function, builtins_class)
             }
-            Ty::Callable { params, returns } => Type::Callable(CallableType::single(
+            Ty::Callable { params, returns } => Type::single_callable(
                 db,
-                Signature::new(
-                    params.into_parameters(db),
-                    returns.map(|ty| ty.into_type(db)),
-                ),
-            )),
+                Signature::new(params.into_parameters(db, env), returns.into_type(db, env)),
+            ),
+            Ty::FloatNewtypeInstance => newtype_instance(db, env, "NewTypeOfFloat"),
+            Ty::IntNewtypeInstance => newtype_instance(db, env, "NewTypeOfInt"),
+            Ty::StrNewtypeInstance => newtype_instance(db, env, "NewTypeOfStr"),
+            Ty::ComplexNewtypeInstance => newtype_instance(db, env, "NewTypeOfComplex"),
+            Ty::SubNewTypeOfIntInstance => newtype_instance(db, env, "SubNewTypeOfInt"),
+            Ty::SubSubNewTypeOfIntInstance => newtype_instance(db, env, "SubSubNewTypeOfInt"),
+            Ty::SubNewTypeOfFloatInstance => newtype_instance(db, env, "SubNewTypeOfFloat"),
         }
     }
 }
 
-fn arbitrary_core_type(g: &mut Gen) -> Ty {
+fn divergent<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    id_bits: u64,
+    materialization: Option<MaterializationKind>,
+) -> Type<'db> {
+    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+
+    match materialization {
+        Some(materialization_kind) => {
+            divergent.materialize(db, materialization_kind, &ApplyTypeMappingVisitor::new(env))
+        }
+        None => divergent,
+    }
+}
+
+fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) -> Type<'db> {
+    let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
+        .expect("Property-test module must exist");
+    let file = ProgramFile::new(db, file, env.program(db));
+    let Place::Defined(DefinedPlace { ty, .. }) = global_symbol(db, file, name).place else {
+        panic!(
+            "Expected a global symbol for `{name}` in the property test module, but it was not found"
+        );
+    };
+    match ty {
+        Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Type::NewTypeInstance(newtype),
+        _ => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FullyStaticTy(Ty);
+
+impl FullyStaticTy {
+    pub(crate) fn into_type<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.0.into_type(db, env)
+    }
+}
+
+fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     // We could select a random integer here, but this would make it much less
     // likely to explore interesting edge cases:
     let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
-    g.choose(&[
-        Ty::Never,
-        Ty::Unknown,
-        Ty::None,
+
+    // Update this if new non-fully-static types are added below.
+    let fully_static_index = 8;
+    let types = &[
         Ty::Any,
+        Ty::Unknown,
+        Ty::Divergent,
+        Ty::TopDivergent,
+        Ty::BottomDivergent,
+        Ty::SubclassOfAny,
+        Ty::UnittestMockLiteral,
+        Ty::UnittestMockInstance,
+        // Add fully static types below, dynamic types above.
+        // Update `fully_static_index` above if adding new dynamic types!
+        Ty::Never,
+        Ty::None,
         int_lit,
         bool_lit,
         Ty::StringLiteral(""),
@@ -216,9 +425,15 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::LiteralString,
         Ty::BytesLiteral(""),
         Ty::BytesLiteral("\x00"),
+        Ty::EnumLiteral("safe"),
+        Ty::EnumLiteral("unsafe"),
+        Ty::EnumLiteral("unknown"),
+        Ty::SingleMemberEnumLiteral,
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
+        Ty::KnownClassInstance(KnownClass::Float),
+        Ty::KnownClassInstance(KnownClass::Complex),
         Ty::KnownClassInstance(KnownClass::Bool),
         Ty::KnownClassInstance(KnownClass::FunctionType),
         Ty::KnownClassInstance(KnownClass::SpecialForm),
@@ -233,7 +448,6 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
         Ty::BuiltinInstance("type"),
         Ty::AbcInstance("ABC"),
         Ty::AbcInstance("ABCMeta"),
-        Ty::SubclassOfAny,
         Ty::SubclassOfBuiltinClass("object"),
         Ty::SubclassOfBuiltinClass("str"),
         Ty::SubclassOfBuiltinClass("type"),
@@ -253,9 +467,20 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
             class: "int",
             method: "bit_length",
         },
-    ])
-    .unwrap()
-    .clone()
+        Ty::IntNewtypeInstance,
+        Ty::StrNewtypeInstance,
+        Ty::FloatNewtypeInstance,
+        Ty::ComplexNewtypeInstance,
+        Ty::SubNewTypeOfIntInstance,
+        Ty::SubSubNewTypeOfIntInstance,
+        Ty::SubNewTypeOfFloatInstance,
+    ];
+    let types = if fully_static {
+        &types[fully_static_index..]
+    } else {
+        types
+    };
+    g.choose(types).unwrap().clone()
 }
 
 /// Constructs an arbitrary type.
@@ -263,46 +488,56 @@ fn arbitrary_core_type(g: &mut Gen) -> Ty {
 /// The `size` parameter controls the depth of the type tree. For example,
 /// a simple type like `int` has a size of 0, `Union[int, str]` has a size
 /// of 1, `tuple[int, Union[str, bytes]]` has a size of 2, etc.
-fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
+///
+/// The `fully_static` parameter, if `true`, limits generation to fully static types.
+fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
     if size == 0 {
-        arbitrary_core_type(g)
+        arbitrary_core_type(g, fully_static)
     } else {
-        match u32::arbitrary(g) % 5 {
-            0 => arbitrary_core_type(g),
+        match u32::arbitrary(g) % 6 {
+            0 => arbitrary_core_type(g, fully_static),
             1 => Ty::Union(
                 (0..*g.choose(&[2, 3]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
-            2 => Ty::Tuple(
+            2 => Ty::FixedLengthTuple(
                 (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
-            3 => Ty::Intersection {
+            3 => Ty::VariableLengthTuple(
+                (0..*g.choose(&[0, 1, 2]).unwrap())
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
+                    .collect(),
+                Box::new(arbitrary_type(g, size - 1, fully_static)),
+                (0..*g.choose(&[0, 1, 2]).unwrap())
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
+                    .collect(),
+            ),
+            4 => Ty::Intersection {
                 pos: (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
                 neg: (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1))
+                    .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             },
-            4 => Ty::Callable {
+            5 => Ty::Callable {
                 params: match u32::arbitrary(g) % 2 {
-                    0 => CallableParams::GradualForm,
-                    1 => CallableParams::List(arbitrary_parameter_list(g, size)),
-                    _ => unreachable!(),
+                    0 if !fully_static => CallableParams::GradualForm,
+                    _ => CallableParams::List(arbitrary_parameter_list(g, size, fully_static)),
                 },
-                returns: arbitrary_optional_type(g, size - 1).map(Box::new),
+                returns: Box::new(arbitrary_type(g, size - 1, fully_static)),
             },
             _ => unreachable!(),
         }
     }
 }
 
-fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
+fn arbitrary_parameter_list(g: &mut Gen, size: u32, fully_static: bool) -> Vec<Param> {
     let mut params: Vec<Param> = vec![];
-    let mut used_names = HashSet::new();
+    let mut used_names = FxHashSet::default();
 
     // First, choose the number of parameters to generate.
     for _ in 0..*g.choose(&[0, 1, 2, 3, 4, 5]).unwrap() {
@@ -352,11 +587,11 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
         params.push(Param {
             kind: next_kind,
             name,
-            annotated_ty: arbitrary_optional_type(g, size),
+            annotated_ty: arbitrary_type(g, size, fully_static),
             default_ty: if matches!(next_kind, ParamKind::Variadic | ParamKind::KeywordVariadic) {
                 None
             } else {
-                arbitrary_optional_type(g, size)
+                arbitrary_optional_type(g, size, fully_static)
             },
         });
     }
@@ -364,12 +599,8 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
     params
 }
 
-fn arbitrary_optional_type(g: &mut Gen, size: u32) -> Option<Ty> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_type(g, size)),
-        _ => unreachable!(),
-    }
+fn arbitrary_optional_type(g: &mut Gen, size: u32, fully_static: bool) -> Option<Ty> {
+    bool::arbitrary(g).then(|| arbitrary_type(g, size, fully_static))
 }
 
 fn arbitrary_name(g: &mut Gen) -> Name {
@@ -377,17 +608,13 @@ fn arbitrary_name(g: &mut Gen) -> Name {
 }
 
 fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
-    match u32::arbitrary(g) % 2 {
-        0 => None,
-        1 => Some(arbitrary_name(g)),
-        _ => unreachable!(),
-    }
+    bool::arbitrary(g).then(|| arbitrary_name(g))
 }
 
 impl Arbitrary for Ty {
     fn arbitrary(g: &mut Gen) -> Ty {
         const MAX_SIZE: u32 = 2;
-        arbitrary_type(g, MAX_SIZE)
+        arbitrary_type(g, MAX_SIZE, false)
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
@@ -397,11 +624,34 @@ impl Arbitrary for Ty {
                 1 => Some(elts.into_iter().next().unwrap()),
                 _ => Some(Ty::Union(elts)),
             })),
-            Ty::Tuple(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
-                0 => None,
-                1 => Some(elts.into_iter().next().unwrap()),
-                _ => Some(Ty::Tuple(elts)),
-            })),
+            Ty::FixedLengthTuple(types) => {
+                Box::new(types.shrink().filter_map(|elts| match elts.len() {
+                    0 => None,
+                    1 => Some(elts.into_iter().next().unwrap()),
+                    _ => Some(Ty::FixedLengthTuple(elts)),
+                }))
+            }
+            Ty::VariableLengthTuple(prefix, variable, suffix) => {
+                // We shrink the suffix first, then the prefix, then the variable-length type.
+                let suffix_shrunk = suffix.shrink().map({
+                    let prefix = prefix.clone();
+                    let variable = variable.clone();
+                    move |suffix| Ty::VariableLengthTuple(prefix.clone(), variable.clone(), suffix)
+                });
+                let prefix_shrunk = prefix.shrink().map({
+                    let variable = variable.clone();
+                    let suffix = suffix.clone();
+                    move |prefix| Ty::VariableLengthTuple(prefix, variable.clone(), suffix.clone())
+                });
+                let variable_shrunk = variable.shrink().map({
+                    let prefix = prefix.clone();
+                    let suffix = suffix.clone();
+                    move |variable| {
+                        Ty::VariableLengthTuple(prefix.clone(), variable, suffix.clone())
+                    }
+                });
+                Box::new(suffix_shrunk.chain(prefix_shrunk).chain(variable_shrunk))
+            }
             Ty::Intersection { pos, neg } => {
                 // Shrinking on intersections is not exhaustive!
                 //
@@ -446,22 +696,123 @@ impl Arbitrary for Ty {
                         }),
                 )
             }
+            Ty::Callable { params, returns } => {
+                let shrunk_parameters = params.clone().shrink().map({
+                    let returns = returns.clone();
+                    move |params| Ty::Callable {
+                        params,
+                        returns: returns.clone(),
+                    }
+                });
+
+                let shrunk_return_type =
+                    shrink_callable_component(&returns).map(move |returns| Ty::Callable {
+                        params: params.clone(),
+                        returns: Box::new(returns),
+                    });
+
+                Box::new(shrunk_parameters.chain(shrunk_return_type))
+            }
             _ => Box::new(std::iter::empty()),
         }
     }
 }
 
-pub(crate) fn intersection<'db>(
-    db: &'db TestDb,
-    tys: impl IntoIterator<Item = Type<'db>>,
-) -> Type<'db> {
-    let mut builder = IntersectionBuilder::new(db);
-    for ty in tys {
-        builder = builder.add_positive(ty);
+impl Arbitrary for FullyStaticTy {
+    fn arbitrary(g: &mut Gen) -> FullyStaticTy {
+        const MAX_SIZE: u32 = 2;
+        FullyStaticTy(arbitrary_type(g, MAX_SIZE, true))
     }
-    builder.build()
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(self.0.shrink().map(FullyStaticTy))
+    }
 }
 
-pub(crate) fn union<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type<'db> {
-    UnionType::from_elements(db, tys)
+pub(crate) fn intersection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    tys: impl IntoIterator<Item = Type<'db>>,
+) -> Type<'db> {
+    IntersectionType::from_elements(db, env, tys)
+}
+
+pub(crate) fn union<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    tys: impl IntoIterator<Item = Type<'db>>,
+) -> Type<'db> {
+    UnionType::from_elements(db, env, tys)
+}
+
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum CallableShrink {
+        Parameter,
+        ParameterName,
+        ParameterDefault,
+        ParameterAnnotation,
+        ReturnType,
+    }
+
+    // Test each independently removable signature detail separately so a failure identifies the
+    // exact shrink candidate that is missing.
+    #[test_case(CallableShrink::Parameter; "removes a parameter")]
+    #[test_case(CallableShrink::ParameterName; "removes a positional only parameter name")]
+    #[test_case(CallableShrink::ParameterDefault; "removes a parameter default")]
+    #[test_case(CallableShrink::ParameterAnnotation; "simplifies a parameter annotation")]
+    #[test_case(CallableShrink::ReturnType; "simplifies the return type")]
+    fn callable_shrinks_parameters_and_return_type(shrink: CallableShrink) {
+        let parameter = Param {
+            kind: ParamKind::PositionalOnly,
+            name: Some(Name::new_static("argument")),
+            annotated_ty: Ty::Union(vec![Ty::KnownClassInstance(KnownClass::Int), Ty::None]),
+            default_ty: Some(Ty::IntLiteral(1)),
+        };
+        let callable = Ty::Callable {
+            params: CallableParams::List(vec![parameter.clone()]),
+            returns: Box::new(Ty::FixedLengthTuple(vec![])),
+        };
+
+        let mut expected_parameters = vec![parameter];
+        let mut expected_return = Ty::FixedLengthTuple(vec![]);
+        match shrink {
+            CallableShrink::Parameter => expected_parameters.clear(),
+            CallableShrink::ParameterName => expected_parameters[0].name = None,
+            CallableShrink::ParameterDefault => expected_parameters[0].default_ty = None,
+            CallableShrink::ParameterAnnotation => {
+                expected_parameters[0].annotated_ty = Ty::KnownClassInstance(KnownClass::Object);
+            }
+            CallableShrink::ReturnType => {
+                expected_return = Ty::KnownClassInstance(KnownClass::Object);
+            }
+        }
+
+        let expected = Ty::Callable {
+            params: CallableParams::List(expected_parameters),
+            returns: Box::new(expected_return),
+        };
+        assert!(callable.shrink().any(|candidate| candidate == expected));
+    }
+
+    // A gradual `...` parameter list can become an empty concrete signature when accepting
+    // arbitrary arguments is not essential to the failing property.
+    #[test]
+    fn gradual_callable_shrinks_to_empty_parameter_list() {
+        let callable = Ty::Callable {
+            params: CallableParams::GradualForm,
+            returns: Box::new(Ty::KnownClassInstance(KnownClass::Object)),
+        };
+
+        assert_eq!(
+            callable.shrink().collect::<Vec<_>>(),
+            vec![Ty::Callable {
+                params: CallableParams::List(vec![]),
+                returns: Box::new(Ty::KnownClassInstance(KnownClass::Object)),
+            }]
+        );
+    }
 }

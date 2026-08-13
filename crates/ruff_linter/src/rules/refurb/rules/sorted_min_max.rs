@@ -1,13 +1,13 @@
-use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::Edit;
-use ruff_diagnostics::Fix;
-use ruff_diagnostics::FixAvailability;
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::Edit;
+use crate::Fix;
+use crate::FixAvailability;
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -42,12 +42,18 @@ use crate::checkers::ast::Checker;
 /// the same key. However, `min(data, key=itemgetter(0))` will return the _first_
 /// "minimum" element in the list in the same scenario.
 ///
-/// As such, this rule's fix is marked as unsafe when the `reverse` keyword is used.
+/// The fix also changes which exception is raised for an empty sequence:
+/// `sorted([])[0]` raises `IndexError`, but `min([])` and `max([])` raise
+/// `ValueError`. Code that catches one specific exception type will need to
+/// be updated after the fix is applied.
+///
+/// As such, this rule's fix is marked as unsafe.
 ///
 /// ## References
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.16.0")]
 pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }
@@ -178,30 +184,27 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
         (Index::Last, true) => MinMax::Min,
     };
 
-    let mut diagnostic = Diagnostic::new(SortedMinMax { min_max }, subscript.range());
+    let mut diagnostic = checker.report_diagnostic(SortedMinMax { min_max }, subscript.range());
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
+            // Preserve any parentheses around the argument. Some expressions are
+            // only valid as a call argument when parenthesized (e.g., `yield`),
+            // so slicing the bare node would produce invalid syntax.
+            let list_expr = checker.locator().slice(
+                parenthesized_range(list_expr.into(), arguments.into(), checker.tokens())
+                    .unwrap_or(list_expr.range()),
+            );
             let replacement = if let Some(key) = key_keyword_expr {
-                format!(
-                    "{min_max}({}, {})",
-                    checker.locator().slice(list_expr),
-                    checker.locator().slice(key),
-                )
+                format!("{min_max}({list_expr}, {})", checker.locator().slice(key))
             } else {
-                format!("{min_max}({})", checker.locator().slice(list_expr))
+                format!("{min_max}({list_expr})")
             };
 
             let replacement = Edit::range_replacement(replacement, subscript.range());
-            if is_reversed {
-                Fix::unsafe_edit(replacement)
-            } else {
-                Fix::safe_edit(replacement)
-            }
+            Fix::unsafe_edit(replacement)
         });
     }
-
-    checker.report_diagnostic(diagnostic);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

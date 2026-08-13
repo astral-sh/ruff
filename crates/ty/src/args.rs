@@ -1,22 +1,34 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
-use ty_project::combine::Combine;
-use ty_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ruff_ranged_value::{RangedValue, ValueSource};
+use ty_combine::Combine;
+use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
+use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_python_semantic::lint;
+use ty_static::EnvVars;
+
+// Configures Clap v3-style help menu colors
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
 
 #[derive(Debug, Parser)]
 #[command(author, name = "ty", about = "An extremely fast Python type checker.")]
 #[command(long_version = crate::version::version())]
+#[command(styles = STYLES)]
 pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub(crate) enum Command {
     /// Check a project for type errors.
@@ -26,14 +38,29 @@ pub(crate) enum Command {
     Server,
 
     /// Display ty's version
-    Version,
+    Version {
+        #[arg(
+            long,
+            value_enum,
+            default_value = "text",
+            help = "The format in which to display the version information"
+        )]
+        output_format: HelpFormat,
+    },
 
     /// Generate shell completion
     #[clap(hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
+
+    /// Explain rules and other parts of ty
+    Explain {
+        #[command(subcommand)]
+        command: ExplainCommand,
+    },
 }
 
 #[derive(Debug, Parser)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct CheckCommand {
     /// List of files or directories to check.
     #[clap(
@@ -41,6 +68,14 @@ pub(crate) struct CheckCommand {
         value_name = "PATH"
     )]
     pub paths: Vec<SystemPathBuf>,
+
+    /// Apply fixes to resolve errors.
+    #[arg(long)]
+    pub(crate) fix: bool,
+
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long, conflicts_with("fix"))]
+    pub(crate) add_ignore: bool,
 
     /// Run the command within the given project directory.
     ///
@@ -51,43 +86,49 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
-    /// Path to the Python environment.
+    /// Path to your project's Python environment or interpreter.
     ///
-    /// ty uses the Python environment to resolve type information and third-party dependencies.
+    /// ty uses your Python environment to resolve third-party imports in your code.
     ///
-    /// If not specified, ty will attempt to infer it from the `VIRTUAL_ENV` environment variable or
-    /// discover a `.venv` directory in the project root or working directory.
+    /// This can be a path to:
     ///
-    /// If a path to a Python interpreter is provided, e.g., `.venv/bin/python3`, ty will attempt to
-    /// find an environment two directories up from the interpreter's path, e.g., `.venv`. At this
-    /// time, ty does not invoke the interpreter to determine the location of the environment. This
-    /// means that ty will not resolve dynamic executables such as a shim.
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A virtual environment directory, e.g. `.venv`
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
     ///
-    /// ty will search in the resolved environments's `site-packages` directories for type
-    /// information and third-party imports.
-    #[arg(long, value_name = "PATH")]
-    pub(crate) python: Option<SystemPathBuf>,
+    /// If you're using a project management tool such as uv or you have an activated Conda or virtual
+    /// environment, you should not generally need to specify this option.
+    ///
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
+    #[arg(long, value_name = "PATH", alias = "venv")]
+    python: Option<SystemPathBuf>,
 
     /// Custom directory to use for stdlib typeshed stubs.
     #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
-    pub(crate) typeshed: Option<SystemPathBuf>,
+    typeshed: Option<SystemPathBuf>,
 
     /// Additional path to use as a module-resolution source (can be passed multiple times).
+    ///
+    /// This is an advanced option that should usually only be used for first-party or third-party
+    /// modules that are not installed into your Python environment in a conventional way.
+    /// Use `--python` to point ty to your Python environment if it is in an unusual location.
     #[arg(long, value_name = "PATH")]
-    pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
+    extra_search_path: Option<Vec<SystemPathBuf>>,
 
     /// Python version to assume when resolving types.
     ///
     /// The Python version affects allowed syntax, type definitions of the standard library, and
     /// type definitions of first- and third-party modules that are conditional on the Python version.
     ///
-    /// By default, the Python version is inferred as the lower bound of the project's
-    /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
-    /// stable version supported by ty is used, which is currently 3.13.
-    ///
-    /// ty will not infer the Python version from the Python environment at this time.
-    #[arg(long, value_name = "VERSION", alias = "target-version")]
-    pub(crate) python_version: Option<PythonVersion>,
+    /// If a version is not specified on the command line or in a configuration file,
+    /// ty will try the following techniques in order of preference to determine a value:
+    /// 1. Check for the `project.requires-python` setting in a `pyproject.toml` file
+    ///    and use the minimum version from the specified range
+    /// 2. Check for an activated or configured Python environment
+    ///    and attempt to infer the Python version of that environment
+    /// 3. Fall back to the latest stable Python version supported by ty (see `ty check --help` output)
+    #[arg(long, value_name = "VERSION", alias = "target-version", value_enum)]
+    python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
     ///
@@ -96,39 +137,51 @@ pub(crate) struct CheckCommand {
     /// assumptions are made about the target platform. If unspecified, the current system's
     /// platform will be used.
     #[arg(long, value_name = "PLATFORM", alias = "platform")]
-    pub(crate) python_platform: Option<String>,
+    python_platform: Option<String>,
 
     #[clap(flatten)]
     pub(crate) verbosity: Verbosity,
 
     #[clap(flatten)]
-    pub(crate) rules: RulesArg,
+    rules: RulesArg,
 
     #[clap(flatten)]
-    pub(crate) config: ConfigsArg,
+    config: ConfigsArg,
+
+    /// The path to a `ty.toml` file to use for configuration.
+    ///
+    /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
+    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
+    pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
-    #[arg(long)]
-    pub(crate) output_format: Option<OutputFormat>,
-
-    /// Control when colored output is used.
-    #[arg(long, value_name = "WHEN")]
-    pub(crate) color: Option<TerminalColor>,
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
+    output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--exit-zero` or `--exit-zero-on-warning`.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
-    pub(crate) error_on_warning: Option<bool>,
+    error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--error-on-warning`.
     #[arg(long)]
     pub(crate) exit_zero: bool,
+
+    /// Use exit code 0 if there are no error-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--error-on-warning`.
+    #[arg(long, conflicts_with = "error_on_warning")]
+    exit_zero_on_warning: bool,
 
     /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
+    /// Use `--no-respect-ignore-files` to disable.
     #[arg(
         long,
         overrides_with("no_respect_ignore_files"),
@@ -139,9 +192,59 @@ pub(crate) struct CheckCommand {
     respect_ignore_files: Option<bool>,
     #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
     no_respect_ignore_files: bool,
+
+    /// Enforce exclusions, even for paths passed to ty directly on the command-line.
+    /// Use `--no-force-exclude` to disable.
+    #[arg(
+        long,
+        overrides_with("no_force_exclude"),
+        help_heading = "File selection"
+    )]
+    force_exclude: bool,
+    #[clap(long, overrides_with("force_exclude"), hide = true)]
+    no_force_exclude: bool,
+
+    /// Exclude files containing PEP 723 inline script metadata unless passed explicitly.
+    /// Use `--include-scripts` to disable.
+    #[arg(
+        long,
+        overrides_with("include_scripts"),
+        help_heading = "File selection",
+        default_missing_value = "true",
+        num_args = 0..1
+    )]
+    exclude_scripts: Option<bool>,
+    #[clap(long, overrides_with("exclude_scripts"), hide = true)]
+    include_scripts: bool,
+
+    /// Glob patterns for files to exclude from type checking.
+    ///
+    /// Uses gitignore-style syntax to exclude files and directories from type checking.
+    /// Supports patterns like `tests/`, `*.tmp`, `**/__pycache__/**`.
+    #[arg(long, help_heading = "File selection")]
+    exclude: Option<Vec<String>>,
+
+    /// Control when colored output is used.
+    #[arg(
+        long,
+        value_name = "WHEN",
+        help_heading = "Global options",
+        display_order = 1000
+    )]
+    pub(crate) color: Option<TerminalColor>,
+
+    /// Hide all progress outputs.
+    ///
+    /// For example, spinners or progress bars.
+    #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
+    pub no_progress: bool,
 }
 
 impl CheckCommand {
+    pub(crate) fn force_exclude(&self) -> bool {
+        resolve_bool_arg(self.force_exclude, self.no_force_exclude).unwrap_or_default()
+    }
+
     pub(crate) fn into_options(self) -> Options {
         let rules = if self.rules.is_empty() {
             None
@@ -161,11 +264,17 @@ impl CheckCommand {
             .no_respect_ignore_files
             .then_some(false)
             .or(self.respect_ignore_files);
+        let exclude_scripts = self
+            .include_scripts
+            .then_some(false)
+            .or(self.exclude_scripts);
+        let error_on_warning = self
+            .exit_zero_on_warning
+            .then_some(false)
+            .or(self.error_on_warning);
         let options = Options {
             environment: Some(EnvironmentOptions {
-                python_version: self
-                    .python_version
-                    .map(|version| RangedValue::cli(version.into())),
+                python_version: self.python_version.map(Into::into).map(RangedValue::cli),
                 python_platform: self
                     .python_platform
                     .map(|platform| RangedValue::cli(platform.into())),
@@ -177,16 +286,24 @@ impl CheckCommand {
                         .map(RelativePathBuf::cli)
                         .collect()
                 }),
+                ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {
                 output_format: self
                     .output_format
                     .map(|output_format| RangedValue::cli(output_format.into())),
-                error_on_warning: self.error_on_warning,
+                error_on_warning,
+            }),
+            src: Some(SrcOptions {
+                respect_ignore_files,
+                exclude_scripts,
+                exclude: self.exclude.map(|excludes| {
+                    RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
+                }),
+                ..SrcOptions::default()
             }),
             rules,
-            respect_ignore_files,
-            ..Default::default()
+            ..Options::default()
         };
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())
@@ -253,7 +370,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
+                .help(
+                    "Treat the given rule as having severity 'error'. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -261,7 +382,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
+                .help(
+                    "Treat the given rule as having severity 'warn'. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -269,7 +394,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times.")
+                .help(
+                    "Disables the rule. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -283,7 +412,7 @@ impl clap::Args for RulesArg {
 /// The diagnostic output format.
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub enum OutputFormat {
-    /// Print diagnostics verbosely, with context and helpful hints.
+    /// Print diagnostics verbosely, with context and helpful hints (default).
     ///
     /// Diagnostic messages may include additional context and
     /// annotations on the input to help understand the message.
@@ -298,13 +427,25 @@ pub enum OutputFormat {
     /// dropped.
     #[value(name = "concise")]
     Concise,
+    /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
+    #[value(name = "gitlab")]
+    Gitlab,
+    /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
+    #[value(name = "github")]
+    Github,
+    /// Print diagnostics as a JUnit-style XML report.
+    #[value(name = "junit")]
+    Junit,
 }
 
-impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
-    fn from(format: OutputFormat) -> ruff_db::diagnostic::DiagnosticFormat {
+impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
+    fn from(format: OutputFormat) -> ty_project::metadata::options::OutputFormat {
         match format {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Gitlab => Self::Gitlab,
+            OutputFormat::Github => Self::Github,
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
@@ -322,9 +463,17 @@ pub(crate) enum TerminalColor {
     /// Never display colors.
     Never,
 }
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub(crate) enum HelpFormat {
+    Text,
+    Json,
+}
+
 /// A TOML `<KEY> = <VALUE>` pair
 /// (such as you might find in a `ty.toml` configuration file)
 /// overriding a specific configuration option.
+///
 /// Overrides of individual settings using this option always take precedence
 /// over all configuration files.
 #[derive(Debug, Clone)]
@@ -359,7 +508,15 @@ impl clap::Args for ConfigsArg {
                 .short('c')
                 .long("config")
                 .value_name("CONFIG_OPTION")
-                .help("A TOML `<KEY> = <VALUE>` pair")
+                .help("A TOML `<KEY> = <VALUE>` pair overriding a specific configuration option.")
+                .long_help(
+                    "
+A TOML `<KEY> = <VALUE>` pair (such as you might find in a `ty.toml` configuration file)
+overriding a specific configuration option.
+
+Overrides of individual settings using this option always take precedence
+over all configuration files.",
+                )
                 .action(ArgAction::Append),
         )
     }
@@ -370,7 +527,32 @@ impl clap::Args for ConfigsArg {
 }
 
 impl ConfigsArg {
-    pub(crate) fn into_options(self) -> Option<Options> {
+    fn into_options(self) -> Option<Options> {
         self.0
+    }
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub(crate) enum ExplainCommand {
+    /// Explain a rule (or all rules).
+    Rule {
+        /// Rule to explain
+        ///
+        /// Defaults to all rules if omitted.
+        #[arg(hide_possible_values = true)]
+        rule: Option<String>,
+
+        /// Output format
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
+}
+
+fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
+    match (yes, no) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+        (..) => unreachable!("Clap should make this impossible"),
     }
 }

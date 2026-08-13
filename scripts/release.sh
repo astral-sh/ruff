@@ -11,14 +11,18 @@ project_root="$(dirname "$script_root")"
 
 echo "Updating metadata with rooster..."
 cd "$project_root"
-uv tool run --from 'rooster-blue>=0.0.7' --python 3.12 --isolated -- \
+uv run --locked --python 3.12 --only-group release \
     rooster release "$@"
 
-echo "Updating lockfile..."
-cargo update -p ruff
+# Bump internal crate versions
+uv run --script "$project_root/scripts/bump-workspace-crate-versions.py"
 
-echo "Generating contributors list..."
-echo ""
-echo ""
-uv tool run --from 'rooster-blue>=0.0.7' --python 3.12 --isolated -- \
-    rooster contributors --quiet
+echo "Updating crate READMEs..."
+uv run --script "$project_root/scripts/generate-crate-readmes.py"
+
+echo "Updating lockfiles..."
+cargo update -p ruff
+uv lock --no-config
+
+echo "Checking crates.io publish setup..."
+uv run --no-config --script "$project_root/scripts/setup-crates-io-publish.py" --quiet

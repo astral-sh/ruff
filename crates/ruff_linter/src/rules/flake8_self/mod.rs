@@ -4,26 +4,26 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
-    use std::convert::AsRef;
     use std::path::Path;
 
     use crate::registry::Rule;
     use crate::rules::flake8_self;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
     use anyhow::Result;
     use ruff_python_ast::name::Name;
     use test_case::test_case;
 
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001.py"))]
     #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_1.py"))]
+    #[test_case(Rule::PrivateMemberAccess, Path::new("SLF001_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_self").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -38,7 +38,24 @@ mod tests {
                 ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
             },
         )?;
-        assert_messages!(diagnostics);
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_method_decorators() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_self/SLF001_custom_decorators.py"),
+            &settings::LinterSettings {
+                pep8_naming: crate::rules::pep8_naming::settings::Settings {
+                    classmethod_decorators: vec!["custom_classmethod".to_string()],
+                    staticmethod_decorators: vec!["custom_staticmethod".to_string()],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::PrivateMemberAccess)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

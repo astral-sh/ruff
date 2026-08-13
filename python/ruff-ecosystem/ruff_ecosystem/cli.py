@@ -54,7 +54,7 @@ def entrypoint():
                 f"Could not find ruff baseline executable: {args.baseline_executable}",
                 sys.stderr,
             )
-            exit(1)
+            sys.exit(1)
         logger.info(
             "Resolved baseline executable %s to %s",
             args.baseline_executable,
@@ -69,7 +69,7 @@ def entrypoint():
                 f"Could not find ruff comparison executable: {args.comparison_executable}",
                 sys.stderr,
             )
-            exit(1)
+            sys.exit(1)
         logger.info(
             "Resolved comparison executable %s to %s",
             args.comparison_executable,
@@ -87,7 +87,8 @@ def entrypoint():
     )
 
     with cache_context as cache:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         main_task = asyncio.ensure_future(
             main(
                 command=RuffCommand(args.ruff_command),

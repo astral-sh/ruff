@@ -1,10 +1,10 @@
-use ruff_formatter::{write, FormatError};
+use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::{SourceComment, dangling_comments};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -21,6 +21,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
             upper,
             step,
             range,
+            node_index: _,
         } = item;
 
         let (first_colon, second_colon) = find_colons(
@@ -152,7 +153,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 /// to find out whether there is a second one, too, e.g. `[1:2]` and `[1:10:2]`.
 ///
 /// Returns the first and optionally the second colon.
-pub(crate) fn find_colons(
+fn find_colons(
     contents: &str,
     range: TextRange,
     lower: Option<&Expr>,
@@ -232,6 +233,7 @@ pub(crate) fn assign_comment_in_slice(
         upper,
         step: _,
         range,
+        node_index: _,
     } = expr_slice;
 
     let (first_colon, second_colon) =

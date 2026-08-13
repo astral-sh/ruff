@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Expr, StmtAssert};
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -15,17 +15,18 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// fruits = ["apples", "plums", "pears"]
-/// fruits.filter(lambda fruit: fruit.startwith("p"))
+/// fruits.filter(lambda fruit: fruit.startswith("p"))
 /// assert len(fruits), 2  # True unless the list is empty
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// fruits = ["apples", "plums", "pears"]
-/// fruits.filter(lambda fruit: fruit.startwith("p"))
+/// fruits.filter(lambda fruit: fruit.startswith("p"))
 /// assert len(fruits) == 2
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct InvalidAssertMessageLiteralArgument;
 
 impl Violation for InvalidAssertMessageLiteralArgument {
@@ -52,8 +53,5 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &
         return;
     }
 
-    checker.report_diagnostic(Diagnostic::new(
-        InvalidAssertMessageLiteralArgument,
-        message.range(),
-    ));
+    checker.report_diagnostic(InvalidAssertMessageLiteralArgument, message.range());
 }

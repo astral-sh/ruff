@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use ruff_index::{newtype_index, IndexVec};
+use ruff_index::{IndexVec, newtype_index};
 
 /// ID uniquely identifying a branch in a program.
 ///

@@ -3,13 +3,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Result;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::helpers::to_module_path;
-use ruff_python_parser::{parse, Mode, ParseOptions};
+use ruff_python_parser::{ParseOptions, parse};
+pub use ty_module_resolver::ResolverEnvironment;
 
 use crate::collector::Collector;
-pub use crate::db::ModuleDb;
+pub use crate::db::{ModuleDb, resolve_search_paths};
 use crate::resolver::Resolver;
-pub use crate::settings::{AnalyzeSettings, Direction};
+pub use crate::settings::{AnalyzeSettings, Direction, StringImports};
 
 mod collector;
 mod db;
@@ -22,40 +24,47 @@ pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 
 impl ModuleImports {
     /// Detect the [`ModuleImports`] for a given Python file.
-    pub fn detect(
-        db: &ModuleDb,
+    pub fn detect<'db>(
+        db: &'db ModuleDb,
+        environment: ResolverEnvironment<'db>,
+        source: &SourceKind,
         path: &SystemPath,
         package: Option<&SystemPath>,
-        string_imports: bool,
+        string_imports: StringImports,
+        type_checking_imports: bool,
     ) -> Result<Self> {
-        // Read and parse the source code.
-        let source = std::fs::read_to_string(path)?;
-        let parsed = parse(&source, ParseOptions::from(Mode::Module))?;
+        // Parse the source code.
+        let parse_options = ParseOptions::from(source.py_source_type())
+            .with_target_version(environment.python_version(db));
+        let parsed = parse(source.source_code(), parse_options)?;
 
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
 
         // Collect the imports.
-        let imports =
-            Collector::new(module_path.as_deref(), string_imports).collect(parsed.syntax());
+        let imports = Collector::new(
+            module_path.as_deref(),
+            string_imports,
+            type_checking_imports,
+        )
+        .collect(parsed.syntax());
 
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
+        let resolver = Resolver::new(db, path, environment);
         for import in imports {
-            let Some(resolved) = Resolver::new(db).resolve(import) else {
-                continue;
-            };
-            let Some(path) = resolved.as_system_path() else {
-                continue;
-            };
-            resolved_imports.insert(path.to_path_buf());
+            for resolved in resolver.resolve(import) {
+                if let Some(path) = resolved.as_system_path() {
+                    resolved_imports.insert(path.to_path_buf());
+                }
+            }
         }
 
         Ok(resolved_imports)
     }
 
     /// Insert a file path into the module imports.
-    pub fn insert(&mut self, path: SystemPathBuf) {
+    fn insert(&mut self, path: SystemPathBuf) {
         self.0.insert(path);
     }
 

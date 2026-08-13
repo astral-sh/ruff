@@ -1,22 +1,24 @@
 use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::fix::edits::{remove_argument, Parentheses};
+use crate::fix::edits::{Parentheses, remove_argument};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary `dict` kwargs.
 ///
 /// ## Why is this bad?
 /// If the `dict` keys are valid identifiers, they can be passed as keyword
-/// arguments directly.
+/// arguments directly, without constructing unnecessary dictionary.
+/// This also makes code more type-safe as type checkers often cannot
+/// precisely verify dynamic keyword arguments.
 ///
 /// ## Example
 ///
@@ -26,6 +28,9 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 ///
 /// print(foo(**{"bar": 2}))  # prints 3
+///
+/// # No typing errors, but results in an exception at runtime.
+/// print(foo(**{"bar": 2, "baz": 3}))
 /// ```
 ///
 /// Use instead:
@@ -36,6 +41,9 @@ use crate::fix::edits::{remove_argument, Parentheses};
 ///
 ///
 /// print(foo(bar=2))  # prints 3
+///
+/// # Typing error detected: No parameter named "baz".
+/// print(foo(bar=2, baz=3))
 /// ```
 ///
 /// ## Fix safety
@@ -62,6 +70,7 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct UnnecessaryDictKwargs;
 
 impl Violation for UnnecessaryDictKwargs {
@@ -92,12 +101,13 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
 
         // Ex) `foo(**{**bar})`
         if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
-            let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
             let edit = Edit::range_replacement(
                 format!("**{}", checker.locator().slice(value)),
                 keyword.range(),
             );
-            checker.report_diagnostic(diagnostic.with_fix(Fix::safe_edit(edit)));
+            checker
+                .report_diagnostic(UnnecessaryDictKwargs, keyword.range())
+                .set_fix(Fix::safe_edit(edit));
             continue;
         }
 
@@ -111,7 +121,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, keyword.range());
+        let mut diagnostic = checker.report_diagnostic(UnnecessaryDictKwargs, keyword.range());
 
         if dict.is_empty() {
             diagnostic.try_set_fix(|| {
@@ -119,7 +129,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                     keyword,
                     &call.arguments,
                     Parentheses::Preserve,
-                    checker.locator().contents(),
+                    checker.source(),
+                    checker.tokens(),
                 )
                 .map(Fix::safe_edit)
             });
@@ -147,8 +158,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                                         parenthesized_range(
                                             value.into(),
                                             dict.into(),
-                                            checker.comment_ranges(),
-                                            checker.locator().contents(),
+                                            checker.tokens()
                                         )
                                         .unwrap_or(value.range())
                                     )
@@ -168,8 +178,6 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                 }
             }
         }
-
-        checker.report_diagnostic(diagnostic);
     }
 }
 

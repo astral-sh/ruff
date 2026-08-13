@@ -1,15 +1,10 @@
 use ruff_formatter::prelude::tag::Condition;
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::{Argument, Arguments, format_args, write};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprRef;
-use ruff_python_trivia::CommentRanges;
-use ruff_python_trivia::{
-    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
-};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
+    SourceComment, dangling_comments, dangling_open_parenthesis_comments, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
@@ -42,6 +37,19 @@ pub(crate) trait NeedsParentheses {
     ) -> OptionalParentheses;
 }
 
+/// Returns `true` if `expr_range` identifies a type annotation child of `parent`,
+/// i.e. the annotation of a `StmtAnnAssign` or the return annotation of a `StmtFunctionDef`.
+pub(crate) fn is_type_annotation_of(expr_range: TextRange, parent: AnyNodeRef) -> bool {
+    match parent {
+        AnyNodeRef::StmtAnnAssign(stmt) => stmt.annotation.range() == expr_range,
+        AnyNodeRef::StmtFunctionDef(stmt) => stmt
+            .returns
+            .as_deref()
+            .is_some_and(|r| r.range() == expr_range),
+        _ => false,
+    }
+}
+
 /// From the perspective of the parent statement or expression, when should the child expression
 /// get parentheses?
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -56,18 +64,20 @@ pub(crate) enum Parenthesize {
     /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
 
-    /// Same as [`Self::IfBreaks`] except that it uses [`parenthesize_if_expands`] for expressions
-    /// with the layout [`NeedsParentheses::BestFit`] which is used by non-splittable
-    /// expressions like literals, name, and strings.
+    /// Same as [`Self::IfBreaks`] except that it uses
+    /// [`parenthesize_if_expands`](crate::builders::parenthesize_if_expands) for expressions with
+    /// the layout [`OptionalParentheses::BestFit`] which is used by non-splittable expressions like
+    /// literals, name, and strings.
     ///
     /// Use this layout over `IfBreaks` when there's a sequence of `maybe_parenthesize_expression`
     /// in a single logical-line and you want to break from right-to-left. Use `IfBreaks` for the
     /// first expression and `IfBreaksParenthesized` for the rest.
     IfBreaksParenthesized,
 
-    /// Same as [`Self::IfBreaksParenthesized`] but uses [`parenthesize_if_expands`] for nested
-    /// [`maybe_parenthesized_expression`] calls unlike other layouts that always omit parentheses
-    /// when outer parentheses are present.
+    /// Same as [`Self::IfBreaksParenthesized`] but uses
+    /// [`parenthesize_if_expands`](crate::builders::parenthesize_if_expands) for nested
+    /// [`maybe_parenthesized_expression`](crate::expression::maybe_parenthesize_expression) calls
+    /// unlike other layouts that always omit parentheses when outer parentheses are present.
     IfBreaksParenthesizedNested,
 }
 
@@ -91,34 +101,6 @@ pub enum Parentheses {
 
     /// Never add parentheses
     Never,
-}
-
-/// Returns `true` if the [`ExprRef`] is enclosed by parentheses in the source code.
-pub(crate) fn is_expression_parenthesized(
-    expr: ExprRef,
-    comment_ranges: &CommentRanges,
-    contents: &str,
-) -> bool {
-    // First test if there's a closing parentheses because it tends to be cheaper.
-    if matches!(
-        first_non_trivia_token(expr.end(), contents),
-        Some(SimpleToken {
-            kind: SimpleTokenKind::RParen,
-            ..
-        })
-    ) {
-        matches!(
-            BackwardsTokenizer::up_to(expr.start(), contents, comment_ranges)
-                .skip_trivia()
-                .next(),
-            Some(SimpleToken {
-                kind: SimpleTokenKind::LParen,
-                ..
-            })
-        )
-    } else {
-        false
-    }
 }
 
 /// Formats `content` enclosed by the `left` and `right` parentheses. The implementation also ensures
@@ -255,7 +237,7 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
                 soft_line_break(),
                 if_group_breaks(&token(")"))
             ])
-            .with_group_id(Some(parens_id))]
+            .with_id(Some(parens_id))]
         )
     }
 }
@@ -422,9 +404,11 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
         let end_of_line_split = self
             .comments
             .partition_point(|comment| comment.line_position().is_end_of_line());
-        debug_assert!(self.comments[end_of_line_split..]
-            .iter()
-            .all(|comment| comment.line_position().is_own_line()));
+        debug_assert!(
+            self.comments[end_of_line_split..]
+                .iter()
+                .all(|comment| comment.line_position().is_own_line())
+        );
         group(&format_args![
             token(self.left),
             // end-of-line comments
@@ -449,20 +433,31 @@ impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::ExprRef;
     use ruff_python_parser::parse_expression;
-    use ruff_python_trivia::CommentRanges;
-
-    use crate::expression::parentheses::is_expression_parenthesized;
+    use ruff_python_trivia::TriviaRanges;
+    use ruff_text_size::Ranged;
 
     #[test]
-    fn test_has_parentheses() {
-        let expression = r#"(b().c("")).d()"#;
-        let parsed = parse_expression(expression).unwrap();
-        assert!(!is_expression_parenthesized(
-            ExprRef::from(parsed.expr()),
-            &CommentRanges::default(),
-            expression
-        ));
+    fn parenthesized_ranges() {
+        let cases = [
+            ("value", false),
+            ("(value)", true),
+            ("((value))", true),
+            ("call(value)", false),
+            ("(value + other).attribute", false),
+            ("(\n    # leading\n    value + other\n)", true),
+            ("(\n    value  # trailing\n)", true),
+            (r#"(b().c("")).d()"#, false),
+        ];
+
+        for (source, expected) in cases {
+            let parsed = parse_expression(source).unwrap();
+            let trivia = TriviaRanges::from(parsed.tokens());
+            assert_eq!(
+                trivia.parenthesized().contains(parsed.expr().range()),
+                expected,
+                "parentheses mismatch for {source:?}",
+            );
+        }
     }
 }

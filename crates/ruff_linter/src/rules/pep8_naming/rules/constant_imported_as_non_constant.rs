@@ -1,9 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, Stmt};
 use ruff_python_stdlib::str;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
+use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
 
 /// ## What it does
@@ -48,6 +49,7 @@ use crate::rules::pep8_naming::{helpers, settings::IgnoreNames};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.82")]
 pub(crate) struct ConstantImportedAsNonConstant {
     name: String,
     asname: String,
@@ -63,32 +65,39 @@ impl Violation for ConstantImportedAsNonConstant {
 
 /// N811
 pub(crate) fn constant_imported_as_non_constant(
+    checker: &Checker,
     name: &str,
     asname: &str,
     alias: &Alias,
     stmt: &Stmt,
     ignore_names: &IgnoreNames,
-) -> Option<Diagnostic> {
-    if str::is_cased_uppercase(name)
-        && !(str::is_cased_uppercase(asname)
-            // Single-character names are ambiguous.
-            // It could be a class or a constant, so allow it to be imported
-            // as `SCREAMING_SNAKE_CASE` *or* `CamelCase`.
-            || (name.chars().nth(1).is_none() && helpers::is_camelcase(asname)))
-    {
-        // Ignore any explicitly-allowed names.
-        if ignore_names.matches(name) || ignore_names.matches(asname) {
-            return None;
-        }
-        let mut diagnostic = Diagnostic::new(
-            ConstantImportedAsNonConstant {
-                name: name.to_string(),
-                asname: asname.to_string(),
-            },
-            alias.range(),
-        );
-        diagnostic.set_parent(stmt.start());
-        return Some(diagnostic);
+) {
+    if !str::is_cased_uppercase(name) {
+        return;
     }
-    None
+
+    if str::is_cased_uppercase(asname) {
+        return;
+    }
+
+    // Single-character names are ambiguous.
+    // It could be a class or a constant, so allow it to be imported
+    // as `SCREAMING_SNAKE_CASE` *or* `CamelCase`.
+    if name.chars().nth(1).is_none() && helpers::is_camelcase(asname) {
+        return;
+    }
+
+    // Ignore any explicitly-allowed names.
+    if ignore_names.matches(name) || ignore_names.matches(asname) {
+        return;
+    }
+
+    let mut diagnostic = checker.report_diagnostic(
+        ConstantImportedAsNonConstant {
+            name: name.to_string(),
+            asname: asname.to_string(),
+        },
+        alias.range(),
+    );
+    diagnostic.set_parent(stmt.start());
 }

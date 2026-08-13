@@ -1,5 +1,5 @@
-use crate::format_element::tag::TagKind;
 use crate::format_element::PrintMode;
+use crate::format_element::tag::TagKind;
 use crate::printer::stack::{Stack, StackedStack};
 use crate::printer::{Indentation, MeasureMode};
 use crate::{IndentStyle, InvalidDocumentError, PrintError, PrintResult};

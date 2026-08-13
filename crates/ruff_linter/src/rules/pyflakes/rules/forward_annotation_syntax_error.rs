@@ -1,5 +1,6 @@
-use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+
+use crate::Violation;
 
 /// ## What it does
 /// Checks for forward annotations that include invalid syntax.
@@ -23,6 +24,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 /// ## References
 /// - [PEP 563 – Postponed Evaluation of Annotations](https://peps.python.org/pep-0563/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.39")]
 pub(crate) struct ForwardAnnotationSyntaxError {
     pub parse_error: String,
 }

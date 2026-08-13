@@ -1,12 +1,10 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-use itertools::Itertools;
-
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::schema::{Cell, SourceValue};
-use crate::CellMetadata;
+use crate::{CellMetadata, SYNTHETIC_CELL_SEPARATOR};
 
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -284,7 +282,7 @@ impl CellOffsets {
 
     /// Returns the range of the cell containing the given offset, if any.
     pub fn containing_range(&self, offset: TextSize) -> Option<TextRange> {
-        self.iter().tuple_windows().find_map(|(start, end)| {
+        self.array_windows::<2>().find_map(|[start, end]| {
             if *start <= offset && offset < *end {
                 Some(TextRange::new(*start, *end))
             } else {
@@ -294,19 +292,51 @@ impl CellOffsets {
     }
 
     /// Returns `true` if the given range contains a cell boundary.
+    ///
+    /// A range starting at the cell boundary isn't considered to contain the cell boundary
+    /// as it starts right after it. A range starting before a cell boundary
+    /// and ending exactly at the boundary is considered to contain the cell boundary.
+    ///
+    /// # Examples
+    /// Cell 1:
+    ///
+    /// ```py
+    /// import c
+    /// ```
+    ///
+    /// Cell 2:
+    ///
+    /// ```py
+    /// import os
+    /// ```
+    ///
+    /// The range `import c`..`import os`, contains a cell boundary because it starts before cell 2 and ends in cell 2 (`end=cell2_boundary`).
+    /// The `import os` contains no cell boundary because it starts at the start of cell 2 (at the cell boundary) but doesn't cross into another cell.
     pub fn has_cell_boundary(&self, range: TextRange) -> bool {
-        self.binary_search_by(|offset| {
-            if range.start() <= *offset {
-                if range.end() < *offset {
-                    std::cmp::Ordering::Greater
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            } else {
-                std::cmp::Ordering::Less
-            }
+        let after_range_start = self.partition_point(|offset| *offset <= range.start());
+        let Some(boundary) = self.get(after_range_start).copied() else {
+            return false;
+        };
+
+        range.contains_inclusive(boundary)
+    }
+
+    /// Returns an iterator over [`TextRange`]s covered by each cell.
+    pub fn ranges(&self) -> impl Iterator<Item = TextRange> {
+        self.array_windows::<2>()
+            .map(|[start, end]| TextRange::new(*start, *end))
+    }
+
+    /// Returns an iterator over the concatenated source ranges covered by each cell's actual
+    /// contents, excluding Ruff's synthetic trailing newline separator.
+    pub fn content_ranges(&self) -> impl Iterator<Item = TextRange> {
+        self.ranges().map(|range| {
+            let end = range
+                .end()
+                .checked_sub(TextSize::of(SYNTHETIC_CELL_SEPARATOR))
+                .expect("cell ranges should include the synthetic separator newline");
+            TextRange::new(range.start(), end)
         })
-        .is_ok()
     }
 }
 

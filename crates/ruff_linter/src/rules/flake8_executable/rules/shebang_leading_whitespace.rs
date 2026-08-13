@@ -1,9 +1,11 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_trivia::is_python_whitespace;
+use crate::checkers::ast::LintContext;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -27,9 +29,15 @@ use ruff_python_trivia::is_python_whitespace;
 /// #!/usr/bin/env python3
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe when the whitespace before the shebang
+/// contains a newline. Deleting the newline can activate an encoding declaration
+/// and change how the file is decoded.
+///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct ShebangLeadingWhitespace;
 
 impl AlwaysFixableViolation for ShebangLeadingWhitespace {
@@ -45,12 +53,13 @@ impl AlwaysFixableViolation for ShebangLeadingWhitespace {
 
 /// EXE004
 pub(crate) fn shebang_leading_whitespace(
+    context: &LintContext,
     range: TextRange,
     locator: &Locator,
-) -> Option<Diagnostic> {
+) {
     // If the shebang is at the beginning of the file, abort.
     if range.start() == TextSize::from(0) {
-        return None;
+        return;
     }
 
     // If the entire prefix _isn't_ whitespace, abort (this is handled by EXE005).
@@ -59,11 +68,21 @@ pub(crate) fn shebang_leading_whitespace(
         .chars()
         .all(|c| is_python_whitespace(c) || matches!(c, '\r' | '\n'))
     {
-        return None;
+        return;
     }
 
     let prefix = TextRange::up_to(range.start());
-    let mut diagnostic = Diagnostic::new(ShebangLeadingWhitespace, prefix);
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
-    Some(diagnostic)
+    if let Some(mut diagnostic) =
+        context.report_diagnostic_if_enabled(ShebangLeadingWhitespace, prefix)
+    {
+        let applicability = if locator.contains_line_break(prefix) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_deletion(prefix),
+            applicability,
+        ));
+    }
 }

@@ -2,7 +2,7 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::{is_python_whitespace, Cursor};
+use crate::{Cursor, is_python_whitespace};
 
 /// Searches for the first non-trivia character after `offset`.
 ///
@@ -169,6 +169,7 @@ fn to_keyword_or_other(source: &str) -> SimpleTokenKind {
         "import" => SimpleTokenKind::Import,
         "in" => SimpleTokenKind::In,
         "is" => SimpleTokenKind::Is,
+        "lazy" => SimpleTokenKind::Lazy, // Lazy is a soft keyword that depends on the context but we can always lex it as a keyword and leave it to the caller (parser) to decide if it should be handled as an identifier or keyword.
         "lambda" => SimpleTokenKind::Lambda,
         "nonlocal" => SimpleTokenKind::Nonlocal,
         "not" => SimpleTokenKind::Not,
@@ -453,6 +454,9 @@ pub enum SimpleTokenKind {
     /// `while`
     While,
 
+    /// `lazy`
+    Lazy,
+
     /// `match`
     Match,
 
@@ -599,6 +603,16 @@ impl<'a> SimpleTokenizer<'a> {
                             | "rb"
                             | "rf"
                             | "u"
+                            | "T"
+                            | "TR"
+                            | "Tr"
+                            | "RT"
+                            | "Rt"
+                            | "t"
+                            | "tR"
+                            | "tr"
+                            | "rT"
+                            | "rt"
                     )
                 {
                     self.bogus = true;
@@ -714,14 +728,7 @@ impl<'a> SimpleTokenizer<'a> {
                     SimpleTokenKind::At
                 }
             }
-            '!' => {
-                if self.cursor.eat_char('=') {
-                    SimpleTokenKind::NotEqual
-                } else {
-                    self.bogus = true;
-                    SimpleTokenKind::Other
-                }
-            }
+            '!' if self.cursor.eat_char('=') => SimpleTokenKind::NotEqual,
             '~' => SimpleTokenKind::Tilde,
             ':' => {
                 if self.cursor.eat_char('=') {
@@ -841,7 +848,7 @@ impl<'a> BackwardsTokenizer<'a> {
         self.filter(|t| !t.kind().is_trivia())
     }
 
-    pub fn next_token(&mut self) -> SimpleToken {
+    fn next_token(&mut self) -> SimpleToken {
         self.cursor.start_token();
         self.back_offset = self.cursor.text_len() + self.offset;
 

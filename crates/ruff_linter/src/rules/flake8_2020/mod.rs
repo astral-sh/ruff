@@ -11,7 +11,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_messages, settings};
+    use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::SysVersionSlice3, Path::new("YTT101.py"))]
     #[test_case(Rule::SysVersion2, Path::new("YTT102.py"))]
@@ -29,7 +29,7 @@ mod tests {
             Path::new("flake8_2020").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -10,7 +10,7 @@ mod tests {
 
     use crate::registry::Rule;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::settings::LinterSettings;
     use crate::test::{test_path, test_resource_path};
 
@@ -39,7 +39,9 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+            assert_diagnostics!(snapshot, diagnostics);
+        });
         Ok(())
     }
 }

@@ -57,7 +57,7 @@ impl NameImport {
     }
 
     /// Returns the [`QualifiedName`] of the imported name (e.g., given `from foo import bar as baz`, returns `["foo", "bar"]`).
-    pub fn qualified_name(&self) -> QualifiedName {
+    pub fn qualified_name(&self) -> QualifiedName<'_> {
         match self {
             NameImport::Import(import) => QualifiedName::user_defined(&import.name.name),
             NameImport::ImportFrom(import_from) => collect_import_from_member(
@@ -229,7 +229,9 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                         module,
                         names,
                         level,
+                        is_lazy: _,
                         range: _,
+                        node_index: _,
                     }) => names
                         .iter()
                         .map(|name| {
@@ -243,7 +245,12 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                             })
                         })
                         .collect(),
-                    Stmt::Import(ast::StmtImport { names, range: _ }) => names
+                    Stmt::Import(ast::StmtImport {
+                        names,
+                        is_lazy: _,
+                        range: _,
+                        node_index: _,
+                    }) => names
                         .iter()
                         .map(|name| {
                             NameImport::Import(ModuleNameImport {
@@ -269,15 +276,11 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for NameImports {
-    fn schema_name() -> String {
-        "NameImports".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("NameImports")
     }
 
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::String.into()),
-            ..Default::default()
-        }
-        .into()
+    fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({ "type": "string" })
     }
 }

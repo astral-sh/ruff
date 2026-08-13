@@ -52,7 +52,7 @@ def _(x: A | B):
 
     if False and isinstance(x, A):
         # TODO: should emit an `unreachable code` diagnostic
-        reveal_type(x)  # revealed: A
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A | B
 
@@ -65,7 +65,7 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A | B
     else:
         # TODO: should emit an `unreachable code` diagnostic
-        reveal_type(x)  # revealed: B & ~A
+        reveal_type(x)  # revealed: Never
 
     reveal_type(x)  # revealed: A | B
 ```
@@ -135,7 +135,7 @@ def _(x: A | B | C, y: A | B | C):
         reveal_type(y)  # revealed:  (B & ~A) | (C & ~A)
 
     if (isinstance(x, A) and isinstance(y, A)) or (isinstance(x, B) and isinstance(y, B)):
-        # Here, types of `x` and `y` can be narrowd since all `or` arms constraint them.
+        # Here, types of `x` and `y` can be narrowed since all `or` arms constraint them.
         reveal_type(x)  # revealed:  A | B
         reveal_type(y)  # revealed:  A | B
     else:

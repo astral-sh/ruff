@@ -1,10 +1,10 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtClassDef;
 use ruff_python_semantic::analyze::class::is_enumeration;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
+use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for enum classes which are also decorated with `@dataclass`.
@@ -45,6 +45,7 @@ use crate::rules::ruff::rules::helpers::{dataclass_kind, DataclassKind};
 /// ## References
 /// - [Python documentation: Enum HOWTO &sect; Dataclass support](https://docs.python.org/3/howto/enum.html#dataclass-support)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct DataclassEnum;
 
 impl Violation for DataclassEnum {
@@ -70,7 +71,5 @@ pub(crate) fn dataclass_enum(checker: &Checker, class_def: &StmtClassDef) {
         return;
     }
 
-    let diagnostic = Diagnostic::new(DataclassEnum, decorator.range);
-
-    checker.report_diagnostic(diagnostic);
+    checker.report_diagnostic(DataclassEnum, decorator.range);
 }

@@ -1,0 +1,40 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    TStringStart 0..2 (flags = DOUBLE_QUOTES | T_STRING),
+    Lbrace 2..3,
+    Rbrace 3..4,
+    TStringEnd 4..5 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringStart 6..8 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 8..12 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringEnd 12..13 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringStart 14..16 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 16..17 (flags = DOUBLE_QUOTES | T_STRING),
+    Lbrace 17..18,
+    Rbrace 18..19,
+    TStringEnd 19..20 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringStart 21..23 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 23..25 (flags = DOUBLE_QUOTES | T_STRING),
+    Lbrace 25..26,
+    Rbrace 26..27,
+    TStringMiddle 27..29 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringEnd 29..30 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringStart 31..33 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 33..41 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringEnd 41..42 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringStart 43..45 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 45..46 (flags = DOUBLE_QUOTES | T_STRING),
+    Lbrace 46..47,
+    Rbrace 47..48,
+    TStringMiddle 48..56 (flags = DOUBLE_QUOTES | T_STRING),
+    Lbrace 56..57,
+    Rbrace 57..58,
+    TStringMiddle 58..71 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringEnd 71..72 (flags = DOUBLE_QUOTES | T_STRING),
+    Newline 72..72,
+]
+```

@@ -1,0 +1,3 @@
+rules.md -diff linguist-generated=true text=auto eol=lf
+cli.md -diff linguist-generated=true text=auto eol=lf
+configuration.md -diff linguist-generated=true text=auto eol=lf

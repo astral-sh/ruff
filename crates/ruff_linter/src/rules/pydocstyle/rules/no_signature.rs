@@ -1,8 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::Ranged;
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 
@@ -41,6 +41,7 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct SignatureInDocstring;
 
 impl Violation for SignatureInDocstring {
@@ -86,6 +87,6 @@ pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
             true
         })
     {
-        checker.report_diagnostic(Diagnostic::new(SignatureInDocstring, docstring.range()));
+        checker.report_diagnostic(SignatureInDocstring, docstring.range());
     }
 }

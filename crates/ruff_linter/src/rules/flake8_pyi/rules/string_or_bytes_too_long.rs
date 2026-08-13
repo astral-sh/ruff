@@ -1,11 +1,11 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, StringLike};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for the use of string and bytes literals longer than 50 characters
@@ -21,6 +21,9 @@ use crate::checkers::ast::Checker;
 /// checkers, the primary consumers of stub files. Replace very long constants
 /// with ellipses (`...`) to simplify the stub.
 ///
+/// The rule does not apply to long entries in `__all__`, which are assumed to
+/// be outside the stub author's control.
+///
 /// ## Example
 ///
 /// ```pyi
@@ -33,6 +36,7 @@ use crate::checkers::ast::Checker;
 /// def foo(arg: str = ...) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct StringOrBytesTooLong;
 
 impl AlwaysFixableViolation for StringOrBytesTooLong {
@@ -50,8 +54,10 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     let semantic = checker.semantic();
 
+    let parent = semantic.current_statement();
+
     // Ignore docstrings.
-    if is_docstring_stmt(semantic.current_statement()) {
+    if is_docstring_stmt(parent) {
         return;
     }
 
@@ -63,21 +69,29 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
         return;
     }
 
+    if checker.in_dunder_all_assignment(parent) {
+        return;
+    }
+
     let length = match string {
         StringLike::String(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
         StringLike::Bytes(ast::ExprBytesLiteral { value, .. }) => value.len(),
         StringLike::FString(node) => count_f_string_chars(node),
+        // TODO(dylan): decide how to count chars, especially
+        // if interpolations are of different type than `str`
+        StringLike::TString(_) => {
+            return;
+        }
     };
     if length <= 50 {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, string.range());
+    let mut diagnostic = checker.report_diagnostic(StringOrBytesTooLong, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
         string.range(),
     )));
-    checker.report_diagnostic(diagnostic);
 }
 
 /// Count the number of visible characters in an f-string. This accounts for
@@ -92,8 +106,10 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
                 .elements
                 .iter()
                 .map(|element| match element {
-                    ast::FStringElement::Literal(string) => string.chars().count(),
-                    ast::FStringElement::Expression(expr) => expr.range().len().to_usize(),
+                    ast::InterpolatedStringElement::Literal(string) => string.chars().count(),
+                    ast::InterpolatedStringElement::Interpolation(expr) => {
+                        expr.range().len().to_usize()
+                    }
                 })
                 .sum(),
         })

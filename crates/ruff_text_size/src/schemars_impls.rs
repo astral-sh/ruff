@@ -6,28 +6,29 @@
 //! bindings to the Workspace API
 
 use crate::{TextRange, TextSize};
-use schemars::{gen::SchemaGenerator, schema::Schema, JsonSchema};
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use std::borrow::Cow;
 
 impl JsonSchema for TextSize {
-    fn schema_name() -> String {
-        String::from("TextSize")
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("TextSize")
     }
 
-    fn json_schema(gen: &mut SchemaGenerator) -> Schema {
+    fn json_schema(r#gen: &mut SchemaGenerator) -> Schema {
         // TextSize is represented as a raw u32, see serde_impls.rs for the
         // actual implementation
-        <u32>::json_schema(gen)
+        <u32>::json_schema(r#gen)
     }
 }
 
 impl JsonSchema for TextRange {
-    fn schema_name() -> String {
-        String::from("TextRange")
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("TextRange")
     }
 
-    fn json_schema(gen: &mut SchemaGenerator) -> Schema {
+    fn json_schema(r#gen: &mut SchemaGenerator) -> Schema {
         // TextSize is represented as (TextSize, TextSize), see serde_impls.rs
         // for the actual implementation
-        <(TextSize, TextSize)>::json_schema(gen)
+        <(TextSize, TextSize)>::json_schema(r#gen)
     }
 }

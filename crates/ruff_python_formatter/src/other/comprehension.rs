@@ -1,11 +1,10 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
+use ruff_formatter::{Buffer, FormatResult, format_args, write};
 use ruff_python_ast::{Comprehension, Expr};
-use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
+use ruff_python_trivia::{SimpleTokenKind, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::parentheses::is_expression_parenthesized;
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -36,11 +35,8 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 // ]
                 // ```
                 let will_be_parenthesized = self.preserve_parentheses
-                    && is_expression_parenthesized(
-                        self.expression.into(),
-                        f.context().comments().ranges(),
-                        f.context().source(),
-                    );
+                    && f.context()
+                        .is_expression_parenthesized(self.expression.into());
 
                 if has_leading_comments && !will_be_parenthesized {
                     soft_line_break_or_space().fmt(f)
@@ -52,6 +48,7 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
 
         let Comprehension {
             range: _,
+            node_index: _,
             target,
             iter,
             ifs,
