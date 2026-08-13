@@ -16,7 +16,7 @@ use crate::types::diagnostic::{
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
-use crate::types::generics::{GenericContext, InvalidSpecialization, bind_typevar};
+use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -507,9 +507,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let specialize = &|types: &[Option<Type<'db>>]| {
             Type::from(generic_class.apply_specialization(db, |_| {
-                generic_context
-                    .specialize_partial(db, types.iter().copied())
-                    .unwrap_or_else(InvalidSpecialization::into_fallback)
+                generic_context.specialize_partial(db, types.iter().copied())
             }))
         };
 
@@ -580,9 +578,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let specialize = &|types: &[Option<Type<'db>>]| {
             let type_alias = generic_type_alias.apply_specialization(db, |_| {
-                generic_context
-                    .specialize_partial(db, types.iter().copied())
-                    .unwrap_or_else(InvalidSpecialization::into_fallback)
+                generic_context.specialize_partial(db, types.iter().copied())
             });
 
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))

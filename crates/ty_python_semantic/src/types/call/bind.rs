@@ -50,8 +50,7 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, InvalidSpecialization, Specialization, SpecializationBuilder,
-    SpecializationError, TypeVarInference,
+    GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
@@ -5940,16 +5939,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         };
         let specialization = inference.specialization(db);
-        self.errors.extend(
-            inference
-                .specialization_errors(db)
-                .iter()
-                .cloned()
-                .map(|error| BindingError::SpecializationError {
+        if let Some(errors) = specialization.errors(db) {
+            self.errors.extend(errors.iter().cloned().map(|error| {
+                BindingError::SpecializationError {
                     error,
                     argument_index: None,
-                }),
-        );
+                }
+            }));
+        }
 
         self.return_ty = self.return_ty.apply_specialization(db, specialization);
         self.inference = Some(inference);
@@ -7281,36 +7278,31 @@ impl<'db> Binding<'db> {
         // approach would be to propagate constraint sets as type context, making bidirectional
         // inference constraint-set-aware, or to infer constraint sets directly for argument types,
         // and avoid the need to construct type context before call inference has completed.
-        Some(
-            generic_context
-                .specialize_recursive(
-                    db,
-                    generic_context.variables(db).map(|typevar| {
-                        let identity = typevar.identity(db);
+        Some(generic_context.specialize_recursive(
+            db,
+            generic_context.variables(db).map(|typevar| {
+                let identity = typevar.identity(db);
 
-                        let call_expression_constraints =
-                            return_type_solutions.get(&identity).copied();
-                        let argument_constraints = self
-                            .specialization(db)
-                            .and_then(|specialization| specialization.get(db, typevar))
-                            .filter(|ty| !ty.has_dynamic(db, env))
-                            .map(|ty| ty.promote(db, env));
+                let call_expression_constraints = return_type_solutions.get(&identity).copied();
+                let argument_constraints = self
+                    .specialization(db)
+                    .and_then(|specialization| specialization.get(db, typevar))
+                    .filter(|ty| !ty.has_dynamic(db, env))
+                    .map(|ty| ty.promote(db, env));
 
-                        // TODO: We should similarly combine both the call expression and argument constraints
-                        // here. We currently only rely on argument constraints when there is no explicit declared
-                        // type for the call expression.
-                        Some(
-                            call_expression_constraints
-                                .or(argument_constraints)
-                                // Default specialize any type variables to a marker type, which will be ignored
-                                // during argument inference, allowing the concrete subset of the parameter
-                                // type to still affect argument inference.
-                                .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
-                        )
-                    }),
+                // TODO: We should similarly combine both the call expression and argument constraints
+                // here. We currently only rely on argument constraints when there is no explicit declared
+                // type for the call expression.
+                Some(
+                    call_expression_constraints
+                        .or(argument_constraints)
+                        // Default specialize any type variables to a marker type, which will be ignored
+                        // during argument inference, allowing the concrete subset of the parameter
+                        // type to still affect argument inference.
+                        .unwrap_or(Type::Dynamic(DynamicType::UnspecializedTypeVar)),
                 )
-                .unwrap_or_else(InvalidSpecialization::into_fallback),
-        )
+            }),
+        ))
     }
 
     /// Records the overload's source definition index for later diagnostics.

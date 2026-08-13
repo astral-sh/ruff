@@ -12,7 +12,6 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
     report_missing_type_arguments, report_unsupported_binary_operation,
 };
-use crate::types::generics::InvalidSpecialization;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::signatures::{ConcatenateTail, Signature};
@@ -1337,9 +1336,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         let class = class_literal.apply_specialization(db, |_| {
                                             generic_context
                                                 .specialize_partial(db, types.iter().copied())
-                                                .unwrap_or_else(
-                                                    InvalidSpecialization::into_fallback,
-                                                )
                                         });
                                         if class_literal.is_protocol(db) {
                                             match Type::instance(db, env, class) {
@@ -1448,16 +1444,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if any_over_type(db, env, value_ty, true, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
-                generic_context
-                    .specialize(
-                        db,
-                        std::iter::repeat_n(
-                            todo_type!("specialized recursive generic type alias"),
-                            generic_context.len(db),
-                        )
-                        .collect::<Vec<_>>(),
+                generic_context.specialize(
+                    db,
+                    std::iter::repeat_n(
+                        todo_type!("specialized recursive generic type alias"),
+                        generic_context.len(db),
                     )
-                    .unwrap_or_else(InvalidSpecialization::into_fallback),
+                    .collect::<Vec<_>>(),
+                ),
             );
             return if in_type_expression {
                 value_ty
@@ -1476,9 +1470,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,
-                generic_context
-                    .specialize_partial(db, types.iter().copied())
-                    .unwrap_or_else(InvalidSpecialization::into_fallback),
+                generic_context.specialize_partial(db, types.iter().copied()),
             );
 
             if in_type_expression {

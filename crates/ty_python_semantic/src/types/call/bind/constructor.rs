@@ -5,7 +5,7 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::{GenericContext, InvalidSpecialization, Specialization};
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
@@ -428,7 +428,6 @@ impl<'db> ConstructorBinding<'db> {
                         specialization.materialization_kind(db),
                         None,
                     )
-                    .unwrap_or_else(InvalidSpecialization::into_fallback)
                 });
             let specialization = if return_specialization_is_informative {
                 return_specialization
@@ -444,9 +443,7 @@ impl<'db> ConstructorBinding<'db> {
             };
             combined = Some(match combined {
                 None => specialization,
-                Some(previous) => previous
-                    .combine(db, specialization)
-                    .unwrap_or_else(InvalidSpecialization::into_fallback),
+                Some(previous) => previous.combine(db, specialization),
             });
         };
 
@@ -637,7 +634,6 @@ impl<'db> ConstructorBinding<'db> {
             specialization.materialization_kind(db),
             None,
         )
-        .expect("unspecializing constructor class type variables must preserve validity")
     }
 
     fn constructed_class_literal(
