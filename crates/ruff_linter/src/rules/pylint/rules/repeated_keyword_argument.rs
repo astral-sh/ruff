@@ -44,17 +44,14 @@ pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
 
     for keyword in &*arguments.keywords {
         if let Some(id) = &keyword.arg {
-            // Ex) `func(a=1, a=2)`
-            if !seen.insert(id.as_str()) {
-                checker.report_diagnostic(
-                    RepeatedKeywordArgument {
-                        duplicate_keyword: id.to_string(),
-                    },
-                    keyword.range(),
-                );
-            }
-        } else if let Expr::Dict(dict) = &keyword.value {
-            // Ex) `func(**{"a": 1, "a": 2})`
+            seen.insert(id.as_str());
+        }
+    }
+
+    for keyword in &*arguments.keywords {
+        if keyword.arg.is_none()
+            && let Expr::Dict(dict) = &keyword.value
+        {
             for key in dict.iter_keys().flatten() {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
                     if !seen.insert(value.to_str()) {
