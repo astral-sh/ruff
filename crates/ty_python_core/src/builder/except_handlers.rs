@@ -33,21 +33,21 @@ impl ExceptionHandlers {
     }
 }
 
-/// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
+/// Maintains a separate [`ExceptionContextStack`] for each scope.
 #[derive(Debug, Default)]
-pub(super) struct TryNodeContextStackManager(Vec<TryNodeContextStack>);
+pub(super) struct ExceptionContextStackManager(Vec<ExceptionContextStack>);
 
-impl TryNodeContextStackManager {
-    /// Push a new [`TryNodeContextStack`] onto the stack of stacks.
+impl ExceptionContextStackManager {
+    /// Push a new [`ExceptionContextStack`] onto the stack of stacks.
     ///
-    /// Each [`TryNodeContextStack`] is only valid for a single scope
+    /// Each [`ExceptionContextStack`] is only valid for a single scope.
     pub(super) fn enter_nested_scope(&mut self) {
-        self.0.push(TryNodeContextStack::default());
+        self.0.push(ExceptionContextStack::default());
     }
 
-    /// Pop a new [`TryNodeContextStack`] off the stack of stacks.
+    /// Pop an [`ExceptionContextStack`] off the stack of stacks.
     ///
-    /// Each [`TryNodeContextStack`] is only valid for a single scope
+    /// Each [`ExceptionContextStack`] is only valid for a single scope.
     pub(super) fn exit_scope(&mut self) {
         let popped_context = self.0.pop();
         debug_assert!(
@@ -57,30 +57,25 @@ impl TryNodeContextStackManager {
         );
     }
 
-    /// Push a [`TryNodeContext`] onto the [`TryNodeContextStack`] at the top of our stack of
+    /// Push an [`ExceptionContext`] onto the [`ExceptionContextStack`] at the top of our stack of
     /// stacks.
     ///
     /// Only suites with handlers collect exception checkpoints; a bare handler prevents those
     /// exceptions from propagating to enclosing suites.
     pub(super) fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
-        self.current_try_context_stack()
+        self.current_exception_context_stack()
             .push_context(exception_handlers);
     }
 
     /// Registers a context manager after it enters but before its target is assigned.
-    ///
-    /// This allows an entered manager to suppress errors raised while binding its target:
-    ///
-    /// ```python
-    /// with manager as (first, second):
-    ///     ...
-    /// ```
     pub(super) fn push_with_context(&mut self) {
-        self.current_try_context_stack().0.push(TryNodeContext {
-            exception_handlers: ExceptionHandlers::propagating(),
-            kind: ExceptionContextKind::With,
-            ..TryNodeContext::default()
-        });
+        self.current_exception_context_stack()
+            .0
+            .push(ExceptionContext {
+                exception_handlers: ExceptionHandlers::propagating(),
+                kind: ExceptionContextKind::With,
+                ..ExceptionContext::default()
+            });
     }
 
     /// Removes the innermost context manager and returns the exceptions it could suppress.
@@ -88,24 +83,25 @@ impl TryNodeContextStackManager {
     /// Removing the context before its exit method runs prevents it from suppressing exceptions
     /// raised by its own exit method.
     pub(super) fn finish_with_context(&mut self) -> Vec<FlowSnapshot> {
-        let stack = self.current_try_context_stack();
-        let snapshots = stack.end_try_suite();
+        let stack = self.current_exception_context_stack();
+        let snapshots = stack.take_exception_snapshots();
         let context = stack.pop_context();
         debug_assert!(matches!(context.kind, ExceptionContextKind::With));
         snapshots
     }
 
-    /// Pop a [`TryNodeContext`] off the [`TryNodeContextStack`] at the top of our stack of stacks.
-    pub(super) fn pop_context(&mut self) -> TryNodeContext {
-        self.current_try_context_stack().pop_context()
+    /// Pop an [`ExceptionContext`] off the stack for the current scope.
+    pub(super) fn pop_context(&mut self) -> ExceptionContext {
+        self.current_exception_context_stack().pop_context()
     }
 
-    /// Retrieve the [`TryNodeContext`] that is currently at the top of the stack, and take all
+    /// Retrieve the [`ExceptionContext`] at the top of the stack, and take all
     /// snapshots recorded while visiting the `try` suite.
     ///
     /// Taking the snapshots deactivates the suite's handlers before their bodies are visited.
     pub(super) fn end_try_suite(&mut self) -> Vec<FlowSnapshot> {
-        self.current_try_context_stack().end_try_suite()
+        self.current_exception_context_stack()
+            .take_exception_snapshots()
     }
 
     /// Records a checkpoint for every active `try` or `with` context that could handle an
@@ -115,7 +111,7 @@ impl TryNodeContextStackManager {
     pub(super) fn record_exception_checkpoint(&mut self, builder: &mut SemanticIndexBuilder) {
         debug_assert_eq!(self.0.len(), builder.scope_stack.len());
 
-        for (scope_stack_index, try_context_stack) in self.0.iter_mut().enumerate().rev() {
+        for (scope_stack_index, exception_context_stack) in self.0.iter_mut().enumerate().rev() {
             let scope_id = builder.scope_stack[scope_stack_index].file_scope_id;
             let use_def_map = &builder.use_def_maps[scope_id];
 
@@ -125,7 +121,7 @@ impl TryNodeContextStackManager {
                 break;
             }
 
-            if !try_context_stack.record_exception_checkpoint(use_def_map) {
+            if !exception_context_stack.record_exception_checkpoint(use_def_map) {
                 break;
             }
 
@@ -141,8 +137,8 @@ impl TryNodeContextStackManager {
     pub(super) fn has_active_exception_handler(&self, builder: &SemanticIndexBuilder) -> bool {
         debug_assert_eq!(self.0.len(), builder.scope_stack.len());
 
-        for (scope_stack_index, try_context_stack) in self.0.iter().enumerate().rev() {
-            if try_context_stack.has_active_exception_handler() {
+        for (scope_stack_index, exception_context_stack) in self.0.iter().enumerate().rev() {
+            if exception_context_stack.has_active_exception_handler() {
                 return true;
             }
 
@@ -157,23 +153,23 @@ impl TryNodeContextStackManager {
 
     /// Records a terminal entry for the nearest enclosing `try`, skipping `with` contexts.
     pub(super) fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
-        self.current_try_context_stack()
+        self.current_exception_context_stack()
             .record_terminal_finally_entry(builder);
     }
 
-    /// Retrieve the [`TryNodeContextStack`] that is relevant for the current scope.
-    fn current_try_context_stack(&mut self) -> &mut TryNodeContextStack {
+    /// Retrieve the [`ExceptionContextStack`] that is relevant for the current scope.
+    fn current_exception_context_stack(&mut self) -> &mut ExceptionContextStack {
         self.0
             .last_mut()
-            .expect("There should always be at least one `TryBlockContexts` on the stack")
+            .expect("There should always be at least one `ExceptionContextStack` on the stack")
     }
 }
 
 /// The contexts of nested `try` and `with` statements for a single scope.
 #[derive(Debug, Default)]
-struct TryNodeContextStack(Vec<TryNodeContext>);
+struct ExceptionContextStack(Vec<ExceptionContext>);
 
-impl TryNodeContextStack {
+impl ExceptionContextStack {
     /// Returns whether a `try` or `with` context is still collecting exception checkpoints.
     fn has_active_exception_handler(&self) -> bool {
         self.0
@@ -181,28 +177,28 @@ impl TryNodeContextStack {
             .any(|context| context.exception_handlers.is_active())
     }
 
-    /// Push a new [`TryNodeContext`] for recording exception checkpoints and terminal entries
+    /// Push a new [`ExceptionContext`] for recording exception checkpoints and terminal entries
     /// while visiting a [`ruff_python_ast::StmtTry`] node.
     fn push_context(&mut self, exception_handlers: ExceptionHandlers) {
-        self.0.push(TryNodeContext {
+        self.0.push(ExceptionContext {
             exception_handlers,
-            ..TryNodeContext::default()
+            ..ExceptionContext::default()
         });
     }
 
-    /// Pop a [`TryNodeContext`] off the stack.
-    fn pop_context(&mut self) -> TryNodeContext {
+    /// Pop an [`ExceptionContext`] off the stack.
+    fn pop_context(&mut self) -> ExceptionContext {
         self.0
             .pop()
-            .expect("Cannot pop a `try` block off an empty `TryBlockContexts` stack")
+            .expect("Cannot pop an exception context off an empty `ExceptionContextStack`")
     }
 
     /// Takes all snapshots recorded by the innermost context and deactivates its handlers.
-    fn end_try_suite(&mut self) -> Vec<FlowSnapshot> {
+    fn take_exception_snapshots(&mut self) -> Vec<FlowSnapshot> {
         let context = self
             .0
             .last_mut()
-            .expect("Cannot take snapshots from an empty `TryBlockContexts` stack");
+            .expect("Cannot take snapshots from an empty `ExceptionContextStack`");
         match std::mem::take(&mut context.exception_handlers) {
             ExceptionHandlers::None => Vec::new(),
             ExceptionHandlers::Propagating(snapshots) | ExceptionHandlers::CatchAll(snapshots) => {
@@ -269,7 +265,7 @@ enum ExceptionContextKind {
 ///
 /// Only `try` contexts also collect terminal entries for a `finally` suite.
 #[derive(Debug, Default)]
-pub(super) struct TryNodeContext {
+pub(super) struct ExceptionContext {
     exception_handlers: ExceptionHandlers,
     kind: ExceptionContextKind,
     last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
@@ -278,7 +274,7 @@ pub(super) struct TryNodeContext {
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
-impl TryNodeContext {
+impl ExceptionContext {
     pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool) {
         (
             self.terminal_finally_entry_snapshots,

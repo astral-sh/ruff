@@ -1,7 +1,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
-use except_handlers::{ExceptionHandlers, TryNodeContextStackManager};
+use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -226,6 +226,7 @@ impl ConditionFlowSnapshot {
     }
 }
 
+#[expect(clippy::struct_excessive_bools)]
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -244,10 +245,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
 
-    /// Per-scope contexts regarding nested `try`/`except` statements
-    try_node_context_stack_manager: TryNodeContextStackManager,
-    /// Number of enclosing `with` statements that can receive exception checkpoints.
-    active_with_depth: usize,
+    /// Per-scope exception contexts for nested `try` and `with` statements.
+    exception_context_stack_manager: ExceptionContextStackManager,
+    /// Whether an enclosing `with` statement can receive exception checkpoints.
+    in_with: bool,
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
@@ -318,8 +319,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_statements: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
-            try_node_context_stack_manager: TryNodeContextStackManager::default(),
-            active_with_depth: 0,
+            exception_context_stack_manager: ExceptionContextStackManager::default(),
+            in_with: false,
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -512,7 +513,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let scope = Scope::new(parent, node_with_kind, children_start..children_start);
         let is_class_scope = scope.kind().is_class();
-        self.try_node_context_stack_manager.enter_nested_scope();
+        self.exception_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
         self.place_tables.push(PlaceTableBuilder::default());
@@ -901,7 +902,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// scope, including those contributed by `global` and `nonlocal` keywords in the popped scope,
     /// but excluding nested `nonlocal`s that resolved to the popped scope.
     fn pop_scope(&mut self) -> NestedGlobalOrNonlocalDeclarations {
-        self.try_node_context_stack_manager.exit_scope();
+        self.exception_context_stack_manager.exit_scope();
 
         let ScopeInfo {
             file_scope_id: popped_scope_id,
@@ -2211,9 +2212,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Records that the current state can enter any active `finally` suites before the current
     /// terminal control-flow transfer reaches its destination.
     fn record_terminal_finally_entry(&mut self) {
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_terminal_finally_entry(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
+        let mut exception_context_stack_manager =
+            std::mem::take(&mut self.exception_context_stack_manager);
+        exception_context_stack_manager.record_terminal_finally_entry(self);
+        self.exception_context_stack_manager = exception_context_stack_manager;
     }
 
     /// Returns whether an exception raised while evaluating `scope` can propagate directly to its
@@ -2248,17 +2250,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Skips snapshot construction when no enclosing `try` or `with` context can handle exceptions.
     fn record_exception_checkpoint(&mut self) {
-        if !(self.in_try || self.active_with_depth != 0)
+        if !(self.in_try || self.in_with)
             || !self
-                .try_node_context_stack_manager
+                .exception_context_stack_manager
                 .has_active_exception_handler(self)
         {
             return;
         }
 
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_exception_checkpoint(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
+        let mut exception_context_stack_manager =
+            std::mem::take(&mut self.exception_context_stack_manager);
+        exception_context_stack_manager.record_exception_checkpoint(self);
+        self.exception_context_stack_manager = exception_context_stack_manager;
     }
 
     fn record_exception_checkpoint_if(&mut self, can_raise: bool) {
@@ -2277,9 +2280,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         is_use
-            && (self.in_try || self.active_with_depth != 0)
+            && (self.in_try || self.in_with)
             && self
-                .try_node_context_stack_manager
+                .exception_context_stack_manager
                 .has_active_exception_handler(self)
             && self
                 .current_place_table()
@@ -3651,7 +3654,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 if msg.is_some()
                     || self
-                        .try_node_context_stack_manager
+                        .exception_context_stack_manager
                         .has_active_exception_handler(self)
                 {
                     let truthy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -4015,7 +4018,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 is_async,
                 ..
             }) => {
-                self.active_with_depth += 1;
+                let was_in_with = std::mem::replace(&mut self.in_with, true);
                 let mut context_managers =
                     SmallVec::<[(&ast::Expr, Option<Expression<'db>>); 1]>::new();
 
@@ -4029,7 +4032,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_expr(context_expr);
                     self.record_exception_checkpoint();
 
-                    self.try_node_context_stack_manager.push_with_context();
+                    self.exception_context_stack_manager.push_with_context();
 
                     let expression = optional_vars.as_deref().map(|optional_vars| {
                         let expression = self.add_standalone_expression(context_expr);
@@ -4050,7 +4053,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 for (context_expr, expression) in context_managers.into_iter().rev() {
                     let mut exceptional_entries = self
-                        .try_node_context_stack_manager
+                        .exception_context_stack_manager
                         .finish_with_context()
                         .into_iter();
 
@@ -4094,7 +4097,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_exception_checkpoint();
                 }
 
-                self.active_with_depth -= 1;
+                self.in_with = was_in_with;
             }
 
             ast::Stmt::For(
@@ -4410,7 +4413,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } else {
                     ExceptionHandlers::propagating()
                 };
-                self.try_node_context_stack_manager
+                self.exception_context_stack_manager
                     .push_context(exception_handlers);
 
                 // Visit the `try` block!
@@ -4422,7 +4425,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that may raise. Keep the context itself on the stack so that terminal statements
                 // in `except` and `else` suites can still be recorded as entries to the associated
                 // `finally` suite.
-                let try_block_snapshots = self.try_node_context_stack_manager.end_try_suite();
+                let try_block_snapshots = self.exception_context_stack_manager.end_try_suite();
 
                 if !handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
@@ -4510,7 +4513,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let normal_pre_finally_state = self.flow_snapshot();
                 let (terminal_finally_entry_snapshots, has_escaping_exception) = self
-                    .try_node_context_stack_manager
+                    .exception_context_stack_manager
                     .pop_context()
                     .into_finally_entry_state();
                 // TODO: there's lots of complexity here that isn't yet handled by our model.

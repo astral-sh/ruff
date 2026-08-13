@@ -11,9 +11,35 @@ use crate::{
 use ruff_python_ast as ast;
 use ty_python_core::EvaluationMode;
 
-/// Caches suppression classification per manager type and evaluates union alternatives separately.
+/// Returns whether this context manager can suppress an exception raised inside its suite.
 ///
-/// Overloads accepting only the `None` arguments of a normal exit cannot suppress exceptions.
+/// Suppression is cached by manager type because the same predicate can be evaluated repeatedly for
+/// different bindings and context managers. Each alternative in a union is classified separately:
+/// if any possible manager can suppress exceptions, the union can suppress exceptions too. Merging
+/// the alternatives' exit return types first could incorrectly classify a suppressing manager
+/// alongside a non-suppressing manager as returning `bool | None`.
+///
+/// Python passes `(None, None, None)` to an exit method when a suite completes normally and passes
+/// the exception type, value, and traceback when it raises. Consequently, an overload whose first
+/// argument is annotated as `None` cannot describe an exceptional exit and must not affect the
+/// suppression result:
+///
+/// ```python
+/// @overload
+/// def __exit__(self, typ: None, value: None, tb: None) -> None: ...
+///
+/// @overload
+/// def __exit__(
+///     self,
+///     typ: type[BaseException],
+///     value: BaseException,
+///     tb: TracebackType | None,
+/// ) -> Literal[True]: ...
+/// ```
+///
+/// This manager can suppress exceptions despite its normal-exit overload returning `None`. For
+/// asynchronous managers, the return type is awaited before applying the typing specification's
+/// rule: only `bool` and `Literal[True]` indicate that exceptions may be suppressed.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _, _| false,
