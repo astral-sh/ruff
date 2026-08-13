@@ -1266,60 +1266,77 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
-impl<'db> Specialization<'db> {
-    /// Validates one type assignment against its type variable's declared domain.
-    fn validate_type_assignment_with(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        assignment: Type<'db>,
-        bound_or_constraints: TypeVarBoundOrConstraints<'db>,
-    ) -> Result<(), SpecializationError<'db>> {
-        let when_assignable_to = |source: Type<'db>, target: Type<'db>| {
-            // Use the cached relation to preserve cycle recovery for recursive bounds.
-            let relation = source.when_constraint_set_assignable_to_owned(db, env, target);
-            constraints.load(db, env, &relation)
-        };
-        let valid = match bound_or_constraints {
-            TypeVarBoundOrConstraints::UpperBound(bound) => when_assignable_to(assignment, bound),
-            // We can't use `when_equivalent_to` here, because that checks full gradual
-            // equivalence, which requires the two types to have exactly the same set of
-            // materializations. That rejects `Any` or `Unknown` against a concrete declared
-            // constraint.
-            //
-            // Instead we use bi-assignability, which correctly rejects strict subtypes and unions
-            // while allowing gradual assignments.
-            TypeVarBoundOrConstraints::Constraints(declared_constraints) => declared_constraints
-                .elements(db)
-                .iter()
-                .copied()
-                .when_any(db, constraints, |declared_constraint| {
-                    when_assignable_to(assignment, declared_constraint).and(db, constraints, || {
-                        when_assignable_to(declared_constraint, assignment)
-                    })
-                }),
-        };
-        if !valid.is_never_satisfied(db, env) {
-            return Ok(());
+/// Validates one type assignment against its type variable's declared domain.
+#[salsa::tracked(
+    returns(clone),
+    cycle_initial=|_, _, _, _, _, _| Ok(()),
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn validate_type_assignment_with<'db>(
+    db: &'db dyn Db,
+    generic_context: GenericContext<'db>,
+    bound_typevar: BoundTypeVarInstance<'db>,
+    assignment: Type<'db>,
+    bound_or_constraints: TypeVarBoundOrConstraints<'db>,
+) -> Result<(), SpecializationError<'db>> {
+    let env = ProgramEnvironment::from_program(generic_context.program(db));
+    let is_invalid = match bound_or_constraints {
+        TypeVarBoundOrConstraints::UpperBound(bound) => {
+            let when = assignment.when_constraint_set_assignable_to_owned(db, &env, bound);
+            when.query(|_builder, when| when.is_never_satisfied(db, &env))
         }
-
-        Err(match bound_or_constraints {
-            TypeVarBoundOrConstraints::UpperBound(bound) => SpecializationError::MismatchedBound {
-                bound_typevar,
-                assignment,
-                bound,
-            },
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    assignment,
-                    constraints,
-                }
-            }
-        })
+        // We can't use `when_equivalent_to` here, because that checks full gradual
+        // equivalence, which requires the two types to have exactly the same set of
+        // materializations. That rejects `Any` or `Unknown` against a concrete declared
+        // constraint.
+        //
+        // Instead we use bi-assignability, which correctly rejects strict subtypes and unions
+        // while allowing gradual assignments.
+        TypeVarBoundOrConstraints::Constraints(declared_constraints) => {
+            let constraints = ConstraintSetBuilder::new();
+            let when_valid = declared_constraints.elements(db).iter().copied().when_any(
+                db,
+                &constraints,
+                |declared_constraint| {
+                    let left = assignment.when_constraint_set_assignable_to(
+                        db,
+                        &env,
+                        declared_constraint,
+                        &constraints,
+                    );
+                    let right = declared_constraint.when_constraint_set_assignable_to(
+                        db,
+                        &env,
+                        assignment,
+                        &constraints,
+                    );
+                    left.and(db, &constraints, || right)
+                },
+            );
+            when_valid.is_never_satisfied(db, &env)
+        }
+    };
+    if !is_invalid {
+        return Ok(());
     }
 
+    Err(match bound_or_constraints {
+        TypeVarBoundOrConstraints::UpperBound(bound) => SpecializationError::MismatchedBound {
+            bound_typevar,
+            assignment,
+            bound,
+        },
+        TypeVarBoundOrConstraints::Constraints(constraints) => {
+            SpecializationError::MismatchedConstraint {
+                bound_typevar,
+                assignment,
+                constraints,
+            }
+        }
+    })
+}
+
+impl<'db> Specialization<'db> {
     /// Creates a specialization, replacing invalid assignments with `Unknown` and recording the
     /// corresponding errors.
     pub(crate) fn new(
@@ -1333,7 +1350,6 @@ impl<'db> Specialization<'db> {
         assert_eq!(generic_context.len(db), types.len());
 
         let env = ProgramEnvironment::from_program(generic_context.program(db));
-        let mut constraints = None;
         let mut fallback_types: Option<Vec<_>> = None;
         let mut errors = Vec::new();
 
@@ -1347,11 +1363,9 @@ impl<'db> Specialization<'db> {
             else {
                 continue;
             };
-            let constraints = constraints.get_or_insert_with(ConstraintSetBuilder::new);
-            let Err(error) = Self::validate_type_assignment_with(
+            let Err(error) = validate_type_assignment_with(
                 db,
-                &env,
-                constraints,
+                generic_context,
                 bound_typevar,
                 assignment,
                 bound_or_constraints,
