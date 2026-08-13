@@ -606,10 +606,10 @@ struct ConstraintTables<'db> {
 
 /// Fields that are empty in most use-def maps.
 ///
-/// These fields share an allocation to avoid storing five collection headers in every
+/// These fields share an allocation to avoid storing six collection headers in every
 /// [`UseDefMap`]. They are not otherwise semantically related.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-struct UseDefMapExtra {
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct UseDefMapExtra<'db> {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
 
@@ -627,6 +627,11 @@ struct UseDefMapExtra {
 
     /// Completed loop headers in this scope.
     loop_headers: FrozenIndexVec<LoopHeaderId, LoopHeader>,
+
+    /// Guaranteed member reads contributing to the value of a local definition.
+    ///
+    /// Only definitions with at least one such dependency are retained.
+    member_dependencies_by_definition: Box<[(Definition<'db>, ScopedMemberId)]>,
 }
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
@@ -784,7 +789,7 @@ pub struct UseDefMap<'db> {
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
 
     /// Collection fields omitted when they would all be empty.
-    extra: Option<Box<UseDefMapExtra>>,
+    extra: Option<Box<UseDefMapExtra<'db>>>,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -855,7 +860,7 @@ impl<'db> UseDefMap<'db> {
             .map_or(&EMPTY_CONSTRAINT_TABLES, |tables| tables)
     }
 
-    fn extra(&self) -> &UseDefMapExtra {
+    fn extra(&self) -> &UseDefMapExtra<'db> {
         self.extra
             .as_deref()
             .expect("extra use-def data should have been retained")
@@ -899,6 +904,25 @@ impl<'db> UseDefMap<'db> {
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
+    }
+
+    /// Whether this definition's value necessarily reads `member` before it is assigned.
+    ///
+    /// Dependencies include local aliases when every reaching value of the alias depends on the
+    /// same member. They are recorded while building the semantic index, in Python evaluation
+    /// order, so eager nested-scope expressions and short-circuiting branches are handled together
+    /// with the existing use-definition analysis.
+    pub fn definition_depends_on_member(
+        &self,
+        definition: Definition<'db>,
+        member: ScopedMemberId,
+    ) -> bool {
+        self.extra.as_ref().is_some_and(|extra| {
+            extra
+                .member_dependencies_by_definition
+                .binary_search(&(definition, member))
+                .is_ok()
+        })
     }
 
     pub fn multi_bindings_at_use(
@@ -1815,6 +1839,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     definitions_by_definition:
         FxHashMap<Definition<'db>, DefinitionsAtDefinition<Bindings, Declarations>>,
 
+    /// Guaranteed member reads contributing to the value of a local definition.
+    member_dependencies_by_definition: FxHashMap<Definition<'db>, SmallVec<[ScopedMemberId; 2]>>,
+
     /// Currently live bindings and declarations for each place.
     symbol_states: IndexVec<ScopedSymbolId, PendingPlaceState>,
 
@@ -1854,6 +1881,7 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: Vec::new(),
             control_flow_revision: ControlFlowRevision::default(),
             definitions_by_definition: FxHashMap::default(),
+            member_dependencies_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
             pending_reachability: PendingReachability::default(),
@@ -1987,6 +2015,35 @@ impl<'db> UseDefMapBuilder<'db> {
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = &LiveBinding> {
         self.bindings_by_use[use_id].iter()
+    }
+
+    /// Record the guaranteed member dependencies of a completed assignment.
+    pub(super) fn record_definition_member_dependencies(
+        &mut self,
+        definition: Definition<'db>,
+        mut dependencies: SmallVec<[ScopedMemberId; 2]>,
+    ) {
+        dependencies.sort_unstable();
+        dependencies.dedup();
+        if !dependencies.is_empty() {
+            self.member_dependencies_by_definition
+                .insert(definition, dependencies);
+        }
+    }
+
+    /// Whether any earlier local definition has a guaranteed member dependency.
+    pub(super) fn has_member_dependencies(&self) -> bool {
+        !self.member_dependencies_by_definition.is_empty()
+    }
+
+    /// Guaranteed member dependencies already recorded for an earlier local definition.
+    pub(super) fn definition_member_dependencies(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<&[ScopedMemberId]> {
+        self.member_dependencies_by_definition
+            .get(&definition)
+            .map(SmallVec::as_slice)
     }
 
     pub(super) fn add_predicate(
@@ -2891,10 +2948,21 @@ impl<'db> UseDefMapBuilder<'db> {
             Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
         let loop_headers = self.loop_headers;
+        let mut member_dependencies_by_definition = self
+            .member_dependencies_by_definition
+            .into_iter()
+            .flat_map(|(definition, members)| {
+                members.into_iter().map(move |member| (definition, member))
+            })
+            .collect::<Vec<_>>();
+        member_dependencies_by_definition.sort_unstable();
+        let member_dependencies_by_definition =
+            member_dependencies_by_definition.into_boxed_slice();
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
-            || !loop_headers.is_empty())
+            || !loop_headers.is_empty()
+            || !member_dependencies_by_definition.is_empty())
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
@@ -2902,6 +2970,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 member_states,
                 enclosing_snapshots: enclosing_snapshots.into(),
                 loop_headers: loop_headers.into(),
+                member_dependencies_by_definition,
             })
         });
         let predicates = self.predicates.build();

@@ -1250,6 +1250,54 @@ class Child(Parent):
 reveal_type(Child.value)  # revealed: Before | After
 ```
 
+#### Self-referential assignments to inherited class variables
+
+An ordinary classmethod assignment reads an inherited class attribute before storing its result.
+
+```py
+class Parent:
+    values = ["a"]
+
+class Child(Parent):
+    @classmethod
+    def update(cls) -> None:
+        cls.values = cls.values + ["b"]
+
+reveal_type(Child.values)  # revealed: list[str]
+```
+
+#### Local aliases of inherited class variables
+
+A class attribute remains the source of an ordinary classmethod assignment when its previous value
+passes through a local alias.
+
+```py
+class Parent:
+    values = ["a"]
+
+class Child(Parent):
+    @classmethod
+    def update(cls) -> None:
+        previous = cls.values
+        cls.values = previous + ["b"]
+
+reveal_type(Child.values)  # revealed: list[str]
+```
+
+#### Self-referential class variables without an independent value
+
+An ordinary self-referential classmethod assignment retains its recursive type when no independent
+class attribute exists.
+
+```py
+class Example:
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value
+
+reveal_type(Example.value)  # revealed: Divergent
+```
+
 ### Instance variables with class-level default values
 
 These are instance attributes, but the fact that we can see that they have a binding (not a
@@ -1332,6 +1380,26 @@ class C:
 reveal_type(C().a)  # revealed: int
 reveal_type(C().b)  # revealed: int
 reveal_type(C().c)  # revealed: int
+```
+
+#### Inherited descriptors are bound before self-referential assignments
+
+An inherited non-data descriptor provides an independent value for a self-referential assignment.
+The right-hand side must invoke its descriptor protocol instead of using the stored descriptor.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class Base:
+    value = Descriptor()
+
+class Child(Base):
+    def copy(self) -> None:
+        self.value = self.value  # error: [invalid-assignment]
+
+reveal_type(Child().value)  # revealed: str
 ```
 
 ### Inheritance of class/instance attributes

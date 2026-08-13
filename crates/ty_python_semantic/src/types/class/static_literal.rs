@@ -48,7 +48,7 @@ use crate::{
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::infer_unpack_types,
+        infer::{infer_definition_types, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -64,6 +64,7 @@ use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
     ProgramFile, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
+    place::ScopedPlaceId,
     place_table,
     scope::{Scope, ScopeId},
     semantic_index,
@@ -2875,7 +2876,7 @@ impl<'db> StaticClassLiteral<'db> {
         else {
             return ImplicitAttribute {
                 member: Member::unbound(),
-                augmented_bindings: None,
+                deferred_updates: None,
             };
         };
 
@@ -2897,7 +2898,7 @@ impl<'db> StaticClassLiteral<'db> {
             member: Member {
                 inner: Place::bound(Type::divergent(id)).into(),
             },
-            augmented_bindings: None,
+            deferred_updates: None,
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -2919,7 +2920,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
-        let mut augmented_bindings = Vec::new();
+        let mut deferred_updates = Vec::new();
         let mut provenance = Provenance::Unknown;
 
         let module = parsed_module(db, python_file).load(db);
@@ -3019,7 +3020,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_definition(declaration)
                                     .with_qualifiers(all_qualifiers),
                             },
-                            augmented_bindings: None,
+                            deferred_updates: None,
                         };
                     }
 
@@ -3030,7 +3031,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 return ImplicitAttribute {
                     member: Member { inner: annotation },
-                    augmented_bindings: None,
+                    deferred_updates: None,
                 };
             }
         }
@@ -3090,7 +3091,24 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)) {
-                    augmented_bindings.push(binding);
+                    deferred_updates.push(DeferredMemberUpdate {
+                        definition: binding,
+                        kind: DeferredMemberUpdateKind::RequiresExisting,
+                    });
+                    continue;
+                }
+
+                if !is_attribute_bound
+                    && let DefinitionKind::Assignment(assignment) = binding.kind(db)
+                    && assignment.unpack().is_none()
+                    && let ScopedPlaceId::Member(member) = binding.place(db)
+                    && use_def_map(db, binding.scope(db))
+                        .definition_depends_on_member(binding, member)
+                {
+                    deferred_updates.push(DeferredMemberUpdate {
+                        definition: binding,
+                        kind: DeferredMemberUpdateKind::ReadsPrevious,
+                    });
                     continue;
                 }
 
@@ -3224,6 +3242,27 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        if is_attribute_bound {
+            for update in deferred_updates
+                .iter()
+                .filter(|update| update.kind == DeferredMemberUpdateKind::ReadsPrevious)
+            {
+                let binding = update.definition;
+                let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
+                    continue;
+                };
+                let inferred_ty = infer_expression_type(
+                    db,
+                    index.expression(assignment.value(&module)),
+                    TypeContext::default(),
+                );
+                provenance = provenance.or(Provenance::SingleDefinition(binding));
+                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+            }
+            deferred_updates
+                .retain(|update| update.kind == DeferredMemberUpdateKind::RequiresExisting);
+        }
+
         let member = if is_attribute_bound {
             Member {
                 inner: Place::bound(
@@ -3241,8 +3280,8 @@ impl<'db> StaticClassLiteral<'db> {
 
         ImplicitAttribute {
             member,
-            augmented_bindings: (!augmented_bindings.is_empty())
-                .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
+            deferred_updates: (!deferred_updates.is_empty())
+                .then(|| DeferredMemberUpdates::new(db, deferred_updates.into_boxed_slice())),
         }
     }
 
@@ -3929,25 +3968,41 @@ fn explicit_bases_cycle_fn<'db>(
 /// Attributes assigned by instance methods or classmethods on a single class.
 ///
 /// Ordinary assignments such as `self.value = 1` or `cls.value = 1` establish an attribute
-/// directly. Augmented assignments first require an existing instance or class attribute to supply
+/// directly. Assignments that first read the same attribute are deferred until MRO lookup finds
 /// the value they read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAttribute<'db> {
     /// The attribute established by assignments that do not depend on an existing value.
     pub(super) member: Member<'db>,
-    /// Augmented assignments that require an existing instance or class attribute.
-    pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
+    /// Assignments that read an existing instance or class attribute before writing it.
+    pub(super) deferred_updates: Option<DeferredMemberUpdates<'db>>,
 }
 
-/// Augmented assignments deferred until MRO lookup finds the attribute they read.
+/// Whether a member update can be recovered when no independent value exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum DeferredMemberUpdateKind {
+    /// An ordinary assignment can still describe a genuinely recursive member type.
+    ReadsPrevious,
+    /// An augmented assignment cannot establish an otherwise missing member.
+    RequiresExisting,
+}
+
+/// A member assignment whose value depends on its incoming state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct DeferredMemberUpdate<'db> {
+    pub(super) definition: Definition<'db>,
+    pub(super) kind: DeferredMemberUpdateKind,
+}
+
+/// Member updates deferred until lookup resolves an independently established value.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct AugmentedBindings<'db> {
+pub(super) struct DeferredMemberUpdates<'db> {
     #[returns(deref)]
-    pub(super) definitions: Box<[Definition<'db>]>,
+    pub(super) updates: Box<[DeferredMemberUpdate<'db>]>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for AugmentedBindings<'_> {}
+impl get_size2::GetSize for DeferredMemberUpdates<'_> {}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {
@@ -3961,6 +4016,37 @@ struct ImplicitAttributeName<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
+
+/// Infer an unanchored recursive assignment through the original expression-inference query.
+///
+/// With no independently established attribute, retaining this query's existing cycle behavior
+/// preserves the recursive types inferred before member-dependent assignments were deferred.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, current: Type<'db>, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_definition(definition);
+        current.cycle_normalized(db, &env, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(super) fn unanchored_member_update_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return infer_definition_types(db, definition).binding_type(definition);
+    };
+
+    let program_file = definition.program_file(db);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let index = semantic_index(db, program_file);
+    infer_expression_type(
+        db,
+        index.expression(assignment.value(&module)),
+        TypeContext::default(),
+    )
+}
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {

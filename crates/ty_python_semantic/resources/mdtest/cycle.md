@@ -385,6 +385,283 @@ class Cached:
 reveal_type(Cached().metadata)  # revealed: int
 ```
 
+## Inherited instance attributes when the base is checked first
+
+A self-referential instance assignment preserves the inherited attribute type when the base file is
+checked first.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+## Inherited instance attributes when the subclass is checked first
+
+Reversing the file order must preserve the same inherited attribute type.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Aliased inherited instance attributes when the base is checked first
+
+A local alias must preserve the inherited attribute type when the base file is checked first.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            previous = self.values
+            self.values = [*previous]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        previous = self.values
+        self.values = previous + ["b"]
+```
+
+## Aliased inherited instance attributes when the subclass is checked first
+
+Reversing the file order must preserve the inherited attribute type when its value passes through a
+local alias.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        previous = self.values
+        self.values = previous + ["b"]
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            previous = self.values
+            self.values = [*previous]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Transitive local aliases preserve inherited instance attributes
+
+An inherited attribute remains the source of an assignment even when its value passes through
+multiple local aliases.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        first = self.values
+        second = first
+        self.values = second + ["b"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Annotated local aliases preserve inherited instance attributes
+
+A local type annotation does not change whether its assigned value reads the inherited attribute.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        previous: list[str] = self.values
+        self.values = previous + ["b"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Comprehension iterables preserve inherited instance attributes
+
+A comprehension evaluates its first iterable before assigning its result to the inherited attribute.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        self.values = [value for value in self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Lambda defaults preserve inherited instance attributes
+
+A lambda evaluates its parameter defaults before assigning the result of its call.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self) -> None:
+        self.values = (lambda previous=self.values: previous)() + ["b"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Conditional updates preserve inherited instance attributes
+
+An assignment reads the inherited attribute before writing it when both conditional branches use its
+previous value.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Base:
+    values = ["a"]
+
+class Child(Base):
+    def update(self, flag: bool) -> None:
+        self.values = self.values + ["a"] if flag else self.values + ["b"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Optional attribute reads do not make assignments recursive
+
+Short-circuited boolean operands and later comparison operands do not prevent an assignment from
+establishing an independent attribute value.
+
+```py
+class ShortCircuitAnd:
+    def initialize(self) -> None:
+        self.value = False and self.value
+
+reveal_type(ShortCircuitAnd().value)  # revealed: bool
+
+class ShortCircuitOr:
+    def initialize(self) -> None:
+        self.value = True or self.value
+
+reveal_type(ShortCircuitOr().value)  # revealed: bool
+
+class ChainedComparison:
+    def initialize(self) -> None:
+        self.value = 0 < -1 < self.value
+
+reveal_type(ChainedComparison().value)  # revealed: bool
+```
+
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
 
 This example was minimized from

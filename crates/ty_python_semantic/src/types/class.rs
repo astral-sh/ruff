@@ -10,7 +10,10 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
-use self::static_literal::{AugmentedBindings, ImplicitAttribute};
+use self::static_literal::{
+    DeferredMemberUpdateKind, DeferredMemberUpdates, ImplicitAttribute,
+    unanchored_member_update_type,
+};
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
@@ -2201,7 +2204,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Pair an ordinary member lookup with augmented assignments that first read their target.
+    /// Pair an ordinary member lookup with assignments that first read their target.
     ///
     /// ```python
     /// class Counter:
@@ -2218,14 +2221,14 @@ impl<'db> ClassType<'db> {
     /// MRO lookup can infer either assignment only after locating an existing `value`. If ordinary
     /// lookup suppressed an implicit attribute, such as a generated `NamedTuple` field, its writes
     /// must remain suppressed too.
-    fn member_with_augmented_bindings(
+    fn member_with_deferred_updates(
         self,
         db: &'db dyn Db,
         member: Member<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let augmented_bindings = self
+        let deferred_updates = self
             .static_class_literal(db)
             .map(|(class, _)| {
                 StaticClassLiteral::implicit_attribute_bindings(
@@ -2236,11 +2239,11 @@ impl<'db> ClassType<'db> {
                 )
             })
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
-            .and_then(|implicit| implicit.augmented_bindings);
+            .and_then(|implicit| implicit.deferred_updates);
 
         ImplicitAttribute {
             member,
-            augmented_bindings,
+            deferred_updates,
         }
     }
 
@@ -2781,6 +2784,23 @@ pub(super) struct MroLookup<'db, I> {
     mro_iter: I,
 }
 
+/// Infer a recursive member update using its independently established incoming value.
+///
+/// Keeping that value in the query identity makes cycle recovery independent of which query
+/// first encounters the cycle.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, independent| independent,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn deferred_member_update_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    _independent: Type<'db>,
+) -> Type<'db> {
+    infer_definition_types(db, definition).binding_type(definition)
+}
+
 impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
     fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, mro_iter: I) -> Self {
@@ -2791,7 +2811,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         }
     }
 
-    /// Infer augmented-assignment results after finding the existing attribute they read.
+    /// Infer updates after finding the independently established attribute they read.
     ///
     /// ```python
     /// class Counter:
@@ -2802,34 +2822,55 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///         self.value += (self.value,)
     /// ```
     ///
-    /// Inferring these bindings earlier would recursively look up the same attribute and
+    /// Inferring these updates earlier would recursively look up the same attribute and
     /// allow an augmented assignment to incorrectly establish an otherwise missing attribute.
     /// Once recursive inference produces a concrete result, top-level cycle placeholders do not
     /// represent additional runtime values. Other inferred alternatives remain intact, as do
     /// nested placeholders in genuinely expanding recursive types such as the tuple above.
-    fn infer_augmented_bindings(
+    fn infer_deferred_updates(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
-    ) -> (Type<'db>, Provenance<'db>) {
+        updates: &[(ClassType<'db>, DeferredMemberUpdates<'db>)],
+        independent: Option<Type<'db>>,
+    ) -> Option<(Type<'db>, Provenance<'db>)> {
         let mut union = UnionBuilder::new(db, env);
         let mut provenance = Provenance::Unknown;
 
-        for (class, bindings) in bindings {
+        for (class, updates) in updates {
             let (_, specialization) = class.class_literal_and_specialization(db);
 
-            for definition in bindings.definitions(db) {
-                let inferred_ty = infer_definition_types(db, *definition)
-                    .binding_type(*definition)
-                    .apply_optional_specialization(db, specialization);
+            for update in updates.updates(db) {
+                if independent.is_none()
+                    && update.kind == DeferredMemberUpdateKind::RequiresExisting
+                {
+                    continue;
+                }
+
+                let definition = update.definition;
+                let inferred_ty = match (update.kind, independent) {
+                    (DeferredMemberUpdateKind::ReadsPrevious, Some(independent)) => {
+                        deferred_member_update_type(db, definition, independent)
+                    }
+                    (DeferredMemberUpdateKind::ReadsPrevious, None) => {
+                        unanchored_member_update_type(db, definition)
+                    }
+                    _ => infer_definition_types(db, definition).binding_type(definition),
+                }
+                .apply_optional_specialization(db, specialization);
                 union = union.add(inferred_ty);
-                provenance = provenance.or(Provenance::SingleDefinition(*definition));
+                provenance = provenance.or(Provenance::SingleDefinition(definition));
             }
         }
 
+        if union.is_empty() {
+            return None;
+        }
+
         let inferred_ty = union.build().promote(db, env).promote_singletons(db, env);
-        let inferred_ty = if let Some(elements) =
-            inferred_ty.as_union().map(|union| union.elements(db))
+        // An independent value makes divergent cycle placeholders redundant; without one, they
+        // remain part of the established recursive inference result.
+        let inferred_ty = if independent.is_some()
+            && let Some(elements) = inferred_ty.as_union().map(|union| union.elements(db))
             && elements.iter().any(Type::is_divergent)
             && elements.iter().any(|ty| !ty.is_divergent())
         {
@@ -2842,7 +2883,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             inferred_ty
         };
 
-        (inferred_ty, provenance)
+        Some((inferred_ty, provenance))
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -2871,7 +2912,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut dynamic_type: Option<Type<'db>> = None;
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Undefined(TypeQualifiers::empty()));
-        let mut pending_augmented_bindings = Vec::new();
+        let mut pending_deferred_updates = Vec::new();
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2909,26 +2950,29 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         continue;
                     }
 
-                    let implicit = class.member_with_augmented_bindings(
+                    let implicit = class.member_with_deferred_updates(
                         db,
                         class.own_class_member(db, &self.env, inherited_generic_context, name),
                         name,
                         MethodDecorator::ClassMethod,
                     );
-                    if let Some(bindings) = implicit.augmented_bindings {
-                        pending_augmented_bindings.push((class, bindings));
+                    if let Some(updates) = implicit.deferred_updates {
+                        pending_deferred_updates.push((class, updates));
                     }
 
                     let mut member = implicit.member.inner;
                     if let Place::Defined(defined) = &mut member.place
-                        && !pending_augmented_bindings.is_empty()
+                        && !pending_deferred_updates.is_empty()
                     {
-                        if !defined.origin.is_declared() {
-                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
-                                db,
-                                &self.env,
-                                &pending_augmented_bindings,
-                            );
+                        if !defined.origin.is_declared()
+                            && let Some((inferred_ty, inferred_provenance)) =
+                                Self::infer_deferred_updates(
+                                    db,
+                                    &self.env,
+                                    &pending_deferred_updates,
+                                    Some(defined.ty),
+                                )
+                        {
                             defined.ty = UnionType::from_two_elements(
                                 db,
                                 &self.env,
@@ -2938,7 +2982,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             defined.provenance = defined.provenance.or(inferred_provenance);
                         }
 
-                        pending_augmented_bindings.clear();
+                        pending_deferred_updates.clear();
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
@@ -2952,6 +2996,17 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             if lookup_result.is_ok() {
                 break;
             }
+        }
+
+        if lookup_result.is_err()
+            && !pending_deferred_updates.is_empty()
+            && let Some((inferred_ty, inferred_provenance)) =
+                Self::infer_deferred_updates(db, &self.env, &pending_deferred_updates, None)
+        {
+            lookup_result = Place::bound(inferred_ty)
+                .with_provenance(inferred_provenance)
+                .with_qualifiers(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                .into_lookup_result(db, &self.env);
         }
 
         ClassMemberResult::Done(CompletedMemberLookup {
@@ -2975,7 +3030,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
-        let mut pending_augmented_bindings = Vec::new();
+        let mut independent = None;
+        let mut pending_deferred_updates = Vec::new();
+        let mut receiver_class = None;
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2989,14 +3046,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
-                    let implicit = class.member_with_augmented_bindings(
+                    let receiver_class = *receiver_class.get_or_insert(class);
+                    let implicit = class.member_with_deferred_updates(
                         db,
                         class.own_instance_member(db, &self.env, name),
                         name,
                         MethodDecorator::None,
                     );
-                    if let Some(bindings) = implicit.augmented_bindings {
-                        pending_augmented_bindings.push((class, bindings));
+                    if let Some(updates) = implicit.deferred_updates {
+                        pending_deferred_updates.push((class, updates));
                     }
 
                     if let member @ PlaceAndQualifiers {
@@ -3038,25 +3096,31 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // possibly-declared types):
                         union = union.add(ty);
                         provenance = provenance.or(member_provenance);
+                        independent = Some(independent.map_or(ty, |previous| {
+                            UnionType::from_two_elements(db, &self.env, previous, ty)
+                        }));
 
                         // TODO: We could raise a diagnostic here if there are conflicting type
                         // qualifiers
                         union_qualifiers |= qualifiers;
 
-                        if !pending_augmented_bindings.is_empty() {
-                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
-                                db,
-                                &self.env,
-                                &pending_augmented_bindings,
-                            );
+                        if !pending_deferred_updates.is_empty()
+                            && let Some((inferred_ty, inferred_provenance)) =
+                                Self::infer_deferred_updates(
+                                    db,
+                                    &self.env,
+                                    &pending_deferred_updates,
+                                    independent,
+                                )
+                        {
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
-                            pending_augmented_bindings.clear();
+                            pending_deferred_updates.clear();
                         }
                     }
 
-                    if !pending_augmented_bindings.is_empty()
+                    if !pending_deferred_updates.is_empty()
                         && let class_member @ Member {
                             inner:
                                 PlaceAndQualifiers {
@@ -3073,7 +3137,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         } = class.own_class_member(db, &self.env, None, name)
                     {
                         if !class_member_ty.is_definitely_non_data_descriptor(db, &self.env) {
-                            pending_augmented_bindings.clear();
+                            pending_deferred_updates.clear();
                             continue;
                         }
 
@@ -3086,17 +3150,41 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
-                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
-                                db,
-                                &self.env,
-                                &pending_augmented_bindings,
-                            );
-                            union = union.add(inferred_ty);
-                            provenance = provenance.or(inferred_provenance);
-                            union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+                            // A class stores the descriptor, but an instance assignment first reads
+                            // its bound value using the original receiver rather than its MRO base.
+                            let receiver = Type::instance(db, &self.env, receiver_class);
+                            let class_member_ty = class_member_ty
+                                .try_call_dunder_get(
+                                    db,
+                                    &self.env,
+                                    Some(receiver),
+                                    receiver.to_meta_type(db, &self.env),
+                                )
+                                .unwrap_or_else(|error| Some(error.fallback()))
+                                .map_or(class_member_ty, |result| result.return_type);
+                            let independent = independent.map_or(class_member_ty, |previous| {
+                                UnionType::from_two_elements(
+                                    db,
+                                    &self.env,
+                                    previous,
+                                    class_member_ty,
+                                )
+                            });
+                            if let Some((inferred_ty, inferred_provenance)) =
+                                Self::infer_deferred_updates(
+                                    db,
+                                    &self.env,
+                                    &pending_deferred_updates,
+                                    Some(independent),
+                                )
+                            {
+                                union = union.add(inferred_ty);
+                                provenance = provenance.or(inferred_provenance);
+                                union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+                            }
                         }
 
-                        pending_augmented_bindings.clear();
+                        pending_deferred_updates.clear();
                         if class_member_definedness == Definedness::AlwaysDefined {
                             definitely_bound_member = Some(class_member.inner);
                         }
@@ -3106,6 +3194,19 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::TypedDict;
                 }
             }
+        }
+
+        if !pending_deferred_updates.is_empty()
+            && let Some((inferred_ty, inferred_provenance)) =
+                Self::infer_deferred_updates(db, &self.env, &pending_deferred_updates, independent)
+        {
+            let member = Place::bound(inferred_ty)
+                .with_provenance(inferred_provenance)
+                .with_qualifiers(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
+            union = union.add(inferred_ty);
+            provenance = provenance.or(inferred_provenance);
+            union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
+            definitely_bound_member.get_or_insert(member);
         }
 
         let result = if union.is_empty() {

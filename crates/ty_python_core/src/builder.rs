@@ -29,7 +29,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, DefinitionState, Definitions, DictKeyAssignmentNodeRef,
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
@@ -38,7 +38,7 @@ use crate::definition::{
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
-use crate::member::MemberExprBuilder;
+use crate::member::{MemberExprBuilder, ScopedMemberId};
 use crate::place::{
     PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -239,6 +239,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
+    /// Guaranteed member dependencies collected while evaluating assignment values.
+    assignment_dependencies: Vec<AssignmentDependencies>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -314,6 +316,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
             current_statements: Vec::new(),
+            assignment_dependencies: Vec::new(),
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
@@ -1398,6 +1401,102 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+        self.record_assignment_dependency(place_id, use_id);
+    }
+
+    /// Add the guaranteed member dependencies introduced by a use in an assignment value.
+    fn record_assignment_dependency(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
+        let Some(frame) = self.assignment_dependencies.last() else {
+            return;
+        };
+        if !frame.collecting || frame.optional || frame.scope != self.current_scope() {
+            return;
+        }
+
+        let dependencies = match place {
+            ScopedPlaceId::Member(member)
+                if self
+                    .current_place_table()
+                    .member(member)
+                    .is_instance_attribute() =>
+            {
+                SmallVec::from_slice(&[member])
+            }
+            ScopedPlaceId::Member(_) => return,
+            ScopedPlaceId::Symbol(_) => {
+                let use_def = self.current_use_def_map();
+                if !use_def.has_member_dependencies() {
+                    return;
+                }
+                let mut reaching = use_def.bindings_at_use(use_id);
+                let Some(first) = reaching.next() else {
+                    return;
+                };
+                let DefinitionState::Defined(first) = use_def.definition(first.binding()) else {
+                    return;
+                };
+                let Some(first_dependencies) = use_def.definition_member_dependencies(first) else {
+                    return;
+                };
+                let mut dependencies =
+                    SmallVec::<[ScopedMemberId; 2]>::from_slice(first_dependencies);
+                for binding in reaching {
+                    let DefinitionState::Defined(definition) =
+                        use_def.definition(binding.binding())
+                    else {
+                        return;
+                    };
+                    let Some(next_dependencies) =
+                        use_def.definition_member_dependencies(definition)
+                    else {
+                        return;
+                    };
+                    dependencies.retain(|member| next_dependencies.contains(member));
+                    if dependencies.is_empty() {
+                        return;
+                    }
+                }
+                dependencies
+            }
+        };
+
+        if let Some(frame) = self.assignment_dependencies.last_mut() {
+            for member in dependencies {
+                if !frame.members.contains(&member) {
+                    frame.members.push(member);
+                }
+            }
+        }
+    }
+
+    /// Temporarily prevent optional subexpressions from contributing guaranteed reads.
+    fn visit_optional_assignment_expression(&mut self, expression: &'ast ast::Expr) {
+        let scope = self.current_scope();
+        let previous = self
+            .assignment_dependencies
+            .last_mut()
+            .filter(|frame| frame.scope == scope)
+            .map(|frame| std::mem::replace(&mut frame.optional, true));
+        self.visit_expr(expression);
+        if let Some(previous) = previous
+            && let Some(frame) = self.assignment_dependencies.last_mut()
+        {
+            frame.optional = previous;
+        }
+    }
+
+    /// Retain the guaranteed member dependencies collected for an assignment definition.
+    fn record_definition_member_dependencies(&mut self, definition: Definition<'db>) {
+        let scope = self.current_scope();
+        if let Some(dependencies) = self
+            .assignment_dependencies
+            .last()
+            .filter(|frame| frame.scope == scope && !frame.members.is_empty())
+            .map(|frame| frame.members.clone())
+        {
+            self.current_use_def_map_mut()
+                .record_definition_member_dependencies(definition, dependencies);
+        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -1412,6 +1511,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     },
                 );
 
+                self.record_definition_member_dependencies(assignment);
+
                 self.add_dict_key_assignment_definitions(&node.targets, &node.value, assignment);
             }
             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
@@ -1420,6 +1521,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     place_id,
                     AnnotatedAssignmentDefinitionNodeRef { node: ann_assign },
                 );
+                if place_id.is_symbol() {
+                    self.record_definition_member_dependencies(assignment);
+                }
 
                 if let Some(value) = ann_assign.value.as_deref() {
                     self.add_dict_key_assignment_definitions(
@@ -3679,7 +3783,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
+                let track_dependencies = self.is_method_or_eagerly_executed_in_method().is_some();
+                if track_dependencies {
+                    self.assignment_dependencies.push(AssignmentDependencies {
+                        scope: self.current_scope(),
+                        members: SmallVec::new(),
+                        collecting: true,
+                        optional: false,
+                    });
+                }
                 self.visit_expr(&node.value);
+                if track_dependencies && let Some(frame) = self.assignment_dependencies.last_mut() {
+                    frame.collecting = false;
+                }
 
                 // Unannotated collection initializers must be standalone expressions to participate
                 // in full-scope bidirectional inference.
@@ -3705,12 +3821,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
                 }
+
+                if track_dependencies {
+                    self.assignment_dependencies.pop();
+                }
             }
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.annotation);
+                let track_dependencies = node.target.is_name_expr()
+                    && node.value.is_some()
+                    && self.is_method_or_eagerly_executed_in_method().is_some();
+                if track_dependencies {
+                    self.assignment_dependencies.push(AssignmentDependencies {
+                        scope: self.current_scope(),
+                        members: SmallVec::new(),
+                        collecting: true,
+                        optional: false,
+                    });
+                }
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                    if track_dependencies
+                        && let Some(frame) = self.assignment_dependencies.last_mut()
+                    {
+                        frame.collecting = false;
+                    }
                     if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
                         // if we're inside a method. This allows type inference to infer the type
@@ -3755,6 +3891,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.try_register_narrowing_alias(&node.target, node.value.as_deref());
                 } else {
                     self.visit_expr(&node.target);
+                }
+
+                if track_dependencies {
+                    self.assignment_dependencies.pop();
                 }
             }
             ast::Stmt::AugAssign(
@@ -5037,6 +5177,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 body, test, orelse, ..
             }) => {
                 self.visit_expr(test);
+                let scope = self.current_scope();
+                let dependencies_before_branches = self
+                    .assignment_dependencies
+                    .last()
+                    .filter(|frame| frame.scope == scope && !frame.optional)
+                    .map(|frame| frame.members.clone());
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                     self.flow_restore(snapshots.truthy);
@@ -5050,6 +5196,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.current_use_def_map_mut()
                     .record_range_reachability(body.range(), in_type_checking_block);
                 self.visit_expr(body);
+                let body_dependencies = dependencies_before_branches
+                    .as_ref()
+                    .and_then(|_| self.assignment_dependencies.last())
+                    .map(|frame| frame.members.clone());
+                if let Some(previous) = dependencies_before_branches.as_ref()
+                    && let Some(frame) = self.assignment_dependencies.last_mut()
+                {
+                    frame.members.clone_from(previous);
+                }
                 let post_body = self.flow_snapshot();
                 self.flow_restore(falsy);
 
@@ -5059,6 +5214,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.current_use_def_map_mut()
                     .record_range_reachability(orelse.range(), in_type_checking_block);
                 self.visit_expr(orelse);
+                if let Some(body_dependencies) = body_dependencies
+                    && let Some(frame) = self.assignment_dependencies.last_mut()
+                {
+                    frame
+                        .members
+                        .retain(|member| body_dependencies.contains(member));
+                }
                 self.flow_merge(post_body);
             }
             ast::Expr::ListComp(
@@ -5140,8 +5302,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 ..
             }) => {
                 self.visit_expr(left);
-                for (op, comparator) in ops.iter().zip(comparators) {
-                    self.visit_expr(comparator);
+                for (index, (op, comparator)) in ops.iter().zip(comparators).enumerate() {
+                    if index == 0 {
+                        self.visit_expr(comparator);
+                    } else {
+                        self.visit_optional_assignment_expression(comparator);
+                    }
                     self.record_exception_checkpoint_if(!matches!(
                         op,
                         ast::CmpOp::Is | ast::CmpOp::IsNot
@@ -5167,7 +5333,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let in_type_checking_block = self.in_type_checking_block;
                     self.current_use_def_map_mut()
                         .record_range_reachability(value.range(), in_type_checking_block);
-                    self.visit_expr(value);
+                    if index == 0 {
+                        self.visit_expr(value);
+                    } else {
+                        self.visit_optional_assignment_expression(value);
+                    }
 
                     // Only non-final values can short-circuit this boolean operation. The final
                     // value can still have its own outcome-specific flow if it is nested.
@@ -5588,6 +5758,14 @@ struct CurrentStatement<'ast, 'db> {
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
+}
+
+/// Member reads guaranteed to contribute to the current assignment value.
+struct AssignmentDependencies {
+    scope: FileScopeId,
+    members: SmallVec<[ScopedMemberId; 2]>,
+    collecting: bool,
+    optional: bool,
 }
 
 #[derive(Debug, PartialEq)]
