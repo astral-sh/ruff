@@ -2439,6 +2439,24 @@ enum ConstraintSetInferenceError<'db> {
     Unsatisfiable,
 }
 
+/// Returns the directional comparisons required by this comparison's polarity.
+///
+/// A covariant comparison requires `actual <= formal`, a contravariant comparison requires
+/// `formal <= actual`, and an invariant comparison requires both. Bivariant comparisons add
+/// no constraints.
+fn relation_directions<T: Copy>(
+    formal: T,
+    actual: T,
+    polarity: TypeVarVariance,
+) -> impl Iterator<Item = (T, T)> {
+    [
+        (!polarity.is_contravariant()).then_some((actual, formal)),
+        (!polarity.is_covariant()).then_some((formal, actual)),
+    ]
+    .into_iter()
+    .flatten()
+}
+
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -3017,24 +3035,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Returns the directional comparisons required by this comparison's polarity.
-    ///
-    /// A covariant comparison requires `actual <= formal`, a contravariant comparison requires
-    /// `formal <= actual`, and an invariant comparison requires both. Bivariant comparisons add
-    /// no constraints.
-    fn relation_directions<T: Copy>(
-        formal: T,
-        actual: T,
-        polarity: TypeVarVariance,
-    ) -> impl Iterator<Item = (T, T)> {
-        [
-            (!polarity.is_contravariant()).then_some((actual, formal)),
-            (!polarity.is_covariant()).then_some((formal, actual)),
-        ]
-        .into_iter()
-        .flatten()
-    }
-
     /// Returns the assignability constraints required by this comparison's polarity.
     fn constraint_for_relation(
         &self,
@@ -3043,7 +3043,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         polarity: TypeVarVariance,
     ) -> ConstraintSet<'db, 'c> {
         let db = self.db;
-        Self::relation_directions(formal, actual, polarity).when_all(
+        relation_directions(formal, actual, polarity).when_all(
             db,
             self.constraints,
             |(source, target)| {
@@ -3846,7 +3846,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     // so would recover the original `Any` requirements. Infer from the complete
                     // interface when doing so is cycle-safe; otherwise use its nonrecursive
                     // requirements and leave full recursive compatibility to argument checking.
-                    let when = Self::relation_directions(
+                    let when = relation_directions(
                         (formal_protocol, formal_origin),
                         (actual_protocol, actual_origin),
                         relation_polarity,
