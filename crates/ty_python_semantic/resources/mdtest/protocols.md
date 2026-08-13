@@ -4044,6 +4044,31 @@ class Incompatible(SupportsMethod[T_co]):
         raise NotImplementedError
 ```
 
+## Recursive protocol receiver binding with an overloaded class method
+
+Accessing an overloaded class method on a generic protocol can recursively bind the protocol's
+receiver. The receiver-binding query must converge and preserve both overload signatures.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, overload
+
+class Container[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S) -> object: ...
+    @overload
+    @classmethod
+    def from_value[Self, S](cls: type[Self], value: S, flag: bool) -> object: ...
+
+reveal_type(Container.from_value)  # revealed: Overload[[S](value: S) -> object, [S](value: S, flag: bool) -> object]
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:

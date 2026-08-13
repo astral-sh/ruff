@@ -1107,10 +1107,10 @@ impl<'db> ConstraintSetBuilder<'db> {
             .expect("non-terminal BDD should have source_order");
 
         // Combining constraint sets can allocate a new source-order tree even when the BDD is
-        // unchanged. Preserve each constraint's first source position, but rebuild the persisted
-        // sidecar densely so redundant combinations cannot affect its IDs or owned-set equality.
-        // Unlike node and constraint IDs, source-order IDs are not embedded in the BDD, so the
-        // sidecar can be rebuilt without remapping the BDD.
+        // unchanged. Preserve each relevant constraint's first source position, but rebuild the
+        // persisted sidecar densely so redundant combinations cannot affect its IDs or owned-set
+        // equality. Unlike node and constraint IDs, source-order IDs are not embedded in the BDD,
+        // so the sidecar can be rebuilt without remapping the BDD.
         let mut storage = self.storage.into_inner();
         let source_constraints = storage.calculate_source_orders(Some(source_order));
 
@@ -1139,9 +1139,23 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         let mut source_orders: IndexVec<SourceOrderId, SourceOrder> =
             IndexVec::with_capacity(source_constraints.len().saturating_mul(2).saturating_sub(1));
+        let live_support = storage.node_support(node);
         let source_order = source_constraints
             .into_iter()
             .fold(None, |left, source_constraint| {
+                // Quantified-away constraints can still determine the order of related live
+                // solutions. An unrelated constraint cannot, and keeping its fresh type variables
+                // in a cached value can prevent recursive Salsa queries from reaching a fixed
+                // point. Incomplete supports may hide a relationship, so preserve those entries.
+                let constraint_support = storage.constraint_support(source_constraint);
+                if !used_constraints[source_constraint.index()]
+                    && let Some(live_support) = live_support
+                    && live_support.is_complete()
+                    && constraint_support.is_complete()
+                    && !constraint_support.overlaps_with(live_support)
+                {
+                    return left;
+                }
                 used_constraints.set(source_constraint.index(), true);
                 let right = source_orders.push(SourceOrder::Constraint(source_constraint));
 
@@ -8666,7 +8680,7 @@ mod tests {
     }
 
     #[test]
-    fn owned_constraint_set_type_walk_excludes_quantified_constraints() {
+    fn owned_constraint_set_discards_unrelated_quantified_constraints() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -8693,7 +8707,48 @@ mod tests {
         );
         assert_eq!(
             owned.inner.as_ref().map(|inner| inner.source_orders.len()),
-            Some(3),
+            Some(1),
+        );
+    }
+
+    #[test]
+    fn owned_constraint_set_preserves_related_quantified_constraint_order() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let v = create_typevar(db, "V");
+
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            let u_t = ConstraintSet::constrain_typevar_with_bounds(
+                db,
+                &env,
+                builder,
+                u,
+                None,
+                Some(Type::TypeVar(t)),
+            );
+            let t_v = ConstraintSet::constrain_typevar(
+                db,
+                &env,
+                builder,
+                t,
+                Type::TypeVar(v),
+                Type::TypeVar(v),
+            );
+
+            u_t.and(db, builder, || t_v).reduce_inferable(
+                db,
+                &env,
+                builder,
+                TypeVarSet::from_typevars(db, [t]),
+            )
+        });
+
+        assert_eq!(
+            owned.inner.as_ref().map(|inner| inner.source_orders.len()),
+            Some(5),
         );
     }
 
