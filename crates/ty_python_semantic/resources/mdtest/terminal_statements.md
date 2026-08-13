@@ -627,6 +627,98 @@ finally:
     missing_name  # error: [unresolved-reference]
 ```
 
+## Terminal exception handlers after a context manager
+
+A handler that assigns a value before returning still contributes that value to the `finally` block:
+
+```py
+from contextlib import nullcontext
+
+def handler_returns() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise ValueError
+    except ValueError:
+        value = "returned"
+        return
+    finally:
+        reveal_type(value)  # revealed: Literal["before", "returned"]
+```
+
+The same is true when the handler raises another exception:
+
+```py
+def handler_raises() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise ValueError
+    except ValueError:
+        value = "raised"
+        raise RuntimeError
+    finally:
+        reveal_type(value)  # revealed: Literal["before", "raised"]
+```
+
+## Named exception handlers after a context manager
+
+Binding an exception does not make a terminal handler a continuing entry into `finally`:
+
+```py
+from contextlib import nullcontext
+
+def named_handler() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise ValueError
+    except ValueError as error:
+        value = error
+        return
+    finally:
+        reveal_type(value)  # revealed: Literal["before"] | ValueError
+```
+
+## Multiple terminal exception handlers after a context manager
+
+Every terminal handler contributes its assignment to the `finally` block:
+
+```py
+from contextlib import nullcontext
+
+def multiple_handlers() -> None:
+    value = "before"
+    try:
+        with nullcontext():
+            raise ValueError
+    except ValueError:
+        value = "value-error"
+        return
+    except TypeError:
+        value = "type-error"
+        raise RuntimeError
+    finally:
+        reveal_type(value)  # revealed: Literal["before", "value-error", "type-error"]
+```
+
+## Continuing exception handlers after a context manager
+
+A handler that continues normally determines the value observed by `finally`:
+
+```py
+from contextlib import nullcontext
+
+value = "before"
+try:
+    with nullcontext():
+        raise ValueError
+except ValueError:
+    value = "continuing"
+finally:
+    reveal_type(value)  # revealed: Literal["continuing"]
+```
+
 ## Raising from a context manager inside `except`
 
 A `finally` block remains reachable when a context manager propagates an exception from an exception
@@ -638,6 +730,74 @@ from contextlib import nullcontext
 try:
     raise ValueError
 except ValueError:
+    with nullcontext():
+        raise RuntimeError
+finally:
+    missing_name  # error: [unresolved-reference]
+```
+
+## Raising from a context manager inside a named exception handler
+
+Clearing a named exception does not hide the terminal path from `finally`:
+
+```py
+from contextlib import nullcontext
+
+try:
+    raise ValueError
+except ValueError as error:
+    with nullcontext():
+        raise RuntimeError
+finally:
+    missing_name  # error: [unresolved-reference]
+```
+
+## Terminal nested exception handlers without their own `finally`
+
+A terminal inner handler still reaches the outer `finally` block:
+
+```py
+from contextlib import nullcontext
+
+def nested_return() -> None:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+        except ValueError:
+            local = 1
+            return
+    finally:
+        missing_name  # error: [unresolved-reference]
+```
+
+A `break` through an inner handler also reaches the outer `finally` block:
+
+```py
+for _ in [1]:
+    try:
+        try:
+            with nullcontext():
+                raise ValueError
+        except ValueError:
+            break
+    finally:
+        missing_name  # error: [unresolved-reference]
+```
+
+## Raising from a context manager inside `else`
+
+A `finally` block remains reachable when a context manager propagates an exception from the `else`
+suite:
+
+```py
+from contextlib import nullcontext
+
+try:
+    pass
+except ValueError:
+    pass
+else:
     with nullcontext():
         raise RuntimeError
 finally:

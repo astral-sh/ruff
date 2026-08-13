@@ -171,6 +171,27 @@ impl ExceptionContextStackManager {
         }
     }
 
+    /// Forwards suspended terminal states through a nested `try` without its own cleanup.
+    pub(super) fn propagate_suppressed_terminal_with_exit(
+        &mut self,
+        next_definition_id: ScopedDefinitionId,
+        terminal_snapshots: Vec<FlowSnapshot>,
+    ) {
+        if let Some(context) = self.current_exception_context_stack().innermost_try() {
+            context.suppressed_terminal_with_exit = Some(next_definition_id);
+            context
+                .terminal_finally_entry_snapshots
+                .extend(terminal_snapshots);
+        }
+    }
+
+    /// Removes the suppression marker for the current `try` control-flow branch.
+    pub(super) fn take_suppressed_terminal_with_exit(&mut self) -> Option<ScopedDefinitionId> {
+        self.current_exception_context_stack()
+            .innermost_try()
+            .and_then(|context| context.suppressed_terminal_with_exit.take())
+    }
+
     /// Records a terminal entry for the nearest enclosing `try`, skipping `with` contexts.
     pub(super) fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
         self.current_exception_context_stack()
@@ -302,13 +323,10 @@ pub(super) struct ExceptionContext {
 }
 
 impl ExceptionContext {
-    pub(super) fn into_finally_entry_state(
-        self,
-    ) -> (Vec<FlowSnapshot>, bool, Option<ScopedDefinitionId>) {
+    pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool) {
         (
             self.terminal_finally_entry_snapshots,
             self.has_escaping_exception,
-            self.suppressed_terminal_with_exit,
         )
     }
 }
