@@ -168,16 +168,16 @@ impl ExceptionContextStackManager {
         }
     }
 
-    /// Forwards gated terminal states to the nearest enclosing `try`.
+    /// Forwards a gated terminal state to the nearest enclosing `try`.
     pub(super) fn propagate_suppressed_terminal_with_exit(
         &mut self,
-        terminal_snapshots: Vec<FlowSnapshot>,
+        terminal_snapshot: FlowSnapshot,
     ) {
         if let Some(context) = self.current_exception_context_stack().innermost_try() {
             context.has_suppressed_terminal_with_exit = true;
             context
                 .terminal_finally_entry_snapshots
-                .extend(terminal_snapshots);
+                .push(terminal_snapshot);
         }
     }
 

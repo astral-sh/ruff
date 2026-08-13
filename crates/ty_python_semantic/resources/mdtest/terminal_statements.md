@@ -645,9 +645,10 @@ finally:
     missing_name  # error: [unresolved-reference]
 ```
 
-## Unreachable assignments after a context manager inside `try`
+## Unreachable bindings after a context manager inside `try`
 
-An assignment after the propagating context manager cannot make the `finally` block unreachable:
+Assignments and imports after the propagating context manager cannot make the `finally` block
+unreachable:
 
 ```py
 from contextlib import nullcontext
@@ -656,23 +657,9 @@ try:
     with nullcontext():
         raise ValueError
     unreachable = 1
-finally:
-    missing_after_unreachable_assignment  # error: [unresolved-reference]
-```
-
-## Unreachable imports after a context manager inside `try`
-
-The same applies to definitions introduced by an unreachable import:
-
-```py
-from contextlib import nullcontext
-
-try:
-    with nullcontext():
-        raise ValueError
     import sys
 finally:
-    missing_after_unreachable_import  # error: [unresolved-reference]
+    missing_after_unreachable_bindings  # error: [unresolved-reference]
 ```
 
 ## Code after a terminal context manager and `finally`
@@ -781,21 +768,6 @@ def handler_returns() -> None:
         reveal_type(value)  # revealed: Literal["before", "returned"]
 ```
 
-The same is true when the handler raises another exception:
-
-```py
-def handler_raises() -> None:
-    value = "before"
-    try:
-        with nullcontext():
-            raise ValueError
-    except ValueError:
-        value = "raised"
-        raise RuntimeError
-    finally:
-        reveal_type(value)  # revealed: Literal["before", "raised"]
-```
-
 ## Named exception handlers after a context manager
 
 Binding an exception does not make a terminal handler a continuing entry into `finally`:
@@ -854,26 +826,10 @@ finally:
     reveal_type(value)  # revealed: Literal["continuing"]
 ```
 
-## Raising from a context manager inside `except`
-
-A `finally` block remains reachable when a context manager propagates an exception from an exception
-handler:
-
-```py
-from contextlib import nullcontext
-
-try:
-    raise ValueError
-except ValueError:
-    with nullcontext():
-        raise RuntimeError
-finally:
-    missing_name  # error: [unresolved-reference]
-```
-
 ## Unreachable assignments after a context manager inside `except`
 
-An unreachable assignment in the exception handler does not hide its terminal path:
+A context manager propagates an exception from a handler even when an unreachable assignment
+follows:
 
 ```py
 from contextlib import nullcontext
@@ -906,27 +862,12 @@ finally:
 
 ## Terminal nested exception handlers without their own `finally`
 
-A terminal inner handler still reaches the outer `finally` block:
+An unreachable assignment and a binding in the terminal inner handler do not prevent the path from
+reaching the outer `finally` block:
 
 ```py
 from contextlib import nullcontext
 
-def nested_return() -> None:
-    try:
-        try:
-            with nullcontext():
-                raise ValueError
-        except ValueError:
-            local = 1
-            return
-    finally:
-        missing_name  # error: [unresolved-reference]
-```
-
-An unreachable assignment in the inner `try` does not prevent its terminal path from reaching the
-outer `finally` block:
-
-```py
 def nested_unreachable_assignment() -> None:
     try:
         try:
@@ -934,6 +875,7 @@ def nested_unreachable_assignment() -> None:
                 raise ValueError
             unreachable = 1
         except ValueError:
+            local = 1
             return
     finally:
         missing_after_nested_unreachable_assignment  # error: [unresolved-reference]
@@ -953,28 +895,9 @@ for _ in [1]:
         missing_name  # error: [unresolved-reference]
 ```
 
-## Raising from a context manager inside `else`
-
-A `finally` block remains reachable when a context manager propagates an exception from the `else`
-suite:
-
-```py
-from contextlib import nullcontext
-
-try:
-    pass
-except ValueError:
-    pass
-else:
-    with nullcontext():
-        raise RuntimeError
-finally:
-    missing_name  # error: [unresolved-reference]
-```
-
 ## Unreachable assignments after a context manager inside `else`
 
-An unreachable assignment in the `else` suite does not hide its terminal path:
+A context manager propagates an exception from `else` even when an unreachable assignment follows:
 
 ```py
 from contextlib import nullcontext

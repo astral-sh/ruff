@@ -4554,8 +4554,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.mark_unreachable();
                 } else {
                     let mut post_finally_terminal_predicate = None;
+                    let mut terminal_snapshots = terminal_finally_entry_snapshots.into_iter();
                     if has_suppressed_terminal_with_exit
-                        && !terminal_finally_entry_snapshots.is_empty()
+                        && let Some(snapshot) = terminal_snapshots.next()
                     {
                         let continuation = self.current_use_def_map().reachability;
                         self.current_reachability_constraints_mut()
@@ -4569,37 +4570,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 is_positive: true,
                             }));
 
-                        let mut terminal_snapshots = terminal_finally_entry_snapshots.into_iter();
-                        if let Some(snapshot) = terminal_snapshots.next() {
-                            self.flow_restore(snapshot);
-                            for snapshot in terminal_snapshots {
-                                self.flow_merge(snapshot);
-                            }
+                        self.flow_restore(snapshot);
+                        for snapshot in terminal_snapshots {
+                            self.flow_merge(snapshot);
+                        }
 
-                            let reachability_constraint = self
-                                .current_reachability_constraints_mut()
-                                .add_atom(predicate_id);
-                            let narrowing_constraint = self
-                                .current_use_def_map_mut()
-                                .narrowing_constraints
-                                .add_atom(predicate_id);
-                            self.current_use_def_map_mut()
-                                .record_non_terminal_call_constraints(
-                                    reachability_constraint,
-                                    narrowing_constraint,
-                                );
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let narrowing_constraint = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+                        self.current_use_def_map_mut()
+                            .record_non_terminal_call_constraints(
+                                reachability_constraint,
+                                narrowing_constraint,
+                            );
 
-                            if finalbody.is_empty() {
-                                let terminal_snapshot = self.flow_snapshot();
-                                self.flow_restore(normal_pre_finally_state);
-                                self.exception_context_stack_manager
-                                    .propagate_suppressed_terminal_with_exit(vec![
-                                        terminal_snapshot,
-                                    ]);
-                            } else {
-                                self.flow_merge(normal_pre_finally_state);
-                                post_finally_terminal_predicate = Some(predicate_id);
-                            }
+                        if finalbody.is_empty() {
+                            let terminal_snapshot = self.flow_snapshot();
+                            self.flow_restore(normal_pre_finally_state);
+                            self.exception_context_stack_manager
+                                .propagate_suppressed_terminal_with_exit(terminal_snapshot);
+                        } else {
+                            self.flow_merge(normal_pre_finally_state);
+                            post_finally_terminal_predicate = Some(predicate_id);
                         }
                     }
                     // Mixed normal and terminal entry states are still handled by the normal path
@@ -4633,7 +4629,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let terminal_snapshot = self.flow_snapshot();
                         self.flow_restore(post_finally_state);
                         self.exception_context_stack_manager
-                            .propagate_suppressed_terminal_with_exit(vec![terminal_snapshot]);
+                            .propagate_suppressed_terminal_with_exit(terminal_snapshot);
 
                         let normal_reachability = self
                             .current_reachability_constraints_mut()

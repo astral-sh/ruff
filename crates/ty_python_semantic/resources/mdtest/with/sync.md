@@ -72,10 +72,8 @@ Unpacking the result of `__enter__` can raise after the context manager has ente
 that exception preserves an earlier binding, while a new target may remain undefined:
 
 ```py
-from collections.abc import Iterable
-
 class EmptyIterableManager:
-    def __enter__(self) -> Iterable[int]:
+    def __enter__(self) -> list[int]:
         return []
 
     def __exit__(self, exc_type, exc_value, traceback) -> bool:

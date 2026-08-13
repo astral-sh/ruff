@@ -75,8 +75,7 @@ impl<'db> Type<'db> {
                 return union
                     .elements(db)
                     .iter()
-                    .copied()
-                    .any(|element| can_suppress_exceptions_impl(db, program, element, is_async));
+                    .any(|&element| can_suppress_exceptions_impl(db, program, element, is_async));
             }
 
             let env = ProgramEnvironment::from_program(program);
