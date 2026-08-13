@@ -156,12 +156,7 @@ impl ExceptionContextStackManager {
         self.0.last().is_some_and(|stack| {
             stack.0.iter().any(|context| {
                 matches!(context.kind, ExceptionContextKind::With)
-                    && matches!(
-                        &context.exception_handlers,
-                        ExceptionHandlers::Propagating(snapshots)
-                            | ExceptionHandlers::CatchAll(snapshots)
-                            if !snapshots.is_empty()
-                    )
+                    && context.last_checkpoint_key.is_some()
             })
         })
     }
@@ -171,13 +166,7 @@ impl ExceptionContextStackManager {
         &mut self,
         next_definition_id: ScopedDefinitionId,
     ) {
-        if let Some(context) = self
-            .current_exception_context_stack()
-            .0
-            .iter_mut()
-            .rev()
-            .find(|context| matches!(context.kind, ExceptionContextKind::Try))
-        {
+        if let Some(context) = self.current_exception_context_stack().innermost_try() {
             context.suppressed_terminal_with_exit = Some(next_definition_id);
         }
     }
@@ -273,14 +262,19 @@ impl ExceptionContextStack {
 
     /// Records a terminal entry for the nearest `try` context, skipping intervening `with` contexts.
     fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
-        if let Some(context) = self
-            .0
+        if let Some(context) = self.innermost_try() {
+            context
+                .terminal_finally_entry_snapshots
+                .push(builder.flow_snapshot());
+        }
+    }
+
+    /// Finds the nearest enclosing `try`, skipping context managers.
+    fn innermost_try(&mut self) -> Option<&mut ExceptionContext> {
+        self.0
             .iter_mut()
             .rev()
             .find(|context| matches!(context.kind, ExceptionContextKind::Try))
-        {
-            context.record_terminal_finally_entry(builder.flow_snapshot());
-        }
     }
 }
 
@@ -316,11 +310,5 @@ impl ExceptionContext {
             self.has_escaping_exception,
             self.suppressed_terminal_with_exit,
         )
-    }
-
-    /// Take a record of what the internal state looked like before a terminal control-flow
-    /// transfer that will pass through the `finally` suite.
-    fn record_terminal_finally_entry(&mut self, snapshot: FlowSnapshot) {
-        self.terminal_finally_entry_snapshots.push(snapshot);
     }
 }

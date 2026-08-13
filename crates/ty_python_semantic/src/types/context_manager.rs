@@ -95,31 +95,29 @@ impl<'db> Type<'db> {
                 return false;
             };
 
-            for callable in &callables {
-                for signature in callable.signatures(db) {
-                    if let Some(exception_type) = signature.parameters().get_positional(0)
-                        && exception_type.annotated_type().is_none(db)
-                    {
-                        continue;
-                    }
+            for signature in callables
+                .iter()
+                .flat_map(|callable| callable.signatures(db))
+            {
+                if let Some(exception_type) = signature.parameters().get_positional(0)
+                    && exception_type.annotated_type().is_none(db)
+                {
+                    continue;
+                }
 
-                    let return_type = if is_async {
-                        let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
-                            return false;
-                        };
-                        awaited
-                    } else {
-                        signature.return_ty
+                let return_type = if is_async {
+                    let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
+                        return false;
                     };
+                    awaited
+                } else {
+                    signature.return_ty
+                };
 
-                    if return_type.is_equivalent_to(
-                        db,
-                        &env,
-                        KnownClass::Bool.to_instance(db, &env),
-                    ) || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
-                    {
-                        return true;
-                    }
+                if return_type.is_equivalent_to(db, &env, KnownClass::Bool.to_instance(db, &env))
+                    || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
+                {
+                    return true;
                 }
             }
 

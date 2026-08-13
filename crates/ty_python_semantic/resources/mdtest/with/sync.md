@@ -331,10 +331,15 @@ with ReturnsAny():
 reveal_type(any_result)  # revealed: str
 ```
 
-## Context managers with a union type
+## Context managers with union and aliased union types
 
 A context manager with a union type may suppress an exception if any member can suppress it, even
 when another member cannot:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class Manager:
@@ -358,29 +363,10 @@ def possibly_suppressing(manager: Suppresses | Propagates) -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
-## Context managers with an aliased union type
-
 A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding:
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
-class Suppresses:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> bool:
-        return True
-
-class Propagates:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
-
 type Managers = Suppresses | Propagates
-
-def may_raise() -> str:
-    raise ValueError
 
 def preserved_binding(manager: Managers) -> None:
     result = None
@@ -445,23 +431,6 @@ normal_value = None
 with NormalOnly():
     normal_value = may_raise()
 reveal_type(normal_value)  # revealed: str
-```
-
-A manager that returns `True` when handling an exception preserves the previous binding:
-
-```py
-class ExceptionOnly(Manager):
-    @overload
-    def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> None: ...
-    @overload
-    def __exit__(self, exc_type: type[BaseException], exc_value: BaseException, traceback: object) -> Literal[True]: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
-        return True if exc_type is not None else None
-
-exceptional_value = None
-with ExceptionOnly():
-    exceptional_value = may_raise()
-reveal_type(exceptional_value)  # revealed: None | str
 ```
 
 An exceptional overload can suppress its exception even if another exceptional overload cannot:

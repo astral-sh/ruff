@@ -4019,8 +4019,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ..
             }) => {
                 let was_in_with = std::mem::replace(&mut self.in_with, true);
-                let mut context_managers =
-                    SmallVec::<[(&ast::Expr, Option<Expression<'db>>); 1]>::new();
 
                 for item @ ast::WithItem {
                     range: _,
@@ -4034,24 +4032,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                     self.exception_context_stack_manager.push_with_context();
 
-                    let expression = optional_vars.as_deref().map(|optional_vars| {
-                        let expression = self.add_standalone_expression(context_expr);
+                    if let Some(optional_vars) = optional_vars.as_deref() {
+                        let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
                                 is_async: *is_async,
                             },
                             optional_vars,
-                            expression,
+                            context_manager,
                         );
-                        expression
-                    });
-                    context_managers.push((context_expr, expression));
+                    }
                 }
 
                 self.visit_body(body);
 
-                for (context_expr, expression) in context_managers.into_iter().rev() {
+                for item in items.iter().rev() {
                     let mut exceptional_entries = self
                         .exception_context_stack_manager
                         .finish_with_context()
@@ -4065,7 +4061,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.exception_context_stack_manager
                                 .record_suppressed_terminal_with_exit(next_definition_id);
                         }
-                        let expression = expression
+                        let context_expr = &item.context_expr;
+                        let expression = self
+                            .expressions_by_node
+                            .get(&ExpressionNodeKey::from(context_expr))
+                            .copied()
                             .unwrap_or_else(|| self.add_standalone_expression(context_expr));
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::ContextManagerSuppresses {
