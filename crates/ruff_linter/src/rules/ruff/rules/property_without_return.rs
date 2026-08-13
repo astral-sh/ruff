@@ -1,7 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
+use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
@@ -55,7 +57,7 @@ impl Violation for PropertyWithoutReturn {
 pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunctionDef) {
     let semantic = checker.semantic();
 
-    if checker.source_type.is_stub() || semantic.in_protocol_or_abstract_method() {
+    if checker.source_type.is_stub() {
         return;
     }
 
@@ -69,8 +71,25 @@ pub(crate) fn property_without_return(checker: &Checker, function_def: &StmtFunc
     let extra_property_decorators = checker.settings().pydocstyle.property_decorators();
     if !visibility::is_property(decorator_list, extra_property_decorators, semantic)
         || visibility::is_overload(decorator_list, semantic)
+        || visibility::is_abstract(decorator_list, semantic)
         || function_type::is_stub(function_def, semantic)
     {
+        return;
+    }
+
+    // A property is only exempt when its *owning* class is a protocol — the class the
+    // method is directly defined in. A concrete class does not become a protocol just
+    // because an enclosing class is one, so we check the nearest class scope rather than
+    // any ancestor.
+    let owner_is_protocol = matches!(
+        semantic.current_scope().kind,
+        ScopeKind::Class(class_def)
+            if class_def
+                .bases()
+                .iter()
+                .any(|base| semantic.match_typing_expr(map_subscript(base), "Protocol"))
+    );
+    if owner_is_protocol {
         return;
     }
 
@@ -104,6 +123,9 @@ impl Visitor<'_> for PropertyVisitor {
 
         match expr {
             Expr::Yield(_) | Expr::YieldFrom(_) => self.found = true,
+            // Lambdas are a separate scope; a `yield` (or any fall-through) inside a
+            // lambda body belongs to the lambda, not the enclosing property.
+            Expr::Lambda(_) => {}
             _ => walk_expr(self, expr),
         }
     }

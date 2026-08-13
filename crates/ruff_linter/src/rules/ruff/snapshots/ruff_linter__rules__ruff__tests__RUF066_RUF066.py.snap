@@ -29,3 +29,23 @@ RUF066 `prop2` is a property without a `return` statement
    |         ^^^^^
 44 |         50
    |
+
+RUF066 `generator_lambda` is a property without a `return` statement
+  --> RUF066.py:75:9
+   |
+73 | class Nested:  # A `yield` in a nested lambda belongs to the lambda, not the property
+74 |     @property
+75 |     def generator_lambda(self):  # ERROR: The property itself falls through
+   |         ^^^^^^^^^^^^^^^^
+76 |         lambda: (yield 1)
+   |
+
+RUF066 `nested_concrete_property` is a property without a `return` statement
+  --> RUF066.py:82:13
+   |
+80 |     class Concrete:
+81 |         @property
+82 |         def nested_concrete_property(self):  # ERROR: Owning class is concrete, not a protocol
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+83 |             self.value
+   |

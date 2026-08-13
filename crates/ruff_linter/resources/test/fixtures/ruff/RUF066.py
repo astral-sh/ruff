@@ -68,3 +68,16 @@ class File:  # Extra tests for things like yield/yield from/raise
     @property
     def children(self):  # OK: Raises
         raise ValueError("File does not have children")
+
+
+class Nested:  # A `yield` in a nested lambda belongs to the lambda, not the property
+    @property
+    def generator_lambda(self):  # ERROR: The property itself falls through
+        lambda: (yield 1)
+
+
+class OuterProtocol(typing.Protocol):  # A concrete class nested in a Protocol is not a protocol
+    class Concrete:
+        @property
+        def nested_concrete_property(self):  # ERROR: Owning class is concrete, not a protocol
+            self.value
