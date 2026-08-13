@@ -1229,6 +1229,10 @@ AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
 Command = A[AnyCallback] | B[AnyCallback]
 Callback = TypeVar("Callback", bound=Callable[[int], str])
 
+# TODO: The explicit specialization Command[Callback] is actually where the error is introduced:
+# Callback ≤ AnyCallback is fine, but there's a nested substitution that produces B[Callback], and
+# Callback does _not_ satisfy the upper bound of BItem. Our specialization validation logic does not
+# catch this because it currently only checks the typevars of the top-most specialization.
 def access(value: Callback | Command[Callback]) -> None:
     if isinstance(value, A | B):
         # error: [invalid-attribute-access]
