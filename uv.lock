@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 4
 requires-python = ">=3.7"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -623,7 +623,7 @@ wheels = [
 
 [[package]]
 name = "ruff"
-version = "0.16.2"
+version = "0.16.3"
 source = { editable = "." }
 
 [package.dev-dependencies]
@@ -633,12 +633,6 @@ dev = [
 release = [
     { name = "rooster", marker = "python_full_version >= '3.12'" },
 ]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [{ name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.4.12" }]
-release = [{ name = "rooster", marker = "python_full_version >= '3.12'", specifier = "==0.1.1" }]
 
 [[package]]
 name = "shellingham"
