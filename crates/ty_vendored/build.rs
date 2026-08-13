@@ -52,9 +52,10 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
 
     let options = SimpleFileOptions::default()
         .compression_method(method)
+        .last_modified_time(zip::DateTime::default())
         .unix_permissions(0o644);
 
-    for entry in walkdir::WalkDir::new(TYPESHED_SOURCE_DIR) {
+    for entry in walkdir::WalkDir::new(TYPESHED_SOURCE_DIR).sort_by_file_name() {
         let dir_entry = entry.unwrap();
         let absolute_path = dir_entry.path();
         let normalized_relative_path = absolute_path
@@ -66,7 +67,6 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
         // Write file or directory explicitly
         // Some unzip tools unzip files with directory paths correctly, some do not!
         if absolute_path.is_file() {
-            println!("adding file {absolute_path:?} as {normalized_relative_path:?} ...");
             zip.start_file(&*normalized_relative_path, options)?;
             let mut f = File::open(absolute_path)?;
             std::io::copy(&mut f, &mut zip).unwrap();
@@ -78,7 +78,6 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
         } else if !normalized_relative_path.is_empty() {
             // Only if not root! Avoids path spec / warning
             // and mapname conversion failed error on unzip
-            println!("adding dir {absolute_path:?} as {normalized_relative_path:?} ...");
             zip.add_directory(normalized_relative_path, options)?;
         }
     }
@@ -86,7 +85,6 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
     // Patch typeshed and add the stubs for the `ty_extensions` package.
     zip.add_directory("stdlib/ty_extensions/", options)?;
     for (source, destination) in TY_EXTENSIONS_STUBS {
-        println!("adding file {source} as {destination} ...");
         zip.start_file(destination, options)?;
         let mut f = File::open(source)?;
         std::io::copy(&mut f, &mut zip).unwrap();
@@ -96,6 +94,12 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed={TYPESHED_SOURCE_DIR}");
+    for (source, _) in TY_EXTENSIONS_STUBS {
+        println!("cargo:rerun-if-changed={source}");
+    }
+
     assert!(
         Path::new(TYPESHED_SOURCE_DIR).is_dir(),
         "Where is typeshed?"
