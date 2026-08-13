@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.16.3
+
+Released on 2026-08-13.
+
+### Preview features
+
+- \[`pylint`\] Fix false negatives on negative numbers (`PLR6104`) ([#27251](https://github.com/astral-sh/ruff/pull/27251))
+- \[`pyupgrade`\] Add rule to replace `while 1` with `while True` (`UP048`) ([#27190](https://github.com/astral-sh/ruff/pull/27190))
+
+### Bug fixes
+
+- \[`flake8-bandit`\] Also check keyword arguments (`S602`, `S603`, `S607`, `S609`) ([#27687](https://github.com/astral-sh/ruff/pull/27687))
+- \[`pylint`\] Allow `continue` in `finally` on Python 3.8 ([#27626](https://github.com/astral-sh/ruff/pull/27626))
+- \[`pylint`\] Fix `PLE1307` false positive with bools ([#27651](https://github.com/astral-sh/ruff/pull/27651))
+- \[`pylint`\] Fix false positives and negatives with `%b` format character (`PLE1300`, `PLE1307`) ([#27560](https://github.com/astral-sh/ruff/pull/27560))
+- \[`pylint`\] Improve handling of concatenated strings (`PLE1300`) ([#27659](https://github.com/astral-sh/ruff/pull/27659))
+
+### Rule changes
+
+- \[`numpy`\] Make `np.chararray` autofix backwards-compatible (`NPY201`) ([#27527](https://github.com/astral-sh/ruff/pull/27527))
+
+### Performance
+
+- Enable PGO for Linux x86-64 Ruff releases ([#27570](https://github.com/astral-sh/ruff/pull/27570))
+- Enable PGO for Linux ARM64 Ruff releases ([#27574](https://github.com/astral-sh/ruff/pull/27574))
+- Enable PGO for Windows x86-64 Ruff releases ([#27573](https://github.com/astral-sh/ruff/pull/27573))
+- Enable PGO for macOS ARM64 Ruff releases ([#27572](https://github.com/astral-sh/ruff/pull/27572))
+- Reduce `Expr` size to 64 bytes ([#27591](https://github.com/astral-sh/ruff/pull/27591))
+
+### CLI
+
+- Hyperlink rule codes in `ruff check --statistics` output ([#27646](https://github.com/astral-sh/ruff/pull/27646))
+
+### Documentation
+
+- \[`ruff`\] Also suggest `asyncio.TaskGroup` (`RUF006`) ([#27461](https://github.com/astral-sh/ruff/pull/27461))
+
+### Other changes
+
+- Use mimalloc v3 ([#27586](https://github.com/astral-sh/ruff/pull/27586))
+
+### Contributors
+
+- [@Andrej730](https://github.com/Andrej730)
+- [@alonfaraj](https://github.com/alonfaraj)
+- [@romero-deshaw](https://github.com/romero-deshaw)
+- [@Avasam](https://github.com/Avasam)
+- [@tjkuson](https://github.com/tjkuson)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@chirizxc](https://github.com/chirizxc)
+- [@saberoueslati](https://github.com/saberoueslati)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.16.2
 
 Released on 2026-08-06.

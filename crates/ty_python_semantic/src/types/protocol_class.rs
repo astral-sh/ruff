@@ -400,7 +400,11 @@ impl<'db> ProtocolInterfaceView<'db> {
         })
     }
 
-    fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
+    pub(super) fn member_by_name<'a>(
+        self,
+        db: &'db dyn Db,
+        name: &'a str,
+    ) -> Option<ProtocolMember<'a, 'db>> {
         self.interface
             .inner(db)
             .get(name)
@@ -903,31 +907,16 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
     ) -> impl std::fmt::Display + 'env {
-        struct ProtocolInterfaceDisplay<'env, 'db> {
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-            interface: ProtocolInterface<'db>,
-        }
-
-        impl std::fmt::Display for ProtocolInterfaceDisplay<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                f.write_char('{')?;
-                for (i, (name, data)) in self.interface.inner(db).iter().enumerate() {
-                    write!(f, "\"{name}\": {data}", data = data.display(db, self.env))?;
-                    if i < self.interface.inner(db).len() - 1 {
-                        f.write_str(", ")?;
-                    }
+        std::fmt::from_fn(move |f| {
+            f.write_char('{')?;
+            for (i, (name, data)) in self.inner(db).iter().enumerate() {
+                write!(f, "\"{name}\": {data}", data = data.display(db, env))?;
+                if i < self.inner(db).len() - 1 {
+                    f.write_str(", ")?;
                 }
-                f.write_char('}')
             }
-        }
-
-        ProtocolInterfaceDisplay {
-            db,
-            env,
-            interface: self,
-        }
+            f.write_char('}')
+        })
     }
 }
 
@@ -1617,60 +1606,37 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn display<'env>(
-        &self,
+    fn display<'a, 'env>(
+        &'a self,
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
-    ) -> impl std::fmt::Display + 'env {
-        struct ProtocolMemberDataDisplay<'env, 'db> {
-            db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
-            kind: ProtocolMemberKind<'db>,
-            qualifiers: TypeQualifiers,
-        }
-
-        impl std::fmt::Display for ProtocolMemberDataDisplay<'_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let db = self.db;
-                match self.kind {
-                    ProtocolMemberKind::Method(member, _) => {
-                        write!(f, "MethodMember(`{}`)", member.ty().display(db, self.env))
-                    }
-                    ProtocolMemberKind::Property { read, write } => {
-                        let env = self.env;
-                        let mut d = f.debug_struct("PropertyMember");
-                        if let Some(read) = read.and_then(|read| read.resolve(db, env)) {
-                            d.field(
-                                "read",
-                                &format_args!("`{}`", read.ty().display(db, self.env)),
-                            );
-                        }
-                        if let Some(write) = write.and_then(|write| write.display_type(db, env)) {
-                            d.field(
-                                "write",
-                                &format_args!("`{}`", write.ty().display(db, self.env)),
-                            );
-                        }
-                        d.finish()
-                    }
-                    ProtocolMemberKind::Attribute(attribute) => {
-                        f.write_str("AttributeMember(")?;
-                        write!(f, "`{}`", attribute.ty().display(db, self.env))?;
-                        if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                            f.write_str("; ClassVar")?;
-                        }
-                        f.write_char(')')
-                    }
-                }
+    ) -> impl std::fmt::Display + 'a
+    where
+        'env: 'a,
+    {
+        std::fmt::from_fn(move |f| match self.kind {
+            ProtocolMemberKind::Method(member, _) => {
+                write!(f, "MethodMember(`{}`)", member.ty().display(db, env))
             }
-        }
-
-        ProtocolMemberDataDisplay {
-            db,
-            env,
-            kind: self.kind,
-            qualifiers: self.qualifiers,
-        }
+            ProtocolMemberKind::Property { read, write } => {
+                let mut d = f.debug_struct("PropertyMember");
+                if let Some(read) = read.and_then(|read| read.resolve(db, env)) {
+                    d.field("read", &format_args!("`{}`", read.ty().display(db, env)));
+                }
+                if let Some(write) = write.and_then(|write| write.display_type(db, env)) {
+                    d.field("write", &format_args!("`{}`", write.ty().display(db, env)));
+                }
+                d.finish()
+            }
+            ProtocolMemberKind::Attribute(attribute) => {
+                f.write_str("AttributeMember(")?;
+                write!(f, "`{}`", attribute.ty().display(db, env))?;
+                if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                    f.write_str("; ClassVar")?;
+                }
+                f.write_char(')')
+            }
+        })
     }
 }
 

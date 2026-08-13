@@ -324,7 +324,13 @@ impl SemanticSyntaxChecker {
 
                 if !ctx.in_module_scope() {
                     for name in names {
-                        if !ctx.has_nonlocal_binding(name) {
+                        if ctx.is_bound_parameter(name) {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::NonlocalParameter(name.to_string()),
+                                name.range,
+                            );
+                        } else if !ctx.has_nonlocal_binding(name) {
                             Self::add_error(
                                 ctx,
                                 SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
@@ -1432,6 +1438,12 @@ impl Display for SemanticSyntaxError {
                     "name `{name}` cannot refer to a parameter and a global variable"
                 )
             }
+            SemanticSyntaxErrorKind::NonlocalParameter(name) => {
+                write!(
+                    f,
+                    "name `{name}` cannot refer to a parameter and a nonlocal variable"
+                )
+            }
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
                 write!(f, "alternative patterns bind different names")
             }
@@ -1870,6 +1882,13 @@ pub enum SemanticSyntaxErrorKind {
     /// bound in the local scope of the function. Using `global` on them introduces
     /// ambiguity and will result in a `SyntaxError`.
     GlobalParameter(String),
+
+    /// Represents a function parameter that is also declared as `nonlocal`.
+    ///
+    /// Declaring a parameter as `nonlocal` is invalid, since parameters are already
+    /// bound in a local scope of the function. using `nonlocal` on them introduces
+    /// ambiguity and will result in a `SyntaxError`.
+    NonlocalParameter(String),
 
     /// Represents the use of alternative patterns in a `match` statement that bind different names.
     ///

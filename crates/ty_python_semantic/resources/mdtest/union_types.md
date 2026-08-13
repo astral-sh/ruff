@@ -393,8 +393,9 @@ def gradual_aliases(
     reveal_type(nested_last)  # revealed: Covariant[NestedGradualAlias]
 ```
 
-Matching materialization endpoints do not establish that gradual tuple arguments have the same
-shape. A bounded generic must preserve which tuple position contains the gradual element.
+Matching top materializations do not establish that gradual tuple arguments have the same shape. A
+bounded generic must preserve which tuple position contains the gradual element, including in its
+bottom materialization.
 
 ```py
 from ty_extensions import Bottom, Top, static_assert
@@ -408,7 +409,7 @@ class C[T: tuple[int, int]]:
         raise NotImplementedError
 
 static_assert(is_equivalent_to(Top[C[L]], Top[C[R]]))
-static_assert(is_equivalent_to(Bottom[C[L]], Bottom[C[R]]))
+static_assert(not is_equivalent_to(Bottom[C[L]], Bottom[C[R]]))
 static_assert(not is_equivalent_to(C[L], C[R]))
 static_assert(not is_equivalent_to(C[L] | C[R], C[L]))
 static_assert(not is_equivalent_to(C[R] | C[L], C[R]))

@@ -99,6 +99,22 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited specializations containing `Never`
+
+A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
+arguments to a generic base.
+
+```py
+from typing import Any, Never
+
+class Kind[*Ts]: ...
+class SupportsKind[*Ts](Kind[*Ts]): ...
+class Container(SupportsKind[int, Never]): ...
+
+def _(value: Container) -> None:
+    expected: Kind[int, Any] = value
+```
+
 ### `TypeVarTuple` with `ParamSpec`
 
 ```py
@@ -953,6 +969,21 @@ def _(
     reveal_type(a8)  # revealed: tuple[bool]
     reveal_type(a9)  # revealed: tuple[int, str, bool]
     reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+```
+
+### Aliases containing `Never`
+
+A variadic alias retains each specialized argument even when a later argument is `Never`.
+
+```py
+from typing import Never
+
+class Container[*Ts]: ...
+
+type Padded[T] = Container[T, Never]
+
+def _(value: Padded[int]) -> None:
+    reveal_type(value)  # revealed: Container[int, Never]
 ```
 
 ### Unpacked tuple type arguments

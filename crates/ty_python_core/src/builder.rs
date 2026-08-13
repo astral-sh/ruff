@@ -2213,22 +2213,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Returns whether an exception raised while evaluating `scope` can propagate directly to its
-    /// enclosing scope. Generator-expression bodies are lazy even though they share the
-    /// comprehension scope kind; their eagerly evaluated first iterable is visited before entering
-    /// the generator scope.
+    /// enclosing scope.
     ///
-    /// Only the list comprehension's call can reach the handler immediately:
+    /// Generator expressions follow the eager comprehension-scope convention used throughout our
+    /// flow model. Although generators are lazy at runtime, their bodies are assumed to execute
+    /// immediately, since in practice they are almost always eagerly iterated over.
     ///
     /// ```python
     /// try:
-    ///     [may_raise() for _ in [0]]
     ///     (may_raise() for _ in [0])
     /// except Exception:
     ///     ...
     /// ```
     fn exception_checkpoint_crosses_scope_boundary(&self, scope_id: FileScopeId) -> bool {
-        let scope = &self.scopes[scope_id];
-        scope.is_eager() && !matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_))
+        self.scopes[scope_id].is_eager()
     }
 
     /// Records the current flow state immediately before an operation that may raise an exception.
@@ -2896,9 +2894,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.record_exception_checkpoint_if(loopback_can_raise);
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
-        if !matches!(scope, NodeWithScopeRef::GeneratorExpression(_)) {
-            self.record_exception_checkpoint();
-        }
+        self.record_exception_checkpoint();
 
         self.current_assignments = saved_assignments;
 
@@ -4593,7 +4589,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
-                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                    if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
+                        && !symbol.is_parameter()
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
                                 name: name.to_string(),
