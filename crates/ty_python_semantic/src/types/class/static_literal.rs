@@ -44,11 +44,11 @@ use crate::{
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
-            DataclassTransformerParams, KnownFunction, is_implicit_classmethod,
+            DataclassTransformerParams, FunctionDecorators, KnownFunction, is_implicit_classmethod,
             is_implicit_staticmethod,
         },
         generics::Specialization,
-        infer::infer_unpack_types,
+        infer::{function_known_decorator_flags, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -2887,7 +2887,9 @@ impl<'db> StaticClassLiteral<'db> {
             target_method_decorator,
         );
 
-        if let Some(incoming) = self.independent_attribute_value(db, attribute) {
+        if !implicit_attribute_has_declaration(db, attribute)
+            && let Some(incoming) = self.independent_attribute_value(db, attribute)
+        {
             Self::implicit_attribute_anchored(db, attribute, incoming)
         } else {
             Self::implicit_attribute_inner(db, attribute)
@@ -4050,18 +4052,72 @@ struct ImplicitAttributeName<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
+/// Returns whether a matching method explicitly declares this attribute.
+///
+/// Local declarations take precedence over inherited values used for cycle recovery.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_has_declaration<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+) -> bool {
+    let class_body_scope = attribute.class_body_scope(db);
+    let index = semantic_index(db, class_body_scope.program_file(db));
+
+    attribute_declarations(db, class_body_scope, attribute.name(db).as_str()).any(
+        |(mut declarations, method_scope_id)| {
+            let method_scope = index.scope(method_scope_id);
+            if let Some(method_def) = method_scope.node().as_function() {
+                let definition = index.expect_single_definition(method_def);
+                let decorators = function_known_decorator_flags(db, definition);
+                let method_name = definition.name(db);
+                let is_classmethod = decorators.contains(FunctionDecorators::CLASSMETHOD)
+                    || method_name.as_deref().is_some_and(is_implicit_classmethod);
+                let is_staticmethod = decorators.contains(FunctionDecorators::STATICMETHOD)
+                    || method_name.as_deref().is_some_and(is_implicit_staticmethod);
+
+                let is_valid_scope = match attribute.target_method_decorator(db) {
+                    MethodDecorator::None => !is_classmethod && !is_staticmethod,
+                    MethodDecorator::ClassMethod => is_classmethod,
+                    MethodDecorator::StaticMethod => is_staticmethod,
+                };
+                if !is_valid_scope {
+                    return false;
+                }
+            }
+
+            declarations.any(|declaration| {
+                matches!(
+                    declaration.declaration,
+                    DefinitionState::Defined(definition)
+                        if matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+                )
+            })
+        },
+    )
+}
+
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
+        let place_table = index.place_table(function_scope_id);
+        let use_def = index.use_def_map(function_scope_id);
+        names.extend(place_table.members().filter_map(|member| {
+            let name = member.as_instance_attribute()?;
+            let member_id = place_table.member_id_by_instance_attribute_name(name)?;
+            let has_binding = use_def
+                .reachable_member_bindings(member_id)
+                .any(|binding| matches!(binding.binding, DefinitionState::Defined(_)));
+            (has_binding
+                || use_def
+                    .reachable_member_declarations(member_id)
+                    .any(|declaration| {
+                        matches!(declaration.declaration, DefinitionState::Defined(_))
+                    }))
+            .then(|| Name::new(name))
+        }));
     }
 
     names.sort_unstable();

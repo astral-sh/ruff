@@ -1531,6 +1531,26 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
+### Explicit subclass annotations override inferred inherited attributes
+
+A subclass's explicit instance-attribute annotation takes precedence over an inferred superclass
+attribute, even when its initializer reads the inherited value.
+
+```py
+class Parent:
+    def __init__(self, value: str) -> None:
+        self.extras = {value}
+
+class Child(Parent):
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.extras: tuple[str, ...] = tuple(self.extras)
+
+def record(child: Child, values: dict[Child, tuple[str, ...]]) -> None:
+    reveal_type(child.extras)  # revealed: tuple[str, ...]
+    values[child] = child.extras
+```
+
 ## Allow replacing ordinary methods with compatible functions
 
 An ordinary method can be replaced directly on a class by another function with a compatible
@@ -4820,6 +4840,31 @@ class C:
         return t
 
 reveal_type(C().x)  # revealed: int
+```
+
+### Decorated methods on generic classes preserve instance binding
+
+An identity-decorated method on a generic class must see other instance methods as bound, and
+subclasses must be able to override those methods normally.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def callback[F](function: F) -> F:
+    return function
+
+class Base[T]:
+    def update(self) -> None: ...
+    @callback
+    def run(self) -> None:
+        reveal_type(self.update)  # revealed: bound method Self@run.update() -> None
+        self.update()
+
+class Child(Base[int]):
+    def update(self) -> None: ...
 ```
 
 ### Attributes defined in methods with unknown decorators
