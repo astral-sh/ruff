@@ -217,7 +217,7 @@ def caught_before_suppression() -> int:
             return 1
 ```
 
-## Eager and lazy expressions inside a suppressing context manager
+## Eager expressions inside a suppressing context manager
 
 A list comprehension evaluates its body eagerly, so a context manager can suppress an exception
 raised inside it:
@@ -235,10 +235,11 @@ def eager_comprehension() -> int:
         return 1
 ```
 
-A generator expression does not evaluate its body until it is iterated:
+Generator expressions are also assumed to run eagerly, so their exceptions can be suppressed:
 
 ```py
-def lazy_generator() -> int:
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+def eager_generator() -> int:
     with suppress(ValueError):
         (may_raise() for _ in [0])
         return 1
