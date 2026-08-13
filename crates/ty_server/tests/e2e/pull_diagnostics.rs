@@ -1482,6 +1482,8 @@ fn extract_result_ids_from_response(response: &WorkspaceDiagnosticReport) -> Vec
 
 mod uv_metadata {
     use lsp_types::{Code, TextDocumentContentChangeEvent, TextDocumentContentChangeWholeDocument};
+    #[cfg(feature = "test-uv")]
+    use ruff_db::system::{OsSystem, System as _};
     use ty_project::UseUv;
 
     use super::{DocumentDiagnosticReport, Result, SystemPath, TestServerBuilder};
@@ -1518,6 +1520,47 @@ mod uv_metadata {
                 }),
             "expected the script synchronization failure to be reported: {report:?}"
         );
+
+        Ok(())
+    }
+
+    #[cfg(feature = "test-uv")]
+    #[test]
+    fn invalid_script_dependency_preserves_uv_error_context() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source = "# /// script\n# dependencies = [\"httpx\", \"\"]\n# ///\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", OsSystem::default().which("uv")?.into_string())
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+        server.await_diagnostic_refresh();
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the script");
+        };
+        let diagnostic = report
+            .full_document_diagnostic_report
+            .items
+            .iter()
+            .find(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+            .ok_or_else(|| anyhow::anyhow!("expected the script synchronization error"))?;
+        let lsp_types::Message::String(message) = &diagnostic.message else {
+            anyhow::bail!("expected a plain-text diagnostic message");
+        };
+
+        assert!(message.contains("TOML parse error at line 1, column 26"));
+        assert!(message.contains("\ninfo: 1 | dependencies = [\"httpx\", \"\"]"));
+        assert!(message.contains("\ninfo:   |                          ^^"));
+        assert!(message.contains("\ninfo: Empty field is not allowed for PEP508\ninfo: \ninfo: ^"));
 
         Ok(())
     }

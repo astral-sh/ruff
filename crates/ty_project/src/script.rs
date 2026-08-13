@@ -351,10 +351,17 @@ impl ScriptConfigurationDiagnostics {
 }
 
 fn uv_metadata_diagnostic(file: File, message: &str) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, message);
+    let mut lines = message.lines();
+    let headline = lines.next().unwrap_or(message);
+    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, headline);
     let mut annotation = Annotation::primary(Span::from(file));
     annotation.hide_snippet(true);
     diagnostic.annotate(annotation);
+
+    for line in lines {
+        diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, line));
+    }
+
     diagnostic
 }
 

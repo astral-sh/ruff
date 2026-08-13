@@ -1707,4 +1707,49 @@ mod uv_metadata {
 
         Ok(())
     }
+
+    #[test]
+    fn invalid_script_dependency_preserves_uv_error_context() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = CliTest::with_file(
+            "script.py",
+            "# /// script\n# dependencies = [\"httpx\", \"\"]\n# ///\n",
+        )?
+        .with_filter(r"(?m)^(info:)[ ]$", "$1");
+
+        assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: TOML parse error at line 1, column 26
+        --> script.py:1:1
+        info:   |
+        info: 1 | dependencies = ["httpx", ""]
+        info:   |                          ^^
+        info: Empty field is not allowed for PEP508
+        info:
+        info: ^
+
+        Found 1 diagnostic
+
+        ----- stderr -----
+        "#);
+        assert_cmd_snapshot!(
+            command_with_script_uv(&case)
+                .arg("script.py")
+                .args(["--output-format", "concise"]),
+            @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        script.py: error[uv-metadata] `uv workspace metadata` failed with status exit status: 2: error: TOML parse error at line 1, column 26
+        Found 1 diagnostic
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
 }
