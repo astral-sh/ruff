@@ -455,6 +455,56 @@ def f(x: MyBits | NoBits):
     ~x
 ```
 
+#### Unions and intersections
+
+A union reports a deprecated operator when any alternative is deprecated. An intersection reports
+deprecated operators only when every applicable implementation is deprecated.
+
+```py
+from typing_extensions import deprecated
+
+class Deprecated:
+    @deprecated("old inversion")
+    def __invert__(self) -> int:
+        return 1
+
+class AlsoDeprecated:
+    @deprecated("another old inversion")
+    def __invert__(self) -> int:
+        return 2
+
+class Ordinary:
+    def __invert__(self) -> int:
+        return 3
+
+def mixed_union(value: Deprecated | Ordinary) -> None:
+    ~value  # error: [deprecated] "old inversion"
+
+def mixed_intersection(value: Deprecated) -> None:
+    if isinstance(value, Ordinary):
+        ~value
+
+def deprecated_intersection(value: Deprecated) -> None:
+    if isinstance(value, AlsoDeprecated):
+        # error: [deprecated] "old inversion"
+        # error: [deprecated] "old inversion"
+        ~value
+```
+
+A gradually typed comparison can produce an intersection of `bool` and `Any`. The unknown
+alternative might provide a nondeprecated operator, so inverting it should not warn.
+
+```py
+from typing import Any
+
+def gradual_intersection(value: Any) -> None:
+    if value is None:
+        return
+
+    mask = value == 0
+    ~mask
+```
+
 #### Bool literals
 
 `bool.__invert__` is one such case in typeshed. This applies both to `bool` literals and to
@@ -494,19 +544,53 @@ def f(value: T) -> None:
 ```
 
 Deprecation reporting for one constraint does not depend on whether another constraint supports the
-operator.
-
-E.g. `Third`, which has no `__invert__` implemented, comes first in the constraint list, but
-`First`'s deprecation is still reported.
+operator or on the order of the constraints.
 
 ```py
 class Third: ...
 
 U = TypeVar("U", Third, First)
+V = TypeVar("V", First, Third)
 
 def g(value: U) -> None:
     # error: [unsupported-operator]
     # error: [deprecated]
+    ~value
+
+def h(value: V) -> None:
+    # error: [unsupported-operator]
+    # error: [deprecated]
+    ~value
+```
+
+A constraint that is itself a union may contain a deprecated operator even when that operator is
+missing from another union member.
+
+```py
+W = TypeVar("W", First | Third, Second)
+
+def nested_union(value: W) -> None:
+    # error: [unsupported-operator]
+    # error: [deprecated] "first"
+    # error: [deprecated] "second"
+    ~value
+```
+
+A deprecated operator should also be reported when its signature cannot accept the implicit unary
+call.
+
+```py
+class Invalid:
+    @deprecated("invalid inversion")
+    def __invert__(self, required: int) -> int:
+        return required
+
+X = TypeVar("X", Invalid, Second)
+
+def invalid_operator(value: X) -> None:
+    # error: [unsupported-operator]
+    # error: [deprecated] "invalid inversion"
+    # error: [deprecated] "second"
     ~value
 ```
 

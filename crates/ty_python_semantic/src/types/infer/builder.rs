@@ -9605,6 +9605,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
+    /// Report a deprecated callable only when its union alternative has no non-deprecated
+    /// intersection member that could provide the implementation instead.
+    fn check_deprecated_bindings<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
+        let db = self.db();
+
+        for callables in bindings.iter_union_elements() {
+            if callables.clone().all(|callable| {
+                let ty = match callable.callable_type {
+                    Type::BoundMethod(bound) => Type::FunctionLiteral(bound.function(db)),
+                    ty => ty,
+                };
+                ty.is_deprecated(db)
+            }) {
+                for callable in callables {
+                    self.check_deprecated(ranged, callable.callable_type);
+                }
+            }
+        }
+    }
+
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let db = self.db();
         let ast::ExprName {
@@ -10703,9 +10723,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeContext::default(),
             ) {
                 Ok(outcome) => {
-                    for callable in outcome.iter_flat() {
-                        self.check_deprecated(unary, callable.callable_type);
-                    }
+                    self.check_deprecated_bindings(unary, &outcome);
                     outcome.return_type(db, env)
                 }
                 Err(e) => {
@@ -10715,9 +10733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         CallDunderError::MethodNotAvailable => None,
                     };
                     if let Some(bindings) = bindings {
-                        for callable in bindings.iter_flat() {
-                            self.check_deprecated(unary, callable.callable_type);
-                        }
+                        self.check_deprecated_bindings(unary, bindings);
                     }
                     self.report_unsupported_unary_operator(
                         unary,
@@ -10834,9 +10850,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 )
                             })
                             .collect();
-                        for outcome in outcomes.iter().filter_map(|outcome| outcome.as_ref().ok()) {
-                            for callable in outcome.iter_flat() {
-                                self.check_deprecated(unary, callable.callable_type);
+                        for outcome in &outcomes {
+                            let bindings = match outcome {
+                                Ok(bindings) => Some(bindings),
+                                // A method can be deprecated even if it is missing from some
+                                // union members or its signature rejects the implicit call.
+                                // Preserve those bindings so the deprecation is reported
+                                // alongside the unsupported-operator diagnostic.
+                                Err(
+                                    CallDunderError::PossiblyUnbound { bindings, .. }
+                                    | CallDunderError::CallError(_, bindings, _),
+                                ) => Some(bindings.as_ref()),
+                                // A completely missing method has no bindings to inspect.
+                                Err(CallDunderError::MethodNotAvailable) => None,
+                            };
+                            if let Some(bindings) = bindings {
+                                self.check_deprecated_bindings(unary, bindings);
                             }
                         }
 
