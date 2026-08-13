@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::source::source_text;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
+use ruff_text_size::TextRange;
 use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
@@ -45,6 +46,18 @@ impl<'db> Script<'db> {
         // do not also allocate a tracked `script` memo just to cache another `None`.
         script_metadata(db, file)?;
         script(db, file)
+    }
+
+    /// Returns the script's Python requirement and its location in the inline metadata.
+    pub(crate) fn python_requirement(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(&'db RangedValue<VersionSpecifiers>, Option<TextRange>)> {
+        let metadata = script_metadata(db, self.file(db))?;
+        Some((
+            metadata.requires_python.as_ref()?,
+            metadata.requires_python_range,
+        ))
     }
 }
 
@@ -181,9 +194,20 @@ pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<Scrip
     }
 
     let tag = ScriptTag::parse(source.as_bytes())?;
-    let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), false);
     // FIXME: Report invalid TOML in script metadata instead of silently ignoring it.
-    let mut metadata: ScriptMetadata = toml::from_str(tag.metadata()).ok()?;
+    let mut metadata: ScriptMetadata = {
+        let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), false);
+        toml::from_str(tag.metadata()).ok()?
+    };
+
+    if metadata.requires_python.is_some() {
+        let metadata_source = tag.metadata_with_source_offsets(source.as_str())?;
+        let _guard = ValueSourceGuard::new(ValueSource::ScriptMetadata(file), true);
+        let requirement: ScriptPythonRequirementSource = toml::from_str(&metadata_source).ok()?;
+        metadata.requires_python_range = requirement
+            .requires_python
+            .and_then(|requirement| requirement.range());
+    }
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
         options.prioritize_all_selectors();
@@ -197,7 +221,15 @@ pub(crate) fn script_metadata(db: &dyn SourceDb, file: File) -> Option<Box<Scrip
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct ScriptMetadata {
     requires_python: Option<RangedValue<VersionSpecifiers>>,
+    #[serde(skip)]
+    requires_python_range: Option<TextRange>,
     tool: Option<Tool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct ScriptPythonRequirementSource {
+    requires_python: Option<RangedValue<String>>,
 }
 
 impl ScriptMetadata {

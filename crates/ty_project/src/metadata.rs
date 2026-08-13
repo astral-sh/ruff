@@ -3,7 +3,7 @@ use configuration_file::{ConfigurationFile, ConfigurationFileError};
 use ruff_db::files::FileRootKind;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_ranged_value::ValueSource;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
@@ -35,6 +35,10 @@ pub struct ProjectMetadata {
     name: ProjectName,
 
     pub(super) root: SystemPathBuf,
+
+    /// The project's original Python requirement and its source location.
+    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
+    requires_python: Option<RangedValue<String>>,
 
     /// The highest-precedence options, such as CLI flags or inline editor configuration.
     #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
@@ -80,6 +84,7 @@ impl ProjectMetadata {
         Self {
             name: ProjectName::new(name),
             root,
+            requires_python: None,
             options: Options::default(),
             uv_workspace_options: None,
             override_options: None,
@@ -109,6 +114,7 @@ impl ProjectMetadata {
         Ok(Self {
             name: ProjectName::new(root.file_name().unwrap_or("root")),
             root: root.to_path_buf(),
+            requires_python: None,
             options,
             uv_workspace_options: None,
             override_options: None,
@@ -156,6 +162,9 @@ impl ProjectMetadata {
         Ok(Self {
             name,
             root,
+            requires_python: project
+                .and_then(|project| project.requires_python.clone())
+                .map(|requirement| requirement.map_value(|requirement| requirement.to_string())),
             options,
             uv_workspace_options: None,
             override_options: None,
@@ -402,6 +411,10 @@ impl ProjectMetadata {
 
     pub(crate) fn options(&self) -> &Options {
         &self.options
+    }
+
+    pub(crate) fn requires_python(&self) -> Option<&RangedValue<String>> {
+        self.requires_python.as_ref()
     }
 
     /// Returns the explicit configuration file that replaces normal project discovery, if any.
@@ -1255,6 +1268,7 @@ unclosed table, expected `]`
             ProjectMetadata(
               name: ProjectName("super-app"),
               root: "/app",
+              requires_python: Some(">=3.12"),
               options: Options(
                 environment: Some(EnvironmentOptions(
                   root: Some([

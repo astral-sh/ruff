@@ -122,6 +122,192 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.11"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> script.py:6:1
+      |
+    6 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.11 was assumed when resolving types because it was specified on the command line
+    info: Python 3.11 does not satisfy the `requires-python` constraint `>=3.12`
+     --> script.py:3:21
+      |
+    3 | # requires-python = ">=3.12"
+      |                     ^^^^^^^^ Python version requirement
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_from_explicit_configuration() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # ///
+
+            PythonFinalizationError
+            "#,
+        ),
+        (
+            "explicit.toml",
+            r#"
+            [environment]
+            python-version = "3.11"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("--config-file").arg("explicit.toml"),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> script.py:6:1
+      |
+    6 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.11 was assumed when resolving types
+     --> explicit.toml:3:18
+      |
+    3 | python-version = "3.11"
+      |                  ^^^^^^ Python version configuration
+    info: Python 3.11 does not satisfy the `requires-python` constraint `>=3.12`
+     --> script.py:3:21
+      |
+    3 | # requires-python = ">=3.12"
+      |                     ^^^^^^^^ Python version requirement
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_only_explains_version_sensitive_errors() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python = ">=3.13"
+        # ///
+
+        from typing import reveal_type
+
+        PythonFinalizationError
+        print(missing)
+        reveal_type(1)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> script.py:8:1
+      |
+    8 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because it was specified on the command line
+    info: Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`
+     --> script.py:3:21
+      |
+    3 | # requires-python = ">=3.13"
+      |                     ^^^^^^^^ Python version requirement
+
+    error[unresolved-reference]: Name `missing` used when not defined
+     --> script.py:9:7
+      |
+    9 | print(missing)
+      |       ^^^^^^^
+
+    info[revealed-type]: Revealed type
+      --> script.py:10:13
+       |
+    10 | reveal_type(1)
+       |             ^ `Literal[1]`
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_in_concise_output() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python = ">=3.13"
+        # ///
+
+        PythonFinalizationError
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-version=3.12")
+            .arg("--output-format=concise"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:1: error[unresolved-reference] Name `PythonFinalizationError` used when not defined
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_without_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        # /// script
+        # requires-python = ">=3.13"
+        # ///
+
+        value = 1
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 

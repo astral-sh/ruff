@@ -115,6 +115,170 @@ fn config_override_python_platform() -> anyhow::Result<()> {
 }
 
 #[test]
+fn python_requirement_mismatch_only_explains_version_sensitive_errors() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.13"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            from typing import reveal_type
+
+            PythonFinalizationError
+            print(missing)
+            reveal_type(1)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> test.py:4:1
+      |
+    4 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because it was specified on the command line
+    info: Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`
+     --> pyproject.toml:3:19
+      |
+    3 | requires-python = ">=3.13"
+      |                   ^^^^^^^^ Python version requirement
+
+    error[unresolved-reference]: Name `missing` used when not defined
+     --> test.py:5:7
+      |
+    5 | print(missing)
+      |       ^^^^^^^
+
+    info[revealed-type]: Revealed type
+     --> test.py:6:13
+      |
+    6 | reveal_type(1)
+      |             ^ `Literal[1]`
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_from_configuration() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.13"
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [environment]
+            python-version = "3.12"
+            "#,
+        ),
+        ("test.py", "PythonFinalizationError"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
+     --> test.py:1:1
+      |
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types
+     --> ty.toml:3:18
+      |
+    3 | python-version = "3.12"
+      |                  ^^^^^^ Python version configuration
+    info: Python 3.12 does not satisfy the `requires-python` constraint `>=3.13`
+     --> pyproject.toml:3:19
+      |
+    3 | requires-python = ">=3.13"
+      |                   ^^^^^^^^ Python version requirement
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_in_concise_output() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.13"
+            "#,
+        ),
+        ("test.py", "PythonFinalizationError"),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--python-version=3.12")
+            .arg("--output-format=concise"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:1: error[unresolved-reference] Name `PythonFinalizationError` used when not defined
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn python_requirement_mismatch_without_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            requires-python = ">=3.13"
+            "#,
+        ),
+        ("test.py", "value = 1"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn config_file_annotation_showing_where_python_version_set_typing_error() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         (
@@ -897,6 +1061,27 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
 
     ----- stderr -----
     ");
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.7"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-syntax]: Cannot use `match` statement on Python 3.7 (syntax was added in Python 3.10)
+     --> test.py:2:1
+      |
+    2 | match object():
+      | ^^^^^
+    info: Python 3.7 was assumed when parsing syntax because it was specified on the command line
+    info: Python 3.7 does not satisfy the `requires-python` constraint `>=3.8`
+     --> pyproject.toml:3:19
+      |
+    3 | requires-python = ">=3.8"
+      |                   ^^^^^^^ Python version requirement
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
 
     Ok(())
 }
