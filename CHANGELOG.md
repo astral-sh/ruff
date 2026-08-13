@@ -7,7 +7,7 @@ Released on 2026-08-13.
 ### Preview features
 
 - \[`pylint`\] Fix false negatives on negative numbers (`PLR6104`) ([#27251](https://github.com/astral-sh/ruff/pull/27251))
-- \[`pyupgrade`\] Add rule to replace `while 1` with `while True` (`while-one`, `UP048`) ([#27190](https://github.com/astral-sh/ruff/pull/27190))
+- \[`pyupgrade`\] Add rule to replace `while 1` with `while True` (`UP048`) ([#27190](https://github.com/astral-sh/ruff/pull/27190))
 
 ### Bug fixes
 
@@ -24,6 +24,10 @@ Released on 2026-08-13.
 ### Performance
 
 - Enable PGO for Linux x86-64 Ruff releases ([#27570](https://github.com/astral-sh/ruff/pull/27570))
+- Enable PGO for Linux ARM64 Ruff releases ([#27574](https://github.com/astral-sh/ruff/pull/27574))
+- Enable PGO for Windows x86-64 Ruff releases ([#27573](https://github.com/astral-sh/ruff/pull/27573))
+- Enable PGO for macOS ARM64 Ruff releases ([#27572](https://github.com/astral-sh/ruff/pull/27572))
+- Reduce `Expr` size to 64 bytes ([#27591](https://github.com/astral-sh/ruff/pull/27591))
 
 ### CLI
 
@@ -35,13 +39,7 @@ Released on 2026-08-13.
 
 ### Other changes
 
-- Enable PGO for Linux ARM64 Ruff releases ([#27574](https://github.com/astral-sh/ruff/pull/27574))
-- Enable PGO for Windows x86-64 Ruff releases ([#27573](https://github.com/astral-sh/ruff/pull/27573))
-- Enable PGO for macOS ARM64 Ruff releases ([#27572](https://github.com/astral-sh/ruff/pull/27572))
-- Use Depot runners for release builds ([#27627](https://github.com/astral-sh/ruff/pull/27627))
-- Use eight-core runners for native Linux PGO builds ([#27662](https://github.com/astral-sh/ruff/pull/27662))
 - Use mimalloc v3 ([#27586](https://github.com/astral-sh/ruff/pull/27586))
-- [ty] Reduce Expr size to 64 bytes ([#27591](https://github.com/astral-sh/ruff/pull/27591))
 
 ### Contributors
 
