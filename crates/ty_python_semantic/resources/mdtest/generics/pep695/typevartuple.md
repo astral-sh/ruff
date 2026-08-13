@@ -219,6 +219,36 @@ class Array[*Ts]:
         return self
 ```
 
+### Constrained inference from synthetic `Self`
+
+A fixed synthetic `Self` domain should provide evidence for inferring a fresh constrained type
+variable, without making the owner's type variables inference targets. This currently fails when the
+matching constraint contains a `TypeVarTuple`.
+
+```py
+from typing import Any, Generic, TypeVar
+
+class Other: ...
+
+class Container[T, *Ts]:
+    values: tuple[T, *Ts]
+
+    def interface(self) -> "Interface[Container[Any, *tuple[Any, ...]]]":
+        # TODO: This should not error once fixed `TypeVarTuple` relations are supported.
+        # error: [invalid-argument-type] "Argument to `Interface.__init__` is incorrect"
+        return Interface(self)
+
+C = TypeVar(
+    "C",
+    Container[Any, *tuple[Any, ...]],
+    Other,
+    covariant=True,
+)
+
+class Interface(Generic[C]):
+    def __init__(self, value: C) -> None: ...
+```
+
 ## Functions
 
 ### Multiple type variable tuples

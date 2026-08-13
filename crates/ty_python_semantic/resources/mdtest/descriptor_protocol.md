@@ -1203,10 +1203,10 @@ class C:
 C().value
 ```
 
-### Property getters reject invalid receiver specializations
+### Property getters do not infer fixed owner type variables
 
-A property getter checks the same specialized receiver as an ordinary method. A generic alias with
-alternatives that impose different type-variable bounds can produce an invalid property access.
+A property getter treats type variables fixed by the owner specialization as evidence, not as
+inference targets.
 
 ```py
 from collections.abc import Callable
@@ -1229,9 +1229,11 @@ AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
 Command = A[AnyCallback] | B[AnyCallback]
 Callback = TypeVar("Callback", bound=Callable[[int], str])
 
+# TODO: `Command[Callback]` produces `B[Callback]`, but `Callback` does not satisfy `BItem`'s
+# upper bound. Report this at `Command[Callback]` once specialization validation can prove that
+# every possible specialization of a symbolic assignment satisfies the destination domain.
 def access(value: Callback | Command[Callback]) -> None:
     if isinstance(value, A | B):
-        # error: [invalid-attribute-access]
         value.callback
 ```
 
