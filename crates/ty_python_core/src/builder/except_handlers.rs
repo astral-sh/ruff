@@ -67,7 +67,14 @@ impl TryNodeContextStackManager {
             .push_context(exception_handlers);
     }
 
-    /// Push a context manager that can collect exceptions raised after it has been entered.
+    /// Registers a context manager after it enters but before its target is assigned.
+    ///
+    /// This allows an entered manager to suppress errors raised while binding its target:
+    ///
+    /// ```python
+    /// with manager as (first, second):
+    ///     ...
+    /// ```
     pub(super) fn push_with_context(&mut self) {
         self.current_try_context_stack().0.push(TryNodeContext {
             exception_handlers: ExceptionHandlers::propagating(),
@@ -76,7 +83,10 @@ impl TryNodeContextStackManager {
         });
     }
 
-    /// Take the exception checkpoints collected by the innermost context manager and remove it.
+    /// Removes the innermost context manager and returns the exceptions it could suppress.
+    ///
+    /// Removing the context before its exit method runs prevents it from suppressing exceptions
+    /// raised by its own exit method.
     pub(super) fn finish_with_context(&mut self) -> Vec<FlowSnapshot> {
         let stack = self.current_try_context_stack();
         let snapshots = stack.end_try_suite();
@@ -98,8 +108,8 @@ impl TryNodeContextStackManager {
         self.current_try_context_stack().end_try_suite()
     }
 
-    /// Record a checkpoint for every active `try` suite that could handle an exception raised at
-    /// the current point in control flow.
+    /// Records a checkpoint for every active `try` or `with` context that could handle an
+    /// exception raised at the current point in control flow.
     ///
     /// Crosses eager scopes, but stops at lazy scopes, unreachable flow, and bare handlers.
     pub(super) fn record_exception_checkpoint(&mut self, builder: &mut SemanticIndexBuilder) {
@@ -125,7 +135,7 @@ impl TryNodeContextStackManager {
         }
     }
 
-    /// Returns whether an active `try` suite can receive an exception from the current scope.
+    /// Returns whether an active `try` or `with` context can receive an exception from this scope.
     ///
     /// A context can remain on the stack for its `finally` suite after its handlers become inactive.
     pub(super) fn has_active_exception_handler(&self, builder: &SemanticIndexBuilder) -> bool {
@@ -145,9 +155,7 @@ impl TryNodeContextStackManager {
         false
     }
 
-    /// Retrieve the stack that is at the top of our stack of stacks.
-    /// Push the snapshot onto the innermost `try` block's terminal-entry snapshots for its
-    /// `finally` suite.
+    /// Records a terminal entry for the nearest enclosing `try`, skipping `with` contexts.
     pub(super) fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
         self.current_try_context_stack()
             .record_terminal_finally_entry(builder);
@@ -161,12 +169,12 @@ impl TryNodeContextStackManager {
     }
 }
 
-/// The contexts of nested `try`/`except` blocks for a single scope
+/// The contexts of nested `try` and `with` statements for a single scope.
 #[derive(Debug, Default)]
 struct TryNodeContextStack(Vec<TryNodeContext>);
 
 impl TryNodeContextStack {
-    /// Returns whether a `try` suite in this scope is still collecting exception checkpoints.
+    /// Returns whether a `try` or `with` context is still collecting exception checkpoints.
     fn has_active_exception_handler(&self) -> bool {
         self.0
             .iter()
@@ -189,7 +197,7 @@ impl TryNodeContextStack {
             .expect("Cannot pop a `try` block off an empty `TryBlockContexts` stack")
     }
 
-    /// Take all snapshots recorded while visiting the `try` suite and deactivate its handlers.
+    /// Takes all snapshots recorded by the innermost context and deactivates its handlers.
     fn end_try_suite(&mut self) -> Vec<FlowSnapshot> {
         let context = self
             .0
@@ -203,8 +211,8 @@ impl TryNodeContextStack {
         }
     }
 
-    /// Records the checkpoint for all enclosing active `try` suites in this scope. Returns whether
-    /// the checkpoint should continue propagating to an enclosing scope.
+    /// Records a checkpoint for every active `try` or `with` context in this scope.
+    /// Returns whether the checkpoint should continue propagating to an enclosing scope.
     ///
     /// A bare handler consumes the exception, preventing any outer handler from seeing it. The
     /// snapshot is constructed only if a handler has not already observed the current flow state.
@@ -236,8 +244,7 @@ impl TryNodeContextStack {
         true
     }
 
-    /// Push the snapshot onto the innermost `try` block's terminal-entry snapshots for its
-    /// `finally` suite.
+    /// Records a terminal entry for the nearest `try` context, skipping intervening `with` contexts.
     fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
         if let Some(context) = self
             .0
@@ -250,7 +257,7 @@ impl TryNodeContextStack {
     }
 }
 
-/// Whether an exception-handling context also owns a `finally` suite.
+/// Distinguishes `try` contexts that may own a `finally` suite from `with` contexts.
 #[derive(Debug, Default)]
 enum ExceptionContextKind {
     #[default]
@@ -258,11 +265,9 @@ enum ExceptionContextKind {
     With,
 }
 
-/// Context for tracking exception and `finally` entry states for a single
-/// [`ruff_python_ast::StmtTry`] node.
+/// Exception-entry states for one `try` or `with` statement.
 ///
-/// It will likely be necessary to add more fields to this struct in the future
-/// when we add more advanced handling of `finally` branches.
+/// Only `try` contexts also collect terminal entries for a `finally` suite.
 #[derive(Debug, Default)]
 pub(super) struct TryNodeContext {
     exception_handlers: ExceptionHandlers,

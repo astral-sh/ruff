@@ -2246,7 +2246,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     reveal_type(state)  # Literal[1]
     /// ```
     ///
-    /// Skips snapshot construction entirely when no enclosing exception handler is active.
+    /// Skips snapshot construction when no enclosing `try` or `with` context can handle exceptions.
     fn record_exception_checkpoint(&mut self) {
         if !(self.in_try || self.active_with_depth != 0)
             || !self

@@ -2,7 +2,6 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::{
     FxOrderSet, Program,
-    place::Place,
     types::{
         Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
         TypeContext, UnionBuilder, call::CallErrorKind, context::InferContext,
@@ -12,6 +11,9 @@ use crate::{
 use ruff_python_ast as ast;
 use ty_python_core::EvaluationMode;
 
+/// Caches suppression classification per manager type and evaluates union alternatives separately.
+///
+/// Overloads accepting only the `None` arguments of a normal exit cannot suppress exceptions.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _, _| false,
@@ -33,23 +35,20 @@ fn context_manager_can_suppress<'db>(
 
     let env = ProgramEnvironment::from_program(program);
     let method = if is_async { "__aexit__" } else { "__exit__" };
-    let Place::Defined(exit) = manager
+    let Some(callables) = manager
         .member_lookup_with_policy(db, &env, method, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
         .place
+        .ignore_possibly_undefined()
+        .and_then(|exit| exit.try_upcast_to_callable(db, &env))
     else {
-        return false;
-    };
-    let Some(callables) = exit.ty.try_upcast_to_callable(db, &env) else {
         return false;
     };
 
     let mut return_types = UnionBuilder::new(db, &env);
     for callable in &callables {
         for signature in callable.signatures(db) {
-            if signature
-                .parameters()
-                .get_positional(0)
-                .is_some_and(|parameter| parameter.annotated_type().is_none(db))
+            if let Some(exception_type) = signature.parameters().get_positional(0)
+                && exception_type.annotated_type().is_none(db)
             {
                 continue;
             }
@@ -74,8 +73,18 @@ fn context_manager_can_suppress<'db>(
 impl<'db> Type<'db> {
     /// Whether this context manager can suppress exceptions according to the typing specification.
     ///
-    /// Only exit methods returning exactly `bool` or `Literal[True]` are considered suppressing.
-    /// Asynchronous context managers are classified by the awaited exit return type.
+    /// Only exit methods returning exactly `bool` or `Literal[True]` are considered suppressing;
+    /// `bool | None` and `Any` are not. Asynchronous exit results are awaited, and manager union
+    /// alternatives are classified independently.
+    ///
+    /// ```python
+    /// from contextlib import suppress
+    ///
+    /// value = None
+    /// with suppress(ValueError):
+    ///     value = int("invalid")
+    /// reveal_type(value)  # int | None
+    /// ```
     pub(crate) fn can_suppress_exceptions(
         self,
         db: &'db dyn Db,

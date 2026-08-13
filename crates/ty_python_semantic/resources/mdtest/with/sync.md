@@ -194,11 +194,10 @@ class AlwaysSuppresses(Manager):
 def may_raise() -> str:
     raise ValueError
 
-for manager in [Suppresses(), AlwaysSuppresses()]:
-    result = 0
-    with manager:
-        result = may_raise()
-    reveal_type(result)  # revealed: Literal[0] | str
+result = 0
+with AlwaysSuppresses():
+    result = may_raise()
+reveal_type(result)  # revealed: Literal[0] | str
 ```
 
 Other exit return types, including `Literal[False]`, `None`, and `bool | None`, do not suppress
@@ -279,23 +278,21 @@ def requires_str(value: str) -> None: ...
 A manager that returns `True` only during normal exit cannot suppress exceptions:
 
 ```py
-def normal_only() -> None:
-    value = None
-    with NormalOnly():
-        value = may_raise()
-    reveal_type(value)  # revealed: str
-    requires_str(value)
+normal_value = None
+with NormalOnly():
+    normal_value = may_raise()
+reveal_type(normal_value)  # revealed: str
+requires_str(normal_value)
 ```
 
 A manager that returns `True` when handling an exception preserves the previous binding:
 
 ```py
-def exception_only() -> None:
-    value = None
-    with ExceptionOnly():
-        value = may_raise()
-    reveal_type(value)  # revealed: None | str
-    requires_str(value)  # error: [invalid-argument-type]
+exceptional_value = None
+with ExceptionOnly():
+    exceptional_value = may_raise()
+reveal_type(exceptional_value)  # revealed: None | str
+requires_str(exceptional_value)  # error: [invalid-argument-type]
 ```
 
 ## Union context manager

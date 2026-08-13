@@ -542,8 +542,8 @@ const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression(expression) => expression.scope(db),
-        PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
+        PredicateNode::Expression(expression)
+        | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }

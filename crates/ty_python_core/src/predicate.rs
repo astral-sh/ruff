@@ -115,6 +115,9 @@ pub struct CallableAndCallExpr<'db> {
 pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
+    ///
+    /// Resolved during type inference because the manager's type is unavailable while its semantic
+    /// index is being built.
     ContextManagerSuppresses {
         expression: Expression<'db>,
         is_async: bool,
