@@ -1530,7 +1530,7 @@ impl<'db> StaticClassLiteral<'db> {
                 return Member::definitely_declared(synthesized_member);
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
+            return self.implicit_attribute(db, name, MethodDecorator::ClassMethod);
         }
 
         // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
@@ -2843,12 +2843,12 @@ impl<'db> StaticClassLiteral<'db> {
     /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
     /// used to skip methods that do not have the expected decorator.
     fn implicit_attribute(
+        self,
         db: &'db dyn Db,
-        class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
-        Self::implicit_attribute_bindings(db, class_body_scope, name, target_method_decorator)
+        self.implicit_attribute_bindings(db, name, target_method_decorator)
             .member
     }
 
@@ -2863,11 +2863,12 @@ impl<'db> StaticClassLiteral<'db> {
     /// Here, `value` remains undefined until MRO lookup finds an independent class or instance
     /// attribute. The same rule applies to `cls.value` in a classmethod.
     pub(super) fn implicit_attribute_bindings(
+        self,
         db: &'db dyn Db,
-        class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
+        let class_body_scope = self.body_scope(db);
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
         let names = implicit_attribute_names(db, class_body_scope);
@@ -2879,15 +2880,99 @@ impl<'db> StaticClassLiteral<'db> {
             };
         };
 
-        Self::implicit_attribute_inner(
+        let attribute = ImplicitAttributeName::new(
             db,
-            ImplicitAttributeName::new(
-                db,
-                class_body_scope,
-                &names[name_index],
-                target_method_decorator,
-            ),
-        )
+            class_body_scope,
+            &names[name_index],
+            target_method_decorator,
+        );
+
+        if let Some(incoming) = self.independent_attribute_value(db, attribute) {
+            Self::implicit_attribute_anchored(db, attribute, incoming)
+        } else {
+            Self::implicit_attribute_inner(db, attribute)
+        }
+    }
+
+    /// Find an attribute value established before methods on this class run.
+    ///
+    /// Inspecting class namespaces never invokes their implicit classmethod lookup. Instance
+    /// attributes from proper superclasses are resolved recursively, always moving toward a
+    /// strictly earlier class in the inheritance hierarchy.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn independent_attribute_value(
+        self,
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+    ) -> Option<Type<'db>> {
+        let name = attribute.name(db).as_str();
+        let target_method_decorator = attribute.target_method_decorator(db);
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+
+        for (index, superclass) in self.iter_mro(db, None).enumerate() {
+            let ClassBase::Class(superclass) = superclass else {
+                continue;
+            };
+            let (literal, specialization) = superclass.class_literal_and_specialization(db);
+            let ClassLiteral::Static(literal) = literal else {
+                continue;
+            };
+
+            let member = class_member(db, literal.body_scope(db), name)
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization));
+            if member.inner.place.is_definitely_bound()
+                && let Ok(ty) = member.inner.into_lookup_result(db, &env)
+                && let ty = ty.inner_type()
+                && ty.is_definitely_non_data_descriptor(db, &env)
+            {
+                let receiver_class = self.identity_specialization(db);
+                let instance = (target_method_decorator == MethodDecorator::None)
+                    .then(|| Type::instance(db, &env, receiver_class));
+                return Some(
+                    ty.try_call_dunder_get(db, &env, instance, Type::from(receiver_class))
+                        .unwrap_or_else(|error| Some(error.fallback()))
+                        .map_or(ty, |result| result.return_type),
+                );
+            }
+
+            if index > 0 {
+                let implicit =
+                    literal.implicit_attribute_bindings(db, name, target_method_decorator);
+                if implicit.member.inner.place.is_definitely_bound()
+                    && let Some(ty) = implicit.member.ignore_possibly_undefined()
+                    && !ty.is_divergent()
+                {
+                    return Some(ty.apply_optional_specialization(db, specialization));
+                }
+            }
+        }
+
+        None
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _, incoming| ImplicitAttribute {
+            member: Member {
+                inner: Place::bound(incoming)
+                    .with_qualifiers(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE),
+            },
+            augmented_bindings: None,
+        },
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn implicit_attribute_anchored(
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+        incoming: Type<'db>,
+    ) -> ImplicitAttribute<'db> {
+        // The incoming value identifies this query and supplies its immediate cycle result.
+        let _ = incoming;
+        Self::implicit_attribute_impl(db, attribute)
     }
 
     #[salsa::tracked(
@@ -2902,6 +2987,13 @@ impl<'db> StaticClassLiteral<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn implicit_attribute_inner(
+        db: &'db dyn Db,
+        attribute: ImplicitAttributeName<'db>,
+    ) -> ImplicitAttribute<'db> {
+        Self::implicit_attribute_impl(db, attribute)
+    }
+
+    fn implicit_attribute_impl(
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
@@ -3299,7 +3391,8 @@ impl<'db> StaticClassLiteral<'db> {
                     if qualifiers.contains(TypeQualifiers::INIT_VAR) {
                         // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
                         // by an implicit assignment in a method
-                        if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                        if self
+                            .implicit_attribute(db, name, MethodDecorator::None)
                             .is_undefined()
                         {
                             return Member::unbound();
@@ -3323,8 +3416,7 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+                        let implicit = self.implicit_attribute(db, name, MethodDecorator::None);
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
@@ -3398,14 +3490,10 @@ impl<'db> StaticClassLiteral<'db> {
                                 ty: implicit_ty,
                                 provenance: implicit_provenance,
                                 ..
-                            }) = Self::implicit_attribute(
-                                db,
-                                body_scope,
-                                name,
-                                MethodDecorator::None,
-                            )
-                            .inner
-                            .place
+                            }) = self
+                                .implicit_attribute(db, name, MethodDecorator::None)
+                                .inner
+                                .place
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
@@ -3438,14 +3526,14 @@ impl<'db> StaticClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    self.implicit_attribute(db, name, MethodDecorator::None)
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            self.implicit_attribute(db, name, MethodDecorator::None)
         }
     }
 

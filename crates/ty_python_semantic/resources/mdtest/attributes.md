@@ -1250,6 +1250,36 @@ class Child(Parent):
 reveal_type(Child.value)  # revealed: Before | After
 ```
 
+#### Inherited class variables preserve their public type
+
+An inferred superclass default constrains classmethod assignments without exposing its literal type.
+
+```py
+class Parent:
+    value = 1
+
+class Child(Parent):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = str(cls.value)  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+```
+
+#### Self-referential class variables without an independent value
+
+An ordinary self-referential classmethod assignment retains its recursive type when no independent
+class attribute exists.
+
+```py
+class Example:
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value
+
+reveal_type(Example.value)  # revealed: Divergent
+```
+
 ### Instance variables with class-level default values
 
 These are instance attributes, but the fact that we can see that they have a binding (not a
@@ -1332,6 +1362,50 @@ class C:
 reveal_type(C().a)  # revealed: int
 reveal_type(C().b)  # revealed: int
 reveal_type(C().c)  # revealed: int
+```
+
+#### Inherited annotated descriptors are bound before self-referential assignments
+
+An inherited descriptor's annotation constrains assignments without changing the bound value read
+before an assignment.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return "value"
+
+class Base:
+    value: Descriptor = Descriptor()
+
+class Child(Base):
+    def update(self) -> None:
+        self.value = self.value + "b"  # error: [invalid-assignment]
+
+    def get_value(self) -> str:
+        return self.value
+
+reveal_type(Child().value)  # revealed: str
+```
+
+#### Inherited descriptors are bound before self-referential class assignments
+
+Reading an inherited descriptor through a class invokes `__get__` with `None` before a classmethod
+stores its updated value.
+
+```py
+class Descriptor:
+    def __get__(self, instance: None, owner: type) -> str:
+        return "value"
+
+class Base:
+    value = Descriptor()
+
+class Child(Base):
+    @classmethod
+    def update(cls) -> None:
+        cls.value = cls.value + "b"
+
+reveal_type(Child.value)  # revealed: str
 ```
 
 ### Inheritance of class/instance attributes
