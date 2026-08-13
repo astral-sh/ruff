@@ -494,7 +494,7 @@ def f(value: T) -> None:
 ```
 
 Deprecation reporting for one constraint does not depend on whether another constraint supports the
-operator
+operator.
 
 E.g. `Third`, which has no `__invert__` implemented, comes first in the constraint list, but
 `First`'s deprecation is still reported.
