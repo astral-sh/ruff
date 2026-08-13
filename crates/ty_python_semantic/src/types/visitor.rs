@@ -10,8 +10,9 @@ use ty_python_core::definition::Definition;
 use crate::types::{
     BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
     GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-    PropertyInstanceType, ProtocolInstanceType, StaticClassLiteral, SubclassOfType, Type,
-    TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+    PropertyInstanceType, ProtocolInstanceType, SlotDescriptorType, StaticClassLiteral,
+    SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType,
+    UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
@@ -68,6 +69,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
         walk_property_instance_type(db, property, self);
+    }
+
+    fn visit_slot_descriptor_type(&self, db: &'db dyn Db, descriptor: SlotDescriptorType<'db>) {
+        self.visit_type(db, descriptor.value_type(db));
     }
 
     fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
@@ -159,6 +164,7 @@ pub(super) enum NonAtomicType<'db> {
     SubclassOf(SubclassOfType<'db>),
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
+    SlotDescriptor(SlotDescriptorType<'db>),
     TypeIs(TypeIsType<'db>),
     TypeGuard(TypeGuardType<'db>),
     TypeForm(TypeFormType<'db>),
@@ -225,6 +231,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
+            Type::SlotDescriptor(descriptor) => {
+                TypeKind::NonAtomic(NonAtomicType::SlotDescriptor(descriptor))
+            }
             Type::TypeVar(bound_typevar) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
@@ -286,6 +295,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::PropertyInstance(property) => {
             visitor.visit_property_instance_type(db, property);
+        }
+        NonAtomicType::SlotDescriptor(descriptor) => {
+            visitor.visit_slot_descriptor_type(db, descriptor);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
         NonAtomicType::TypeGuard(type_guard) => {

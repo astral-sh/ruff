@@ -11,6 +11,7 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
+pub use self::slots::SlotDescriptorType;
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
@@ -71,6 +72,7 @@ mod enum_literal;
 mod implicit_attributes;
 mod known;
 mod named_tuple;
+mod slots;
 mod static_literal;
 mod typed_dict;
 
@@ -3378,62 +3380,4 @@ pub(super) enum MetaclassErrorKind<'db> {
     PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum SlotsKind {
-    /// `__slots__` is not found in the class.
-    NotSpecified,
-    /// `__slots__` is defined but empty: `__slots__ = ()`.
-    Empty,
-    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
-    NotEmpty,
-    /// `__slots__` is defined but its value is dynamic:
-    /// * `__slots__ = tuple(a for a in b)`
-    /// * `__slots__ = ["a", "b"]`
-    Dynamic,
-}
-
-impl SlotsKind {
-    fn from(db: &dyn Db, base: StaticClassLiteral) -> Self {
-        let env = ProgramEnvironment::from_scope(base.body_scope(db));
-        let Place::Defined(DefinedPlace {
-            ty: slots_ty,
-            definedness: bound,
-            ..
-        }) = base
-            .own_class_member(
-                db,
-                &env,
-                base.inherited_generic_context(db),
-                None,
-                "__slots__",
-            )
-            .inner
-            .place
-        else {
-            return Self::NotSpecified;
-        };
-
-        if matches!(bound, Definedness::PossiblyUndefined) {
-            return Self::Dynamic;
-        }
-
-        match slots_ty {
-            // __slots__ = ("a", "b")
-            Type::NominalInstance(nominal) => match nominal
-                .tuple_spec(db, &env)
-                .and_then(|spec| spec.len().into_fixed_length())
-            {
-                Some(0) => Self::Empty,
-                Some(_) => Self::NotEmpty,
-                None => Self::Dynamic,
-            },
-
-            // __slots__ = "abc"  # Same as `("abc",)`
-            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
-
-            _ => Self::Dynamic,
-        }
-    }
 }

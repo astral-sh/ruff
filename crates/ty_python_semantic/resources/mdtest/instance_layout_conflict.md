@@ -64,6 +64,22 @@ class AB(  # error: [instance-layout-conflict]
 ): ...
 ```
 
+## Slot names that are not statically known
+
+A nonempty tuple still creates a distinct instance layout when its individual slot names are not
+known.
+
+```py
+def create(name: str) -> None:
+    class A:
+        __slots__ = (name,)
+
+    class B:
+        __slots__ = ("value",)
+
+    class C(A, B): ...  # error: [instance-layout-conflict]
+```
+
 ## Synthesized `__slots__` from dataclasses
 
 ```py
@@ -277,6 +293,20 @@ class Task(asyncio.Task[Any]): ...
 class SubClass(Task, Future): ...  # fine
 ```
 
+## Slot names declared in a list
+
+A list of slot names restricts the instance layout just like a tuple.
+
+```py
+class A:
+    __slots__ = ["a"]
+
+class B:
+    __slots__ = ("b",)
+
+class C(A, B): ...  # error: [instance-layout-conflict]
+```
+
 ## False negatives
 
 ### Possibly unbound `__slots__`
@@ -309,19 +339,6 @@ def _(flag: bool):
 
     # Might or might not be fine at runtime
     class C(A, B): ...
-```
-
-### Non-tuple `__slots__` definitions
-
-```py
-class A:
-    __slots__ = ["a", "b"]  # This is treated as "dynamic"
-
-class B:
-    __slots__ = ("c", "d")
-
-# False negative: [incompatible-slots]
-class C(A, B): ...
 ```
 
 ### Diagnostic if `__slots__` is externally modified

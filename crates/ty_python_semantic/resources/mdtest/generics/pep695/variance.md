@@ -505,6 +505,26 @@ static_assert(not is_subtype_of(C[A], C[B]))
 One might think that occurrences in the types of normal attributes are covariant, but they are
 mutable, and thus the occurrences are invariant.
 
+### Slotted Attributes
+
+Slots store mutable instance attributes, so a slotted attribute also makes its type parameter
+invariant.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class A: ...
+class B(A): ...
+
+class Slotted[T]:
+    __slots__ = ("value",)
+    value: T
+
+static_assert(not is_subtype_of(Slotted[B], Slotted[A]))
+static_assert(not is_subtype_of(Slotted[A], Slotted[B]))
+```
+
 ### Immutable Attributes
 
 Immutable attributes can't be written to, and thus constrain the typevar to covariance, not

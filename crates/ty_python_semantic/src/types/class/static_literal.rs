@@ -33,7 +33,7 @@ use crate::{
         class::{
             ClassInstanceFlags, ClassMemberResult, CodeGeneratorKind, DisjointBase,
             DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
-            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, SlotsKind,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField,
             synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
@@ -652,7 +652,7 @@ impl<'db> StaticClassLiteral<'db> {
             && !self.is_protocol(db)
         {
             Some(DisjointBase::due_to_decorator(self))
-        } else if SlotsKind::from(db, self) == SlotsKind::NotEmpty {
+        } else if self.has_nonempty_slots(db) {
             Some(DisjointBase::due_to_dunder_slots(ClassLiteral::Static(
                 self,
             )))
@@ -1542,7 +1542,27 @@ impl<'db> StaticClassLiteral<'db> {
             }
         });
 
-        if member.is_undefined() {
+        // The inherited `object.__dict__` annotation already describes dictionary access. A
+        // synthesized slot descriptor would incorrectly replace the class's own namespace.
+        if name != "__dict__"
+            && self
+                .slot_names(db)
+                .is_some_and(|slots| slots.iter().any(|slot| slot == name))
+            && (self.has_generated_slots(db)
+                || !self.has_own_class_binding(db, name)
+                || self.file(db).is_stub(db) && self.has_instance_slot(db, name))
+        {
+            return Member::definitely_declared(self.own_slot_descriptor(
+                db,
+                env,
+                specialization,
+                name,
+            ));
+        }
+
+        if member.is_undefined()
+            || name == "__slots__" && self.has_generated_slots(db) && !self.has_explicit_slots(db)
+        {
             if let Some(synthesized_member) = self.own_synthesized_member(
                 db,
                 env,
@@ -2020,24 +2040,6 @@ impl<'db> StaticClassLiteral<'db> {
                     .map(|(name, _)| Type::string_literal(db, name));
                 Some(Type::heterogeneous_tuple(db, env, match_args))
             }
-            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__weakref__")
-                if env.python_version(db) >= PythonVersion::PY311 =>
-            {
-                if !self.has_dataclass_param(db, field_policy, DataclassFlags::WEAKREF_SLOT)
-                    || !self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
-                {
-                    return None;
-                }
-
-                // This could probably be `weakref | None`, but it does not seem important enough to
-                // model it precisely.
-                Some(UnionType::from_two_elements(
-                    db,
-                    env,
-                    Type::any(),
-                    Type::none(db, env),
-                ))
-            }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db, env)
@@ -2114,6 +2116,14 @@ impl<'db> StaticClassLiteral<'db> {
             {
                 self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
                     .then(|| {
+                        if let Some(slots) = self.slot_names(db) {
+                            return Type::heterogeneous_tuple(
+                                db,
+                                env,
+                                slots.iter().map(|name| Type::string_literal(db, name)),
+                            );
+                        }
+
                         let fields = self.fields(db, specialization, field_policy);
                         let slots = fields.keys().map(|name| Type::string_literal(db, name));
                         Type::heterogeneous_tuple(db, env, slots)
@@ -2844,7 +2854,7 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if self.is_typed_dict(db) {
+        if self.is_typed_dict(db) || self.lacks_instance_storage(db, name) {
             return Place::Undefined.into();
         }
 
@@ -2943,7 +2953,10 @@ impl<'db> StaticClassLiteral<'db> {
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                     let inferred = place_from_bindings(db, env, bindings).place;
-                    let has_binding = !inferred.is_undefined();
+                    // Stub assignments to slots describe instance storage, not runtime class
+                    // attributes.
+                    let has_binding = !(inferred.is_undefined()
+                        || self.file(db).is_stub(db) && self.has_instance_slot(db, name));
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.

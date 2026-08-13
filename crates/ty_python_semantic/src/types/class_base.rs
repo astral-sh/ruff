@@ -206,6 +206,7 @@ impl<'db> ClassBase<'db> {
             }
 
             Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::EnumComplement(_)
             | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
