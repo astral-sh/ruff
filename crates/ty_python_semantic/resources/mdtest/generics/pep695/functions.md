@@ -274,6 +274,21 @@ reveal_type(invariant(Invariant[Producer[Middle]](), Middle()))  # revealed: Mid
 invariant(Invariant[Producer[Middle]](), Base())  # error: [invalid-argument-type]
 ```
 
+When the same protocol specialization appears first contravariantly and then covariantly, both
+relationships contribute their constraints even though the formal and actual types are identical.
+
+```py
+class MixedVariance[First, Second]:
+    def put(self, value: First) -> None: ...
+    def get(self) -> Second:
+        raise NotImplementedError
+
+def repeated_polarity[T](container: MixedVariance[Producer[T], Producer[T]], witness: T) -> T:
+    return witness
+
+reveal_type(repeated_polarity(MixedVariance[Producer[Middle], Producer[Middle]](), Derived()))  # revealed: Middle
+```
+
 A consuming protocol reverses the relationship once more. Nesting that protocol inside a
 contravariant class therefore turns its upper bound back into a lower bound.
 
@@ -353,6 +368,21 @@ reveal_type(covariant(Covariant[Callable[[], Middle]](), Base()))  # revealed: B
 reveal_type(contravariant(Contravariant[Callable[[], Middle]](), Derived()))  # revealed: Derived
 reveal_type(invariant(Invariant[Callable[[], Middle]](), Middle()))  # revealed: Middle
 invariant(Invariant[Callable[[], Middle]](), Base())  # error: [invalid-argument-type]
+```
+
+The same callable specialization can contribute both an upper and a lower bound when it appears
+first in a contravariant position and then in a covariant position.
+
+```py
+class MixedVariance[First, Second]:
+    def put(self, value: First) -> None: ...
+    def get(self) -> Second:
+        raise NotImplementedError
+
+def repeated_polarity[T](container: MixedVariance[Callable[[], T], Callable[[], T]], witness: T) -> T:
+    return witness
+
+reveal_type(repeated_polarity(MixedVariance[Callable[[], Middle], Callable[[], Middle]](), Derived()))  # revealed: Middle
 ```
 
 An unrelated variadic type parameter currently sends the entire inference context through the legacy

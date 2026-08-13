@@ -3344,7 +3344,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
         polarity: TypeVarVariance,
-        seen: &mut FxHashSet<(Type<'db>, Type<'db>)>,
+        seen: &mut FxHashSet<(Type<'db>, Type<'db>, TypeVarVariance)>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         // TODO: Eventually, the builder will maintain a constraint set, instead of a hash-map of
@@ -3360,8 +3360,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
-        // Avoid infinite recursion
-        if !seen.insert((formal, actual)) {
+        // Avoid infinite recursion while retaining comparisons under different polarities.
+        if !seen.insert((formal, actual, polarity)) {
             return Ok(());
         }
 
