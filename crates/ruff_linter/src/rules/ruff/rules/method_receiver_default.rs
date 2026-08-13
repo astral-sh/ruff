@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast};
-use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType, is_class_method};
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
@@ -39,27 +38,12 @@ use crate::checkers::ast::Checker;
 ///
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
-pub(crate) struct MethodReceiverDefault {
-    receiver_kind: ReceiverKind,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum ReceiverKind {
-    Instance,
-    Class,
-}
+pub(crate) struct MethodReceiverDefault;
 
 impl Violation for MethodReceiverDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        match self.receiver_kind {
-            ReceiverKind::Instance => {
-                "Instance receiver parameter should not have a default value".to_string()
-            }
-            ReceiverKind::Class => {
-                "Class receiver parameter should not have a default value".to_string()
-            }
-        }
+        "Receiver parameter should not have a default value".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -85,20 +69,14 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    let ScopeKind::Class(class_def) = parent_scope.kind else {
+    let ScopeKind::Class(_) = parent_scope.kind else {
         return;
     };
 
-    // Determine receiver kind
-    let Some(receiver_kind) = receiver_kind(
-        name.as_str(),
-        decorator_list,
-        parent_scope,
-        class_def,
-        checker,
-    ) else {
+    // Determine whether this function has a bound receiver parameter.
+    if !has_receiver_parameter(name.as_str(), decorator_list, parent_scope, checker) {
         return;
-    };
+    }
 
     // Get the first parameter (the receiver)
     let Some(first_param) = parameters
@@ -111,20 +89,19 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
 
     // Check if the receiver parameter has a default value
     if let Some(default_expr) = &first_param.default {
-        let diagnostic = MethodReceiverDefault { receiver_kind };
+        let diagnostic = MethodReceiverDefault;
 
         checker.report_diagnostic(diagnostic, default_expr.range());
     }
 }
 
-/// Determine the receiver kind for a function, if it has a receiver parameter.
-fn receiver_kind(
+/// Determine whether a function has a bound receiver parameter.
+fn has_receiver_parameter(
     name: &str,
     decorator_list: &[ast::Decorator],
     parent_scope: &Scope,
-    class_def: &ast::StmtClassDef,
     checker: &Checker,
-) -> Option<ReceiverKind> {
+) -> bool {
     let semantic = checker.semantic();
 
     let function_kind = function_type::classify(
@@ -143,7 +120,7 @@ fn receiver_kind(
         // unrelated decorator (`@some_decorator`) or a stacked one alongside `@classmethod` could
         // change how the receiver is bound, so we bail out rather than risk a false positive.
         FunctionType::ClassMethod => match decorator_list {
-            [] => Some(ReceiverKind::Class),
+            [] => true,
             [decorator]
                 if is_class_method(
                     decorator,
@@ -151,22 +128,13 @@ fn receiver_kind(
                     &checker.settings().pep8_naming.classmethod_decorators,
                 ) =>
             {
-                Some(ReceiverKind::Class)
+                true
             }
-            _ => None,
+            _ => false,
         },
-        FunctionType::NewMethod if decorator_list.is_empty() => Some(ReceiverKind::Class),
-        // On a metaclass, instances are themselves classes, so a plain method's first parameter
-        // (conventionally named `cls`, not `self`) is bound to a class, not an ordinary
-        // instance. Report that as a class receiver so the diagnostic matches the convention.
-        FunctionType::Method if decorator_list.is_empty() => {
-            if is_metaclass(class_def, semantic).is_yes() {
-                Some(ReceiverKind::Class)
-            } else {
-                Some(ReceiverKind::Instance)
-            }
-        }
-        FunctionType::Function => None,
-        _ => None,
+        FunctionType::NewMethod if decorator_list.is_empty() => true,
+        FunctionType::Method if decorator_list.is_empty() => true,
+        FunctionType::Function => false,
+        _ => false,
     }
 }

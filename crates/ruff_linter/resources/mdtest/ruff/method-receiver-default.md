@@ -27,7 +27,7 @@ class NestedInIfReceiverDefault:
 ```
 
 ```snapshot
-error[RUF077]: Instance receiver parameter should not have a default value
+error[RUF077]: Receiver parameter should not have a default value
  --> src/mdtest_snippet.py:2:21
   |
 2 |     def method(self=None): ...  # snapshot: method-receiver-default
@@ -52,7 +52,7 @@ class ClassGetitemReceiver:
 ## Metaclasses
 
 On a metaclass, a plain method's first parameter is conventionally `cls`, not `self`, because
-instances of a metaclass are themselves classes. The diagnostic should reflect that.
+instances of a metaclass are themselves classes.
 
 ```py
 class Meta(type):
@@ -60,7 +60,7 @@ class Meta(type):
 ```
 
 ```snapshot
-error[RUF077]: Class receiver parameter should not have a default value
+error[RUF077]: Receiver parameter should not have a default value
  --> src/mdtest_snippet.py:2:20
   |
 2 |     def method(cls=None): ...  # snapshot: method-receiver-default
