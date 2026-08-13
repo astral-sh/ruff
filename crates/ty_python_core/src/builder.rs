@@ -239,6 +239,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
+    /// Attribute-read dependency of the ordinary assignment value currently being evaluated.
+    assignment_member_dependency: Option<AssignmentMemberDependency>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -314,6 +316,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
             current_statements: Vec::new(),
+            assignment_member_dependency: None,
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
@@ -1398,6 +1401,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+        self.record_assignment_member_dependency(place_id, use_id);
+    }
+
+    /// Record a possible attribute read while evaluating an ordinary assignment value.
+    fn record_assignment_member_dependency(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
+        let Some(frame) = self.assignment_member_dependency.as_ref() else {
+            return;
+        };
+        if frame.has_dependency || frame.scope != self.current_scope() || !frame.collecting {
+            return;
+        }
+
+        let has_dependency = match place {
+            ScopedPlaceId::Member(_) => true,
+            ScopedPlaceId::Symbol(_) => self
+                .current_use_def_map()
+                .use_may_depend_on_instance_member(use_id),
+        };
+
+        if has_dependency && let Some(frame) = self.assignment_member_dependency.as_mut() {
+            frame.has_dependency = true;
+        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -1411,6 +1436,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         target: expr,
                     },
                 );
+
+                if self
+                    .assignment_member_dependency
+                    .as_ref()
+                    .is_some_and(|frame| {
+                        frame.scope == self.current_scope() && frame.has_dependency
+                    })
+                {
+                    self.current_use_def_map_mut()
+                        .record_member_dependent_definition(assignment);
+                }
 
                 self.add_dict_key_assignment_definitions(&node.targets, &node.value, assignment);
             }
@@ -3675,7 +3711,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
+                let track_dependency = self.is_method_or_eagerly_executed_in_method().is_some();
+                if track_dependency {
+                    self.assignment_member_dependency = Some(AssignmentMemberDependency {
+                        scope: self.current_scope(),
+                        has_dependency: false,
+                        collecting: true,
+                    });
+                }
                 self.visit_expr(&node.value);
+                if track_dependency && let Some(frame) = self.assignment_member_dependency.as_mut()
+                {
+                    frame.collecting = false;
+                }
 
                 // Unannotated collection initializers must be standalone expressions to participate
                 // in full-scope bidirectional inference.
@@ -3700,6 +3748,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     for target in &node.targets {
                         self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);
                     }
+                }
+
+                if track_dependency {
+                    self.assignment_member_dependency.take();
                 }
             }
             ast::Stmt::AnnAssign(node) => {
@@ -5586,6 +5638,13 @@ struct CurrentStatement<'ast, 'db> {
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
+}
+
+/// Whether an ordinary assignment value might depend on an attribute read.
+struct AssignmentMemberDependency {
+    scope: FileScopeId,
+    has_dependency: bool,
+    collecting: bool,
 }
 
 #[derive(Debug, PartialEq)]

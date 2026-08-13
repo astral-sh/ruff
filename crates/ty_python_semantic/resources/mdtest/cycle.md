@@ -532,6 +532,148 @@ class Parent(Base):
         return self.values
 ```
 
+## Same-class and final attributes when the base is checked first
+
+A same-class initializer can follow an update through a local alias. A bare `Final` declaration
+without a value does not replace an inherited initializer.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`base.py`:
+
+```py
+from typing import Final
+
+class Parent:
+    def update(self):
+        previous = self.values
+        self.values = [*previous]
+
+    def __init__(self):
+        self.values = ["a"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+
+class FinalBase:
+    values = ["a"]
+
+class FinalParent(FinalBase):
+    def __init__(self):
+        self.values: Final
+        self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+`child.py`:
+
+```py
+from base import FinalParent, Parent
+
+class Child(Parent):
+    def update(self):
+        self.values = [*self.values]
+
+class FinalChild(FinalParent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+## Same-class and final attributes when the subclass is checked first
+
+Reversing file order preserves both the same-class initializer and the inherited bare `Final` value.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+`child.py`:
+
+```py
+from base import FinalParent, Parent
+
+class Child(Parent):
+    def update(self):
+        self.values = [*self.values]
+
+class FinalChild(FinalParent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+```
+
+`base.py`:
+
+```py
+from typing import Final
+
+class Parent:
+    def update(self):
+        previous = self.values
+        self.values = [*previous]
+
+    def __init__(self):
+        self.values = ["a"]
+
+    def get_values(self) -> list[str]:
+        return self.values
+
+class FinalBase:
+    values = ["a"]
+
+class FinalParent(FinalBase):
+    def __init__(self):
+        self.values: Final
+        self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values
+```
+
+## Final annotations that establish an attribute type
+
+An initialized bare `Final` infers its value, while `Final[T]` retains its explicit declared type.
+
+```py
+from typing import Final
+
+class Initialized:
+    def __init__(self):
+        self.values: Final = ["a"]
+
+class Declared:
+    def __init__(self):
+        self.values: Final[list[str]]
+        self.values = ["a"]
+
+reveal_type(Initialized().values)  # revealed: list[str]
+reveal_type(Declared().values)  # revealed: list[str]
+```
+
+## Same-named attributes on unrelated receivers
+
+An independently initialized attribute must not replace a different receiver's same-named attribute.
+
+```py
+class Other:
+    def __init__(self):
+        self.values = [1]
+
+class Example:
+    def __init__(self):
+        self.values = ["a"]
+
+    def update(self, other: Other):
+        self.values = [*other.values]
+
+reveal_type(Example().values)  # revealed: list[str] | list[int]
+```
+
 ## Inherited attributes remain stable across assignment forms
 
 Inherited attribute inference does not depend on how an assignment accesses or binds the previous

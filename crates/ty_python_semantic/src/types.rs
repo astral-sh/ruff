@@ -4532,6 +4532,70 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Recover a recursive attribute read from an independently initialized instance member.
+    ///
+    /// The fallback belongs to this read rather than the complete implicit-attribute summary,
+    /// allowing assignments that transform the member to contribute their normal inferred types.
+    fn try_member_lookup_with_cycle_anchor(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> MemberLookupResult<'db> {
+        let (class, target_method_decorator) = match self {
+            Type::ClassLiteral(_) | Type::GenericAlias(_) => {
+                let Some(class) = self.to_class_type(db) else {
+                    return self.try_member_lookup(db, env, name);
+                };
+                (class, MethodDecorator::ClassMethod)
+            }
+            _ => {
+                let Some(class) = self.nominal_class(db, env) else {
+                    return self.try_member_lookup(db, env, name);
+                };
+                (class, MethodDecorator::None)
+            }
+        };
+
+        let Some((class, specialization)) = class.static_class_literal(db) else {
+            return self.try_member_lookup(db, env, name);
+        };
+        let Some(incoming) =
+            class.independent_own_attribute_value(db, name, target_method_decorator)
+        else {
+            return self.try_member_lookup(db, env, name);
+        };
+        let incoming = incoming.apply_optional_specialization(db, specialization);
+
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _, incoming| Ok(Place::bound(incoming).into()),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn member_lookup_with_cycle_anchor<'db>(
+            db: &'db dyn Db,
+            key: MemberLookupKey<'db>,
+            incoming: Type<'db>,
+        ) -> MemberLookupResult<'db> {
+            // The incoming value identifies this query and supplies its cycle result.
+            let _ = incoming;
+            let env = ProgramEnvironment::from_program(key.program(db));
+            key.ty(db).try_member_lookup(db, &env, key.name(db))
+        }
+
+        member_lookup_with_cycle_anchor(
+            db,
+            MemberLookupKey::new(
+                db,
+                env.program(db),
+                self,
+                name,
+                MemberLookupPolicy::default(),
+            ),
+            incoming,
+        )
+    }
+
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
     pub(crate) fn member_lookup_with_policy(

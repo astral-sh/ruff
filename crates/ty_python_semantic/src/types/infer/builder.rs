@@ -118,11 +118,12 @@ use crate::types::{
     CallableTypes, ClassType, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter,
-    Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, TypedDictModule, UnionAccumulator, UnionBuilder, UnionType,
-    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    Parameters, ProgramEnvironment, SentinelInstance, Signature, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{
@@ -202,6 +203,15 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
+
+/// The temporary receiver-member value used while evaluating an assignment's transfer effect.
+#[derive(Clone)]
+struct MemberCycleOverride<'db> {
+    name: Name,
+    owner: StaticClassLiteral<'db>,
+    incoming: Type<'db>,
+    active_aliases: FxHashSet<Definition<'db>>,
+}
 
 /// Builder to infer all types in a region.
 ///
@@ -362,6 +372,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// Speculative attribute value used only when checking an assignment's transfer effect.
+    member_cycle_override: Option<MemberCycleOverride<'db>>,
+
     /// If the inference region refers to a definition, whether synthesized dictionary-key
     /// assignments derived from its right-hand side should be discarded.
     discards_dict_key_assignments: bool,
@@ -494,6 +507,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_recovery: None,
+            member_cycle_override: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
         }
@@ -4240,6 +4254,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         declared
     }
 
+    /// Infer only a valid annotated assignment's annotation, without reporting diagnostics.
+    ///
+    /// Full definition inference remains responsible for validating the assignment and reporting
+    /// annotation diagnostics. Suppressing them here lets declaration classification run before a
+    /// potentially recursive initializer without constructing or discarding duplicate diagnostics.
+    pub(super) fn infer_annotated_assignment_annotation_only(
+        mut self,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+    ) -> Option<TypeAndQualifiers<'db>> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+
+        let target = assignment.target(self.module());
+        (target.is_name_expr() || self.is_valid_receiver_annotation_target(target))
+            .then(|| self.infer_annotated_assignment_annotation(assignment))
+    }
+
+    /// Infer an assignment value with matching recursive member reads replaced by `incoming`.
+    pub(super) fn infer_dependent_assignment_transfer(
+        mut self,
+        assignment: &AssignmentDefinitionKind<'db>,
+        name: Name,
+        incoming: Type<'db>,
+    ) -> Option<Type<'db>> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+
+        if assignment.unpack().is_some() {
+            return None;
+        }
+
+        let owner = nearest_enclosing_class(self.db(), self.index, self.scope())?;
+
+        self.expression_cache = None;
+        self.member_cycle_override = Some(MemberCycleOverride {
+            name,
+            owner,
+            incoming,
+            active_aliases: FxHashSet::default(),
+        });
+
+        Some(
+            self.infer_expression_uncached(assignment.value(self.module()), TypeContext::default()),
+        )
+    }
+
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
     pub(super) fn infer_annotated_assignment_cycle_initial(
         mut self,
@@ -6172,7 +6232,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(standalone_expression) = self.index.try_expression(expression) {
+        if self.member_cycle_override.is_some() {
+            self.infer_expression_uncached(expression, tcx)
+        } else if let Some(standalone_expression) = self.index.try_expression(expression) {
             self.infer_standalone_expression_impl(expression, standalone_expression, tcx)
         } else {
             self.infer_expression(expression, tcx)
@@ -6246,6 +6308,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if self.member_cycle_override.is_some() {
+            return self.infer_expression_uncached(expression, tcx);
+        }
+
         let types = infer_expression_types(self.db(), standalone_expression, tcx);
         self.extend_expression(types);
 
@@ -9769,6 +9835,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let db = self.db();
+        if self.member_cycle_override.is_some() {
+            let use_id = name_node.scoped_use_id(db, self.program_file());
+            let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+            let bindings = use_def
+                .bindings_at_use(use_id)
+                .map(|binding| binding.binding)
+                .collect::<SmallVec<[_; 2]>>();
+
+            if bindings.iter().any(|binding| {
+                binding.definition().is_some_and(|definition| {
+                    use_def.definition_may_depend_on_instance_member(definition)
+                })
+            }) {
+                let mut aliases = UnionBuilder::new(db, self.program_environment());
+
+                for binding in bindings {
+                    let Some(definition) = binding.definition() else {
+                        aliases.add_in_place(Type::unknown());
+                        continue;
+                    };
+                    if use_def.definition_may_depend_on_instance_member(definition)
+                        && let DefinitionKind::Assignment(assignment) = definition.kind(db)
+                    {
+                        let is_new = self
+                            .member_cycle_override
+                            .as_mut()
+                            .is_some_and(|state| state.active_aliases.insert(definition));
+                        if !is_new {
+                            aliases.add_in_place(Type::unknown());
+                            continue;
+                        }
+
+                        let ty = self.infer_expression_uncached(
+                            assignment.value(self.module()),
+                            TypeContext::default(),
+                        );
+                        if let Some(state) = self.member_cycle_override.as_mut() {
+                            state.active_aliases.remove(&definition);
+                        }
+                        aliases.add_in_place(ty);
+                    } else {
+                        aliases.add_in_place(binding_type(db, definition));
+                    }
+                }
+
+                return aliases.build();
+            }
+        }
+
         let expr = PlaceExpr::from_expr_name(name_node);
 
         let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
@@ -10152,6 +10267,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        if let Some(state) = &self.member_cycle_override
+            && state.name == attribute.attr.id
+            && value_type
+                .nominal_class(self.db(), self.program_environment())
+                .or_else(|| value_type.to_class_type(self.db()))
+                .and_then(|class| class.static_class_literal(self.db()))
+                .is_some_and(|(owner, _)| owner == state.owner)
+        {
+            return Ok(state.incoming);
+        }
+
         let env = self.program_environment();
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
@@ -10185,15 +10311,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-        let fallback_place = value_type
-            .try_member_lookup(db, env, &attr.id)
-            .unwrap_or_else(|error| {
-                error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
-                error.fallback_member(db)
-            })
-            .map_type(|ty| {
-                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
-            });
+        let is_member_dependent_assignment = match self.region {
+            InferenceRegion::Definition(definition) => {
+                matches!(definition.kind(db), DefinitionKind::Assignment(_))
+                    && self
+                        .index
+                        .use_def_map(definition.file_scope(db))
+                        .definition_may_depend_on_instance_member(definition)
+            }
+            InferenceRegion::Expression(expression, _) => {
+                expression.assigned_to(db).is_some_and(|assignment| {
+                    DefinitionNodeKey::from_assignment(assignment.node(self.module())).any(
+                        |definition_key| {
+                            self.index
+                                .try_definition(definition_key)
+                                .is_some_and(|definition| {
+                                    self.index
+                                        .use_def_map(definition.file_scope(db))
+                                        .definition_may_depend_on_instance_member(definition)
+                                })
+                        },
+                    )
+                })
+            }
+            InferenceRegion::Statement(_)
+            | InferenceRegion::FunctionDecorators(_)
+            | InferenceRegion::Deferred(_)
+            | InferenceRegion::Scope(_, _) => false,
+        };
+        let fallback_place = if is_member_dependent_assignment {
+            value_type.try_member_lookup_with_cycle_anchor(db, env, &attr.id)
+        } else {
+            value_type.try_member_lookup(db, env, &attr.id)
+        }
+        .unwrap_or_else(|error| {
+            error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
+            error.fallback_member(db)
+        })
+        .map_type(|ty| {
+            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+        });
 
         let attr_name = &attr.id;
         let lookup_result = fallback_place.into_lookup_result(db, env);
@@ -11052,6 +11209,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_cycle_override: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -11113,6 +11271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_cycle_override: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -11210,6 +11369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
+            member_cycle_override: _,
             reachability_cache: _,
             declarations: _,
             deferred: _,
@@ -11271,6 +11431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_cycle_override: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -11411,6 +11572,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Builder only state
             expression_cache: _,
+            member_cycle_override: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -11468,6 +11630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
+            ref member_cycle_override,
             ref reachability_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
@@ -11509,6 +11672,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
+        builder
+            .member_cycle_override
+            .clone_from(member_cycle_override);
         builder.reachability_cache.clone_from(reachability_cache);
         builder
             .return_types_and_ranges
@@ -11553,6 +11719,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            member_cycle_override: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,

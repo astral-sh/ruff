@@ -161,6 +161,81 @@ pub(crate) fn infer_definition_types<'db>(
     .finish_definition(definition)
 }
 
+/// Infer an annotated assignment's declared type without evaluating its initializer.
+///
+/// Attribute lookup needs to distinguish an independent declaration such as `self.x: int` from a
+/// qualifier-only declaration such as `self.x: Final` before deciding how to recover from cycles.
+/// Inferring the complete definition here would evaluate the initializer and could enter that
+/// cycle before the appropriate recovery strategy has been selected.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn annotated_assignment_annotation<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<TypeAndQualifiers<'db>> {
+    let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_file(program_file);
+
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Definition(definition),
+        python_file.file(db),
+        program_file,
+        index,
+        &module,
+    )
+    .infer_annotated_assignment_annotation_only(assignment)
+}
+
+/// Infer an attribute assignment's effect with its recursive reads replaced by `incoming`.
+///
+/// This uses a private inference builder rather than the normal expression or definition queries:
+/// the provisional value is only valid while testing whether the assignment preserves an
+/// independently initialized attribute type.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn dependent_assignment_transfer<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    incoming: Type<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let attribute = assignment.target(&module).as_attribute_expr()?;
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_file(program_file);
+
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Definition(definition),
+        python_file.file(db),
+        program_file,
+        index,
+        &module,
+    )
+    .infer_dependent_assignment_transfer(assignment, attribute.attr.id.clone(), incoming)
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:
