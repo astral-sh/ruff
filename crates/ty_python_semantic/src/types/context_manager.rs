@@ -4,7 +4,7 @@ use crate::{
     FxOrderSet, Program,
     types::{
         Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
-        TypeContext, UnionBuilder, call::CallErrorKind, context::InferContext,
+        TypeContext, call::CallErrorKind, context::InferContext,
         diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
@@ -21,9 +21,9 @@ impl<'db> Type<'db> {
     /// Suppression is cached by manager type because the same predicate can be evaluated repeatedly
     /// for different bindings and context managers. Each alternative in a union is classified
     /// separately: if any possible manager can suppress exceptions, the union can suppress
-    /// exceptions too. Merging the alternatives' exit return types first could incorrectly
-    /// classify a suppressing manager alongside a non-suppressing manager as returning
-    /// `bool | None`.
+    /// exceptions too. Exceptional-exit overloads are also classified independently. Merging the
+    /// return types of different manager alternatives or overloads could incorrectly classify a
+    /// suppressing exit alongside a non-suppressing exit as returning `bool | None`.
     ///
     /// Python passes `(None, None, None)` to an exit method when a suite completes normally and
     /// passes the exception type, value, and traceback when it raises. Consequently, an overload
@@ -71,7 +71,7 @@ impl<'db> Type<'db> {
             manager: Type<'db>,
             is_async: bool,
         ) -> bool {
-            if let Type::Union(union) = manager {
+            if let Some(union) = manager.as_union_like(db) {
                 return union
                     .elements(db)
                     .iter()
@@ -95,7 +95,6 @@ impl<'db> Type<'db> {
                 return false;
             };
 
-            let mut return_types = UnionBuilder::new(db, &env);
             for callable in &callables {
                 for signature in callable.signatures(db) {
                     if let Some(exception_type) = signature.parameters().get_positional(0)
@@ -112,13 +111,19 @@ impl<'db> Type<'db> {
                     } else {
                         signature.return_ty
                     };
-                    return_types.add_in_place(return_type);
+
+                    if return_type.is_equivalent_to(
+                        db,
+                        &env,
+                        KnownClass::Bool.to_instance(db, &env),
+                    ) || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
+                    {
+                        return true;
+                    }
                 }
             }
 
-            let return_type = return_types.build();
-            return_type.is_equivalent_to(db, &env, KnownClass::Bool.to_instance(db, &env))
-                || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
+            false
         }
 
         can_suppress_exceptions_impl(db, env.program(db), self, mode.is_async())

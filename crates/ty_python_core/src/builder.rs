@@ -4059,6 +4059,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                     if let Some(exceptional_entry) = exceptional_entries.next() {
                         let normal_exit = self.flow_snapshot();
+                        if normal_exit.is_always_unreachable() {
+                            let next_definition_id =
+                                self.current_use_def_map().next_definition_id();
+                            self.exception_context_stack_manager
+                                .record_suppressed_terminal_with_exit(next_definition_id);
+                        }
                         let expression = expression
                             .unwrap_or_else(|| self.add_standalone_expression(context_expr));
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
@@ -4512,7 +4518,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 let normal_pre_finally_state = self.flow_snapshot();
-                let (terminal_finally_entry_snapshots, has_escaping_exception) = self
+                let (
+                    terminal_finally_entry_snapshots,
+                    has_escaping_exception,
+                    suppressed_terminal_with_exit,
+                ) = self
                     .exception_context_stack_manager
                     .pop_context()
                     .into_finally_entry_state();
@@ -4544,6 +4554,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     self.mark_unreachable();
                 } else {
+                    if !finalbody.is_empty()
+                        && suppressed_terminal_with_exit
+                            == Some(self.current_use_def_map().next_definition_id())
+                    {
+                        // Later definitions belong to an ordinary continuing path, so they make
+                        // the manager's earlier terminal-entry snapshots stale for this cleanup.
+                        for snapshot in terminal_finally_entry_snapshots {
+                            self.flow_merge(snapshot);
+                        }
+                    }
                     // Mixed normal and terminal entry states are still handled by the normal path
                     // only. See the corresponding TODO tests in `terminal_statements.md`.
                     self.visit_body(finalbody);
@@ -4574,6 +4594,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {
+                if self
+                    .exception_context_stack_manager
+                    .has_with_exception_checkpoint()
+                {
+                    self.record_ambiguous_reachability();
+                }
                 let snapshot = self.flow_snapshot();
                 if let Some(current_loop) = self.current_loop_mut() {
                     if stmt.is_continue_stmt() {

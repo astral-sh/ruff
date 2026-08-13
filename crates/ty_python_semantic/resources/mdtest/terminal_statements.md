@@ -596,6 +596,54 @@ def returns_through_finally() -> None:
         reveal_type(value)  # revealed: Literal["returned"]
 ```
 
+## Continuing after a suppressing context manager inside `try`
+
+When a context manager suppresses an exception, a later assignment determines the value observed by
+the `finally` block:
+
+```py
+from contextlib import suppress
+
+value = "before"
+try:
+    with suppress(ValueError):
+        raise ValueError
+    value = "continuing"
+finally:
+    reveal_type(value)  # revealed: Literal["continuing"]
+```
+
+## Raising from a context manager inside `try`
+
+A `finally` block remains reachable when a context manager propagates an exception:
+
+```py
+from contextlib import nullcontext
+
+try:
+    with nullcontext():
+        raise ValueError
+finally:
+    missing_name  # error: [unresolved-reference]
+```
+
+## Raising from a context manager inside `except`
+
+A `finally` block remains reachable when a context manager propagates an exception from an exception
+handler:
+
+```py
+from contextlib import nullcontext
+
+try:
+    raise ValueError
+except ValueError:
+    with nullcontext():
+        raise RuntimeError
+finally:
+    missing_name  # error: [unresolved-reference]
+```
+
 ## Possibly unbound names in `finally` after a context manager
 
 When an assignment raises before binding a name, a `finally` block can observe that the name is
@@ -618,9 +666,8 @@ def without_context_manager() -> str | None:
         reveal_type(value)  # revealed: str
 ```
 
-Adding a non-suppressing context manager currently hides the exceptional path from the `finally`
-block. Properly modeling the continuing and terminating paths is tracked in
-[ty#233](https://github.com/astral-sh/ty/issues/233).
+A non-suppressing context manager does not prevent the `finally` block from observing that the name
+may remain undefined.
 
 ```py
 def with_context_manager() -> str | None:
@@ -631,8 +678,8 @@ def with_context_manager() -> str | None:
     except ValueError:
         return None
     finally:
-        # TODO: should emit [possibly-unresolved-reference] and reveal `str`.
-        reveal_type(value)  # revealed: Never
+        # error: [possibly-unresolved-reference]
+        reveal_type(value)  # revealed: str
 ```
 
 ## Calls to functions returning `Never` / `NoReturn`

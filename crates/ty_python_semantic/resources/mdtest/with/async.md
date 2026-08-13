@@ -62,6 +62,47 @@ async def propagating_exit() -> None:
     reveal_type(result)  # revealed: str
 ```
 
+## Async context managers with an aliased union type
+
+A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Suppresses:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class Propagates:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None: ...
+
+type Managers = Suppresses | Propagates
+
+async def may_raise() -> str:
+    raise ValueError
+
+async def preserved_binding(manager: Managers) -> None:
+    result = None
+    async with manager:
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+A suppressed exception can also leave a new binding undefined:
+
+```py
+async def missing_binding(manager: Managers) -> None:
+    async with manager:
+        result = await may_raise()
+    # error: [possibly-unresolved-reference]
+    reveal_type(result)  # revealed: str
+```
+
 ## Earlier async context managers can suppress later entry failures
 
 If an earlier async context manager suppresses an exception while a later manager enters, the later
@@ -156,6 +197,27 @@ class ExceptionalExitOnly:
 async def exceptional_exit_only() -> None:
     result = None
     async with ExceptionalExitOnly():
+        result = await may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+An exceptional overload can suppress its exception even if another exceptional overload cannot:
+
+```py
+class SuppressesValueError:
+    async def __aenter__(self) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: type[ValueError], exc_value: ValueError, traceback: object) -> Literal[True]: ...
+    @overload
+    async def __aexit__(self, exc_type: type[TypeError], exc_value: TypeError, traceback: object) -> None: ...
+    @overload
+    async def __aexit__(self, exc_type: None, exc_value: None, traceback: None) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True if exc_type is ValueError else None
+
+async def mixed_exceptional_exits() -> None:
+    result = None
+    async with SuppressesValueError():
         result = await may_raise()
     reveal_type(result)  # revealed: None | str
 ```

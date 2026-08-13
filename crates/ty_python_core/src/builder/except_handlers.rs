@@ -151,6 +151,37 @@ impl ExceptionContextStackManager {
         false
     }
 
+    /// Returns whether an enclosing context manager has already seen an exception checkpoint.
+    pub(super) fn has_with_exception_checkpoint(&self) -> bool {
+        self.0.last().is_some_and(|stack| {
+            stack.0.iter().any(|context| {
+                matches!(context.kind, ExceptionContextKind::With)
+                    && matches!(
+                        &context.exception_handlers,
+                        ExceptionHandlers::Propagating(snapshots)
+                            | ExceptionHandlers::CatchAll(snapshots)
+                            if !snapshots.is_empty()
+                    )
+            })
+        })
+    }
+
+    /// Records the enclosing `try`'s definition cursor when suppression bypasses a terminal body.
+    pub(super) fn record_suppressed_terminal_with_exit(
+        &mut self,
+        next_definition_id: ScopedDefinitionId,
+    ) {
+        if let Some(context) = self
+            .current_exception_context_stack()
+            .0
+            .iter_mut()
+            .rev()
+            .find(|context| matches!(context.kind, ExceptionContextKind::Try))
+        {
+            context.suppressed_terminal_with_exit = Some(next_definition_id);
+        }
+    }
+
     /// Records a terminal entry for the nearest enclosing `try`, skipping `with` contexts.
     pub(super) fn record_terminal_finally_entry(&mut self, builder: &SemanticIndexBuilder) {
         self.current_exception_context_stack()
@@ -271,14 +302,19 @@ pub(super) struct ExceptionContext {
     last_checkpoint_key: Option<(ScopedDefinitionId, ControlFlowRevision)>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
+    /// Definition cursor at a possible suppression continuation from a terminal manager body.
+    suppressed_terminal_with_exit: Option<ScopedDefinitionId>,
     terminal_finally_entry_snapshots: Vec<FlowSnapshot>,
 }
 
 impl ExceptionContext {
-    pub(super) fn into_finally_entry_state(self) -> (Vec<FlowSnapshot>, bool) {
+    pub(super) fn into_finally_entry_state(
+        self,
+    ) -> (Vec<FlowSnapshot>, bool, Option<ScopedDefinitionId>) {
         (
             self.terminal_finally_entry_snapshots,
             self.has_escaping_exception,
+            self.suppressed_terminal_with_exit,
         )
     }
 

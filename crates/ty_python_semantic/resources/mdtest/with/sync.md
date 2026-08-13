@@ -111,6 +111,74 @@ with suppress(ValueError), EnterFails() as target:
 reveal_type(target)  # revealed: str
 ```
 
+## Loop exits inside multiple context managers
+
+A context manager cannot suppress a `break`, but it can suppress an exception while the next manager
+enters. An assignment after the managers is therefore only possibly reached:
+
+```py
+from contextlib import nullcontext, suppress
+
+for _ in [1]:
+    with suppress(ValueError), nullcontext():
+        break
+    after_break = 1
+
+after_break  # error: [possibly-unresolved-reference]
+```
+
+It cannot suppress a `continue` either:
+
+```py
+for _ in [1]:
+    with suppress(ValueError), nullcontext():
+        continue
+    after_continue = 1
+
+after_continue  # error: [possibly-unresolved-reference]
+```
+
+An exception inside one manager can likewise be suppressed before a `break`:
+
+```py
+for _ in [1]:
+    with suppress(ValueError):
+        int("invalid")
+        break
+    after_exception = 1
+
+after_exception  # error: [possibly-unresolved-reference]
+```
+
+## Loop exits inside nested context managers
+
+Nested context managers cannot suppress a `break`, but the outer manager can suppress an exception
+while the inner manager enters:
+
+```py
+from contextlib import nullcontext, suppress
+
+for _ in [1]:
+    with suppress(ValueError):
+        with nullcontext():
+            break
+    after_break = 1
+
+after_break  # error: [possibly-unresolved-reference]
+```
+
+They cannot suppress a `continue` either:
+
+```py
+for _ in [1]:
+    with suppress(ValueError):
+        with nullcontext():
+            continue
+    after_continue = 1
+
+after_continue  # error: [possibly-unresolved-reference]
+```
+
 ## Returning from an exception-suppressing context manager
 
 A context manager cannot suppress a return statement:
@@ -290,6 +358,47 @@ def possibly_suppressing(manager: Suppresses | Propagates) -> None:
     reveal_type(result)  # revealed: None | str
 ```
 
+## Context managers with an aliased union type
+
+A PEP 695 alias does not prevent a suppressing union member from preserving an earlier binding:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Suppresses:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class Propagates:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+type Managers = Suppresses | Propagates
+
+def may_raise() -> str:
+    raise ValueError
+
+def preserved_binding(manager: Managers) -> None:
+    result = None
+    with manager:
+        result = may_raise()
+    reveal_type(result)  # revealed: None | str
+```
+
+A suppressed exception can also leave a new binding undefined:
+
+```py
+def missing_binding(manager: Managers) -> None:
+    with manager:
+        result = may_raise()
+    # error: [possibly-unresolved-reference]
+    reveal_type(result)  # revealed: str
+```
+
 ## Non-suppressing context managers preserve narrowing
 
 A non-suppressing manager does not change narrowing after an exception propagates:
@@ -353,6 +462,25 @@ exceptional_value = None
 with ExceptionOnly():
     exceptional_value = may_raise()
 reveal_type(exceptional_value)  # revealed: None | str
+```
+
+An exceptional overload can suppress its exception even if another exceptional overload cannot:
+
+```py
+class SuppressesValueError(Manager):
+    @overload
+    def __exit__(self, exc_type: type[ValueError], exc_value: ValueError, traceback: object) -> Literal[True]: ...
+    @overload
+    def __exit__(self, exc_type: type[TypeError], exc_value: TypeError, traceback: object) -> None: ...
+    @overload
+    def __exit__(self, exc_type: None, exc_value: None, traceback: None) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True if exc_type is ValueError else None
+
+mixed_exceptional_value = None
+with SuppressesValueError():
+    mixed_exceptional_value = may_raise()
+reveal_type(mixed_exceptional_value)  # revealed: None | str
 ```
 
 ## Union context manager
