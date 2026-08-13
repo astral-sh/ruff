@@ -618,7 +618,7 @@ def outer():
     a = None
     def g(a):
         if True:
-            nonlocal a  # snapshot: invalid-syntax
+            nonlocal a  # error: [invalid-syntax]
 
 def h(a):
     def inner():
@@ -628,7 +628,7 @@ def outer():
     a = None
     def i(a):
         try:
-            nonlocal a  # snapshot: invalid-syntax
+            nonlocal a  # error: [invalid-syntax]
         except Exception:
             pass
 
@@ -637,7 +637,7 @@ def outer():
     def f(a):
         a = 1
         a = 2
-        nonlocal a  # snapshot: invalid-syntax
+        nonlocal a  # error: [invalid-syntax]
 
 def f(a):
     class Inner:
@@ -645,7 +645,7 @@ def f(a):
 
 def f(a):
     def inner(a):
-        nonlocal a  # snapshot: invalid-syntax
+        nonlocal a  # error: [invalid-syntax]
 
 def f(a=1):
     def inner():
@@ -656,34 +656,6 @@ def f(a=1):
 error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
  --> src/mdtest_snippet.py:6:18
   |
-6 |         nonlocal a # snapshot: invalid-syntax
+6 |         nonlocal a  # snapshot: invalid-syntax
   |                  ^
-
-
-error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
-  --> src/mdtest_snippet.py:12:22
-   |
-12 |             nonlocal a # snapshot: invalid-syntax
-   |                      ^
-
-
-error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
-  --> src/mdtest_snippet.py:22:22
-   |
-22 |             nonlocal a # snapshot: invalid-syntax
-   |                      ^
-
-
-error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
-  --> src/mdtest_snippet.py:31:18
-   |
-31 |         nonlocal a # snapshot: invalid-syntax
-   |                  ^
-
-
-error[invalid-syntax]: name `a` cannot refer to a parameter and a nonlocal variable
-  --> src/mdtest_snippet.py:39:18
-   |
-39 |         nonlocal a # snapshot: invalid-syntax
-   |                  ^
 ```
