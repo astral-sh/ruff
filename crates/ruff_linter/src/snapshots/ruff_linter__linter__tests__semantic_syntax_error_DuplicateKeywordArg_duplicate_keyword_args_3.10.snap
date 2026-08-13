@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/linter.rs
-assertion_line: 1093
 ---
 <filename>:4:8: SyntaxError: Duplicate keyword argument "x"
   |

@@ -1,36 +1,42 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/non_duplicate_keyword_args.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: NodeIndex(None),
         range: 0..71,
         body: [
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: NodeIndex(None),
                     range: 0..15,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..10,
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 8..9,
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 8..9,
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 8..9,
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -45,9 +51,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: NodeIndex(None),
                                 range: 12..15,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 12..15,
                                     },
                                 ),
@@ -58,12 +66,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 16..24,
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 16..24,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 16..19,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -71,18 +82,22 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 19..24,
+                                node_index: NodeIndex(None),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 20..23,
+                                        node_index: NodeIndex(None),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 20..21,
+                                                node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
                                                 range: 22..23,
                                                 value: Int(
                                                     1,
@@ -98,25 +113,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
+                    node_index: NodeIndex(None),
                     range: 25..46,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("bar"),
                         range: 29..32,
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 32..41,
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 33..34,
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 33..34,
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("x"),
                                         range: 33..34,
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -124,11 +145,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 36..37,
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 36..37,
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("y"),
                                         range: 36..37,
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -136,11 +160,14 @@ Module(
                             },
                             ParameterWithDefault {
                                 range: 39..40,
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 39..40,
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("z"),
                                         range: 39..40,
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -155,9 +182,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
+                                node_index: NodeIndex(None),
                                 range: 43..46,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
                                         range: 43..46,
                                     },
                                 ),
@@ -168,12 +197,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
+                    node_index: NodeIndex(None),
                     range: 47..70,
                     value: Call(
                         ExprCall {
+                            node_index: NodeIndex(None),
                             range: 47..70,
                             func: Name(
                                 ExprName {
+                                    node_index: NodeIndex(None),
                                     range: 47..50,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -181,28 +213,34 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 50..70,
+                                node_index: NodeIndex(None),
                                 args: [],
                                 keywords: [
                                     Keyword {
                                         range: 51..56,
+                                        node_index: NodeIndex(None),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
                                                 range: 51..52,
+                                                node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: StringLiteral(
                                             ExprStringLiteral {
+                                                node_index: NodeIndex(None),
                                                 range: 53..56,
                                                 value: StringLiteralValue {
                                                     inner: Single(
                                                         StringLiteral {
                                                             range: 53..56,
+                                                            node_index: NodeIndex(None),
                                                             value: "a",
                                                             flags: StringLiteralFlags {
                                                                 quote_style: Double,
                                                                 prefix: Empty,
                                                                 triple_quoted: false,
+                                                                unclosed: false,
                                                             },
                                                         },
                                                     ),
@@ -212,14 +250,17 @@ Module(
                                     },
                                     Keyword {
                                         range: 58..61,
+                                        node_index: NodeIndex(None),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("y"),
                                                 range: 58..59,
+                                                node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: NumberLiteral(
                                             ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
                                                 range: 60..61,
                                                 value: Int(
                                                     1,
@@ -229,14 +270,17 @@ Module(
                                     },
                                     Keyword {
                                         range: 63..69,
+                                        node_index: NodeIndex(None),
                                         arg: Some(
                                             Identifier {
                                                 id: Name("z"),
                                                 range: 63..64,
+                                                node_index: NodeIndex(None),
                                             },
                                         ),
                                         value: BooleanLiteral(
                                             ExprBooleanLiteral {
+                                                node_index: NodeIndex(None),
                                                 range: 65..69,
                                                 value: true,
                                             },
