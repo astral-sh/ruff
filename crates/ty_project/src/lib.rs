@@ -37,6 +37,8 @@ mod files;
 pub mod glob;
 pub mod metadata;
 pub mod parallel;
+mod script;
+mod uv;
 mod walk;
 pub mod watch;
 
