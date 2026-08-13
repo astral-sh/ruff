@@ -6,8 +6,10 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use ruff_python_ast::name::Name;
+use ty_python_core::semantic_index;
 
 use crate::types::context::LintDiagnosticGuard;
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::tuple::TupleLength;
 use crate::types::{DisplaySettings, Type, TypedDictType};
 use crate::{FxOrderSet, ProgramEnvironment};
@@ -177,7 +179,7 @@ impl<'db> ErrorContext<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         relation: TypeRelation,
-        help_messages: &mut FxOrderSet<HelpMessages>,
+        help_messages: &mut FxOrderSet<HelpMessages<'db>>,
     ) -> Option<String> {
         let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
             TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
@@ -311,11 +313,12 @@ impl<'db> ErrorContext<'db> {
             Self::OpenTypedDictNotAssignableToMapping { source, target } => {
                 let name = source.defining_class().map(|class| class.name(db));
                 help_messages.insert(HelpMessages::OpenTypedDictNotAssignableToMapping {
-                    typed_dict_name: name.cloned(),
-                    relation,
+                    typed_dict_name: name,
+                    mapping_target: *target,
                 });
                 help_messages.insert(HelpMessages::ExplainOpenTypedDictUnsoundness {
-                    typed_dict_name: name.cloned(),
+                    typed_dict_name: name,
+                    mapping_target: *target,
                 });
 
                 format!(
@@ -481,7 +484,7 @@ impl<'db> ErrorContext<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum HelpMessages {
+enum HelpMessages<'db> {
     RequiredFieldCouldBeRemoved,
     TypedDictNotAssignableToDict(TypeRelation),
     ConsiderUsingMappingInsteadOfDict,
@@ -490,35 +493,48 @@ enum HelpMessages {
         parameter_name: Option<Name>,
     },
     OpenTypedDictNotAssignableToMapping {
-        typed_dict_name: Option<Name>,
-        relation: TypeRelation,
+        typed_dict_name: Option<&'db Name>,
+        mapping_target: Type<'db>,
     },
     ExplainOpenTypedDictUnsoundness {
-        typed_dict_name: Option<Name>,
+        typed_dict_name: Option<&'db Name>,
+        mapping_target: Type<'db>,
+    },
+    SuggestMakingParameterPositionalOnly {
+        ty: Type<'db>,
+        protocol: Type<'db>,
+        declaring_protocol_name: &'db Name,
+        method_name: Name,
+        parameter_name: Name,
     },
 }
 
-impl std::fmt::Display for HelpMessages {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+impl<'db> HelpMessages<'db> {
+    fn display(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment,
+        relation: TypeRelation,
+    ) -> impl std::fmt::Display {
+        std::fmt::from_fn(move |f| match self {
             HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
                 "The required field could be removed through a destructive operation \
-                like `del` on the target.",
+                like `del` on the target",
             ),
             HelpMessages::TypedDictNotAssignableToDict(relation) => {
                 write!(
                     f,
                     "A TypedDict is not usually {} any `dict[..]` type; \
-                    `dict` types allow destructive operations like `clear()`.",
+                    `dict` types allow destructive operations like `clear()`",
                     relation.description()
                 )
             }
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
-                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`.")
+                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`")
             }
             HelpMessages::OpenTypedDictNotAssignableToMapping {
                 typed_dict_name,
-                relation,
+                mapping_target,
             } => {
                 let name = typed_dict_name
                     .as_ref()
@@ -526,13 +542,17 @@ impl std::fmt::Display for HelpMessages {
                     .unwrap_or_else(|| "this TypedDict".to_string());
                 write!(
                     f,
-                    "{name} would be {relation} this `Mapping` type \
+                    "{name} would be {relation} `{mapping}` \
                     if it were declared with `closed=True`, \
-                    but TypedDicts are open by default.",
-                    relation = relation.description()
+                    but TypedDicts are open by default",
+                    relation = relation.description(),
+                    mapping = mapping_target.display(db, env)
                 )
             }
-            HelpMessages::ExplainOpenTypedDictUnsoundness { typed_dict_name } => {
+            HelpMessages::ExplainOpenTypedDictUnsoundness {
+                typed_dict_name,
+                mapping_target,
+            } => {
                 let name = typed_dict_name
                     .as_ref()
                     .map(|name| format!("`{name}`"))
@@ -540,7 +560,8 @@ impl std::fmt::Display for HelpMessages {
                 write!(
                     f,
                     "A subclass of {name} could validly add a new field \
-                    of an arbitrary type, violating subtyping with the `Mapping` type"
+                    of an arbitrary type, violating subtyping with `{mapping_type}`",
+                    mapping_type = mapping_target.display(db, env)
                 )
             }
             HelpMessages::TopCallableExplanation => f.write_str(
@@ -552,7 +573,26 @@ impl std::fmt::Display for HelpMessages {
                 Some(name) => write!(f, "Parameter `{name}` must have a default value"),
                 None => f.write_str("The parameter must have a default value"),
             },
-        }
+            HelpMessages::SuggestMakingParameterPositionalOnly {
+                ty,
+                protocol,
+                declaring_protocol_name,
+                method_name,
+                parameter_name,
+            } => {
+                let settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, [*ty, *protocol]);
+                write!(
+                    f,
+                    "`{source}` might be {relation} `{target}` \
+                    if the parameter `{parameter_name}` were made positional-only \
+                    in `{declaring_protocol_name}.{method_name}`",
+                    source = ty.display_with(db, env, settings.clone()),
+                    relation = relation.description(),
+                    target = protocol.display_with(db, env, settings),
+                )
+            }
+        })
     }
 }
 
@@ -584,12 +624,38 @@ impl<'db> ErrorContextNode<'db> {
         env: &ProgramEnvironment<'db>,
         relation: TypeRelation,
         output_lines: &mut Vec<String>,
-        help_messages: &mut FxOrderSet<HelpMessages>,
+        help_messages: &mut FxOrderSet<HelpMessages<'db>>,
         prefix: &str,
         continuation: &str,
     ) {
         if let Some(line) = self.context.render(db, env, relation, help_messages) {
             output_lines.push(format!("{prefix}{line}"));
+        }
+
+        if let ErrorContext::TypeNotCompatibleWithProtocol { ty, protocol } = &self.context
+            && let Type::ProtocolInstance(proto_instance) = protocol
+            && let [single_child] = self.children.as_slice()
+            && let ErrorContext::ProtocolMemberIncompatible { member_name } = &single_child.context
+            && let [single_grandchild] = single_child.children.as_slice()
+            && let ErrorContext::ParameterNameMismatch { target_name, .. }
+            | ErrorContext::ParameterMustAcceptKeywordArguments { target_name, .. } =
+                &single_grandchild.context
+            && let Some(protocol_member) =
+                proto_instance.interface(db).member_by_name(db, member_name)
+            && let Some(definition) = protocol_member.definition()
+            && let Some(declaring_protocol) = nearest_enclosing_class(
+                db,
+                semantic_index(db, definition.program_file(db)),
+                definition.scope(db),
+            )
+        {
+            help_messages.insert(HelpMessages::SuggestMakingParameterPositionalOnly {
+                ty: *ty,
+                protocol: *protocol,
+                declaring_protocol_name: declaring_protocol.name(db),
+                method_name: member_name.clone(),
+                parameter_name: target_name.clone(),
+            });
         }
 
         let num_children = self.children.len();
@@ -722,7 +788,7 @@ impl<'db> ErrorContextTree<'db> {
             diag.info(line);
         }
         for help_message in help_messages {
-            diag.help(help_message.to_string());
+            diag.help(help_message.display(db, env, self.relation));
         }
     }
 }
