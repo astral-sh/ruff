@@ -392,6 +392,105 @@ reveal_type(simple(variadic2))  # revealed: tuple[Unknown, ...]
 reveal_type(simple(keyword_only))  # revealed: tuple[Unknown, ...]
 ```
 
+### Callable inference through invariant and contravariant wrappers
+
+An unpacked `TypeVarTuple` keeps its precise inferred parameter types when a callable or callable
+protocol is nested inside an invariant or contravariant wrapper.
+
+```py
+from typing import Callable, Protocol
+
+class Invariant[T]:
+    def __init__(self, callback: T) -> None: ...
+    callback: T
+
+class Contravariant[T]:
+    def __init__(self, callback: T) -> None: ...
+    def put(self, callback: T) -> None: ...
+
+def invariant[*Ts](wrapper: Invariant[Callable[[*Ts], None]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def contravariant[*Ts](wrapper: Contravariant[Callable[[*Ts], None]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def callback(first: object, value: str) -> None: ...
+
+reveal_type(invariant(Invariant(callback)))  # revealed: tuple[object, str]
+reveal_type(contravariant(Contravariant(callback)))  # revealed: tuple[object, str]
+```
+
+A callable protocol preserves the same inferred parameters through both wrapper variances.
+
+```py
+class Callback[*Ts](Protocol):
+    def __call__(self, *args: *Ts) -> None: ...
+
+def invariant_protocol[*Ts](wrapper: Invariant[Callback[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def contravariant_protocol[*Ts](wrapper: Contravariant[Callback[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+reveal_type(invariant_protocol(Invariant(callback)))  # revealed: tuple[object, str]
+reveal_type(contravariant_protocol(Contravariant(callback)))  # revealed: tuple[object, str]
+```
+
+Separately declared protocols with equivalent variadic methods also preserve the exact inferred
+tuple under both wrapper variances.
+
+```py
+class Target[*Ts](Protocol):
+    def call(self, *args: *Ts) -> None: ...
+
+class Actual[*Ts](Protocol):
+    def call(self, *args: *Ts) -> None: ...
+
+def invariant_structural[*Ts](wrapper: Invariant[Target[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def contravariant_structural[*Ts](wrapper: Contravariant[Target[*Ts]]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def check_structural(
+    invariant_wrapper: Invariant[Actual[str]],
+    contravariant_wrapper: Contravariant[Actual[str]],
+) -> None:
+    reveal_type(invariant_structural(invariant_wrapper))  # revealed: tuple[str]
+    reveal_type(contravariant_structural(contravariant_wrapper))  # revealed: tuple[str]
+```
+
+Unions of structurally compatible protocols retain the same tuple. Incompatible alternatives are
+rejected without widening their inferred tuple to an unknown-length tuple.
+
+```py
+class Other[*Ts](Protocol):
+    def call(self, *args: *Ts) -> None: ...
+
+def check_unions(
+    invariant_match: Invariant[Actual[str] | Other[str]],
+    contravariant_match: Contravariant[Actual[str] | Other[str]],
+    invariant_mismatch: Invariant[Actual[str] | Other[bytes]],
+    contravariant_mismatch: Contravariant[Actual[str] | Other[bytes]],
+) -> None:
+    reveal_type(invariant_structural(invariant_match))  # revealed: tuple[str]
+    reveal_type(contravariant_structural(contravariant_match))  # revealed: tuple[str]
+    # error: [invalid-argument-type]
+    reveal_type(invariant_structural(invariant_mismatch))  # revealed: tuple[()]
+    # error: [invalid-argument-type]
+    reveal_type(contravariant_structural(contravariant_mismatch))  # revealed: tuple[()]
+```
+
+A nominal class implementing the same variadic protocol retains its precise method parameter.
+
+```py
+class StringRunner:
+    def call(self, value: str) -> None: ...
+
+reveal_type(invariant_structural(Invariant(StringRunner())))  # revealed: tuple[str]
+reveal_type(contravariant_structural(Contravariant(StringRunner())))  # revealed: tuple[str]
+```
+
 ### Callable return inference
 
 An unpacked `TypeVarTuple` in a callable return type is inferred as one packed tuple, including
