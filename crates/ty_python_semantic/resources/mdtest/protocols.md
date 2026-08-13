@@ -4096,7 +4096,7 @@ class Box(Protocol[T]):
     @classmethod
     def last(cls: type[S]) -> object: ...
 
-Box.first()
+reveal_type(Box.first())  # revealed: Box[Unknown]
 ```
 
 ## Recursive protocol receiver binding with a defaulted type variable
@@ -4123,7 +4123,7 @@ class Box[T](Protocol):
     @classmethod
     def last[S = int](cls: type[S]) -> object: ...
 
-Box.first()
+reveal_type(Box.first())  # revealed: Box[Unknown]
 ```
 
 ## Subtyping of protocols with generic method members
